@@ -6,7 +6,7 @@ export default async function JobsPage() {
 
   const { data: jobs, error } = await supabase
     .from("jobs")
-    .select("id, title, city, status, scheduled_date, created_at")
+    .select("id, title, city, status, scheduled_date, created_at, customer_first_name, customer_last_name, job_notes")
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -56,6 +56,18 @@ export default async function JobsPage() {
               <div className="font-medium">{job.title}</div>
               <div className="text-sm text-gray-600">
                 {job.city ?? "—"} • {job.status ?? "—"}
+                      {(job.customer_first_name || job.customer_last_name) ? (
+                <div className="text-sm text-gray-600">
+                  Customer: {`${job.customer_first_name ?? ""} ${job.customer_last_name ?? ""}`.trim()}
+                </div>
+              ) : null}
+
+              {job.job_notes ? (
+                <div className="text-xs text-gray-500 mt-1">
+                  Notes: {job.job_notes.length > 80 ? `${job.job_notes.slice(0, 80)}…` : job.job_notes}
+                </div>
+              ) : null}
+
               </div>
             </Link>
           ))}
