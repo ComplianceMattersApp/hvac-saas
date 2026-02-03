@@ -5,6 +5,7 @@
     updateJobScheduleFromForm,
     advanceJobStatusFromForm,
     markJobFailedFromForm,
+    updateJobCustomerFromForm,
     type JobStatus,
   } from "@/lib/actions/job-actions";
 
@@ -184,6 +185,79 @@
             </div>
           </div>
         </div>
+
+      {/* Edit Customer + Notes */}
+      <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+        <h2 className="text-sm font-semibold mb-3">Edit Customer + Notes</h2>
+
+        <form action={updateJobCustomerFromForm} className="grid gap-4">
+          <input type="hidden" name="id" value={job.id} />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">
+                First Name
+              </label>
+              <input
+                type="text"
+                name="customer_first_name"
+                defaultValue={job.customer_first_name ?? ""}
+                className="w-full border rounded px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">
+                Last Name
+              </label>
+              <input
+                type="text"
+                name="customer_last_name"
+                defaultValue={job.customer_last_name ?? ""}
+                className="w-full border rounded px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Email</label>
+              <input
+                type="email"
+                name="customer_email"
+                defaultValue={job.customer_email ?? ""}
+                className="w-full border rounded px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Phone</label>
+              <input
+                type="tel"
+                name="customer_phone"
+                defaultValue={job.customer_phone ?? ""}
+                className="w-full border rounded px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Notes</label>
+            <textarea
+              name="job_notes"
+              defaultValue={job.job_notes ?? ""}
+              rows={4}
+              className="w-full border rounded px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <button className="border rounded px-3 py-2 text-sm">
+              Save Customer Info
+            </button>
+          </div>
+        </form>
+      </div>
 
         {/* Workflow */}
         <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">

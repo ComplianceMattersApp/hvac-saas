@@ -74,6 +74,10 @@ export async function updateJob(input: {
   window_end?: string | null;
   customer_phone?: string | null;
   on_the_way_at?: string | null;
+  customer_first_name?: string | null;
+  customer_last_name?: string | null;
+  customer_email?: string | null;
+  job_notes?: string | null;
 }) {
   const supabase = await createClient();
   const { id, ...updates } = input;
@@ -267,4 +271,30 @@ export async function markJobFailedFromForm(formData: FormData) {
 
   await updateJob({ id, status: "failed" });
   redirect(`/jobs/${id}`);
+}
+/**
+ * UPDATE: used by Customer + Notes edit form on job detail page
+ */
+export async function updateJobCustomerFromForm(formData: FormData) {
+  const id = String(formData.get("id") || "").trim();
+  if (!id) throw new Error("Job ID is required");
+
+  const customer_first_name = String(formData.get("customer_first_name") || "").trim() || null;
+  const customer_last_name = String(formData.get("customer_last_name") || "").trim() || null;
+  const customer_email = String(formData.get("customer_email") || "").trim() || null;
+  const customer_phone = String(formData.get("customer_phone") || "").trim() || null;
+  const job_notes = String(formData.get("job_notes") || "").trim() || null;
+
+  await updateJob({
+    id,
+    customer_first_name,
+    customer_last_name,
+    customer_email,
+    customer_phone,
+    job_notes,
+  });
+
+  redirect(`/jobs/${id}`);
+
+  
 }
