@@ -127,6 +127,423 @@ export async function deleteJobEquipmentFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}`);
 }
 
+export async function saveEccTestOverrideFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+  const override = String(formData.get("override") || "none").trim(); // "pass" | "fail" | "none"
+  const reasonRaw = String(formData.get("override_reason") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  let override_pass: boolean | null = null;
+  let override_reason: string | null = null;
+
+  if (override === "pass") override_pass = true;
+  else if (override === "fail") override_pass = false;
+  else override_pass = null;
+
+  // Require reason if override is set
+  if (override_pass !== null) {
+    if (!reasonRaw) throw new Error("Override reason is required");
+    override_reason = reasonRaw;
+  } else {
+    override_reason = null;
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      override_pass,
+      override_reason,
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  revalidatePath(`/jobs/${jobId}`);
+}
+
+
+export async function addEccTestRunFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testType = String(formData.get("test_type") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testType) throw new Error("Missing test_type");
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("ecc_test_runs").insert({
+    job_id: jobId,
+    test_type: testType,
+    data: {},
+    computed: {},
+    computed_pass: null,
+    override_pass: null,
+    override_reason: null,
+  });
+
+  if (error) throw error;
+
+  revalidatePath(`/jobs/${jobId}`);
+}
+
+export async function deleteEccTestRunFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .delete()
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  revalidatePath(`/jobs/${jobId}`);
+}
+
+export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  const num = (key: string) => {
+    const raw = String(formData.get(key) || "").trim();
+    if (!raw) return null;
+    const val = Number(raw);
+    return Number.isFinite(val) ? val : null;
+  };
+
+  const data = {
+    // CHEERS F2
+    lowest_return_air_db_f: num("lowest_return_air_db_f"),
+    condenser_air_entering_db_f: num("condenser_air_entering_db_f"),
+    liquid_line_temp_f: num("liquid_line_temp_f"),
+    liquid_line_pressure_psig: num("liquid_line_pressure_psig"),
+    condenser_sat_temp_f: num("condenser_sat_temp_f"),
+    target_subcool_f: num("target_subcool_f"),
+
+    // CHEERS G
+    suction_line_temp_f: num("suction_line_temp_f"),
+    suction_line_pressure_psig: num("suction_line_pressure_psig"),
+    evaporator_sat_temp_f: num("evaporator_sat_temp_f"),
+
+    // Your workflow extras
+    outdoor_temp_f: num("outdoor_temp_f"),
+    refrigerant_type: String(formData.get("refrigerant_type") || "").trim() || null,
+    filter_drier_installed: formData.get("filter_drier_installed") === "on",
+    notes: String(formData.get("notes") || "").trim() || null,
+  };
+
+  const measuredSubcool =
+  data.condenser_sat_temp_f != null && data.liquid_line_temp_f != null
+    ? data.condenser_sat_temp_f - data.liquid_line_temp_f
+    : null;
+
+const measuredSuperheat =
+  data.suction_line_temp_f != null && data.evaporator_sat_temp_f != null
+    ? data.suction_line_temp_f - data.evaporator_sat_temp_f
+    : null;
+
+const subcoolDelta =
+  measuredSubcool != null && data.target_subcool_f != null
+    ? measuredSubcool - data.target_subcool_f
+    : null;
+
+
+ // Rules (your current spec)
+  const rules = {
+    
+    indoor_min_f: 70,  // we will use lowest_return_air_db_f as indoor proxy
+    outdoor_min_f: 55,
+    subcool_tolerance_f: 2,
+    superheat_max_f: 25,
+    filter_drier_required: true,
+  };
+
+  const failures: string[] = [];
+  const warnings: string[] = [];
+  const blocked: string[] = [];
+
+
+
+  // Temperature gating (doesn't block saving; affects computed_pass)
+  if (data.lowest_return_air_db_f != null && data.lowest_return_air_db_f < rules.indoor_min_f) {
+  blocked.push(`Indoor temp below ${rules.indoor_min_f}F`);
+} else if (data.lowest_return_air_db_f == null) {
+  warnings.push("Missing lowest return air dry bulb");
+}
+
+if (data.outdoor_temp_f != null && data.outdoor_temp_f < rules.outdoor_min_f) {
+  blocked.push(`Outdoor temp below ${rules.outdoor_min_f}F`);
+} else if (data.outdoor_temp_f == null) {
+  warnings.push("Missing outdoor temp");
+}
+
+  // Filter drier required
+  if (rules.filter_drier_required && !data.filter_drier_installed) {
+    failures.push("Filter drier not confirmed");
+  }
+
+  // Superheat rule
+  if (measuredSuperheat != null) {
+    if (measuredSuperheat >= rules.superheat_max_f) {
+      failures.push(`Superheat >= ${rules.superheat_max_f}F`);
+    }
+  } else {
+    warnings.push("Missing superheat inputs");
+  }
+
+  // Subcool rule (needs target)
+  if (data.target_subcool_f == null) {
+    warnings.push("Missing target subcool");
+  }
+  if (measuredSubcool != null && data.target_subcool_f != null) {
+    if (Math.abs(measuredSubcool - data.target_subcool_f) > rules.subcool_tolerance_f) {
+      failures.push(`Subcool not within ±${rules.subcool_tolerance_f}F of target`);
+    }
+  } else {
+    warnings.push("Missing subcool inputs");
+  }
+
+  // Decide computed_pass
+  // If we don't have enough to compute meaningfully, keep null.
+  const hasCoreCompute =
+    measuredSubcool != null &&
+    measuredSuperheat != null &&
+    data.target_subcool_f != null;
+
+  const isBlocked = blocked.length > 0;
+  const computedPass = isBlocked ? null : hasCoreCompute ? failures.length === 0 : null;
+
+  const computed = {
+  status: isBlocked ? "blocked" : "computed",
+  blocked,
+  measured_subcool_f: measuredSubcool,
+  measured_superheat_f: measuredSuperheat,
+  subcool_delta_f: subcoolDelta,
+  rules,
+  failures,
+  warnings,
+};
+
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data,
+      computed,
+      computed_pass: computedPass,
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  revalidatePath(`/jobs/${jobId}`);
+}
+
+export async function saveAirflowDataFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+  const projectType = String(formData.get("project_type") || "").trim(); // "alteration" | "all_new"
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  const num = (key: string) => {
+    const raw = String(formData.get(key) || "").trim();
+    if (!raw) return null;
+    const val = Number(raw);
+    return Number.isFinite(val) ? val : null;
+  };
+
+  const measuredTotalCfm = num("measured_total_cfm");
+  const tonnage = num("tonnage");
+
+  const cfmPerTon = projectType === "all_new" ? 350 : 300;
+
+  const requiredTotalCfm =
+    tonnage != null ? tonnage * cfmPerTon : null;
+
+  const failures: string[] = [];
+  const warnings: string[] = [];
+
+  if (tonnage == null) warnings.push("Missing tonnage");
+  if (measuredTotalCfm == null) warnings.push("Missing measured total airflow");
+
+  let computedPass: boolean | null = null;
+
+  if (measuredTotalCfm != null && requiredTotalCfm != null) {
+    if (measuredTotalCfm < requiredTotalCfm) {
+      failures.push(`Airflow below required (${requiredTotalCfm} CFM)`);
+      computedPass = false;
+    } else {
+      computedPass = true;
+    }
+  } else {
+    computedPass = null; // not enough inputs
+  }
+
+  const data = {
+    measured_total_cfm: measuredTotalCfm,
+    tonnage,
+    cfm_per_ton_required: cfmPerTon,
+    notes: String(formData.get("notes") || "").trim() || null,
+  };
+
+  const computed = {
+    cfm_per_ton_required: cfmPerTon,
+    required_total_cfm: requiredTotalCfm,
+    measured_total_cfm: measuredTotalCfm,
+    failures,
+    warnings,
+  };
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data,
+      computed,
+      computed_pass: computedPass,
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  revalidatePath(`/jobs/${jobId}`);
+}
+
+export async function saveDuctLeakageDataFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+  const projectType = String(formData.get("project_type") || "").trim(); // "alteration" | "all_new"
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  const num = (key: string) => {
+    const raw = String(formData.get(key) || "").trim();
+    if (!raw) return null;
+    const val = Number(raw);
+    return Number.isFinite(val) ? val : null;
+  };
+
+  const measuredLeakageCfm = num("measured_duct_leakage_cfm");
+  const tonnage = num("tonnage");
+
+  const leakagePerTonMax = projectType === "all_new" ? 20 : 40; // CFM per ton max
+  const maxLeakageCfm = tonnage != null ? tonnage * leakagePerTonMax : null;
+
+  const failures: string[] = [];
+  const warnings: string[] = [];
+
+  if (tonnage == null) warnings.push("Missing tonnage");
+  if (measuredLeakageCfm == null) warnings.push("Missing measured duct leakage");
+
+  let computedPass: boolean | null = null;
+
+  if (measuredLeakageCfm != null && maxLeakageCfm != null) {
+    if (measuredLeakageCfm > maxLeakageCfm) {
+      failures.push(`Duct leakage above max (${maxLeakageCfm} CFM)`);
+      computedPass = false;
+    } else {
+      computedPass = true;
+    }
+  } else {
+    computedPass = null;
+  }
+
+  const data = {
+    measured_duct_leakage_cfm: measuredLeakageCfm,
+    tonnage,
+    max_cfm_per_ton: leakagePerTonMax,
+    notes: String(formData.get("notes") || "").trim() || null,
+  };
+
+  const computed = {
+    max_cfm_per_ton: leakagePerTonMax,
+    max_leakage_cfm: maxLeakageCfm,
+    measured_duct_leakage_cfm: measuredLeakageCfm,
+    failures,
+    warnings,
+  };
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data,
+      computed,
+      computed_pass: computedPass,
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  revalidatePath(`/jobs/${jobId}`);
+}
+
+export async function addAlterationCoreTestsFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  if (!jobId) throw new Error("Missing job_id");
+
+  const supabase = await createClient();
+
+  // Find existing tests for this job
+  const { data: existing, error: existingError } = await supabase
+    .from("ecc_test_runs")
+    .select("test_type")
+    .eq("job_id", jobId);
+
+  if (existingError) throw existingError;
+
+  const existingSet = new Set((existing ?? []).map((r: any) => r.test_type));
+
+  const required = ["duct_leakage", "airflow", "refrigerant_charge"];
+
+  const toInsert = required
+    .filter((t) => !existingSet.has(t))
+    .map((test_type) => ({
+      job_id: jobId,
+      test_type,
+      data: {},
+      computed: {},
+      computed_pass: null,
+      override_pass: null,
+      override_reason: null,
+    }));
+
+  if (toInsert.length > 0) {
+    const { error: insertError } = await supabase
+      .from("ecc_test_runs")
+      .insert(toInsert);
+
+    if (insertError) throw insertError;
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+}
+
 
 export async function createJob(input: CreateJobInput) {
   const supabase = await createClient();
