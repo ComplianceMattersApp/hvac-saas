@@ -177,6 +177,11 @@ export default function NewJobPage() {
 
         {/* Workflow-first: status is always Open at creation */}
         <input type="hidden" name="status" value="open" />
+        <input type="hidden" name="job_type" value="ecc" />
+        <input type="hidden" name="job_type" value="ecc" />
+        <input type="hidden" name="project_type" value="alteration" />
+
+
 
         <div className="pt-4">
           <button

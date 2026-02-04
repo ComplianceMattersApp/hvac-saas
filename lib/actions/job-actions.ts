@@ -2,6 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+
 
 export type JobStatus =
   | "open"
@@ -12,6 +14,8 @@ export type JobStatus =
   | "cancelled";
 
 type CreateJobInput = {
+  job_type?: string | null;
+  project_type?: string | null;
   title: string;
   city: string;
   scheduled_date: string;
@@ -25,15 +29,113 @@ type CreateJobInput = {
   customer_last_name?: string | null;
   customer_email?: string | null;
   job_notes?: string | null;
+  job_type?: string | null;
 
 
 };
+
+export async function addJobEquipmentFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const equipmentRole = String(formData.get("equipment_role") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!equipmentRole) throw new Error("Missing equipment_role");
+
+  const manufacturer = String(formData.get("manufacturer") || "").trim() || null;
+  const model = String(formData.get("model") || "").trim() || null;
+  const serial = String(formData.get("serial") || "").trim() || null;
+
+  const tonnageRaw = String(formData.get("tonnage") || "").trim();
+  const tonnage = tonnageRaw ? Number(tonnageRaw) : null;
+
+  const refrigerantType = String(formData.get("refrigerant_type") || "").trim() || null;
+  const notes = String(formData.get("notes") || "").trim() || null;
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("job_equipment").insert({
+    job_id: jobId,
+    equipment_role: equipmentRole,
+    manufacturer,
+    model,
+    serial,
+    tonnage,
+    refrigerant_type: refrigerantType,
+    notes,
+  });
+
+  if (error) throw error;
+
+  revalidatePath(`/jobs/${jobId}`);
+}
+
+export async function updateJobEquipmentFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const equipmentId = String(formData.get("equipment_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!equipmentId) throw new Error("Missing equipment_id");
+
+  const equipmentRole = String(formData.get("equipment_role") || "").trim() || null;
+  const manufacturer = String(formData.get("manufacturer") || "").trim() || null;
+  const model = String(formData.get("model") || "").trim() || null;
+  const serial = String(formData.get("serial") || "").trim() || null;
+
+  const tonnageRaw = String(formData.get("tonnage") || "").trim();
+  const tonnage = tonnageRaw ? Number(tonnageRaw) : null;
+
+  const refrigerantType = String(formData.get("refrigerant_type") || "").trim() || null;
+  const notes = String(formData.get("notes") || "").trim() || null;
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("job_equipment")
+    .update({
+      equipment_role: equipmentRole,
+      manufacturer,
+      model,
+      serial,
+      tonnage,
+      refrigerant_type: refrigerantType,
+      notes,
+    })
+    .eq("id", equipmentId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  revalidatePath(`/jobs/${jobId}`);
+}
+
+export async function deleteJobEquipmentFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const equipmentId = String(formData.get("equipment_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!equipmentId) throw new Error("Missing equipment_id");
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("job_equipment")
+    .delete()
+    .eq("id", equipmentId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  revalidatePath(`/jobs/${jobId}`);
+}
 
 
 export async function createJob(input: CreateJobInput) {
   const supabase = await createClient();
 
   const payload = {
+    job_type: input.job_type ?? "ecc",
+    project_type: input.project_type ?? "alteration",
+
     title: input.title,
     city: input.city,
     scheduled_date: input.scheduled_date,
@@ -48,6 +150,9 @@ export async function createJob(input: CreateJobInput) {
     customer_last_name: input.customer_last_name ?? null,
     customer_email: input.customer_email ?? null,
     job_notes: input.job_notes ?? null,
+
+    job_type: input.job_type ?? "ecc",
+
   };
 
 
@@ -97,6 +202,10 @@ export async function updateJob(input: {
  * CREATE: used by /jobs/new form
  */
 export async function createJobFromForm(formData: FormData) {
+
+  const jobType = String(formData.get("job_type") || "ecc").trim();
+  const projectType = String(formData.get("project_type") || "alteration").trim();
+
   const title = String(formData.get("title") || "").trim();
   const city = String(formData.get("city") || "").trim();
   const customerPhoneRaw = String(formData.get("customer_phone") || "").trim();
@@ -135,6 +244,9 @@ export async function createJobFromForm(formData: FormData) {
   }
 
   const created = await createJob({
+    job_type: jobType,
+    project_type: projectType,
+
     customer_first_name: customerFirstNameRaw || null,
     customer_last_name: customerLastNameRaw || null,
     customer_email: customerEmailRaw || null,
@@ -228,6 +340,27 @@ export async function updateJobStatusQuick(input: { id: string; status: JobStatu
   await updateJob({ id: input.id, status: input.status });
   return { ok: true };
 }
+
+export async function updateJobProfileFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  if (!jobId) throw new Error("Missing job_id");
+
+  const jobType = String(formData.get("job_type") || "ecc").trim();
+  const projectType = String(formData.get("project_type") || "alteration").trim();
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("jobs")
+    .update({
+      job_type: jobType,
+      project_type: projectType,
+    })
+    .eq("id", jobId);
+
+  if (error) throw error;
+}
+
 export async function updateJobScheduleFromForm(formData: FormData) {
   const id = String(formData.get("id") || "").trim();
 

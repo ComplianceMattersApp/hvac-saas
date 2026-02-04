@@ -1,11 +1,16 @@
 
+
   import { createClient } from "@/lib/supabase/server";
   import { notFound } from "next/navigation";
   import {
+    addJobEquipmentFromForm,
+    deleteJobEquipmentFromForm,
     updateJobScheduleFromForm,
     advanceJobStatusFromForm,
     markJobFailedFromForm,
     updateJobCustomerFromForm,
+    updateJobProfileFromForm,
+    updateJobEquipmentFromForm,
     type JobStatus,
   } from "@/lib/actions/job-actions";
 
@@ -59,15 +64,47 @@
 
     const supabase = await createClient();
 
-    const { data: job, error: jobError } = await supabase
-      .from("jobs")
-      .select(
-        "id, title, city, status, scheduled_date, created_at, contractor_id, permit_number, window_start, window_end, customer_phone, on_the_way_at, customer_first_name, customer_last_name, customer_email, job_notes"
-      )
-      .eq("id", id)
-      .single();
+const { data: job, error: jobError } = await supabase
+  .from("jobs")
+  .select(`
+    job_type,
+    project_type,
+    id,
+    title,
+    city,
+    status,
+    scheduled_date,
+    created_at,
+    contractor_id,
+    permit_number,
+    window_start,
+    window_end,
+    customer_phone,
+    on_the_way_at,
+    customer_first_name,
+    customer_last_name,
+    customer_email,
+    job_notes,
+    job_equipment (
+      id,
+      equipment_role,
+      manufacturer,
+      model,
+      serial,
+      tonnage,
+      refrigerant_type,
+      notes,
+      created_at,
+      updated_at
+    )
+  `)
+  .eq("id", id)
+  .single();
+
+      
 
     if (jobError || !job) return notFound();
+
 
     let contractorName: string | null = null;
 
@@ -258,6 +295,318 @@
           </div>
         </form>
       </div>
+
+      <section className="rounded-lg border p-4">
+  <h2 className="text-lg font-semibold">Equipment</h2>
+  <p className="text-sm text-muted-foreground">
+    Add the equipment tied to this job. You can add multiple systems if needed.
+  </p>
+
+  {/* Add Equipment */}
+  <form action={addJobEquipmentFromForm} className="mt-4 grid gap-3">
+    <input type="hidden" name="job_id" value={job.id} />
+
+    <div className="grid gap-1">
+      <label className="text-sm font-medium" htmlFor="equipment_role">
+        Equipment Role
+      </label>
+      <select
+        id="equipment_role"
+        name="equipment_role"
+        className="w-full rounded-md border px-3 py-2"
+        defaultValue="outdoor_unit"
+        required
+      >
+        <option value="outdoor_unit">Outdoor Unit</option>
+        <option value="indoor_unit">Indoor Unit / Coil</option>
+        <option value="air_handler">Air Handler</option>
+        <option value="furnace">Furnace</option>
+        <option value="heat_pump">Heat Pump</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid gap-1">
+        <label className="text-sm font-medium" htmlFor="manufacturer">
+          Manufacturer (optional)
+        </label>
+        <input
+          id="manufacturer"
+          name="manufacturer"
+          className="w-full rounded-md border px-3 py-2"
+          placeholder="York"
+        />
+      </div>
+
+      <div className="grid gap-1">
+        <label className="text-sm font-medium" htmlFor="model">
+          Model (optional)
+        </label>
+        <input
+          id="model"
+          name="model"
+          className="w-full rounded-md border px-3 py-2"
+          placeholder="Model #"
+        />
+      </div>
+
+      <div className="grid gap-1">
+        <label className="text-sm font-medium" htmlFor="serial">
+          Serial (optional)
+        </label>
+        <input
+          id="serial"
+          name="serial"
+          className="w-full rounded-md border px-3 py-2"
+          placeholder="Serial #"
+        />
+      </div>
+
+      <div className="grid gap-1">
+        <label className="text-sm font-medium" htmlFor="tonnage">
+          Tonnage (optional)
+        </label>
+        <input
+          id="tonnage"
+          name="tonnage"
+          type="number"
+          step="0.5"
+          min="0"
+          className="w-full rounded-md border px-3 py-2"
+          placeholder="5"
+        />
+      </div>
+
+<div className="grid gap-1">
+  <label className="text-sm font-medium" htmlFor="refrigerant_type">
+    Refrigerant (optional)
+  </label>
+  <select
+    id="refrigerant_type"
+    name="refrigerant_type"
+    className="w-full rounded-md border px-3 py-2"
+    defaultValue=""
+  >
+    <option value="">Select refrigerant</option>
+    <option value="R-410A">R-410A</option>
+    <option value="R-32">R-32</option>
+    <option value="R-454B">R-454B</option>
+    <option value="R-22">R-22</option>
+    <option value="Other">Other</option>
+  </select>
+</div>
+
+
+      <div className="grid gap-1 sm:col-span-2">
+        <label className="text-sm font-medium" htmlFor="notes">
+          Notes (optional)
+        </label>
+        <input
+          id="notes"
+          name="notes"
+          className="w-full rounded-md border px-3 py-2"
+          placeholder="Any extra details..."
+        />
+      </div>
+    </div>
+
+    <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
+      Add Equipment
+    </button>
+  </form>
+
+  {/* Existing Equipment List */}
+  <div className="mt-6 space-y-3">
+    {job.job_equipment && job.job_equipment.length > 0 ? (
+      job.job_equipment.map((eq: any) => (
+        <div key={eq.id} className="rounded-md border p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="font-medium">
+                {eq.equipment_role?.replaceAll("_", " ") || "equipment"}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {[eq.manufacturer, eq.model].filter(Boolean).join(" ") || "No make/model yet"}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {eq.tonnage ? `${eq.tonnage} ton` : null}
+                {eq.tonnage && eq.refrigerant_type ? " • " : null}
+                {eq.refrigerant_type || null}
+              </div>
+              {eq.serial ? (
+                <div className="text-sm text-muted-foreground">Serial: {eq.serial}</div>
+              ) : null}
+              {eq.notes ? (
+                <div className="mt-2 text-sm">{eq.notes}</div>
+              ) : null}
+            </div>
+<form action={updateJobEquipmentFromForm} className="mt-3 grid gap-3 border-t pt-3">
+  <input type="hidden" name="job_id" value={job.id} />
+  <input type="hidden" name="equipment_id" value={eq.id} />
+
+  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="grid gap-1">
+      <label className="text-sm font-medium" htmlFor={`role-${eq.id}`}>
+        Equipment Role
+      </label>
+      <select
+        id={`role-${eq.id}`}
+        name="equipment_role"
+        defaultValue={eq.equipment_role ?? "outdoor_unit"}
+        className="w-full rounded-md border px-3 py-2"
+        required
+      >
+        <option value="outdoor_unit">Outdoor Unit</option>
+        <option value="indoor_unit">Indoor Unit / Coil</option>
+        <option value="air_handler">Air Handler</option>
+        <option value="furnace">Furnace</option>
+        <option value="heat_pump">Heat Pump</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+
+    <div className="grid gap-1">
+      <label className="text-sm font-medium" htmlFor={`mfr-${eq.id}`}>
+        Manufacturer
+      </label>
+      <input
+        id={`mfr-${eq.id}`}
+        name="manufacturer"
+        defaultValue={eq.manufacturer ?? ""}
+        className="w-full rounded-md border px-3 py-2"
+      />
+    </div>
+
+    <div className="grid gap-1">
+      <label className="text-sm font-medium" htmlFor={`model-${eq.id}`}>
+        Model
+      </label>
+      <input
+        id={`model-${eq.id}`}
+        name="model"
+        defaultValue={eq.model ?? ""}
+        className="w-full rounded-md border px-3 py-2"
+      />
+    </div>
+
+    <div className="grid gap-1">
+      <label className="text-sm font-medium" htmlFor={`serial-${eq.id}`}>
+        Serial
+      </label>
+      <input
+        id={`serial-${eq.id}`}
+        name="serial"
+        defaultValue={eq.serial ?? ""}
+        className="w-full rounded-md border px-3 py-2"
+      />
+    </div>
+
+    <div className="grid gap-1">
+      <label className="text-sm font-medium" htmlFor={`ton-${eq.id}`}>
+        Tonnage
+      </label>
+      <input
+        id={`ton-${eq.id}`}
+        name="tonnage"
+        type="number"
+        step="0.5"
+        min="0"
+        defaultValue={eq.tonnage ?? ""}
+        className="w-full rounded-md border px-3 py-2"
+      />
+    </div>
+
+    <div className="grid gap-1">
+      <label className="text-sm font-medium" htmlFor={`ref-${eq.id}`}>
+        Refrigerant
+      </label>
+      <select
+        id={`ref-${eq.id}`}
+        name="refrigerant_type"
+        defaultValue={eq.refrigerant_type ?? ""}
+        className="w-full rounded-md border px-3 py-2"
+      >
+        <option value="">Select refrigerant</option>
+        <option value="R-410A">R-410A</option>
+        <option value="R-32">R-32</option>
+        <option value="R-454B">R-454B</option>
+        <option value="R-22">R-22</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <div className="grid gap-1 sm:col-span-2">
+      <label className="text-sm font-medium" htmlFor={`notes-${eq.id}`}>
+        Notes
+      </label>
+      <input
+        id={`notes-${eq.id}`}
+        name="notes"
+        defaultValue={eq.notes ?? ""}
+        className="w-full rounded-md border px-3 py-2"
+      />
+    </div>
+  </div>
+
+  <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
+    Save Changes
+  </button>
+</form>
+
+            <form action={deleteJobEquipmentFromForm}>
+              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="equipment_id" value={eq.id} />
+              <button
+                type="submit"
+                className="rounded-md border px-3 py-1 text-sm"
+              >
+                Delete
+              </button>
+            </form>
+          </div>
+        </div>
+      ))
+    ) : (
+      <div className="rounded-md border p-3 text-sm text-muted-foreground">
+        No equipment added yet.
+      </div>
+    )}
+  </div>
+</section>
+
+
+      <section className="rounded-lg border p-4">
+  <h2 className="text-lg font-semibold">ECC Profile</h2>
+  <p className="text-sm text-muted-foreground">
+    Controls which ECC tests and equipment requirements apply to this job.
+  </p>
+
+  <form action={updateJobProfileFromForm} className="mt-3 space-y-3">
+    <input type="hidden" name="job_id" value={job.id} />
+    <input type="hidden" name="job_type" value={job.job_type ?? "ecc"} />
+
+    <div className="space-y-1">
+      <label className="text-sm font-medium" htmlFor="project_type">
+        Project Type
+      </label>
+      <select
+        id="project_type"
+        name="project_type"
+        defaultValue={job.project_type ?? "alteration"}
+        className="w-full rounded-md border px-3 py-2"
+      >
+        <option value="alteration">Alteration</option>
+        <option value="all_new">All New</option>
+      </select>
+    </div>
+
+    <button type="submit" className="rounded-md bg-black px-4 py-2 text-white">
+      Save ECC Profile
+    </button>
+  </form>
+</section>
+
 
         {/* Workflow */}
         <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
