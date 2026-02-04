@@ -16,6 +16,7 @@ export type JobStatus =
 type CreateJobInput = {
   job_type?: string | null;
   project_type?: string | null;
+
   title: string;
   city: string;
   scheduled_date: string;
@@ -29,8 +30,6 @@ type CreateJobInput = {
   customer_last_name?: string | null;
   customer_email?: string | null;
   job_notes?: string | null;
-  job_type?: string | null;
-
 
 };
 
@@ -151,7 +150,6 @@ export async function createJob(input: CreateJobInput) {
     customer_email: input.customer_email ?? null,
     job_notes: input.job_notes ?? null,
 
-    job_type: input.job_type ?? "ecc",
 
   };
 
