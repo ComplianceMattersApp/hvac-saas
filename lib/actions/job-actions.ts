@@ -14,6 +14,8 @@ export type JobStatus =
   | "cancelled";
 
 type CreateJobInput = {
+
+  job_address: "TEST ADDRESS",
   job_type?: string | null;
   project_type?: string | null;
 
@@ -30,6 +32,8 @@ type CreateJobInput = {
   customer_last_name?: string | null;
   customer_email?: string | null;
   job_notes?: string | null;
+  job_address?: string | null;
+
 
 };
 
@@ -553,6 +557,7 @@ export async function createJob(input: CreateJobInput) {
     project_type: input.project_type ?? "alteration",
 
     title: input.title,
+    job_address: input.job_address ?? null,
     city: input.city,
     scheduled_date: input.scheduled_date,
     status: input.status,
@@ -574,7 +579,7 @@ export async function createJob(input: CreateJobInput) {
   const { data, error } = await supabase
     .from("jobs")
     .insert(payload)
-    .select("id, permit_number, window_start, window_end, customer_first_name, customer_last_name, customer_email, job_notes")
+    .select("id, permit_number, window_start, window_end, customer_first_name, customer_last_name, customer_email, job_notes, job_address")
 
     .single();
 
@@ -630,6 +635,8 @@ export async function createJobFromForm(formData: FormData) {
   const customerLastNameRaw = String(formData.get("customer_last_name") || "").trim();
   const customerEmailRaw = String(formData.get("customer_email") || "").trim();
   const jobNotesRaw = String(formData.get("job_notes") || "").trim();
+  const jobAddressRaw = String(formData.get("job_address") || "").trim();
+
 
   const windowStartTime = String(formData.get("window_start") || "").trim(); // HH:MM
   const windowEndTime = String(formData.get("window_end") || "").trim(); // HH:MM
@@ -659,8 +666,10 @@ export async function createJobFromForm(formData: FormData) {
   }
 
   const created = await createJob({
+    
     job_type: jobType,
     project_type: projectType,
+    job_address: jobAddressRaw || null,
 
     customer_first_name: customerFirstNameRaw || null,
     customer_last_name: customerLastNameRaw || null,

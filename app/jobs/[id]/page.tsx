@@ -88,6 +88,7 @@ const { data: job, error: jobError } = await supabase
     id,
     title,
     city,
+    job_address,
     status,
     scheduled_date,
     created_at,
@@ -163,17 +164,24 @@ if (jobError || !job) return notFound();
         {/* Summary */}
         <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
           <div className="grid gap-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Status</span>
-              <span className="font-medium">{formatStatus(job.status)}</span>
-              {job.job_notes ? (
+            
+<div className="flex justify-between">
+  <span className="text-gray-600">Status</span>
+  <span className="font-medium">{formatStatus(job.status)}</span>
+</div>
+
+{job.job_notes ? (
   <div className="mt-4 border-t pt-4">
-    <div className="text-xs text-gray-600 mb-1">Job Notes</div>
-    <div className="text-sm whitespace-pre-wrap">{job.job_notes}</div>
+    <div className="text-xs text-gray-600 mb-1 uppercase tracking-wide">
+      Job Notes
+    </div>
+    <div className="text-sm whitespace-pre-wrap text-gray-800">
+      {job.job_notes}
+    </div>
   </div>
 ) : null}
 
-            </div>
+
 
             <div className="flex justify-between">
               <span className="text-gray-600">Arrival Window</span>
@@ -207,6 +215,16 @@ if (jobError || !job) return notFound();
   <span className="text-gray-600">Customer Email</span>
   <span className="font-medium">{job.customer_email ?? "—"}</span>
 </div>
+
+{job.job_address ? (
+  <div className="flex justify-between">
+    <span className="text-gray-600">Address</span>
+    <span className="font-medium">{job.job_address}</span>
+  </div>
+) : null}
+
+
+
 
   <div className="flex justify-between">
     <span className="text-gray-600">On The Way At</span>

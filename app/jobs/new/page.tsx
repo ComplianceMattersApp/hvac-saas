@@ -3,9 +3,12 @@
 import { useState } from "react";
 import { createJobFromForm } from "@/lib/actions";
 
+
 export default function NewJobPage() {
   const [windowStart, setWindowStart] = useState("");
   const [windowEnd, setWindowEnd] = useState("");
+  const [jobAddress, setJobAddress] = useState('');
+
 
   function onQuickWindowChange(value: string) {
     if (!value) return;
@@ -82,6 +85,19 @@ export default function NewJobPage() {
             />
           </div>
         </div>
+
+      <div className="space-y-2">
+  <label className="text-sm font-medium">Address (optional)</label>
+<input
+  type="text"
+  name="job_address"
+  value={jobAddress}
+  onChange={(e) => setJobAddress(e.target.value)}
+  placeholder="e.g. 123 Main St"
+  className="w-full rounded-md border px-3 py-2 bg-transparent"
+/>
+</div>
+
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -178,10 +194,9 @@ export default function NewJobPage() {
         {/* Workflow-first: status is always Open at creation */}
         <input type="hidden" name="status" value="open" />
         <input type="hidden" name="job_type" value="ecc" />
-        <input type="hidden" name="job_type" value="ecc" />
         <input type="hidden" name="project_type" value="alteration" />
 
-
+       
 
         <div className="pt-4">
           <button
