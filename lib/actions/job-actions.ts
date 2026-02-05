@@ -15,7 +15,6 @@ export type JobStatus =
 
 type CreateJobInput = {
 
-  job_address: "TEST ADDRESS",
   job_type?: string | null;
   project_type?: string | null;
 
