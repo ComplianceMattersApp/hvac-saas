@@ -36,6 +36,18 @@ type CreateJobInput = {
 
 };
 
+export async function getContractors() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("contractors")
+    .select("id, name, phone, email")
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function addJobEquipmentFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const equipmentRole = String(formData.get("equipment_role") || "").trim();
@@ -214,6 +226,56 @@ export async function deleteEccTestRunFromForm(formData: FormData) {
 
   revalidatePath(`/jobs/${jobId}`);
 }
+
+export async function createContractorFromForm(formData: FormData) {
+  const name = String(formData.get("name") || "").trim();
+  const phone = String(formData.get("phone") || "").trim() || null;
+  const email = String(formData.get("email") || "").trim() || null;
+  const notes = String(formData.get("notes") || "").trim() || null;
+  const returnPath = String(formData.get("return_path") || "").trim();
+
+
+  if (!name) throw new Error("Contractor name is required");
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("contractors")
+    .insert({ name, phone, email, notes })
+    .select("id, name, phone, email")
+    .single();
+
+  if (error) throw error;
+
+  // Revalidate common views where contractors appear
+  revalidatePath("/jobs");
+  if (returnPath) revalidatePath(returnPath);
+
+  return data;
+}
+
+export async function updateJobContractorFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const contractorIdRaw = String(formData.get("contractor_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+
+  // empty string means "clear"
+  const contractor_id = contractorIdRaw ? contractorIdRaw : null;
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("jobs")
+    .update({ contractor_id })
+    .eq("id", jobId);
+
+  if (error) throw error;
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/jobs");
+}
+
 
 export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();

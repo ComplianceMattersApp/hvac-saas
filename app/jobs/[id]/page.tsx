@@ -18,6 +18,10 @@
     updateJobCustomerFromForm,
     updateJobProfileFromForm,
     updateJobEquipmentFromForm,
+    getContractors,
+    updateJobContractorFromForm,
+    createContractorFromForm,
+
     type JobStatus,
   } from "@/lib/actions/job-actions";
 
@@ -70,6 +74,8 @@
     const { id } = await params;
 
     const supabase = await createClient();
+    const contractors = await getContractors();
+
 
     function getEffectiveResultLabel(t: any) {
   if (t.override_pass === true) return "PASS (override)";
@@ -181,6 +187,76 @@ if (jobError || !job) return notFound();
   </div>
 ) : null}
 
+<div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+  <div className="text-sm font-semibold mb-3">Contractor</div>
+
+  <form action={updateJobContractorFromForm} className="flex flex-col gap-3">
+    <input type="hidden" name="job_id" value={job.id} />
+
+    <select
+      name="contractor_id"
+      defaultValue={job.contractor_id ?? ""}
+      className="w-full border rounded px-3 py-2"
+    >
+      <option value="">— Unassigned —</option>
+      {contractors.map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.name}{c.phone ? ` • ${c.phone}` : ""}{c.email ? ` • ${c.email}` : ""}
+        </option>
+      ))}
+    </select>
+
+    <div className="flex gap-2">
+      <button type="submit" className="px-3 py-2 rounded bg-blue-600 text-white">
+        Save
+      </button>
+
+      <button
+        type="submit"
+        name="contractor_id"
+        value=""
+        className="px-3 py-2 rounded border"
+      >
+        Clear
+      </button>
+    </div>
+  </form>
+</div>
+
+<div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+  <div className="text-sm font-semibold mb-3">Add Contractor</div>
+
+  <form action={createContractorFromForm} className="grid gap-3">
+    <input type="hidden" name="return_path" value={`/jobs/${job.id}`} />
+
+    <div>
+      <label className="block text-sm text-gray-600 mb-1">Name</label>
+      <input name="name" required className="w-full border rounded px-3 py-2" />
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label className="block text-sm text-gray-600 mb-1">Phone (optional)</label>
+        <input name="phone" className="w-full border rounded px-3 py-2" />
+      </div>
+      <div>
+        <label className="block text-sm text-gray-600 mb-1">Email (optional)</label>
+        <input name="email" type="email" className="w-full border rounded px-3 py-2" />
+      </div>
+    </div>
+
+    <div>
+      <label className="block text-sm text-gray-600 mb-1">Notes (optional)</label>
+      <textarea name="notes" rows={3} className="w-full border rounded px-3 py-2" />
+    </div>
+
+    <div className="flex gap-2">
+      <button type="submit" className="px-3 py-2 rounded bg-blue-600 text-white">
+        Create Contractor
+      </button>
+    </div>
+  </form>
+</div>
 
 
             <div className="flex justify-between">
