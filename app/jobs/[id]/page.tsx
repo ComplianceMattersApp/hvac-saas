@@ -154,6 +154,11 @@ if (jobError || !job) return notFound();
     const scheduledDateValue = isoToDateInput(job.scheduled_date);
     const windowStartValue = isoToTimeInput(job.window_start);
     const windowEndValue = isoToTimeInput(job.window_end);
+    const createContractorAction = async (formData: FormData) => {
+  "use server";
+  await createContractorFromForm(formData);
+};
+
 
     const isTerminal =
       job.status === "completed" ||
@@ -226,7 +231,8 @@ if (jobError || !job) return notFound();
 <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
   <div className="text-sm font-semibold mb-3">Add Contractor</div>
 
-  <form action={createContractorFromForm} className="grid gap-3">
+  <form action={createContractorAction} className="grid gap-3">
+
     <input type="hidden" name="return_path" value={`/jobs/${job.id}`} />
 
     <div>
