@@ -645,7 +645,7 @@ export async function createJob(input: CreateJobInput) {
     .single();
 
   if (error) throw error;
-  return;
+  return data;
 }
 
 export async function updateJob(input: {
