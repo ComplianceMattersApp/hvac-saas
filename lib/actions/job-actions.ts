@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
+import {
+  updateJobOpsFromForm,
+  updateJobOpsDetailsFromForm,
+} from "./job-ops-actions";
 
 export type JobStatus =
   | "open"
@@ -13,6 +17,7 @@ export type JobStatus =
   | "failed"
   | "cancelled";
 
+  
 type CreateJobInput = {
 
   job_type?: string | null;
@@ -35,6 +40,29 @@ type CreateJobInput = {
 
 
 };
+
+type OpsSnapshot = {
+  ops_status: string | null;
+  pending_info_reason: string | null;
+  follow_up_date: string | null; // keep as string for diffing
+  next_action_note: string | null;
+  action_required_by: string | null;
+};
+
+function buildOpsChanges(before: OpsSnapshot, after: OpsSnapshot) {
+  const keys = Object.keys(after) as (keyof OpsSnapshot)[];
+  const changes: Array<{ field: keyof OpsSnapshot; from: any; to: any }> = [];
+
+  for (const k of keys) {
+    const from = before[k] ?? null;
+    const to = after[k] ?? null;
+    if (from !== to) changes.push({ field: k, from, to });
+  }
+
+  return changes;
+}
+
+
 
 export async function getContractors() {
   const supabase = await createClient();
@@ -614,6 +642,7 @@ export async function createJob(input: CreateJobInput) {
   const supabase = await createClient();
 
   const payload = {
+    
     job_type: input.job_type ?? "ecc",
     project_type: input.project_type ?? "alteration",
 
@@ -687,6 +716,13 @@ export async function createJobFromForm(formData: FormData) {
   const jobType = String(formData.get("job_type") || "ecc").trim();
   const projectType = String(formData.get("project_type") || "alteration").trim();
 
+  const contractorIdRaw = formData.get("contractor_id");
+  const contractor_id =
+  typeof contractorIdRaw === "string" && contractorIdRaw.trim()
+    ? contractorIdRaw.trim()
+    : null;
+
+
   const title = String(formData.get("title") || "").trim();
   const city = String(formData.get("city") || "").trim();
   const customerPhoneRaw = String(formData.get("customer_phone") || "").trim();
@@ -741,6 +777,7 @@ export async function createJobFromForm(formData: FormData) {
     city,
     scheduled_date,
     status,
+    contractor_id,
     permit_number: permitNumberRaw ? permitNumberRaw : null,
     window_start,
     window_end,
@@ -749,6 +786,8 @@ export async function createJobFromForm(formData: FormData) {
 
   redirect(`/jobs/${created.id}`);
 }
+
+
 
 /**
  * UPDATE: used by Edit Scheduling form on job detail page
@@ -846,6 +885,8 @@ export async function updateJobProfileFromForm(formData: FormData) {
   if (error) throw error;
 }
 
+
+
 export async function updateJobScheduleFromForm(formData: FormData) {
   const id = String(formData.get("id") || "").trim();
 
@@ -916,3 +957,4 @@ export async function updateJobCustomerFromForm(formData: FormData) {
 
   
 }
+

@@ -1,1517 +1,649 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
+import { createClient } from "@/lib/supabase/server";
 
-  import { createClient } from "@/lib/supabase/server";
-  import { notFound } from "next/navigation";
-  import {
-    addAlterationCoreTestsFromForm,
-    saveDuctLeakageDataFromForm,
-    saveAirflowDataFromForm,
-    saveEccTestOverrideFromForm,
-    saveRefrigerantChargeDataFromForm,
-    deleteEccTestRunFromForm,
-    addEccTestRunFromForm,
-    addJobEquipmentFromForm,
-    deleteJobEquipmentFromForm,
-    updateJobScheduleFromForm,
-    advanceJobStatusFromForm,
-    markJobFailedFromForm,
-    updateJobCustomerFromForm,
-    updateJobProfileFromForm,
-    updateJobEquipmentFromForm,
-    getContractors,
-    updateJobContractorFromForm,
-    createContractorFromForm,
+import {
+  getContractors,
+  updateJobCustomerFromForm,
+  updateJobScheduleFromForm,
+  advanceJobStatusFromForm,
+  markJobFailedFromForm,
+  type JobStatus,
+} from "@/lib/actions/job-actions";
 
-    type JobStatus,
-  } from "@/lib/actions/job-actions";
+import {
+  updateJobOpsFromForm,
+  updateJobOpsDetailsFromForm,
+} from "@/lib/actions/job-ops-actions";
 
-  function isoToDateInput(iso?: string | null) {
-    if (!iso) return "";
-    const d = new Date(iso);
-    // scheduled_date is stored as noon Z, so this should be stable
-    return d.toISOString().slice(0, 10); // YYYY-MM-DD
-  }
+import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 
-  function isoToTimeInput(iso?: string | null) {
-    if (!iso) return "";
-    const d = new Date(iso);
-    return d.toISOString().slice(11, 16); // HH:MM (UTC-based)
-  }
-
-  function formatStatus(status?: string | null) {
-    const s = (status ?? "").toString();
-    const map: Record<JobStatus, string> = {
-      open: "Open",
-      on_the_way: "On The Way",
-      in_process: "In Process",
-      completed: "Completed",
-      failed: "Failed",
-      cancelled: "Cancelled",
-    };
-
-    // If for any reason the DB has an unexpected string, show it as-is
-    return (map as any)[s] ?? (s ? s : "—");
-  }
-
-  function nextStatusLabel(status?: string | null) {
-    const s = (status ?? "open") as JobStatus;
-    const nextMap: Record<JobStatus, string> = {
-      open: "On The Way",
-      on_the_way: "In Process",
-      in_process: "Completed",
-      completed: "Completed",
-      failed: "Failed",
-      cancelled: "Cancelled",
-    };
-    return nextMap[s] ?? "Next";
-  }
-
-  export default async function JobDetailPage({
-    params,
-  }: {
-    params: Promise<{ id: string }>;
-  }) {
-    const { id } = await params;
-
-    const supabase = await createClient();
-    const contractors = await getContractors();
-
-
-    function getEffectiveResultLabel(t: any) {
-  if (t.override_pass === true) return "PASS (override)";
-  if (t.override_pass === false) return "FAIL (override)";
-  if (t.computed?.status === "blocked") return "BLOCKED (conditions)";
-  if (t.computed_pass === true) return "PASS";
-  if (t.computed_pass === false) return "FAIL";
-  return "Not computed";
+function formatDateLAFromIso(iso: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
 }
 
-const { data: job, error: jobError } = await supabase
-  .from("jobs")
-  .select(`
-    job_type,
-    project_type,
-    id,
-    title,
-    city,
-    job_address,
-    status,
-    scheduled_date,
-    created_at,
-    contractor_id,
-    permit_number,
-    window_start,
-    window_end,
-    customer_phone,
-    on_the_way_at,
-    customer_first_name,
-    customer_last_name,
-    customer_email,
-    job_notes,
-    job_equipment (
+function formatDateTimeLAFromIso(iso: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
+function isoToDateInput(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toISOString().slice(0, 10);
+}
+
+function isoToTimeInput(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toISOString().slice(11, 16);
+}
+
+function formatStatus(status?: string | null) {
+  const s = (status ?? "").toString();
+  const map: Record<JobStatus, string> = {
+    open: "Open",
+    on_the_way: "On The Way",
+    in_process: "In Process",
+    completed: "Completed",
+    failed: "Failed",
+    cancelled: "Cancelled",
+  };
+  return (map as any)[s] ?? (s ? s : "—");
+}
+
+function nextStatusLabel(status?: string | null) {
+  const s = (status ?? "open") as JobStatus;
+  const nextMap: Record<JobStatus, string> = {
+    open: "On The Way",
+    on_the_way: "In Process",
+    in_process: "Completed",
+    completed: "Completed",
+    failed: "Failed",
+    cancelled: "Cancelled",
+  };
+  return nextMap[s] ?? "—";
+}
+
+export default async function JobDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ tab?: string }>;
+}) {
+  const { id } = await params;
+
+  const sp = searchParams ? await searchParams : {};
+  const tab = (sp?.tab ?? "info") as "info" | "ops" | "tests";
+
+  const supabase = await createClient();
+  const contractors = await getContractors();
+
+  const { data: job, error: jobError } = await supabase
+    .from("jobs")
+    .select(`
+      job_type,
+      project_type,
       id,
-      equipment_role,
-      manufacturer,
-      model,
-      serial,
-      tonnage,
-      refrigerant_type,
-      notes,
+      title,
+      city,
+      job_address,
+      status,
+      scheduled_date,
       created_at,
-      updated_at
-    ),
-    ecc_test_runs (
-      id,
-      test_type,
-      data,
-      computed,
-      computed_pass,
-      override_pass,
-      override_reason,
-      created_at,
-      updated_at
-    )
-  `)
-  .eq("id", id)
-  .single();
+      contractor_id,
+      ops_status,
+      pending_info_reason,
+      follow_up_date,
+      next_action_note,
+      action_required_by,
+      permit_number,
+      window_start,
+      window_end,
+      customer_phone,
+      on_the_way_at,
+      customer_first_name,
+      customer_last_name,
+      customer_email,
+      job_notes,
+      job_equipment (
+        id,
+        equipment_role,
+        manufacturer,
+        model,
+        serial,
+        tonnage,
+        refrigerant_type,
+        notes,
+        created_at,
+        updated_at
+      ),
+      ecc_test_runs (
+        id,
+        test_type,
+        data,
+        computed,
+        computed_pass,
+        override_pass,
+        override_reason,
+        created_at,
+        updated_at
+      )
+    `)
+    .eq("id", id)
+    .single();
 
-if (jobError || !job) return notFound();
+  if (jobError || !job) return notFound();
 
+  const { data: customerAttempts, error: attemptsErr } = await supabase
+    .from("job_events")
+    .select("created_at, meta")
+    .eq("job_id", id)
+    .eq("event_type", "customer_attempt")
+    .order("created_at", { ascending: false })
+    .limit(200);
 
+  if (attemptsErr) throw new Error(attemptsErr.message);
 
-    let contractorName: string | null = null;
+  const attemptCount = customerAttempts?.length ?? 0;
+  const lastAttemptIso =
+    customerAttempts?.[0]?.created_at ? String(customerAttempts[0].created_at) : null;
 
-    if (job.contractor_id) {
-      const { data: contractor } = await supabase
-        .from("contractors")
-        .select("name")
-        .eq("id", job.contractor_id)
-        .single();
+  const lastAttemptLabel = lastAttemptIso ? formatDateLAFromIso(lastAttemptIso) : "—";
+  const last3Attempts = (customerAttempts ?? []).slice(0, 3);
 
-      contractorName = contractor?.name ?? null;
-    }
+  const customerName = [job.customer_first_name, job.customer_last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 
-    const scheduledDateValue = isoToDateInput(job.scheduled_date);
-    const windowStartValue = isoToTimeInput(job.window_start);
-    const windowEndValue = isoToTimeInput(job.window_end);
-    const createContractorAction = async (formData: FormData) => {
-  "use server";
-  await createContractorFromForm(formData);
-};
+  const contractorName =
+    contractors?.find((c: any) => c.id === job.contractor_id)?.name ?? "—";
 
-
-    const isTerminal =
-      job.status === "completed" ||
-      job.status === "failed" ||
-      job.status === "cancelled";
-
-    return (
-      <div className="p-6 max-w-3xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold">{job.title}</h1>
-          <p className="text-sm text-gray-600">{job.city ?? "No city set"}</p>
-        </div>
-
-        {/* Summary */}
-        <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
-          <div className="grid gap-3 text-sm">
-            
-<div className="flex justify-between">
-  <span className="text-gray-600">Status</span>
-  <span className="font-medium">{formatStatus(job.status)}</span>
-</div>
-
-{job.job_notes ? (
-  <div className="mt-4 border-t pt-4">
-    <div className="text-xs text-gray-600 mb-1 uppercase tracking-wide">
-      Job Notes
-    </div>
-    <div className="text-sm whitespace-pre-wrap text-gray-800">
-      {job.job_notes}
-    </div>
-  </div>
-) : null}
-
-<div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
-  <div className="text-sm font-semibold mb-3">Contractor</div>
-
-  <form action={updateJobContractorFromForm} className="flex flex-col gap-3">
-    <input type="hidden" name="job_id" value={job.id} />
-
-    <select
-      name="contractor_id"
-      defaultValue={job.contractor_id ?? ""}
-      className="w-full border rounded px-3 py-2"
-    >
-      <option value="">— Unassigned —</option>
-      {contractors.map((c) => (
-        <option key={c.id} value={c.id}>
-          {c.name}{c.phone ? ` • ${c.phone}` : ""}{c.email ? ` • ${c.email}` : ""}
-        </option>
-      ))}
-    </select>
-
-    <div className="flex gap-2">
-      <button type="submit" className="px-3 py-2 rounded bg-blue-600 text-white">
-        Save
-      </button>
-
-      <button
-        type="submit"
-        name="contractor_id"
-        value=""
-        className="px-3 py-2 rounded border"
-      >
-        Clear
-      </button>
-    </div>
-  </form>
-</div>
-
-<div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
-  <div className="text-sm font-semibold mb-3">Add Contractor</div>
-
-  <form action={createContractorAction} className="grid gap-3">
-
-    <input type="hidden" name="return_path" value={`/jobs/${job.id}`} />
-
-    <div>
-      <label className="block text-sm text-gray-600 mb-1">Name</label>
-      <input name="name" required className="w-full border rounded px-3 py-2" />
-    </div>
-
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div>
-        <label className="block text-sm text-gray-600 mb-1">Phone (optional)</label>
-        <input name="phone" className="w-full border rounded px-3 py-2" />
-      </div>
-      <div>
-        <label className="block text-sm text-gray-600 mb-1">Email (optional)</label>
-        <input name="email" type="email" className="w-full border rounded px-3 py-2" />
-      </div>
-    </div>
-
-    <div>
-      <label className="block text-sm text-gray-600 mb-1">Notes (optional)</label>
-      <textarea name="notes" rows={3} className="w-full border rounded px-3 py-2" />
-    </div>
-
-    <div className="flex gap-2">
-      <button type="submit" className="px-3 py-2 rounded bg-blue-600 text-white">
-        Create Contractor
-      </button>
-    </div>
-  </form>
-</div>
-
-
-            <div className="flex justify-between">
-              <span className="text-gray-600">Arrival Window</span>
-              <span className="font-medium">
-                {job.window_start && job.window_end
-                  ? `${new Date(job.window_start).toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })} – ${new Date(job.window_end).toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}`
-                  : "—"}
-              </span>
-            </div>
-          <div className="flex justify-between">
-    <span className="text-gray-600">Customer Phone</span>
-    <span className="font-medium">{job.customer_phone ?? "—"}</span>
-  </div>
-
-<div className="flex justify-between">
-  <span className="text-gray-600">Customer Name</span>
-  <span className="font-medium">
-    {job.customer_first_name || job.customer_last_name
-      ? `${job.customer_first_name ?? ""} ${job.customer_last_name ?? ""}`.trim()
-      : "—"}
-  </span>
-</div>
-
-<div className="flex justify-between">
-  <span className="text-gray-600">Customer Email</span>
-  <span className="font-medium">{job.customer_email ?? "—"}</span>
-</div>
-
-{job.job_address ? (
-  <div className="flex justify-between">
-    <span className="text-gray-600">Address</span>
-    <span className="font-medium">{job.job_address}</span>
-  </div>
-) : null}
-
-
-
-
-  <div className="flex justify-between">
-    <span className="text-gray-600">On The Way At</span>
-    <span className="font-medium">
-      {job.on_the_way_at ? new Date(job.on_the_way_at).toLocaleString() : "—"}
-    </span>
-  </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Permit Number</span>
-              <span className="font-medium">{job.permit_number ?? "—"}</span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-gray-600">Scheduled Date</span>
-              <span className="font-medium">
-                {job.scheduled_date
-                  ? new Date(job.scheduled_date).toLocaleDateString()
-                  : "—"}
-              </span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-gray-600">Created</span>
-              <span className="font-medium">
-                {job.created_at ? new Date(job.created_at).toLocaleString() : "—"}
-              </span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-gray-600">Contractor</span>
-              <span className="font-medium">{contractorName ?? "—"}</span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-gray-600">Job ID</span>
-              <span className="font-mono text-xs text-gray-700 break-all">
-                {job.id}
-              </span>
-            </div>
-          </div>
-        </div>
-
-      {/* Edit Customer + Notes */}
-      <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
-        <h2 className="text-sm font-semibold mb-3">Edit Customer + Notes</h2>
-
-        <form action={updateJobCustomerFromForm} className="grid gap-4">
-          <input type="hidden" name="id" value={job.id} />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                First Name
-              </label>
-              <input
-                type="text"
-                name="customer_first_name"
-                defaultValue={job.customer_first_name ?? ""}
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                Last Name
-              </label>
-              <input
-                type="text"
-                name="customer_last_name"
-                defaultValue={job.customer_last_name ?? ""}
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Email</label>
-              <input
-                type="email"
-                name="customer_email"
-                defaultValue={job.customer_email ?? ""}
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Phone</label>
-              <input
-                type="tel"
-                name="customer_phone"
-                defaultValue={job.customer_phone ?? ""}
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-gray-600 mb-1">Notes</label>
-            <textarea
-              name="job_notes"
-              defaultValue={job.job_notes ?? ""}
-              rows={4}
-              className="w-full border rounded px-3 py-2 text-sm"
-            />
-          </div>
-
-          <div className="flex justify-end">
-            <button className="border rounded px-3 py-2 text-sm">
-              Save Customer Info
-            </button>
-          </div>
-        </form>
+  return (
+    <div className="p-6 max-w-3xl">
+      {/* Header */}
+      <div className="mb-3">
+        <h1 className="text-2xl font-semibold">{job.title}</h1>
+        <p className="text-sm text-gray-600">{job.city ?? "No city set"}</p>
       </div>
 
-      <section className="rounded-lg border p-4">
-  <h2 className="text-lg font-semibold">Equipment</h2>
-  <p className="text-sm text-muted-foreground">
-    Add the equipment tied to this job. You can add multiple systems if needed.
-  </p>
-
-  {/* Add Equipment */}
-  <form action={addJobEquipmentFromForm} className="mt-4 grid gap-3">
-    <input type="hidden" name="job_id" value={job.id} />
-
-    <div className="grid gap-1">
-      <label className="text-sm font-medium" htmlFor="equipment_role">
-        Equipment Role
-      </label>
-      <select
-        id="equipment_role"
-        name="equipment_role"
-        className="w-full rounded-md border px-3 py-2"
-        defaultValue="outdoor_unit"
-        required
-      >
-        <option value="outdoor_unit">Outdoor Unit</option>
-        <option value="indoor_unit">Indoor Unit / Coil</option>
-        <option value="air_handler">Air Handler</option>
-        <option value="furnace">Furnace</option>
-        <option value="heat_pump">Heat Pump</option>
-        <option value="other">Other</option>
-      </select>
-    </div>
-
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor="manufacturer">
-          Manufacturer (optional)
-        </label>
-        <input
-          id="manufacturer"
-          name="manufacturer"
-          className="w-full rounded-md border px-3 py-2"
-          placeholder="York"
-        />
-      </div>
-
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor="model">
-          Model (optional)
-        </label>
-        <input
-          id="model"
-          name="model"
-          className="w-full rounded-md border px-3 py-2"
-          placeholder="Model #"
-        />
-      </div>
-
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor="serial">
-          Serial (optional)
-        </label>
-        <input
-          id="serial"
-          name="serial"
-          className="w-full rounded-md border px-3 py-2"
-          placeholder="Serial #"
-        />
-      </div>
-
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor="tonnage">
-          Tonnage (optional)
-        </label>
-        <input
-          id="tonnage"
-          name="tonnage"
-          type="number"
-          step="0.5"
-          min="0"
-          className="w-full rounded-md border px-3 py-2"
-          placeholder="5"
-        />
-      </div>
-
-<div className="grid gap-1">
-  <label className="text-sm font-medium" htmlFor="refrigerant_type">
-    Refrigerant (optional)
-  </label>
-  <select
-    id="refrigerant_type"
-    name="refrigerant_type"
-    className="w-full rounded-md border px-3 py-2"
-    defaultValue=""
-  >
-    <option value="">Select refrigerant</option>
-    <option value="R-410A">R-410A</option>
-    <option value="R-32">R-32</option>
-    <option value="R-454B">R-454B</option>
-    <option value="R-22">R-22</option>
-    <option value="Other">Other</option>
-  </select>
-</div>
-
-
-      <div className="grid gap-1 sm:col-span-2">
-        <label className="text-sm font-medium" htmlFor="notes">
-          Notes (optional)
-        </label>
-        <input
-          id="notes"
-          name="notes"
-          className="w-full rounded-md border px-3 py-2"
-          placeholder="Any extra details..."
-        />
-      </div>
-    </div>
-
-    <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
-      Add Equipment
-    </button>
-  </form>
-
-  <section className="rounded-lg border p-4">
-  <h2 className="text-lg font-semibold">ECC Tests</h2>
-  <p className="text-sm text-muted-foreground">
-    Tests can be captured in any order. Results will compute from entered data, with optional override later.
-  </p>
-
-  {/* Which tests apply */}
-  <div className="mt-4 rounded-md border p-3">
-    <div className="text-sm font-medium">Applies to this job</div>
-
-    {job.project_type === "alteration" ? (
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-        <li>Duct Leakage (10% / 400 CFM per ton basis)</li>
-        <li>Airflow (300 CFM per ton minimum)</li>
-        <li>Refrigerant Charge (target subcool based)</li>
-      </ul>
-    ) : (
-      <div className="mt-2 text-sm text-muted-foreground">
-        All New: tests vary by job. You’ll select which tests to capture in the next step.
-      </div>
-    )}
-  </div>
-
-  {/* Add tests */}
-<form className="mt-4 grid gap-3">
-  <input type="hidden" name="job_id" value={job.id} />
-
-  {job.project_type === "alteration" ? (
-    <button
-      type="submit"
-      formAction={addAlterationCoreTestsFromForm}
-      className="w-fit rounded-md border px-4 py-2 text-sm"
-    >
-      Add Alteration Core Tests
-    </button>
-  ) : null}
-
-  <div className="grid gap-1">
-    <label className="text-sm font-medium" htmlFor="test_type">
-      Add a test
-    </label>
-
-    <select
-      id="test_type"
-      name="test_type"
-      className="rounded-md border px-3 py-2"
-      defaultValue=""
-    >
-      <option value="" disabled>
-        Select test…
-      </option>
-
-      {/* Alteration core */}
-      <option value="refrigerant_charge">Refrigerant Charge</option>
-      <option value="airflow">Airflow</option>
-      <option value="duct_leakage">Duct Leakage</option>
-
-      {/* Future / All New examples (keep if you want) */}
-      <option value="whole_house_fan">Whole House Fan</option>
-      <option value="mch_26">MCH 26</option>
-    </select>
-  </div>
-
-  <button
-    type="submit"
-    formAction={addEccTestRunFromForm}
-    className="w-fit rounded-md bg-black px-4 py-2 text-white"
-  >
-    Add Test
-  </button>
-</form>
-
-  <div className="mt-6 space-y-3">
-    {job.ecc_test_runs && job.ecc_test_runs.length > 0 ? (
-      job.ecc_test_runs.map((t: any) => (
-        <div key={t.id} className="rounded-md border p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="font-medium">
-                {(t.test_type || "test").replaceAll("_", " ")}
-              </div>
-
-              <form action={saveEccTestOverrideFromForm} className="mt-3 grid gap-3 border-t pt-3">
-  <input type="hidden" name="job_id" value={job.id} />
-  <input type="hidden" name="test_run_id" value={t.id} />
-
-  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-    <div className="grid gap-1">
-      <label className="text-sm font-medium" htmlFor={`ovr-${t.id}`}>
-        Manual Override
-      </label>
-      <select
-        id={`ovr-${t.id}`}
-        name="override"
-        className="w-full rounded-md border px-3 py-2"
-          defaultValue={
-    t.override_pass === true ? "pass" : t.override_pass === false ? "fail" : "none"
-  }
->
-
-  defaultValue={
-    t.override_pass === true ? "pass" : t.override_pass === false ? "fail" : "none"
-  }
-
-        <option value="none">None</option>
-        <option value="pass">Override PASS</option>
-        <option value="fail">Override FAIL</option>
-      </select>
-    </div>
-
-    <div className="grid gap-1">
-      <label className="text-sm font-medium" htmlFor={`ovr-reason-${t.id}`}>
-        Override Reason (required if override set)
-      </label>
-      <input
-        id={`ovr-reason-${t.id}`}
-        name="override_reason"
-        className="w-full rounded-md border px-3 py-2"
-        defaultValue={t.override_reason ?? ""}
-        placeholder="Explain why you're overriding the computed result..."
-      />
-    </div>
-  </div>
-
-  <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
-    Save Override
-  </button>
-</form>
-
-{t.test_type === "duct_leakage" ? (
-  <div className="mt-3 border-t pt-3">
-    <div className="text-sm text-muted-foreground">
-      <div>
-        Max Allowed: {t.computed?.max_leakage_cfm ?? "—"} CFM{" "}
-        {t.computed?.max_cfm_per_ton ? `(at ${t.computed.max_cfm_per_ton} CFM/ton max)` : ""}
-      </div>
-      <div>Measured: {t.data?.measured_duct_leakage_cfm ?? "—"} CFM</div>
-
-      {t.computed?.failures?.length ? (
-        <div className="mt-2">
-          <div className="font-medium">Failures</div>
-          <ul className="list-disc pl-5">
-            {t.computed.failures.map((f: string, i: number) => (
-              <li key={i}>{f}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {t.computed?.warnings?.length ? (
-        <div className="mt-2">
-          <div className="font-medium">Missing / Warnings</div>
-          <ul className="list-disc pl-5">
-            {t.computed.warnings.map((w: string, i: number) => (
-              <li key={i}>{w}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </div>
-
-    <form action={saveDuctLeakageDataFromForm} className="mt-3 grid gap-3">
-      <input type="hidden" name="job_id" value={job.id} />
-      <input type="hidden" name="test_run_id" value={t.id} />
-      <input type="hidden" name="project_type" value={job.project_type} />
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="grid gap-1">
-          <label className="text-sm font-medium" htmlFor={`dl-ton-${t.id}`}>
-            System Tonnage
-          </label>
-          <input
-            id={`dl-ton-${t.id}`}
-            name="tonnage"
-            type="number"
-            step="0.1"
-            className="w-full rounded-md border px-3 py-2"
-            defaultValue={t.data?.tonnage ?? ""}
-          />
-        </div>
-
-        <div className="grid gap-1">
-          <label className="text-sm font-medium" htmlFor={`dl-meas-${t.id}`}>
-            Measured Duct Leakage (CFM)
-          </label>
-          <input
-            id={`dl-meas-${t.id}`}
-            name="measured_duct_leakage_cfm"
-            type="number"
-            step="1"
-            className="w-full rounded-md border px-3 py-2"
-            defaultValue={t.data?.measured_duct_leakage_cfm ?? ""}
-          />
-        </div>
-
-        <div className="grid gap-1 sm:col-span-2">
-          <label className="text-sm font-medium" htmlFor={`dl-notes-${t.id}`}>
-            Notes (optional)
-          </label>
-          <input
-            id={`dl-notes-${t.id}`}
-            name="notes"
-            className="w-full rounded-md border px-3 py-2"
-            defaultValue={t.data?.notes ?? ""}
-          />
-        </div>
-      </div>
-
-      <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
-        Save Duct Leakage
-      </button>
-    </form>
-  </div>
-) : null}
-
-
-<div key={t.id} className="rounded-md border p-3">
-  {/* Header row */}
-  <div className="flex items-start justify-between gap-3">
-    <div>
-      <div className="font-medium">
-        {(t.test_type || "test").replaceAll("_", " ")}
-      </div>
-
-      <div className="mt-1 text-sm text-muted-foreground">
-        Computed:{" "}
-        {t.computed_pass === true
-          ? "PASS"
-          : t.computed_pass === false
-          ? "FAIL"
-          : "Not computed"}
-      </div>
-
-      <div className="text-sm text-muted-foreground">
-        Override:{" "}
-        {t.override_pass === true
-          ? "PASS"
-          : t.override_pass === false
-          ? "FAIL"
-          : "None"}
-      </div>
-    </div>
-
-    <div className="mt-1 text-sm">
-  <span className="font-medium">Result:</span> {getEffectiveResultLabel(t)}
-
-
-</div>
-
-
-    <div className="flex items-center gap-2">
-      <div className="text-xs text-muted-foreground">
-        {t.updated_at ? new Date(t.updated_at).toLocaleString() : null}
-      </div>
-
-      {/* Delete is its own tiny form (ONLY the button) */}
-      <form action={deleteEccTestRunFromForm}>
-        <input type="hidden" name="job_id" value={job.id} />
-        <input type="hidden" name="test_run_id" value={t.id} />
-        <button type="submit" className="rounded-md border px-3 py-1 text-sm">
-          Delete
-        </button>
-      </form>
-    </div>
-  </div>
-
-  {/* Computed details (you already added) */}
-  {t.test_type === "refrigerant_charge" ? (
-    <div className="mt-2 text-sm text-muted-foreground">
-      <div>
-        Measured Subcool: {t.computed?.measured_subcool_f ?? "—"} °F
-      </div>
-      <div>Measured Superheat: {t.computed?.measured_superheat_f ?? "—"} °F</div>
-    </div>
-  ) : null}
-
-
-</div>
-
-{t.test_type === "airflow" ? (
-  <div className="mt-3 border-t pt-3">
-    <div className="text-sm text-muted-foreground">
-      <div>
-        Required: {t.computed?.required_total_cfm ?? "—"} CFM{" "}
-        {t.computed?.cfm_per_ton_required ? `(at ${t.computed.cfm_per_ton_required} CFM/ton)` : ""}
-      </div>
-      <div>Measured: {t.data?.measured_total_cfm ?? "—"} CFM</div>
-
-      {t.computed?.failures?.length ? (
-        <div className="mt-2">
-          <div className="font-medium">Failures</div>
-          <ul className="list-disc pl-5">
-            {t.computed.failures.map((f: string, i: number) => (
-              <li key={i}>{f}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {t.computed?.warnings?.length ? (
-        <div className="mt-2">
-          <div className="font-medium">Missing / Warnings</div>
-          <ul className="list-disc pl-5">
-            {t.computed.warnings.map((w: string, i: number) => (
-              <li key={i}>{w}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </div>
-
-    <form action={saveAirflowDataFromForm} className="mt-3 grid gap-3">
-      <input type="hidden" name="job_id" value={job.id} />
-      <input type="hidden" name="test_run_id" value={t.id} />
-      <input type="hidden" name="project_type" value={job.project_type} />
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="grid gap-1">
-          <label className="text-sm font-medium" htmlFor={`ton-${t.id}`}>
-            System Tonnage
-          </label>
-          <input
-            id={`ton-${t.id}`}
-            name="tonnage"
-            type="number"
-            step="0.1"
-            className="w-full rounded-md border px-3 py-2"
-            defaultValue={t.data?.tonnage ?? ""}
-          />
-        </div>
-
-        <div className="grid gap-1">
-          <label className="text-sm font-medium" htmlFor={`cfm-${t.id}`}>
-            Measured Total Airflow (CFM)
-          </label>
-          <input
-            id={`cfm-${t.id}`}
-            name="measured_total_cfm"
-            type="number"
-            step="1"
-            className="w-full rounded-md border px-3 py-2"
-            defaultValue={t.data?.measured_total_cfm ?? ""}
-          />
-        </div>
-
-        <div className="grid gap-1 sm:col-span-2">
-          <label className="text-sm font-medium" htmlFor={`air-notes-${t.id}`}>
-            Notes (optional)
-          </label>
-          <input
-            id={`air-notes-${t.id}`}
-            name="notes"
-            className="w-full rounded-md border px-3 py-2"
-            defaultValue={t.data?.notes ?? ""}
-          />
-        </div>
-      </div>
-
-      <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
-        Save Airflow
-      </button>
-    </form>
-  </div>
-) : null}
-
-
-  {/* ✅ Refrigerant Charge entry form goes HERE (separate form, not nested) */}
-{t.test_type === "refrigerant_charge" ? (
-  <form
-    action={saveRefrigerantChargeDataFromForm}
-    className="mt-3 grid gap-3 border-t pt-3"
-  >
-    <input type="hidden" name="job_id" value={job.id} />
-    <input type="hidden" name="test_run_id" value={t.id} />
-
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {/* CHEERS F2 */}
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor={`lrdb-${t.id}`}>
-          Lowest Return Air Dry Bulb (°F)
-        </label>
-        <input
-          id={`lrdb-${t.id}`}
-          name="lowest_return_air_db_f"
-          type="number"
-          step="0.1"
-          className="w-full rounded-md border px-3 py-2"
-          defaultValue={t.data?.lowest_return_air_db_f ?? ""}
-        />
-      </div>
-
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor={`tcondb-${t.id}`}>
-          Condenser Air Entering DB (°F)
-        </label>
-        <input
-          id={`tcondb-${t.id}`}
-          name="condenser_air_entering_db_f"
-          type="number"
-          step="0.1"
-          className="w-full rounded-md border px-3 py-2"
-          defaultValue={t.data?.condenser_air_entering_db_f ?? ""}
-        />
-      </div>
-
-      {/* Your workflow extra */}
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor={`out-${t.id}`}>
-          Outdoor Temp (°F)
-        </label>
-        <input
-          id={`out-${t.id}`}
-          name="outdoor_temp_f"
-          type="number"
-          step="0.1"
-          className="w-full rounded-md border px-3 py-2"
-          defaultValue={t.data?.outdoor_temp_f ?? ""}
-        />
-      </div>
-
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor={`ref-${t.id}`}>
-          Refrigerant Type
-        </label>
-        <select
-          id={`ref-${t.id}`}
-          name="refrigerant_type"
-          className="w-full rounded-md border px-3 py-2"
-          defaultValue={t.data?.refrigerant_type ?? ""}
+      {/* Tab row (URL changes + render changes) */}
+      <div className="mb-4 flex gap-2">
+        <Link
+          href={`/jobs/${job.id}?tab=info`}
+          className={`px-3 py-2 rounded border text-sm ${
+            tab === "info" ? "bg-black text-white" : "bg-white"
+          }`}
         >
-          <option value="">Select</option>
-          <option value="R-410A">R-410A</option>
-          <option value="R-32">R-32</option>
-          <option value="R-454B">R-454B</option>
-          <option value="R-22">R-22</option>
-          <option value="Other">Other</option>
-        </select>
+          Info
+        </Link>
+
+        <Link
+          href={`/jobs/${job.id}?tab=ops`}
+          className={`px-3 py-2 rounded border text-sm ${
+            tab === "ops" ? "bg-black text-white" : "bg-white"
+          }`}
+        >
+          Ops
+        </Link>
+
+        <Link
+          href={`/jobs/${job.id}?tab=tests`}
+          className={`px-3 py-2 rounded border text-sm ${
+            tab === "tests" ? "bg-black text-white" : "bg-white"
+          }`}
+        >
+          Tests
+        </Link>
       </div>
 
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor={`llt-${t.id}`}>
-          Liquid Line Temp (°F)
-        </label>
-        <input
-          id={`llt-${t.id}`}
-          name="liquid_line_temp_f"
-          type="number"
-          step="0.1"
-          className="w-full rounded-md border px-3 py-2"
-          defaultValue={t.data?.liquid_line_temp_f ?? ""}
-        />
-      </div>
+      {/* Command Center Snapshot (always visible) */}
+      <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+        <div className="text-sm font-semibold mb-3">Job Overview</div>
 
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor={`llp-${t.id}`}>
-          Liquid Line Pressure (psig)
-        </label>
-        <input
-          id={`llp-${t.id}`}
-          name="liquid_line_pressure_psig"
-          type="number"
-          step="0.1"
-          className="w-full rounded-md border px-3 py-2"
-          defaultValue={t.data?.liquid_line_pressure_psig ?? ""}
-        />
-      </div>
+        <div className="grid gap-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Status</span>
+            <span className="font-medium">{formatStatus(job.status)}</span>
+          </div>
 
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor={`tcsat-${t.id}`}>
-          Condenser Saturation Temp (°F)
-        </label>
-        <input
-          id={`tcsat-${t.id}`}
-          name="condenser_sat_temp_f"
-          type="number"
-          step="0.1"
-          className="w-full rounded-md border px-3 py-2"
-          defaultValue={t.data?.condenser_sat_temp_f ?? ""}
-        />
-      </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Customer</span>
+            <span className="font-medium">{customerName || "—"}</span>
+          </div>
 
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor={`tsc-${t.id}`}>
-          Target Subcool (°F)
-        </label>
-        <input
-          id={`tsc-${t.id}`}
-          name="target_subcool_f"
-          type="number"
-          step="0.1"
-          className="w-full rounded-md border px-3 py-2"
-          defaultValue={t.data?.target_subcool_f ?? ""}
-        />
-      </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Phone</span>
+            <span className="font-medium">{job.customer_phone || "—"}</span>
+          </div>
 
-      {/* CHEERS G */}
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor={`suctt-${t.id}`}>
-          Suction Line Temp (°F)
-        </label>
-        <input
-          id={`suctt-${t.id}`}
-          name="suction_line_temp_f"
-          type="number"
-          step="0.1"
-          className="w-full rounded-md border px-3 py-2"
-          defaultValue={t.data?.suction_line_temp_f ?? ""}
-        />
-      </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Address</span>
+            <span className="font-medium text-right">{job.job_address || "—"}</span>
+          </div>
 
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor={`suctp-${t.id}`}>
-          Suction Line Pressure (psig)
-        </label>
-        <input
-          id={`suctp-${t.id}`}
-          name="suction_line_pressure_psig"
-          type="number"
-          step="0.1"
-          className="w-full rounded-md border px-3 py-2"
-          defaultValue={t.data?.suction_line_pressure_psig ?? ""}
-        />
-      </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Permit</span>
+            <span className="font-medium">{job.permit_number || "—"}</span>
+          </div>
 
-      <div className="grid gap-1">
-        <label className="text-sm font-medium" htmlFor={`tesat-${t.id}`}>
-          Evaporator Saturation Temp (°F)
-        </label>
-        <input
-          id={`tesat-${t.id}`}
-          name="evaporator_sat_temp_f"
-          type="number"
-          step="0.1"
-          className="w-full rounded-md border px-3 py-2"
-          defaultValue={t.data?.evaporator_sat_temp_f ?? ""}
-        />
-      </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Scheduled</span>
+            <span className="font-medium">
+              {job.scheduled_date ? formatDateLAFromIso(String(job.scheduled_date)) : "—"}
+            </span>
+          </div>
 
-      <div className="flex items-center gap-2 sm:col-span-2">
-        <input
-          id={`fd-${t.id}`}
-          name="filter_drier_installed"
-          type="checkbox"
-          defaultChecked={!!t.data?.filter_drier_installed}
-        />
-        <label className="text-sm font-medium" htmlFor={`fd-${t.id}`}>
-          Filter drier installed
-        </label>
-      </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Arrival Window</span>
+            <span className="font-medium">
+              {job.window_start && job.window_end
+                ? `${isoToTimeInput(job.window_start)} - ${isoToTimeInput(job.window_end)}`
+                : "—"}
+            </span>
+          </div>
 
-      <div className="grid gap-1 sm:col-span-2">
-        <label className="text-sm font-medium" htmlFor={`notes-${t.id}`}>
-          Notes (optional)
-        </label>
-        <input
-          id={`notes-${t.id}`}
-          name="notes"
-          className="w-full rounded-md border px-3 py-2"
-          defaultValue={t.data?.notes ?? ""}
-        />
-      </div>
-    </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Contractor</span>
+            <span className="font-medium">{contractorName}</span>
+          </div>
 
-    <button
-      type="submit"
-      className="w-fit rounded-md bg-black px-4 py-2 text-white"
-    >
-      Save Refrigerant Charge Readings
-    </button>
-  </form>
-) : null}
+<div className="flex justify-end">
+  <details className="text-sm">
+    <summary className="cursor-pointer text-gray-600 underline">
+      Change contractor
+    </summary>
+
+    
+  </details>
+</div>
 
 
-              <form action={deleteEccTestRunFromForm}>
-  <input type="hidden" name="job_id" value={job.id} />
-  <input type="hidden" name="test_run_id" value={t.id} />
-  <button type="submit" className="rounded-md border px-3 py-1 text-sm">
-    Delete
-  </button>
-</form>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Job ID</span>
+            <span className="font-mono text-xs">{job.id}</span>
+          </div>
 
-
-              <div className="mt-1 text-sm text-muted-foreground">
-                Computed:{" "}
-                {t.computed_pass === true
-                  ? "PASS"
-                  : t.computed_pass === false
-                  ? "FAIL"
-                  : "Not computed"}
+          {job.job_notes ? (
+            <div className="mt-3 border-t pt-3">
+              <div className="text-xs text-gray-600 mb-1 uppercase tracking-wide">
+                Job Notes
               </div>
-
-              <div className="text-sm text-muted-foreground">
-                Override:{" "}
-                {t.override_pass === true
-                  ? "PASS"
-                  : t.override_pass === false
-                  ? "FAIL"
-                  : "None"}
-              </div>
-
-              {t.override_reason ? (
-                <div className="mt-2 text-sm">
-                  <span className="font-medium">Override reason:</span>{" "}
-                  {t.override_reason}
-                </div>
-              ) : null}
+              <div className="text-sm whitespace-pre-wrap text-gray-800">{job.job_notes}</div>
             </div>
-
-            {t.test_type === "refrigerant_charge" ? (
-  <div className="mt-2 text-sm text-muted-foreground">
-    <div>
-      Measured Subcool: {t.computed?.measured_subcool_f ?? "—"} °F
-      {t.computed?.subcool_delta_f != null ? ` (Δ ${t.computed.subcool_delta_f}°F)` : ""}
-    </div>
-    <div>Measured Superheat: {t.computed?.measured_superheat_f ?? "—"} °F</div>
-
-{t.computed?.blocked?.length ? (
-  <div className="mt-2">
-    <div className="font-medium">Blocked</div>
-    <ul className="list-disc pl-5">
-      {t.computed.blocked.map((b: string, i: number) => (
-        <li key={i}>{b}</li>
-      ))}
-    </ul>
-  </div>
-) : null}
-
-
-    {t.computed?.failures?.length ? (
-      <div className="mt-2">
-        <div className="font-medium">Failures</div>
-        <ul className="list-disc pl-5">
-          {t.computed.failures.map((f: string, i: number) => (
-            <li key={i}>{f}</li>
-          ))}
-        </ul>
+          ) : null}
+        </div>
       </div>
-    ) : null}
 
-    {t.computed?.warnings?.length ? (
-      <div className="mt-2">
-        <div className="font-medium">Missing / Warnings</div>
-        <ul className="list-disc pl-5">
-          {t.computed.warnings.map((w: string, i: number) => (
-            <li key={i}>{w}</li>
-          ))}
-        </ul>
-      </div>
-    ) : null}
-  </div>
-) : null}
+      {/* TAB: INFO */}
+      {tab === "info" && (
+        <>
+          {/* Quick actions (status progression) */}
+          <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+            <div className="text-sm font-semibold mb-3">Quick Actions</div>
 
+            <div className="flex flex-wrap gap-2">
+              <form action={advanceJobStatusFromForm}>
+                <input type="hidden" name="job_id" value={job.id} />
+                <button className="px-3 py-2 rounded bg-black text-white text-sm" type="submit">
+                  Advance to: {nextStatusLabel(job.status)}
+                </button>
+              </form>
 
-            <div className="text-xs text-muted-foreground">
-              {t.updated_at ? new Date(t.updated_at).toLocaleString() : null}
+              <form action={markJobFailedFromForm}>
+                <input type="hidden" name="job_id" value={job.id} />
+                <button className="px-3 py-2 rounded border text-sm" type="submit">
+                  Mark Failed
+                </button>
+              </form>
+
+              <Link className="px-3 py-2 rounded border text-sm" href="/jobs">
+                Back to Jobs
+              </Link>
             </div>
           </div>
-        </div>
-      ))
-    ) : (
-      <div className="rounded-md border p-3 text-sm text-muted-foreground">
-        No tests added yet.
-      </div>
-    )}
-  </div>
-</section>
 
-  {/* Existing Equipment List */}
-  <div className="mt-6 space-y-3">
-    {job.job_equipment && job.job_equipment.length > 0 ? (
-      job.job_equipment.map((eq: any) => (
-        <div key={eq.id} className="rounded-md border p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="font-medium">
-                {eq.equipment_role?.replaceAll("_", " ") || "equipment"}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {[eq.manufacturer, eq.model].filter(Boolean).join(" ") || "No make/model yet"}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {eq.tonnage ? `${eq.tonnage} ton` : null}
-                {eq.tonnage && eq.refrigerant_type ? " • " : null}
-                {eq.refrigerant_type || null}
-              </div>
-              {eq.serial ? (
-                <div className="text-sm text-muted-foreground">Serial: {eq.serial}</div>
-              ) : null}
-              {eq.notes ? (
-                <div className="mt-2 text-sm">{eq.notes}</div>
-              ) : null}
-            </div>
-<form action={updateJobEquipmentFromForm} className="mt-3 grid gap-3 border-t pt-3">
-  <input type="hidden" name="job_id" value={job.id} />
-  <input type="hidden" name="equipment_id" value={eq.id} />
 
-  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-    <div className="grid gap-1">
-      <label className="text-sm font-medium" htmlFor={`role-${eq.id}`}>
-        Equipment Role
-      </label>
-      <select
-        id={`role-${eq.id}`}
-        name="equipment_role"
-        defaultValue={eq.equipment_role ?? "outdoor_unit"}
-        className="w-full rounded-md border px-3 py-2"
-        required
-      >
-        <option value="outdoor_unit">Outdoor Unit</option>
-        <option value="indoor_unit">Indoor Unit / Coil</option>
-        <option value="air_handler">Air Handler</option>
-        <option value="furnace">Furnace</option>
-        <option value="heat_pump">Heat Pump</option>
-        <option value="other">Other</option>
-      </select>
-    </div>
 
-    <div className="grid gap-1">
-      <label className="text-sm font-medium" htmlFor={`mfr-${eq.id}`}>
-        Manufacturer
-      </label>
-      <input
-        id={`mfr-${eq.id}`}
-        name="manufacturer"
-        defaultValue={eq.manufacturer ?? ""}
-        className="w-full rounded-md border px-3 py-2"
-      />
-    </div>
+          {/* Edit Customer */}
+          <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+            <div className="text-sm font-semibold mb-3">Customer</div>
 
-    <div className="grid gap-1">
-      <label className="text-sm font-medium" htmlFor={`model-${eq.id}`}>
-        Model
-      </label>
-      <input
-        id={`model-${eq.id}`}
-        name="model"
-        defaultValue={eq.model ?? ""}
-        className="w-full rounded-md border px-3 py-2"
-      />
-    </div>
-
-    <div className="grid gap-1">
-      <label className="text-sm font-medium" htmlFor={`serial-${eq.id}`}>
-        Serial
-      </label>
-      <input
-        id={`serial-${eq.id}`}
-        name="serial"
-        defaultValue={eq.serial ?? ""}
-        className="w-full rounded-md border px-3 py-2"
-      />
-    </div>
-
-    <div className="grid gap-1">
-      <label className="text-sm font-medium" htmlFor={`ton-${eq.id}`}>
-        Tonnage
-      </label>
-      <input
-        id={`ton-${eq.id}`}
-        name="tonnage"
-        type="number"
-        step="0.5"
-        min="0"
-        defaultValue={eq.tonnage ?? ""}
-        className="w-full rounded-md border px-3 py-2"
-      />
-    </div>
-
-    <div className="grid gap-1">
-      <label className="text-sm font-medium" htmlFor={`ref-${eq.id}`}>
-        Refrigerant
-      </label>
-      <select
-        id={`ref-${eq.id}`}
-        name="refrigerant_type"
-        defaultValue={eq.refrigerant_type ?? ""}
-        className="w-full rounded-md border px-3 py-2"
-      >
-        <option value="">Select refrigerant</option>
-        <option value="R-410A">R-410A</option>
-        <option value="R-32">R-32</option>
-        <option value="R-454B">R-454B</option>
-        <option value="R-22">R-22</option>
-        <option value="Other">Other</option>
-      </select>
-    </div>
-
-    <div className="grid gap-1 sm:col-span-2">
-      <label className="text-sm font-medium" htmlFor={`notes-${eq.id}`}>
-        Notes
-      </label>
-      <input
-        id={`notes-${eq.id}`}
-        name="notes"
-        defaultValue={eq.notes ?? ""}
-        className="w-full rounded-md border px-3 py-2"
-      />
-    </div>
-  </div>
-
-  <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
-    Save Changes
-  </button>
-</form>
-
-            <form action={deleteJobEquipmentFromForm}>
+            <form action={updateJobCustomerFromForm} className="grid gap-3">
               <input type="hidden" name="job_id" value={job.id} />
-              <input type="hidden" name="equipment_id" value={eq.id} />
-              <button
-                type="submit"
-                className="rounded-md border px-3 py-1 text-sm"
-              >
-                Delete
-              </button>
-            </form>
-          </div>
-        </div>
-      ))
-    ) : (
-      <div className="rounded-md border p-3 text-sm text-muted-foreground">
-        No equipment added yet.
-      </div>
-    )}
-  </div>
-</section>
 
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">First Name</label>
+                  <input
+                    name="customer_first_name"
+                    defaultValue={job.customer_first_name ?? ""}
+                    className="w-full rounded border px-2 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Last Name</label>
+                  <input
+                    name="customer_last_name"
+                    defaultValue={job.customer_last_name ?? ""}
+                    className="w-full rounded border px-2 py-2 text-sm"
+                  />
+                </div>
+              </div>
 
-      <section className="rounded-lg border p-4">
-  <h2 className="text-lg font-semibold">ECC Profile</h2>
-  <p className="text-sm text-muted-foreground">
-    Controls which ECC tests and equipment requirements apply to this job.
-  </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Phone</label>
+                  <input
+                    name="customer_phone"
+                    defaultValue={job.customer_phone ?? ""}
+                    className="w-full rounded border px-2 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Email</label>
+                  <input
+                    name="customer_email"
+                    defaultValue={job.customer_email ?? ""}
+                    className="w-full rounded border px-2 py-2 text-sm"
+                  />
+                </div>
+              </div>
 
-  <form action={updateJobProfileFromForm} className="mt-3 space-y-3">
-    <input type="hidden" name="job_id" value={job.id} />
-    <input type="hidden" name="job_type" value={job.job_type ?? "ecc"} />
-
-    <div className="space-y-1">
-      <label className="text-sm font-medium" htmlFor="project_type">
-        Project Type
-      </label>
-      <select
-        id="project_type"
-        name="project_type"
-        defaultValue={job.project_type ?? "alteration"}
-        className="w-full rounded-md border px-3 py-2"
-      >
-        <option value="alteration">Alteration</option>
-        <option value="all_new">All New</option>
-      </select>
-    </div>
-
-    <button type="submit" className="rounded-md bg-black px-4 py-2 text-white">
-      Save ECC Profile
-    </button>
-  </form>
-</section>
-
-
-        {/* Workflow */}
-        <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
-          <h2 className="text-sm font-semibold mb-3">Workflow</h2>
-
-          <div className="flex gap-3 flex-wrap items-center">
-            <form action={advanceJobStatusFromForm}>
-              <input type="hidden" name="id" value={job.id} />
-              <input
-                type="hidden"
-                name="current_status"
-                value={(job.status ?? "open") as JobStatus}
-              />
-              <button
-                className="border rounded px-3 py-2 text-sm"
-                disabled={isTerminal}
-                title={
-                  isTerminal
-                    ? "Job is in a final status"
-                    : `Advance to ${nextStatusLabel(job.status)}`
-                }
-              >
-                {isTerminal ? "Status Final" : `Advance → ${nextStatusLabel(job.status)}`}
-              </button>
-            </form>
-
-            <form action={markJobFailedFromForm}>
-              <input type="hidden" name="id" value={job.id} />
-              <button
-                className="border rounded px-3 py-2 text-sm"
-                disabled={job.status === "failed"}
-                title="Mark ECC failure for this job"
-              >
-                Mark Failed (ECC)
+              <button className="px-3 py-2 rounded bg-black text-white text-sm w-fit" type="submit">
+                Save Customer
               </button>
             </form>
           </div>
 
-          <p className="text-xs text-gray-600 mt-2">
-            Flow: Open → On The Way → In Process → Completed (or Failed).
-          </p>
-        </div>
+          {/* Equipment + Tests summary cards */}
+          <section className="rounded-lg border p-4 mb-4">
+            <h2 className="text-lg font-semibold">Equipment</h2>
+            <p className="text-sm text-muted-foreground">Capture equipment in the guided flow.</p>
 
-        {/* Inline Edit Scheduling */}
-        <div className="rounded-lg border bg-white p-4 text-gray-900">
-          <h2 className="text-sm font-semibold mb-3 scroll-mt-24" id="schedule">
-            Edit Scheduling
-          </h2>
-
-          <form action={updateJobScheduleFromForm} className="grid gap-4">
-            <input type="hidden" name="id" value={job.id} />
-
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                Scheduled Date
-              </label>
-              <input
-                type="date"
-                name="scheduled_date"
-                defaultValue={scheduledDateValue}
-                className="w-full border rounded px-3 py-2 text-sm"
-                required
-                autoFocus
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">
-                  Window Start (optional)
-                </label>
-                <input
-                  type="time"
-                  name="window_start"
-                  defaultValue={windowStartValue}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                />
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <div className="text-sm text-gray-600">
+                {job.job_equipment?.length ? (
+                  <span>{job.job_equipment.length} item(s) captured</span>
+                ) : (
+                  <span>No equipment captured yet.</span>
+                )}
               </div>
 
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">
-                  Window End (optional)
-                </label>
-                <input
-                  type="time"
-                  name="window_end"
-                  defaultValue={windowEndValue}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                />
+              <Link
+                href={`/jobs/${job.id}/info?f=equipment`}
+                className="px-3 py-2 rounded bg-black text-white text-sm"
+              >
+                Capture Equipment
+              </Link>
+            </div>
+          </section>
+
+          <section className="rounded-lg border p-4 mb-6">
+            <h2 className="text-lg font-semibold">Tests</h2>
+            <p className="text-sm text-muted-foreground">
+              Capture and review ECC test results on the Tests page.
+            </p>
+
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <div className="text-sm text-gray-600">
+                {job.ecc_test_runs?.length ? (
+                  <span>{job.ecc_test_runs.length} test run(s) recorded</span>
+                ) : (
+                  <span>No tests recorded yet.</span>
+                )}
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                Permit Number (optional)
-              </label>
-              <input
-                type="text"
-                name="permit_number"
-                defaultValue={job.permit_number ?? ""}
-                className="w-full border rounded px-3 py-2 text-sm"
-                placeholder="e.g. 2026-12345"
-              />
+              <Link
+                href={`/jobs/${job.id}/tests`}
+                className="px-3 py-2 rounded bg-black text-white text-sm"
+              >
+                Go to Tests
+              </Link>
             </div>
+          </section>
 
-            <div className="flex justify-end">
-              <button className="border rounded px-3 py-2 text-sm">
+          {/* Scheduling */}
+          <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+            <div className="text-sm font-semibold mb-3">Scheduling</div>
+
+            <form action={updateJobScheduleFromForm} className="grid gap-3">
+              <input type="hidden" name="job_id" value={job.id} />
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Scheduled Date</label>
+                  <input
+                    type="date"
+                    name="scheduled_date"
+                    defaultValue={isoToDateInput(String(job.scheduled_date ?? ""))}
+                    className="w-full rounded border px-2 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Permit #</label>
+                  <input
+                    name="permit_number"
+                    defaultValue={job.permit_number ?? ""}
+                    className="w-full rounded border px-2 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Window Start</label>
+                  <input
+                    type="time"
+                    name="window_start"
+                    defaultValue={isoToTimeInput(job.window_start)}
+                    className="w-full rounded border px-2 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Window End</label>
+                  <input
+                    type="time"
+                    name="window_end"
+                    defaultValue={isoToTimeInput(job.window_end)}
+                    className="w-full rounded border px-2 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <button className="px-3 py-2 rounded bg-black text-white text-sm w-fit" type="submit">
                 Save Scheduling
               </button>
+            </form>
+          </div>
+        </>
+      )}
+
+      {/* TAB: OPS */}
+      {tab === "ops" && (
+        <>
+          {/* Job Status (ops_status) */}
+          <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+            <div className="text-sm font-semibold mb-3">Job Status</div>
+
+            <form action={updateJobOpsFromForm} className="flex gap-2 items-end">
+              <input type="hidden" name="job_id" value={job.id} />
+
+              <div className="flex-1">
+                <label className="block text-xs text-gray-600 mb-1">Ops Status</label>
+                <select
+                  name="ops_status"
+                  defaultValue={job.ops_status ?? "need_to_schedule"}
+                  className="w-full rounded border px-2 py-2 text-sm"
+                >
+                  <option value="need_to_schedule">Need to Schedule</option>
+                  <option value="pending_info">Pending Info</option>
+                  <option value="on_hold">On Hold</option>
+                  <option value="retest_needed">Retest Needed</option>
+                  <option value="ready">Ready</option>
+                </select>
+              </div>
+
+              <button className="px-3 py-2 rounded bg-black text-white text-sm" type="submit">
+                Save
+              </button>
+            </form>
+          </div>
+
+          {/* Follow Up */}
+          <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+            <div className="text-sm font-semibold mb-3">Follow Up</div>
+
+            <form action={updateJobOpsDetailsFromForm} className="grid gap-3">
+              <input type="hidden" name="job_id" value={job.id} />
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Action Required By</label>
+                  <select
+                    name="action_required_by"
+                    defaultValue={job.action_required_by ?? ""}
+                    className="w-full rounded border px-2 py-2 text-sm"
+                  >
+                    <option value="">—</option>
+                    <option value="rater">Rater</option>
+                    <option value="contractor">Contractor</option>
+                    <option value="customer">Customer</option>
+                  </select>
+                </div>
+
+
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Follow-up Date</label>
+                  <input
+                    type="date"
+                    name="follow_up_date"
+                    defaultValue={job.follow_up_date ? isoToDateInput(String(job.follow_up_date)) : ""}
+                    className="w-full rounded border px-2 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Pending Info Reason</label>
+                <input
+                  name="pending_info_reason"
+                  defaultValue={job.pending_info_reason ?? ""}
+                  className="w-full rounded border px-2 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Next Action Note</label>
+                <textarea
+                  name="next_action_note"
+                  defaultValue={job.next_action_note ?? ""}
+                  className="w-full rounded border px-2 py-2 text-sm"
+                  rows={4}
+                />
+              </div>
+
+              <button className="px-3 py-2 rounded bg-black text-white text-sm w-fit" type="submit">
+                Save Follow Up
+              </button>
+            </form>
+          </div>
+
+          {/* Customer Follow-up Attempts */}
+          {job.action_required_by === "customer" ? (
+            <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+              <div className="text-sm font-semibold mb-2">Customer Follow-Up</div>
+
+              <div className="text-xs text-gray-600 mb-3">
+                Attempts: <span className="font-medium">{attemptCount}</span> • Last:{" "}
+                <span className="font-medium">{lastAttemptLabel}</span>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-4">
+                <form action={logCustomerContactAttemptFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="method" value="call" />
+                  <input type="hidden" name="result" value="no_answer" />
+                  <button className="px-3 py-2 rounded border text-sm" type="submit">
+                    Log Call (No Answer)
+                  </button>
+                </form>
+
+                <form action={logCustomerContactAttemptFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="method" value="text" />
+                  <input type="hidden" name="result" value="sent" />
+                  <button className="px-3 py-2 rounded border text-sm" type="submit">
+                    Log Text (Sent)
+                  </button>
+                </form>
+
+                <form action={logCustomerContactAttemptFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="method" value="call" />
+                  <input type="hidden" name="result" value="spoke" />
+                  <button className="px-3 py-2 rounded border text-sm" type="submit">
+                    Log Call (Spoke)
+                  </button>
+                </form>
+              </div>
+
+              <div className="space-y-2">
+                {last3Attempts.map((a: any, idx: number) => (
+                  <div key={idx} className="rounded border p-3 text-sm">
+                    <div className="text-xs text-gray-600">
+                      {a.created_at ? formatDateTimeLAFromIso(String(a.created_at)) : "—"}
+                    </div>
+                    <div className="mt-1">
+                      <span className="font-medium">Method:</span>{" "}
+                      {a?.meta?.method ? String(a.meta.method) : "—"} •{" "}
+                      <span className="font-medium">Result:</span>{" "}
+                      {a?.meta?.result ? String(a.meta.result) : "—"}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </form>
+          ) : null}
+        </>
+      )}
+
+      {/* TAB: TESTS */}
+      {tab === "tests" && (
+        <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+          <div className="text-sm font-semibold mb-2">Tests</div>
+          <div className="text-sm text-gray-600 mb-3">
+            {job.ecc_test_runs?.length ? (
+              <span>{job.ecc_test_runs.length} test run(s) recorded.</span>
+            ) : (
+              <span>No tests recorded yet.</span>
+            )}
+          </div>
+
+          <Link
+            href={`/jobs/${job.id}/tests`}
+            className="px-3 py-2 rounded bg-black text-white text-sm inline-block"
+          >
+            Go to Tests
+          </Link>
         </div>
-      </div>
-    );
-  }
+      )}
+    </div>
+  );
+}
