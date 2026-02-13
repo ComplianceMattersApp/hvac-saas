@@ -596,6 +596,91 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}`);
 }
 
+export async function completeEccTestRunFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  const supabase = await createClient();
+
+  // 1) Load the test run (need visit_id)
+  const { data: run, error: runErr } = await supabase
+    .from("ecc_test_runs")
+    .select("id, job_id, visit_id, computed_pass, override_pass")
+    .eq("id", testRunId)
+    .eq("job_id", jobId)
+    .single();
+
+  if (runErr) throw runErr;
+  if (!run) throw new Error("Test run not found");
+
+  // 2) Ensure visit_id exists (fallback to latest visit for job, then stamp it)
+  let visitId: string | null = run.visit_id ?? null;
+
+  if (!visitId) {
+    const { data: v, error: vErr } = await supabase
+      .from("job_visits")
+      .select("id")
+      .eq("job_id", jobId)
+      .order("visit_number", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (vErr) throw vErr;
+    if (!v?.id) throw new Error("No visit exists for this job");
+
+    visitId = v.id;
+
+    const { error: fixErr } = await supabase
+      .from("ecc_test_runs")
+      .update({ visit_id: visitId })
+      .eq("id", testRunId)
+      .eq("job_id", jobId);
+
+    if (fixErr) throw fixErr;
+  }
+
+  // 3) Mark this test as completed
+  const { error: markErr } = await supabase
+    .from("ecc_test_runs")
+    .update({ is_completed: true })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (markErr) throw markErr;
+
+  // 4) Recompute job ops_status from ALL completed runs on this visit
+  const { data: completedRuns, error: runsErr } = await supabase
+    .from("ecc_test_runs")
+    .select("computed_pass, override_pass")
+    .eq("visit_id", visitId)
+    .eq("is_completed", true);
+
+  if (runsErr) throw runsErr;
+
+  const anyFail = (completedRuns ?? []).some((r) => {
+    const pass =
+      r.override_pass !== null && r.override_pass !== undefined
+        ? r.override_pass
+        : r.computed_pass;
+    return pass === false;
+  });
+
+  const nextOps = anyFail ? "failed_pending_retest" : "ready_to_close";
+
+  const { error: jobErr } = await supabase
+    .from("jobs")
+    .update({ ops_status: nextOps })
+    .eq("id", jobId);
+
+  if (jobErr) throw jobErr;
+
+  revalidatePath(`/jobs/${jobId}`);
+}
+
+
 export async function addAlterationCoreTestsFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   if (!jobId) throw new Error("Missing job_id");
@@ -787,8 +872,6 @@ export async function createJobFromForm(formData: FormData) {
   redirect(`/jobs/${created.id}`);
 }
 
-
-
 /**
  * UPDATE: used by Edit Scheduling form on job detail page
  */
@@ -856,6 +939,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
   redirect(`/jobs/${id}`);
 }
+
 
 /**
  * OPTIONAL: keep for future admin tools (not used in calendar anymore)

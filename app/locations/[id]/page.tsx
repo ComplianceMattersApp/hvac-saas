@@ -4,6 +4,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createNextVisit } from "./visit-actions";
+import { scheduleRetest } from "./retest-actions";
+
 
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -141,18 +143,6 @@ export default async function LocationDetailPage(props: {
                       : "Not scheduled"}
                   </div>
 
-                  {/* ✅ Add Visit button */}
-                  <form action={createNextVisit}>
-                    <input type="hidden" name="locationId" value={locationId} />
-                    <input type="hidden" name="jobId" value={j.job_id} />
-                    <button
-                      className="mt-2 rounded border px-3 py-1 text-xs"
-                      type="submit"
-                    >
-                      + Add Visit (Retest)
-                    </button>
-                  </form>
-
                   {/* Visits */}
                   {visits.length === 0 ? (
                     <div className="mt-2 text-xs text-muted-foreground">
@@ -177,95 +167,6 @@ export default async function LocationDetailPage(props: {
                                     v.last_test_run_at
                                   ).toLocaleString()}`
                                 : ""}
-                                {/* Schedule Visit */}
-<form action={scheduleVisit} className="mt-2 grid gap-2">
-  <input type="hidden" name="locationId" value={locationId} />
-  <input type="hidden" name="jobId" value={j.job_id} />
-  <input type="hidden" name="visitId" value={v.visit_id} />
-
-  <label className="text-xs">
-    Scheduled At
-    <input
-      name="scheduledAt"
-      type="datetime-local"
-      className="mt-1 w-full rounded border px-2 py-1 text-xs"
-      required
-    />
-  </label>
-
-  <div className="grid grid-cols-2 gap-2">
-    <label className="text-xs">
-      Window Start
-      <input
-        name="windowStart"
-        type="datetime-local"
-        className="mt-1 w-full rounded border px-2 py-1 text-xs"
-      />
-    </label>
-
-    <label className="text-xs">
-      Window End
-      <input
-        name="windowEnd"
-        type="datetime-local"
-        className="mt-1 w-full rounded border px-2 py-1 text-xs"
-      />
-    </label>
-  </div>
-
-  <label className="text-xs">
-    Visit Notes
-    <textarea
-      name="notes"
-      className="mt-1 w-full rounded border px-2 py-1 text-xs"
-      rows={2}
-      placeholder="What happened this visit / what’s next…"
-    />
-  </label>
-
-  <button className="rounded border px-3 py-1 text-xs w-fit" type="submit">
-    Save Schedule
-  </button>
-</form>
-
-{/* Close Visit */}
-<form action={closeVisit} className="mt-2 grid gap-2">
-  <input type="hidden" name="locationId" value={locationId} />
-  <input type="hidden" name="jobId" value={j.job_id} />
-  <input type="hidden" name="visitId" value={v.visit_id} />
-
-  <label className="text-xs">
-    Close Visit Outcome
-    <select
-      name="outcome"
-      className="mt-1 w-full rounded border px-2 py-1 text-xs"
-      defaultValue=""
-      required
-    >
-      <option value="" disabled>
-        Select…
-      </option>
-      <option value="pass">Pass / Complete</option>
-      <option value="fail">Fail / Needs Retest</option>
-    </select>
-  </label>
-
-  <label className="text-xs">
-    Closeout Notes
-    <textarea
-      name="notes"
-      className="mt-1 w-full rounded border px-2 py-1 text-xs"
-      rows={2}
-      placeholder="What happened today / what’s next…"
-    />
-  </label>
-
-  <button className="rounded border px-3 py-1 text-xs w-fit" type="submit">
-    Close Visit
-  </button>
-</form>
-
-
                             </div>
                           </div>
                         ))}

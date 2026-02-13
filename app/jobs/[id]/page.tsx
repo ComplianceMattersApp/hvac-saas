@@ -8,7 +8,6 @@ import {
   updateJobCustomerFromForm,
   updateJobScheduleFromForm,
   advanceJobStatusFromForm,
-  markJobFailedFromForm,
   type JobStatus,
 } from "@/lib/actions/job-actions";
 
@@ -301,13 +300,6 @@ export default async function JobDetailPage({
                 <input type="hidden" name="job_id" value={job.id} />
                 <button className="px-3 py-2 rounded bg-black text-white text-sm" type="submit">
                   Advance to: {nextStatusLabel(job.status)}
-                </button>
-              </form>
-
-              <form action={markJobFailedFromForm}>
-                <input type="hidden" name="job_id" value={job.id} />
-                <button className="px-3 py-2 rounded border text-sm" type="submit">
-                  Mark Failed
                 </button>
               </form>
 
