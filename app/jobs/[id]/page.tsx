@@ -8,6 +8,7 @@ import {
   updateJobCustomerFromForm,
   updateJobScheduleFromForm,
   advanceJobStatusFromForm,
+  completeDataEntryFromForm,
   type JobStatus,
 } from "@/lib/actions/job-actions";
 
@@ -272,6 +273,7 @@ export default async function JobDetailPage({
 </div>
 
 
+
           <div className="flex justify-between">
             <span className="text-gray-600">Job ID</span>
             <span className="font-mono text-xs">{job.id}</span>
@@ -288,6 +290,8 @@ export default async function JobDetailPage({
         </div>
       </div>
 
+
+
       {/* TAB: INFO */}
       {tab === "info" && (
         <>
@@ -296,12 +300,54 @@ export default async function JobDetailPage({
             <div className="text-sm font-semibold mb-3">Quick Actions</div>
 
             <div className="flex flex-wrap gap-2">
-              <form action={advanceJobStatusFromForm}>
-                <input type="hidden" name="job_id" value={job.id} />
-                <button className="px-3 py-2 rounded bg-black text-white text-sm" type="submit">
-                  Advance to: {nextStatusLabel(job.status)}
-                </button>
-              </form>
+              <div className="text-sm font-medium">
+  Current Status: {job.status.replaceAll("_", " ")}
+</div>
+
+
+              {!["completed", "failed", "cancelled"].includes(job.status) && (
+  <form action={advanceJobStatusFromForm}>
+    <input type="hidden" name="id" value={job.id} />
+    <input type="hidden" name="current_status" value={job.status} />
+
+    <button
+      type="submit"
+      className="px-3 py-2 rounded border text-sm cursor-pointer"
+    >
+      {job.status === "open" && "Mark On The Way"}
+      {job.status === "on_the_way" && "Start Job"}
+      {job.status === "in_process" && "Mark Completed"}
+    </button>
+  </form>
+)}
+
+{job.ops_status === "data_entry" ? (
+  <div className="rounded-lg border bg-yellow-50 p-4 mt-6">
+    <div className="font-semibold mb-2">
+      Data Entry Required
+    </div>
+
+    <form action={completeDataEntryFromForm} className="flex flex-wrap gap-2 items-end">
+      <input type="hidden" name="id" value={job.id} />
+
+      <div className="flex flex-col">
+        <label className="text-sm">Invoice # (optional)</label>
+        <input
+          name="invoice_number"
+          className="rounded border px-3 py-2 text-sm"
+        />
+      </div>
+
+      <button
+        type="submit"
+        className="px-3 py-2 rounded border text-sm bg-black text-white"
+      >
+        Mark Data Entry Complete
+      </button>
+    </form>
+  </div>
+) : null}
+
 
               <Link className="px-3 py-2 rounded border text-sm" href="/jobs">
                 Back to Jobs
@@ -316,7 +362,8 @@ export default async function JobDetailPage({
             <div className="text-sm font-semibold mb-3">Customer</div>
 
             <form action={updateJobCustomerFromForm} className="grid gap-3">
-              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="id" value={job.id} />
+
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -414,7 +461,8 @@ export default async function JobDetailPage({
             <div className="text-sm font-semibold mb-3">Scheduling</div>
 
             <form action={updateJobScheduleFromForm} className="grid gap-3">
-              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="id" value={job.id} />
+
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -475,7 +523,8 @@ export default async function JobDetailPage({
             <div className="text-sm font-semibold mb-3">Job Status</div>
 
             <form action={updateJobOpsFromForm} className="flex gap-2 items-end">
-              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="id" value={job.id} />
+
 
               <div className="flex-1">
                 <label className="block text-xs text-gray-600 mb-1">Ops Status</label>
@@ -503,7 +552,8 @@ export default async function JobDetailPage({
             <div className="text-sm font-semibold mb-3">Follow Up</div>
 
             <form action={updateJobOpsDetailsFromForm} className="grid gap-3">
-              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="id" value={job.id} />
+
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -569,7 +619,8 @@ export default async function JobDetailPage({
 
               <div className="flex flex-wrap gap-2 mb-4">
                 <form action={logCustomerContactAttemptFromForm}>
-                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="id" value={job.id} />
+
                   <input type="hidden" name="method" value="call" />
                   <input type="hidden" name="result" value="no_answer" />
                   <button className="px-3 py-2 rounded border text-sm" type="submit">
@@ -578,7 +629,8 @@ export default async function JobDetailPage({
                 </form>
 
                 <form action={logCustomerContactAttemptFromForm}>
-                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="id" value={job.id} />
+
                   <input type="hidden" name="method" value="text" />
                   <input type="hidden" name="result" value="sent" />
                   <button className="px-3 py-2 rounded border text-sm" type="submit">
@@ -587,7 +639,7 @@ export default async function JobDetailPage({
                 </form>
 
                 <form action={logCustomerContactAttemptFromForm}>
-                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="id" value={job.id} />
                   <input type="hidden" name="method" value="call" />
                   <input type="hidden" name="result" value="spoke" />
                   <button className="px-3 py-2 rounded border text-sm" type="submit">

@@ -20,31 +20,33 @@ export default async function JobInfoPage({
 
   const supabase = await createClient();
 
-  const { data: job, error } = await supabase
-    .from("jobs")
-    .select(
-      `
-      id,
-      title,
-      city,
-      job_equipment (
-        id,
-        equipment_role,
-        manufacturer,
-        model,
-        serial,
-        tonnage,
-        refrigerant_type,
-        notes,
-        created_at,
-        updated_at
-      )
+const { data: job, error } = await supabase
+  .from("jobs")
+  .select(
     `
+    id,
+    title,
+    city,
+    job_equipment (
+      id,
+      equipment_role,
+      system_location,
+      manufacturer,
+      model,
+      serial,
+      tonnage,
+      refrigerant_type,
+      notes,
+      created_at,
+      updated_at
     )
-    .eq("id", id)
-    .single();
+  `
+  )
+  .eq("id", id)
+  .single();
 
-  if (error || !job) return notFound();
+if (error || !job) return notFound();
+
 
   return (
     <div className="p-6 max-w-3xl space-y-4">
@@ -77,6 +79,8 @@ export default async function JobInfoPage({
 ) : null}
 
 
+addJobEquipmentFromForm
+
       {/* Focused content */}
       {focused === "equipment" ? (
         <div className="rounded-lg border bg-white p-4 space-y-4">
@@ -100,6 +104,22 @@ export default async function JobInfoPage({
               <div className="font-medium text-gray-900">
                 {(eq.equipment_role ?? "equipment").replaceAll("_", " ")}
               </div>
+<label className="text-sm font-medium" htmlFor="system_location">
+  System Location (optional)
+</label>
+<input
+  id="system_location"
+  name="system_location"
+  className="w-full rounded-md border px-3 py-2"
+  defaultValue={eq?.system_location ?? ""}
+/>
+
+{eq.system_location ? (
+  <div className="text-sm text-muted-foreground">
+    Location: {eq.system_location ?? "—"}
+  </div>
+) : null}
+
 
               <div className="text-sm text-gray-700">
                 {[eq.manufacturer, eq.model].filter(Boolean).join(" ") || "—"}
@@ -137,10 +157,10 @@ export default async function JobInfoPage({
   )}
 </div>
           
-
 {/* Add Equipment */}
   <form action={addJobEquipmentFromForm} className="mt-4 grid gap-3">
     <input type="hidden" name="job_id" value={job.id} />
+
 
     <div className="grid gap-1">
        <label className="text-sm font-medium text-gray-900" htmlFor="equipment_role">
@@ -161,6 +181,17 @@ export default async function JobInfoPage({
         <option value="other">Other</option>
       </select>
     </div>
+<div className="grid gap-1">
+  <label className="text-sm font-medium text-gray-900" htmlFor="system_location">
+    System Location (Upstairs / Downstairs / Closet)
+  </label>
+  <input
+    id="system_location"
+    name="system_location"
+    className="w-full rounded-md border px-3 py-2"
+    placeholder="Upstairs"
+  />
+</div>
 
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div className="grid gap-1">
@@ -255,6 +286,7 @@ export default async function JobInfoPage({
       ) : (
         <div className="text-sm text-gray-600">Choose an option above to begin.</div>
       )}
+
 
 
 

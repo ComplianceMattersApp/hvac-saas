@@ -17,9 +17,7 @@ export type JobStatus =
   | "failed"
   | "cancelled";
 
-  
 type CreateJobInput = {
-
   job_type?: string | null;
   project_type?: string | null;
 
@@ -37,8 +35,6 @@ type CreateJobInput = {
   customer_email?: string | null;
   job_notes?: string | null;
   job_address?: string | null;
-
-
 };
 
 type OpsSnapshot = {
@@ -62,7 +58,46 @@ function buildOpsChanges(before: OpsSnapshot, after: OpsSnapshot) {
   return changes;
 }
 
+/** ✅ Single source of truth for redirects back to /tests (NEVER writes s= when empty) */
+function redirectToTests(opts: {
+  jobId: string;
+  testType?: string | null;
+  systemId?: string | null;
+}) {
+  const { jobId } = opts;
+  const testType = String(opts.testType ?? "").trim();
+  const systemId = String(opts.systemId ?? "").trim();
 
+  const q = new URLSearchParams();
+  if (testType) q.set("t", testType);
+  if (systemId) q.set("s", systemId);
+
+  const qs = q.toString();
+  redirect(qs ? `/jobs/${jobId}/tests?${qs}` : `/jobs/${jobId}/tests`);
+}
+
+/** ✅ Defensive resolver: if form is missing system_id, fall back to run.system_id */
+async function resolveSystemIdForRun(params: {
+  supabase: any;
+  jobId: string;
+  testRunId: string;
+  systemIdFromForm?: string | null;
+}): Promise<string | null> {
+  const fromForm = String(params.systemIdFromForm ?? "").trim();
+  if (fromForm) return fromForm;
+
+  const { data, error } = await params.supabase
+    .from("ecc_test_runs")
+    .select("system_id")
+    .eq("id", params.testRunId)
+    .eq("job_id", params.jobId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const fromRun = String(data?.system_id ?? "").trim();
+  return fromRun || null;
+}
 
 export async function getContractors() {
   const supabase = await createClient();
@@ -77,11 +112,19 @@ export async function getContractors() {
 }
 
 export async function addJobEquipmentFromForm(formData: FormData) {
+  "use server";
+
   const jobId = String(formData.get("job_id") || "").trim();
   const equipmentRole = String(formData.get("equipment_role") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
   if (!equipmentRole) throw new Error("Missing equipment_role");
+
+  const systemLocationRaw = String(formData.get("system_location") || "").trim();
+  if (!systemLocationRaw) throw new Error("Missing system_location");
+
+  // Keep the user's casing for display, but use exact match for now.
+  const systemLocation = systemLocationRaw;
 
   const manufacturer = String(formData.get("manufacturer") || "").trim() || null;
   const model = String(formData.get("model") || "").trim() || null;
@@ -90,14 +133,44 @@ export async function addJobEquipmentFromForm(formData: FormData) {
   const tonnageRaw = String(formData.get("tonnage") || "").trim();
   const tonnage = tonnageRaw ? Number(tonnageRaw) : null;
 
-  const refrigerantType = String(formData.get("refrigerant_type") || "").trim() || null;
+  const refrigerantType =
+    String(formData.get("refrigerant_type") || "").trim() || null;
+
   const notes = String(formData.get("notes") || "").trim() || null;
 
   const supabase = await createClient();
 
-  const { error } = await supabase.from("job_equipment").insert({
+  // 1) Resolve/Create system for this job + location
+  const { data: existingSystem, error: sysFindErr } = await supabase
+    .from("job_systems")
+    .select("id")
+    .eq("job_id", jobId)
+    .eq("name", systemLocation)
+    .maybeSingle();
+
+  if (sysFindErr) throw sysFindErr;
+
+  let systemId = existingSystem?.id ?? null;
+
+  if (!systemId) {
+    const { data: newSystem, error: sysCreateErr } = await supabase
+      .from("job_systems")
+      .insert({ job_id: jobId, name: systemLocation })
+      .select("id")
+      .single();
+
+    if (sysCreateErr) throw sysCreateErr;
+    systemId = newSystem.id;
+  }
+
+  if (!systemId) throw new Error("Unable to resolve system_id");
+
+  // 2) Insert equipment tied to system_id
+  const { error: eqErr } = await supabase.from("job_equipment").insert({
     job_id: jobId,
+    system_id: systemId,
     equipment_role: equipmentRole,
+    system_location: systemLocation,
     manufacturer,
     model,
     serial,
@@ -106,19 +179,28 @@ export async function addJobEquipmentFromForm(formData: FormData) {
     notes,
   });
 
-  if (error) throw error;
+  if (eqErr) throw eqErr;
 
-  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/info`);
+  revalidatePath(`/jobs/${jobId}/tests`);
+  redirect(`/jobs/${jobId}/info?f=equipment`);
 }
 
 export async function updateJobEquipmentFromForm(formData: FormData) {
+  "use server";
+
   const jobId = String(formData.get("job_id") || "").trim();
   const equipmentId = String(formData.get("equipment_id") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
   if (!equipmentId) throw new Error("Missing equipment_id");
 
-  const equipmentRole = String(formData.get("equipment_role") || "").trim() || null;
+  const equipmentRole =
+    String(formData.get("equipment_role") || "").trim() || null;
+
+  const systemLocation =
+    String(formData.get("system_location") || "").trim() || null;
+
   const manufacturer = String(formData.get("manufacturer") || "").trim() || null;
   const model = String(formData.get("model") || "").trim() || null;
   const serial = String(formData.get("serial") || "").trim() || null;
@@ -126,7 +208,9 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
   const tonnageRaw = String(formData.get("tonnage") || "").trim();
   const tonnage = tonnageRaw ? Number(tonnageRaw) : null;
 
-  const refrigerantType = String(formData.get("refrigerant_type") || "").trim() || null;
+  const refrigerantType =
+    String(formData.get("refrigerant_type") || "").trim() || null;
+
   const notes = String(formData.get("notes") || "").trim() || null;
 
   const supabase = await createClient();
@@ -135,6 +219,7 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
     .from("job_equipment")
     .update({
       equipment_role: equipmentRole,
+      system_location: systemLocation,
       manufacturer,
       model,
       serial,
@@ -147,7 +232,8 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
 
   if (error) throw error;
 
-  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/info`);
+  redirect(`/jobs/${jobId}/info?f=equipment`);
 }
 
 export async function deleteJobEquipmentFromForm(formData: FormData) {
@@ -207,32 +293,92 @@ export async function saveEccTestOverrideFromForm(formData: FormData) {
 
   if (error) throw error;
 
+  revalidatePath(`/jobs/${jobId}/tests`);
   revalidatePath(`/jobs/${jobId}`);
 }
 
-
 export async function addEccTestRunFromForm(formData: FormData) {
+  "use server";
+
   const jobId = String(formData.get("job_id") || "").trim();
+  const systemId = String(formData.get("system_id") || "").trim();
   const testType = String(formData.get("test_type") || "").trim();
+  const equipmentId = String(formData.get("equipment_id") || "").trim(); // optional
 
   if (!jobId) throw new Error("Missing job_id");
+  if (!systemId) throw new Error("Missing system_id");
   if (!testType) throw new Error("Missing test_type");
 
   const supabase = await createClient();
 
-  const { error } = await supabase.from("ecc_test_runs").insert({
+  // Attach to Visit #1 (create it if missing)
+  const { data: visitExisting, error: visitFindErr } = await supabase
+    .from("job_visits")
+    .select("id, visit_number")
+    .eq("job_id", jobId)
+    .eq("visit_number", 1)
+    .maybeSingle();
+
+  if (visitFindErr) throw visitFindErr;
+
+  let visitId = visitExisting?.id;
+
+  if (!visitId) {
+    const { data: visitNew, error: visitCreateErr } = await supabase
+      .from("job_visits")
+      .insert({ job_id: jobId, visit_number: 1 })
+      .select("id")
+      .single();
+
+    if (visitCreateErr) throw visitCreateErr;
+    visitId = visitNew.id;
+  }
+
+  if (!visitId) throw new Error("Unable to resolve Visit #1");
+
+  // 🔒 Duplicate prevention: job + system + test_type
+  const { data: existing, error: existErr } = await supabase
+    .from("ecc_test_runs")
+    .select("id")
+    .eq("job_id", jobId)
+    .eq("system_id", systemId)
+    .eq("test_type", testType)
+    .limit(1);
+
+  if (existErr) throw existErr;
+
+  if ((existing ?? []).length) {
+    revalidatePath(`/jobs/${jobId}/tests`);
+    redirectToTests({ jobId, testType, systemId });
+  }
+
+  const payload: any = {
     job_id: jobId,
+    visit_id: visitId,
     test_type: testType,
+
+    // ✅ canonical anchor
+    system_id: systemId,
+
+    // keep legacy for now
+    system_key: systemId,
+
+    is_completed: false,
     data: {},
     computed: {},
     computed_pass: null,
     override_pass: null,
     override_reason: null,
-  });
+  };
 
-  if (error) throw error;
+  if (equipmentId) payload.equipment_id = equipmentId;
 
-  revalidatePath(`/jobs/${jobId}`);
+  const { error: insErr } = await supabase.from("ecc_test_runs").insert(payload);
+
+  if (insErr) throw insErr;
+
+  revalidatePath(`/jobs/${jobId}/tests`);
+  redirectToTests({ jobId, testType, systemId });
 }
 
 export async function deleteEccTestRunFromForm(formData: FormData) {
@@ -252,6 +398,7 @@ export async function deleteEccTestRunFromForm(formData: FormData) {
 
   if (error) throw error;
 
+  revalidatePath(`/jobs/${jobId}/tests`);
   revalidatePath(`/jobs/${jobId}`);
 }
 
@@ -261,7 +408,6 @@ export async function createContractorFromForm(formData: FormData) {
   const email = String(formData.get("email") || "").trim() || null;
   const notes = String(formData.get("notes") || "").trim() || null;
   const returnPath = String(formData.get("return_path") || "").trim();
-
 
   if (!name) throw new Error("Contractor name is required");
 
@@ -304,7 +450,12 @@ export async function updateJobContractorFromForm(formData: FormData) {
   revalidatePath("/jobs");
 }
 
-
+/** =========================
+ * SAVE: REFRIGERANT CHARGE
+ * - merges existing data
+ * - revalidates /tests
+ * - redirects back preserving t & s (never blank s=)
+ * ========================= */
 export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
@@ -341,25 +492,23 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   };
 
   const measuredSubcool =
-  data.condenser_sat_temp_f != null && data.liquid_line_temp_f != null
-    ? data.condenser_sat_temp_f - data.liquid_line_temp_f
-    : null;
+    data.condenser_sat_temp_f != null && data.liquid_line_temp_f != null
+      ? data.condenser_sat_temp_f - data.liquid_line_temp_f
+      : null;
 
-const measuredSuperheat =
-  data.suction_line_temp_f != null && data.evaporator_sat_temp_f != null
-    ? data.suction_line_temp_f - data.evaporator_sat_temp_f
-    : null;
+  const measuredSuperheat =
+    data.suction_line_temp_f != null && data.evaporator_sat_temp_f != null
+      ? data.suction_line_temp_f - data.evaporator_sat_temp_f
+      : null;
 
-const subcoolDelta =
-  measuredSubcool != null && data.target_subcool_f != null
-    ? measuredSubcool - data.target_subcool_f
-    : null;
+  const subcoolDelta =
+    measuredSubcool != null && data.target_subcool_f != null
+      ? measuredSubcool - data.target_subcool_f
+      : null;
 
-
- // Rules (your current spec)
+  // Rules (your current spec)
   const rules = {
-    
-    indoor_min_f: 70,  // we will use lowest_return_air_db_f as indoor proxy
+    indoor_min_f: 70, // we will use lowest_return_air_db_f as indoor proxy
     outdoor_min_f: 55,
     subcool_tolerance_f: 2,
     superheat_max_f: 25,
@@ -370,20 +519,18 @@ const subcoolDelta =
   const warnings: string[] = [];
   const blocked: string[] = [];
 
-
-
   // Temperature gating (doesn't block saving; affects computed_pass)
   if (data.lowest_return_air_db_f != null && data.lowest_return_air_db_f < rules.indoor_min_f) {
-  blocked.push(`Indoor temp below ${rules.indoor_min_f}F`);
-} else if (data.lowest_return_air_db_f == null) {
-  warnings.push("Missing lowest return air dry bulb");
-}
+    blocked.push(`Indoor temp below ${rules.indoor_min_f}F`);
+  } else if (data.lowest_return_air_db_f == null) {
+    warnings.push("Missing lowest return air dry bulb");
+  }
 
-if (data.outdoor_temp_f != null && data.outdoor_temp_f < rules.outdoor_min_f) {
-  blocked.push(`Outdoor temp below ${rules.outdoor_min_f}F`);
-} else if (data.outdoor_temp_f == null) {
-  warnings.push("Missing outdoor temp");
-}
+  if (data.outdoor_temp_f != null && data.outdoor_temp_f < rules.outdoor_min_f) {
+    blocked.push(`Outdoor temp below ${rules.outdoor_min_f}F`);
+  } else if (data.outdoor_temp_f == null) {
+    warnings.push("Missing outdoor temp");
+  }
 
   // Filter drier required
   if (rules.filter_drier_required && !data.filter_drier_installed) {
@@ -412,7 +559,6 @@ if (data.outdoor_temp_f != null && data.outdoor_temp_f < rules.outdoor_min_f) {
   }
 
   // Decide computed_pass
-  // If we don't have enough to compute meaningfully, keep null.
   const hasCoreCompute =
     measuredSubcool != null &&
     measuredSuperheat != null &&
@@ -422,34 +568,64 @@ if (data.outdoor_temp_f != null && data.outdoor_temp_f < rules.outdoor_min_f) {
   const computedPass = isBlocked ? null : hasCoreCompute ? failures.length === 0 : null;
 
   const computed = {
-  status: isBlocked ? "blocked" : "computed",
-  blocked,
-  measured_subcool_f: measuredSubcool,
-  measured_superheat_f: measuredSuperheat,
-  subcool_delta_f: subcoolDelta,
-  rules,
-  failures,
-  warnings,
-};
-
+    status: isBlocked ? "blocked" : "computed",
+    blocked,
+    measured_subcool_f: measuredSubcool,
+    measured_superheat_f: measuredSuperheat,
+    subcool_delta_f: subcoolDelta,
+    rules,
+    failures,
+    warnings,
+  };
 
   const supabase = await createClient();
 
-  const { error } = await supabase
+  // 1) Load existing data so we don't wipe fields
+  const { data: existingRun, error: loadErr } = await supabase
+    .from("ecc_test_runs")
+    .select("data")
+    .eq("id", testRunId)
+    .eq("job_id", jobId)
+    .single();
+
+  if (loadErr) throw loadErr;
+
+  const existingData = (existingRun?.data ?? {}) as Record<string, any>;
+
+  // 2) Merge: new values override old; untouched fields remain
+  const mergedData = { ...existingData, ...data };
+
+  const { error: upErr } = await supabase
     .from("ecc_test_runs")
     .update({
-      data,
+      data: mergedData,
       computed,
       computed_pass: computedPass,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", testRunId)
     .eq("job_id", jobId);
 
-  if (error) throw error;
+  if (upErr) throw upErr;
 
+  // ✅ preserve system selection reliably
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  revalidatePath(`/jobs/${jobId}/tests`);
   revalidatePath(`/jobs/${jobId}`);
+  redirectToTests({ jobId, testType: "refrigerant_charge", systemId });
 }
 
+/** =========================
+ * SAVE: AIRFLOW
+ * - revalidates /tests
+ * - redirects back preserving t & s
+ * ========================= */
 export async function saveAirflowDataFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
@@ -470,8 +646,7 @@ export async function saveAirflowDataFromForm(formData: FormData) {
 
   const cfmPerTon = projectType === "all_new" ? 350 : 300;
 
-  const requiredTotalCfm =
-    tonnage != null ? tonnage * cfmPerTon : null;
+  const requiredTotalCfm = tonnage != null ? tonnage * cfmPerTon : null;
 
   const failures: string[] = [];
   const warnings: string[] = [];
@@ -482,14 +657,10 @@ export async function saveAirflowDataFromForm(formData: FormData) {
   let computedPass: boolean | null = null;
 
   if (measuredTotalCfm != null && requiredTotalCfm != null) {
-    if (measuredTotalCfm < requiredTotalCfm) {
-      failures.push(`Airflow below required (${requiredTotalCfm} CFM)`);
-      computedPass = false;
-    } else {
-      computedPass = true;
-    }
+    computedPass = measuredTotalCfm < requiredTotalCfm ? false : true;
+    if (computedPass === false) failures.push(`Airflow below required (${requiredTotalCfm} CFM)`);
   } else {
-    computedPass = null; // not enough inputs
+    computedPass = null;
   }
 
   const data = {
@@ -515,15 +686,30 @@ export async function saveAirflowDataFromForm(formData: FormData) {
       data,
       computed,
       computed_pass: computedPass,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", testRunId)
     .eq("job_id", jobId);
 
   if (error) throw error;
 
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  revalidatePath(`/jobs/${jobId}/tests`);
   revalidatePath(`/jobs/${jobId}`);
+  redirectToTests({ jobId, testType: "airflow", systemId });
 }
 
+/** =========================
+ * SAVE: DUCT LEAKAGE
+ * - revalidates /tests
+ * - redirects back preserving t & s
+ * ========================= */
 export async function saveDuctLeakageDataFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
@@ -542,7 +728,7 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
   const measuredLeakageCfm = num("measured_duct_leakage_cfm");
   const tonnage = num("tonnage");
 
-  const leakagePerTonMax = projectType === "all_new" ? 20 : 40; // CFM per ton max
+  const leakagePerTonMax = projectType === "all_new" ? 20 : 40;
   const maxLeakageCfm = tonnage != null ? tonnage * leakagePerTonMax : null;
 
   const failures: string[] = [];
@@ -554,12 +740,8 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
   let computedPass: boolean | null = null;
 
   if (measuredLeakageCfm != null && maxLeakageCfm != null) {
-    if (measuredLeakageCfm > maxLeakageCfm) {
-      failures.push(`Duct leakage above max (${maxLeakageCfm} CFM)`);
-      computedPass = false;
-    } else {
-      computedPass = true;
-    }
+    computedPass = measuredLeakageCfm > maxLeakageCfm ? false : true;
+    if (computedPass === false) failures.push(`Duct leakage above max (${maxLeakageCfm} CFM)`);
   } else {
     computedPass = null;
   }
@@ -587,16 +769,33 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
       data,
       computed,
       computed_pass: computedPass,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", testRunId)
     .eq("job_id", jobId);
 
   if (error) throw error;
 
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  revalidatePath(`/jobs/${jobId}/tests`);
   revalidatePath(`/jobs/${jobId}`);
+  redirectToTests({ jobId, testType: "duct_leakage", systemId });
 }
 
+/** =========================
+ * COMPLETE TEST RUN
+ * ✅ FIXES System 2 collision by scoping conflict check to (visit + test_type + system_id)
+ * ✅ Always redirects preserving t & s (never blank s=)
+ * ========================= */
 export async function completeEccTestRunFromForm(formData: FormData) {
+  "use server";
+
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
 
@@ -605,10 +804,10 @@ export async function completeEccTestRunFromForm(formData: FormData) {
 
   const supabase = await createClient();
 
-  // 1) Load the test run (need visit_id)
+  // 1) Load the run we are completing (includes system_id)
   const { data: run, error: runErr } = await supabase
     .from("ecc_test_runs")
-    .select("id, job_id, visit_id, computed_pass, override_pass")
+    .select("id, job_id, test_type, visit_id, is_completed, system_id")
     .eq("id", testRunId)
     .eq("job_id", jobId)
     .single();
@@ -616,7 +815,10 @@ export async function completeEccTestRunFromForm(formData: FormData) {
   if (runErr) throw runErr;
   if (!run) throw new Error("Test run not found");
 
-  // 2) Ensure visit_id exists (fallback to latest visit for job, then stamp it)
+  // Resolve system_id: prefer form, fallback to run.system_id
+  const systemId = String(formData.get("system_id") || "").trim() || String(run.system_id || "").trim() || null;
+
+  // 2) Ensure visit_id exists (fallback to Visit #1)
   let visitId: string | null = run.visit_id ?? null;
 
   if (!visitId) {
@@ -624,74 +826,101 @@ export async function completeEccTestRunFromForm(formData: FormData) {
       .from("job_visits")
       .select("id")
       .eq("job_id", jobId)
-      .order("visit_number", { ascending: false })
+      .order("visit_number", { ascending: true })
       .limit(1)
       .single();
 
     if (vErr) throw vErr;
     if (!v?.id) throw new Error("No visit exists for this job");
-
     visitId = v.id;
-
-    const { error: fixErr } = await supabase
-      .from("ecc_test_runs")
-      .update({ visit_id: visitId })
-      .eq("id", testRunId)
-      .eq("job_id", jobId);
-
-    if (fixErr) throw fixErr;
   }
 
-  // 3) Mark this test as completed
-  const { error: markErr } = await supabase
+  // 3) Conflict check (SCOPED): same visit + same test_type + same system_id
+  const conflictQuery = supabase
     .from("ecc_test_runs")
-    .update({ is_completed: true })
-    .eq("id", testRunId)
+    .select("id")
+    .eq("visit_id", visitId)
+    .eq("test_type", run.test_type)
+    .neq("id", run.id)
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  // Only scope by system_id if we have one (canonical new jobs will)
+  const { data: existing, error: existErr } = systemId
+    ? await conflictQuery.eq("system_id", systemId)
+    : await conflictQuery;
+
+  if (existErr) throw existErr;
+
+  const conflict = (existing ?? [])[0] ?? null;
+  const targetId = conflict?.id ?? run.id;
+
+  // 4) If we are keeping this row and it was missing visit_id, stamp it now
+  if (!conflict?.id && !run.visit_id) {
+    const { error: stampErr } = await supabase
+      .from("ecc_test_runs")
+      .update({ visit_id: visitId })
+      .eq("id", run.id)
+      .eq("job_id", jobId);
+
+    if (stampErr) throw stampErr;
+  }
+
+  // 5) Mark completed
+  const { error: completeErr } = await supabase
+    .from("ecc_test_runs")
+    .update({ is_completed: true, updated_at: new Date().toISOString() })
+    .eq("id", targetId)
     .eq("job_id", jobId);
 
-  if (markErr) throw markErr;
+  if (completeErr) throw completeErr;
 
-  // 4) Recompute job ops_status from ALL completed runs on this visit
-  const { data: completedRuns, error: runsErr } = await supabase
-    .from("ecc_test_runs")
-    .select("computed_pass, override_pass")
-    .eq("visit_id", visitId)
-    .eq("is_completed", true);
+  // 6) If there was a conflict, delete the duplicate (the one user clicked)
+  if (conflict?.id) {
+    const { error: delErr } = await supabase
+      .from("ecc_test_runs")
+      .delete()
+      .eq("id", run.id)
+      .eq("job_id", jobId);
 
-  if (runsErr) throw runsErr;
+    if (delErr) throw delErr;
+  }
 
-  const anyFail = (completedRuns ?? []).some((r) => {
-    const pass =
-      r.override_pass !== null && r.override_pass !== undefined
-        ? r.override_pass
-        : r.computed_pass;
-    return pass === false;
-  });
-
-  const nextOps = anyFail ? "failed_pending_retest" : "ready_to_close";
-
-  const { error: jobErr } = await supabase
-    .from("jobs")
-    .update({ ops_status: nextOps })
-    .eq("id", jobId);
-
-  if (jobErr) throw jobErr;
-
+  revalidatePath(`/jobs/${jobId}/tests`);
   revalidatePath(`/jobs/${jobId}`);
+  redirectToTests({ jobId, testType: run.test_type, systemId });
 }
 
-
 export async function addAlterationCoreTestsFromForm(formData: FormData) {
+  "use server";
+
   const jobId = String(formData.get("job_id") || "").trim();
+  const systemId = String(formData.get("system_id") || "").trim();
+  const equipmentId = String(formData.get("equipment_id") || "").trim(); // optional
+
   if (!jobId) throw new Error("Missing job_id");
+  if (!systemId) throw new Error("Missing system_id");
 
   const supabase = await createClient();
 
-  // Find existing tests for this job
+  // Attach to Visit #1 for now
+  const { data: visit, error: visitErr } = await supabase
+    .from("job_visits")
+    .select("id, visit_number")
+    .eq("job_id", jobId)
+    .order("visit_number", { ascending: true })
+    .limit(1)
+    .single();
+
+  if (visitErr) throw visitErr;
+  if (!visit?.id) throw new Error("No visit found for job");
+
+  // Find existing core tests for THIS job + THIS system
   const { data: existing, error: existingError } = await supabase
     .from("ecc_test_runs")
     .select("test_type")
-    .eq("job_id", jobId);
+    .eq("job_id", jobId)
+    .eq("system_id", systemId);
 
   if (existingError) throw existingError;
 
@@ -701,33 +930,37 @@ export async function addAlterationCoreTestsFromForm(formData: FormData) {
 
   const toInsert = required
     .filter((t) => !existingSet.has(t))
-    .map((test_type) => ({
-      job_id: jobId,
-      test_type,
-      data: {},
-      computed: {},
-      computed_pass: null,
-      override_pass: null,
-      override_reason: null,
-    }));
+    .map((test_type) => {
+      const row: any = {
+        job_id: jobId,
+        visit_id: visit.id,
+        test_type,
+        system_id: systemId,
+        is_completed: false,
+        data: {},
+        computed: {},
+        computed_pass: null,
+        override_pass: null,
+        override_reason: null,
+      };
+
+      if (equipmentId) row.equipment_id = equipmentId;
+      return row;
+    });
 
   if (toInsert.length > 0) {
-    const { error: insertError } = await supabase
-      .from("ecc_test_runs")
-      .insert(toInsert);
-
+    const { error: insertError } = await supabase.from("ecc_test_runs").insert(toInsert);
     if (insertError) throw insertError;
   }
 
-  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/tests`);
+  redirectToTests({ jobId, systemId });
 }
-
 
 export async function createJob(input: CreateJobInput) {
   const supabase = await createClient();
 
   const payload = {
-    
     job_type: input.job_type ?? "ecc",
     project_type: input.project_type ?? "alteration",
 
@@ -746,16 +979,14 @@ export async function createJob(input: CreateJobInput) {
     customer_last_name: input.customer_last_name ?? null,
     customer_email: input.customer_email ?? null,
     job_notes: input.job_notes ?? null,
-
-
   };
-
 
   const { data, error } = await supabase
     .from("jobs")
     .insert(payload)
-    .select("id, permit_number, window_start, window_end, customer_first_name, customer_last_name, customer_email, job_notes, job_address")
-
+    .select(
+      "id, permit_number, window_start, window_end, customer_first_name, customer_last_name, customer_email, job_notes, job_address"
+    )
     .single();
 
   if (error) throw error;
@@ -797,16 +1028,14 @@ export async function updateJob(input: {
  * CREATE: used by /jobs/new form
  */
 export async function createJobFromForm(formData: FormData) {
-
   const jobType = String(formData.get("job_type") || "ecc").trim();
   const projectType = String(formData.get("project_type") || "alteration").trim();
 
   const contractorIdRaw = formData.get("contractor_id");
   const contractor_id =
-  typeof contractorIdRaw === "string" && contractorIdRaw.trim()
-    ? contractorIdRaw.trim()
-    : null;
-
+    typeof contractorIdRaw === "string" && contractorIdRaw.trim()
+      ? contractorIdRaw.trim()
+      : null;
 
   const title = String(formData.get("title") || "").trim();
   const city = String(formData.get("city") || "").trim();
@@ -819,10 +1048,8 @@ export async function createJobFromForm(formData: FormData) {
   const jobNotesRaw = String(formData.get("job_notes") || "").trim();
   const jobAddressRaw = String(formData.get("job_address") || "").trim();
 
-
   const windowStartTime = String(formData.get("window_start") || "").trim(); // HH:MM
   const windowEndTime = String(formData.get("window_end") || "").trim(); // HH:MM
-  
 
   const status = String(formData.get("status") || "open").trim() as JobStatus;
 
@@ -848,7 +1075,6 @@ export async function createJobFromForm(formData: FormData) {
   }
 
   const created = await createJob({
-    
     job_type: jobType,
     project_type: projectType,
     job_address: jobAddressRaw || null,
@@ -876,25 +1102,25 @@ export async function createJobFromForm(formData: FormData) {
  * UPDATE: used by Edit Scheduling form on job detail page
  */
 export async function advanceJobStatusFromForm(formData: FormData) {
-  const id = String(formData.get("id") || "").trim();
-  const raw = String(formData.get("current_status") || "open").trim();
+  const id =
+    String(formData.get("id") || "").trim() ||
+    String(formData.get("job_id") || "").trim();
 
   if (!id) throw new Error("Job ID is required");
 
-  const allowed: JobStatus[] = [
-    "open",
-    "on_the_way",
-    "in_process",
-    "completed",
-    "failed",
-    "cancelled",
-  ];
+  const supabase = await createClient();
 
-  const current: JobStatus = allowed.includes(raw as JobStatus)
-    ? (raw as JobStatus)
-    : "open";
+  // ✅ Read true current status from DB (source of truth)
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select("status, on_the_way_at")
+    .eq("id", id)
+    .single();
 
-  // inline mapping = zero chance of missing constants
+  if (jobErr) throw jobErr;
+
+  const current = (job?.status || "open") as JobStatus;
+
   const nextMap: Record<JobStatus, JobStatus> = {
     open: "on_the_way",
     on_the_way: "in_process",
@@ -906,73 +1132,37 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
   const next = nextMap[current];
 
-  const supabase = await createClient();
-
-  // 🔒 ONLY stamp the first time we enter "on_the_way"
-  if (next === "on_the_way") {
-    const { data: existing, error: readErr } = await supabase
+  // ✅ stamp only first time entering on_the_way
+  if (next === "on_the_way" && !job?.on_the_way_at) {
+    const { error: updErr } = await supabase
       .from("jobs")
-      .select("on_the_way_at")
-      .eq("id", id)
-      .single();
+      .update({ status: "on_the_way", on_the_way_at: new Date().toISOString() })
+      .eq("id", id);
 
-    if (readErr) throw readErr;
-
-    // only set if empty
-    if (!existing?.on_the_way_at) {
-      const { error: writeErr } = await supabase
-        .from("jobs")
-        .update({
-          status: "on_the_way",
-          on_the_way_at: new Date().toISOString(),
-        })
-        .eq("id", id);
-
-      if (writeErr) throw writeErr;
-    } else {
-      // already stamped → just advance status
-      await updateJob({ id, status: "on_the_way" });
-    }
+    if (updErr) throw updErr;
   } else {
-    await updateJob({ id, status: next });
+    const updatePayload: Record<string, any> = { status: next };
+
+    // ✅ When field marks completed, push into Data Entry queue
+    if (next === "completed") {
+      updatePayload.ops_status = "data_entry";
+    }
+
+    const { error: updErr } = await supabase
+      .from("jobs")
+      .update(updatePayload)
+      .eq("id", id);
+
+    if (updErr) throw updErr;
   }
 
   redirect(`/jobs/${id}`);
 }
 
-
-/**
- * OPTIONAL: keep for future admin tools (not used in calendar anymore)
- */
-export async function updateJobStatusQuick(input: { id: string; status: JobStatus }) {
-  await updateJob({ id: input.id, status: input.status });
-  return { ok: true };
-}
-
-export async function updateJobProfileFromForm(formData: FormData) {
-  const jobId = String(formData.get("job_id") || "").trim();
-  if (!jobId) throw new Error("Missing job_id");
-
-  const jobType = String(formData.get("job_type") || "ecc").trim();
-  const projectType = String(formData.get("project_type") || "alteration").trim();
-
-  const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("jobs")
-    .update({
-      job_type: jobType,
-      project_type: projectType,
-    })
-    .eq("id", jobId);
-
-  if (error) throw error;
-}
-
-
-
 export async function updateJobScheduleFromForm(formData: FormData) {
-  const id = String(formData.get("id") || "").trim();
+  const id =
+    String(formData.get("id") || "").trim() ||
+    String(formData.get("job_id") || "").trim();
 
   const scheduledDate = String(formData.get("scheduled_date") || "").trim(); // YYYY-MM-DD
   const permitNumberRaw = String(formData.get("permit_number") || "").trim();
@@ -1008,18 +1198,25 @@ export async function updateJobScheduleFromForm(formData: FormData) {
 
   redirect(`/jobs/${id}`);
 }
+
 export async function markJobFailedFromForm(formData: FormData) {
-  const id = String(formData.get("id") || "").trim();
+  const id =
+    String(formData.get("id") || "").trim() ||
+    String(formData.get("job_id") || "").trim();
+
   if (!id) throw new Error("Job ID is required");
 
   await updateJob({ id, status: "failed" });
   redirect(`/jobs/${id}`);
 }
+
 /**
  * UPDATE: used by Customer + Notes edit form on job detail page
  */
 export async function updateJobCustomerFromForm(formData: FormData) {
-  const id = String(formData.get("id") || "").trim();
+  const id =
+    String(formData.get("id") || "").trim() ||
+    String(formData.get("job_id") || "").trim();
   if (!id) throw new Error("Job ID is required");
 
   const customer_first_name = String(formData.get("customer_first_name") || "").trim() || null;
@@ -1038,7 +1235,29 @@ export async function updateJobCustomerFromForm(formData: FormData) {
   });
 
   redirect(`/jobs/${id}`);
-
-  
 }
 
+export async function completeDataEntryFromForm(formData: FormData) {
+  const id =
+    String(formData.get("id") || "").trim() ||
+    String(formData.get("job_id") || "").trim();
+
+  if (!id) throw new Error("Job ID is required");
+
+  const invoice = String(formData.get("invoice_number") || "").trim() || null;
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("jobs")
+    .update({
+      ops_status: "closed",
+      invoice_number: invoice,
+      data_entry_completed_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) throw error;
+
+  redirect(`/jobs/${id}`);
+}
