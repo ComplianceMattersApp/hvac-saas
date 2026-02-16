@@ -257,8 +257,15 @@ export async function deleteJobEquipmentFromForm(formData: FormData) {
 }
 
 export async function saveEccTestOverrideFromForm(formData: FormData) {
+  "use server";
+
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
+
+  // hardening: these must be provided by the form
+  const systemIdRaw = String(formData.get("system_id") || "").trim();
+  const testTypeRaw = String(formData.get("test_type") || "").trim();
+
   const override = String(formData.get("override") || "none").trim(); // "pass" | "fail" | "none"
   const reasonRaw = String(formData.get("override_reason") || "").trim();
 
@@ -280,6 +287,10 @@ export async function saveEccTestOverrideFromForm(formData: FormData) {
     override_reason = null;
   }
 
+  // ✅ validate testType against allowed pills
+  const allowed = new Set(["duct_leakage", "airflow", "refrigerant_charge", "custom"]);
+  const testType = allowed.has(testTypeRaw) ? testTypeRaw : "";
+
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -293,9 +304,43 @@ export async function saveEccTestOverrideFromForm(formData: FormData) {
 
   if (error) throw error;
 
+  // Re-render tests page
   revalidatePath(`/jobs/${jobId}/tests`);
-  revalidatePath(`/jobs/${jobId}`);
+
+  /**
+   * 🔒 HARD RULE: never redirect with &s=
+   * - if systemId missing, redirect without s (or throw)
+   */
+  // 🔒 Resolve system_id from the run (authoritative), fallback to form
+const { data: run, error: runErr } = await supabase
+  .from("ecc_test_runs")
+  .select("system_id")
+  .eq("id", testRunId)
+  .eq("job_id", jobId)
+  .single();
+
+if (runErr) throw runErr;
+
+const systemId = String(run?.system_id || systemIdRaw || "").trim();
+
+
+  if (!testType) {
+    // preserve system if present, but don't emit blank s=
+    if (systemId) redirectToTests({ jobId, systemId });
+    redirectToTests({ jobId });
+  }
+
+  if (!systemId) {
+    // explicit error OR redirect without s; pick one:
+    // throw new Error("Missing system_id");
+    redirectToTests({ jobId, testType });
+  }
+
+  redirectToTests({ jobId, testType, systemId });
+  
+  
 }
+
 
 export async function addEccTestRunFromForm(formData: FormData) {
   "use server";
@@ -804,7 +849,7 @@ export async function completeEccTestRunFromForm(formData: FormData) {
 
   const supabase = await createClient();
 
-  // 1) Load the run we are completing (includes system_id)
+  // 1) Load the run we are completing (this is the one we must KEEP)
   const { data: run, error: runErr } = await supabase
     .from("ecc_test_runs")
     .select("id, job_id, test_type, visit_id, is_completed, system_id")
@@ -816,9 +861,12 @@ export async function completeEccTestRunFromForm(formData: FormData) {
   if (!run) throw new Error("Test run not found");
 
   // Resolve system_id: prefer form, fallback to run.system_id
-  const systemId = String(formData.get("system_id") || "").trim() || String(run.system_id || "").trim() || null;
+  const systemId =
+    String(formData.get("system_id") || "").trim() ||
+    String(run.system_id || "").trim() ||
+    null;
 
-  // 2) Ensure visit_id exists (fallback to Visit #1)
+  // 2) Ensure visit_id exists (fallback to earliest visit)
   let visitId: string | null = run.visit_id ?? null;
 
   if (!visitId) {
@@ -833,30 +881,8 @@ export async function completeEccTestRunFromForm(formData: FormData) {
     if (vErr) throw vErr;
     if (!v?.id) throw new Error("No visit exists for this job");
     visitId = v.id;
-  }
 
-  // 3) Conflict check (SCOPED): same visit + same test_type + same system_id
-  const conflictQuery = supabase
-    .from("ecc_test_runs")
-    .select("id")
-    .eq("visit_id", visitId)
-    .eq("test_type", run.test_type)
-    .neq("id", run.id)
-    .order("updated_at", { ascending: false })
-    .limit(1);
-
-  // Only scope by system_id if we have one (canonical new jobs will)
-  const { data: existing, error: existErr } = systemId
-    ? await conflictQuery.eq("system_id", systemId)
-    : await conflictQuery;
-
-  if (existErr) throw existErr;
-
-  const conflict = (existing ?? [])[0] ?? null;
-  const targetId = conflict?.id ?? run.id;
-
-  // 4) If we are keeping this row and it was missing visit_id, stamp it now
-  if (!conflict?.id && !run.visit_id) {
+    // stamp visit_id on the run we're keeping
     const { error: stampErr } = await supabase
       .from("ecc_test_runs")
       .update({ visit_id: visitId })
@@ -866,21 +892,39 @@ export async function completeEccTestRunFromForm(formData: FormData) {
     if (stampErr) throw stampErr;
   }
 
-  // 5) Mark completed
+  // 3) Find any duplicate for same visit + test_type (+ system_id if present)
+  const baseConflictQuery = supabase
+    .from("ecc_test_runs")
+    .select("id")
+    .eq("visit_id", visitId)
+    .eq("test_type", run.test_type)
+    .neq("id", run.id)
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  const { data: existing, error: existErr } = systemId
+    ? await baseConflictQuery.eq("system_id", systemId)
+    : await baseConflictQuery;
+
+  if (existErr) throw existErr;
+
+  const conflict = (existing ?? [])[0] ?? null;
+
+  // 4) Mark THIS run completed (the one the user clicked)
   const { error: completeErr } = await supabase
     .from("ecc_test_runs")
     .update({ is_completed: true, updated_at: new Date().toISOString() })
-    .eq("id", targetId)
+    .eq("id", run.id)
     .eq("job_id", jobId);
 
   if (completeErr) throw completeErr;
 
-  // 6) If there was a conflict, delete the duplicate (the one user clicked)
+  // 5) If there was a conflict, delete the OTHER row (never delete the clicked one)
   if (conflict?.id) {
     const { error: delErr } = await supabase
       .from("ecc_test_runs")
       .delete()
-      .eq("id", run.id)
+      .eq("id", conflict.id)
       .eq("job_id", jobId);
 
     if (delErr) throw delErr;
@@ -890,6 +934,7 @@ export async function completeEccTestRunFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}`);
   redirectToTests({ jobId, testType: run.test_type, systemId });
 }
+
 
 export async function addAlterationCoreTestsFromForm(formData: FormData) {
   "use server";

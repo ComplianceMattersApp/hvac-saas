@@ -368,8 +368,12 @@ export default async function JobTestsPage({
             ) : (
               <>
                 <form action={saveEccTestOverrideFromForm} className="grid gap-3 border-t pt-3">
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <input type="hidden" name="test_run_id" value={runDL.id} />
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="test_run_id" value={runDL.id} />
+
+                    {/* 🔒 hardening: always preserve system + test context */}
+                    <input type="hidden" name="system_id" value={selectedSystemId} />
+                    <input type="hidden" name="test_type" value="duct_leakage" />
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="grid gap-1">
