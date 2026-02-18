@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "../../lib/supabase/client";
 
 
 export default function LoginPage() {
   const router = useRouter();
+
   const supabase = createClient();
 
   const [email, setEmail] = useState("");
@@ -31,7 +32,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/customers");
+    router.push("/ops");
     router.refresh();
   }
 

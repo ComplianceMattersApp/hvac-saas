@@ -136,7 +136,6 @@ export default function NewJobForm({ contractors }: { contractors: Contractor[] 
             <input
               type="date"
               name="scheduled_date"
-              required
               className="w-full border rounded px-3 py-2"
             />
           </div>

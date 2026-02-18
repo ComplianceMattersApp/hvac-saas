@@ -468,30 +468,33 @@ export default async function JobTestsPage({
                       />
                     </div>
                   </div>
+   <div className="flex flex-wrap gap-2 items-center">
+  {/* SAVE */}
+  <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
+    Save Duct Leakage
+  </button>
 
-                  <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
-                    Save Duct Leakage
-                  </button>
-                </form>
+  {/* COMPLETE — uses SAME form payload (includes tonnage/measured/notes) */}
+  <button
+    type="submit"
+    formAction={completeEccTestRunFromForm}
+    className="px-3 py-2 rounded border text-sm"
+    disabled={!!runDL.is_completed}
+  >
+    {runDL.is_completed ? "Completed ✅" : "Complete Duct Leakage Test"}
+  </button>
+</div>
+</form>
 
-                <div className="flex flex-wrap gap-2 items-center">
-                  <form action={completeEccTestRunFromForm}>
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <input type="hidden" name="test_run_id" value={runDL.id} />
-                    <input type="hidden" name="system_id" value={selectedSystemId} />
-                    <button type="submit" className="px-3 py-2 rounded border text-sm" disabled={!!runDL.is_completed}>
-                      {runDL.is_completed ? "Completed ✅" : "Complete Duct Leakage Test"}
-                    </button>
-                  </form>
+{/* DELETE stays separate */}
+<form action={deleteEccTestRunFromForm}>
+  <input type="hidden" name="job_id" value={job.id} />
+  <input type="hidden" name="test_run_id" value={runDL.id} />
+  <button type="submit" className="rounded-md border px-3 py-2 text-sm">
+    Delete
+  </button>
+</form>
 
-                  <form action={deleteEccTestRunFromForm}>
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <input type="hidden" name="test_run_id" value={runDL.id} />
-                    <button type="submit" className="rounded-md border px-3 py-2 text-sm">
-                      Delete
-                    </button>
-                  </form>
-                </div>
               </>
             )}
           </div>

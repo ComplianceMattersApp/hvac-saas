@@ -3,11 +3,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { laWallClockToUtcIso } from "@/lib/utils/time";
+
 
 import {
   updateJobOpsFromForm,
   updateJobOpsDetailsFromForm,
 } from "./job-ops-actions";
+
+import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 
 export type JobStatus =
   | "open"
@@ -20,10 +24,9 @@ export type JobStatus =
 type CreateJobInput = {
   job_type?: string | null;
   project_type?: string | null;
-
   title: string;
   city: string;
-  scheduled_date: string;
+  scheduled_date: string | null;
   status: JobStatus;
   contractor_id?: string | null;
   permit_number?: string | null;
@@ -852,7 +855,7 @@ export async function completeEccTestRunFromForm(formData: FormData) {
   // 1) Load the run we are completing (this is the one we must KEEP)
   const { data: run, error: runErr } = await supabase
     .from("ecc_test_runs")
-    .select("id, job_id, test_type, visit_id, is_completed, system_id")
+    .select("id, job_id, test_type, visit_id, is_completed, system_id, computed_pass, override_pass, data")
     .eq("id", testRunId)
     .eq("job_id", jobId)
     .single();
@@ -866,6 +869,8 @@ export async function completeEccTestRunFromForm(formData: FormData) {
     String(run.system_id || "").trim() ||
     null;
 
+
+    
   // 2) Ensure visit_id exists (fallback to earliest visit)
   let visitId: string | null = run.visit_id ?? null;
 
@@ -882,6 +887,82 @@ export async function completeEccTestRunFromForm(formData: FormData) {
     if (!v?.id) throw new Error("No visit exists for this job");
     visitId = v.id;
 
+    // --- AUTO-SAVE ON COMPLETE (duct_leakage) ---
+// If user skipped Save, we compute + persist so a run can never be "completed" blank.
+const hasPassFail =
+  run.override_pass === true ||
+  run.override_pass === false ||
+  run.computed_pass === true ||
+  run.computed_pass === false;
+
+const hasAnyData =
+  run.data && typeof run.data === "object" && Object.keys(run.data).length > 0;
+
+if (!hasPassFail && !hasAnyData && run.test_type === "duct_leakage") {
+  const projectType = String(formData.get("project_type") || "").trim(); // "alteration" | "all_new"
+
+  const num = (key: string) => {
+    const raw = String(formData.get(key) || "").trim();
+    if (!raw) return null;
+    const val = Number(raw);
+    return Number.isFinite(val) ? val : null;
+  };
+
+  const measuredLeakageCfm = num("measured_duct_leakage_cfm");
+  const tonnage = num("tonnage");
+
+  const leakagePerTonMax = projectType === "all_new" ? 20 : 40;
+  const maxLeakageCfm = tonnage != null ? tonnage * leakagePerTonMax : null;
+
+  const failures: string[] = [];
+  const warnings: string[] = [];
+
+  if (tonnage == null) warnings.push("Missing tonnage");
+  if (measuredLeakageCfm == null) warnings.push("Missing measured duct leakage");
+
+  let computedPass: boolean | null = null;
+
+  if (measuredLeakageCfm != null && maxLeakageCfm != null) {
+    computedPass = measuredLeakageCfm > maxLeakageCfm ? false : true;
+    if (computedPass === false) failures.push(`Duct leakage above max (${maxLeakageCfm} CFM)`);
+  }
+
+  const data = {
+    measured_duct_leakage_cfm: measuredLeakageCfm,
+    tonnage,
+    max_cfm_per_ton: leakagePerTonMax,
+    notes: String(formData.get("notes") || "").trim() || null,
+  };
+
+  const computed = {
+    max_cfm_per_ton: leakagePerTonMax,
+    max_leakage_cfm: maxLeakageCfm,
+    measured_duct_leakage_cfm: measuredLeakageCfm,
+    failures,
+    warnings,
+  };
+
+  // Persist compute before allowing completion
+  const { error: saveErr } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data,
+      computed,
+      computed_pass: computedPass,
+      updated_at: new Date().toISOString(),
+      visit_id: visitId,        // also ensure visit_id is stamped
+      system_id: systemId,      // ensure system_id is stamped
+    })
+    .eq("id", run.id)
+    .eq("job_id", jobId);
+
+  if (saveErr) throw saveErr;
+
+  // refresh our local run values for later logic (optional but helps)
+  run.computed_pass = computedPass as any;
+  run.data = data as any;
+}
+
     // stamp visit_id on the run we're keeping
     const { error: stampErr } = await supabase
       .from("ecc_test_runs")
@@ -893,14 +974,15 @@ export async function completeEccTestRunFromForm(formData: FormData) {
   }
 
   // 3) Find any duplicate for same visit + test_type (+ system_id if present)
-  const baseConflictQuery = supabase
-    .from("ecc_test_runs")
-    .select("id")
-    .eq("visit_id", visitId)
-    .eq("test_type", run.test_type)
-    .neq("id", run.id)
-    .order("updated_at", { ascending: false })
-    .limit(1);
+const baseConflictQuery = supabase
+  .from("ecc_test_runs")
+  .select("id, computed_pass, override_pass, data, updated_at")
+  .eq("job_id", jobId)
+  .eq("visit_id", visitId)
+  .eq("test_type", run.test_type)
+  .neq("id", run.id)
+  .order("updated_at", { ascending: false })
+  .limit(1);
 
   const { data: existing, error: existErr } = systemId
     ? await baseConflictQuery.eq("system_id", systemId)
@@ -909,12 +991,32 @@ export async function completeEccTestRunFromForm(formData: FormData) {
   if (existErr) throw existErr;
 
   const conflict = (existing ?? [])[0] ?? null;
+  const conflictHasPassFail =
+  conflict?.override_pass === true ||
+  conflict?.override_pass === false ||
+  conflict?.computed_pass === true ||
+  conflict?.computed_pass === false;
+
+const conflictHasAnyData =
+  conflict?.data && typeof conflict.data === "object" && Object.keys(conflict.data).length > 0;
+
+// pick keeper: prefer the row that actually has pass/fail or data
+const clickedIsGoodNow =
+  run.override_pass === true ||
+  run.override_pass === false ||
+  run.computed_pass === true ||
+  run.computed_pass === false ||
+  (run.data && typeof run.data === "object" && Object.keys(run.data).length > 0);
+
+const keepId = !clickedIsGoodNow && (conflictHasPassFail || conflictHasAnyData) ? conflict.id : run.id;
+const deleteId = keepId === run.id ? conflict?.id : run.id;
+
 
   // 4) Mark THIS run completed (the one the user clicked)
   const { error: completeErr } = await supabase
     .from("ecc_test_runs")
     .update({ is_completed: true, updated_at: new Date().toISOString() })
-    .eq("id", run.id)
+    .eq("id", keepId)
     .eq("job_id", jobId);
 
   if (completeErr) throw completeErr;
@@ -929,6 +1031,10 @@ export async function completeEccTestRunFromForm(formData: FormData) {
 
     if (delErr) throw delErr;
   }
+
+  // 6) Update ECC ops_status based on completed test outcomes (failed vs paperwork_required)
+  await evaluateEccOpsStatus(jobId);
+
 
   revalidatePath(`/jobs/${jobId}/tests`);
   revalidatePath(`/jobs/${jobId}`);
@@ -1005,6 +1111,15 @@ export async function addAlterationCoreTestsFromForm(formData: FormData) {
 export async function createJob(input: CreateJobInput) {
   const supabase = await createClient();
 
+  const normalizeTimestamptz = (v: any) => {
+  const s = typeof v === "string" ? v.trim() : "";
+  if (!s) return null;
+  // Reject time-only strings like "T12:00:00.000Z"
+  if (s.startsWith("T")) return null;
+  return s;
+};
+
+
   const payload = {
     job_type: input.job_type ?? "ecc",
     project_type: input.project_type ?? "alteration",
@@ -1026,6 +1141,8 @@ export async function createJob(input: CreateJobInput) {
     job_notes: input.job_notes ?? null,
   };
 
+
+  
   const { data, error } = await supabase
     .from("jobs")
     .insert(payload)
@@ -1039,11 +1156,12 @@ export async function createJob(input: CreateJobInput) {
 }
 
 export async function updateJob(input: {
+  
   id: string;
   title?: string;
   city?: string;
   status?: JobStatus;
-  scheduled_date?: string;
+  scheduled_date?: string | null;
   contractor_id?: string | null;
   permit_number?: string | null;
   window_start?: string | null;
@@ -1072,6 +1190,7 @@ export async function updateJob(input: {
 /**
  * CREATE: used by /jobs/new form
  */
+
 export async function createJobFromForm(formData: FormData) {
   const jobType = String(formData.get("job_type") || "ecc").trim();
   const projectType = String(formData.get("project_type") || "alteration").trim();
@@ -1085,7 +1204,17 @@ export async function createJobFromForm(formData: FormData) {
   const title = String(formData.get("title") || "").trim();
   const city = String(formData.get("city") || "").trim();
   const customerPhoneRaw = String(formData.get("customer_phone") || "").trim();
+
+  // Date/time inputs from the form (wall-clock LA time)
   const scheduledDate = String(formData.get("scheduled_date") || "").trim(); // YYYY-MM-DD
+  const windowStartTime = String(formData.get("window_start") || "").trim(); // HH:MM
+  const windowEndTime = String(formData.get("window_end") || "").trim(); // HH:MM
+
+  // Persist in DB as UTC ISO, derived from LA wall-clock inputs
+  const scheduled_date_db = scheduledDate || null;
+  const window_start_db = windowStartTime || null;
+  const window_end_db = windowEndTime || null;
+
   const permitNumberRaw = String(formData.get("permit_number") || "").trim();
   const customerFirstNameRaw = String(formData.get("customer_first_name") || "").trim();
   const customerLastNameRaw = String(formData.get("customer_last_name") || "").trim();
@@ -1093,31 +1222,24 @@ export async function createJobFromForm(formData: FormData) {
   const jobNotesRaw = String(formData.get("job_notes") || "").trim();
   const jobAddressRaw = String(formData.get("job_address") || "").trim();
 
-  const windowStartTime = String(formData.get("window_start") || "").trim(); // HH:MM
-  const windowEndTime = String(formData.get("window_end") || "").trim(); // HH:MM
+  const ops_status = scheduledDate ? "scheduled" : "need_to_schedule";
 
   const status = String(formData.get("status") || "open").trim() as JobStatus;
 
-  if (!title) throw new Error("Title is required");
+  if (jobType === "service" && !title) throw new Error("Title is required");
   if (!city) throw new Error("City is required");
-  if (!scheduledDate) throw new Error("Scheduled date is required");
 
-  // Keep your existing convention
-  const scheduled_date = `${scheduledDate}T12:00:00.000Z`;
-
-  const window_start = windowStartTime
-    ? new Date(`${scheduledDate}T${windowStartTime}:00`).toISOString()
-    : null;
-
-  const window_end = windowEndTime
-    ? new Date(`${scheduledDate}T${windowEndTime}:00`).toISOString()
-    : null;
-
-  if (window_start && window_end) {
-    const s = new Date(window_start).getTime();
-    const e = new Date(window_end).getTime();
-    if (!(s < e)) throw new Error("Arrival window start must be before end");
+  // Validate arrival window only if both are present
+  if (window_start_db && window_end_db) {
+  if (window_start_db >= window_end_db) {
+    throw new Error("Arrival window start must be before end");
   }
+}
+
+
+  // ...keep the rest of your function exactly as-is below...
+
+
 
   const created = await createJob({
     job_type: jobType,
@@ -1131,12 +1253,12 @@ export async function createJobFromForm(formData: FormData) {
 
     title,
     city,
-    scheduled_date,
+    scheduled_date: scheduled_date_db,
     status,
     contractor_id,
     permit_number: permitNumberRaw ? permitNumberRaw : null,
-    window_start,
-    window_end,
+    window_start: window_start_db,
+    window_end: window_end_db,
     customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
   });
 
@@ -1189,9 +1311,22 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     const updatePayload: Record<string, any> = { status: next };
 
     // ✅ When field marks completed, push into Data Entry queue
-    if (next === "completed") {
-      updatePayload.ops_status = "data_entry";
-    }
+    // When field marks completed, push into the correct Ops queue
+  if (next === "completed") {
+  const { data: jt, error: jtErr } = await supabase
+    .from("jobs")
+    .select("job_type")
+    .eq("id", id)
+    .single();
+
+  if (jtErr) throw jtErr;
+
+  if (jt?.job_type === "service") {
+    updatePayload.ops_status = "invoice_required";
+  }
+  // ecc: ops_status handled by ECC test evaluation (failed/paperwork_required)
+}
+
 
     const { error: updErr } = await supabase
       .from("jobs")
@@ -1215,31 +1350,30 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const windowEndTime = String(formData.get("window_end") || "").trim(); // HH:MM
 
   if (!id) throw new Error("Job ID is required");
-  if (!scheduledDate) throw new Error("Scheduled date is required");
+ // scheduledDate optional: blank means move job back to need_to_schedule
 
-  const scheduled_date = `${scheduledDate}T12:00:00.000Z`;
 
-  const window_start = windowStartTime
-    ? new Date(`${scheduledDate}T${windowStartTime}:00`).toISOString()
-    : null;
+// scheduledDate optional: blank means move job back to need_to_schedule
+const scheduled_date_db = scheduledDate || null;
+const window_start_db = windowStartTime || null;
+const window_end_db = windowEndTime || null;
 
-  const window_end = windowEndTime
-    ? new Date(`${scheduledDate}T${windowEndTime}:00`).toISOString()
-    : null;
 
-  if (window_start && window_end) {
-    const s = new Date(window_start).getTime();
-    const e = new Date(window_end).getTime();
-    if (!(s < e)) throw new Error("Arrival window start must be before end");
+// validate ordering ONLY if both exist
+if (window_start_db && window_end_db) {
+  if (window_start_db >= window_end_db) {
+    throw new Error("Arrival window start must be before end");
   }
+}
 
-  await updateJob({
-    id,
-    scheduled_date,
-    permit_number: permitNumberRaw ? permitNumberRaw : null,
-    window_start,
-    window_end,
-  });
+await updateJob({
+  id,
+  scheduled_date: scheduled_date_db,
+  permit_number: permitNumberRaw ? permitNumberRaw : null,
+  window_start: window_start_db,
+  window_end: window_end_db,
+});
+
 
   redirect(`/jobs/${id}`);
 }
@@ -1293,10 +1427,35 @@ export async function completeDataEntryFromForm(formData: FormData) {
 
   const supabase = await createClient();
 
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select("id, job_type, ops_status")
+    .eq("id", id)
+    .single();
+
+  if (jobErr) throw jobErr;
+
+  // Service: data entry completion = invoice sent/recorded -> closed
+  if (job?.job_type === "service") {
+    const { error } = await supabase
+      .from("jobs")
+      .update({
+        ops_status: "closed",
+        invoice_number: invoice,
+        data_entry_completed_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (error) throw error;
+
+    redirect(`/jobs/${id}`);
+  }
+
+  // ECC: data entry completion should NOT close the job
+  // ECC must go: paperwork_required -> (paperwork complete) -> closed
   const { error } = await supabase
     .from("jobs")
     .update({
-      ops_status: "closed",
       invoice_number: invoice,
       data_entry_completed_at: new Date().toISOString(),
     })

@@ -1,13 +1,19 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 const OPS_STATUSES = [
-  'need_to_schedule',
-  'pending_info',
-  'on_hold',
-  'retest_needed',
-  'ready',
+  "need_to_schedule",
+  "scheduled",
+  "pending_info",
+  "on_hold",
+  "failed",
+  "retest_needed",
+  "paperwork_required",
+  "invoice_required",
+  "closed",
 ] as const;
 
 type OpsStatus = (typeof OPS_STATUSES)[number];
@@ -161,20 +167,24 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   if (changes.length === 0) return;
 
   // UPDATE
-  const { error: updateErr } = await supabase
-    .from('jobs')
-    .update({ ops_status: opsStatus })
-    .eq('id', jobId);
+const { error: updateErr } = await supabase
+  .from("jobs")
+  .update({ ops_status: opsStatus })
+  .eq("id", jobId);
 
-  if (updateErr) throw new Error(updateErr.message);
+if (updateErr) throw new Error(updateErr.message);
 
-  // LOG
-  const { error: eventErr } = await supabase.from('job_events').insert({
-    job_id: jobId,
-    event_type: 'ops_update',
-    message: 'Ops status updated',
-    meta: { changes, source: 'job_detail' },
-  });
+// LOG
+const { error: eventErr } = await supabase.from("job_events").insert({
+  job_id: jobId,
+  event_type: "ops_update",
+  message: "Ops status updated",
+  meta: { changes, source: "job_detail" },
+});
 
-  if (eventErr) throw new Error(eventErr.message);
+if (eventErr) throw new Error(eventErr.message);
+
+// ✅ force UI refresh LAST
+revalidatePath(`/jobs/${jobId}`);
+redirect(`/jobs/${jobId}?tab=ops`);
 }

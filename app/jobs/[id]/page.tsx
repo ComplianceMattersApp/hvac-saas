@@ -12,12 +12,32 @@ import {
   type JobStatus,
 } from "@/lib/actions/job-actions";
 
+
+import ServiceStatusActions from "./_components/ServiceStatusActions";
+
+
 import {
   updateJobOpsFromForm,
   updateJobOpsDetailsFromForm,
 } from "@/lib/actions/job-ops-actions";
 
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
+
+function dateToDateInput(value?: string | null) {
+  if (!value) return "";
+
+  const s = String(value).trim();
+  if (!s) return "";
+
+  // New DB type: "YYYY-MM-DD"
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // Legacy ISO (timestamptz)
+  const d = new Date(s);
+  if (!Number.isFinite(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
 
 function formatDateLAFromIso(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -39,17 +59,25 @@ function formatDateTimeLAFromIso(iso: string) {
   }).format(new Date(iso));
 }
 
-function isoToDateInput(iso?: string | null) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return d.toISOString().slice(0, 10);
-}
+function timeToTimeInput(value?: string | null) {
+  if (!value) return "";
 
-function isoToTimeInput(iso?: string | null) {
-  if (!iso) return "";
-  const d = new Date(iso);
+  const s = String(value).trim();
+  if (!s) return "";
+
+  // ✅ New DB type: "HH:MM:SS" or "HH:MM"
+  // e.g. "08:00:00" -> "08:00"
+  if (/^\d{2}:\d{2}(:\d{2})?$/.test(s)) {
+    return s.slice(0, 5);
+  }
+
+  // ✅ Legacy / mixed cases: ISO string
+  // e.g. "2026-02-17T16:00:00.000Z"
+  const d = new Date(s);
+  if (!Number.isFinite(d.getTime())) return "";
   return d.toISOString().slice(11, 16);
 }
+
 
 function formatStatus(status?: string | null) {
   const s = (status ?? "").toString();
@@ -84,10 +112,10 @@ export default async function JobDetailPage({
   params: Promise<{ id: string }>;
   searchParams?: Promise<{ tab?: string }>;
 }) {
-  const { id } = await params;
+  const { id: jobId } = await params;
 
   const sp = searchParams ? await searchParams : {};
-  const tab = (sp?.tab ?? "info") as "info" | "ops" | "tests";
+  const tab = ((sp?.tab ?? "info") as "info" | "ops" | "tests")
 
   const supabase = await createClient();
   const contractors = await getContractors();
@@ -143,7 +171,8 @@ export default async function JobDetailPage({
         updated_at
       )
     `)
-    .eq("id", id)
+    .eq("id", jobId)
+
     .single();
 
   if (jobError || !job) return notFound();
@@ -151,7 +180,8 @@ export default async function JobDetailPage({
   const { data: customerAttempts, error: attemptsErr } = await supabase
     .from("job_events")
     .select("created_at, meta")
-    .eq("job_id", id)
+    .eq("job_id", jobId)
+
     .eq("event_type", "customer_attempt")
     .order("created_at", { ascending: false })
     .limit(200);
@@ -211,6 +241,7 @@ export default async function JobDetailPage({
         </Link>
       </div>
 
+
       {/* Command Center Snapshot (always visible) */}
       <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
         <div className="text-sm font-semibold mb-3">Job Overview</div>
@@ -252,7 +283,7 @@ export default async function JobDetailPage({
             <span className="text-gray-600">Arrival Window</span>
             <span className="font-medium">
               {job.window_start && job.window_end
-                ? `${isoToTimeInput(job.window_start)} - ${isoToTimeInput(job.window_end)}`
+                ? `${timeToTimeInput(job.window_start)} - ${timeToTimeInput(job.window_end)}`
                 : "—"}
             </span>
           </div>
@@ -271,6 +302,9 @@ export default async function JobDetailPage({
     
   </details>
 </div>
+
+ <ServiceStatusActions jobId={jobId} />
+
 
 
 
@@ -330,6 +364,7 @@ export default async function JobDetailPage({
     <form action={completeDataEntryFromForm} className="flex flex-wrap gap-2 items-end">
       <input type="hidden" name="id" value={job.id} />
 
+      
       <div className="flex flex-col">
         <label className="text-sm">Invoice # (optional)</label>
         <input
@@ -337,7 +372,7 @@ export default async function JobDetailPage({
           className="rounded border px-3 py-2 text-sm"
         />
       </div>
-
+    
       <button
         type="submit"
         className="px-3 py-2 rounded border text-sm bg-black text-white"
@@ -470,7 +505,7 @@ export default async function JobDetailPage({
                   <input
                     type="date"
                     name="scheduled_date"
-                    defaultValue={isoToDateInput(String(job.scheduled_date ?? ""))}
+                    defaultValue={dateToDateInput(String(job.scheduled_date ?? ""))}
                     className="w-full rounded border px-2 py-2 text-sm"
                   />
                 </div>
@@ -491,7 +526,7 @@ export default async function JobDetailPage({
                   <input
                     type="time"
                     name="window_start"
-                    defaultValue={isoToTimeInput(job.window_start)}
+                    defaultValue={timeToTimeInput(job.window_start)}
                     className="w-full rounded border px-2 py-2 text-sm"
                   />
                 </div>
@@ -501,7 +536,7 @@ export default async function JobDetailPage({
                   <input
                     type="time"
                     name="window_end"
-                    defaultValue={isoToTimeInput(job.window_end)}
+                    defaultValue={timeToTimeInput(job.window_end)}
                     className="w-full rounded border px-2 py-2 text-sm"
                   />
                 </div>
@@ -523,22 +558,28 @@ export default async function JobDetailPage({
             <div className="text-sm font-semibold mb-3">Job Status</div>
 
             <form action={updateJobOpsFromForm} className="flex gap-2 items-end">
-              <input type="hidden" name="id" value={job.id} />
+              <input type="hidden" name="job_id" value={job.id} />
+
 
 
               <div className="flex-1">
                 <label className="block text-xs text-gray-600 mb-1">Ops Status</label>
                 <select
-                  name="ops_status"
-                  defaultValue={job.ops_status ?? "need_to_schedule"}
-                  className="w-full rounded border px-2 py-2 text-sm"
-                >
-                  <option value="need_to_schedule">Need to Schedule</option>
-                  <option value="pending_info">Pending Info</option>
-                  <option value="on_hold">On Hold</option>
-                  <option value="retest_needed">Retest Needed</option>
-                  <option value="ready">Ready</option>
-                </select>
+                name="ops_status"
+                defaultValue={job.ops_status ?? "need_to_schedule"}
+                className="w-full rounded border px-2 py-2 text-sm"
+              >
+                <option value="need_to_schedule">Need to Schedule</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="pending_info">Pending Info</option>
+                <option value="on_hold">On Hold</option>
+                <option value="failed">Failed</option>
+                <option value="retest_needed">Retest Needed</option>
+                <option value="paperwork_required">Paperwork Required</option>
+                <option value="invoice_required">Invoice Required</option>
+                <option value="closed">Closed</option>
+              </select>
+
               </div>
 
               <button className="px-3 py-2 rounded bg-black text-white text-sm" type="submit">
@@ -576,7 +617,7 @@ export default async function JobDetailPage({
                   <input
                     type="date"
                     name="follow_up_date"
-                    defaultValue={job.follow_up_date ? isoToDateInput(String(job.follow_up_date)) : ""}
+                    defaultValue={job.follow_up_date ? dateToDateInput(String(job.follow_up_date)) : ""}
                     className="w-full rounded border px-2 py-2 text-sm"
                   />
                 </div>
