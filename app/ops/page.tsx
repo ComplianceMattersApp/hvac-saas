@@ -2,7 +2,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import ContractorFilter from "./_components/ContractorFilter";
-import Image from "next/image";
+
+import {
+  displayDateLA,
+  displayWindowLA,
+  startOfTodayUtcIsoLA,
+  startOfTomorrowUtcIsoLA,
+} from "@/lib/utils/schedule-la";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -20,6 +26,26 @@ function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
 
   // Initial guess: midnight UTC on that date
   let utcMs = Date.UTC(y, m - 1, day, 0, 0, 0);
+
+ //Helper for dashboard time view
+
+ function timeToDisplay(t?: string | null) {
+  if (!t) return "";
+  const s = String(t).trim();
+  if (!s) return "";
+  // Accept "HH:MM:SS" or "HH:MM"
+  const hhmm = /^\d{2}:\d{2}/.test(s) ? s.slice(0, 5) : "";
+  return hhmm || "";
+}
+
+function windowToDisplay(start?: string | null, end?: string | null) {
+  const a = timeToDisplay(start);
+  const b = timeToDisplay(end);
+  if (!a && !b) return "";
+  if (a && b) return `${a}–${b}`;
+  return a || b;
+}
+
 
   // Helper to get TZ offset minutes at a UTC instant (e.g., "GMT-08:00")
   const getOffsetMinutes = (utcMillis: number) => {
@@ -107,6 +133,25 @@ export default async function OpsPage({
 
   const supabase = await createClient();
 
+  // ✅ Counts per ops_status (exclude "closed", respect contractor filter)
+let countsQ = supabase
+  .from("jobs")
+  .select("ops_status")
+  .neq("ops_status", "closed");
+
+if (contractor) countsQ = countsQ.eq("contractor_id", contractor);
+
+const { data: countRows, error: countsErr } = await countsQ;
+if (countsErr) throw countsErr;
+
+const counts = new Map<string, number>();
+for (const row of countRows ?? []) {
+  const key = String((row as any).ops_status ?? "");
+  if (!key) continue;
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+
   // Contractors for filter dropdown
   const { data: contractors } = await supabase
     .from("contractors")
@@ -140,46 +185,40 @@ export default async function OpsPage({
     return qb;
   };
 
-  // ✅ LA "today" boundaries expressed as UTC timestamps (matches your stored scheduled_date)
-const laToday = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/Los_Angeles",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-    }).format(new Date()); // "YYYY-MM-DD"
+// ✅ Today in LA as "YYYY-MM-DD" (matches jobs.scheduled_date type = DATE)
+// Canonical LA day boundaries, expressed as UTC ISO instants for timestamptz comparisons
+const startTodayUtc = startOfTodayUtcIsoLA();
+const startTomorrowUtc = startOfTomorrowUtcIsoLA();
 
-const todayStart = startOfDayUtcForTimeZone("America/Los_Angeles");
-const tomorrowStart = new Date(new Date(todayStart).getTime() + 24 * 60 * 60 * 1000).toISOString();
+// 1) TODAY (scheduled jobs where scheduled_date falls within LA "today")
+let todayQ = supabase
+  .from("jobs")
+  .select(baseSelect)
+  .eq("ops_status", "scheduled")
+  .gte("scheduled_date", startTodayUtc)
+  .lt("scheduled_date", startTomorrowUtc)
+  .order("window_start", { ascending: true });
 
+todayQ = applyCommonFilters(todayQ);
 
-  // 1) TODAY (ONLY scheduled jobs for today)
-  let todayQ = supabase
-    .from("jobs")
-    .select(baseSelect)
-    .eq("ops_status", "scheduled")
-    .gte("scheduled_date", todayStart)
-    .lt("scheduled_date", tomorrowStart)
-    .order("window_start", { ascending: true })
-    .order("scheduled_date", { ascending: true });
+const { data: todayJobs, error: todayErr } = await todayQ;
+if (todayErr) throw todayErr;
 
-  todayQ = applyCommonFilters(todayQ);
+// 2) UPCOMING (scheduled jobs on/after LA tomorrow)
+let upcomingQ = supabase
+  .from("jobs")
+  .select(baseSelect)
+  .eq("ops_status", "scheduled")
+  .gte("scheduled_date", startTomorrowUtc)
+  .order("scheduled_date", { ascending: true })
+  .order("window_start", { ascending: true })
+  .limit(25);
 
-  const { data: todayJobs, error: todayErr } = await todayQ;
-  if (todayErr) throw todayErr;
+upcomingQ = applyCommonFilters(upcomingQ);
 
-  // 2) UPCOMING (scheduled jobs after today)
-  let upcomingQ = supabase
-    .from("jobs")
-    .select(baseSelect)
-    .eq("ops_status", "scheduled")
-    .gte("scheduled_date", tomorrowStart)
-    .order("scheduled_date", { ascending: true })
-    .limit(25);
+const { data: upcomingJobs, error: upcomingErr } = await upcomingQ;
+if (upcomingErr) throw upcomingErr;
 
-  upcomingQ = applyCommonFilters(upcomingQ);
-
-  const { data: upcomingJobs, error: upcomingErr } = await upcomingQ;
-  if (upcomingErr) throw upcomingErr;
 
   // 3) CALL LIST preview (need_to_schedule)
   let callListQ = supabase
@@ -236,7 +275,7 @@ const tomorrowStart = new Date(new Date(todayStart).getTime() + 24 * 60 * 60 * 1
     <div className="flex flex-wrap gap-2">
       <Link
         href="/jobs/new"
-        className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-900"
+        className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-white"
       >
         + New Job
       </Link>
@@ -267,8 +306,9 @@ const tomorrowStart = new Date(new Date(todayStart).getTime() + 24 * 60 * 60 * 1
 </div>
 
 
+
     {/* Filters */}
-    <div className="rounded-lg border bg-white p-4 space-y-3">
+    <div className="rounded-lg border bg-white p-4 shadow-sm">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
       </div>
@@ -311,11 +351,19 @@ const tomorrowStart = new Date(new Date(todayStart).getTime() + 24 * 60 * 60 * 1
     const jobs = Array.isArray(todayJobs) ? [...todayJobs] : [];
 
     // 1) Sort by window_start (nulls last)
-    jobs.sort((a: any, b: any) => {
-      const at = a?.window_start ? new Date(a.window_start).getTime() : Number.POSITIVE_INFINITY;
-      const bt = b?.window_start ? new Date(b.window_start).getTime() : Number.POSITIVE_INFINITY;
-      return at - bt;
-    });
+jobs.sort((a: any, b: any) => {
+  const at = a?.window_start
+    ? parseInt(a.window_start.slice(0, 2)) * 60 +
+      parseInt(a.window_start.slice(3, 5))
+    : Number.POSITIVE_INFINITY;
+
+  const bt = b?.window_start
+    ? parseInt(b.window_start.slice(0, 2)) * 60 +
+      parseInt(b.window_start.slice(3, 5))
+    : Number.POSITIVE_INFINITY;
+
+  return at - bt;
+});
 
     // 2) Group by city (fallback to "Unknown City")
     const groups = new Map<string, any[]>();
@@ -358,22 +406,11 @@ const tomorrowStart = new Date(new Date(todayStart).getTime() + 24 * 60 * 60 * 1
                       </div>
                     </div>
 
-<div className="text-xs text-muted-foreground text-right whitespace-nowrap">
-  {j.window_start
-    ? new Date(j.window_start).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "America/Los_Angeles",
-      })
-    : "—"}
-  {j.window_end
-    ? `–${new Date(j.window_end).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "America/Los_Angeles",
-      })}`
-    : ""}
-</div>
+                  <div className="text-xs text-muted-foreground text-right whitespace-nowrap">
+                    {displayWindowLA(j.window_start, j.window_end) || "—"}
+                  </div>
+
+
 
                   </div>
                 </Link>
@@ -463,46 +500,70 @@ const tomorrowStart = new Date(new Date(todayStart).getTime() + 24 * 60 * 60 * 1
         </div>
       </div>
 
-      {/* Queue Tabs */}
-      <div className="rounded-lg border bg-white p-4 space-y-3">
-        <div className="text-sm font-semibold">Queues</div>
+{/* Queue Tabs */}
+<div className="rounded-lg border bg-white p-4 space-y-3">
+  <div className="text-sm font-semibold">Queues</div>
 
-        <div className="flex flex-wrap gap-2">
-          {OPS_TABS.map((t) => {
-            const href = `/ops${buildQueryString({
-              bucket: t.key,
-              contractor: contractor ?? "",
-              q: q ?? "",
-            })}`;
-            const active = bucket === t.key;
-            return (
-              <Link
-                key={t.key}
-                href={href}
+  <div className="flex flex-wrap gap-2">
+    {OPS_TABS.map((t) => {
+      const href = `/ops${buildQueryString({
+        bucket: t.key,
+        contractor: contractor ?? "",
+        q: q ?? "",
+      })}`;
+
+      const active = bucket === t.key;
+      const count = counts.get(t.key) ?? 0;
+
+      return (
+        <Link
+          key={t.key}
+          href={href}
+          className={[
+  "rounded-full border px-3 py-1 text-sm transition font-medium",
+  active
+    ? "bg-black text-white border-black"
+    : "bg-white text-gray-900 border-gray-300 hover:bg-gray-100",
+].join(" ")}
+        >
+          <span className="flex items-center gap-2">
+            {t.label}
+
+            {/* Show badge ONLY if not closed AND count > 0 */}
+            {t.key !== "closed" && count > 0 && (
+              <span
                 className={[
-                  "rounded-full border px-3 py-1 text-sm",
-                  active ? "bg-black text-white" : "bg-white",
-                ].join(" ")}
-              >
-                {t.label}
-              </Link>
-            );
-          })}
-        </div>
+  "rounded-full border px-3 py-1 text-sm transition font-medium",
+  active
+    ? "bg-black text-white border-black"
+    : "bg-white text-gray-900 border-gray-300 hover:bg-gray-100",
+].join(" ")}
 
-        <div className="text-xs text-muted-foreground">
+              >
+                {count}
+              </span>
+            )}
+          </span>
+        </Link>
+      );
+    })}
+  </div>
+</div>
+
+ 
+        <div className="text-xs text-blue-600">
           Showing: <span className="font-medium">{bucket}</span>
         </div>
 
         <div className="space-y-2">
           {(bucketJobs ?? []).length === 0 ? (
-            <div className="text-sm text-muted-foreground">No jobs in this queue.</div>
+            <div className="text-sm text-blue-600">No jobs in this queue.</div>
           ) : (
             (bucketJobs ?? []).map((j: any) => (
               <Link
                 key={j.id}
                 href={`/jobs/${j.id}?tab=ops`}
-                className="block rounded-md border p-3 hover:bg-gray-50"
+                className="block rounded-md border bg-white p-3 hover:bg-gray-50 transition"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -523,7 +584,6 @@ const tomorrowStart = new Date(new Date(todayStart).getTime() + 24 * 60 * 60 * 1
             ))
           )}
         </div>
-      </div>
     </div>
   );
 }

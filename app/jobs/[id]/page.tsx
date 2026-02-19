@@ -14,7 +14,7 @@ import {
 
 
 import ServiceStatusActions from "./_components/ServiceStatusActions";
-
+import { displayDateLA } from "@/lib/utils/schedule-la";
 
 import {
   updateJobOpsFromForm,
@@ -22,6 +22,9 @@ import {
 } from "@/lib/actions/job-ops-actions";
 
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
+
+
+
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -49,15 +52,38 @@ function formatDateLAFromIso(iso: string) {
 }
 
 function formatDateTimeLAFromIso(iso: string) {
-  return new Intl.DateTimeFormat("en-US", {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
+
+  const date = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+  }).format(d);
+
+  const time = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(iso));
+    hour12: false,
+  }).format(d);
+
+  return `${date} ${time}`;
 }
+
+
+function formatDateDisplay(date?: string | null) {
+  if (!date) return "";
+  return date; // already "YYYY-MM-DD"
+}
+
+function formatTimeDisplay(time?: string | null) {
+  if (!time) return "";
+  const s = String(time);
+  return s.slice(0, 5); // "HH:MM"
+}
+
 
 function timeToTimeInput(value?: string | null) {
   if (!value) return "";
@@ -123,6 +149,7 @@ export default async function JobDetailPage({
   const { data: job, error: jobError } = await supabase
     .from("jobs")
     .select(`
+      customer_id,
       job_type,
       project_type,
       id,
@@ -205,6 +232,32 @@ export default async function JobDetailPage({
 
   return (
     <div className="p-6 max-w-3xl">
+
+<div className="flex items-center justify-between mb-4">
+  <Link
+    href="/ops"
+    className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+  >
+    ← Back to Ops
+  </Link>
+
+  <div className="flex gap-2">
+    <Link
+      href="/customers"
+      className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+    >
+      Customers
+    </Link>
+    <Link
+      href="/calendar"
+      className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+    >
+      Calendar
+    </Link>
+  </div>
+</div>
+
+
       {/* Header */}
       <div className="mb-3">
         <h1 className="text-2xl font-semibold">{job.title}</h1>
@@ -275,7 +328,7 @@ export default async function JobDetailPage({
           <div className="flex justify-between">
             <span className="text-gray-600">Scheduled</span>
             <span className="font-medium">
-              {job.scheduled_date ? formatDateLAFromIso(String(job.scheduled_date)) : "—"}
+              {job.scheduled_date ? displayDateLA(String(job.scheduled_date)) : "—"}
             </span>
           </div>
 
@@ -297,11 +350,26 @@ export default async function JobDetailPage({
   <details className="text-sm">
     <summary className="cursor-pointer text-gray-600 underline">
       Change contractor
-    </summary>
-
-    
+    </summary>    
   </details>
 </div>
+
+{job.customer_id ? (
+  <Link
+    href={`/customers/${job.customer_id}/edit`}
+    className="inline-flex items-center rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+  >
+    Edit Customer →
+  </Link>
+) : (
+  <div className="text-xs text-red-600">
+    This job is not linked to a customer yet.
+  </div>
+)}
+
+
+
+
 
  <ServiceStatusActions jobId={jobId} />
 
@@ -393,6 +461,8 @@ export default async function JobDetailPage({
 
 
           {/* Edit Customer */}
+
+          
           <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
             <div className="text-sm font-semibold mb-3">Customer</div>
 
@@ -437,6 +507,14 @@ export default async function JobDetailPage({
                   />
                 </div>
               </div>
+
+              <Link
+  href={`/customers/${job.customer_id}/edit`}
+  className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+>
+  Edit Customer
+</Link>
+
 
               <button className="px-3 py-2 rounded bg-black text-white text-sm w-fit" type="submit">
                 Save Customer
@@ -492,61 +570,81 @@ export default async function JobDetailPage({
           </section>
 
           {/* Scheduling */}
-          <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
-            <div className="text-sm font-semibold mb-3">Scheduling</div>
+<div className="rounded-xl border bg-white p-5 sm:p-6 text-gray-900 mb-6 shadow-sm">
+  <div className="flex items-center justify-between mb-4">
+    <div>
+      <div className="text-base font-semibold">Scheduling</div>
+      <div className="text-xs text-gray-500">Set date, arrival window, and permit info.</div>
+    </div>
+  </div>
 
-            <form action={updateJobScheduleFromForm} className="grid gap-3">
-              <input type="hidden" name="id" value={job.id} />
+  <form action={updateJobScheduleFromForm} className="space-y-4">
+    <input type="hidden" name="id" value={job.id} />
 
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="space-y-1">
+        <label className="block text-xs font-medium text-gray-700">Scheduled Date</label>
+        <input
+          type="date"
+          name="scheduled_date"
+          defaultValue={displayDateLA(job.scheduled_date)}
+          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+        />
+      </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Scheduled Date</label>
-                  <input
-                    type="date"
-                    name="scheduled_date"
-                    defaultValue={dateToDateInput(String(job.scheduled_date ?? ""))}
-                    className="w-full rounded border px-2 py-2 text-sm"
-                  />
-                </div>
+      <div className="space-y-1">
+        <label className="block text-xs font-medium text-gray-700">Permit #</label>
+        <input
+          name="permit_number"
+          defaultValue={job.permit_number ?? ""}
+          placeholder="Optional"
+          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black"
+        />
+      </div>
+    </div>
 
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Permit #</label>
-                  <input
-                    name="permit_number"
-                    defaultValue={job.permit_number ?? ""}
-                    className="w-full rounded border px-2 py-2 text-sm"
-                  />
-                </div>
-              </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="space-y-1">
+        <label className="block text-xs font-medium text-gray-700">Window Start</label>
+        <input
+          type="time"
+          name="window_start"
+          defaultValue={timeToTimeInput(job.window_start)}
+          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+        />
+        <div className="text-[11px] text-gray-500">Example: 08:00</div>
+      </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Window Start</label>
-                  <input
-                    type="time"
-                    name="window_start"
-                    defaultValue={timeToTimeInput(job.window_start)}
-                    className="w-full rounded border px-2 py-2 text-sm"
-                  />
-                </div>
+      <div className="space-y-1">
+        <label className="block text-xs font-medium text-gray-700">Window End</label>
+        <input
+          type="time"
+          name="window_end"
+          defaultValue={timeToTimeInput(job.window_end)}
+          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+        />
+        <div className="text-[11px] text-gray-500">Example: 10:00</div>
+      </div>
+    </div>
 
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Window End</label>
-                  <input
-                    type="time"
-                    name="window_end"
-                    defaultValue={timeToTimeInput(job.window_end)}
-                    className="w-full rounded border px-2 py-2 text-sm"
-                  />
-                </div>
-              </div>
+    <div className="flex flex-wrap items-center gap-2 pt-1">
+      <button
+        className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+        type="submit"
+      >
+        Save Scheduling
+      </button>
 
-              <button className="px-3 py-2 rounded bg-black text-white text-sm w-fit" type="submit">
-                Save Scheduling
-              </button>
-            </form>
-          </div>
+      <Link
+        href="/ops"
+        className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
+      >
+        Back to Ops
+      </Link>
+    </div>
+  </form>
+</div>
+
         </>
       )}
 

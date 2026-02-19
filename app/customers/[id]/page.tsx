@@ -69,7 +69,12 @@ export default async function CustomerDetailPage(props: {
     );
   }
 
+
+  
   const customer = customerRow as CustomerSummaryRow;
+
+ 
+
 
   const { data: locationsData, error: locationsErr } = await supabase
     .from("customer_locations_summary")
@@ -87,6 +92,8 @@ export default async function CustomerDetailPage(props: {
         <Link href="/customers" className="text-sm underline">
           ← Back to Customers
         </Link>
+
+        
 
         <h1 className="text-2xl font-semibold">
           {customer.full_name ?? "Unnamed Customer"}

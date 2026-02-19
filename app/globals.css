@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Make native date/time picker icons visible in Chrome/Edge */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  display: block;
+  cursor: pointer;
+  filter: invert(0);
+}
+
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -25,8 +35,14 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 /* Make native date/time picker icons visible in dark UI */
-input[type="date"],
-input[type="time"],
-input[type="datetime-local"] {
-  color-scheme: dark;
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  background: rgba(0,0,0,0.06);
 }

@@ -3,7 +3,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { laWallClockToUtcIso } from "@/lib/utils/time";
 
 
 import {
@@ -1215,6 +1214,8 @@ export async function createJobFromForm(formData: FormData) {
   const window_start_db = windowStartTime || null;
   const window_end_db = windowEndTime || null;
 
+
+
   const permitNumberRaw = String(formData.get("permit_number") || "").trim();
   const customerFirstNameRaw = String(formData.get("customer_first_name") || "").trim();
   const customerLastNameRaw = String(formData.get("customer_last_name") || "").trim();
@@ -1230,11 +1231,12 @@ export async function createJobFromForm(formData: FormData) {
   if (!city) throw new Error("City is required");
 
   // Validate arrival window only if both are present
-  if (window_start_db && window_end_db) {
-  if (window_start_db >= window_end_db) {
+  if (windowStartTime && windowEndTime) {
+  if (windowStartTime >= windowEndTime) {
     throw new Error("Arrival window start must be before end");
   }
 }
+
 
 
   // ...keep the rest of your function exactly as-is below...
@@ -1350,33 +1352,31 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const windowEndTime = String(formData.get("window_end") || "").trim(); // HH:MM
 
   if (!id) throw new Error("Job ID is required");
- // scheduledDate optional: blank means move job back to need_to_schedule
+
+  // scheduledDate optional: blank means move job back to need_to_schedule
+  const scheduled_date_db = scheduledDate || null;
+  const window_start_db = windowStartTime || null;
+  const window_end_db = windowEndTime || null;
 
 
-// scheduledDate optional: blank means move job back to need_to_schedule
-const scheduled_date_db = scheduledDate || null;
-const window_start_db = windowStartTime || null;
-const window_end_db = windowEndTime || null;
-
-
-// validate ordering ONLY if both exist
-if (window_start_db && window_end_db) {
-  if (window_start_db >= window_end_db) {
-    throw new Error("Arrival window start must be before end");
+  // validate ordering ONLY if both exist
+  if (windowStartTime && windowEndTime) {
+    if (windowStartTime >= windowEndTime) {
+      throw new Error("Arrival window start must be before end");
+    }
   }
-}
 
-await updateJob({
-  id,
-  scheduled_date: scheduled_date_db,
-  permit_number: permitNumberRaw ? permitNumberRaw : null,
-  window_start: window_start_db,
-  window_end: window_end_db,
-});
-
+  await updateJob({
+    id,
+    scheduled_date: scheduled_date_db,
+    permit_number: permitNumberRaw ? permitNumberRaw : null,
+    window_start: window_start_db,
+    window_end: window_end_db,
+  });
 
   redirect(`/jobs/${id}`);
 }
+
 
 export async function markJobFailedFromForm(formData: FormData) {
   const id =
