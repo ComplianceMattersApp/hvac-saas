@@ -3,18 +3,10 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 
 type JobType = "ecc" | "service";
 
-function toISODateMidnight(dateStr: string) {
-  // dateStr: "YYYY-MM-DD"
-  return `${dateStr}T00:00:00`;
-}
-
-function toISODatetime(dateStr: string, timeStr: string) {
-  // dateStr: "YYYY-MM-DD", timeStr: "HH:MM"
-  return `${dateStr}T${timeStr}:00`;
-}
 
 export async function createJobFromIntake(formData: FormData) {
   const supabase = await createClient();
@@ -40,9 +32,8 @@ export async function createJobFromIntake(formData: FormData) {
   const city = String(formData.get("city") || "").trim();
   const locationNotes = String(formData.get("location_notes") || "").trim() || null;
 
-  const scheduledDateStr = String(formData.get("scheduled_date") || "").trim(); // "YYYY-MM-DD" or ""
-  const windowStartStr = String(formData.get("window_start") || "").trim(); // "HH:MM" or ""
-  const windowEndStr = String(formData.get("window_end") || "").trim(); // "HH:MM" or ""
+const { scheduled_date, window_start, window_end, ops_status } =
+  deriveScheduleAndOps(formData);
 
   const equipmentEnabled = String(formData.get("equipment_enabled") || "0") === "1";
   const equipmentJson = String(formData.get("equipment_json") || "[]");
@@ -59,19 +50,6 @@ export async function createJobFromIntake(formData: FormData) {
   if (jobType === "service" && !titleRaw) {
     throw new Error("Service jobs require a Job Title.");
   }
-
-  // -----------------------------
-  // ops_status routing rule
-  // -----------------------------
-  const hasScheduledDate = Boolean(scheduledDateStr);
-  const opsStatus = hasScheduledDate ? "scheduled" : "need_to_schedule";
-
-  // Jobs table uses timestamptz for these:
-  const scheduledDateISO = hasScheduledDate ? toISODateMidnight(scheduledDateStr) : null;
-  const windowStartISO =
-    hasScheduledDate && windowStartStr ? toISODatetime(scheduledDateStr, windowStartStr) : null;
-  const windowEndISO =
-    hasScheduledDate && windowEndStr ? toISODatetime(scheduledDateStr, windowEndStr) : null;
 
   // -----------------------------
   // REQUIRED DB columns you do not collect at intake
@@ -153,11 +131,11 @@ export async function createJobFromIntake(formData: FormData) {
 
       permit_number: permitNumber,
 
-      scheduled_date: scheduledDateISO,
-      window_start: windowStartISO,
-      window_end: windowEndISO,
+      scheduled_date,
+      window_start,
+      window_end,
 
-      ops_status: opsStatus,
+      ops_status,
     })
     .select("id, ops_status")
     .single();
@@ -242,7 +220,7 @@ export async function createJobFromIntake(formData: FormData) {
   // -----------------------------
   // Redirect rule
   // -----------------------------
-  if (opsStatus === "scheduled") {
+  if (ops_status === "scheduled") {
     redirect(`/jobs/${jobId}`);
   }
 

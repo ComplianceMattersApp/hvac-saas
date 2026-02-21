@@ -12,6 +12,7 @@ import {
 
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 
+
 export type JobStatus =
   | "open"
   | "on_the_way"
@@ -21,6 +22,7 @@ export type JobStatus =
   | "cancelled";
 
 type CreateJobInput = {
+  ops_status?: string | null;
   job_type?: string | null;
   project_type?: string | null;
   title: string;
@@ -37,7 +39,18 @@ type CreateJobInput = {
   customer_email?: string | null;
   job_notes?: string | null;
   job_address?: string | null;
-};
+  billing_recipient?: "contractor" | "customer" | "other" | null;
+  billing_name?: string | null;
+  billing_email?: string | null;
+  billing_phone?: string | null;
+  billing_address_line1?: string | null;
+  billing_address_line2?: string | null;
+  billing_city?: string | null;
+  billing_state?: string | null;
+  billing_zip?: string | null;
+  
+  };
+
 
 type OpsSnapshot = {
   ops_status: string | null;
@@ -1138,6 +1151,18 @@ export async function createJob(input: CreateJobInput) {
     customer_last_name: input.customer_last_name ?? null,
     customer_email: input.customer_email ?? null,
     job_notes: input.job_notes ?? null,
+
+        ops_status: input.ops_status ?? null,
+
+    billing_recipient: input.billing_recipient ?? null,
+    billing_name: input.billing_name ?? null,
+    billing_email: input.billing_email ?? null,
+    billing_phone: input.billing_phone ?? null,
+    billing_address_line1: input.billing_address_line1 ?? null,
+    billing_address_line2: input.billing_address_line2 ?? null,
+    billing_city: input.billing_city ?? null,
+    billing_state: input.billing_state ?? null,
+    billing_zip: input.billing_zip ?? null,
   };
 
 
@@ -1146,7 +1171,7 @@ export async function createJob(input: CreateJobInput) {
     .from("jobs")
     .insert(payload)
     .select(
-      "id, permit_number, window_start, window_end, customer_first_name, customer_last_name, customer_email, job_notes, job_address"
+      "id, permit_number, window_start, window_end, customer_first_name, customer_last_name, customer_email, job_notes, job_address, scheduled_date: scheduledDate, window_start: windowStart, window_end: windowEnd, ops_status: opsStatus"
     )
     .single();
 
@@ -1204,17 +1229,62 @@ export async function createJobFromForm(formData: FormData) {
   const city = String(formData.get("city") || "").trim();
   const customerPhoneRaw = String(formData.get("customer_phone") || "").trim();
 
-  // Date/time inputs from the form (wall-clock LA time)
-  const scheduledDate = String(formData.get("scheduled_date") || "").trim(); // YYYY-MM-DD
-  const windowStartTime = String(formData.get("window_start") || "").trim(); // HH:MM
-  const windowEndTime = String(formData.get("window_end") || "").trim(); // HH:MM
+  const billing_recipient = String(formData.get("billing_recipient") || "").trim() as
+  | "contractor"
+  | "customer"
+  | "other"
+  | "";
 
-  // Persist in DB as UTC ISO, derived from LA wall-clock inputs
-  const scheduled_date_db = scheduledDate || null;
-  const window_start_db = windowStartTime || null;
-  const window_end_db = windowEndTime || null;
+  const billing_name = String(formData.get("billing_name") || "").trim() || null;
+  const billing_email = String(formData.get("billing_email") || "").trim() || null;
+  const billing_phone = String(formData.get("billing_phone") || "").trim() || null;
 
+  const billing_address_line1 = String(formData.get("billing_address_line1") || "").trim() || null;
+  const billing_address_line2 = String(formData.get("billing_address_line2") || "").trim() || null;
+  const billing_city = String(formData.get("billing_city") || "").trim() || null;
+  const billing_state = String(formData.get("billing_state") || "").trim() || null;
+  const billing_zip = String(formData.get("billing_zip") || "").trim() || null;
 
+  // Default if empty: contractor if contractor_id exists, else customer
+  const billingRecipientFinal =
+    billing_recipient ||
+    (contractor_id ? "contractor" : "customer");
+
+  // Server-side validation
+  if (billingRecipientFinal === "contractor" && !contractor_id) {
+    throw new Error("Billing recipient is Contractor, but no contractor was selected.");
+  }
+
+  if (billingRecipientFinal === "other") {
+    if (!billing_name || !billing_address_line1 || !billing_city || !billing_state || !billing_zip) {
+      throw new Error("Billing recipient is Other: Billing name and full address are required.");
+    }
+  }
+
+//022026
+
+// Scheduling (DB types: scheduled_date DATE, window_start/end TIME)
+// Treat inputs as wall-clock strings. Do not Date-parse.
+const scheduledDateStr = String(formData.get("scheduled_date") || "").trim(); // YYYY-MM-DD or ""
+const windowStartStr   = String(formData.get("window_start") || "").trim();   // HH:MM or ""
+const windowEndStr     = String(formData.get("window_end") || "").trim();     // HH:MM or ""
+
+const hasScheduledDate = Boolean(scheduledDateStr);
+
+// Ops status derived from whether it's scheduled
+const ops_status = hasScheduledDate ? "scheduled" : "need_to_schedule";
+
+// Only persist arrival window if there is a scheduled date
+const scheduled_date_db = hasScheduledDate ? scheduledDateStr : null;
+const window_start_db   = hasScheduledDate ? (windowStartStr || null) : null;
+const window_end_db     = hasScheduledDate ? (windowEndStr || null) : null;
+
+// Validate arrival window only if both are present
+if (window_start_db && window_end_db) {
+  if (window_start_db >= window_end_db) {
+    throw new Error("Arrival window start must be before end");
+  }
+}
 
   const permitNumberRaw = String(formData.get("permit_number") || "").trim();
   const customerFirstNameRaw = String(formData.get("customer_first_name") || "").trim();
@@ -1223,23 +1293,10 @@ export async function createJobFromForm(formData: FormData) {
   const jobNotesRaw = String(formData.get("job_notes") || "").trim();
   const jobAddressRaw = String(formData.get("job_address") || "").trim();
 
-  const ops_status = scheduledDate ? "scheduled" : "need_to_schedule";
-
   const status = String(formData.get("status") || "open").trim() as JobStatus;
 
   if (jobType === "service" && !title) throw new Error("Title is required");
   if (!city) throw new Error("City is required");
-
-  // Validate arrival window only if both are present
-  if (windowStartTime && windowEndTime) {
-  if (windowStartTime >= windowEndTime) {
-    throw new Error("Arrival window start must be before end");
-  }
-}
-
-
-
-  // ...keep the rest of your function exactly as-is below...
 
 
 
@@ -1262,6 +1319,16 @@ export async function createJobFromForm(formData: FormData) {
     window_start: window_start_db,
     window_end: window_end_db,
     customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
+    ops_status,
+    billing_recipient: billingRecipientFinal,
+    billing_name,
+    billing_email,
+    billing_phone,
+    billing_address_line1,
+    billing_address_line2,
+    billing_city,
+    billing_state,
+billing_zip,
   });
 
   redirect(`/jobs/${created.id}`);
@@ -1358,13 +1425,6 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const window_start_db = windowStartTime || null;
   const window_end_db = windowEndTime || null;
 
-
-  // validate ordering ONLY if both exist
-  if (windowStartTime && windowEndTime) {
-    if (windowStartTime >= windowEndTime) {
-      throw new Error("Arrival window start must be before end");
-    }
-  }
 
   await updateJob({
     id,

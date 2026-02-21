@@ -11,6 +11,7 @@ export default function NewJobForm({ contractors }: { contractors: Contractor[] 
   const [windowEnd, setWindowEnd] = useState("");
   const [jobAddress, setJobAddress] = useState('');
 
+  const [billingRecipient, setBillingRecipient] = useState<"contractor" | "customer" | "other">("contractor");
 
   function onQuickWindowChange(value: string) {
     if (!value) return;
@@ -48,6 +49,111 @@ export default function NewJobForm({ contractors }: { contractors: Contractor[] 
       </option>
     ))}
   </select>
+</div>
+
+
+
+{/* Billing Recipient */}
+<div className="rounded-lg border p-3 space-y-3">
+  <div>
+    <label className="block text-sm font-medium mb-2">
+      Billing Recipient
+    </label>
+
+    <div className="flex gap-4">
+      <label className="flex items-center gap-2">
+        <input
+          type="radio"
+          name="billing_recipient"
+          value="contractor"
+          checked={billingRecipient === "contractor"}
+          onChange={() => setBillingRecipient("contractor")}
+        />
+        Contractor
+      </label>
+
+      <label className="flex items-center gap-2">
+        <input
+          type="radio"
+          name="billing_recipient"
+          value="customer"
+          checked={billingRecipient === "customer"}
+          onChange={() => setBillingRecipient("customer")}
+        />
+        Customer
+      </label>
+
+      <label className="flex items-center gap-2">
+        <input
+          type="radio"
+          name="billing_recipient"
+          value="other"
+          checked={billingRecipient === "other"}
+          onChange={() => setBillingRecipient("other")}
+        />
+        Other
+      </label>
+    </div>
+  </div>
+
+  {billingRecipient === "other" && (
+    <div className="space-y-3 pt-2">
+      <input
+        type="text"
+        name="billing_name"
+        placeholder="Billing Name"
+        required
+        className="w-full border rounded px-3 py-2"
+      />
+
+      <input
+        type="text"
+        name="billing_address_line1"
+        placeholder="Billing Address"
+        required
+        className="w-full border rounded px-3 py-2"
+      />
+
+      <div className="grid grid-cols-2 gap-3">
+        <input
+          type="text"
+          name="billing_city"
+          placeholder="City"
+          required
+          className="border rounded px-3 py-2"
+        />
+        <input
+          type="text"
+          name="billing_state"
+          placeholder="State"
+          required
+          className="border rounded px-3 py-2"
+        />
+      </div>
+
+      <input
+        type="text"
+        name="billing_zip"
+        placeholder="Zip"
+        required
+        className="w-full border rounded px-3 py-2"
+      />
+
+      <input
+        type="email"
+        name="billing_email"
+        placeholder="Billing Email (optional)"
+        className="w-full border rounded px-3 py-2"
+      />
+
+      <input
+        type="tel"
+        name="billing_phone"
+        placeholder="Billing Phone (optional)"
+        className="w-full border rounded px-3 py-2"
+      />
+    </div>
+  )}
 </div>
 
 

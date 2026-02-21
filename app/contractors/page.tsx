@@ -48,9 +48,19 @@ export default async function ContractorsPage() {
           <ul className="divide-y">
             {contractors.map((c) => (
               <li key={c.id} className="p-4 flex items-center justify-between">
-                <div className="font-medium text-gray-900">{c.name}</div>
+              <div className="font-medium text-gray-900">{c.name}</div>
+
+              <div className="flex items-center gap-3">
+                <Link
+                  href={`/contractors/${c.id}/edit`}
+                  className="text-sm underline"
+                >
+                  Edit
+                </Link>
+
                 <div className="text-xs text-gray-500">{c.id}</div>
-              </li>
+              </div>
+            </li>
             ))}
           </ul>
         )}

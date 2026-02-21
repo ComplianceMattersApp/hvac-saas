@@ -105,6 +105,7 @@ function timeToTimeInput(value?: string | null) {
 }
 
 
+
 function formatStatus(status?: string | null) {
   const s = (status ?? "").toString();
   const map: Record<JobStatus, string> = {
@@ -130,6 +131,8 @@ function nextStatusLabel(status?: string | null) {
   };
   return nextMap[s] ?? "—";
 }
+
+
 
 export default async function JobDetailPage({
   params,
@@ -174,6 +177,15 @@ export default async function JobDetailPage({
       customer_last_name,
       customer_email,
       job_notes,
+      billing_recipient,
+      billing_name,
+      billing_email,
+      billing_phone,
+      billing_address_line1,
+      billing_address_line2, 
+      billing_city,
+      billing_state,
+      billing_zip,
       job_equipment (
         id,
         equipment_role,
@@ -204,6 +216,8 @@ export default async function JobDetailPage({
 
   if (jobError || !job) return notFound();
 
+  
+
   const { data: customerAttempts, error: attemptsErr } = await supabase
     .from("job_events")
     .select("created_at, meta")
@@ -214,6 +228,29 @@ export default async function JobDetailPage({
     .limit(200);
 
   if (attemptsErr) throw new Error(attemptsErr.message);
+
+const contractorId = job.contractor_id ?? null;
+const customerId = job.customer_id ?? null;
+
+const { data: contractorBilling } = contractorId
+  ? await supabase
+      .from("contractors")
+      .select(
+        "id, name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip"
+      )
+      .eq("id", contractorId)
+      .maybeSingle()
+  : { data: null };
+
+const { data: customerBilling } = customerId
+  ? await supabase
+      .from("customers")
+      .select(
+        "id, full_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip"
+      )
+      .eq("id", customerId)
+      .maybeSingle()
+  : { data: null };
 
   const attemptCount = customerAttempts?.length ?? 0;
   const lastAttemptIso =
@@ -229,6 +266,80 @@ export default async function JobDetailPage({
 
   const contractorName =
     contractors?.find((c: any) => c.id === job.contractor_id)?.name ?? "—";
+    
+function formatBillingAddress(a: {
+  billing_address_line1?: string | null;
+  billing_address_line2?: string | null;
+  billing_city?: string | null;
+  billing_state?: string | null;
+  billing_zip?: string | null;
+}) {
+  const line1 = a.billing_address_line1 ?? "";
+  const line2 = a.billing_address_line2 ?? "";
+  const city = a.billing_city ?? "";
+  const state = a.billing_state ?? "";
+  const zip = a.billing_zip ?? "";
+
+  const parts = [
+    line1,
+    line2,
+    [city, state, zip].filter(Boolean).join(" "),
+  ].filter((x) => String(x || "").trim().length > 0);
+
+  return parts;
+}
+
+const recipient = (job.billing_recipient ?? "").trim();
+
+let billingSourceLabel = "Not set";
+let billing = {
+  billing_name: null as string | null,
+  billing_email: null as string | null,
+  billing_phone: null as string | null,
+  billing_address_line1: null as string | null,
+  billing_address_line2: null as string | null,
+  billing_city: null as string | null,
+  billing_state: null as string | null,
+  billing_zip: null as string | null,
+};
+
+if (recipient === "contractor") {
+  billingSourceLabel = "Contractor";
+  billing = {
+    billing_name: contractorBilling?.billing_name ?? contractorBilling?.name ?? null,
+    billing_email: contractorBilling?.billing_email ?? null,
+    billing_phone: contractorBilling?.billing_phone ?? null,
+    billing_address_line1: contractorBilling?.billing_address_line1 ?? null,
+    billing_address_line2: contractorBilling?.billing_address_line2 ?? null,
+    billing_city: contractorBilling?.billing_city ?? null,
+    billing_state: contractorBilling?.billing_state ?? null,
+    billing_zip: contractorBilling?.billing_zip ?? null,
+  };
+} else if (recipient === "customer") {
+  billingSourceLabel = "Customer";
+  billing = {
+    billing_name: customerBilling?.billing_name ?? customerBilling?.full_name ?? null,
+    billing_email: customerBilling?.billing_email ?? null,
+    billing_phone: customerBilling?.billing_phone ?? null,
+    billing_address_line1: customerBilling?.billing_address_line1 ?? null,
+    billing_address_line2: customerBilling?.billing_address_line2 ?? null,
+    billing_city: customerBilling?.billing_city ?? null,
+    billing_state: customerBilling?.billing_state ?? null,
+    billing_zip: customerBilling?.billing_zip ?? null,
+  };
+} else if (recipient === "other") {
+  billingSourceLabel = "Other (job override)";
+  billing = {
+    billing_name: job.billing_name ?? null,
+    billing_email: job.billing_email ?? null,
+    billing_phone: job.billing_phone ?? null,
+    billing_address_line1: job.billing_address_line1 ?? null,
+    billing_address_line2: job.billing_address_line2 ?? null,
+    billing_city: job.billing_city ?? null,
+    billing_state: job.billing_state ?? null,
+    billing_zip: job.billing_zip ?? null,
+  };
+}
 
   return (
     <div className="p-6 max-w-3xl">
@@ -392,7 +503,29 @@ export default async function JobDetailPage({
         </div>
       </div>
 
+{/* Billing Summary */}
 
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 shadow-sm space-y-3 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="text-base font-semibold text-white">Billing Summary</div>
+              <div className="text-xs text-zinc-400">{billingSourceLabel}</div>
+            </div>
+
+            <div className="text-sm text-zinc-200">
+              <div className="font-medium">{billing.billing_name || "—"}</div>
+
+              {formatBillingAddress(billing).map((line, idx) => (
+                <div key={idx} className="text-zinc-300">
+                  {line}
+                </div>
+              ))}
+
+              <div className="mt-2 space-y-1">
+                <div className="text-zinc-300">Email: {billing.billing_email || "—"}</div>
+                <div className="text-zinc-300">Phone: {billing.billing_phone || "—"}</div>
+              </div>
+            </div>
+          </div>
 
       {/* TAB: INFO */}
       {tab === "info" && (
@@ -460,67 +593,6 @@ export default async function JobDetailPage({
 
 
 
-          {/* Edit Customer */}
-
-          
-          <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
-            <div className="text-sm font-semibold mb-3">Customer</div>
-
-            <form action={updateJobCustomerFromForm} className="grid gap-3">
-              <input type="hidden" name="id" value={job.id} />
-
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">First Name</label>
-                  <input
-                    name="customer_first_name"
-                    defaultValue={job.customer_first_name ?? ""}
-                    className="w-full rounded border px-2 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Last Name</label>
-                  <input
-                    name="customer_last_name"
-                    defaultValue={job.customer_last_name ?? ""}
-                    className="w-full rounded border px-2 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Phone</label>
-                  <input
-                    name="customer_phone"
-                    defaultValue={job.customer_phone ?? ""}
-                    className="w-full rounded border px-2 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Email</label>
-                  <input
-                    name="customer_email"
-                    defaultValue={job.customer_email ?? ""}
-                    className="w-full rounded border px-2 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              <Link
-  href={`/customers/${job.customer_id}/edit`}
-  className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
->
-  Edit Customer
-</Link>
-
-
-              <button className="px-3 py-2 rounded bg-black text-white text-sm w-fit" type="submit">
-                Save Customer
-              </button>
-            </form>
-          </div>
 
           {/* Equipment + Tests summary cards */}
           <section className="rounded-lg border p-4 mb-4">

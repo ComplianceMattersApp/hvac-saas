@@ -3,13 +3,16 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { upsertCustomerProfileFromForm } from "@/lib/actions/customer-actions";
 
-export default async function EditCustomerPage({
+export default async function CustomerEditPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ saved?: string }>;
 }) {
   const { id } = await params;
-
+  const sp = searchParams ? await searchParams : {};
+  
 
   const supabase = await createClient();
 
@@ -27,6 +30,17 @@ export default async function EditCustomerPage({
     )
     .eq("id", id)
     .maybeSingle();
+
+    
+    const { data: location } = await supabase
+  .from("locations")
+  .select("id, address_line1, address_line2, city, state, zip")
+  .eq("customer_id", id)
+  .order("created_at", { ascending: true })
+  .limit(1)
+  .maybeSingle();
+
+  
 
   // ✅ DIAGNOSTIC: show real errors instead of returning 404
   if (error || !customer) {
@@ -64,7 +78,14 @@ export default async function EditCustomerPage({
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    
+
+        <div className="p-6 max-w-3xl mx-auto space-y-6">
+          {sp?.saved === "1" && (
+  <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-900 shadow">
+          Saved ✅
+        </div>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-2">
   <h1 className="text-2xl font-semibold">Edit Customer</h1>
@@ -185,6 +206,46 @@ export default async function EditCustomerPage({
           </div>
         </div>
 
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 shadow-sm space-y-4">
+  <div className="text-base font-semibold">Service Address</div>
+
+  <div className="space-y-3">
+    <input
+      name="address_line1"
+      placeholder="Address line 1"
+      defaultValue={location?.address_line1 ?? ""}
+      className="w-full rounded-md border px-3 py-2 text-sm"
+    />
+    <input
+      name="address_line2"
+      placeholder="Address line 2"
+      defaultValue={location?.address_line2 ?? ""}
+      className="w-full rounded-md border px-3 py-2 text-sm"
+    />
+
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <input
+        name="city"
+        placeholder="City"
+        defaultValue={location?.city ?? ""}
+        className="w-full rounded-md border px-3 py-2 text-sm"
+      />
+      <input
+        name="state"
+        placeholder="State"
+        defaultValue={location?.state ?? ""}
+        className="w-full rounded-md border px-3 py-2 text-sm"
+      />
+      <input
+        name="zip"
+        placeholder="ZIP"
+        defaultValue={location?.zip ?? ""}
+        className="w-full rounded-md border px-3 py-2 text-sm"
+      />
+    </div>
+  </div>
+</div>
+
         <button
   className="rounded-md bg-white text-black px-4 py-2 text-sm font-medium hover:bg-zinc-200"
   type="submit"
@@ -194,5 +255,9 @@ export default async function EditCustomerPage({
         </button>
       </form>
     </div>
-  );
+    )
+  ;
+  
+  
 }
+  

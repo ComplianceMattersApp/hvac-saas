@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation"
 
 function toFullName(first?: string | null, last?: string | null) {
   const f = String(first ?? "").trim();
@@ -109,10 +110,13 @@ export async function upsertCustomerProfileFromForm(formData: FormData) {
 
   // Refresh UI
   revalidatePath(`/customers/${customer_id}`);
+  // Refresh UI
+  revalidatePath(`/customers/${customer_id}`);
+  revalidatePath(`/customers/${customer_id}/edit`);
   revalidatePath("/customers");
   revalidatePath("/ops");
-}
-export async function updateCustomerFromForm(formData: FormData) {
-  return upsertCustomerProfileFromForm(formData);
+
+  // ✅ this is what makes the banner possible
+  redirect(`/customers/${customer_id}/edit?saved=1`);
 }
 
