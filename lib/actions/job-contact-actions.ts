@@ -1,7 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 type AttemptMethod = "call" | "text";
 
 function addDays(dateYYYYMMDD: string, days: number) {
@@ -102,8 +103,12 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
         first_attempt_date: firstAttemptDate,
         attempt_count: attemptCountAfter,
       },
+      
     });
+    
 
     if (escErr) throw new Error(escErr.message);
   }
+  revalidatePath(`/jobs/${jobId}`);
+  redirect(`/jobs/${jobId}?tab=ops`);
 }

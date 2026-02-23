@@ -4,18 +4,31 @@
 import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createJobFromIntake } from "@/lib/actions/intake-actions";
+import JobCoreFields from "@/components/jobs/JobCoreFields";
 
 type JobType = "ecc" | "service";
 
+type EquipmentRole =
+  | ""
+  | "outdoor"
+  | "indoor"
+  | "furnace"
+  | "air_handler"
+  | "package"
+  | "other";
+
 type EquipmentRow = {
-  make?: string;
+  make?: string; // we'll POST as "manufacturer"
   model?: string;
   serial?: string;
+  tonnage?: string;
+  refrigerant_type?: string; // visible but optional
+  equipment_role?: EquipmentRole;
   notes?: string;
 };
 
 type SystemBlock = {
-  label: string;
+  label: string; // this becomes system_location
   equipment: EquipmentRow[];
 };
 
@@ -30,7 +43,20 @@ export default function IntakePage() {
   // Optional equipment
   const [showEquipment, setShowEquipment] = useState(false);
   const [systems, setSystems] = useState<SystemBlock[]>([
-    { label: "", equipment: [{ make: "", model: "", serial: "", notes: "" }] },
+    {
+      label: "",
+      equipment: [
+        {
+          make: "",
+          model: "",
+          serial: "",
+          tonnage: "",
+          refrigerant_type: "",
+          equipment_role: "",
+          notes: "",
+        },
+      ],
+    },
   ]);
 
   // Service title required / ECC optional
@@ -40,32 +66,62 @@ export default function IntakePage() {
   const equipmentActive = useMemo(() => {
     if (!showEquipment) return false;
 
-    // If any field in any equipment row has content, we consider equipment being entered.
     return systems.some((sys) =>
       sys.equipment.some((e) =>
-        [e.make, e.model, e.serial, e.notes].some((v) => (v ?? "").trim().length > 0)
+        [
+          e.make,
+          e.model,
+          e.serial,
+          e.tonnage,
+          e.refrigerant_type,
+          e.equipment_role,
+          e.notes,
+        ].some((v) => (v ?? "").trim().length > 0)
       )
     );
   }, [showEquipment, systems]);
 
-  const equipmentJson = useMemo(() => JSON.stringify(systems), [systems]);
-
   function updateSystemLabel(idx: number, value: string) {
-    setSystems((prev) => prev.map((s, i) => (i === idx ? { ...s, label: value } : s)));
+    setSystems((prev) =>
+      prev.map((s, i) => (i === idx ? { ...s, label: value } : s))
+    );
   }
 
-  function updateEquipmentField(sysIdx: number, eqIdx: number, field: keyof EquipmentRow, value: string) {
+  function updateEquipmentField(
+    sysIdx: number,
+    eqIdx: number,
+    field: keyof EquipmentRow,
+    value: string
+  ) {
     setSystems((prev) =>
       prev.map((sys, i) => {
         if (i !== sysIdx) return sys;
-        const nextEq = sys.equipment.map((eq, j) => (j === eqIdx ? { ...eq, [field]: value } : eq));
+        const nextEq = sys.equipment.map((eq, j) =>
+          j === eqIdx ? { ...eq, [field]: value } : eq
+        );
         return { ...sys, equipment: nextEq };
       })
     );
   }
 
   function addSystem() {
-    setSystems((prev) => [...prev, { label: "", equipment: [{ make: "", model: "", serial: "", notes: "" }] }]);
+    setSystems((prev) => [
+      ...prev,
+      {
+        label: "",
+        equipment: [
+          {
+            make: "",
+            model: "",
+            serial: "",
+            tonnage: "",
+            refrigerant_type: "",
+            equipment_role: "",
+            notes: "",
+          },
+        ],
+      },
+    ]);
   }
 
   function removeSystem(idx: number) {
@@ -76,7 +132,21 @@ export default function IntakePage() {
     setSystems((prev) =>
       prev.map((sys, i) => {
         if (i !== sysIdx) return sys;
-        return { ...sys, equipment: [...sys.equipment, { make: "", model: "", serial: "", notes: "" }] };
+        return {
+          ...sys,
+          equipment: [
+            ...sys.equipment,
+            {
+              make: "",
+              model: "",
+              serial: "",
+              tonnage: "",
+              refrigerant_type: "",
+              equipment_role: "",
+              notes: "",
+            },
+          ],
+        };
       })
     );
   }
@@ -86,7 +156,22 @@ export default function IntakePage() {
       prev.map((sys, i) => {
         if (i !== sysIdx) return sys;
         const next = sys.equipment.filter((_, j) => j !== eqIdx);
-        return { ...sys, equipment: next.length ? next : [{ make: "", model: "", serial: "", notes: "" }] };
+        return {
+          ...sys,
+          equipment: next.length
+            ? next
+            : [
+                {
+                  make: "",
+                  model: "",
+                  serial: "",
+                  tonnage: "",
+                  refrigerant_type: "",
+                  equipment_role: "",
+                  notes: "",
+                },
+              ],
+        };
       })
     );
   }
@@ -96,7 +181,8 @@ export default function IntakePage() {
       <header className="mb-5">
         <h1 className="text-xl font-semibold">Customer Intake</h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Create Customer → Location → Job → Visit #1, then route into Ops correctly.
+          Create Customer → Location → Job → Visit #1, then route into Ops
+          correctly.
         </p>
       </header>
 
@@ -107,7 +193,9 @@ export default function IntakePage() {
         onSubmit={(e) => {
           // Hard UI guardrails before server action runs
           if (jobType === "service") {
-            const titleEl = (e.currentTarget.elements.namedItem("title") as HTMLInputElement | null);
+            const titleEl = e.currentTarget.elements.namedItem(
+              "title"
+            ) as HTMLInputElement | null;
             if (!titleEl?.value?.trim()) {
               e.preventDefault();
               alert("Service jobs require a Job Title.");
@@ -121,7 +209,9 @@ export default function IntakePage() {
             const missingLabel = systems.some((s) => !s.label.trim());
             if (missingLabel) {
               e.preventDefault();
-              alert("If you add equipment, each system must have a Location Label (System label).");
+              alert(
+                'If you add equipment, each system must have a Location Label (e.g., "Upstairs").'
+              );
               return;
             }
           }
@@ -129,8 +219,9 @@ export default function IntakePage() {
       >
         {/* Hidden inputs for server action */}
         <input type="hidden" name="job_type" value={jobType} />
-        <input type="hidden" name="equipment_enabled" value={showEquipment ? "1" : "0"} />
-        <input type="hidden" name="equipment_json" value={equipmentJson} />
+        {jobType === "ecc" && (
+          <input type="hidden" name="project_type" value="alteration" />
+        )}
 
         {/* A) Job Type (TOP) */}
         <section className="rounded-xl border bg-white p-4">
@@ -159,148 +250,25 @@ export default function IntakePage() {
           </div>
 
           <div className="mt-3 text-xs text-neutral-600">
-            {jobType === "service" ? "Service requires a Job Title." : "ECC Title is optional (auto-title later)."}
+            {jobType === "service"
+              ? "Service requires a Job Title."
+              : "ECC Title is optional (auto-title later)."}
           </div>
         </section>
 
-        {/* B + C) Title + Permit */}
-        <section className="rounded-xl border bg-white p-4">
-          <h2 className="text-sm font-semibold">Job Details</h2>
+        {/* Shared core fields (title/permit/customer/address/city/job_notes) */}
+        <JobCoreFields mode="external" titleRequired={titleRequired} />
 
-          <div className="mt-3 space-y-3">
-            <div>
-              <label className="block text-sm font-medium">
-                Job Title {titleRequired ? <span className="text-red-600">*</span> : <span className="text-neutral-500">(optional)</span>}
-              </label>
-              <input
-                name="title"
-                type="text"
-                required={titleRequired}
-                placeholder={jobType === "service" ? "e.g., Duct Cleaning, HVAC Repair, Dryer Vent" : "Optional for ECC"}
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
+        <div className="text-xs text-neutral-600 -mt-3">
+          You can always add more notes later from inside the job.
+        </div>
 
-            <div>
-              <label className="block text-sm font-medium">
-                Permit Number <span className="text-neutral-500">(optional)</span>
-              </label>
-              <input
-                name="permit_number"
-                type="text"
-                placeholder="Optional for both ECC and Service"
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* D) Customer Info */}
-        <section className="rounded-xl border bg-white p-4">
-          <h2 className="text-sm font-semibold">Customer</h2>
-
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium">
-                First Name <span className="text-red-600">*</span>
-              </label>
-              <input
-                name="customer_first_name"
-                type="text"
-                required
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium">
-                Last Name <span className="text-red-600">*</span>
-              </label>
-              <input
-                name="customer_last_name"
-                type="text"
-                required
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium">
-                Phone <span className="text-red-600">*</span>
-              </label>
-              <input
-                name="customer_phone"
-                type="tel"
-                required
-                placeholder="(###) ###-####"
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium">
-                Email <span className="text-neutral-500">(optional)</span>
-              </label>
-              <input
-                name="customer_email"
-                type="email"
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* E) Location Info */}
-        <section className="rounded-xl border bg-white p-4">
-          <h2 className="text-sm font-semibold">Service Location</h2>
-
-          <div className="mt-3 space-y-3">
-            <div>
-              <label className="block text-sm font-medium">
-                Service Address <span className="text-red-600">*</span>
-              </label>
-              <input
-                name="address_line1"
-                type="text"
-                required
-                placeholder="123 Main St"
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium">
-                  City <span className="text-red-600">*</span>
-                </label>
-                <input
-                  name="city"
-                  type="text"
-                  required
-                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium">
-                  Notes <span className="text-neutral-500">(optional)</span>
-                </label>
-                <input
-                  name="location_notes"
-                  type="text"
-                  placeholder="Gate code / best time to call"
-                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* F) Scheduling Inputs (optional) */}
+        {/* Scheduling Inputs (optional) */}
         <section className="rounded-xl border bg-white p-4">
           <h2 className="text-sm font-semibold">Scheduling (Optional)</h2>
           <p className="mt-1 text-xs text-neutral-600">
-            If a Scheduled Date is set → ops_status becomes <b>scheduled</b>. Otherwise → <b>need_to_schedule</b>.
+            If a Scheduled Date is set → ops_status becomes <b>scheduled</b>.
+            Otherwise → <b>need_to_schedule</b>.
           </p>
 
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -337,13 +305,14 @@ export default function IntakePage() {
           </div>
         </section>
 
-        {/* G) Optional Equipment */}
+        {/* Optional Equipment */}
         <section className="rounded-xl border bg-white p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold">Optional Equipment</h2>
               <p className="mt-1 text-xs text-neutral-600">
-                Expand to add equipment now. You can always add later on the job page.
+                Expand to add equipment now. You can always add more later on the
+                job page.
               </p>
             </div>
 
@@ -359,7 +328,8 @@ export default function IntakePage() {
           {showEquipment && (
             <div className="mt-4 space-y-4">
               <div className="rounded-lg bg-neutral-50 p-3 text-xs text-neutral-700">
-                <b>Rule:</b> If you enter equipment, each system needs a <b>Location Label</b> (e.g., “Upstairs”, “Downstairs”).
+                <b>Rule:</b> If you enter equipment, each system needs a{" "}
+                <b>Location Label</b> (e.g., “Upstairs”, “Downstairs”).
               </div>
 
               {systems.map((sys, sysIdx) => (
@@ -381,7 +351,13 @@ export default function IntakePage() {
                   <div className="mt-3">
                     <label className="block text-sm font-medium">
                       Location Label{" "}
-                      {equipmentActive ? <span className="text-red-600">*</span> : <span className="text-neutral-500">(required if equipment is entered)</span>}
+                      {equipmentActive ? (
+                        <span className="text-red-600">*</span>
+                      ) : (
+                        <span className="text-neutral-500">
+                          (required if equipment is entered)
+                        </span>
+                      )}
                     </label>
                     <input
                       type="text"
@@ -395,6 +371,13 @@ export default function IntakePage() {
                   <div className="mt-4 space-y-3">
                     {sys.equipment.map((eq, eqIdx) => (
                       <div key={eqIdx} className="rounded-lg border bg-white p-3">
+                        {/* This hidden input ensures each equipment row posts system_location */}
+                        <input
+                          type="hidden"
+                          name="system_location"
+                          value={sys.label}
+                        />
+
                         <div className="flex items-center justify-between gap-2">
                           <div className="text-xs font-semibold text-neutral-700">
                             Equipment {eqIdx + 1}
@@ -411,44 +394,156 @@ export default function IntakePage() {
                           )}
                         </div>
 
+                        {/* Role / Tonnage / Refrigerant */}
                         <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
                           <div>
-                            <label className="block text-xs font-medium">Make</label>
+                            <label className="block text-xs font-medium">
+                              Equipment Role
+                            </label>
+                            <select
+                              name="equipment_role"
+                              value={eq.equipment_role ?? ""}
+                              onChange={(e) =>
+                                updateEquipmentField(
+                                  sysIdx,
+                                  eqIdx,
+                                  "equipment_role",
+                                  e.target.value
+                                )
+                              }
+                              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                            >
+                              <option value="">(optional)</option>
+                              <option value="outdoor">Outdoor</option>
+                              <option value="indoor">Indoor</option>
+                              <option value="furnace">Furnace</option>
+                              <option value="air_handler">Air Handler</option>
+                              <option value="package">Package</option>
+                              <option value="other">Other</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium">
+                              Tonnage
+                            </label>
                             <input
                               type="text"
-                              value={eq.make ?? ""}
-                              onChange={(e) => updateEquipmentField(sysIdx, eqIdx, "make", e.target.value)}
+                              name="tonnage"
+                              value={eq.tonnage ?? ""}
+                              onChange={(e) =>
+                                updateEquipmentField(
+                                  sysIdx,
+                                  eqIdx,
+                                  "tonnage",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Optional"
                               className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-xs font-medium">Model</label>
+                            <label className="block text-xs font-medium">
+                              Refrigerant Type
+                            </label>
                             <input
                               type="text"
-                              value={eq.model ?? ""}
-                              onChange={(e) => updateEquipmentField(sysIdx, eqIdx, "model", e.target.value)}
-                              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-medium">Serial</label>
-                            <input
-                              type="text"
-                              value={eq.serial ?? ""}
-                              onChange={(e) => updateEquipmentField(sysIdx, eqIdx, "serial", e.target.value)}
+                              name="refrigerant_type"
+                              value={eq.refrigerant_type ?? ""}
+                              onChange={(e) =>
+                                updateEquipmentField(
+                                  sysIdx,
+                                  eqIdx,
+                                  "refrigerant_type",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Optional"
                               className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
                             />
                           </div>
                         </div>
 
+                        {/* Manufacturer/Model/Serial */}
+                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div>
+                            <label className="block text-xs font-medium">
+                              Manufacturer
+                            </label>
+                            <input
+                              type="text"
+                              name="manufacturer"
+                              value={eq.make ?? ""}
+                              onChange={(e) =>
+                                updateEquipmentField(
+                                  sysIdx,
+                                  eqIdx,
+                                  "make",
+                                  e.target.value
+                                )
+                              }
+                              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium">
+                              Model
+                            </label>
+                            <input
+                              type="text"
+                              name="model"
+                              value={eq.model ?? ""}
+                              onChange={(e) =>
+                                updateEquipmentField(
+                                  sysIdx,
+                                  eqIdx,
+                                  "model",
+                                  e.target.value
+                                )
+                              }
+                              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium">
+                              Serial
+                            </label>
+                            <input
+                              type="text"
+                              name="serial"
+                              value={eq.serial ?? ""}
+                              onChange={(e) =>
+                                updateEquipmentField(
+                                  sysIdx,
+                                  eqIdx,
+                                  "serial",
+                                  e.target.value
+                                )
+                              }
+                              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Notes */}
                         <div className="mt-3">
                           <label className="block text-xs font-medium">Notes</label>
                           <input
                             type="text"
+                            name="notes"
                             value={eq.notes ?? ""}
-                            onChange={(e) => updateEquipmentField(sysIdx, eqIdx, "notes", e.target.value)}
+                            onChange={(e) =>
+                              updateEquipmentField(
+                                sysIdx,
+                                eqIdx,
+                                "notes",
+                                e.target.value
+                              )
+                            }
                             placeholder="Optional"
                             className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
                           />

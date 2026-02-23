@@ -5,8 +5,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 
-type JobType = "ecc" | "service";
-
 
 export async function createJobFromIntake(formData: FormData) {
   const supabase = await createClient();
@@ -18,7 +16,9 @@ export async function createJobFromIntake(formData: FormData) {
   // -----------------------------
   // Read + normalize form fields
   // -----------------------------
-  const jobType = (String(formData.get("job_type") || "ecc") as JobType) ?? "ecc";
+  const jobType = (String(formData.get("job_type") || "ecc").trim() || "ecc") as
+  | "ecc"
+  | "service";
 
   const titleRaw = String(formData.get("title") || "").trim();
   const permitNumber = String(formData.get("permit_number") || "").trim() || null;
@@ -30,13 +30,13 @@ export async function createJobFromIntake(formData: FormData) {
 
   const addressLine1 = String(formData.get("address_line1") || "").trim();
   const city = String(formData.get("city") || "").trim();
-  const locationNotes = String(formData.get("location_notes") || "").trim() || null;
 
-const { scheduled_date, window_start, window_end, ops_status } =
-  deriveScheduleAndOps(formData);
+  // Notes should always exist + be editable later
+  const jobNotes = String(formData.get("job_notes") || "").trim() || null;
 
-  const equipmentEnabled = String(formData.get("equipment_enabled") || "0") === "1";
-  const equipmentJson = String(formData.get("equipment_json") || "[]");
+  // Canonical scheduling logic (already extracted)
+  const { scheduled_date, window_start, window_end, ops_status } =
+    deriveScheduleAndOps(formData);
 
   // -----------------------------
   // Hard validation (server-side)
@@ -53,16 +53,13 @@ const { scheduled_date, window_start, window_end, ops_status } =
 
   // -----------------------------
   // REQUIRED DB columns you do not collect at intake
-  // (from your schema: NOT NULL)
   // -----------------------------
-  // jobs.title is NOT NULL → ECC must be auto-titled if blank
   const autoTitle = `ECC Test - ${lastName}${city ? ` (${city})` : ""}`;
   const jobTitle = titleRaw || autoTitle;
 
-  // jobs.project_type is NOT NULL
-  // We will set a safe default that won’t block intake.
-  // You can refine later (alteration/all_new/new_construction) once you add that UI.
-  const projectTypeDefault = jobType === "service" ? "service" : "alteration";
+  // IMPORTANT: project_type must remain valid for your constraints.
+  // If service cannot use custom values, keep a safe default.
+  const projectTypeDefault = jobType === "service" ? "alteration" : "alteration";
 
   // jobs.lifecycle_state is NOT NULL
   const lifecycleStateDefault = "active";
@@ -89,7 +86,7 @@ const { scheduled_date, window_start, window_end, ops_status } =
   const customerId = customer.id as string;
 
   // -----------------------------
-  // 2) Create location
+  // 2) Create location (service address)
   // -----------------------------
   const { data: location, error: locationErr } = await supabase
     .from("locations")
@@ -97,7 +94,6 @@ const { scheduled_date, window_start, window_end, ops_status } =
       customer_id: customerId,
       address_line1: addressLine1,
       city,
-      notes: locationNotes,
       owner_user_id: userId,
     })
     .select("id")
@@ -131,6 +127,8 @@ const { scheduled_date, window_start, window_end, ops_status } =
 
       permit_number: permitNumber,
 
+      job_notes: jobNotes,
+
       scheduled_date,
       window_start,
       window_end,
@@ -145,75 +143,119 @@ const { scheduled_date, window_start, window_end, ops_status } =
 
   // -----------------------------
   // 4) Visit #1 (best-effort)
-  // We don't have visits schema yet, so we won’t block intake if this fails.
   // -----------------------------
   try {
     await supabase.from("visits").insert({ job_id: jobId });
   } catch {
-    // intentionally ignored until you paste visits schema
+    // intentionally ignored until visits schema is finalized
   }
 
   // -----------------------------
-  // 5) Optional equipment at intake
-  // Must create job_systems and set job_equipment.system_id (no null)
+  // 5) Structured equipment from intake (NEW)
+  // Intake posts arrays (one per equipment row)
+  // We create job_systems by unique system_location label
+  // Then insert job_equipment rows linked to system_id
   // -----------------------------
-  if (equipmentEnabled) {
-    let systems: any[] = [];
-    try {
-      systems = JSON.parse(equipmentJson);
-    } catch {
-      systems = [];
-    }
+  const systemLocations = formData.getAll("system_location").map((v) => String(v || "").trim());
+  const equipmentRoles = formData.getAll("equipment_role").map((v) => String(v || "").trim());
+  const manufacturers = formData.getAll("manufacturer").map((v) => String(v || "").trim());
+  const models = formData.getAll("model").map((v) => String(v || "").trim());
+  const serials = formData.getAll("serial").map((v) => String(v || "").trim());
+  const tonnages = formData.getAll("tonnage").map((v) => String(v || "").trim());
+  const refrigerants = formData.getAll("refrigerant_type").map((v) => String(v || "").trim());
+  const eqNotes = formData.getAll("notes").map((v) => String(v || "").trim());
 
-    if (Array.isArray(systems)) {
-      for (const sys of systems) {
-        const label = String(sys?.label || "").trim();
-        const eqList = Array.isArray(sys?.equipment) ? sys.equipment : [];
+  const hasAnyEquipmentRow =
+    systemLocations.length ||
+    equipmentRoles.length ||
+    manufacturers.length ||
+    models.length ||
+    serials.length ||
+    tonnages.length ||
+    refrigerants.length ||
+    eqNotes.length;
 
-        const hasAnyEq = eqList.some((e: any) =>
-          [e?.make, e?.model, e?.serial, e?.notes].some((v) => String(v || "").trim().length > 0)
-        );
+  if (hasAnyEquipmentRow) {
+    // Build normalized rows first; filter out truly blank rows
+    const rawRows = systemLocations.map((system_location, i) => {
+      const role = equipmentRoles[i] || ""; // optional
+      const manufacturer = manufacturers[i] || "";
+      const model = models[i] || "";
+      const serial = serials[i] || "";
+      const tonnage = tonnages[i] || "";
+      const refrigerant_type = refrigerants[i] || ""; // optional
+      const notes = eqNotes[i] || "";
 
-        if (!hasAnyEq) continue;
+      const hasAny =
+        system_location ||
+        role ||
+        manufacturer ||
+        model ||
+        serial ||
+        tonnage ||
+        refrigerant_type ||
+        notes;
 
-        if (!label) {
-          throw new Error("If you add equipment, each system must have a Location Label.");
-        }
+      if (!hasAny) return null;
 
+      if (!system_location) {
+        // You already enforce this client-side when equipment is active
+        throw new Error("If you add equipment, each system must have a Location Label.");
+      }
+
+      return {
+        system_location,
+        equipment_role: role || "equipment", // keep safe default for NOT NULL
+        manufacturer: manufacturer || null,
+        model: model || null,
+        serial: serial || null,
+        tonnage: tonnage || null,
+        refrigerant_type: refrigerant_type || null,
+        notes: notes || null,
+      };
+    }).filter(Boolean) as Array<{
+      system_location: string;
+      equipment_role: string;
+      manufacturer: string | null;
+      model: string | null;
+      serial: string | null;
+      tonnage: string | null;
+      refrigerant_type: string | null;
+      notes: string | null;
+    }>;
+
+    if (rawRows.length) {
+      // Create / reuse job_systems by unique label
+      const uniqueLabels = Array.from(new Set(rawRows.map((r) => r.system_location)));
+
+      const systemIdByLabel = new Map<string, string>();
+
+      for (const label of uniqueLabels) {
         const { data: systemRow, error: systemErr } = await supabase
           .from("job_systems")
-          .insert({
-            job_id: jobId,
-            name: label,
-          })
+          .insert({ job_id: jobId, name: label })
           .select("id")
           .single();
 
         if (systemErr) throw new Error(`System insert failed: ${systemErr.message}`);
-        const systemId = systemRow.id as string;
-
-        for (const e of eqList) {
-          const manufacturer = String(e?.make || "").trim() || null;
-          const model = String(e?.model || "").trim() || null;
-          const serial = String(e?.serial || "").trim() || null;
-          const notes = String(e?.notes || "").trim() || null;
-
-          if (!manufacturer && !model && !serial && !notes) continue;
-
-          const { error: eqErr } = await supabase.from("job_equipment").insert({
-            job_id: jobId,
-            system_id: systemId, // ✅ prevents null
-            system_location: label,
-            equipment_role: "equipment", // required NOT NULL
-            manufacturer,
-            model,
-            serial,
-            notes,
-          });
-
-          if (eqErr) throw new Error(`Equipment insert failed: ${eqErr.message}`);
-        }
+        systemIdByLabel.set(label, systemRow.id as string);
       }
+
+      const insertRows = rawRows.map((r) => ({
+        job_id: jobId,
+        system_id: systemIdByLabel.get(r.system_location)!, // guaranteed
+        system_location: r.system_location,
+        equipment_role: r.equipment_role, // NOT NULL
+        manufacturer: r.manufacturer,
+        model: r.model,
+        serial: r.serial,
+        tonnage: r.tonnage,
+        refrigerant_type: r.refrigerant_type, // optional
+        notes: r.notes,
+      }));
+
+      const { error: eqErr } = await supabase.from("job_equipment").insert(insertRows);
+      if (eqErr) throw new Error(`Equipment insert failed: ${eqErr.message}`);
     }
   }
 

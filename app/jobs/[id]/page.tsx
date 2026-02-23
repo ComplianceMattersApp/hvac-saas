@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
 import { createClient } from "@/lib/supabase/server";
 
 import {
@@ -10,6 +9,7 @@ import {
   advanceJobStatusFromForm,
   completeDataEntryFromForm,
   type JobStatus,
+  createRetestJobFromForm,
 } from "@/lib/actions/job-actions";
 
 
@@ -156,6 +156,7 @@ export default async function JobDetailPage({
       job_type,
       project_type,
       id,
+      parent_job_id,
       title,
       city,
       job_address,
@@ -186,6 +187,14 @@ export default async function JobDetailPage({
       billing_city,
       billing_state,
       billing_zip,
+      locations:locations (
+        id,
+        address_line1,
+        address_line2,
+        city,
+        state,
+        zip
+      ),
       job_equipment (
         id,
         equipment_role,
@@ -216,7 +225,35 @@ export default async function JobDetailPage({
 
   if (jobError || !job) return notFound();
 
-  
+  // --- Linked Jobs (Parent + Children) ---
+const parentJobId = (job as any).parent_job_id as string | null;
+const retestRootId = parentJobId ?? jobId;
+
+const { data: parentJob } = parentJobId
+  ? await supabase
+      .from("jobs")
+      .select("id, title, status, ops_status, created_at")
+      .eq("id", parentJobId)
+      .maybeSingle()
+  : { data: null };
+
+const { data: childJobs, error: childErr } = await supabase
+  .from("jobs")
+  .select("id, title, status, ops_status, created_at")
+  .eq("parent_job_id", retestRootId)
+  .order("created_at", { ascending: false });
+
+if (childErr) throw new Error(childErr.message);
+
+// --- Unified Timeline (job_events) ---
+const { data: timelineEvents, error: tlErr } = await supabase
+  .from("job_events")
+  .select("created_at, event_type, meta")
+  .eq("job_id", jobId)
+  .order("created_at", { ascending: false })
+  .limit(200);
+
+if (tlErr) throw new Error(tlErr.message);
 
   const { data: customerAttempts, error: attemptsErr } = await supabase
     .from("job_events")
@@ -252,12 +289,13 @@ const { data: customerBilling } = customerId
       .maybeSingle()
   : { data: null };
 
+
   const attemptCount = customerAttempts?.length ?? 0;
   const lastAttemptIso =
     customerAttempts?.[0]?.created_at ? String(customerAttempts[0].created_at) : null;
 
   const lastAttemptLabel = lastAttemptIso ? formatDateLAFromIso(lastAttemptIso) : "—";
-  const last3Attempts = (customerAttempts ?? []).slice(0, 3);
+  const last3Attempts = (customerAttempts ?? []).slice(0, 25);
 
   const customerName = [job.customer_first_name, job.customer_last_name]
     .filter(Boolean)
@@ -266,6 +304,12 @@ const { data: customerBilling } = customerId
 
   const contractorName =
     contractors?.find((c: any) => c.id === job.contractor_id)?.name ?? "—";
+
+    const serviceAddressLine1 =
+  (job as any).locations?.address_line1 ?? job.job_address ?? null;
+
+const serviceCity =
+  (job as any).locations?.city ?? job.city ?? null;
     
 function formatBillingAddress(a: {
   billing_address_line1?: string | null;
@@ -372,7 +416,7 @@ if (recipient === "contractor") {
       {/* Header */}
       <div className="mb-3">
         <h1 className="text-2xl font-semibold">{job.title}</h1>
-        <p className="text-sm text-gray-600">{job.city ?? "No city set"}</p>
+        <p className="text-sm text-gray-600">{serviceCity ?? "No city set"}</p>
       </div>
 
       {/* Tab row (URL changes + render changes) */}
@@ -428,7 +472,7 @@ if (recipient === "contractor") {
 
           <div className="flex justify-between">
             <span className="text-gray-600">Address</span>
-            <span className="font-medium text-right">{job.job_address || "—"}</span>
+            <span className="font-medium text-right">{serviceAddressLine1 || "—"}</span>
           </div>
 
           <div className="flex justify-between">
@@ -542,7 +586,7 @@ if (recipient === "contractor") {
 
               {!["completed", "failed", "cancelled"].includes(job.status) && (
   <form action={advanceJobStatusFromForm}>
-    <input type="hidden" name="id" value={job.id} />
+    <input type="hidden" name="job_id" value={job.id} />
     <input type="hidden" name="current_status" value={job.status} />
 
     <button
@@ -563,7 +607,7 @@ if (recipient === "contractor") {
     </div>
 
     <form action={completeDataEntryFromForm} className="flex flex-wrap gap-2 items-end">
-      <input type="hidden" name="id" value={job.id} />
+      <input type="hidden" name="job_id" value={job.id} />
 
       
       <div className="flex flex-col">
@@ -651,7 +695,7 @@ if (recipient === "contractor") {
   </div>
 
   <form action={updateJobScheduleFromForm} className="space-y-4">
-    <input type="hidden" name="id" value={job.id} />
+    <input type="hidden" name="job_id" value={job.id} />
 
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div className="space-y-1">
@@ -758,12 +802,131 @@ if (recipient === "contractor") {
             </form>
           </div>
 
+          {/* Retest + Linked Jobs */}
+<div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+  <div className="text-sm font-semibold mb-3">Retest</div>
+
+  {["failed", "retest_needed"].includes(String(job.ops_status ?? "")) ? (
+    <form action={createRetestJobFromForm} className="mb-4">
+      <input type="hidden" name="parent_job_id" value={job.id} />
+
+        <label className="flex items-center gap-2 text-sm text-gray-700 mb-3">
+          <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
+          Copy equipment from original
+        </label>
+
+      <button
+        type="submit"
+        className="px-3 py-2 rounded bg-black text-white text-sm"
+      >
+        Create Retest Job
+      </button>
+    </form>
+  ) : (
+    <div className="text-sm text-gray-600 mb-4">
+      Retest button appears when Ops Status is <span className="font-medium">Failed</span> or{" "}
+      <span className="font-medium">Retest Needed</span>.
+    </div>
+  )}
+
+  {parentJob ? (
+    <div className="text-sm mb-3">
+      <div className="text-xs text-gray-600 mb-1">Original Job</div>
+      <Link className="underline" href={`/jobs/${parentJob.id}?tab=ops`}>
+        {parentJob.title ?? parentJob.id}
+      </Link>
+      <div className="text-xs text-gray-600 mt-1">
+        Status: {String(parentJob.status)} • Ops: {String(parentJob.ops_status ?? "—")}
+      </div>
+    </div>
+  ) : null}
+
+  <div className="text-sm">
+    <div className="text-xs text-gray-600 mb-1">Retests</div>
+
+    {childJobs?.length ? (
+      <div className="space-y-2">
+        {childJobs.map((cj: any) => (
+          <div key={cj.id} className="rounded border p-3 text-sm">
+            <Link className="underline" href={`/jobs/${cj.id}?tab=ops`}>
+              {cj.title ?? cj.id}
+            </Link>
+            <div className="text-xs text-gray-600 mt-1">
+              Status: {String(cj.status)} • Ops: {String(cj.ops_status ?? "—")}
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="text-sm text-gray-600">No retests yet.</div>
+    )}
+  </div>
+</div>
+
+{/* Timeline */}
+<div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+  <div className="text-sm font-semibold mb-3">Timeline</div>
+
+  <div className="space-y-2">
+    {(timelineEvents ?? []).length ? (
+      (timelineEvents ?? []).map((e: any, idx: number) => {
+        const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "—";
+        const type = String(e?.event_type ?? "");
+        const meta = e?.meta ?? {};
+
+        const icon =
+          type === "job_created" ? "🆕" :
+          type === "retest_created" ? "🔁" :
+          type === "customer_attempt" ? "📞" :
+          type === "status_changed" ? "🔄" :
+          type === "job_failed" ? "❌" :
+          type === "job_passed" ? "✅" :
+          type === "scheduled" ? "📅" :
+          type === "unscheduled" ? "🗓️" :
+          type === "schedule_updated" ? "🕒" :
+          "📝";
+
+        return (
+          <div key={idx} className="rounded border p-3 text-sm bg-white">
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-xs text-gray-600">{when}</div>
+              <div className="text-xs text-gray-500">{icon}</div>
+            </div>
+
+            <div className="mt-2 font-medium">{type}</div>
+
+            {type === "retest_created" && meta?.child_job_id ? (
+              <div className="mt-1 text-sm">
+                Retest:{" "}
+                <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
+                  View linked retest
+                </Link>
+              </div>
+            ) : null}
+
+            {type === "retest_created" && meta?.parent_job_id ? (
+              <div className="mt-1 text-sm">
+                Original:{" "}
+                <Link className="underline" href={`/jobs/${String(meta.parent_job_id)}?tab=ops`}>
+                  View original job
+                </Link>
+              </div>
+            ) : null}
+          </div>
+        );
+      })
+    ) : (
+      <div className="text-sm text-gray-600">No timeline events yet.</div>
+    )}
+  </div>
+</div>
+
           {/* Follow Up */}
           <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
             <div className="text-sm font-semibold mb-3">Follow Up</div>
 
             <form action={updateJobOpsDetailsFromForm} className="grid gap-3">
-              <input type="hidden" name="id" value={job.id} />
+              <input type="hidden" name="job_id" value={job.id} />
 
 
               <div className="grid grid-cols-2 gap-2">
@@ -819,7 +982,7 @@ if (recipient === "contractor") {
           </div>
 
           {/* Customer Follow-up Attempts */}
-          {job.action_required_by === "customer" ? (
+          {job.ops_status === "need_to_schedule" ? (
             <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
               <div className="text-sm font-semibold mb-2">Customer Follow-Up</div>
 
@@ -830,7 +993,7 @@ if (recipient === "contractor") {
 
               <div className="flex flex-wrap gap-2 mb-4">
                 <form action={logCustomerContactAttemptFromForm}>
-                  <input type="hidden" name="id" value={job.id} />
+                  <input type="hidden" name="job_id" value={job.id} />
 
                   <input type="hidden" name="method" value="call" />
                   <input type="hidden" name="result" value="no_answer" />
@@ -840,7 +1003,7 @@ if (recipient === "contractor") {
                 </form>
 
                 <form action={logCustomerContactAttemptFromForm}>
-                  <input type="hidden" name="id" value={job.id} />
+                  <input type="hidden" name="job_id" value={job.id} />
 
                   <input type="hidden" name="method" value="text" />
                   <input type="hidden" name="result" value="sent" />
@@ -850,29 +1013,52 @@ if (recipient === "contractor") {
                 </form>
 
                 <form action={logCustomerContactAttemptFromForm}>
-                  <input type="hidden" name="id" value={job.id} />
+                  <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="method" value="call" />
                   <input type="hidden" name="result" value="spoke" />
                   <button className="px-3 py-2 rounded border text-sm" type="submit">
                     Log Call (Spoke)
                   </button>
+                  
                 </form>
               </div>
 
               <div className="space-y-2">
-                {last3Attempts.map((a: any, idx: number) => (
-                  <div key={idx} className="rounded border p-3 text-sm">
-                    <div className="text-xs text-gray-600">
-                      {a.created_at ? formatDateTimeLAFromIso(String(a.created_at)) : "—"}
-                    </div>
-                    <div className="mt-1">
-                      <span className="font-medium">Method:</span>{" "}
-                      {a?.meta?.method ? String(a.meta.method) : "—"} •{" "}
-                      <span className="font-medium">Result:</span>{" "}
-                      {a?.meta?.result ? String(a.meta.result) : "—"}
-                    </div>
-                  </div>
-                ))}
+                {last3Attempts.map((a: any, idx: number) => {
+  const method = a?.meta?.method ? String(a.meta.method) : "";
+  const result = a?.meta?.result ? String(a.meta.result) : "";
+  const when = a?.created_at ? formatDateTimeLAFromIso(String(a.created_at)) : "—";
+
+  const methodIcon = method === "text" ? "💬" : method === "call" ? "📞" : "📝";
+
+  const resultLabel =
+    result === "no_answer" ? "No Answer" :
+    result === "sent" ? "Sent" :
+    result === "spoke" ? "Spoke" :
+    (result || "—");
+
+  return (
+    <div key={idx} className="rounded border p-3 text-sm bg-white">
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-xs text-gray-600">{when}</div>
+        <div className="text-xs text-gray-500">
+          {a?.meta?.attempt_number ? `#${String(a.meta.attempt_number)}` : null}
+        </div>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs">
+          <span>{methodIcon}</span>
+          <span className="capitalize">{method || "—"}</span>
+        </span>
+
+        <span className="inline-flex items-center rounded-full border px-2 py-1 text-xs">
+          {resultLabel}
+        </span>
+      </div>
+    </div>
+  );
+})}
               </div>
             </div>
           ) : null}
@@ -901,4 +1087,5 @@ if (recipient === "contractor") {
       )}
     </div>
   );
+  
 }

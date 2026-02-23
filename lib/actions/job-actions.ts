@@ -1,8 +1,11 @@
+//lib/actions/job-actions.ts
+
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 
 
 import {
@@ -24,6 +27,8 @@ export type JobStatus =
 type CreateJobInput = {
   ops_status?: string | null;
   job_type?: string | null;
+  customer_id?: string | null;
+  location_id?: string | null;
   project_type?: string | null;
   title: string;
   city: string;
@@ -50,6 +55,26 @@ type CreateJobInput = {
   billing_zip?: string | null;
   
   };
+
+
+
+async function insertJobEvent(params: {
+  supabase: any;
+  jobId: string;
+  event_type: string;
+  meta?: Record<string, any> | null;
+}) {
+  const { supabase, jobId, event_type } = params;
+  const meta = params.meta ?? null;
+
+  const { error } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type,
+    meta,
+  });
+
+  if (error) throw error;
+}
 
 
 type OpsSnapshot = {
@@ -135,7 +160,16 @@ export async function addJobEquipmentFromForm(formData: FormData) {
   if (!jobId) throw new Error("Missing job_id");
   if (!equipmentRole) throw new Error("Missing equipment_role");
 
-  const systemLocationRaw = String(formData.get("system_location") || "").trim();
+  const systemChoice = String(formData.get("system_location") || "").trim();
+  const systemCustom = String(formData.get("system_location_custom") || "").trim();
+
+  if (systemChoice === "__new__" && !systemCustom) {
+    throw new Error("Please type a new System Location name.");
+  }
+
+  const systemLocationRaw =
+    systemChoice === "__new__" ? systemCustom : systemChoice;
+
   if (!systemLocationRaw) throw new Error("Missing system_location");
 
   // Keep the user's casing for display, but use exact match for now.
@@ -1120,7 +1154,7 @@ export async function addAlterationCoreTestsFromForm(formData: FormData) {
   redirectToTests({ jobId, systemId });
 }
 
-export async function createJob(input: CreateJobInput) {
+export async function createJob(input: CreateJobInput): Promise<{ id: string }> {
   const supabase = await createClient();
 
   const normalizeTimestamptz = (v: any) => {
@@ -1146,7 +1180,8 @@ export async function createJob(input: CreateJobInput) {
     window_start: input.window_start ?? null,
     window_end: input.window_end ?? null,
     customer_phone: input.customer_phone ?? null,
-
+    customer_id: input.customer_id ?? null,
+    location_id: input.location_id ?? null,
     customer_first_name: input.customer_first_name ?? null,
     customer_last_name: input.customer_last_name ?? null,
     customer_email: input.customer_email ?? null,
@@ -1171,16 +1206,16 @@ export async function createJob(input: CreateJobInput) {
     .from("jobs")
     .insert(payload)
     .select(
-      "id, permit_number, window_start, window_end, customer_first_name, customer_last_name, customer_email, job_notes, job_address, scheduled_date: scheduledDate, window_start: windowStart, window_end: windowEnd, ops_status: opsStatus"
+      "id"
     )
     .single();
 
   if (error) throw error;
-  return data;
+  return data as { id: string };
 }
 
 export async function updateJob(input: {
-  
+  ops_status?: string | null;
   id: string;
   title?: string;
   city?: string;
@@ -1225,8 +1260,18 @@ export async function createJobFromForm(formData: FormData) {
       ? contractorIdRaw.trim()
       : null;
 
-  const title = String(formData.get("title") || "").trim();
-  const city = String(formData.get("city") || "").trim();
+    const title = String(formData.get("title") || "").trim();
+    const city = String(formData.get("city") || "").trim();
+
+      const titleFinal =
+        title ||
+        (jobType === "ecc"
+          ? `ECC ${projectType.replaceAll("_", " ")} — ${city}`
+          : "");
+
+    // DB requires non-blank title. For ECC, auto-generate if left blank.
+
+
   const customerPhoneRaw = String(formData.get("customer_phone") || "").trim();
 
   const billing_recipient = String(formData.get("billing_recipient") || "").trim() as
@@ -1246,45 +1291,24 @@ export async function createJobFromForm(formData: FormData) {
   const billing_zip = String(formData.get("billing_zip") || "").trim() || null;
 
   // Default if empty: contractor if contractor_id exists, else customer
-  const billingRecipientFinal =
-    billing_recipient ||
-    (contractor_id ? "contractor" : "customer");
+  let billingRecipientFinal =
+  billing_recipient ||
+  (contractor_id ? "contractor" : "customer");
+
+// Safety: if user picked "contractor" but no contractor was selected, fall back to customer
+if (billingRecipientFinal === "contractor" && !contractor_id) {
+  billingRecipientFinal = "customer";
+}
 
   // Server-side validation
-  if (billingRecipientFinal === "contractor" && !contractor_id) {
-    throw new Error("Billing recipient is Contractor, but no contractor was selected.");
-  }
-
   if (billingRecipientFinal === "other") {
     if (!billing_name || !billing_address_line1 || !billing_city || !billing_state || !billing_zip) {
       throw new Error("Billing recipient is Other: Billing name and full address are required.");
     }
   }
 
-//022026
-
-// Scheduling (DB types: scheduled_date DATE, window_start/end TIME)
-// Treat inputs as wall-clock strings. Do not Date-parse.
-const scheduledDateStr = String(formData.get("scheduled_date") || "").trim(); // YYYY-MM-DD or ""
-const windowStartStr   = String(formData.get("window_start") || "").trim();   // HH:MM or ""
-const windowEndStr     = String(formData.get("window_end") || "").trim();     // HH:MM or ""
-
-const hasScheduledDate = Boolean(scheduledDateStr);
-
-// Ops status derived from whether it's scheduled
-const ops_status = hasScheduledDate ? "scheduled" : "need_to_schedule";
-
-// Only persist arrival window if there is a scheduled date
-const scheduled_date_db = hasScheduledDate ? scheduledDateStr : null;
-const window_start_db   = hasScheduledDate ? (windowStartStr || null) : null;
-const window_end_db     = hasScheduledDate ? (windowEndStr || null) : null;
-
-// Validate arrival window only if both are present
-if (window_start_db && window_end_db) {
-  if (window_start_db >= window_end_db) {
-    throw new Error("Arrival window start must be before end");
-  }
-}
+  const { scheduled_date, window_start, window_end, ops_status } =
+    deriveScheduleAndOps(formData);
 
   const permitNumberRaw = String(formData.get("permit_number") || "").trim();
   const customerFirstNameRaw = String(formData.get("customer_first_name") || "").trim();
@@ -1295,29 +1319,68 @@ if (window_start_db && window_end_db) {
 
   const status = String(formData.get("status") || "open").trim() as JobStatus;
 
-  if (jobType === "service" && !title) throw new Error("Title is required");
+  if (jobType === "service" && !titleFinal) throw new Error("Title is required");
   if (!city) throw new Error("City is required");
 
+    const supabase = await createClient();
 
+  // Canonical service address input (prefer address_line1, fallback to legacy job_address)
+  const address_line1 =
+    String(formData.get("address_line1") || "").trim() ||
+    String(formData.get("job_address") || "").trim();
+
+  if (!address_line1) throw new Error("Service Address is required");
+
+  // 1) Create Customer
+  const { data: customer, error: customerErr } = await supabase
+    .from("customers")
+    .insert({
+      first_name: customerFirstNameRaw || null,
+      last_name: customerLastNameRaw || null,
+      email: customerEmailRaw || null,
+      phone: customerPhoneRaw ? customerPhoneRaw : null,
+    })
+    .select("id")
+    .single();
+
+  if (customerErr) throw customerErr;
+
+  // 2) Create Location (service address)
+  const { data: location, error: locationErr } = await supabase
+    .from("locations")
+    .insert({
+      customer_id: customer.id,
+      address_line1,
+      city, // you already validate city above
+    })
+    .select("id")
+    .single();
+
+  if (locationErr) throw locationErr;
+
+  const customer_id = customer.id;
+  const location_id = location.id;
 
   const created = await createJob({
     job_type: jobType,
     project_type: projectType,
     job_address: jobAddressRaw || null,
+    customer_id,
+    location_id,
 
     customer_first_name: customerFirstNameRaw || null,
     customer_last_name: customerLastNameRaw || null,
     customer_email: customerEmailRaw || null,
     job_notes: jobNotesRaw || null,
 
-    title,
+    title: titleFinal,
     city,
-    scheduled_date: scheduled_date_db,
+    scheduled_date,
     status,
     contractor_id,
     permit_number: permitNumberRaw ? permitNumberRaw : null,
-    window_start: window_start_db,
-    window_end: window_end_db,
+    window_start,
+    window_end,
     customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
     ops_status,
     billing_recipient: billingRecipientFinal,
@@ -1331,8 +1394,227 @@ if (window_start_db && window_end_db) {
 billing_zip,
   });
 
+  // ✅ timeline: job created
+  await insertJobEvent({
+    supabase,
+    jobId: created.id,
+    event_type: "job_created",
+    meta: { job_type: jobType, project_type: projectType },
+  });
+
+  revalidatePath(`/jobs/${created.id}`);
+  revalidatePath(`/ops`);
+
   redirect(`/jobs/${created.id}`);
 }
+
+
+// ✅ Create a Retest job linked to a parent (failed) job via jobs.parent_job_id
+export async function createRetestJobFromForm(formData: FormData) {
+  "use server";
+  const copyEquipment = String(formData.get("copy_equipment") || "") === "1";
+  const parentJobId = String(formData.get("parent_job_id") || "").trim();
+  if (!parentJobId) throw new Error("Missing parent_job_id");
+
+  const supabase = await createClient();
+
+  // 1) Load parent job
+  const { data: parentData, error: parentErr } = await supabase
+    .from("jobs")
+    .select(
+      [
+        "id",
+        "job_type",
+        "project_type",
+        "title",
+        "city",
+        "customer_id",
+        "location_id",
+        "contractor_id",
+        "permit_number",
+        "customer_phone",
+        "customer_first_name",
+        "customer_last_name",
+        "customer_email",
+        "job_address",
+        "billing_recipient",
+        "billing_name",
+        "billing_email",
+        "billing_phone",
+        "billing_address_line1",
+        "billing_address_line2",
+        "billing_city",
+        "billing_state",
+        "billing_zip",
+      ].join(",")
+    )
+    .eq("id", parentJobId)
+    .single();
+
+  if (parentErr) throw parentErr;
+  const parent = parentData as any;
+
+  // 2) Create retest job (unscheduled by default)
+  const retestTitle = `Retest — ${parent?.title ?? "Job"}`;
+
+  const payload: any = {
+    parent_job_id: parentJobId,
+
+    job_type: parent?.job_type ?? "ecc",
+    project_type: parent?.project_type ?? "alteration",
+
+    title: retestTitle,
+    city: parent?.city ?? "",
+
+    customer_id: parent?.customer_id ?? null,
+    location_id: parent?.location_id ?? null,
+    contractor_id: parent?.contractor_id ?? null,
+
+    scheduled_date: null,
+    window_start: null,
+    window_end: null,
+
+    status: "open",
+    ops_status: "need_to_schedule",
+
+    permit_number: parent?.permit_number ?? null,
+    customer_phone: parent?.customer_phone ?? null,
+    customer_first_name: parent?.customer_first_name ?? null,
+    customer_last_name: parent?.customer_last_name ?? null,
+    customer_email: parent?.customer_email ?? null,
+    job_address: parent?.job_address ?? null,
+
+    billing_recipient: parent?.billing_recipient ?? null,
+    billing_name: parent?.billing_name ?? null,
+    billing_email: parent?.billing_email ?? null,
+    billing_phone: parent?.billing_phone ?? null,
+    billing_address_line1: parent?.billing_address_line1 ?? null,
+    billing_address_line2: parent?.billing_address_line2 ?? null,
+    billing_city: parent?.billing_city ?? null,
+    billing_state: parent?.billing_state ?? null,
+    billing_zip: parent?.billing_zip ?? null,
+  };
+
+  const { data: child, error: insErr } = await supabase
+    .from("jobs")
+    .insert(payload)
+    .select("id")
+    .single();
+
+  if (insErr) throw insErr;
+
+  // 3) Timeline events on BOTH jobs
+  await insertJobEvent({
+    supabase,
+    jobId: parentJobId,
+    event_type: "retest_created",
+    meta: { child_job_id: child.id },
+  });
+
+  await insertJobEvent({
+    supabase,
+    jobId: child.id,
+    event_type: "retest_created",
+    meta: { parent_job_id: parentJobId },
+  });
+
+  // ✅ Optional: copy systems + equipment from original → retest
+if (copyEquipment) {
+  // 1) Fetch parent systems
+  const { data: parentSystems, error: sysErr } = await supabase
+    .from("job_systems")
+    .select("id, name")
+    .eq("job_id", parentJobId);
+
+  if (sysErr) throw sysErr;
+
+  // 2) Insert child systems (same names)
+  const systemIdMap = new Map<string, string>(); // parentSystemId → childSystemId
+
+  if (parentSystems?.length) {
+    const insertSystems = parentSystems.map((s: any) => ({
+      job_id: child.id,
+      name: s.name ?? "System",
+    }));
+
+    const { data: newSystems, error: newSysErr } = await supabase
+      .from("job_systems")
+      .insert(insertSystems)
+      .select("id, name");
+
+    if (newSysErr) throw newSysErr;
+
+    // Map by name in order (safe enough because retest is a straight copy)
+    // If you ever allow duplicate names, we can map by index.
+    for (let i = 0; i < parentSystems.length; i++) {
+      const parentSys = parentSystems[i];
+      const childSys = newSystems?.[i];
+      if (parentSys?.id && childSys?.id) {
+        systemIdMap.set(String(parentSys.id), String(childSys.id));
+      }
+    }
+  }
+
+  // 3) Fetch parent equipment
+  const { data: parentEquip, error: eqErr } = await supabase
+    .from("job_equipment")
+    .select(
+      [
+        "equipment_role",
+        "manufacturer",
+        "model",
+        "model_number",
+        "serial",
+        "tonnage",
+        "refrigerant_type",
+        "notes",
+        "system_location",
+        "system_id",
+      ].join(",")
+    )
+    .eq("job_id", parentJobId);
+
+  if (eqErr) throw eqErr;
+
+  // 4) Insert child equipment (remap system_id)
+  if (parentEquip?.length) {
+    const insertEquip = parentEquip.map((e: any) => ({
+      job_id: child.id,
+      equipment_role: e.equipment_role ?? null,
+      manufacturer: e.manufacturer ?? null,
+      model: e.model ?? null,
+      model_number: e.model_number ?? null,
+      serial: e.serial ?? null,
+      tonnage: e.tonnage ?? null,
+      refrigerant_type: e.refrigerant_type ?? null,
+      notes: e.notes ?? null,
+      system_location: e.system_location ?? null,
+      system_id: e.system_id ? systemIdMap.get(String(e.system_id)) ?? null : null,
+    }));
+
+    const { error: insEqErr } = await supabase
+      .from("job_equipment")
+      .insert(insertEquip);
+
+    if (insEqErr) throw insEqErr;
+  }
+
+  // 5) Timeline event (optional but nice)
+  await insertJobEvent({
+    supabase,
+    jobId: child.id,
+    event_type: "equipment_copied",
+    meta: { from_job_id: parentJobId },
+  });
+}
+
+  revalidatePath(`/jobs/${parentJobId}`);
+  revalidatePath(`/jobs/${child.id}`);
+  revalidatePath(`/ops`);
+
+  redirect(`/jobs/${child.id}?tab=ops`);
+}
+
 
 /**
  * UPDATE: used by Edit Scheduling form on job detail page
@@ -1404,38 +1686,91 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     if (updErr) throw updErr;
   }
+  // ✅ timeline: status change
+  await insertJobEvent({
+    supabase,
+    jobId: id,
+    event_type: "status_changed",
+    meta: { from: current, to: next },
+  });
+
+  revalidatePath(`/jobs/${id}`);
+  revalidatePath(`/ops`);
 
   redirect(`/jobs/${id}`);
 }
+
 
 export async function updateJobScheduleFromForm(formData: FormData) {
   const id =
     String(formData.get("id") || "").trim() ||
     String(formData.get("job_id") || "").trim();
 
-  const scheduledDate = String(formData.get("scheduled_date") || "").trim(); // YYYY-MM-DD
-  const permitNumberRaw = String(formData.get("permit_number") || "").trim();
-  const windowStartTime = String(formData.get("window_start") || "").trim(); // HH:MM
-  const windowEndTime = String(formData.get("window_end") || "").trim(); // HH:MM
-
   if (!id) throw new Error("Job ID is required");
 
-  // scheduledDate optional: blank means move job back to need_to_schedule
-  const scheduled_date_db = scheduledDate || null;
-  const window_start_db = windowStartTime || null;
-  const window_end_db = windowEndTime || null;
+  const permitNumberRaw = String(formData.get("permit_number") || "").trim();
 
+  const supabase = await createClient();
+
+  // Read prior scheduling snapshot so we can log changes
+  const { data: before, error: beforeErr } = await supabase
+    .from("jobs")
+    .select("scheduled_date, window_start, window_end, ops_status")
+    .eq("id", id)
+    .single();
+
+  if (beforeErr) throw beforeErr;
+
+  // Canonical scheduling + ops_status logic (NO Date parsing)
+  const { scheduled_date, window_start, window_end, ops_status } =
+    deriveScheduleAndOps(formData);
 
   await updateJob({
     id,
-    scheduled_date: scheduled_date_db,
+    scheduled_date,
+    window_start,
+    window_end,
+    ops_status,
     permit_number: permitNumberRaw ? permitNumberRaw : null,
-    window_start: window_start_db,
-    window_end: window_end_db,
   });
+
+  const wasScheduled =
+    !!before?.scheduled_date || !!before?.window_start || !!before?.window_end;
+  const isScheduled = !!scheduled_date || !!window_start || !!window_end;
+
+  const event_type =
+    !wasScheduled && isScheduled
+      ? "scheduled"
+      : wasScheduled && !isScheduled
+      ? "unscheduled"
+      : "schedule_updated";
+
+  await insertJobEvent({
+    supabase,
+    jobId: id,
+    event_type,
+    meta: {
+      before: {
+        scheduled_date: before?.scheduled_date ?? null,
+        window_start: before?.window_start ?? null,
+        window_end: before?.window_end ?? null,
+        ops_status: before?.ops_status ?? null,
+      },
+      after: {
+        scheduled_date,
+        window_start,
+        window_end,
+        ops_status,
+      },
+    },
+  });
+
+  revalidatePath(`/jobs/${id}`);
+  revalidatePath(`/ops`);
 
   redirect(`/jobs/${id}`);
 }
+
 
 
 export async function markJobFailedFromForm(formData: FormData) {

@@ -505,48 +505,55 @@ jobs.sort((a: any, b: any) => {
   <div className="text-sm font-semibold">Queues</div>
 
   <div className="flex flex-wrap gap-2">
-    {OPS_TABS.map((t) => {
-      const href = `/ops${buildQueryString({
-        bucket: t.key,
-        contractor: contractor ?? "",
-        q: q ?? "",
-      })}`;
+    {OPS_TABS
+  .filter((t) => {
+    const count = counts.get(t.key) ?? 0;
+    const active = bucket === t.key;
 
-      const active = bucket === t.key;
-      const count = counts.get(t.key) ?? 0;
+    // Show tab only if it has jobs OR it's the active tab OR it's Closed
+    return count > 0 || active || t.key === "closed";
+  })
+  .map((t) => {
+    const href = `/ops${buildQueryString({
+      bucket: t.key,
+      contractor: contractor ?? "",
+      q: q ?? "",
+    })}`;
 
-      return (
-        <Link
-          key={t.key}
-          href={href}
-          className={[
-  "rounded-full border px-3 py-1 text-sm transition font-medium",
-  active
-    ? "bg-black text-white border-black"
-    : "bg-white text-gray-900 border-gray-300 hover:bg-gray-100",
-].join(" ")}
-        >
-          <span className="flex items-center gap-2">
-            {t.label}
+    const active = bucket === t.key;
+    const count = counts.get(t.key) ?? 0;
 
-            {/* Show badge ONLY if not closed AND count > 0 */}
-            {t.key !== "closed" && count > 0 && (
-              <span
-                className={[
-  "rounded-full border px-3 py-1 text-sm transition font-medium",
-  active
-    ? "bg-black text-white border-black"
-    : "bg-white text-gray-900 border-gray-300 hover:bg-gray-100",
-].join(" ")}
+    return (
+      <Link
+        key={t.key}
+        href={href}
+        className={[
+          "rounded-full border px-3 py-1 text-sm transition font-medium",
+          active
+            ? "bg-black text-white border-black"
+            : "bg-white text-gray-900 border-gray-300 hover:bg-gray-100",
+        ].join(" ")}
+      >
+        <span className="flex items-center gap-2">
+          {t.label}
 
-              >
-                {count}
-              </span>
-            )}
-          </span>
-        </Link>
-      );
-    })}
+          {/* Badge: show only if count > 0 OR it's Closed (always visible) */}
+          {(count > 0 || t.key === "closed") && (
+            <span
+              className={[
+                "rounded-full border px-3 py-1 text-sm transition font-medium",
+                active
+                  ? "bg-black text-white border-black"
+                  : "bg-white text-gray-900 border-gray-300 hover:bg-gray-100",
+              ].join(" ")}
+            >
+              {count}
+            </span>
+          )}
+        </span>
+      </Link>
+    );
+  })}
   </div>
 </div>
 

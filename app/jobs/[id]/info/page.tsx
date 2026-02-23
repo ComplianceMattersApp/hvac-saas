@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import SystemLocationPicker from "@/components/jobs/SystemLocationPicker";
 
 import {
   addJobEquipmentFromForm,
@@ -47,6 +48,14 @@ const { data: job, error } = await supabase
 
 if (error || !job) return notFound();
 
+
+  const { data: systems, error: systemsErr } = await supabase
+    .from("job_systems")
+    .select("id, name")
+    .eq("job_id", id)
+    .order("name", { ascending: true });
+
+  if (systemsErr) throw systemsErr;
 
   return (
     <div className="p-6 max-w-3xl space-y-4">
@@ -160,8 +169,6 @@ addJobEquipmentFromForm
 {/* Add Equipment */}
   <form action={addJobEquipmentFromForm} className="mt-4 grid gap-3">
     <input type="hidden" name="job_id" value={job.id} />
-
-
     <div className="grid gap-1">
        <label className="text-sm font-medium text-gray-900" htmlFor="equipment_role">
         Equipment Role
@@ -174,25 +181,19 @@ addJobEquipmentFromForm
         required
       >
         <option value="outdoor_unit">Outdoor Unit</option>
-        <option value="indoor_unit">Indoor Unit / Coil</option>
+        <option value="indoor_unit">Coil</option>
         <option value="air_handler">Air Handler</option>
         <option value="furnace">Furnace</option>
         <option value="heat_pump">Heat Pump</option>
+        <option value="other">Pack Unit</option>
         <option value="other">Other</option>
       </select>
     </div>
-<div className="grid gap-1">
-  <label className="text-sm font-medium text-gray-900" htmlFor="system_location">
-    System Location (Upstairs / Downstairs / Closet)
-  </label>
-  <input
-    id="system_location"
-    name="system_location"
-    className="w-full rounded-md border px-3 py-2"
-    placeholder="Upstairs"
-  />
-</div>
+     
+     <SystemLocationPicker systems={systems ?? []} />
 
+
+ 
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div className="grid gap-1">
          <label className="text-sm font-medium text-gray-900" htmlFor="manufacturer">
