@@ -375,6 +375,23 @@ export default async function JobTestsPage({
                     <input type="hidden" name="system_id" value={selectedSystemId} />
                     <input type="hidden" name="test_type" value="duct_leakage" />
 
+                    <input
+                      type="checkbox"
+                      name="rc_exempt_package_unit"
+                      defaultChecked={runRC.data?.charge_exempt_reason === "package_unit"}
+                    />
+
+                    <input
+                      type="checkbox"
+                      name="rc_exempt_conditions"
+                      defaultChecked={runRC.data?.charge_exempt_reason === "conditions_not_met"}
+                    />
+
+                    <input
+                      name="rc_override_details"
+                      defaultValue={runRC.data?.charge_exempt_details ?? ""}
+                    />
+
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`ovr-${runDL.id}`}>
@@ -742,6 +759,7 @@ export default async function JobTestsPage({
                       />
                     </div>
 
+
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`tsc-${runRC.id}`}>
                         Target Subcool (°F)
@@ -808,6 +826,29 @@ export default async function JobTestsPage({
                       <label className="text-sm font-medium" htmlFor={`fd-${runRC.id}`}>
                         Filter drier installed
                       </label>
+                    </div>
+
+                    <div className="rounded-md border p-3 mt-3 sm:col-span-2">
+                      <div className="text-sm font-semibold mb-2">Charge Verification Override (if applicable)</div>
+
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="rc_exempt_package_unit" />
+                        Package unit — charge verification not required
+                      </label>
+
+                      <label className="flex items-center gap-2 text-sm mt-2">
+                        <input type="checkbox" name="rc_exempt_conditions" />
+                        Conditions not met / weather — override charge verification
+                      </label>
+
+                      <div className="mt-2">
+                        <label className="block text-xs mb-1">Override details (optional)</label>
+                        <input
+                          name="rc_override_details"
+                          className="w-full rounded-md border px-3 py-2 text-sm"
+                          placeholder='Example: "Outdoor temp 48°F" or "Rain / unsafe roof access"'
+                        />
+                      </div>
                     </div>
 
                     <div className="grid gap-1 sm:col-span-2">

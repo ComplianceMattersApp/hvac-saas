@@ -246,6 +246,64 @@ if (upcomingErr) throw upcomingErr;
   const { data: bucketJobs, error: bucketErr } = await bucketQ;
   if (bucketErr) throw bucketErr;
 
+  // --- Customer/Location lookup maps (source-of-truth) ---
+const allJobs = [
+  ...(todayJobs ?? []),
+  ...(upcomingJobs ?? []),
+  ...(callListJobs ?? []),
+  ...(bucketJobs ?? []),
+] as any[];
+
+const customerIds = Array.from(
+  new Set(allJobs.map((j) => j.customer_id).filter(Boolean))
+) as string[];
+
+const locationIds = Array.from(
+  new Set(allJobs.map((j) => j.location_id).filter(Boolean))
+) as string[];
+
+const [custRes, locRes] = await Promise.all([
+  customerIds.length
+    ? supabase
+        .from("customers")
+        .select("id, full_name, first_name, last_name, phone")
+        .in("id", customerIds)
+    : Promise.resolve({ data: [] as any[], error: null }),
+
+  locationIds.length
+    ? supabase
+        .from("locations")
+        .select("id, address_line1, city, state, zip, postal_code")
+        .in("id", locationIds)
+    : Promise.resolve({ data: [] as any[], error: null }),
+]);
+
+if (custRes.error) throw custRes.error;
+if (locRes.error) throw locRes.error;
+
+const customersById = new Map((custRes.data ?? []).map((c: any) => [c.id, c]));
+const locationsById = new Map((locRes.data ?? []).map((l: any) => [l.id, l]));
+
+// helpers used in JSX (prefer truth tables, fallback to job snapshot)
+function customerLine(j: any) {
+  const c = j.customer_id ? customersById.get(j.customer_id) : null;
+  const name =
+    (c?.full_name ||
+      `${c?.first_name ?? ""} ${c?.last_name ?? ""}`.trim() ||
+      `${j.customer_first_name ?? ""} ${j.customer_last_name ?? ""}`.trim() ||
+      "—");
+
+  const phone = c?.phone ?? j.customer_phone ?? "—";
+  return `${name} • ${phone}`;
+}
+
+function addressLine(j: any) {
+  const l = j.location_id ? locationsById.get(j.location_id) : null;
+  const addr = l?.address_line1 ?? j.job_address ?? "—";
+  const city = l?.city ?? j.city ?? "—";
+  return `${addr}, ${city}`;
+}
+
   const selectedContractorName =
     contractor && contractors?.find((c: any) => c.id === contractor)?.name;
 
@@ -402,7 +460,7 @@ jobs.sort((a: any, b: any) => {
                         {j.customer_phone ?? "—"}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {j.job_address ?? "—"}, {j.city ?? "—"}
+                        {addressLine(j)}
                       </div>
                     </div>
 
@@ -449,11 +507,10 @@ jobs.sort((a: any, b: any) => {
                 >
                   <div className="text-sm font-medium">{j.title}</div>
                   <div className="text-xs text-muted-foreground">
-                    {j.customer_first_name ?? ""} {j.customer_last_name ?? ""} •{" "}
-                    {j.customer_phone ?? "—"}
+                    {customerLine(j)}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {j.job_address ?? "—"}, {j.city ?? "—"}
+                    {addressLine(j)}
                   </div>
                 </Link>
               ))
@@ -482,8 +539,7 @@ jobs.sort((a: any, b: any) => {
                     <div>
                       <div className="text-sm font-medium">{j.title}</div>
                       <div className="text-xs text-muted-foreground">
-                        {j.customer_first_name ?? ""} {j.customer_last_name ?? ""} •{" "}
-                        {j.customer_phone ?? "—"}
+                        {customerLine(j)}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {j.job_address ?? "—"}, {j.city ?? "—"}
@@ -576,11 +632,10 @@ jobs.sort((a: any, b: any) => {
                   <div>
                     <div className="text-sm font-medium">{j.title}</div>
                     <div className="text-xs text-muted-foreground">
-                      {j.customer_first_name ?? ""} {j.customer_last_name ?? ""} •{" "}
-                      {j.customer_phone ?? "—"}
+                      {customerLine(j)}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {j.job_address ?? "—"}, {j.city ?? "—"}
+                      {addressLine(j)}
                     </div>
                   </div>
                   <div className="text-xs text-muted-foreground text-right">

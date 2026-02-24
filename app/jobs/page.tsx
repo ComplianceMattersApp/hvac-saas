@@ -12,6 +12,8 @@ const QUEUES = [
   "ready",
 ] as const;
 
+
+
 type Queue = (typeof QUEUES)[number];
 
 function formatDateLA(iso: string) {
@@ -87,7 +89,7 @@ if (countsData) {
   let query = supabase
     .from("jobs")
     .select(
-      "id, title, city, status, scheduled_date, created_at, customer_first_name, customer_last_name, job_notes, ops_status, follow_up_date, next_action_note, pending_info_reason"
+      "id, title, status, scheduled_date, created_at, ops_status, follow_up_date, next_action_note, pending_info_reason, job_notes, customer_id, location_id, customer_first_name, customer_last_name, customer_phone, job_address, city"
     );
 
   if (queue === "attention_today") {
@@ -106,6 +108,7 @@ if (countsData) {
     .limit(200);
 
   if (error) {
+
     return (
       <div className="p-6">
         <h1 className="text-xl font-semibold">Jobs</h1>
@@ -115,6 +118,36 @@ if (countsData) {
       </div>
     );
   }
+
+          const customerIds = Array.from(
+      new Set((jobs ?? []).map((j: any) => j.customer_id).filter(Boolean))
+    ) as string[];
+
+    const locationIds = Array.from(
+      new Set((jobs ?? []).map((j: any) => j.location_id).filter(Boolean))
+    ) as string[];
+
+    const [custRes, locRes] = await Promise.all([
+      customerIds.length
+        ? supabase
+            .from("customers")
+            .select("id, full_name, first_name, last_name, phone")
+            .in("id", customerIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
+
+      locationIds.length
+        ? supabase
+            .from("locations")
+            .select("id, address_line1, city")
+            .in("id", locationIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
+    ]);
+
+    if (custRes.error) throw custRes.error;
+    if (locRes.error) throw locRes.error;
+
+    const customersById = new Map((custRes.data ?? []).map((c: any) => [c.id, c]));
+    const locationsById = new Map((locRes.data ?? []).map((l: any) => [l.id, l]));
 
   return (
     <div className="p-6 space-y-4">
@@ -174,13 +207,21 @@ if (countsData) {
       ) : (
         <div className="rounded border divide-y">
           {jobs.map((job) => {
+            const c: any = job.customer_id ? customersById.get(job.customer_id) : null;
+const l: any = job.location_id ? locationsById.get(job.location_id) : null;
+
+const customerName: string | null =
+  (c?.full_name ||
+    `${c?.first_name ?? ""} ${c?.last_name ?? ""}`.trim() ||
+    `${job.customer_first_name ?? ""} ${job.customer_last_name ?? ""}`.trim()) || null;
+
+const displayCity: string = (l?.city ?? job.city ?? "—") as string;
   const today = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Los_Angeles",
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
 }).format(new Date());
-
 
   const isUrgent =
     job.follow_up_date &&
@@ -190,6 +231,7 @@ if (countsData) {
     );
 
   return (
+
     <Link
       key={job.id}
       href={`/jobs/${job.id}`}
@@ -203,7 +245,7 @@ if (countsData) {
                   <div className="font-medium">{job.title}</div>
 
                   <div className="text-sm text-gray-600">
-                    {job.city ?? "—"} • {job.status ?? "—"} •{" "}
+                    {displayCity} • {job.status ?? "—"} •{" "}
                     <span className="font-medium">{job.ops_status ?? "—"}</span>
                     {job.follow_up_date ? <> • Follow-up: {job.follow_up_date}</> : null}
                   </div>

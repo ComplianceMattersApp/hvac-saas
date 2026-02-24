@@ -56,7 +56,87 @@ type CreateJobInput = {
   
   };
 
+async function applyRetestResolution(params: {
+  supabase: any;
+  childJobId: string;
+  parentJobId: string;
+  childOpsBefore: string | null;
+  childOpsAfter: string | null;
+}) {
+  const { supabase, childJobId, parentJobId, childOpsBefore, childOpsAfter } = params;
 
+  // Only act on transitions into terminal ECC outcomes
+  const becamePassed =
+    childOpsAfter === "paperwork_required" && childOpsBefore !== "paperwork_required";
+  const becameFailed =
+    childOpsAfter === "failed" && childOpsBefore !== "failed";
+
+  if (!becamePassed && !becameFailed) return;
+
+  if (becamePassed) {
+    // Child event
+    await insertJobEvent({
+      supabase,
+      jobId: childJobId,
+      event_type: "job_passed",
+      meta: { via: "ecc_evaluate" },
+    });
+
+    // Parent event + status resolution
+    await insertJobEvent({
+      supabase,
+      jobId: parentJobId,
+      event_type: "retest_passed",
+      meta: { child_job_id: childJobId },
+    });
+
+    // Resolve parent out of failed if it's currently failed/retest-related
+    const { data: parent, error: parentErr } = await supabase
+      .from("jobs")
+      .select("ops_status")
+      .eq("id", parentJobId)
+      .maybeSingle();
+
+    if (parentErr) throw parentErr;
+
+    const parentOps = String(parent?.ops_status ?? "").trim() || null;
+
+    // Conservative: only auto-change when parent is in a failure state
+    if (parentOps === "failed" || parentOps === "retest_needed") {
+      const { error: updErr } = await supabase
+        .from("jobs")
+        .update({ ops_status: "closed" })
+        .eq("id", parentJobId);
+
+      if (updErr) throw updErr;
+
+      await insertJobEvent({
+        supabase,
+        jobId: parentJobId,
+        event_type: "status_changed",
+        meta: { from: parentOps, to: "closed", reason: "retest_passed" },
+      });
+    }
+  }
+
+  if (becameFailed) {
+    // Child event
+    await insertJobEvent({
+      supabase,
+      jobId: childJobId,
+      event_type: "job_failed",
+      meta: { via: "ecc_evaluate" },
+    });
+
+    // Parent breadcrumb (no parent status change)
+    await insertJobEvent({
+      supabase,
+      jobId: parentJobId,
+      event_type: "retest_failed",
+      meta: { child_job_id: childJobId },
+    });
+  }
+}
 
 async function insertJobEvent(params: {
   supabase: any;
@@ -554,6 +634,33 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
 
+    // Override / exemption flags (no schema change; stored + enforced via override_pass)
+  const exemptPackageUnit = formData.get("rc_exempt_package_unit") === "on";
+  const exemptConditions = formData.get("rc_exempt_conditions") === "on";
+  const overrideDetails = String(formData.get("rc_override_details") || "").trim() || null;
+
+  // If both checked, treat as package unit (and record a warning)
+  const isChargeExempt = exemptPackageUnit || exemptConditions;
+
+  const chargeExemptReason = exemptPackageUnit
+    ? "package_unit"
+    : exemptConditions
+      ? "conditions_not_met"
+      : null;
+
+  const chargeOverrideReasonText = exemptPackageUnit
+    ? "Package unit — charge verification not required"
+    : exemptConditions
+      ? "Conditions not met / weather — charge verification override"
+      : null;
+
+  const fullOverrideReason =
+    isChargeExempt
+      ? (overrideDetails
+          ? `${chargeOverrideReasonText}: ${overrideDetails}`
+          : chargeOverrideReasonText)
+      : null;
+
   if (!jobId) throw new Error("Missing job_id");
   if (!testRunId) throw new Error("Missing test_run_id");
 
@@ -659,16 +766,34 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
     data.target_subcool_f != null;
 
   const isBlocked = blocked.length > 0;
-  const computedPass = isBlocked ? null : hasCoreCompute ? failures.length === 0 : null;
+
+  // ✅ Exemption/override path: counts as PASS and should not block job resolution
+  const computedPass = isChargeExempt
+    ? true
+    : isBlocked
+      ? null
+      : hasCoreCompute
+        ? failures.length === 0
+        : null;
+
+  if (isChargeExempt) {
+    // keep a breadcrumb inside computed for auditing
+    warnings.push(
+      exemptPackageUnit
+        ? "Charge verification exempt: package unit"
+        : "Charge verification override: conditions not met"
+    );
+    if (overrideDetails) warnings.push(`Override details: ${overrideDetails}`);
+  }
 
   const computed = {
-    status: isBlocked ? "blocked" : "computed",
-    blocked,
+    status: isChargeExempt ? "exempt" : isBlocked ? "blocked" : "computed",
+    blocked: isChargeExempt ? [] : blocked,
     measured_subcool_f: measuredSubcool,
     measured_superheat_f: measuredSuperheat,
     subcool_delta_f: subcoolDelta,
     rules,
-    failures,
+    failures: isChargeExempt ? [] : failures,
     warnings,
   };
 
@@ -691,12 +816,21 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
 
   const { error: upErr } = await supabase
     .from("ecc_test_runs")
-    .update({
-      data: mergedData,
-      computed,
-      computed_pass: computedPass,
-      updated_at: new Date().toISOString(),
-    })
+      .update({
+    data: {
+      ...mergedData,
+      // store exemption info for reporting/audit
+      charge_exempt: isChargeExempt || undefined,
+      charge_exempt_reason: chargeExemptReason || undefined,
+      charge_exempt_details: overrideDetails || undefined,
+    },
+    computed,
+    computed_pass: computedPass,
+    // ✅ this is the key that makes evaluateEccOpsStatus treat it as PASS
+    override_pass: isChargeExempt ? true : null,
+    override_reason: isChargeExempt ? fullOverrideReason : null,
+    updated_at: new Date().toISOString(),
+  })
     .eq("id", testRunId)
     .eq("job_id", jobId);
 
@@ -1079,7 +1213,50 @@ const deleteId = keepId === run.id ? conflict?.id : run.id;
   }
 
   // 6) Update ECC ops_status based on completed test outcomes (failed vs paperwork_required)
-  await evaluateEccOpsStatus(jobId);
+
+// BEFORE snapshot: child ops_status + parent link
+const { data: childBefore, error: childBeforeErr } = await supabase
+  .from("jobs")
+  .select("ops_status, parent_job_id")
+  .eq("id", jobId)
+  .maybeSingle();
+
+if (childBeforeErr) throw childBeforeErr;
+
+const childOpsBefore = (childBefore?.ops_status ?? null) as string | null;
+const parentJobId = (childBefore?.parent_job_id ?? null) as string | null;
+
+// Existing behavior (keep)
+await evaluateEccOpsStatus(jobId);
+
+await insertJobEvent({
+  supabase,
+  jobId,
+  event_type: "debug_marker",
+  meta: { note: "after_evaluateEccOpsStatus" },
+});
+
+// AFTER snapshot: child ops_status
+const { data: childAfter, error: childAfterErr } = await supabase
+  .from("jobs")
+  .select("ops_status")
+  .eq("id", jobId)
+  .maybeSingle();
+
+if (childAfterErr) throw childAfterErr;
+
+const childOpsAfter = (childAfter?.ops_status ?? null) as string | null;
+
+// Retest resolution (only if linked)
+if (parentJobId) {
+  await applyRetestResolution({
+    supabase,
+    childJobId: jobId,
+    parentJobId,
+    childOpsBefore,
+    childOpsAfter,
+  });
+}
 
 
   revalidatePath(`/jobs/${jobId}/tests`);

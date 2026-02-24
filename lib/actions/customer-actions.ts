@@ -58,6 +58,20 @@ export async function upsertCustomerProfileFromForm(formData: FormData) {
 
   if (custErr) throw custErr;
 
+  // 1B) Sync job snapshot fields for all jobs tied to this customer
+// This keeps /ops + job cards accurate even if they still read from jobs.* fields.
+const { error: jobsSnapErr } = await supabase
+  .from("jobs")
+  .update({
+  customer_first_name: first_name,
+  customer_last_name: last_name,
+  customer_email: email,
+  customer_phone: phone,
+  })
+  .eq("customer_id", customer_id);
+
+if (jobsSnapErr) throw jobsSnapErr;
+
   // 2) Upsert primary location
   // If all service fields are blank, do nothing (optional)
   const anyService =
@@ -89,20 +103,48 @@ export async function upsertCustomerProfileFromForm(formData: FormData) {
         .eq("id", existingLoc.id);
 
       if (locUpdErr) throw locUpdErr;
+      // 2B) Sync job address snapshots for jobs at this location
+      const { error: jobsAddrErr } = await supabase
+        .from("jobs")
+        .update({
+          job_address: address_line1,
+          city,
+        })
+        .eq("location_id", existingLoc.id);
+
+      if (jobsAddrErr) throw jobsAddrErr;
+
     } else {
-      const { error: locInsErr } = await supabase.from("locations").insert({
-        customer_id,
-        nickname: null,
-        label: "Primary",
-        address_line1,
-        address_line2,
-        city,
-        state,
-        zip,
-        postal_code: zip,
-      });
+      const { data: newLoc, error: locInsErr } = await supabase
+        .from("locations")
+        .insert({
+          customer_id,
+          nickname: null,
+          label: "Primary",
+          address_line1,
+          address_line2,
+          city,
+          state,
+          zip,
+          postal_code: zip,
+        })
+        .select("id")
+        .single();
 
       if (locInsErr) throw locInsErr;
+
+      // Sync job address snapshots for jobs tied to this customer that may point at this new primary location later.
+      // (Safe even if 0 rows match.)
+      const { error: jobsAddrErr } = await supabase
+        .from("jobs")
+        .update({
+          job_address: address_line1,
+          city,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("location_id", newLoc.id);
+
+      if (jobsAddrErr) throw jobsAddrErr;
     }
   }
 
@@ -110,11 +152,10 @@ export async function upsertCustomerProfileFromForm(formData: FormData) {
 
   // Refresh UI
   revalidatePath(`/customers/${customer_id}`);
-  // Refresh UI
-  revalidatePath(`/customers/${customer_id}`);
   revalidatePath(`/customers/${customer_id}/edit`);
   revalidatePath("/customers");
   revalidatePath("/ops");
+  revalidatePath("/jobs");
 
   // ✅ this is what makes the banner possible
   redirect(`/customers/${customer_id}/edit?saved=1`);

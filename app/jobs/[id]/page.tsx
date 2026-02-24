@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import SubmitButton from "@/components/SubmitButton";
 
 import {
   getContractors,
@@ -283,7 +284,7 @@ const { data: customerBilling } = customerId
   ? await supabase
       .from("customers")
       .select(
-        "id, full_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip"
+        "id, full_name, first_name, last_name, phone, email, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip"
       )
       .eq("id", customerId)
       .maybeSingle()
@@ -297,10 +298,14 @@ const { data: customerBilling } = customerId
   const lastAttemptLabel = lastAttemptIso ? formatDateLAFromIso(lastAttemptIso) : "—";
   const last3Attempts = (customerAttempts ?? []).slice(0, 25);
 
-  const customerName = [job.customer_first_name, job.customer_last_name]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  const customerName =
+  (customerBilling?.full_name ||
+    [customerBilling?.first_name, customerBilling?.last_name].filter(Boolean).join(" ").trim() ||
+    [job.customer_first_name, job.customer_last_name].filter(Boolean).join(" ").trim() ||
+    "—");
+
+const customerPhone =
+  customerBilling?.phone ?? job.customer_phone ?? "—";
 
   const contractorName =
     contractors?.find((c: any) => c.id === job.contractor_id)?.name ?? "—";
@@ -883,8 +888,11 @@ if (recipient === "contractor") {
           type === "job_passed" ? "✅" :
           type === "scheduled" ? "📅" :
           type === "unscheduled" ? "🗓️" :
+          type === "retest_passed" ? "✅" :
+          type === "retest_failed" ? "❌" :
           type === "schedule_updated" ? "🕒" :
           "📝";
+          
 
         return (
           <div key={idx} className="rounded border p-3 text-sm bg-white">
@@ -912,6 +920,25 @@ if (recipient === "contractor") {
                 </Link>
               </div>
             ) : null}
+
+            {type === "retest_passed" && meta?.child_job_id ? (
+              <div className="mt-1 text-sm">
+                Resolved by retest:{" "}
+                <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
+                  View retest job
+                </Link>
+              </div>
+            ) : null}
+
+            {type === "retest_failed" && meta?.child_job_id ? (
+              <div className="mt-1 text-sm">
+                Retest failed again:{" "}
+                <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
+                  View retest job
+                </Link>
+              </div>
+            ) : null}
+
           </div>
         );
       })
@@ -997,9 +1024,9 @@ if (recipient === "contractor") {
 
                   <input type="hidden" name="method" value="call" />
                   <input type="hidden" name="result" value="no_answer" />
-                  <button className="px-3 py-2 rounded border text-sm" type="submit">
+                  <SubmitButton className="px-3 py-2 rounded border text-sm">
                     Log Call (No Answer)
-                  </button>
+                  </SubmitButton>
                 </form>
 
                 <form action={logCustomerContactAttemptFromForm}>
