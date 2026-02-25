@@ -161,3 +161,35 @@ if (jobsSnapErr) throw jobsSnapErr;
   redirect(`/customers/${customer_id}/edit?saved=1`);
 }
 
+export async function archiveCustomerFromForm(formData: FormData) {
+  "use server";
+  const supabase = await createClient();
+
+  const customer_id = String(formData.get("customer_id") ?? "").trim();
+  if (!customer_id) throw new Error("Missing customer_id");
+
+  // Safety: do not archive if customer has jobs
+  const { count: jobsCount, error: jobsErr } = await supabase
+    .from("jobs")
+    .select("id", { count: "exact", head: true })
+    .eq("customer_id", customer_id);
+
+  if (jobsErr) throw jobsErr;
+  if ((jobsCount ?? 0) > 0) {
+    redirect(`/customers/${customer_id}?err=has_jobs`);
+  }
+
+  const { error } = await supabase
+    .from("customers")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", customer_id);
+
+  if (error) throw error;
+
+  revalidatePath("/customers");
+  revalidatePath(`/customers/${customer_id}`);
+  revalidatePath("/ops");
+  revalidatePath("/jobs");
+
+  redirect(`/customers?saved=archived`);
+}

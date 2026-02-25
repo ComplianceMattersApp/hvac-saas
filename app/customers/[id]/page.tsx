@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { archiveCustomerFromForm } from "@/lib/actions/customer-actions";
+
 
 type CustomerSummaryRow = {
   customer_id: string;
@@ -66,16 +68,10 @@ export default async function CustomerDetailPage(props: {
           Back to Customers
         </Link>
       </div>
+      
     );
   }
-
-
-  
   const customer = customerRow as CustomerSummaryRow;
-
- 
-
-
   const { data: locationsData, error: locationsErr } = await supabase
     .from("customer_locations_summary")
     .select("*")
@@ -85,6 +81,22 @@ export default async function CustomerDetailPage(props: {
   if (locationsErr) throw locationsErr;
 
   const locations = (locationsData ?? []) as CustomerLocationRow[];
+
+  // Fetch jobs grouped by location
+const jobsByLocation = new Map<string, any[]>();
+
+for (const loc of locations) {
+  const { data: jobsData, error: jobsErr } = await supabase
+    .from("jobs")
+    .select("id, title, status, ops_status, scheduled_date, created_at")
+    .eq("location_id", loc.location_id)
+    .order("scheduled_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
+
+  if (jobsErr) throw jobsErr;
+
+  jobsByLocation.set(loc.location_id, jobsData ?? []);
+}
 
   return (
     <div className="p-6 space-y-6">
@@ -126,11 +138,10 @@ export default async function CustomerDetailPage(props: {
         ) : (
           <div className="grid gap-3">
             {locations.map((l) => (
-              <Link
+              <div
                 key={l.location_id}
-                href={`/locations/${l.location_id}`}
-                className="block rounded-lg border p-4 hover:bg-muted/50"
-              >
+                className="rounded-lg border p-4"
+>
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="font-medium">
@@ -151,16 +162,78 @@ export default async function CustomerDetailPage(props: {
                         : ""}
                     </div>
                   </div>
+                  
 
                   <div className="text-sm text-muted-foreground whitespace-nowrap">
                     View →
                   </div>
                 </div>
-              </Link>
+
+                <div className="mt-3">
+  <Link
+    href={`/locations/${l.location_id}`}
+    className="text-sm underline text-muted-foreground"
+  >
+    View Location →
+  </Link>
+</div>
+
+                <div className="mt-3 space-y-2">
+  <div className="text-sm font-medium">Jobs</div>
+
+  {(jobsByLocation.get(l.location_id) ?? []).length === 0 ? (
+    <div className="text-sm text-muted-foreground">
+      No jobs for this location.
+    </div>
+  ) : (
+    (jobsByLocation.get(l.location_id) ?? []).map((job) => (
+      <Link
+        key={job.id}
+        href={`/jobs/${job.id}`}
+        className="block rounded-md border px-3 py-2 text-sm hover:bg-muted/50"
+      >
+        <div className="flex justify-between">
+          <span>{job.title ?? "Untitled Job"}</span>
+          <span className="text-muted-foreground">
+            {job.status === "failed"
+              ? "FAILED"
+              : job.status === "completed"
+                ? "Completed"
+                : job.scheduled_date
+                  ? `Scheduled ${new Date(job.scheduled_date).toLocaleDateString()}`
+                  : job.ops_status ?? "Unscheduled"}
+            </span>
+        </div>
+      </Link>
+    ))
+  )}
+</div>
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* 🔴 Danger Zone */}
+<div className="rounded-lg border border-red-200 p-4 space-y-2">
+  <div className="font-semibold text-red-700">Danger zone</div>
+  <div className="text-sm text-gray-600">
+    Archive removes this customer from active lists. Cannot archive if customer has jobs.
+  </div>
+
+  <form action={archiveCustomerFromForm}>
+    <input type="hidden" name="customer_id" value={customerId} />
+    <button
+      type="submit"
+      className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+    >
+      Archive Customer
+    </button>
+  </form>
+</div>
     </div>
+    
+    
   );
+  
 }

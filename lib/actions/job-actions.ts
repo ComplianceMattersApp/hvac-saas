@@ -58,6 +58,44 @@ type CreateJobInput = {
   
   };
 
+async function cleanupOrphanSystem(opts: {
+  supabase: any;
+  jobId: string;
+  systemId: string;
+}) {
+  const { supabase, jobId, systemId } = opts;
+  if (!systemId) return;
+
+  // any equipment left on this system?
+  const { count: eqCount, error: eqErr } = await supabase
+    .from("job_equipment")
+    .select("id", { count: "exact", head: true })
+    .eq("job_id", jobId)
+    .eq("system_id", systemId);
+
+  if (eqErr) throw eqErr;
+
+  // any test runs left on this system?
+  const { count: trCount, error: trErr } = await supabase
+    .from("ecc_test_runs")
+    .select("id", { count: "exact", head: true })
+    .eq("job_id", jobId)
+    .eq("system_id", systemId);
+
+  if (trErr) throw trErr;
+
+  // orphan rule
+  if ((eqCount ?? 0) === 0 && (trCount ?? 0) === 0) {
+    const { error: delSysErr } = await supabase
+      .from("job_systems")
+      .delete()
+      .eq("job_id", jobId)
+      .eq("id", systemId);
+
+    if (delSysErr) throw delSysErr;
+  }
+}
+
 async function applyRetestResolution(params: {
   supabase: any;
   childJobId: string;
@@ -376,15 +414,21 @@ export async function deleteJobEquipmentFromForm(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from("job_equipment")
-    .delete()
-    .eq("id", equipmentId)
-    .eq("job_id", jobId);
+ const { data: deleted, error: delErr } = await supabase
+  .from("job_equipment")
+  .delete()
+  .eq("id", equipmentId)
+  .eq("job_id", jobId)
+  .select("system_id")
+  .maybeSingle();
 
-  if (error) throw error;
+if (delErr) throw delErr;
 
-  revalidatePath(`/jobs/${jobId}`);
+const systemId = String(deleted?.system_id ?? "").trim();
+await cleanupOrphanSystem({ supabase, jobId, systemId });
+
+revalidatePath(`/jobs/${jobId}`);
+revalidatePath(`/jobs/${jobId}/tests`);
 }
 
 export async function saveEccTestOverrideFromForm(formData: FormData) {
@@ -582,16 +626,21 @@ export async function deleteEccTestRunFromForm(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from("ecc_test_runs")
-    .delete()
-    .eq("id", testRunId)
-    .eq("job_id", jobId);
+const { data: deletedRun, error: delRunErr } = await supabase
+  .from("ecc_test_runs")
+  .delete()
+  .eq("id", testRunId)
+  .eq("job_id", jobId)
+  .select("system_id")
+  .maybeSingle();
 
-  if (error) throw error;
+if (delRunErr) throw delRunErr;
 
-  revalidatePath(`/jobs/${jobId}/tests`);
-  revalidatePath(`/jobs/${jobId}`);
+const systemId = String(deletedRun?.system_id ?? "").trim();
+await cleanupOrphanSystem({ supabase, jobId, systemId });
+
+revalidatePath(`/jobs/${jobId}/tests`);
+revalidatePath(`/jobs/${jobId}`);
 }
 
 export async function createContractorFromForm(formData: FormData) {
