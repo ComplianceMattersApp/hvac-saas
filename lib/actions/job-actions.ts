@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
+ import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
+ 
 
 
 import {
@@ -408,13 +410,12 @@ export async function saveEccTestOverrideFromForm(formData: FormData) {
   else if (override === "fail") override_pass = false;
   else override_pass = null;
 
-  // Require reason if override is set
-  if (override_pass !== null) {
-    if (!reasonRaw) throw new Error("Override reason is required");
-    override_reason = reasonRaw;
-  } else {
-    override_reason = null;
-  }
+ // Smoke Test only: reason is optional
+if (override_pass !== null) {
+  override_reason = reasonRaw || "Smoke Test";
+} else {
+  override_reason = null;
+}
 
   // ✅ validate testType against allowed pills
   const allowed = new Set(["duct_leakage", "airflow", "refrigerant_charge", "custom"]);
@@ -422,16 +423,29 @@ export async function saveEccTestOverrideFromForm(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from("ecc_test_runs")
-    .update({
-      override_pass,
-      override_reason,
-    })
-    .eq("id", testRunId)
-    .eq("job_id", jobId);
+  const { data: updated, error } = await supabase
+  .from("ecc_test_runs")
+  .update({
+    override_pass,
+    override_reason,
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", testRunId)
+  .eq("job_id", jobId)
+  .select("id, job_id, test_type, override_pass, override_reason")
+  .maybeSingle();
 
-  if (error) throw error;
+if (error) throw error;
+
+// 🔎 Force visibility if nothing matched
+if (!updated?.id) {
+  throw new Error(
+    `Override update matched 0 rows. job_id=${jobId} test_run_id=${testRunId}`
+  );
+}
+
+    await evaluateEccOpsStatus(jobId);
+    revalidatePath(`/jobs/${jobId}`);
 
   // Re-render tests page
   revalidatePath(`/jobs/${jobId}/tests`);
@@ -441,6 +455,7 @@ export async function saveEccTestOverrideFromForm(formData: FormData) {
    * - if systemId missing, redirect without s (or throw)
    */
   // 🔒 Resolve system_id from the run (authoritative), fallback to form
+
 const { data: run, error: runErr } = await supabase
   .from("ecc_test_runs")
   .select("system_id")
@@ -450,7 +465,10 @@ const { data: run, error: runErr } = await supabase
 
 if (runErr) throw runErr;
 
-const systemId = String(run?.system_id || systemIdRaw || "").trim();
+const systemId =
+  (run?.system_id ? String(run.system_id).trim() : "") ||
+  (systemIdRaw ? String(systemIdRaw).trim() : "") ||
+  "";
 
 
   if (!testType) {
@@ -630,6 +648,94 @@ export async function updateJobContractorFromForm(formData: FormData) {
  * - revalidates /tests
  * - redirects back preserving t & s (never blank s=)
  * ========================= */
+
+export async function markRefrigerantChargeExemptFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+
+  const exemptPackageUnit = formData.get("rc_exempt_package_unit") === "on";
+  const exemptConditions = formData.get("rc_exempt_conditions") === "on";
+  const details = String(formData.get("rc_override_details") || "").trim() || null;
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  // Choose reason (package_unit wins if both checked)
+  const exemptReason = exemptPackageUnit
+    ? "package_unit"
+    : exemptConditions
+      ? "conditions_not_met"
+      : null;
+
+  if (!exemptReason) {
+    throw new Error("Select Package unit or Conditions not met to mark exempt.");
+  }
+
+  const reasonLabel =
+    exemptReason === "package_unit"
+      ? "Package unit — charge verification not required"
+      : "Conditions not met / weather — charge verification override";
+
+  const fullReason = details ? `${reasonLabel}: ${details}` : reasonLabel;
+
+  const supabase = await createClient();
+
+  // merge into data for persistence/UI defaults
+  const { data: existingRun, error: loadErr } = await supabase
+    .from("ecc_test_runs")
+    .select("data")
+    .eq("id", testRunId)
+    .eq("job_id", jobId)
+    .single();
+
+  if (loadErr) throw loadErr;
+
+  const existingData = (existingRun?.data ?? {}) as Record<string, any>;
+  const mergedData = {
+    ...existingData,
+    charge_exempt_reason: exemptReason,
+    charge_exempt_details: details,
+  };
+
+  const computed = {
+    status: "exempt",
+    exempt_reason: exemptReason,
+    exempt_details: details,
+    note: "Marked exempt (auto-pass) by technician",
+  };
+
+  const { error: upErr } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data: mergedData,
+      computed,
+      computed_pass: true,
+      override_pass: true,
+      override_reason: fullReason,
+      is_completed: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (upErr) throw upErr;
+
+  await evaluateEccOpsStatus(jobId);
+
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  revalidatePath(`/jobs/${jobId}/tests`);
+  revalidatePath(`/jobs/${jobId}`);
+  redirectToTests({ jobId, testType: "refrigerant_charge", systemId });
+}
+
 export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
@@ -1495,9 +1601,11 @@ if (billingRecipientFinal === "contractor" && !contractor_id) {
   const jobAddressRaw = String(formData.get("job_address") || "").trim();
 
   const status = String(formData.get("status") || "open").trim() as JobStatus;
+  
 
   if (jobType === "service" && !titleFinal) throw new Error("Title is required");
   if (!city) throw new Error("City is required");
+  
 
     const supabase = await createClient();
 
@@ -1506,27 +1614,28 @@ if (billingRecipientFinal === "contractor" && !contractor_id) {
     String(formData.get("address_line1") || "").trim() ||
     String(formData.get("job_address") || "").trim();
 
-  if (!address_line1) throw new Error("Service Address is required");
 
-  // 1) Create Customer
-  const { data: customer, error: customerErr } = await supabase
-    .from("customers")
-    .insert({
-      first_name: customerFirstNameRaw || null,
-      last_name: customerLastNameRaw || null,
-      email: customerEmailRaw || null,
-      phone: customerPhoneRaw ? customerPhoneRaw : null,
-    })
-    .select("id")
-    .single();
 
-  if (customerErr) throw customerErr;
+if (!address_line1) {
+  redirect("/jobs/new?err=missing_address");
+}
+
+
+  
+  // 1) Find or create Customer (duplicate-safe)
+const { customerId, reused } = await findOrCreateCustomer({
+  supabase,
+  firstName: customerFirstNameRaw,
+  lastName: customerLastNameRaw,
+  phone: customerPhoneRaw,
+  email: customerEmailRaw,
+});
 
   // 2) Create Location (service address)
   const { data: location, error: locationErr } = await supabase
     .from("locations")
     .insert({
-      customer_id: customer.id,
+      customer_id: customerId,
       address_line1,
       city, // you already validate city above
     })
@@ -1535,7 +1644,7 @@ if (billingRecipientFinal === "contractor" && !contractor_id) {
 
   if (locationErr) throw locationErr;
 
-  const customer_id = customer.id;
+  const customer_id = customerId;
   const location_id = location.id;
 
   const created = await createJob({
@@ -1582,7 +1691,8 @@ billing_zip,
   revalidatePath(`/jobs/${created.id}`);
   revalidatePath(`/ops`);
 
-  redirect(`/jobs/${created.id}`);
+  const banner = reused ? "customer_reused" : "customer_created";
+redirect(`/jobs/${created.id}?banner=${banner}`);
 }
 
 
@@ -1790,6 +1900,7 @@ if (copyEquipment) {
   revalidatePath(`/ops`);
 
   redirect(`/jobs/${child.id}?tab=ops`);
+  
 }
 
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { markRefrigerantChargeExemptFromForm } from "@/lib/actions/job-actions";
 
 import {
   completeEccTestRunFromForm,
@@ -361,6 +362,7 @@ export default async function JobTestsPage({
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="test_type" value="duct_leakage" />
+                                
                 <button className="rounded-md bg-black px-4 py-2 text-white text-sm" type="submit">
                   Create Duct Leakage Run
                 </button>
@@ -370,27 +372,10 @@ export default async function JobTestsPage({
                 <form action={saveEccTestOverrideFromForm} className="grid gap-3 border-t pt-3">
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runDL.id} />
-
-                    {/* 🔒 hardening: always preserve system + test context */}
                     <input type="hidden" name="system_id" value={selectedSystemId} />
                     <input type="hidden" name="test_type" value="duct_leakage" />
 
-                    <input
-                      type="checkbox"
-                      name="rc_exempt_package_unit"
-                      defaultChecked={runRC.data?.charge_exempt_reason === "package_unit"}
-                    />
 
-                    <input
-                      type="checkbox"
-                      name="rc_exempt_conditions"
-                      defaultChecked={runRC.data?.charge_exempt_reason === "conditions_not_met"}
-                    />
-
-                    <input
-                      name="rc_override_details"
-                      defaultValue={runRC.data?.charge_exempt_details ?? ""}
-                    />
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="grid gap-1">
@@ -406,8 +391,7 @@ export default async function JobTestsPage({
                         }
                       >
                         <option value="none">None</option>
-                        <option value="pass">Override PASS</option>
-                        <option value="fail">Override FAIL</option>
+                        <option value="pass">Smoke Test (Pass)</option>
                       </select>
                     </div>
 
@@ -827,47 +811,54 @@ export default async function JobTestsPage({
                         Filter drier installed
                       </label>
                     </div>
-
-                    <div className="rounded-md border p-3 mt-3 sm:col-span-2">
-                      <div className="text-sm font-semibold mb-2">Charge Verification Override (if applicable)</div>
-
-                      <label className="flex items-center gap-2 text-sm">
-                        <input type="checkbox" name="rc_exempt_package_unit" />
-                        Package unit — charge verification not required
-                      </label>
-
-                      <label className="flex items-center gap-2 text-sm mt-2">
-                        <input type="checkbox" name="rc_exempt_conditions" />
-                        Conditions not met / weather — override charge verification
-                      </label>
-
-                      <div className="mt-2">
-                        <label className="block text-xs mb-1">Override details (optional)</label>
-                        <input
-                          name="rc_override_details"
-                          className="w-full rounded-md border px-3 py-2 text-sm"
-                          placeholder='Example: "Outdoor temp 48°F" or "Rain / unsafe roof access"'
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid gap-1 sm:col-span-2">
-                      <label className="text-sm font-medium" htmlFor={`notes-${runRC.id}`}>
-                        Notes (optional)
-                      </label>
-                      <input
-                        id={`notes-${runRC.id}`}
-                        name="notes"
-                        className="w-full rounded-md border px-3 py-2"
-                        defaultValue={runRC.data?.notes ?? ""}
-                      />
-                    </div>
                   </div>
 
                   <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
                     Save Refrigerant Charge Readings
                   </button>
                 </form>
+                
+                <form action={markRefrigerantChargeExemptFromForm} className="rounded-md border p-3 mt-3 sm:col-span-2">
+  <input type="hidden" name="job_id" value={job.id} />
+  <input type="hidden" name="test_run_id" value={runRC.id} />
+  <input type="hidden" name="system_id" value={selectedSystemId} />
+
+  <div className="text-sm font-semibold mb-2">Charge Verification Override (if applicable)</div>
+
+  <label className="flex items-center gap-2 text-sm">
+    <input
+      type="checkbox"
+      name="rc_exempt_package_unit"
+      defaultChecked={runRC.data?.charge_exempt_reason === "package_unit"}
+    />
+    Package unit — charge verification not required
+  </label>
+
+  <label className="flex items-center gap-2 text-sm mt-2">
+    <input
+      type="checkbox"
+      name="rc_exempt_conditions"
+      defaultChecked={runRC.data?.charge_exempt_reason === "conditions_not_met"}
+    />
+    Conditions not met / weather — override charge verification
+  </label>
+
+  <div className="mt-2">
+    <label className="block text-xs mb-1">Override details (optional)</label>
+    <input
+      name="rc_override_details"
+      className="w-full rounded-md border px-3 py-2 text-sm"
+      defaultValue={runRC.data?.charge_exempt_details ?? ""}
+      placeholder='Example: "Outdoor temp 48°F" or "Rain / unsafe roof access"'
+    />
+  </div>
+
+  <div className="mt-3">
+    <button type="submit" className="rounded-md bg-black px-4 py-2 text-white text-sm">
+      Mark Exempt (Pass)
+    </button>
+  </div>
+</form>
 
                 <div className="flex flex-wrap gap-2 items-center">
                   <form action={completeEccTestRunFromForm}>

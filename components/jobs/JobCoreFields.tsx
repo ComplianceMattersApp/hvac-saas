@@ -87,6 +87,7 @@ export default function JobCoreFields({ mode, titleRequired }: Props) {
           <input
             type="text"
             name="address_line1"
+            required
             className="w-full border rounded px-3 py-2"
           />
         </div>

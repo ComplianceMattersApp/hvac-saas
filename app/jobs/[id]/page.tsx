@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SubmitButton from "@/components/SubmitButton";
+import FlashBanner from "@/components/ui/FlashBanner";
 
 import {
   getContractors,
@@ -139,9 +140,10 @@ export default async function JobDetailPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
-  searchParams?: Promise<{ tab?: string }>;
+  params: { id: string };
+  searchParams?: { tab?: string; banner?: string };
 }) {
+  
   const { id: jobId } = await params;
 
   const sp = searchParams ? await searchParams : {};
@@ -417,12 +419,70 @@ if (recipient === "contractor") {
   </div>
 </div>
 
-
       {/* Header */}
+
+      {sp?.banner === "customer_reused" && (
+  <FlashBanner
+    type="warning"
+    message="Existing customer matched by phone — reused (no duplicate created)."
+  />
+)}
+
+{sp?.banner === "customer_created" && (
+  <FlashBanner
+    type="success"
+    message="New customer created and linked to this job."
+  />
+)}
       <div className="mb-3">
         <h1 className="text-2xl font-semibold">{job.title}</h1>
         <p className="text-sm text-gray-600">{serviceCity ?? "No city set"}</p>
       </div>
+
+      {job.status === "completed" && job.ops_status !== "closed" ? (() => {
+  const ops = job.ops_status;
+
+  const meta =
+    ops === "paperwork_required"
+      ? {
+          title: "Job completed — paperwork still required",
+          body: "Upload/attach required documents (invoice/cert) to fully close out the job.",
+        }
+      : ops === "pending_info"
+        ? {
+            title: "Job completed — pending information",
+            body: "Some required info is still missing (ex: permit number, required fields, or notes). Add it to close out.",
+          }
+        : ops === "failed"
+          ? {
+              title: "Job completed — but the job is still marked FAILED",
+              body: "A failed test is still unresolved. Complete the retest/corrections to move toward closeout.",
+            }
+          : ops === "scheduled"
+            ? {
+                title: "Job completed — but still scheduled",
+                body: "This job is marked completed, but scheduling is still set. Unschedule or close out remaining items.",
+              }
+            : ops === "need_to_schedule"
+              ? {
+                  title: "Job completed — but still in Need to Schedule",
+                  body: "This job is marked completed, but ops status indicates scheduling is still needed. Review status flow.",
+                }
+              : {
+                  title: "Job completed — but compliance is not fully resolved",
+                  body: "Complete remaining ECC items (tests, paperwork, invoice/cert) to fully close out the job.",
+                };
+
+                
+  return (
+    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 mt-3">
+      <div className="text-sm font-semibold">{meta.title}</div>
+      <div className="mt-1 text-sm">
+        Current Ops Status: <span className="font-medium">{ops}</span>. {meta.body}
+      </div>
+    </div>
+  );
+})() : null}
 
       {/* Tab row (URL changes + render changes) */}
       <div className="mb-4 flex gap-2">
@@ -472,7 +532,7 @@ if (recipient === "contractor") {
 
           <div className="flex justify-between">
             <span className="text-gray-600">Phone</span>
-            <span className="font-medium">{job.customer_phone || "—"}</span>
+            <span className="font-medium">{customerPhone}</span>
           </div>
 
           <div className="flex justify-between">

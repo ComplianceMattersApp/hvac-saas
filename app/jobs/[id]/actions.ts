@@ -2,6 +2,19 @@
 
 import { createClient } from '@/lib/supabase/server';
 
+function normalizePhone10(raw: string | null | undefined) {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.length > 10 ? digits.slice(-10) : digits; // last-10 match
+}
+
+function normalizeName(raw: string) {
+  return raw
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const OPS_STATUSES = [
   'need_to_schedule',
   'pending_info',
