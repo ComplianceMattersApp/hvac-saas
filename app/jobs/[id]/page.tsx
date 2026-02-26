@@ -574,6 +574,7 @@ if (recipient === "contractor") {
   </details>
 </div>
 
+
 {job.customer_id ? (
   <Link
     href={`/customers/${job.customer_id}/edit`}

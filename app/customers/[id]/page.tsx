@@ -105,6 +105,13 @@ for (const loc of locations) {
           ← Back to Customers
         </Link>
 
+        <Link
+        href={`/jobs/new?customer_id=${customerId}`}
+        className="inline-flex items-center rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-gray-900"
+      >
+        + Create Job
+      </Link>
+
         
 
         <h1 className="text-2xl font-semibold">

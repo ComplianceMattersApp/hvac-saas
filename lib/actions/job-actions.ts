@@ -1663,13 +1663,132 @@ if (billingRecipientFinal === "contractor" && !contractor_id) {
     String(formData.get("address_line1") || "").trim() ||
     String(formData.get("job_address") || "").trim();
 
+    const existingCustomerId = String(formData.get("customer_id") || "").trim();
+    const existingLocationId = String(formData.get("location_id") || "").trim();
 
+    const locationNickname = String(formData.get("location_nickname") || "").trim() || null;
+    const zip = String(formData.get("zip") || "").trim() || null;
+
+  if (existingCustomerId && existingLocationId) {
+    const created = await createJob({
+      job_type: jobType,
+      project_type: projectType,
+      job_address: jobAddressRaw || null,
+      customer_id: existingCustomerId,
+      location_id: existingLocationId,
+
+      customer_first_name: customerFirstNameRaw || null,
+      customer_last_name: customerLastNameRaw || null,
+      customer_email: customerEmailRaw || null,
+      job_notes: jobNotesRaw || null,
+
+      title: titleFinal,
+      city,
+      scheduled_date,
+      status,
+      contractor_id,
+      permit_number: permitNumberRaw ? permitNumberRaw : null,
+      window_start,
+      window_end,
+      customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
+      ops_status,
+      billing_recipient: billingRecipientFinal,
+      billing_name,
+      billing_email,
+      billing_phone,
+      billing_address_line1,
+      billing_address_line2,
+      billing_city,
+      billing_state,
+      billing_zip,
+    });
+
+    await insertJobEvent({
+      supabase,
+      jobId: created.id,
+      event_type: "job_created",
+      meta: { job_type: jobType, project_type: projectType, source: "customer" },
+    });
+
+    revalidatePath(`/jobs/${created.id}`);
+    revalidatePath(`/ops`);
+    revalidatePath(`/customers/${existingCustomerId}`);
+
+    redirect(`/jobs/${created.id}`);
+  }
 
 if (!address_line1) {
   redirect("/jobs/new?err=missing_address");
 }
 
+if (existingCustomerId && !existingLocationId) {
+  if (!address_line1) throw new Error("Service Address is required");
+  if (!city) throw new Error("City is required");
+  if (!zip) throw new Error("Zip is required");
 
+  // 1) Create Location for existing customer
+  const { data: location, error: locationErr } = await supabase
+    .from("locations")
+    .insert({
+      customer_id: existingCustomerId,
+      nickname: locationNickname,
+      address_line1,
+      city,
+      zip,
+    })
+    .select("id")
+    .single();
+
+  if (locationErr) throw locationErr;
+
+  // 2) Create Job tied to existing customer + new location
+  const created = await createJob({
+    job_type: jobType,
+    project_type: projectType,
+    job_address: jobAddressRaw || null,
+    customer_id: existingCustomerId,
+    location_id: location.id,
+
+    customer_first_name: customerFirstNameRaw || null,
+    customer_last_name: customerLastNameRaw || null,
+    customer_email: customerEmailRaw || null,
+    job_notes: jobNotesRaw || null,
+
+    title: titleFinal,
+    city,
+    scheduled_date,
+    status,
+    contractor_id,
+    permit_number: permitNumberRaw ? permitNumberRaw : null,
+    window_start,
+    window_end,
+    customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
+    ops_status,
+    billing_recipient: billingRecipientFinal,
+    billing_name,
+    billing_email,
+    billing_phone,
+    billing_address_line1,
+    billing_address_line2,
+    billing_city,
+    billing_state,
+    billing_zip,
+  });
+
+  await insertJobEvent({
+    supabase,
+    jobId: created.id,
+    event_type: "job_created",
+    meta: { job_type: jobType, project_type: projectType, source: "customer_new_location" },
+  });
+
+  revalidatePath(`/jobs/${created.id}`);
+  revalidatePath(`/ops`);
+  revalidatePath(`/customers/${existingCustomerId}`);
+  revalidatePath(`/locations/${location.id}`);
+
+  redirect(`/jobs/${created.id}`);
+}
   
   // 1) Find or create Customer (duplicate-safe)
 const { customerId, reused } = await findOrCreateCustomer({

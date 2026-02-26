@@ -6,7 +6,45 @@ import JobCoreFields from "@/components/jobs/JobCoreFields";
 
 type Contractor = { id: string; name: string };
 
-export default function NewJobForm({ contractors }: { contractors: Contractor[] }) {
+
+
+type ExistingCustomer = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  email: string | null;
+};
+
+type LocationRow = {
+  id: string;
+  nickname: string | null;
+  address_line1: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+};
+
+export default function NewJobForm({
+  contractors,
+  existingCustomer,
+  locations = [],
+}: {
+  contractors: Contractor[];
+  existingCustomer?: ExistingCustomer | null;
+  locations?: LocationRow[];
+}) {
+
+  const isExistingCustomer = Boolean(existingCustomer?.id);
+
+  const [locationId, setLocationId] = useState<string>(() => {
+    return isExistingCustomer && locations.length ? locations[0].id : "";
+  });
+
+const selectedLoc = isExistingCustomer
+  ? locations.find((l) => l.id === locationId) ?? null
+  : null;
+
   const [windowStart, setWindowStart] = useState("");
   const [windowEnd, setWindowEnd] = useState("");
 
@@ -20,6 +58,8 @@ export default function NewJobForm({ contractors }: { contractors: Contractor[] 
   const [projectType, setProjectType] = useState<
     "alteration" | "all_new" | "new_construction"
   >("alteration");
+
+  const isNewLocation = isExistingCustomer && locationId === "__new__";
 
   function onQuickWindowChange(value: string) {
     if (!value) return;
@@ -80,13 +120,142 @@ export default function NewJobForm({ contractors }: { contractors: Contractor[] 
             <input type="hidden" name="project_type" value="alteration" />
           )}
 
+                    {/* Service Title (required for Service jobs) */}
+      {jobType === "service" ? (
+        <div className="rounded-lg border p-3 space-y-2">
+          <label className="block text-sm font-medium">Service Title</label>
+          <input
+            name="title"
+            className="w-full border rounded px-3 py-2"
+            placeholder="e.g., Duct Cleaning, Dryer Vent, Maintenance"
+            required
+          />
+        </div>
+      ) : (
+        // For ECC jobs, keep title optional/auto — no field needed
+        <input type="hidden" name="title" value="" />
+      )}
+
+
           {/* Canonical field submitted */}
           <input type="hidden" name="job_type" value={jobType} />
         </div>
 
-        {/* Shared Core Fields (title/permit/customer/address/city/notes) */}
-        <JobCoreFields mode="internal" titleRequired={jobType === "service"} />
+        {isExistingCustomer ? (
 
+          
+        <div className="space-y-4">
+          {/* Existing customer mode: lock customer + pick a location */}
+          <input type="hidden" name="customer_id" value={existingCustomer!.id} />
+
+        <div className="rounded-lg border p-3 space-y-2">
+        <div className="text-sm font-semibold">Customer</div>
+
+        {/* Snapshot fields still submitted (no re-entry) */}
+        <input type="hidden" name="customer_first_name" value={existingCustomer?.first_name ?? ""} />
+        <input type="hidden" name="customer_last_name" value={existingCustomer?.last_name ?? ""} />
+        <input type="hidden" name="customer_phone" value={existingCustomer?.phone ?? ""} />
+        <input type="hidden" name="customer_email" value={existingCustomer?.email ?? ""} />
+
+        <div className="text-sm">
+          <div className="font-medium">
+            {(existingCustomer?.first_name ?? "").trim()}{" "}
+            {(existingCustomer?.last_name ?? "").trim()}
+          </div>
+
+          <div className="text-muted-foreground">
+            {existingCustomer?.phone ?? "No phone"}
+            {existingCustomer?.email ? ` • ${existingCustomer.email}` : ""}
+          </div>
+        </div>
+      </div>
+    
+
+    <div className="rounded-lg border p-3 space-y-3">
+      <div className="text-sm font-semibold">Service Location</div>
+
+      <div className="space-y-1">
+        <label className="block text-sm font-medium">Pick a Location</label>
+        <select
+          name="location_id"
+          value={locationId}
+          onChange={(e) => setLocationId(e.target.value)}
+          className="w-full border rounded px-3 py-2"
+          required
+        >
+          {locations.length === 0 ? (
+            <option value="">No locations found</option>
+          ) : (
+            locations.map((l) => (
+              <option key={l.id} value={l.id}>
+                {(l.nickname ?? "Service Location") +
+                  " — " +
+                  (l.address_line1 ?? "No address") +
+                  (l.city ? `, ${l.city}` : "")}
+              </option>
+              
+            ))
+          )}
+          <option value="__new__">+ Add new location…</option>
+        </select>
+      </div>
+{isNewLocation ? (
+  <div className="grid gap-3">
+    {/* Tell server this is a new location */}
+    <input type="hidden" name="location_id" value="" />
+
+    <div className="space-y-1">
+      <label className="block text-sm font-medium">Nickname (optional)</label>
+      <input
+        name="location_nickname"
+        className="w-full border rounded px-3 py-2"
+        placeholder="Main House, ADU, Shop"
+      />
+    </div>
+
+    <div className="space-y-1">
+      <label className="block text-sm font-medium">Service Address</label>
+      <input
+        name="address_line1"
+        className="w-full border rounded px-3 py-2"
+        required
+      />
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="space-y-1">
+        <label className="block text-sm font-medium">City</label>
+        <input name="city" className="w-full border rounded px-3 py-2" required />
+      </div>
+
+      <div className="space-y-1">
+        <label className="block text-sm font-medium">Zip</label>
+        <input name="zip" className="w-full border rounded px-3 py-2" required />
+      </div>
+    </div>
+  </div>
+) : (
+  <>
+    <input type="hidden" name="location_id" value={locationId} />
+    <input type="hidden" name="address_line1" value={selectedLoc?.address_line1 ?? ""} />
+    <input type="hidden" name="city" value={selectedLoc?.city ?? ""} />
+    <input type="hidden" name="zip" value={selectedLoc?.zip ?? ""} />
+
+    <div className="text-sm text-muted-foreground">
+      {selectedLoc?.address_line1 ?? "No address"}
+      {selectedLoc?.city ? `, ${selectedLoc.city}` : ""}
+      {selectedLoc?.zip ? ` ${selectedLoc.zip}` : ""}
+    </div>
+  </>
+)}
+    </div>
+  </div>
+) : (
+  <>
+    {/* Normal flow: new customer + new location */}
+    <JobCoreFields mode="internal" titleRequired={jobType === "service"} />
+  </>
+)}
         {/* Contractor */}
         <div>
           <label className="block text-sm font-medium mb-1">

@@ -1,8 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import NewJobForm from "./NewJobForm";
 
-export default async function NewJobPage() {
+function isUuid(v: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
+
+export default async function NewJobPage(props: {
+  searchParams?: Promise<{ customer_id?: string }>;
+}) {
   const supabase = await createClient();
+
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData?.user) redirect("/login");
+
+  const sp = props.searchParams ? await props.searchParams : undefined;
+  const customerId = String(sp?.customer_id ?? "").trim();
 
   const { data: contractors, error } = await supabase
     .from("contractors")
@@ -11,5 +24,35 @@ export default async function NewJobPage() {
 
   if (error) throw new Error(error.message);
 
-  return <NewJobForm contractors={contractors ?? []} />;
+  // Optional: existing customer mode
+  let existingCustomer: any = null;
+  let customerLocations: any[] = [];
+
+  if (customerId && isUuid(customerId)) {
+    const { data: cRow, error: cErr } = await supabase
+      .from("customers")
+      .select("id, first_name, last_name, phone, email")
+      .eq("id", customerId)
+      .maybeSingle();
+
+    if (cErr) throw cErr;
+    existingCustomer = cRow;
+
+    const { data: locs, error: locErr } = await supabase
+      .from("locations")
+      .select("id, address_line1, city, state, zip, nickname")
+      .eq("customer_id", customerId)
+      .order("created_at", { ascending: false });
+
+    if (locErr) throw locErr;
+    customerLocations = locs ?? [];
+  }
+
+  return (
+    <NewJobForm
+      contractors={contractors ?? []}
+      existingCustomer={existingCustomer}
+      locations={customerLocations}
+    />
+  );
 }
