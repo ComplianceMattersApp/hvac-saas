@@ -37,6 +37,10 @@ function nextFollowUpDate(attemptCountAfterInsert: number) {
 export async function logCustomerContactAttemptFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
 
+    // Actor (for timeline attribution)
+  const { data: userData } = await supabase.auth.getUser();
+  const actorId = userData?.user?.id ?? null;
+
   const jobId = String(formData.get("job_id") || "").trim();
   const method = String(formData.get("method") || "").trim() as AttemptMethod;
   const result = String(formData.get("result") || "").trim() || "no_answer";
@@ -63,18 +67,19 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
       : todayYYYYMMDD();
 
   // 2) Insert the attempt event (CYA)
-  const { error: insertErr } = await supabase.from("job_events").insert({
-    job_id: jobId,
-    event_type: "customer_attempt",
-    message: "Customer contact attempt logged",
-    meta: {
-      method,
-      result,
-      attempt_number: attemptCountAfter,
-    },
-  });
+const { error: insertErr } = await supabase.from("job_events").insert({
+  job_id: jobId,
+  user_id: actorId,   // 👈 new
+  event_type: "customer_attempt",
+  message: "Customer contact attempt logged",
+  meta: {
+    method,
+    result,
+    attempt_number: attemptCountAfter,
+  },
+});
 
-  if (insertErr) throw new Error(insertErr.message);
+if (insertErr) throw new Error(insertErr.message);
 
   // 3) Auto-set follow-up date based on cadence
   const followUp = nextFollowUpDate(attemptCountAfter);

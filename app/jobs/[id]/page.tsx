@@ -251,7 +251,7 @@ if (childErr) throw new Error(childErr.message);
 // --- Unified Timeline (job_events) ---
 const { data: timelineEvents, error: tlErr } = await supabase
   .from("job_events")
-  .select("created_at, event_type, meta")
+  .select("created_at, event_type, meta, user_id")
   .eq("job_id", jobId)
   .order("created_at", { ascending: false })
   .limit(200);
@@ -260,7 +260,7 @@ if (tlErr) throw new Error(tlErr.message);
 
   const { data: customerAttempts, error: attemptsErr } = await supabase
     .from("job_events")
-    .select("created_at, meta")
+    .select("created_at, meta, user_id")
     .eq("job_id", jobId)
 
     .eq("event_type", "customer_attempt")
@@ -936,9 +936,13 @@ if (recipient === "contractor") {
   <div className="space-y-2">
     {(timelineEvents ?? []).length ? (
       (timelineEvents ?? []).map((e: any, idx: number) => {
+
+        
+        
         const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "—";
         const type = String(e?.event_type ?? "");
         const meta = e?.meta ?? {};
+        
 
         const icon =
           type === "job_created" ? "🆕" :
