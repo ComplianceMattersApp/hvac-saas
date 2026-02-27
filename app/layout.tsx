@@ -18,6 +18,7 @@ export const metadata: Metadata = {
     template: "%s | Compliance Matters",
   },
   description: "Compliance Matters ECC & Operations Software",
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({
