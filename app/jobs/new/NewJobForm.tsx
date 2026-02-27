@@ -1,12 +1,12 @@
+// app/jobs/new/NewJobForm.tsx
+
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createJobFromForm } from "@/lib/actions";
 import JobCoreFields from "@/components/jobs/JobCoreFields";
 
 type Contractor = { id: string; name: string };
-
-
 
 type ExistingCustomer = {
   id: string;
@@ -25,39 +25,114 @@ type LocationRow = {
   zip: string | null;
 };
 
+type MyContractor = { id: string; name: string } | null;
+
+type ComponentType =
+  | "condenser_ac"
+  | "heat_pump_outdoor"
+  | "furnace_gas"
+  | "air_handler_electric"
+  | "package_gas_electric"
+  | "package_heat_pump"
+  | "mini_split_outdoor"
+  | "mini_split_head"
+  | "other";
+
+type EquipmentComponent = {
+  id: string;
+  type: ComponentType;
+  manufacturer: string;
+  model: string;
+  serial: string;
+  refrigerant_type: string;
+  tonnage: string; // keep string in UI; server can coerce
+  notes: string;
+};
+
+type EquipmentSystem = {
+  id: string;
+  name: string; // System Location/Name (required if any component selected)
+  components: EquipmentComponent[];
+};
+
+const DRAFT_KEY = "cm:newjob:draft:v1";
+
+function uid() {
+  return Math.random().toString(16).slice(2) + Date.now().toString(16);
+}
+
+function componentLabel(t: ComponentType) {
+  switch (t) {
+    case "condenser_ac":
+      return "Condenser (A/C)";
+    case "heat_pump_outdoor":
+      return "Heat Pump (Outdoor)";
+    case "furnace_gas":
+      return "Furnace (Gas)";
+    case "air_handler_electric":
+      return "Air Handler (Electric)";
+    case "package_gas_electric":
+      return "Package Unit (Gas/Electric)";
+    case "package_heat_pump":
+      return "Package Unit (Heat Pump)";
+    case "mini_split_outdoor":
+      return "Mini-Split Outdoor";
+    case "mini_split_head":
+      return "Mini-Split Indoor Head";
+    default:
+      return "Other";
+  }
+}
+
 export default function NewJobForm({
   contractors,
   existingCustomer,
   locations = [],
+  myContractor,
 }: {
   contractors: Contractor[];
   existingCustomer?: ExistingCustomer | null;
   locations?: LocationRow[];
+  myContractor?: MyContractor;
 }) {
-
   const isExistingCustomer = Boolean(existingCustomer?.id);
 
   const [locationId, setLocationId] = useState<string>(() => {
     return isExistingCustomer && locations.length ? locations[0].id : "";
   });
 
-const selectedLoc = isExistingCustomer
-  ? locations.find((l) => l.id === locationId) ?? null
-  : null;
+  const selectedLoc = isExistingCustomer
+    ? locations.find((l) => l.id === locationId) ?? null
+    : null;
 
   const [windowStart, setWindowStart] = useState("");
   const [windowEnd, setWindowEnd] = useState("");
 
+  // Contractor selection (internal/admin only). Contractor users are auto-tied.
   const [contractorId, setContractorId] = useState<string>("");
+
   const [jobType, setJobType] = useState<"ecc" | "service">("ecc");
 
   const [billingRecipient, setBillingRecipient] = useState<
     "contractor" | "customer" | "other"
-  >("customer");
+  >(myContractor?.id ? "contractor" : "customer");
 
   const [projectType, setProjectType] = useState<
     "alteration" | "all_new" | "new_construction"
   >("alteration");
+
+  // Billing fields (optional unless "other")
+  const [billingName, setBillingName] = useState("");
+  const [billingEmail, setBillingEmail] = useState("");
+  const [billingPhone, setBillingPhone] = useState("");
+  const [billingAddr1, setBillingAddr1] = useState("");
+  const [billingAddr2, setBillingAddr2] = useState("");
+  const [billingCity, setBillingCity] = useState("");
+  const [billingState, setBillingState] = useState("CA");
+  const [billingZip, setBillingZip] = useState("");
+
+  // Optional equipment
+  const [systems, setSystems] = useState<EquipmentSystem[]>([]);
 
   const isNewLocation = isExistingCustomer && locationId === "__new__";
 
@@ -68,15 +143,247 @@ const selectedLoc = isExistingCustomer
     if (end) setWindowEnd(end);
   }
 
+  const equipmentHasAnyComponents = useMemo(
+    () => systems.some((s) => s.components.length > 0),
+    [systems]
+  );
+
+  const systemsNeedingName = useMemo(() => {
+    return systems
+      .filter((s) => s.components.length > 0 && !s.name.trim())
+      .map((s) => s.id);
+  }, [systems]);
+
+  const canSubmit = systemsNeedingName.length === 0;
+
+  const equipmentJson = useMemo(() => {
+    // Only send payload when something was actually selected.
+    const payloadSystems = systems
+      .filter((s) => s.components.length > 0)
+      .map((s) => ({
+        name: s.name.trim(),
+        components: s.components.map((c) => ({
+          type: c.type,
+          manufacturer: c.manufacturer.trim() || null,
+          model: c.model.trim() || null,
+          serial: c.serial.trim() || null,
+          refrigerant_type: c.refrigerant_type.trim() || null,
+          tonnage: c.tonnage.trim() || null,
+          notes: c.notes.trim() || null,
+        })),
+      }))
+      // if name is blank, keep it (server will reject), but we already block submit client-side
+      ;
+
+    if (payloadSystems.length === 0) return "";
+    return JSON.stringify({ systems: payloadSystems });
+  }, [systems]);
+
+  // ---- Draft save/restore ----
+  const [draftFound, setDraftFound] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      setDraftFound(Boolean(raw));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  function saveDraft() {
+    try {
+      const draft = {
+        windowStart,
+        windowEnd,
+        contractorId,
+        jobType,
+        billingRecipient,
+        projectType,
+        billingName,
+        billingEmail,
+        billingPhone,
+        billingAddr1,
+        billingAddr2,
+        billingCity,
+        billingState,
+        billingZip,
+        systems,
+        locationId,
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      setDraftFound(true);
+      alert("Draft saved on this device.");
+    } catch {
+      alert("Unable to save draft in this browser.");
+    }
+  }
+
+  function restoreDraft() {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      setWindowStart(d.windowStart ?? "");
+      setWindowEnd(d.windowEnd ?? "");
+      setContractorId(d.contractorId ?? "");
+      setJobType(d.jobType ?? "ecc");
+      setBillingRecipient(d.billingRecipient ?? (myContractor?.id ? "contractor" : "customer"));
+      setProjectType(d.projectType ?? "alteration");
+
+      setBillingName(d.billingName ?? "");
+      setBillingEmail(d.billingEmail ?? "");
+      setBillingPhone(d.billingPhone ?? "");
+      setBillingAddr1(d.billingAddr1 ?? "");
+      setBillingAddr2(d.billingAddr2 ?? "");
+      setBillingCity(d.billingCity ?? "");
+      setBillingState(d.billingState ?? "CA");
+      setBillingZip(d.billingZip ?? "");
+
+      setSystems(d.systems ?? []);
+      if (!myContractor?.id) setLocationId(d.locationId ?? locationId);
+
+      alert("Draft restored.");
+    } catch {
+      alert("Draft was corrupted and could not be restored.");
+    }
+  }
+
+  function discardDraft() {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+      setDraftFound(false);
+      alert("Draft discarded.");
+    } catch {
+      // ignore
+    }
+  }
+
+  function addSystem() {
+    setSystems((prev) => [
+      ...prev,
+      { id: uid(), name: "", components: [] },
+    ]);
+  }
+
+  function removeSystem(systemId: string) {
+    setSystems((prev) => prev.filter((s) => s.id !== systemId));
+  }
+
+  function setSystemName(systemId: string, name: string) {
+    setSystems((prev) =>
+      prev.map((s) => (s.id === systemId ? { ...s, name } : s))
+    );
+  }
+
+  function addComponent(systemId: string, type: ComponentType) {
+    setSystems((prev) =>
+      prev.map((s) => {
+        if (s.id !== systemId) return s;
+        const next: EquipmentComponent = {
+          id: uid(),
+          type,
+          manufacturer: "",
+          model: "",
+          serial: "",
+          refrigerant_type: "",
+          tonnage: "",
+          notes: "",
+        };
+        return { ...s, components: [...s.components, next] };
+      })
+    );
+  }
+
+  function removeComponent(systemId: string, compId: string) {
+    setSystems((prev) =>
+      prev.map((s) => {
+        if (s.id !== systemId) return s;
+        const nextComps = s.components.filter((c) => c.id !== compId);
+        return { ...s, components: nextComps };
+      })
+    );
+  }
+
+  function patchComponent(systemId: string, compId: string, patch: Partial<EquipmentComponent>) {
+    setSystems((prev) =>
+      prev.map((s) => {
+        if (s.id !== systemId) return s;
+        return {
+          ...s,
+          components: s.components.map((c) => (c.id === compId ? { ...c, ...patch } : c)),
+        };
+      })
+    );
+  }
+
   return (
     <div className="p-6 max-w-lg">
-      <h1 className="text-xl font-semibold mb-6">New Job</h1>
+      <h1 className="text-xl font-semibold mb-2">New Job</h1>
+
+      <div className="text-sm text-gray-600 mb-6">
+        <div className="font-medium text-gray-800">How this works</div>
+        <ul className="list-disc pl-5 space-y-1 mt-1">
+          <li>Fill out the core job + customer info.</li>
+          <li>
+            (Optional) Add equipment if you have it — even a single component (furnace-only, condenser-only, etc.).
+          </li>
+          <li>Submit and the job will appear in the Ops queue.</li>
+        </ul>
+      </div>
+
+      {draftFound && (
+        <div className="rounded-lg border p-3 mb-4 bg-gray-50">
+          <div className="text-sm font-medium mb-2">Draft found on this device</div>
+          <div className="flex gap-2">
+            <button type="button" className="border rounded px-3 py-1 text-sm" onClick={restoreDraft}>
+              Restore
+            </button>
+            <button type="button" className="border rounded px-3 py-1 text-sm" onClick={discardDraft}>
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
 
       <form action={createJobFromForm} className="space-y-4">
+        {/* Identity-tied contractor */}
+        {myContractor?.id ? (
+          <>
+            <div className="rounded-lg border p-3">
+              <div className="text-sm font-medium">Submitting as</div>
+              <div className="text-sm text-gray-700 mt-1">{myContractor.name}</div>
+            </div>
+            <input type="hidden" name="contractor_id" value={myContractor.id} />
+          </>
+        ) : (
+          <div className="rounded-lg border p-3 space-y-2">
+            <label className="block text-sm font-medium">Contractor (optional)</label>
+            <select
+              name="contractor_id"
+              className="border rounded w-full p-2"
+              value={contractorId}
+              onChange={(e) => {
+                const v = e.target.value;
+                setContractorId(v);
+                // Let server decide default, but keep UI sensible
+                if (v && billingRecipient === "customer") setBillingRecipient("contractor");
+                if (!v && billingRecipient === "contractor") setBillingRecipient("customer");
+              }}
+            >
+              <option value="">— None —</option>
+              {contractors.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Job Type */}
         <div className="rounded-lg border p-3 space-y-2">
           <label className="block text-sm font-medium">Job Type</label>
-
           <div className="flex gap-4">
             <label className="flex items-center gap-2">
               <input
@@ -101,362 +408,377 @@ const selectedLoc = isExistingCustomer
             </label>
           </div>
 
-          {/* Project Type (ECC only) */}
-          {jobType === "ecc" ? (
-            <div>
-              <label className="block text-sm font-medium mb-1">Project Type</label>
-              <select
-                name="project_type"
-                value={projectType}
-                onChange={(e) => setProjectType(e.target.value as any)}
-                className="w-full border rounded px-3 py-2"
-              >
-                <option value="alteration">Alteration</option>
-                <option value="all_new">All New</option>
-                <option value="new_construction">New Construction</option>
-              </select>
-            </div>
-          ) : (
-            <input type="hidden" name="project_type" value="alteration" />
-          )}
-
-                    {/* Service Title (required for Service jobs) */}
-      {jobType === "service" ? (
-        <div className="rounded-lg border p-3 space-y-2">
-          <label className="block text-sm font-medium">Service Title</label>
-          <input
-            name="title"
-            className="w-full border rounded px-3 py-2"
-            placeholder="e.g., Duct Cleaning, Dryer Vent, Maintenance"
-            required
-          />
-        </div>
-      ) : (
-        // For ECC jobs, keep title optional/auto — no field needed
-        <input type="hidden" name="title" value="" />
-      )}
-
-
-          {/* Canonical field submitted */}
+          {/* real submitted value */}
           <input type="hidden" name="job_type" value={jobType} />
         </div>
 
-        {isExistingCustomer ? (
-
-          
-        <div className="space-y-4">
-          {/* Existing customer mode: lock customer + pick a location */}
-          <input type="hidden" name="customer_id" value={existingCustomer!.id} />
-
+        {/* Project Type */}
         <div className="rounded-lg border p-3 space-y-2">
-        <div className="text-sm font-semibold">Customer</div>
-
-        {/* Snapshot fields still submitted (no re-entry) */}
-        <input type="hidden" name="customer_first_name" value={existingCustomer?.first_name ?? ""} />
-        <input type="hidden" name="customer_last_name" value={existingCustomer?.last_name ?? ""} />
-        <input type="hidden" name="customer_phone" value={existingCustomer?.phone ?? ""} />
-        <input type="hidden" name="customer_email" value={existingCustomer?.email ?? ""} />
-
-        <div className="text-sm">
-          <div className="font-medium">
-            {(existingCustomer?.first_name ?? "").trim()}{" "}
-            {(existingCustomer?.last_name ?? "").trim()}
-          </div>
-
-          <div className="text-muted-foreground">
-            {existingCustomer?.phone ?? "No phone"}
-            {existingCustomer?.email ? ` • ${existingCustomer.email}` : ""}
-          </div>
-        </div>
-      </div>
-    
-
-    <div className="rounded-lg border p-3 space-y-3">
-      <div className="text-sm font-semibold">Service Location</div>
-
-      <div className="space-y-1">
-        <label className="block text-sm font-medium">Pick a Location</label>
-        <select
-          name="location_id"
-          value={locationId}
-          onChange={(e) => setLocationId(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-          required
-        >
-          {locations.length === 0 ? (
-            <option value="">No locations found</option>
-          ) : (
-            locations.map((l) => (
-              <option key={l.id} value={l.id}>
-                {(l.nickname ?? "Service Location") +
-                  " — " +
-                  (l.address_line1 ?? "No address") +
-                  (l.city ? `, ${l.city}` : "")}
-              </option>
-              
-            ))
-          )}
-          <option value="__new__">+ Add new location…</option>
-        </select>
-      </div>
-{isNewLocation ? (
-  <div className="grid gap-3">
-    {/* Tell server this is a new location */}
-    <input type="hidden" name="location_id" value="" />
-
-    <div className="space-y-1">
-      <label className="block text-sm font-medium">Nickname (optional)</label>
-      <input
-        name="location_nickname"
-        className="w-full border rounded px-3 py-2"
-        placeholder="Main House, ADU, Shop"
-      />
-    </div>
-
-    <div className="space-y-1">
-      <label className="block text-sm font-medium">Service Address</label>
-      <input
-        name="address_line1"
-        className="w-full border rounded px-3 py-2"
-        required
-      />
-    </div>
-
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div className="space-y-1">
-        <label className="block text-sm font-medium">City</label>
-        <input name="city" className="w-full border rounded px-3 py-2" required />
-      </div>
-
-      <div className="space-y-1">
-        <label className="block text-sm font-medium">Zip</label>
-        <input name="zip" className="w-full border rounded px-3 py-2" required />
-      </div>
-    </div>
-  </div>
-) : (
-  <>
-    <input type="hidden" name="location_id" value={locationId} />
-    <input type="hidden" name="address_line1" value={selectedLoc?.address_line1 ?? ""} />
-    <input type="hidden" name="city" value={selectedLoc?.city ?? ""} />
-    <input type="hidden" name="zip" value={selectedLoc?.zip ?? ""} />
-
-    <div className="text-sm text-muted-foreground">
-      {selectedLoc?.address_line1 ?? "No address"}
-      {selectedLoc?.city ? `, ${selectedLoc.city}` : ""}
-      {selectedLoc?.zip ? ` ${selectedLoc.zip}` : ""}
-    </div>
-  </>
-)}
-    </div>
-  </div>
-) : (
-  <>
-    {/* Normal flow: new customer + new location */}
-    <JobCoreFields mode="internal" titleRequired={jobType === "service"} />
-  </>
-)}
-        {/* Contractor */}
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Contractor (optional)
-          </label>
+          <label className="block text-sm font-medium">Project Type (ECC)</label>
           <select
-            name="contractor_id"
-            value={contractorId}
-            onChange={(e) => {
-              const next = e.target.value;
-              setContractorId(next);
-
-              // Auto-toggle billing recipient based on contractor selection
-              setBillingRecipient((prev) => {
-                if (next && prev === "customer") return "contractor";
-                if (!next && prev === "contractor") return "customer";
-                return prev;
-              });
-            }}
-            className="w-full border rounded px-3 py-2"
+            name="project_type"
+            className="border rounded w-full p-2"
+            value={projectType}
+            onChange={(e) => setProjectType(e.target.value as any)}
           >
-            <option value="">— None —</option>
-            {contractors.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+            <option value="alteration">Alteration</option>
+            <option value="all_new">All New</option>
+            <option value="new_construction">New Construction</option>
           </select>
         </div>
 
-        {/* Billing Recipient */}
-        <div className="rounded-lg border p-3 space-y-3">
-          <div>
-            <label className="block text-sm font-medium mb-2">Billing Recipient</label>
+        {/* Scheduling */}
+        <div className="rounded-lg border p-3 space-y-2">
+          <div className="text-sm font-medium">Scheduling (wall-clock)</div>
+          <div className="text-xs text-gray-600">
+            Enter times exactly as you want them shown (ex: 08:00). No timezone conversion.
+          </div>
 
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="billing_recipient"
-                  value="contractor"
-                  disabled={!contractorId}
-                  checked={billingRecipient === "contractor"}
-                  onChange={() => setBillingRecipient("contractor")}
-                />
-                Contractor
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="billing_recipient"
-                  value="customer"
-                  checked={billingRecipient === "customer"}
-                  onChange={() => setBillingRecipient("customer")}
-                />
-                Customer
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="billing_recipient"
-                  value="other"
-                  checked={billingRecipient === "other"}
-                  onChange={() => setBillingRecipient("other")}
-                />
-                Other
-              </label>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-gray-600">Window Start</label>
+              <input
+                type="time"
+                name="window_start"
+                className="border rounded w-full p-2"
+                value={windowStart}
+                onChange={(e) => setWindowStart(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-600">Window End</label>
+              <input
+                type="time"
+                name="window_end"
+                className="border rounded w-full p-2"
+                value={windowEnd}
+                onChange={(e) => setWindowEnd(e.target.value)}
+              />
             </div>
           </div>
 
+          <div>
+            <label className="text-xs text-gray-600">Quick Window</label>
+            <select className="border rounded w-full p-2" onChange={(e) => onQuickWindowChange(e.target.value)}>
+              <option value="">— Select —</option>
+              <option value="08:00-10:00">08:00-10:00</option>
+              <option value="10:00-12:00">10:00-12:00</option>
+              <option value="12:00-14:00">12:00-14:00</option>
+              <option value="14:00-16:00">14:00-16:00</option>
+            </select>
+          </div>
+        </div>
+
+        <JobCoreFields
+          mode={myContractor?.id ? "external" : "internal"}
+          titleRequired={jobType === "service"}
+        />
+
+        {/* Billing Recipient */}
+        <div className="rounded-lg border p-3 space-y-2">
+          <label className="block text-sm font-medium">Billing Recipient</label>
+
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="_billingRecipientUi"
+                value="contractor"
+                checked={billingRecipient === "contractor"}
+                onChange={() => setBillingRecipient("contractor")}
+                disabled={Boolean(!myContractor?.id && !contractorId)}
+              />
+              Contractor (company)
+              {!myContractor?.id && !contractorId && (
+                <span className="text-xs text-gray-500">(select contractor first)</span>
+              )}
+            </label>
+
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="_billingRecipientUi"
+                value="customer"
+                checked={billingRecipient === "customer"}
+                onChange={() => setBillingRecipient("customer")}
+              />
+              Customer / Homeowner
+            </label>
+
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="_billingRecipientUi"
+                value="other"
+                checked={billingRecipient === "other"}
+                onChange={() => setBillingRecipient("other")}
+              />
+              Other (custom)
+            </label>
+          </div>
+
+          <input type="hidden" name="billing_recipient" value={billingRecipient} />
+
           {billingRecipient === "other" && (
-            <div className="space-y-3 pt-2">
-              <input
-                type="text"
-                name="billing_name"
-                placeholder="Billing Name"
-                required
-                className="w-full border rounded px-3 py-2"
-              />
-
-              <input
-                type="text"
-                name="billing_address_line1"
-                placeholder="Billing Address"
-                required
-                className="w-full border rounded px-3 py-2"
-              />
-
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  name="billing_city"
-                  placeholder="City"
-                  required
-                  className="border rounded px-3 py-2"
-                />
-                <input
-                  type="text"
-                  name="billing_state"
-                  placeholder="State"
-                  required
-                  className="border rounded px-3 py-2"
-                />
+            <div className="mt-2 space-y-2">
+              <div className="text-xs text-gray-600">
+                If billing is “Other”, please enter billing name + address.
               </div>
 
               <input
-                type="text"
-                name="billing_zip"
-                placeholder="Zip"
-                required
-                className="w-full border rounded px-3 py-2"
+                className="border rounded w-full p-2"
+                name="billing_name"
+                placeholder="Billing name"
+                value={billingName}
+                onChange={(e) => setBillingName(e.target.value)}
               />
-
               <input
-                type="email"
+                className="border rounded w-full p-2"
                 name="billing_email"
-                placeholder="Billing Email (optional)"
-                className="w-full border rounded px-3 py-2"
+                placeholder="Billing email (optional)"
+                value={billingEmail}
+                onChange={(e) => setBillingEmail(e.target.value)}
               />
-
               <input
-                type="tel"
+                className="border rounded w-full p-2"
                 name="billing_phone"
-                placeholder="Billing Phone (optional)"
-                className="w-full border rounded px-3 py-2"
+                placeholder="Billing phone (optional)"
+                value={billingPhone}
+                onChange={(e) => setBillingPhone(e.target.value)}
+              />
+              <input
+                className="border rounded w-full p-2"
+                name="billing_address_line1"
+                placeholder="Address line 1"
+                value={billingAddr1}
+                onChange={(e) => setBillingAddr1(e.target.value)}
+              />
+              <input
+                className="border rounded w-full p-2"
+                name="billing_address_line2"
+                placeholder="Address line 2 (optional)"
+                value={billingAddr2}
+                onChange={(e) => setBillingAddr2(e.target.value)}
+              />
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  className="border rounded w-full p-2 col-span-2"
+                  name="billing_city"
+                  placeholder="City"
+                  value={billingCity}
+                  onChange={(e) => setBillingCity(e.target.value)}
+                />
+                <input
+                  className="border rounded w-full p-2"
+                  name="billing_state"
+                  placeholder="State"
+                  value={billingState}
+                  onChange={(e) => setBillingState(e.target.value)}
+                />
+              </div>
+              <input
+                className="border rounded w-full p-2"
+                name="billing_zip"
+                placeholder="ZIP"
+                value={billingZip}
+                onChange={(e) => setBillingZip(e.target.value)}
               />
             </div>
           )}
         </div>
 
-        {/* Scheduling */}
+        {/* Optional Equipment */}
         <div className="rounded-lg border p-3 space-y-3">
-          {/* Scheduled Date */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Scheduled Date</label>
-            <input
-              type="date"
-              name="scheduled_date"
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium">Optional Equipment</div>
+              <div className="text-xs text-gray-600 mt-1">
+                Add what you know — all equipment fields are optional.
+                <br />
+                <span className="font-medium">
+                  Rule:
+                </span>{" "}
+                If you add a component, you must name the system (Upstairs/Downstairs/ADU) so tests map correctly.
+              </div>
+            </div>
 
-          {/* Quick Window */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Quick Window (optional)
-            </label>
-            <select
-              name="quick_window"
-              defaultValue=""
-              onChange={(e) => onQuickWindowChange(e.target.value)}
-              className="w-full border rounded px-3 py-2"
+            <button
+              type="button"
+              className="border rounded px-3 py-1 text-sm"
+              onClick={addSystem}
             >
-              <option value="">Select a window…</option>
-              <option value="08:00-10:00">8:00 AM – 10:00 AM</option>
-              <option value="10:00-12:00">10:00 AM – 12:00 PM</option>
-              <option value="12:00-14:00">12:00 PM – 2:00 PM</option>
-              <option value="14:00-16:00">2:00 PM – 4:00 PM</option>
-              <option value="16:00-18:00">4:00 PM – 6:00 PM</option>
-            </select>
-            <p className="text-xs text-gray-300 mt-1">
-              Selecting a window auto-fills the times. You can still edit them.
-            </p>
+              Add System
+            </button>
           </div>
 
-          {/* Window Start */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Window Start (optional)
-            </label>
-            <input
-              type="time"
-              name="window_start"
-              value={windowStart}
-              onChange={(e) => setWindowStart(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
+          {systems.length === 0 && (
+            <div className="text-sm text-gray-600">
+              No systems added. (That’s fine.)
+            </div>
+          )}
 
-          {/* Window End */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Window End (optional)
-            </label>
-            <input
-              type="time"
-              name="window_end"
-              value={windowEnd}
-              onChange={(e) => setWindowEnd(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
+          {systems.map((sys, idx) => {
+            const nameRequired = sys.components.length > 0;
+            const showNameError = nameRequired && !sys.name.trim();
+
+            return (
+              <div key={sys.id} className="rounded-lg border p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">System {idx + 1}</div>
+                  <button
+                    type="button"
+                    className="text-sm text-red-600"
+                    onClick={() => removeSystem(sys.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-600">
+                    System Location/Name {nameRequired ? "(required)" : "(optional)"}
+                  </label>
+                  <input
+                    className={`border rounded w-full p-2 ${showNameError ? "border-red-500" : ""}`}
+                    placeholder='Examples: "Upstairs", "Main House", "ADU", "Zone 1"'
+                    value={sys.name}
+                    onChange={(e) => setSystemName(sys.id, e.target.value)}
+                  />
+                  {showNameError && (
+                    <div className="text-xs text-red-600 mt-1">
+                      System name is required when any component is added.
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-600">Add Component</label>
+                    <select
+                      className="border rounded w-full p-2"
+                      defaultValue=""
+                      onChange={(e) => {
+                        const v = e.target.value as ComponentType;
+                        if (!v) return;
+                        addComponent(sys.id, v);
+                        e.currentTarget.value = "";
+                      }}
+                    >
+                      <option value="">— Select —</option>
+                      <option value="condenser_ac">Condenser (A/C)</option>
+                      <option value="heat_pump_outdoor">Heat Pump (Outdoor)</option>
+                      <option value="furnace_gas">Furnace (Gas)</option>
+                      <option value="air_handler_electric">Air Handler (Electric)</option>
+                      <option value="package_gas_electric">Package Unit (Gas/Electric)</option>
+                      <option value="package_heat_pump">Package Unit (Heat Pump)</option>
+                      <option value="mini_split_outdoor">Mini-Split Outdoor</option>
+                      <option value="mini_split_head">Mini-Split Indoor Head</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                {sys.components.length === 0 ? (
+                  <div className="text-sm text-gray-600">No components added yet.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {sys.components.map((c) => (
+                      <div key={c.id} className="rounded border p-2 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium">{componentLabel(c.type)}</div>
+                          <button
+                            type="button"
+                            className="text-sm text-red-600"
+                            onClick={() => removeComponent(sys.id, c.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            className="border rounded p-2"
+                            placeholder="Manufacturer (optional)"
+                            value={c.manufacturer}
+                            onChange={(e) => patchComponent(sys.id, c.id, { manufacturer: e.target.value })}
+                          />
+                          <input
+                            className="border rounded p-2"
+                            placeholder="Model (optional)"
+                            value={c.model}
+                            onChange={(e) => patchComponent(sys.id, c.id, { model: e.target.value })}
+                          />
+                          <input
+                            className="border rounded p-2"
+                            placeholder="Serial (optional)"
+                            value={c.serial}
+                            onChange={(e) => patchComponent(sys.id, c.id, { serial: e.target.value })}
+                          />
+                          <input
+                            className="border rounded p-2"
+                            placeholder="Tonnage (optional)"
+                            value={c.tonnage}
+                            onChange={(e) => patchComponent(sys.id, c.id, { tonnage: e.target.value })}
+                          />
+                        </div>
+
+                        {(c.type === "condenser_ac" ||
+                          c.type === "heat_pump_outdoor" ||
+                          c.type === "package_gas_electric" ||
+                          c.type === "package_heat_pump" ||
+                          c.type === "mini_split_outdoor") && (
+                          <input
+                            className="border rounded w-full p-2"
+                            placeholder="Refrigerant type (optional)"
+                            value={c.refrigerant_type}
+                            onChange={(e) => patchComponent(sys.id, c.id, { refrigerant_type: e.target.value })}
+                          />
+                        )}
+
+                        <textarea
+                          className="border rounded w-full p-2"
+                          placeholder="Notes (optional)"
+                          value={c.notes}
+                          onChange={(e) => patchComponent(sys.id, c.id, { notes: e.target.value })}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* equipment_json payload */}
+          <input type="hidden" name="equipment_json" value={equipmentJson} />
         </div>
 
-        {/* Workflow-first: status is always Open at creation */}
-        <input type="hidden" name="status" value="open" />
+        {!canSubmit && (
+          <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+            Please name each system that has components. (Example: Upstairs / Downstairs / ADU)
+          </div>
+        )}
 
-        <div className="pt-4">
-          <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="border rounded px-3 py-2 text-sm"
+            onClick={saveDraft}
+          >
+            Save Draft
+          </button>
+
+          <button
+            type="submit"
+            className={`rounded px-3 py-2 text-sm text-white ${canSubmit ? "bg-black" : "bg-gray-400 cursor-not-allowed"}`}
+            disabled={!canSubmit}
+            onClick={() => {
+              // If submit succeeds, server will redirect away. We can safely clear draft on click.
+              try {
+                localStorage.removeItem(DRAFT_KEY);
+              } catch {}
+            }}
+          >
             Create Job
           </button>
         </div>

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
- import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
+import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
  
 
 
@@ -1581,8 +1581,8 @@ export async function updateJob(input: {
 /**
  * CREATE: used by /jobs/new form
  */
-
 export async function createJobFromForm(formData: FormData) {
+  // ----- basic fields -----
   const jobType = String(formData.get("job_type") || "ecc").trim();
   const projectType = String(formData.get("project_type") || "alteration").trim();
 
@@ -1592,52 +1592,34 @@ export async function createJobFromForm(formData: FormData) {
       ? contractorIdRaw.trim()
       : null;
 
-    const title = String(formData.get("title") || "").trim();
-    const city = String(formData.get("city") || "").trim();
+  const title = String(formData.get("title") || "").trim();
+  const city = String(formData.get("city") || "").trim();
 
-      const titleFinal =
-        title ||
-        (jobType === "ecc"
-          ? `ECC ${projectType.replaceAll("_", " ")} — ${city}`
-          : "");
-
-    // DB requires non-blank title. For ECC, auto-generate if left blank.
-
+  const titleFinal =
+    title ||
+    (jobType === "ecc"
+      ? `ECC ${projectType.replaceAll("_", " ")} — ${city}`
+      : "");
 
   const customerPhoneRaw = String(formData.get("customer_phone") || "").trim();
 
   const billing_recipient = String(formData.get("billing_recipient") || "").trim() as
-  | "contractor"
-  | "customer"
-  | "other"
-  | "";
+    | "contractor"
+    | "customer"
+    | "other"
+    | "";
 
   const billing_name = String(formData.get("billing_name") || "").trim() || null;
   const billing_email = String(formData.get("billing_email") || "").trim() || null;
   const billing_phone = String(formData.get("billing_phone") || "").trim() || null;
 
-  const billing_address_line1 = String(formData.get("billing_address_line1") || "").trim() || null;
-  const billing_address_line2 = String(formData.get("billing_address_line2") || "").trim() || null;
+  const billing_address_line1 =
+    String(formData.get("billing_address_line1") || "").trim() || null;
+  const billing_address_line2 =
+    String(formData.get("billing_address_line2") || "").trim() || null;
   const billing_city = String(formData.get("billing_city") || "").trim() || null;
   const billing_state = String(formData.get("billing_state") || "").trim() || null;
   const billing_zip = String(formData.get("billing_zip") || "").trim() || null;
-
-  // Default if empty: contractor if contractor_id exists, else customer
-  let billingRecipientFinal =
-  billing_recipient ||
-  (contractor_id ? "contractor" : "customer");
-
-// Safety: if user picked "contractor" but no contractor was selected, fall back to customer
-if (billingRecipientFinal === "contractor" && !contractor_id) {
-  billingRecipientFinal = "customer";
-}
-
-  // Server-side validation
-  if (billingRecipientFinal === "other") {
-    if (!billing_name || !billing_address_line1 || !billing_city || !billing_state || !billing_zip) {
-      throw new Error("Billing recipient is Other: Billing name and full address are required.");
-    }
-  }
 
   const { scheduled_date, window_start, window_end, ops_status } =
     deriveScheduleAndOps(formData);
@@ -1650,25 +1632,149 @@ if (billingRecipientFinal === "contractor" && !contractor_id) {
   const jobAddressRaw = String(formData.get("job_address") || "").trim();
 
   const status = String(formData.get("status") || "open").trim() as JobStatus;
-  
 
   if (jobType === "service" && !titleFinal) throw new Error("Title is required");
   if (!city) throw new Error("City is required");
-  
 
-    const supabase = await createClient();
+  // ----- supabase + identity -----
+  const supabase = await createClient();
 
-  // Canonical service address input (prefer address_line1, fallback to legacy job_address)
+  const { data: authData, error: authErr } = await supabase.auth.getUser();
+  if (authErr) throw new Error(authErr.message);
+  const user = authData?.user ?? null;
+
+  // Enforce contractor based on login (multi-user)
+  let contractorIdFinal = contractor_id;
+
+  if (user?.id) {
+    const { data: cu, error: cuErr } = await supabase
+      .from("contractor_users")
+      .select("contractor_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (cuErr) throw new Error(cuErr.message);
+
+    if (cu?.contractor_id) {
+      contractorIdFinal = cu.contractor_id;
+    }
+  }
+
+  // ----- billing defaults based on FINAL contractor id -----
+  let billingRecipientFinal =
+    billing_recipient || (contractorIdFinal ? "contractor" : "customer");
+
+  if (billingRecipientFinal === "contractor" && !contractorIdFinal) {
+    billingRecipientFinal = "customer";
+  }
+
+  if (billingRecipientFinal === "other") {
+    if (!billing_name || !billing_address_line1 || !billing_city || !billing_state || !billing_zip) {
+      throw new Error("Billing recipient is Other: Billing name and full address are required.");
+    }
+  }
+
+  // ----- canonical service address input -----
   const address_line1 =
     String(formData.get("address_line1") || "").trim() ||
     String(formData.get("job_address") || "").trim();
 
-    const existingCustomerId = String(formData.get("customer_id") || "").trim();
-    const existingLocationId = String(formData.get("location_id") || "").trim();
+  const existingCustomerId = String(formData.get("customer_id") || "").trim();
+  const existingLocationId = String(formData.get("location_id") || "").trim();
 
-    const locationNickname = String(formData.get("location_nickname") || "").trim() || null;
-    const zip = String(formData.get("zip") || "").trim() || null;
+  const locationNickname =
+    String(formData.get("location_nickname") || "").trim() || null;
+  const zip = String(formData.get("zip") || "").trim() || null;
 
+  // ----- equipment payload (optional) + server validation -----
+  const equipmentJsonRaw = String(formData.get("equipment_json") || "").trim();
+  let equipmentPayload: any = null;
+
+  if (equipmentJsonRaw) {
+    try {
+      equipmentPayload = JSON.parse(equipmentJsonRaw);
+    } catch {
+      throw new Error("Equipment payload was invalid. Please try again.");
+    }
+
+    const systems = Array.isArray(equipmentPayload?.systems) ? equipmentPayload.systems : [];
+    for (const s of systems) {
+      const hasComponents = Array.isArray(s?.components) && s.components.length > 0;
+      const name = String(s?.name || "").trim();
+      // Locked rule A: selecting a component => system name required
+      if (hasComponents && !name) {
+        throw new Error("Equipment added: System Location/Name is required for each system.");
+      }
+    }
+  }
+
+  async function insertEquipmentForJob(jobId: string) {
+    const systems = Array.isArray(equipmentPayload?.systems) ? equipmentPayload.systems : [];
+    if (!systems.length) return;
+
+    for (const s of systems) {
+      const systemName = String(s?.name || "").trim();
+      const comps = Array.isArray(s?.components) ? s.components : [];
+      if (!comps.length) continue;
+
+      // Create system (job_systems.name is NOT NULL)
+      const { data: createdSystem, error: sysCreateErr } = await supabase
+        .from("job_systems")
+        .insert({ job_id: jobId, name: systemName })
+        .select("id")
+        .single();
+
+      if (sysCreateErr) throw sysCreateErr;
+      const systemId = createdSystem?.id;
+      if (!systemId) throw new Error("Unable to create system_id");
+
+      for (const c of comps) {
+        const equipment_role = String(c?.type || "").trim();
+        if (!equipment_role) continue; // should never happen if UI is correct
+
+        const manufacturer = c?.manufacturer ? String(c.manufacturer).trim() : null;
+        const model = c?.model ? String(c.model).trim() : null;
+        const serial = c?.serial ? String(c.serial).trim() : null;
+        const refrigerant_type = c?.refrigerant_type ? String(c.refrigerant_type).trim() : null;
+        const notes = c?.notes ? String(c.notes).trim() : null;
+
+        const tonnageRaw = c?.tonnage ? String(c.tonnage).trim() : "";
+        const tonnage = tonnageRaw ? Number(tonnageRaw) : null;
+
+        const { error: eqErr } = await supabase.from("job_equipment").insert({
+          job_id: jobId,
+          system_id: systemId,
+          equipment_role,               // NOT NULL in DB
+          system_location: systemName,  // optional helper column
+          manufacturer,
+          model,
+          serial,
+          tonnage,
+          refrigerant_type,
+          notes,
+        });
+
+        if (eqErr) throw eqErr;
+      }
+    }
+  }
+
+  async function logIntakeSubmitted(jobId: string) {
+    await insertJobEvent({
+      supabase,
+      jobId,
+      event_type: "intake_submitted",
+      meta: {
+        source: contractorIdFinal ? "contractor" : "internal",
+        user_id: user?.id ?? null,
+        contractor_id: contractorIdFinal,
+        job_type: jobType,
+        project_type: projectType,
+      },
+    });
+  }
+
+  // ---- Branch 1: existing customer + existing location ----
   if (existingCustomerId && existingLocationId) {
     const created = await createJob({
       job_type: jobType,
@@ -1686,12 +1792,13 @@ if (billingRecipientFinal === "contractor" && !contractor_id) {
       city,
       scheduled_date,
       status,
-      contractor_id,
+      contractor_id: contractorIdFinal,
       permit_number: permitNumberRaw ? permitNumberRaw : null,
       window_start,
       window_end,
       customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
       ops_status,
+
       billing_recipient: billingRecipientFinal,
       billing_name,
       billing_email,
@@ -1710,6 +1817,9 @@ if (billingRecipientFinal === "contractor" && !contractor_id) {
       meta: { job_type: jobType, project_type: projectType, source: "customer" },
     });
 
+    await logIntakeSubmitted(created.id);
+    await insertEquipmentForJob(created.id);
+
     revalidatePath(`/jobs/${created.id}`);
     revalidatePath(`/ops`);
     revalidatePath(`/customers/${existingCustomerId}`);
@@ -1717,36 +1827,109 @@ if (billingRecipientFinal === "contractor" && !contractor_id) {
     redirect(`/jobs/${created.id}`);
   }
 
-if (!address_line1) {
-  redirect("/jobs/new?err=missing_address");
-}
+  // If no service address, bounce back (your existing behavior)
+  if (!address_line1) {
+    redirect("/jobs/new?err=missing_address");
+  }
 
-if (existingCustomerId && !existingLocationId) {
-  if (!address_line1) throw new Error("Service Address is required");
-  if (!city) throw new Error("City is required");
-  if (!zip) throw new Error("Zip is required");
+  // ---- Branch 2: existing customer + NEW location ----
+  if (existingCustomerId && !existingLocationId) {
+    if (!address_line1) throw new Error("Service Address is required");
+    if (!city) throw new Error("City is required");
+    if (!zip) throw new Error("Zip is required");
 
-  // 1) Create Location for existing customer
+    const { data: location, error: locationErr } = await supabase
+      .from("locations")
+      .insert({
+        customer_id: existingCustomerId,
+        nickname: locationNickname,
+        address_line1,
+        city,
+        zip,
+      })
+      .select("id")
+      .single();
+
+    if (locationErr) throw locationErr;
+
+    const created = await createJob({
+      job_type: jobType,
+      project_type: projectType,
+      job_address: jobAddressRaw || null,
+      customer_id: existingCustomerId,
+      location_id: location.id,
+
+      customer_first_name: customerFirstNameRaw || null,
+      customer_last_name: customerLastNameRaw || null,
+      customer_email: customerEmailRaw || null,
+      job_notes: jobNotesRaw || null,
+
+      title: titleFinal,
+      city,
+      scheduled_date,
+      status,
+      contractor_id: contractorIdFinal,
+      permit_number: permitNumberRaw ? permitNumberRaw : null,
+      window_start,
+      window_end,
+      customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
+      ops_status,
+
+      billing_recipient: billingRecipientFinal,
+      billing_name,
+      billing_email,
+      billing_phone,
+      billing_address_line1,
+      billing_address_line2,
+      billing_city,
+      billing_state,
+      billing_zip,
+    });
+
+    await insertJobEvent({
+      supabase,
+      jobId: created.id,
+      event_type: "job_created",
+      meta: { job_type: jobType, project_type: projectType, source: "customer_new_location" },
+    });
+
+    await logIntakeSubmitted(created.id);
+    await insertEquipmentForJob(created.id);
+
+    revalidatePath(`/jobs/${created.id}`);
+    revalidatePath(`/ops`);
+    revalidatePath(`/customers/${existingCustomerId}`);
+    revalidatePath(`/locations/${location.id}`);
+
+    redirect(`/jobs/${created.id}`);
+  }
+
+  // ---- Branch 3: new customer flow (duplicate-safe) ----
+  const { customerId, reused } = await findOrCreateCustomer({
+    supabase,
+    firstName: customerFirstNameRaw,
+    lastName: customerLastNameRaw,
+    phone: customerPhoneRaw,
+    email: customerEmailRaw,
+  });
+
   const { data: location, error: locationErr } = await supabase
     .from("locations")
     .insert({
-      customer_id: existingCustomerId,
-      nickname: locationNickname,
+      customer_id: customerId,
       address_line1,
       city,
-      zip,
     })
     .select("id")
     .single();
 
   if (locationErr) throw locationErr;
 
-  // 2) Create Job tied to existing customer + new location
   const created = await createJob({
     job_type: jobType,
     project_type: projectType,
     job_address: jobAddressRaw || null,
-    customer_id: existingCustomerId,
+    customer_id: customerId,
     location_id: location.id,
 
     customer_first_name: customerFirstNameRaw || null,
@@ -1758,12 +1941,13 @@ if (existingCustomerId && !existingLocationId) {
     city,
     scheduled_date,
     status,
-    contractor_id,
+    contractor_id: contractorIdFinal,
     permit_number: permitNumberRaw ? permitNumberRaw : null,
     window_start,
     window_end,
     customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
     ops_status,
+
     billing_recipient: billingRecipientFinal,
     billing_name,
     billing_email,
@@ -1779,299 +1963,18 @@ if (existingCustomerId && !existingLocationId) {
     supabase,
     jobId: created.id,
     event_type: "job_created",
-    meta: { job_type: jobType, project_type: projectType, source: "customer_new_location" },
-  });
-
-  revalidatePath(`/jobs/${created.id}`);
-  revalidatePath(`/ops`);
-  revalidatePath(`/customers/${existingCustomerId}`);
-  revalidatePath(`/locations/${location.id}`);
-
-  redirect(`/jobs/${created.id}`);
-}
-  
-  // 1) Find or create Customer (duplicate-safe)
-const { customerId, reused } = await findOrCreateCustomer({
-  supabase,
-  firstName: customerFirstNameRaw,
-  lastName: customerLastNameRaw,
-  phone: customerPhoneRaw,
-  email: customerEmailRaw,
-});
-
-  // 2) Create Location (service address)
-  const { data: location, error: locationErr } = await supabase
-    .from("locations")
-    .insert({
-      customer_id: customerId,
-      address_line1,
-      city, // you already validate city above
-    })
-    .select("id")
-    .single();
-
-  if (locationErr) throw locationErr;
-
-  const customer_id = customerId;
-  const location_id = location.id;
-
-  const created = await createJob({
-    job_type: jobType,
-    project_type: projectType,
-    job_address: jobAddressRaw || null,
-    customer_id,
-    location_id,
-
-    customer_first_name: customerFirstNameRaw || null,
-    customer_last_name: customerLastNameRaw || null,
-    customer_email: customerEmailRaw || null,
-    job_notes: jobNotesRaw || null,
-
-    title: titleFinal,
-    city,
-    scheduled_date,
-    status,
-    contractor_id,
-    permit_number: permitNumberRaw ? permitNumberRaw : null,
-    window_start,
-    window_end,
-    customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
-    ops_status,
-    billing_recipient: billingRecipientFinal,
-    billing_name,
-    billing_email,
-    billing_phone,
-    billing_address_line1,
-    billing_address_line2,
-    billing_city,
-    billing_state,
-billing_zip,
-  });
-
-  // ✅ timeline: job created
-  await insertJobEvent({
-    supabase,
-    jobId: created.id,
-    event_type: "job_created",
     meta: { job_type: jobType, project_type: projectType },
   });
+
+  await logIntakeSubmitted(created.id);
+  await insertEquipmentForJob(created.id);
 
   revalidatePath(`/jobs/${created.id}`);
   revalidatePath(`/ops`);
 
   const banner = reused ? "customer_reused" : "customer_created";
-redirect(`/jobs/${created.id}?banner=${banner}`);
+  redirect(`/jobs/${created.id}?banner=${banner}`);
 }
-
-
-// ✅ Create a Retest job linked to a parent (failed) job via jobs.parent_job_id
-export async function createRetestJobFromForm(formData: FormData) {
-  "use server";
-  const copyEquipment = String(formData.get("copy_equipment") || "") === "1";
-  const parentJobId = String(formData.get("parent_job_id") || "").trim();
-  if (!parentJobId) throw new Error("Missing parent_job_id");
-
-  const supabase = await createClient();
-
-  // 1) Load parent job
-  const { data: parentData, error: parentErr } = await supabase
-    .from("jobs")
-    .select(
-      [
-        "id",
-        "job_type",
-        "project_type",
-        "title",
-        "city",
-        "customer_id",
-        "location_id",
-        "contractor_id",
-        "permit_number",
-        "customer_phone",
-        "customer_first_name",
-        "customer_last_name",
-        "customer_email",
-        "job_address",
-        "billing_recipient",
-        "billing_name",
-        "billing_email",
-        "billing_phone",
-        "billing_address_line1",
-        "billing_address_line2",
-        "billing_city",
-        "billing_state",
-        "billing_zip",
-      ].join(",")
-    )
-    .eq("id", parentJobId)
-    .single();
-
-  if (parentErr) throw parentErr;
-  const parent = parentData as any;
-
-  // 2) Create retest job (unscheduled by default)
-  const retestTitle = `Retest — ${parent?.title ?? "Job"}`;
-
-  const payload: any = {
-    parent_job_id: parentJobId,
-
-    job_type: parent?.job_type ?? "ecc",
-    project_type: parent?.project_type ?? "alteration",
-
-    title: retestTitle,
-    city: parent?.city ?? "",
-
-    customer_id: parent?.customer_id ?? null,
-    location_id: parent?.location_id ?? null,
-    contractor_id: parent?.contractor_id ?? null,
-
-    scheduled_date: null,
-    window_start: null,
-    window_end: null,
-
-    status: "open",
-    ops_status: "need_to_schedule",
-
-    permit_number: parent?.permit_number ?? null,
-    customer_phone: parent?.customer_phone ?? null,
-    customer_first_name: parent?.customer_first_name ?? null,
-    customer_last_name: parent?.customer_last_name ?? null,
-    customer_email: parent?.customer_email ?? null,
-    job_address: parent?.job_address ?? null,
-
-    billing_recipient: parent?.billing_recipient ?? null,
-    billing_name: parent?.billing_name ?? null,
-    billing_email: parent?.billing_email ?? null,
-    billing_phone: parent?.billing_phone ?? null,
-    billing_address_line1: parent?.billing_address_line1 ?? null,
-    billing_address_line2: parent?.billing_address_line2 ?? null,
-    billing_city: parent?.billing_city ?? null,
-    billing_state: parent?.billing_state ?? null,
-    billing_zip: parent?.billing_zip ?? null,
-  };
-
-  const { data: child, error: insErr } = await supabase
-    .from("jobs")
-    .insert(payload)
-    .select("id")
-    .single();
-
-  if (insErr) throw insErr;
-
-  // 3) Timeline events on BOTH jobs
-  await insertJobEvent({
-    supabase,
-    jobId: parentJobId,
-    event_type: "retest_created",
-    meta: { child_job_id: child.id },
-  });
-
-  await insertJobEvent({
-    supabase,
-    jobId: child.id,
-    event_type: "retest_created",
-    meta: { parent_job_id: parentJobId },
-  });
-
-  // ✅ Optional: copy systems + equipment from original → retest
-if (copyEquipment) {
-  // 1) Fetch parent systems
-  const { data: parentSystems, error: sysErr } = await supabase
-    .from("job_systems")
-    .select("id, name")
-    .eq("job_id", parentJobId);
-
-  if (sysErr) throw sysErr;
-
-  // 2) Insert child systems (same names)
-  const systemIdMap = new Map<string, string>(); // parentSystemId → childSystemId
-
-  if (parentSystems?.length) {
-    const insertSystems = parentSystems.map((s: any) => ({
-      job_id: child.id,
-      name: s.name ?? "System",
-    }));
-
-    const { data: newSystems, error: newSysErr } = await supabase
-      .from("job_systems")
-      .insert(insertSystems)
-      .select("id, name");
-
-    if (newSysErr) throw newSysErr;
-
-    // Map by name in order (safe enough because retest is a straight copy)
-    // If you ever allow duplicate names, we can map by index.
-    for (let i = 0; i < parentSystems.length; i++) {
-      const parentSys = parentSystems[i];
-      const childSys = newSystems?.[i];
-      if (parentSys?.id && childSys?.id) {
-        systemIdMap.set(String(parentSys.id), String(childSys.id));
-      }
-    }
-  }
-
-  // 3) Fetch parent equipment
-  const { data: parentEquip, error: eqErr } = await supabase
-    .from("job_equipment")
-    .select(
-      [
-        "equipment_role",
-        "manufacturer",
-        "model",
-        "model_number",
-        "serial",
-        "tonnage",
-        "refrigerant_type",
-        "notes",
-        "system_location",
-        "system_id",
-      ].join(",")
-    )
-    .eq("job_id", parentJobId);
-
-  if (eqErr) throw eqErr;
-
-  // 4) Insert child equipment (remap system_id)
-  if (parentEquip?.length) {
-    const insertEquip = parentEquip.map((e: any) => ({
-      job_id: child.id,
-      equipment_role: e.equipment_role ?? null,
-      manufacturer: e.manufacturer ?? null,
-      model: e.model ?? null,
-      model_number: e.model_number ?? null,
-      serial: e.serial ?? null,
-      tonnage: e.tonnage ?? null,
-      refrigerant_type: e.refrigerant_type ?? null,
-      notes: e.notes ?? null,
-      system_location: e.system_location ?? null,
-      system_id: e.system_id ? systemIdMap.get(String(e.system_id)) ?? null : null,
-    }));
-
-    const { error: insEqErr } = await supabase
-      .from("job_equipment")
-      .insert(insertEquip);
-
-    if (insEqErr) throw insEqErr;
-  }
-
-  // 5) Timeline event (optional but nice)
-  await insertJobEvent({
-    supabase,
-    jobId: child.id,
-    event_type: "equipment_copied",
-    meta: { from_job_id: parentJobId },
-  });
-}
-
-  revalidatePath(`/jobs/${parentJobId}`);
-  revalidatePath(`/jobs/${child.id}`);
-  revalidatePath(`/ops`);
-
-  redirect(`/jobs/${child.id}?tab=ops`);
-  
-}
-
-
 /**
  * UPDATE: used by Edit Scheduling form on job detail page
  */
@@ -2315,4 +2218,216 @@ export async function completeDataEntryFromForm(formData: FormData) {
   if (error) throw error;
 
   redirect(`/jobs/${id}`);
+}
+// ✅ Create a Retest job linked to a parent (failed) job via jobs.parent_job_id
+export async function createRetestJobFromForm(formData: FormData) {
+  "use server";
+
+  const copyEquipment = String(formData.get("copy_equipment") || "") === "1";
+  const parentJobId = String(formData.get("parent_job_id") || "").trim();
+  if (!parentJobId) throw new Error("Missing parent_job_id");
+
+  const supabase = await createClient();
+
+  // 1) Load parent job
+  const { data: parentData, error: parentErr } = await supabase
+    .from("jobs")
+    .select(
+      [
+        "id",
+        "job_type",
+        "project_type",
+        "title",
+        "city",
+        "customer_id",
+        "location_id",
+        "contractor_id",
+        "permit_number",
+        "customer_phone",
+        "customer_first_name",
+        "customer_last_name",
+        "customer_email",
+        "job_address",
+        "billing_recipient",
+        "billing_name",
+        "billing_email",
+        "billing_phone",
+        "billing_address_line1",
+        "billing_address_line2",
+        "billing_city",
+        "billing_state",
+        "billing_zip",
+      ].join(",")
+    )
+    .eq("id", parentJobId)
+    .single();
+
+  if (parentErr) throw parentErr;
+  const parent = parentData as any;
+
+  // 2) Create retest job (unscheduled by default)
+  const retestTitle = `Retest — ${parent?.title ?? "Job"}`;
+
+  const payload: any = {
+    parent_job_id: parentJobId,
+
+    job_type: parent?.job_type ?? "ecc",
+    project_type: parent?.project_type ?? "alteration",
+
+    title: retestTitle,
+    city: parent?.city ?? "",
+
+    customer_id: parent?.customer_id ?? null,
+    location_id: parent?.location_id ?? null,
+    contractor_id: parent?.contractor_id ?? null,
+
+    scheduled_date: null,
+    window_start: null,
+    window_end: null,
+
+    status: "open",
+    ops_status: "need_to_schedule",
+
+    permit_number: parent?.permit_number ?? null,
+    customer_phone: parent?.customer_phone ?? null,
+    customer_first_name: parent?.customer_first_name ?? null,
+    customer_last_name: parent?.customer_last_name ?? null,
+    customer_email: parent?.customer_email ?? null,
+    job_address: parent?.job_address ?? null,
+
+    billing_recipient: parent?.billing_recipient ?? null,
+    billing_name: parent?.billing_name ?? null,
+    billing_email: parent?.billing_email ?? null,
+    billing_phone: parent?.billing_phone ?? null,
+    billing_address_line1: parent?.billing_address_line1 ?? null,
+    billing_address_line2: parent?.billing_address_line2 ?? null,
+    billing_city: parent?.billing_city ?? null,
+    billing_state: parent?.billing_state ?? null,
+    billing_zip: parent?.billing_zip ?? null,
+  };
+
+  const { data: child, error: insErr } = await supabase
+    .from("jobs")
+    .insert(payload)
+    .select("id")
+    .single();
+
+  if (insErr) throw insErr;
+
+  // 3) Timeline events on BOTH jobs
+  await insertJobEvent({
+    supabase,
+    jobId: parentJobId,
+    event_type: "retest_created",
+    meta: { child_job_id: child.id },
+  });
+
+  await insertJobEvent({
+    supabase,
+    jobId: child.id,
+    event_type: "retest_created",
+    meta: { parent_job_id: parentJobId },
+  });
+
+  // ✅ Optional: copy systems + equipment from original → retest
+  if (copyEquipment) {
+    // 1) Fetch parent systems
+    const { data: parentSystems, error: sysErr } = await supabase
+      .from("job_systems")
+      .select("id, name")
+      .eq("job_id", parentJobId);
+
+    if (sysErr) throw sysErr;
+
+    // 2) Insert child systems (same names)
+    const systemIdMap = new Map<string, string>(); // parentSystemId → childSystemId
+
+    if (parentSystems?.length) {
+      const insertSystems = parentSystems.map((s: any) => ({
+        job_id: child.id,
+        name: s.name ?? "System",
+      }));
+
+      const { data: newSystems, error: newSysErr } = await supabase
+        .from("job_systems")
+        .insert(insertSystems)
+        .select("id, name");
+
+      if (newSysErr) throw newSysErr;
+
+      for (let i = 0; i < parentSystems.length; i++) {
+        const parentSys = parentSystems[i];
+        const childSys = newSystems?.[i];
+        if (parentSys?.id && childSys?.id) {
+          systemIdMap.set(String(parentSys.id), String(childSys.id));
+        }
+      }
+    }
+
+    // 3) Fetch parent equipment
+    const { data: parentEquip, error: eqErr } = await supabase
+      .from("job_equipment")
+      .select(
+        [
+          "equipment_role",
+          "manufacturer",
+          "model",
+          "model_number",
+          "serial",
+          "tonnage",
+          "refrigerant_type",
+          "notes",
+          "system_location",
+          "system_id",
+        ].join(",")
+      )
+      .eq("job_id", parentJobId);
+
+    if (eqErr) throw eqErr;
+
+    // 4) Insert child equipment (remap system_id)
+    if (parentEquip?.length) {
+      const insertEquip = parentEquip.map((e: any) => {
+        const mappedSystemId =
+          e.system_id ? systemIdMap.get(String(e.system_id)) ?? null : null;
+
+        return {
+          job_id: child.id,
+          // equipment_role is NOT NULL in your schema; enforce a safe value
+          equipment_role: String(e.equipment_role || "other"),
+          manufacturer: e.manufacturer ?? null,
+          model: e.model ?? null,
+          model_number: e.model_number ?? null,
+          serial: e.serial ?? null,
+          tonnage: e.tonnage ?? null,
+          refrigerant_type: e.refrigerant_type ?? null,
+          notes: e.notes ?? null,
+          system_location: e.system_location ?? null,
+          // system_id is NOT NULL in your schema; only insert rows that have a mapped system_id
+          system_id: mappedSystemId,
+        };
+      }).filter((row: any) => row.system_id); // enforce NOT NULL system_id
+
+      if (insertEquip.length) {
+        const { error: insEqErr } = await supabase
+          .from("job_equipment")
+          .insert(insertEquip);
+
+        if (insEqErr) throw insEqErr;
+      }
+    }
+
+    await insertJobEvent({
+      supabase,
+      jobId: child.id,
+      event_type: "equipment_copied",
+      meta: { from_job_id: parentJobId },
+    });
+  }
+
+  revalidatePath(`/jobs/${parentJobId}`);
+  revalidatePath(`/jobs/${child.id}`);
+  revalidatePath(`/ops`);
+
+  redirect(`/jobs/${child.id}?tab=ops`);
 }

@@ -1,3 +1,5 @@
+// app/jobs/new/page.tsx
+
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import NewJobForm from "./NewJobForm";
@@ -13,16 +15,40 @@ export default async function NewJobPage(props: {
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
+  const user = userData.user;
 
-  const sp = props.searchParams ? await props.searchParams : undefined;
-  const customerId = String(sp?.customer_id ?? "").trim();
+  // Identify contractor user (multi-user per contractor)
+  let myContractor: { id: string; name: string } | null = null;
 
+  const { data: cu, error: cuErr } = await supabase
+    .from("contractor_users")
+    .select("contractor_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (cuErr) throw new Error(cuErr.message);
+
+  if (cu?.contractor_id) {
+    const { data: cRow, error: cErr } = await supabase
+      .from("contractors")
+      .select("id, name")
+      .eq("id", cu.contractor_id)
+      .maybeSingle();
+
+    if (cErr) throw new Error(cErr.message);
+    if (cRow?.id) myContractor = { id: cRow.id, name: cRow.name };
+  }
+
+  // Still fetch contractors list for internal/admin use
   const { data: contractors, error } = await supabase
     .from("contractors")
     .select("id, name")
     .order("name", { ascending: true });
 
   if (error) throw new Error(error.message);
+
+  const sp = props.searchParams ? await props.searchParams : undefined;
+  const customerId = String(sp?.customer_id ?? "").trim();
 
   // Optional: existing customer mode
   let existingCustomer: any = null;
@@ -53,6 +79,7 @@ export default async function NewJobPage(props: {
       contractors={contractors ?? []}
       existingCustomer={existingCustomer}
       locations={customerLocations}
+      myContractor={myContractor}
     />
   );
 }
