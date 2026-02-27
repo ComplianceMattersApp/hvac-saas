@@ -136,18 +136,16 @@ function nextStatusLabel(status?: string | null) {
 
 
 
-export default async function JobDetailPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams?: { tab?: string; banner?: string };
-}) {
-  
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ tab?: string; banner?: string }>;
+};
+
+export default async function JobDetailPage({ params, searchParams }: Props) {
   const { id: jobId } = await params;
 
-  const sp = searchParams ? await searchParams : {};
-  const tab = ((sp?.tab ?? "info") as "info" | "ops" | "tests")
+  const sp = (await searchParams) ?? {};
+  const tab = (sp.tab ?? "info") as "info" | "ops" | "tests";
 
   const supabase = await createClient();
   const contractors = await getContractors();
