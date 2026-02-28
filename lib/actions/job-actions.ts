@@ -183,14 +183,17 @@ async function insertJobEvent(params: {
   jobId: string;
   event_type: string;
   meta?: Record<string, any> | null;
+  userId?: string | null;
 }) {
   const { supabase, jobId, event_type } = params;
   const meta = params.meta ?? null;
+  const userId = params.userId ?? null;
 
   const { error } = await supabase.from("job_events").insert({
     job_id: jobId,
     event_type,
     meta,
+    user_id: userId,
   });
 
   if (error) throw error;
@@ -1645,6 +1648,8 @@ if (userErr) throw new Error(userErr.message);
 const user = userData?.user ?? null;
 const userId = user?.id ?? null;
 
+let isContractorUser = false;
+
 // Enforce contractor based on login (multi-user per contractor)
 let contractorIdFinal = contractor_id;
 
@@ -1659,9 +1664,9 @@ if (userId) {
 
   if (cu?.contractor_id) {
     contractorIdFinal = cu.contractor_id;
+    isContractorUser = true;
   }
 }
-
 
   // ----- billing defaults based on FINAL contractor id -----
   let billingRecipientFinal =
@@ -1762,20 +1767,46 @@ if (userId) {
     }
   }
 
-  async function logIntakeSubmitted(jobId: string) {
-    await insertJobEvent({
-      supabase,
-      jobId,
-      event_type: "intake_submitted",
-      meta: {
-        source: contractorIdFinal ? "contractor" : "internal",
-        user_id: user?.id ?? null,
-        contractor_id: contractorIdFinal,
-        job_type: jobType,
-        project_type: projectType,
-      },
-    });
+async function logIntakeSubmitted(jobId: string) {
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: "intake_submitted",
+    meta: {
+      source: contractorIdFinal ? "contractor" : "internal",
+      contractor_id: contractorIdFinal,
+      job_type: jobType,
+      project_type: projectType,
+    },
+    userId,
+  });
+}
+
+async function postCreate(createdJobId: string, metaSource: string) {
+  // log timeline first (so it always happens)
+  await insertJobEvent({
+    supabase,
+    jobId: createdJobId,
+    event_type: "job_created",
+    meta: { source: metaSource },
+    userId,
+  });
+
+  await logIntakeSubmitted(createdJobId);
+  await insertEquipmentForJob(createdJobId);
+
+  // refresh views
+  revalidatePath(`/jobs/${createdJobId}`);
+  revalidatePath(`/ops`);
+
+  if (isContractorUser) {
+    revalidatePath(`/portal`);
+    revalidatePath(`/portal/jobs/${createdJobId}`);
+    redirect(`/portal/jobs/${createdJobId}`);
   }
+
+  redirect(`/jobs/${createdJobId}`);
+}
 
   // ---- Branch 1: existing customer + existing location ----
   if (existingCustomerId && existingLocationId) {
@@ -1813,21 +1844,8 @@ if (userId) {
       billing_zip,
     });
 
-    await insertJobEvent({
-      supabase,
-      jobId: created.id,
-      event_type: "job_created",
-      meta: { job_type: jobType, project_type: projectType, source: "customer" },
-    });
-
-    await logIntakeSubmitted(created.id);
-    await insertEquipmentForJob(created.id);
-
-    revalidatePath(`/jobs/${created.id}`);
-    revalidatePath(`/ops`);
-    revalidatePath(`/customers/${existingCustomerId}`);
-
-    redirect(`/jobs/${created.id}`);
+ await postCreate(created.id, "customer");
+ return;
   }
 
   // If no service address, bounce back (your existing behavior)
@@ -1889,22 +1907,9 @@ if (userId) {
       billing_zip,
     });
 
-    await insertJobEvent({
-      supabase,
-      jobId: created.id,
-      event_type: "job_created",
-      meta: { job_type: jobType, project_type: projectType, source: "customer_new_location" },
-    });
+await postCreate(created.id, "customer_new_location");
+return;
 
-    await logIntakeSubmitted(created.id);
-    await insertEquipmentForJob(created.id);
-
-    revalidatePath(`/jobs/${created.id}`);
-    revalidatePath(`/ops`);
-    revalidatePath(`/customers/${existingCustomerId}`);
-    revalidatePath(`/locations/${location.id}`);
-
-    redirect(`/jobs/${created.id}`);
   }
 
   // ---- Branch 3: new customer flow (duplicate-safe) ----
@@ -1962,22 +1967,12 @@ if (userId) {
     billing_zip,
   });
 
-  await insertJobEvent({
-    supabase,
-    jobId: created.id,
-    event_type: "job_created",
-    meta: { job_type: jobType, project_type: projectType },
-  });
 
-  await logIntakeSubmitted(created.id);
-  await insertEquipmentForJob(created.id);
-
-  revalidatePath(`/jobs/${created.id}`);
-  revalidatePath(`/ops`);
-
-  const banner = reused ? "customer_reused" : "customer_created";
-  redirect(`/jobs/${created.id}?banner=${banner}`);
+    const banner = reused ? "customer_reused" : "customer_created";
+await postCreate(created.id, banner);
+return;
 }
+
 /**
  * UPDATE: used by Edit Scheduling form on job detail page
  */

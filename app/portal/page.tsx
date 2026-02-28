@@ -1,3 +1,4 @@
+//app portal page - shows summary tiles and recent jobs list, with links to queues and job details
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -113,36 +114,27 @@ export default async function PortalPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 text-gray-900 dark:text-gray-100">
       {/* Header */}
-      <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 flex items-start justify-between gap-4 shadow-sm">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Contractor Portal
-          </h1>
-          <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-            {contractorName}
-          </div>
-        </div>
+      {/* Header */}
+<div className="rounded-xl border bg-white dark:bg-gray-900 p-5 flex items-start justify-between gap-4 shadow-sm">
+  <div>
+    <h1 className="text-2xl font-semibold tracking-tight">Contractor Portal</h1>
+    <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+      {contractorName}
+    </div>
+  </div>
 
-        <div className="flex gap-2">
-          <Link
-            href="/jobs/new"
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
-          >
-            Add Job
-          </Link>
-          <Link
-            href="/jobs"
-            className="px-4 py-2 rounded-lg border bg-white dark:bg-gray-900 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition"
-          >
-            View Jobs
-          </Link>
-        </div>
-      </div>
+    <Link
+    href="/jobs/new"
+    className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-white text-sm font-medium hover:bg-gray-800 transition"
+  >
+    + Add Job
+  </Link>
+</div>
 
       {/* Tiles */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Link
-          href="/jobs?queue=attention_today"
+          href="/portal?queue=attention_today"
           className="rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-sm hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-800 transition"
         >
           <div className="text-xs text-gray-500 dark:text-gray-300 flex items-center gap-2">
@@ -158,7 +150,7 @@ export default async function PortalPage() {
         </Link>
 
         <Link
-          href="/jobs?queue=need_to_schedule"
+          href="/portal?queue=need_to_schedule"
           className="rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-sm hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-800 transition"
         >
           <div className="text-xs text-gray-500 dark:text-gray-300 flex items-center gap-2">
@@ -174,7 +166,7 @@ export default async function PortalPage() {
         </Link>
 
         <Link
-          href="/jobs?queue=pending_info"
+          href="/portal?queue=pending_info"
           className="rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-sm hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-800 transition"
         >
           <div className="text-xs text-gray-500 dark:text-gray-300 flex items-center gap-2">
@@ -190,7 +182,7 @@ export default async function PortalPage() {
         </Link>
 
         <Link
-          href="/jobs?queue=retest_needed"
+          href="/portal?queue=retest_needed"
           className="rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-sm hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-800 transition"
         >
           <div className="text-xs text-gray-500 dark:text-gray-300 flex items-center gap-2">
@@ -237,7 +229,7 @@ export default async function PortalPage() {
               return (
                 <Link
                   key={job.id}
-                  href={`/jobs/${job.id}`}
+                  href={`/portal/jobs/${job.id}`}
                   className={`block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition border-l-4 ${accent}`}
                 >
                   <div className="flex items-start justify-between gap-3">

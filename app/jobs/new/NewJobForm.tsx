@@ -430,48 +430,52 @@ const [billingRecipient, setBillingRecipient] = useState<
           </select>
         </div>
 
-        {/* Scheduling */}
-        <div className="rounded-lg border p-3 space-y-2">
-          <div className="text-sm font-medium">Scheduling (wall-clock)</div>
-          <div className="text-xs text-gray-600">
-            Enter times exactly as you want them shown (ex: 08:00). No timezone conversion.
-          </div>
+{/* Scheduling (internal only) */}
+{!isContractorMode && (
+  <div className="rounded-lg border p-3 space-y-2">
+    <div className="text-sm font-medium">Scheduling (wall-clock)</div>
+    <div className="text-xs text-gray-600">
+      Enter times exactly as you want them shown (ex: 08:00). No timezone conversion.
+    </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-gray-600">Window Start</label>
-              <input
-                type="time"
-                name="window_start"
-                className="border rounded w-full p-2"
-                value={windowStart}
-                onChange={(e) => setWindowStart(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-600">Window End</label>
-              <input
-                type="time"
-                name="window_end"
-                className="border rounded w-full p-2"
-                value={windowEnd}
-                onChange={(e) => setWindowEnd(e.target.value)}
-              />
-            </div>
-          </div>
+    <div className="grid grid-cols-2 gap-2">
+      <div>
+        <label className="text-xs text-gray-600">Window Start</label>
+        <input
+          type="time"
+          name="window_start"
+          className="border rounded w-full p-2"
+          value={windowStart}
+          onChange={(e) => setWindowStart(e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="text-xs text-gray-600">Window End</label>
+        <input
+          type="time"
+          name="window_end"
+          className="border rounded w-full p-2"
+          value={windowEnd}
+          onChange={(e) => setWindowEnd(e.target.value)}
+        />
+      </div>
+    </div>
 
-          <div>
-            <label className="text-xs text-gray-600">Quick Window</label>
-            <select className="border rounded w-full p-2" onChange={(e) => onQuickWindowChange(e.target.value)}>
-              <option value="">— Select —</option>
-              <option value="08:00-10:00">08:00-10:00</option>
-              <option value="10:00-12:00">10:00-12:00</option>
-              <option value="12:00-14:00">12:00-14:00</option>
-              <option value="14:00-16:00">14:00-16:00</option>
-            </select>
-          </div>
-        </div>
-
+    <div>
+      <label className="text-xs text-gray-600">Quick Window</label>
+      <select
+        className="border rounded w-full p-2"
+        onChange={(e) => onQuickWindowChange(e.target.value)}
+      >
+        <option value="">— Select —</option>
+        <option value="08:00-10:00">08:00-10:00</option>
+        <option value="10:00-12:00">10:00-12:00</option>
+        <option value="12:00-14:00">12:00-14:00</option>
+        <option value="14:00-16:00">14:00-16:00</option>
+      </select>
+    </div>
+  </div>
+)}
         <JobCoreFields
           mode={myContractor?.id ? "external" : "internal"}
           titleRequired={jobType === "service"}
