@@ -95,6 +95,9 @@ export default function NewJobForm({
   locations?: LocationRow[];
   myContractor?: MyContractor;
 }) {
+
+  const isContractorMode = Boolean(myContractor?.id);
+  
   const isExistingCustomer = Boolean(existingCustomer?.id);
 
   const [locationId, setLocationId] = useState<string>(() => {
@@ -109,11 +112,11 @@ export default function NewJobForm({
   const [windowEnd, setWindowEnd] = useState("");
 
   // Contractor selection (internal/admin only). Contractor users are auto-tied.
-  const [contractorId, setContractorId] = useState<string>("");
+ const [contractorId, setContractorId] = useState<string>(() => myContractor?.id ?? "");
 
   const [jobType, setJobType] = useState<"ecc" | "service">("ecc");
 
-  const [billingRecipient, setBillingRecipient] = useState<
+const [billingRecipient, setBillingRecipient] = useState<
     "contractor" | "customer" | "other"
   >(myContractor?.id ? "contractor" : "customer");
 

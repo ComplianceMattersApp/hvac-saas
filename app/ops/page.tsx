@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import ContractorFilter from "./_components/ContractorFilter";
+import { redirect } from "next/navigation";
 
 import {
   displayDateLA,
@@ -132,6 +133,23 @@ export default async function OpsPage({
   const q = (sp.q ?? "").trim() || null;
 
   const supabase = await createClient();
+
+const { data: userData } = await supabase.auth.getUser();
+const user = userData?.user;
+
+if (!user) redirect("/login");
+
+const { data: cu, error: cuErr } = await supabase
+  .from("contractor_users")
+  .select("contractor_id")
+  .eq("user_id", user.id)
+  .maybeSingle();
+
+if (cuErr) throw cuErr;
+
+if (cu?.contractor_id) {
+  redirect("/jobs/new");
+}
 
   // ✅ Counts per ops_status (exclude "closed", respect contractor filter)
 let countsQ = supabase
@@ -468,7 +486,7 @@ jobs.sort((a: any, b: any) => {
                     {displayWindowLA(j.window_start, j.window_end) || "—"}
                   </div>
 
-
+                
 
                   </div>
                 </Link>

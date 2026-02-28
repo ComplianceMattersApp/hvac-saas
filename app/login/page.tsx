@@ -32,8 +32,26 @@ export default function LoginPage() {
       return;
     }
 
+// Check if this user is mapped to a contractor
+const { data: { user } } = await supabase.auth.getUser();
+
+if (user) {
+  const { data: cu } = await supabase
+    .from("contractor_users")
+    .select("contractor_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (cu?.contractor_id) {
+    // Contractor login
+    router.push("/portal");
+  } else {
+    // Internal/admin login
     router.push("/ops");
-    router.refresh();
+  }
+
+  router.refresh();
+}
   }
 
   return (

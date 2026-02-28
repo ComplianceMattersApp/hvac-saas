@@ -15,7 +15,10 @@ export default async function NewJobPage(props: {
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
+  
   const user = userData.user;
+
+  
 
   // Identify contractor user (multi-user per contractor)
   let myContractor: { id: string; name: string } | null = null;

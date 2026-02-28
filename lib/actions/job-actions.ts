@@ -1636,29 +1636,32 @@ export async function createJobFromForm(formData: FormData) {
   if (jobType === "service" && !titleFinal) throw new Error("Title is required");
   if (!city) throw new Error("City is required");
 
-  // ----- supabase + identity -----
-  const supabase = await createClient();
+// ----- supabase + identity -----
+const supabase = await createClient();
 
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr) throw new Error(authErr.message);
-  const user = authData?.user ?? null;
+const { data: userData, error: userErr } = await supabase.auth.getUser();
+if (userErr) throw new Error(userErr.message);
 
-  // Enforce contractor based on login (multi-user)
-  let contractorIdFinal = contractor_id;
+const user = userData?.user ?? null;
+const userId = user?.id ?? null;
 
-  if (user?.id) {
-    const { data: cu, error: cuErr } = await supabase
-      .from("contractor_users")
-      .select("contractor_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
+// Enforce contractor based on login (multi-user per contractor)
+let contractorIdFinal = contractor_id;
 
-    if (cuErr) throw new Error(cuErr.message);
+if (userId) {
+  const { data: cu, error: cuErr } = await supabase
+    .from("contractor_users")
+    .select("contractor_id")
+    .eq("user_id", userId)
+    .maybeSingle();
 
-    if (cu?.contractor_id) {
-      contractorIdFinal = cu.contractor_id;
-    }
+  if (cuErr) throw new Error(cuErr.message);
+
+  if (cu?.contractor_id) {
+    contractorIdFinal = cu.contractor_id;
   }
+}
+
 
   // ----- billing defaults based on FINAL contractor id -----
   let billingRecipientFinal =
