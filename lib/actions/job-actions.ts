@@ -1712,62 +1712,96 @@ if (userId) {
       // Locked rule A: selecting a component => system name required
       if (hasComponents && !name) {
         throw new Error("Equipment added: System Location/Name is required for each system.");
+      
+      }
+      
+    }
+    
+  }
+
+  
+
+ async function insertEquipmentForJob(jobId: string) {
+  console.error("EQUIP ENTER", { jobId, isContractorUser });
+
+  const { data: u0, error: u0e } = await supabase.auth.getUser();
+  console.error("EQUIP AUTH (top)", {
+    uid: u0?.user?.id ?? null,
+    err: u0e?.message ?? null,
+  });
+
+  const systems = Array.isArray(equipmentPayload?.systems)
+    ? equipmentPayload.systems
+    : [];
+  if (!systems.length) return;
+
+  for (const s of systems) {
+    const systemName = String(s?.name || "").trim();
+    const comps = Array.isArray(s?.components) ? s.components : [];
+    if (!comps.length) continue;
+
+    // B) right before job_systems insert (per system)
+    console.error("EQUIP BEFORE job_systems insert", { jobId, systemName });
+
+    const { data: u1, error: u1e } = await supabase.auth.getUser();
+    console.error("EQUIP AUTH (pre-insert)", {
+      uid: u1?.user?.id ?? null,
+      err: u1e?.message ?? null,
+    });
+
+    // Create system (job_systems.name is NOT NULL)
+    const { data: createdSystem, error: sysCreateErr } = await supabase
+      .from("job_systems")
+      .insert({ job_id: jobId, name: systemName })
+      .select("id")
+      .single();
+
+    // C) if it fails, print the full supabase error object
+    if (sysCreateErr) {
+      console.error("job_systems insert error obj:", sysCreateErr);
+      throw sysCreateErr;
+    }
+
+    const systemId = createdSystem?.id;
+    if (!systemId) throw new Error("Unable to create system_id");
+
+    for (const c of comps) {
+      const equipment_role = String(c?.type || "").trim();
+      if (!equipment_role) continue;
+
+      const manufacturer = c?.manufacturer ? String(c.manufacturer).trim() : null;
+      const model = c?.model ? String(c.model).trim() : null;
+      const serial = c?.serial ? String(c.serial).trim() : null;
+      const refrigerant_type = c?.refrigerant_type ? String(c.refrigerant_type).trim() : null;
+      const notes = c?.notes ? String(c.notes).trim() : null;
+
+      const tonnageRaw = c?.tonnage ? String(c.tonnage).trim() : "";
+      const tonnage = tonnageRaw ? Number(tonnageRaw) : null;
+
+      const { error: eqErr } = await supabase.from("job_equipment").insert({
+        job_id: jobId,
+        system_id: systemId,
+        equipment_role,
+        system_location: systemName,
+        manufacturer,
+        model,
+        serial,
+        tonnage,
+        refrigerant_type,
+        notes,
+      });
+
+      if (eqErr) {
+        console.error("job_equipment insert error obj:", eqErr);
+        throw eqErr;
       }
     }
   }
-
-  async function insertEquipmentForJob(jobId: string) {
-    const systems = Array.isArray(equipmentPayload?.systems) ? equipmentPayload.systems : [];
-    if (!systems.length) return;
-
-    for (const s of systems) {
-      const systemName = String(s?.name || "").trim();
-      const comps = Array.isArray(s?.components) ? s.components : [];
-      if (!comps.length) continue;
-
-      // Create system (job_systems.name is NOT NULL)
-      const { data: createdSystem, error: sysCreateErr } = await supabase
-        .from("job_systems")
-        .insert({ job_id: jobId, name: systemName })
-        .select("id")
-        .single();
-
-      if (sysCreateErr) throw sysCreateErr;
-      const systemId = createdSystem?.id;
-      if (!systemId) throw new Error("Unable to create system_id");
-
-      for (const c of comps) {
-        const equipment_role = String(c?.type || "").trim();
-        if (!equipment_role) continue; // should never happen if UI is correct
-
-        const manufacturer = c?.manufacturer ? String(c.manufacturer).trim() : null;
-        const model = c?.model ? String(c.model).trim() : null;
-        const serial = c?.serial ? String(c.serial).trim() : null;
-        const refrigerant_type = c?.refrigerant_type ? String(c.refrigerant_type).trim() : null;
-        const notes = c?.notes ? String(c.notes).trim() : null;
-
-        const tonnageRaw = c?.tonnage ? String(c.tonnage).trim() : "";
-        const tonnage = tonnageRaw ? Number(tonnageRaw) : null;
-
-        const { error: eqErr } = await supabase.from("job_equipment").insert({
-          job_id: jobId,
-          system_id: systemId,
-          equipment_role,               // NOT NULL in DB
-          system_location: systemName,  // optional helper column
-          manufacturer,
-          model,
-          serial,
-          tonnage,
-          refrigerant_type,
-          notes,
-        });
-
-        if (eqErr) throw eqErr;
-      }
-    }
-  }
+}
 
 async function logIntakeSubmitted(jobId: string) {
+  if (isContractorUser) return; // <-- add this line
+
   await insertJobEvent({
     supabase,
     jobId,
@@ -1783,7 +1817,9 @@ async function logIntakeSubmitted(jobId: string) {
 }
 
 async function postCreate(createdJobId: string, metaSource: string) {
-  // log timeline first (so it always happens)
+
+  if (!isContractorUser) {
+  // Internal users can write system timeline events
   await insertJobEvent({
     supabase,
     jobId: createdJobId,
@@ -1793,7 +1829,18 @@ async function postCreate(createdJobId: string, metaSource: string) {
   });
 
   await logIntakeSubmitted(createdJobId);
-  await insertEquipmentForJob(createdJobId);
+} else {
+  // Contractors can only write allowed sandbox events
+  await insertJobEvent({
+    supabase,
+    jobId: createdJobId,
+    event_type: "contractor_note",
+    meta: { note: "Job created via contractor portal", source: metaSource },
+    userId,
+  });
+}
+
+await insertEquipmentForJob(createdJobId);
 
   // refresh views
   revalidatePath(`/jobs/${createdJobId}`);
@@ -1808,6 +1855,15 @@ async function postCreate(createdJobId: string, metaSource: string) {
   redirect(`/jobs/${createdJobId}`);
 }
 
+const CONTRACTOR_SANDBOX_ALLOWED = new Set([
+  "contractor_note",
+  "contractor_correction_submission",
+  "attachment_added",
+]);
+
+function canContractorWriteEvent(event_type: string) {
+  return CONTRACTOR_SANDBOX_ALLOWED.has(event_type);
+}
   // ---- Branch 1: existing customer + existing location ----
   if (existingCustomerId && existingLocationId) {
     const created = await createJob({
