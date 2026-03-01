@@ -101,8 +101,9 @@ export default function NewJobForm({
   const isExistingCustomer = Boolean(existingCustomer?.id);
 
   const [locationId, setLocationId] = useState<string>(() => {
-    return isExistingCustomer && locations.length ? locations[0].id : "";
-  });
+  if (!isExistingCustomer) return "";
+  return locations.length ? locations[0].id : "__new__";
+});
 
   const selectedLoc = isExistingCustomer
     ? locations.find((l) => l.id === locationId) ?? null
@@ -416,19 +417,21 @@ const [billingRecipient, setBillingRecipient] = useState<
         </div>
 
         {/* Project Type */}
-        <div className="rounded-lg border p-3 space-y-2">
-          <label className="block text-sm font-medium">Project Type (ECC)</label>
-          <select
-            name="project_type"
-            className="border rounded w-full p-2"
-            value={projectType}
-            onChange={(e) => setProjectType(e.target.value as any)}
-          >
-            <option value="alteration">Alteration</option>
-            <option value="all_new">All New</option>
-            <option value="new_construction">New Construction</option>
-          </select>
-        </div>
+{jobType !== "service" && (
+  <div className="rounded-lg border p-3 space-y-2">
+    <label className="block text-sm font-medium">Project Type (ECC)</label>
+    <select
+      name="project_type"
+      className="border rounded w-full p-2"
+      value={projectType}
+      onChange={(e) => setProjectType(e.target.value as any)}
+    >
+      <option value="alteration">Alteration</option>
+      <option value="all_new">All New</option>
+      <option value="new_construction">New Construction</option>
+    </select>
+  </div>
+)}
 
 {/* Scheduling (internal only) */}
 {!isContractorMode && (
@@ -476,10 +479,91 @@ const [billingRecipient, setBillingRecipient] = useState<
     </div>
   </div>
 )}
-        <JobCoreFields
-          mode={myContractor?.id ? "external" : "internal"}
-          titleRequired={jobType === "service"}
-        />
+
+{/* Existing Customer / Location Mode */}
+{isExistingCustomer && existingCustomer?.id ? (
+  <>
+    <div className="rounded-lg border p-3 space-y-1">
+      <div className="text-sm font-semibold">Customer (Existing)</div>
+      <div className="text-sm text-gray-700">
+        {(existingCustomer.first_name ?? "") + " " + (existingCustomer.last_name ?? "")}
+      </div>
+      {existingCustomer.phone ? (
+        <div className="text-xs text-gray-600">Phone: {existingCustomer.phone}</div>
+      ) : null}
+      {existingCustomer.email ? (
+        <div className="text-xs text-gray-600">Email: {existingCustomer.email}</div>
+      ) : null}
+
+      <input type="hidden" name="customer_id" value={existingCustomer.id} />
+    </div>
+
+    <div className="rounded-lg border p-3 space-y-2">
+      <div className="text-sm font-semibold">Service Location</div>
+
+      <label className="block text-sm font-medium">Pick a location</label>
+      <select
+        className="border rounded w-full p-2"
+        value={locationId}
+        onChange={(e) => setLocationId(e.target.value)}
+      >
+        {locations.map((l) => (
+          <option key={l.id} value={l.id}>
+            {(l.nickname ? `${l.nickname} — ` : "") + (l.address_line1 ?? "Address") + ", " + (l.city ?? "")}
+          </option>
+        ))}
+        <option value="__new__">+ Add new location…</option>
+      </select>
+
+      {!isNewLocation ? (
+        <input type="hidden" name="location_id" value={locationId} />
+      ) : (
+        <div className="space-y-2 mt-2">
+          <div className="text-xs text-gray-600">
+            New location details (required for new location)
+          </div>
+
+          <input
+            className="border rounded w-full p-2"
+            name="location_nickname"
+            placeholder="Nickname (optional) e.g., Main House, ADU"
+          />
+
+          <input
+            className="border rounded w-full p-2"
+            name="address_line1"
+            placeholder="Address"
+            required
+          />
+
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              className="border rounded w-full p-2"
+              name="city"
+              placeholder="City"
+              required
+            />
+            <input
+              className="border rounded w-full p-2"
+              name="zip"
+              placeholder="ZIP"
+              required
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  </>
+) : null}
+
+
+       
+          <JobCoreFields
+  mode={myContractor?.id ? "external" : "internal"}
+  titleRequired={jobType === "service"}
+  hideCustomer={isExistingCustomer}
+  hideServiceLocation={isExistingCustomer}
+/>
 
         {/* Billing Recipient */}
         <div className="rounded-lg border p-3 space-y-2">
