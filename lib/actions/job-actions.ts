@@ -274,6 +274,27 @@ export async function getContractors() {
   return data ?? [];
 }
 
+export async function archiveJobFromForm(formData: FormData) {
+  "use server";
+  const supabase = await createClient();
+
+  const job_id = String(formData.get("job_id") ?? "").trim();
+  if (!job_id) throw new Error("Missing job_id");
+
+  const { error } = await supabase
+    .from("jobs")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", job_id);
+
+  if (error) throw error;
+
+  revalidatePath("/ops");
+  revalidatePath("/jobs");
+  revalidatePath(`/jobs/${job_id}`);
+
+  redirect(`/ops?saved=job_archived`);
+}
+
 export async function addJobEquipmentFromForm(formData: FormData) {
   "use server";
 

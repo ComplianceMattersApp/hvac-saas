@@ -127,6 +127,7 @@ const { data: job, error: jobErr } = await supabase
     .select(
       "id, title, status, ops_status, created_at, scheduled_date, window_start, window_end, permit_number, parent_job_id"
     )
+    .is("deleted_at", null)
     .or(`id.eq.${rootJobId},parent_job_id.eq.${rootJobId}`)
     .order("created_at", { ascending: true })
     .limit(20);

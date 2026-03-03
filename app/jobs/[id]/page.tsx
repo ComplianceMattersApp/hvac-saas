@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SubmitButton from "@/components/SubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
+import { revalidatePath } from "next/cache";
 
 import {
   getContractors,
@@ -132,6 +133,43 @@ function nextStatusLabel(status?: string | null) {
     cancelled: "Cancelled",
   };
   return nextMap[s] ?? "—";
+}
+
+async function archiveJobFromForm(formData: FormData) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const job_id = String(formData.get("job_id") ?? "").trim();
+  if (!job_id) throw new Error("Missing job_id");
+
+  // Safety: internal-only (block contractor portal users)
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  if (!userData?.user) throw new Error("Not authenticated");
+
+  const { data: cu } = await supabase
+    .from("contractor_users")
+    .select("contractor_id")
+    .eq("user_id", userData.user.id)
+    .maybeSingle();
+
+  if (cu?.contractor_id) throw new Error("Forbidden");
+
+  const { error } = await supabase
+    .from("jobs")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", job_id);
+
+  if (error) throw error;
+
+  revalidatePath("/ops");
+  revalidatePath("/jobs");
+  revalidatePath(`/jobs/${job_id}`);
+
+  // Optional: bounce back to ops after archiving
+  // (If you want to stay on the page, remove this line.)
+  // redirect("/ops");
 }
 
 
@@ -634,6 +672,24 @@ if (recipient === "contractor") {
               </div>
             </div>
           </div>
+
+          {/* 🔴 Danger Zone */}
+<div className="rounded-lg border border-red-200 bg-white p-4 space-y-2 mb-6">
+  <div className="font-semibold text-red-700">Danger zone</div>
+  <div className="text-sm text-gray-600">
+    Archive hides this job across Ops, portal, and searches. This can be undone later (by clearing deleted_at).
+  </div>
+
+  <form action={archiveJobFromForm}>
+    <input type="hidden" name="job_id" value={job.id} />
+    <button
+      type="submit"
+      className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+    >
+      Archive Job
+    </button>
+  </form>
+</div>
 
       {/* TAB: INFO */}
       {tab === "info" && (

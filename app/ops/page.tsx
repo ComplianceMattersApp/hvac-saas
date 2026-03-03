@@ -178,7 +178,7 @@ for (const row of countRows ?? []) {
 
   // Common job select (keep lightweight)
  const baseSelect =
-  "id, title, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, customer_id, location_id";
+  "id, title, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, customer_id, deleted_at, location_id";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -212,6 +212,7 @@ const startTomorrowUtc = startOfTomorrowUtcIsoLA();
 let todayQ = supabase
   .from("jobs")
   .select(baseSelect)
+  .is("deleted_at", null)
   .eq("ops_status", "scheduled")
   .gte("scheduled_date", startTodayUtc)
   .lt("scheduled_date", startTomorrowUtc)
@@ -226,6 +227,7 @@ if (todayErr) throw todayErr;
 let upcomingQ = supabase
   .from("jobs")
   .select(baseSelect)
+  .is("deleted_at", null)
   .eq("ops_status", "scheduled")
   .gte("scheduled_date", startTomorrowUtc)
   .order("scheduled_date", { ascending: true })
@@ -242,6 +244,7 @@ if (upcomingErr) throw upcomingErr;
   let callListQ = supabase
     .from("jobs")
     .select(baseSelect)
+    .is("deleted_at", null)
     .eq("ops_status", "need_to_schedule")
     .order("created_at", { ascending: false })
     .limit(10);
@@ -255,6 +258,7 @@ if (upcomingErr) throw upcomingErr;
   let bucketQ = supabase
     .from("jobs")
     .select(baseSelect)
+    .is("deleted_at", null)
     .eq("ops_status", bucket)
     .order("created_at", { ascending: false })
     .limit(100);
