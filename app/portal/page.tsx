@@ -96,9 +96,12 @@ export default async function PortalPage() {
   }
 
   // Recent jobs list (top 10)
-  const { data: jobs, error: jobsErr } = await supabase
+    const { data: jobs, error: jobsErr } = await supabase
     .from("jobs")
-    .select("id, title, status, ops_status, follow_up_date, created_at, city")
+    .select(`
+      id, title, status, ops_status, follow_up_date, created_at, city, job_address,
+      locations:location_id ( address_line1, city, state )
+    `)
     .order("created_at", { ascending: false })
     .limit(10);
 
@@ -236,7 +239,21 @@ export default async function PortalPage() {
                     <div>
                       <div className="font-medium">{job.title}</div>
                       <div className="text-sm text-gray-600 dark:text-gray-300 flex flex-wrap items-center gap-2">
-                        <span>{(job.city ?? "—") as string}</span>
+                        {(() => {
+                            const loc = (job as any)?.locations ?? null;
+                            const line1 =
+                              String(loc?.address_line1 ?? "").trim() ||
+                              String(job?.job_address ?? "").trim();
+                            const city =
+                              String(loc?.city ?? "").trim() ||
+                              String(job?.city ?? "").trim();
+                            const state = String(loc?.state ?? "").trim();
+
+                            const left = line1 ? line1 : "—";
+                            const right = city ? ` • ${city}${state ? `, ${state}` : ""}` : "";
+
+                            return <span>{left}{right}</span>;
+                          })()}
                         <span className="text-gray-300 dark:text-gray-600">•</span>
                         <span>{(job.status ?? "—") as string}</span>
                         <span className="text-gray-300 dark:text-gray-600">•</span>

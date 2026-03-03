@@ -1,8 +1,10 @@
 // app/portal/jobs/[id]/page.tsx
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import JobAttachments from "@/components/portal/JobAttachments";
+import { AccordionCards } from "@/components/AccordionCards";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -148,13 +150,35 @@ const { data: job, error: jobErr } = await supabase
 
   const { data: events, error: evErr } = await supabase
     .from("job_events")
-    .select("job_id, created_at, event_type, meta")
+    .select("job_id, created_at, event_type, meta, user_id")
     .in("job_id", chainJobIds.length ? chainJobIds : [jobId])
     .in("event_type", SAFE_EVENT_TYPES)
     .order("created_at", { ascending: false })
     .limit(300);
 
   if (evErr) throw evErr;
+
+  function shortUid(uid: string | null | undefined) {
+  const s = String(uid || "").trim();
+  if (!s) return "—";
+  return `${s.slice(0, 6)}…${s.slice(-4)}`;
+}
+
+const myUid = userData?.user?.id ?? null;
+
+const contractorNotes = (events ?? [])
+  .filter((e: any) => e?.event_type === "contractor_note")
+  .map((e: any) => {
+    const meta = typeof e.meta === "string" ? null : e.meta;
+    const noteText = meta?.note ? String(meta.note).trim() : "";
+    return {
+      created_at: e.created_at,
+      user_id: e.user_id ?? null,
+      note: noteText,
+    };
+  })
+  .filter((n: any) => n.note);
+  
 
   // --- Tests (ECC runs across the whole chain) ---
   const { data: testRuns, error: trErr } = await supabase
@@ -215,119 +239,133 @@ const addressState = String(loc?.state ?? "").trim();
           : !!latestCompletedRun.computed_pass)
       : null;
 
-  function extractFailReasons(computed: any): string[] {
-    if (!computed) return [];
+function extractTopReasons(run: any): string[] {
+  const computed = run?.computed ?? null;
+  if (!computed) return [];
 
-    // Common shapes we might see:
-    // { fail_reasons: ["...", "..."] }
-    // { reasons: [...] }
-    // { checks: [{name, pass, message}] }
-    // { failures: [{message}] }
-    const out: string[] = [];
+  const failures = Array.isArray(computed.failures)
+    ? computed.failures.map(String).map((s: string) => s.trim()).filter(Boolean)
+    : [];
 
-    const c = computed;
+  if (failures.length) return failures.slice(0, 3);
 
-    const arr1 = Array.isArray(c.fail_reasons) ? c.fail_reasons : null;
-    if (arr1) out.push(...arr1.map(String));
+  const warnings = Array.isArray(computed.warnings)
+    ? computed.warnings.map(String).map((s: string) => s.trim()).filter(Boolean)
+    : [];
 
-    const arr2 = Array.isArray(c.reasons) ? c.reasons : null;
-    if (arr2) out.push(...arr2.map(String));
+  if (warnings.length) return warnings.slice(0, 3);
 
-    const checks = Array.isArray(c.checks) ? c.checks : null;
-    if (checks) {
-      for (const ch of checks) {
-        if (ch && ch.pass === false) {
-          const msg = ch.message ?? ch.reason ?? ch.name ?? "Failed check";
-          out.push(String(msg));
-        }
-      }
-    }
+  // Fallback: duct leakage specific numeric summary if present
+  const measured = computed.measured_duct_leakage_cfm;
+  const max = computed.max_leakage_cfm;
 
-    const failures = Array.isArray(c.failures) ? c.failures : null;
-    if (failures) {
-      for (const f of failures) {
-        const msg = f?.message ?? f?.reason ?? f?.name ?? "Failure";
-        out.push(String(msg));
-      }
-    }
-
-    // De-dupe + trim + keep first few
-    return Array.from(new Set(out.map((s) => s.trim()).filter(Boolean))).slice(0, 3);
+  if (typeof measured === "number" && typeof max === "number") {
+    if (measured > max) return [`Duct leakage ${measured} CFM exceeds max ${max} CFM.`];
+    return [`Duct leakage ${measured} CFM (max ${max} CFM).`];
   }
 
-  const failReasons =
-    latestCompletedRun && latestPass === false
-      ? extractFailReasons((latestCompletedRun as any).computed)
-      : [];
+  return [];
+}
+
+  const topReasons =
+  latestCompletedRun ? extractTopReasons(latestCompletedRun) : [];
+
+  async function addContractorNote(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const note = String(formData.get("note") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!note) throw new Error("Note is required");
+
+  const supabase = await createClient();
+
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  if (!userData?.user) redirect("/login");
+
+  const { error: insErr } = await supabase.from("job_events").insert({
+  job_id: jobId,
+  event_type: "contractor_note",
+  user_id: userData.user.id,
+  meta: { note },
+});
+
+  if (insErr) throw insErr;
+
+  revalidatePath(`/portal/jobs/${jobId}`);
+  redirect(`/portal/jobs/${jobId}`);
+}
+
 
   return (
 
     // Header
     <div className="max-w-4xl mx-auto space-y-6 text-gray-900 dark:text-gray-100">
+      {/* Header */}
+<div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-1">
+  <div className="flex items-start justify-between gap-4">
+    <div>
+      <div className="text-xs text-gray-500 dark:text-gray-300">
+        Contractor Portal • {contractorName}
+      </div>
 
+      <h1 className="text-2xl font-semibold tracking-tight mt-1">
+        {job.title ?? "Job"}
+      </h1>
 
+      <div className="text-sm text-gray-600 dark:text-gray-300">
+        {addressLine1 ? addressLine1 : "—"}
+        {addressCity ? ` • ${addressCity}` : ""}
+        {addressState ? `, ${addressState}` : ""}
+      </div>
+    </div>
 
-      <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-1">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-xs text-gray-500 dark:text-gray-300">
-              Contractor Portal • {contractorName}
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight mt-1">
-              {job.title ?? "Job"}
-            </h1>
-            <div className="text-sm text-gray-600 dark:text-gray-300">
-  {addressLine1 ? addressLine1 : "—"}
-  {addressCity ? ` • ${addressCity}` : ""}
-  {addressState ? `, ${addressState}` : ""}
+    <Link
+      href="/portal"
+      className="px-3 py-2 rounded-lg border bg-white dark:bg-gray-900 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+    >
+      Back
+    </Link>
+  </div>
 </div>
-          </div>
 
-          <Link
-            href="/portal"
-            className="px-3 py-2 rounded-lg border bg-white dark:bg-gray-900 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition"
-          >
-            Back
-          </Link>
-        </div>
+{/* Job Health (Urgency Banner) */}
+{latestCompletedRun ? (
+  <div
+    className={[
+      "rounded-xl border p-5 shadow-sm space-y-2",
+      (() => {
+        const run = latestCompletedRun as any;
+        const finalPass =
+          run.override_pass != null ? !!run.override_pass : !!run.computed_pass;
 
-              {/* Job Health (Urgency Banner) */}
-      <div
-        className={[
-          "rounded-xl border p-5 shadow-sm space-y-2",
-          latestCompletedRun
-            ? latestPass
-              ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900/40"
-              : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/40"
-            : "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800",
-        ].join(" ")}
-      >
-        {!latestCompletedRun ? (
-          <>
-            <div className="text-sm font-semibold">Awaiting Test</div>
-            <div className="text-sm text-gray-700 dark:text-gray-200">
-              No completed test results yet. We’ll update this page as soon as testing is performed.
-            </div>
-          </>
-        ) : latestPass ? (
-          <>
-            <div className="text-sm font-semibold">PASS — Job meets requirements</div>
-            <div className="text-sm text-gray-700 dark:text-gray-200">
-              Latest completed test: {String((latestCompletedRun as any).test_type ?? "Test")} •{" "}
-              {formatDateLA(String((latestCompletedRun as any).created_at))}
-            </div>
-          </>
-        ) : (
+        return finalPass
+          ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900/40"
+          : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/40";
+      })(),
+    ].join(" ")}
+  >
+    {(() => {
+      const run = latestCompletedRun as any;
+      const finalPass =
+        run.override_pass != null ? !!run.override_pass : !!run.computed_pass;
+      const wouldFail = run.computed_pass === false && run.override_pass === true;
+      const reasons = extractTopReasons(run);
+
+      if (!finalPass) {
+        return (
           <>
             <div className="text-sm font-semibold">FAILED — Retest Required</div>
             <div className="text-sm text-gray-700 dark:text-gray-200">
-              Latest completed test: {String((latestCompletedRun as any).test_type ?? "Test")} •{" "}
-              {formatDateLA(String((latestCompletedRun as any).created_at))}
+              Latest completed test: {String(run.test_type ?? "Test")} •{" "}
+              {formatDateLA(String(run.created_at))}
             </div>
 
-            {failReasons.length > 0 ? (
+            {reasons.length ? (
               <ul className="list-disc pl-5 text-sm text-gray-800 dark:text-gray-100">
-                {failReasons.map((r, i) => (
+                {reasons.map((r: string, i: number) => (
                   <li key={i}>{r}</li>
                 ))}
               </ul>
@@ -337,328 +375,494 @@ const addressState = String(loc?.state ?? "").trim();
               </div>
             )}
           </>
-        )}
-      </div>
+        );
+      }
 
-            {/* At a glance */}
-      <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
-        <div className="text-sm font-semibold">At a glance</div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
-            <div className="text-xs text-gray-500 dark:text-gray-300">Scheduled</div>
-            <div className="font-medium mt-1">
-              {(job as any).scheduled_date ? String((job as any).scheduled_date) : "Not scheduled"}
-              {windowLabel ? ` • ${windowLabel}` : ""}
-            </div>
+      return (
+        <>
+          <div className="text-sm font-semibold">
+            {wouldFail
+              ? "PASS (Override) — Review Required"
+              : "PASS — Job meets requirements"}
           </div>
 
-          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
-            <div className="text-xs text-gray-500 dark:text-gray-300">Status</div>
-            <div className="font-medium mt-1">
-              {(job.status ?? "—") as string} • {(job.ops_status ?? "—") as string}
-            </div>
+          <div className="text-sm text-gray-700 dark:text-gray-200">
+            Latest completed test: {String(run.test_type ?? "Test")} •{" "}
+            {formatDateLA(String(run.created_at))}
           </div>
 
-          {(job as any).permit_number ? (
-            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
-              <div className="text-xs text-gray-500 dark:text-gray-300">Permit</div>
-              <div className="font-medium mt-1">{String((job as any).permit_number)}</div>
+          {wouldFail && reasons.length ? (
+            <div className="text-sm text-gray-700 dark:text-gray-200">
+              Would have failed without override:
+              <ul className="list-disc pl-5 mt-1">
+                {reasons.map((r: string, i: number) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
             </div>
           ) : null}
-
-          {(job as any).pending_info_reason || (job as any).next_action_note ? (
-            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
-              <div className="text-xs text-gray-500 dark:text-gray-300">Next action</div>
-              <div className="font-medium mt-1">
-                {String((job as any).pending_info_reason || (job as any).next_action_note)}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Job chain (Original + Retests) */}
-      <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-sm font-semibold">Job history</div>
-          <div className="text-xs text-gray-500 dark:text-gray-300">
-            Instances: {(jobChain?.length ?? 0) as number}
-          </div>
-        </div>
-
-        {!jobChain || jobChain.length === 0 ? (
-          <div className="text-sm text-gray-600 dark:text-gray-300">—</div>
-        ) : (
-          <div className="space-y-2">
-            {jobChain.map((j: any, idx: number) => {
-              const isCurrent = j.id === jobId;
-              const label = idx === 0 ? "Original" : `Retest ${idx}`;
-              const win =
-                j.scheduled_date && j.window_start && j.window_end
-                  ? `${formatTimeLocal(j.window_start)}–${formatTimeLocal(j.window_end)}`
-                  : null;
-
-              return (
-                <div
-                  key={j.id}
-                  className={[
-                    "rounded-lg border p-3",
-                    isCurrent
-                      ? "bg-white dark:bg-gray-900"
-                      : "bg-gray-50 dark:bg-gray-800/40",
-                  ].join(" ")}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium">
-                      {label}
-                      {isCurrent ? " • (current)" : ""}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-300">
-                      {j.created_at ? formatDateLA(String(j.created_at)) : "—"}
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
-                    Status: {String(j.status ?? "—")} • Ops: {String(j.ops_status ?? "—")}
-                    {j.scheduled_date ? ` • Scheduled: ${String(j.scheduled_date)}` : ""}
-                    {win ? ` • ${win}` : ""}
-                  </div>
-
-                  {!isCurrent ? (
-                    <div className="mt-2">
-                      <Link
-                        href={`/portal/jobs/${j.id}`}
-                        className="text-sm underline text-gray-900 dark:text-gray-100 hover:opacity-80"
-                      >
-                        View this instance
-                      </Link>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Test results (across all instances) */}
-      <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold">Test results</div>
-          <div className="text-xs text-gray-500 dark:text-gray-300">
-            Runs: {(testRuns?.length ?? 0) as number}
-          </div>
-        </div>
-
-        {!testRuns || testRuns.length === 0 ? (
-          <div className="text-sm text-gray-600 dark:text-gray-300">No test results yet.</div>
-        ) : (
-          <div className="space-y-2">
-            {testRuns.map((r: any) => {
-              const pass = r.override_pass != null ? !!r.override_pass : !!r.computed_pass;
-              const inst = chainById.get(r.job_id);
-              const instLabel = inst?.id === rootJobId ? "Original" : "Retest";
-
-              return (
-                <div key={r.id} className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium">
-                      {String(r.test_type ?? "Test")}{" "}
-                      <span className="text-xs text-gray-500 dark:text-gray-300">
-                        • {instLabel}
-                      </span>
-                    </div>
-                    <span
-                      className={[
-                        "text-xs px-2 py-1 rounded",
-                        pass
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200"
-                          : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200",
-                      ].join(" ")}
-                    >
-                      {pass ? "PASS" : "FAIL"}
-                    </span>
-                  </div>
-
-                  <div className="text-xs text-gray-500 dark:text-gray-300 mt-1">
-                    {r.created_at ? formatDateLA(String(r.created_at)) : "—"}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* History (safe subset across all instances) */}
-      <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold">History</div>
-          <div className="text-xs text-gray-500 dark:text-gray-300">
-            Events: {(events?.length ?? 0) as number}
-          </div>
-        </div>
-
-        {!events || events.length === 0 ? (
-          <div className="text-sm text-gray-600 dark:text-gray-300">No history yet.</div>
-        ) : (
-          <div className="space-y-2">
-            {events.map((e: any, idx: number) => (
-              <div
-                key={`${String(e.created_at)}-${idx}`}
-                className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-medium">
-                  {e.event_type === "contractor_note" && "Note added"}
-                  {e.event_type === "customer_attempt" && "Contact attempt"}
-                  {e.event_type === "contractor_correction_submission" && "Corrections submitted"}
-                  {e.event_type === "attachment_added" && "Attachment added"}
-                </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-300">
-                    {e.created_at ? formatDateLA(String(e.created_at)) : "—"}
-                  </div>
-                </div>
-
-                {e.meta ? (
-  <div className="text-sm text-gray-700 dark:text-gray-200 mt-2 space-y-1">
-    {(() => {
-      const meta = typeof e.meta === "string" ? null : e.meta;
-
-      if (!meta) return null;
-
-      // Contractor note
-      if (e.event_type === "contractor_note" && meta.note) {
-        return <div>{String(meta.note)}</div>;
-      }
-
-      // Customer attempt
-      if (e.event_type === "customer_attempt") {
-        const method = meta.method ? String(meta.method) : "Attempt";
-        const result = meta.result ? ` — ${meta.result}` : "";
-        return <div>{method}{result}</div>;
-      }
-
-      // Correction submission
-      if (e.event_type === "contractor_correction_submission") {
-        return <div>Corrections submitted.</div>;
-      }
-
-      // Attachment added
-      if (e.event_type === "attachment_added") {
-        return <div>Attachment uploaded.</div>;
-      }
-
-      // Fallback (safe)
-      return null;
+        </>
+      );
     })()}
   </div>
 ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      </div>
+{/* At a glance */}
+<div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
+  <div className="text-sm font-semibold">At a glance</div>
 
-            {/* Equipment */}
-      <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-sm font-semibold">Equipment</div>
-          <div className="text-xs text-gray-500 dark:text-gray-300">
-            Systems: {(systems?.length ?? 0) as number} • Items:{" "}
-            {(equipment?.length ?? 0) as number}
-          </div>
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+    <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+      <div className="text-xs text-gray-500 dark:text-gray-300">Scheduled</div>
+      <div className="font-medium mt-1">
+        {(job as any).scheduled_date ? String((job as any).scheduled_date) : "Not scheduled"}
+        {windowLabel ? ` • ${windowLabel}` : ""}
+      </div>
+    </div>
+
+    <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+      <div className="text-xs text-gray-500 dark:text-gray-300">Status</div>
+      <div className="font-medium mt-1">
+        {(job.status ?? "—") as string} • {(job.ops_status ?? "—") as string}
+      </div>
+    </div>
+
+    {(job as any).permit_number ? (
+      <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+        <div className="text-xs text-gray-500 dark:text-gray-300">Permit</div>
+        <div className="font-medium mt-1">{String((job as any).permit_number)}</div>
+      </div>
+    ) : null}
+
+    {(job as any).pending_info_reason || (job as any).next_action_note ? (
+      <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+        <div className="text-xs text-gray-500 dark:text-gray-300">Next action</div>
+        <div className="font-medium mt-1">
+          {String((job as any).pending_info_reason || (job as any).next_action_note)}
         </div>
+      </div>
+    ) : null}
+  </div>
+</div>
 
-        {(!equipment || equipment.length === 0) && (!systems || systems.length === 0) ? (
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            No equipment added yet.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {(systems ?? []).map((s: any) => {
-              const rows = grouped.get(s.id) ?? [];
-              return (
-                <div key={s.id} className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
-                  <div className="text-sm font-semibold">
-                    {String(s.name ?? "System")}
+
+     
+
+      
+      {/* Notes Section */}
+      <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
+  <div className="text-sm font-semibold">Add a note</div>
+  <div className="text-sm text-gray-600 dark:text-gray-300">
+    Use this to request an afternoon appointment, add gate codes, access notes, etc.
+  </div>
+
+  <form action={addContractorNote} className="space-y-3">
+    <input type="hidden" name="job_id" value={jobId} />
+
+    <textarea
+      name="note"
+      rows={3}
+      placeholder="Type your note here..."
+      className="w-full border rounded-md px-3 py-2 bg-white dark:bg-gray-900"
+    />
+
+    <button
+      type="submit"
+      className="px-4 py-2 rounded-lg border bg-gray-900 text-white text-sm font-medium hover:opacity-90 transition"
+    >
+      Save Note
+    </button>
+  </form>
+</div>
+
+
+
+{/* Collapsible sections (single-open) */}
+<AccordionCards
+  items={[
+    {
+  key: "notes",
+  title: (
+    <div className="flex items-center justify-between w-full">
+      <span>Notes</span>
+      <span className="text-xs text-gray-500 dark:text-gray-300">
+        {contractorNotes.length} total
+      </span>
+    </div>
+  ),
+  children: (
+    <>
+      {contractorNotes.length === 0 ? (
+        <div className="text-sm text-gray-600 dark:text-gray-300">
+          No notes yet.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {contractorNotes.map((n: any, idx: number) => {
+            const who =
+              n.user_id && myUid && n.user_id === myUid
+                ? "You"
+                : `User ${shortUid(n.user_id)}`;
+
+            return (
+              <div
+                key={`${String(n.created_at)}-${idx}`}
+                className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs text-gray-500 dark:text-gray-300">
+                    {who}
                   </div>
-
-                  {rows.length === 0 ? (
-                    <div className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-                      No equipment items on this system yet.
-                    </div>
-                  ) : (
-                    <div className="mt-2 space-y-2">
-                      {rows.map((e: any) => {
-                        const role = String(e.equipment_role ?? "—");
-                        const make = e.manufacturer ? String(e.manufacturer) : "";
-                        const model = e.model ? String(e.model) : "";
-                        const serial = e.serial ? String(e.serial) : "";
-                        const ton = e.tonnage != null ? `${e.tonnage} ton` : "";
-                        const ref = e.refrigerant_type ? String(e.refrigerant_type) : "";
-
-                        const line1 = [make, model].filter(Boolean).join(" ");
-                        const line2 = [serial ? `S/N ${serial}` : "", ton, ref].filter(Boolean).join(" • ");
-
-                        return (
-                          <div key={e.id} className="rounded-md border bg-white dark:bg-gray-900 p-3">
-                            <div className="text-sm font-medium">{role}</div>
-                            {line1 ? (
-                              <div className="text-sm text-gray-700 dark:text-gray-200 mt-1">
-                                {line1}
-                              </div>
-                            ) : null}
-                            {line2 ? (
-                              <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
-                                {line2}
-                              </div>
-                            ) : null}
-                            {e.notes ? (
-                              <div className="text-xs text-gray-600 dark:text-gray-300 mt-2">
-                                Notes: {String(e.notes)}
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <div className="text-xs text-gray-500 dark:text-gray-300">
+                    {n.created_at
+                      ? formatDateLA(String(n.created_at))
+                      : "—"}
+                  </div>
                 </div>
-              );
-            })}
 
-            {/* Fallback group if some equipment has no system_id */}
-            {Array.from(grouped.keys())
-              .filter((k) => k.startsWith("loc:"))
-              .map((k) => {
-                const locName = k.replace("loc:", "");
-                const rows = grouped.get(k) ?? [];
+                <div className="text-sm text-gray-800 dark:text-gray-100 mt-2 whitespace-pre-wrap">
+                  {n.note}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  ),
+},
+
+    {
+      key: "test-results",
+      title: (
+        <div className="flex items-center justify-between w-full">
+          <span>Test results</span>
+          <span className="text-xs text-gray-500 dark:text-gray-300">
+            Runs: {(testRuns?.length ?? 0) as number}
+          </span>
+        </div>
+      ),
+      defaultOpen: true,
+      children: (
+        <>
+          {!testRuns || testRuns.length === 0 ? (
+            <div className="text-sm text-gray-600 dark:text-gray-300">
+              No test results yet.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {testRuns.map((r: any) => {
+                const pass =
+                  r.override_pass != null ? !!r.override_pass : !!r.computed_pass;
+                const inst = chainById.get(r.job_id);
+                const instLabel = inst?.id === rootJobId ? "Original" : "Retest";
+
                 return (
-                  <div key={k} className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
-                    <div className="text-sm font-semibold">{locName}</div>
-                    <div className="mt-2 space-y-2">
-                      {rows.map((e: any) => (
-                        <div key={e.id} className="rounded-md border bg-white dark:bg-gray-900 p-3">
-                          <div className="text-sm font-medium">
-                            {String(e.equipment_role ?? "—")}
-                          </div>
-                          <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
-                            {[e.manufacturer, e.model].filter(Boolean).join(" ")}
-                          </div>
-                        </div>
-                      ))}
+                  <div
+                    key={r.id}
+                    className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-medium">
+                        {String(r.test_type ?? "Test")}{" "}
+                        <span className="text-xs text-gray-500 dark:text-gray-300">
+                          • {instLabel}
+                        </span>
+                      </div>
+                      <span
+                        className={[
+                          "text-xs px-2 py-1 rounded",
+                          pass
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200"
+                            : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200",
+                        ].join(" ")}
+                      >
+                        {pass ? "PASS" : "FAIL"}
+                      </span>
                     </div>
+
+                    <div className="text-xs text-gray-500 dark:text-gray-300 mt-1">
+                      {r.created_at ? formatDateLA(String(r.created_at)) : "—"}
+                    </div>
+
+                    {/* show top reasons when fail */}
+                    {!pass ? (() => {
+                      const reasons = extractTopReasons(r);
+                      if (!reasons.length) return null;
+                      return (
+                        <ul className="list-disc pl-5 text-sm mt-2 text-gray-800 dark:text-gray-100">
+                          {reasons.slice(0, 3).map((x: string, i: number) => (
+                            <li key={i}>{x}</li>
+                          ))}
+                        </ul>
+                      );
+                    })() : null}
                   </div>
                 );
               })}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "job-history",
+      title: (
+        <div className="flex items-center justify-between w-full">
+          <span>Job history</span>
+          <span className="text-xs text-gray-500 dark:text-gray-300">
+            Instances: {(jobChain?.length ?? 0) as number}
+          </span>
+        </div>
+      ),
+      children: (
+        <>
+          {!jobChain || jobChain.length === 0 ? (
+            <div className="text-sm text-gray-600 dark:text-gray-300">—</div>
+          ) : (
+            <div className="space-y-2">
+              {jobChain.map((j: any, idx: number) => {
+                const isCurrent = j.id === jobId;
+                const label = idx === 0 ? "Original" : `Retest ${idx}`;
+                const win =
+                  j.scheduled_date && j.window_start && j.window_end
+                    ? `${formatTimeLocal(j.window_start)}–${formatTimeLocal(j.window_end)}`
+                    : null;
 
+                return (
+                  <div
+                    key={j.id}
+                    className={[
+                      "rounded-lg border p-3",
+                      isCurrent
+                        ? "bg-white dark:bg-gray-900"
+                        : "bg-gray-50 dark:bg-gray-800/40",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-medium">
+                        {label}
+                        {isCurrent ? " • (current)" : ""}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-300">
+                        {j.created_at ? formatDateLA(String(j.created_at)) : "—"}
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                      Status: {String(j.status ?? "—")} • Ops:{" "}
+                      {String(j.ops_status ?? "—")}
+                      {j.scheduled_date ? ` • Scheduled: ${String(j.scheduled_date)}` : ""}
+                      {win ? ` • ${win}` : ""}
+                    </div>
+
+                    {!isCurrent ? (
+                      <div className="mt-2">
+                        <Link
+                          href={`/portal/jobs/${j.id}`}
+                          className="text-sm underline text-gray-900 dark:text-gray-100 hover:opacity-80"
+                        >
+                          View this instance
+                        </Link>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "history",
+      title: (
+        <div className="flex items-center justify-between w-full">
+          <span>Audit Trail</span>
+          <span className="text-xs text-gray-500 dark:text-gray-300">
+            Events: {(events?.length ?? 0) as number}
+          </span>
+        </div>
+      ),
+      children: (
+        <>
+          {!events || events.length === 0 ? (
+            <div className="text-sm text-gray-600 dark:text-gray-300">
+              No history yet.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {events.map((e: any, idx: number) => {
+                const meta = typeof e.meta === "string" ? null : e.meta;
+
+                return (
+                  <div
+                    key={`${String(e.created_at)}-${idx}`}
+                    className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-medium">
+                        {e.event_type === "contractor_note" && "Note added"}
+                        {e.event_type === "customer_attempt" && "Contact attempt"}
+                        {e.event_type === "contractor_correction_submission" &&
+                          "Corrections submitted"}
+                        {e.event_type === "attachment_added" && "Attachment added"}
+
+                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-300">
+                          •{" "}
+                          {e.user_id && myUid && e.user_id === myUid
+                            ? "You"
+                            : `User ${shortUid(e.user_id)}`}
+                        </span>
+                      </div>
+
+                      <div className="text-xs text-gray-500 dark:text-gray-300">
+                        {formatDateLA(String(e.created_at))}
+                      </div>
+                    </div>
+
+                    {/* safe meta rendering */}
+                    {meta ? (
+                      <div className="text-sm text-gray-700 dark:text-gray-200 mt-2">
+                        {e.event_type === "contractor_note" && meta.note ? (
+                          <div className="whitespace-pre-wrap">{String(meta.note)}</div>
+                        ) : e.event_type === "customer_attempt" ? (
+                          <div>
+                            {meta.method ? String(meta.method) : "Attempt"}
+                            {meta.result ? ` — ${String(meta.result)}` : ""}
+                          </div>
+                        ) : e.event_type === "contractor_correction_submission" ? (
+                          <div>Corrections submitted.</div>
+                        ) : e.event_type === "attachment_added" ? (
+                          <div>Attachment uploaded.</div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "equipment",
+      title: (
+        <div className="flex items-center justify-between w-full">
+          <span>Equipment</span>
+          <span className="text-xs text-gray-500 dark:text-gray-300">
+            Systems: {(systems?.length ?? 0) as number} • Items:{" "}
+            {(equipment?.length ?? 0) as number}
+          </span>
+        </div>
+      ),
+      children: (
+        <>
+          {(!equipment || equipment.length === 0) && (!systems || systems.length === 0) ? (
+            <div className="text-sm text-gray-600 dark:text-gray-300">
+              No equipment added yet.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {(systems ?? []).map((s: any) => {
+                const rows = grouped.get(s.id) ?? [];
+                return (
+                  <div
+                    key={s.id}
+                    className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3"
+                  >
+                    <div className="text-sm font-semibold">{String(s.name ?? "System")}</div>
+
+                    {rows.length === 0 ? (
+                      <div className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                        No equipment items on this system yet.
+                      </div>
+                    ) : (
+                      <div className="mt-2 space-y-2">
+                        {rows.map((e: any) => {
+                          const role = String(e.equipment_role ?? "—");
+                          const make = e.manufacturer ? String(e.manufacturer) : "";
+                          const model = e.model ? String(e.model) : "";
+                          const serial = e.serial ? String(e.serial) : "";
+                          const ton = e.tonnage != null ? `${e.tonnage} ton` : "";
+                          const ref = e.refrigerant_type ? String(e.refrigerant_type) : "";
+
+                          const line1 = [make, model].filter(Boolean).join(" ");
+                          const line2 = [serial ? `S/N ${serial}` : "", ton, ref]
+                            .filter(Boolean)
+                            .join(" • ");
+
+                          return (
+                            <div
+                              key={e.id}
+                              className="rounded-md border bg-white dark:bg-gray-900 p-3"
+                            >
+                              <div className="text-sm font-medium">{role}</div>
+                              {line1 ? (
+                                <div className="text-sm text-gray-700 dark:text-gray-200 mt-1">
+                                  {line1}
+                                </div>
+                              ) : null}
+                              {line2 ? (
+                                <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                                  {line2}
+                                </div>
+                              ) : null}
+                              {e.notes ? (
+                                <div className="text-xs text-gray-600 dark:text-gray-300 mt-2">
+                                  Notes: {String(e.notes)}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Fallback group if some equipment has no system_id */}
+              {Array.from(grouped.keys())
+                .filter((k) => k.startsWith("loc:"))
+                .map((k) => {
+                  const locName = k.replace("loc:", "");
+                  const rows = grouped.get(k) ?? [];
+                  return (
+                    <div
+                      key={k}
+                      className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3"
+                    >
+                      <div className="text-sm font-semibold">{locName}</div>
+                      <div className="mt-2 space-y-2">
+                        {rows.map((e: any) => (
+                          <div
+                            key={e.id}
+                            className="rounded-md border bg-white dark:bg-gray-900 p-3"
+                          >
+                            <div className="text-sm font-medium">
+                              {String(e.equipment_role ?? "—")}
+                            </div>
+                            <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                              {[e.manufacturer, e.model].filter(Boolean).join(" ")}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </>
+      ),
+    },
+  ]}
+/>
+
+
+       
            {/* Attachments (upload + list) */}
       <JobAttachments jobId={jobId} initialItems={items} />
 
