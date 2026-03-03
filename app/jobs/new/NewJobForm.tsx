@@ -433,6 +433,15 @@ const [billingRecipient, setBillingRecipient] = useState<
   </div>
 )}
 
+<div>
+  <label className="text-xs text-gray-600">Scheduled Date</label>
+  <input
+    type="date"
+    name="scheduled_date"
+    className="border rounded w-full p-2"
+  />
+</div>
+
 {/* Scheduling (internal only) */}
 {!isContractorMode && (
   <div className="rounded-lg border p-3 space-y-2">

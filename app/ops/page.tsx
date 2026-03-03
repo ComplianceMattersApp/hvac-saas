@@ -177,8 +177,8 @@ for (const row of countRows ?? []) {
     .order("name", { ascending: true });
 
   // Common job select (keep lightweight)
-  const baseSelect =
-    "id, title, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id";
+ const baseSelect =
+  "id, title, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, customer_id, location_id";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -560,7 +560,7 @@ jobs.sort((a: any, b: any) => {
                         {customerLine(j)}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {j.job_address ?? "—"}, {j.city ?? "—"}
+                        {addressLine(j)}
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground text-right">
