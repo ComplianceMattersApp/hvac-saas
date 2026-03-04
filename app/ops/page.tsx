@@ -155,7 +155,8 @@ if (cu?.contractor_id) {
 let countsQ = supabase
   .from("jobs")
   .select("ops_status")
-  .neq("ops_status", "closed");
+  .neq("ops_status", "closed")
+  .is("deleted_at", null);
 
 if (contractor) countsQ = countsQ.eq("contractor_id", contractor);
 
