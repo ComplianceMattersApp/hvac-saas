@@ -303,17 +303,19 @@ export async function archiveJobFromForm(formData: FormData) {
 
   if (!u?.user) redirect("/login");
 
-  const { data: cu } = await supabase
-    .from("contractor_users")
-    .select("contractor_id")
-    .eq("user_id", u.user.id)
-    .maybeSingle();
+const { data: iu, error: iuErr } = await supabase
+  .from("internal_users")
+  .select("user_id")
+  .eq("user_id", u.user.id)
+  .maybeSingle();
 
-  console.error("ARCHIVE CU", { contractor_id: cu?.contractor_id ?? null });
+if (iuErr) throw iuErr;
+if (!iu?.user_id) throw new Error("Only internal users can archive jobs.");
 
+
+
+  
   // Optional hard safety: ensure ONLY internal users can archive
-  if (cu?.contractor_id) throw new Error("Contractor users cannot archive jobs.");
-
   const job_id = String(formData.get("job_id") ?? "").trim();
   if (!job_id) throw new Error("Missing job_id");
 
