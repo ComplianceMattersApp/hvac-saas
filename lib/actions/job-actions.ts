@@ -271,31 +271,46 @@ export async function archiveJobFromForm(formData: FormData) {
 
   const supabase = await createClient();
 
+  const { data: ctx, error: ctxErr } = await supabase.rpc("debug_auth_context");
+  console.error("ARCHIVE DB CONTEXT", { ctx, ctxErr });
+
   const job_id = String(formData.get("job_id") ?? "").trim();
   if (!job_id) throw new Error("Missing job_id");
 
+  // Confirm we have an authenticated user
   const { data: u, error: ue } = await supabase.auth.getUser();
+  console.error("ARCHIVE AUTH", { uid: u?.user?.id ?? null, err: ue?.message ?? null });
   if (ue) throw ue;
   if (!u?.user) redirect("/login");
 
-  // hard safety: internal only
+  // Confirm internal user (your table)
   const { data: iu, error: iuErr } = await supabase
     .from("internal_users")
     .select("user_id")
     .eq("user_id", u.user.id)
     .maybeSingle();
 
+  console.error("ARCHIVE INTERNAL", { ok: !!iu?.user_id, uid: u.user.id, iuErr: iuErr?.message ?? null });
   if (iuErr) throw iuErr;
   if (!iu?.user_id) throw new Error("Only internal users can archive jobs.");
 
-  // archive (guard against double-archive)
-  const { error } = await supabase
-    .from("jobs")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", job_id)
-    .is("deleted_at", null);
+  // Do the archive and REQUIRE a returned row (proves success)
+  const ts = new Date().toISOString();
 
-  if (error) throw error;
+  const { data: updated, error: upErr } = await supabase
+    .from("jobs")
+    .update({ deleted_at: ts })
+    .eq("id", job_id)
+    .is("deleted_at", null)
+    .select("id, deleted_at")
+    .maybeSingle();
+
+  console.error("ARCHIVE UPDATE", { updated, upErr });
+
+  if (upErr) throw upErr;
+  if (!updated?.id) {
+    throw new Error("Archive failed (no row updated). Job may already be archived or RLS blocked the update.");
+  }
 
   revalidatePath("/ops");
   revalidatePath("/jobs");
