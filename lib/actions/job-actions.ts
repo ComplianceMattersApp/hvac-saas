@@ -7,16 +7,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
- 
-
-
-import {
-  updateJobOpsFromForm,
-  updateJobOpsDetailsFromForm,
-} from "./job-ops-actions";
-
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 
 
@@ -279,16 +269,16 @@ export async function getContractors() {
 export async function archiveJobFromForm(formData: FormData) {
   "use server";
 
-  // IMPORTANT: use the project’s server helper so the DB receives the JWT
   const supabase = await createClient();
 
-  const { data: u, error: ue } = await supabase.auth.getUser();
-  console.error("ARCHIVE AUTH", { uid: u?.user?.id ?? null, err: ue?.message ?? null });
+  const job_id = String(formData.get("job_id") ?? "").trim();
+  if (!job_id) throw new Error("Missing job_id");
 
+  const { data: u, error: ue } = await supabase.auth.getUser();
   if (ue) throw ue;
   if (!u?.user) redirect("/login");
 
-  // Internal-only guard (no redirects for debug — fail loudly)
+  // hard safety: internal only
   const { data: iu, error: iuErr } = await supabase
     .from("internal_users")
     .select("user_id")
@@ -298,17 +288,12 @@ export async function archiveJobFromForm(formData: FormData) {
   if (iuErr) throw iuErr;
   if (!iu?.user_id) throw new Error("Only internal users can archive jobs.");
 
-  const job_id = String(formData.get("job_id") ?? "").trim();
-  if (!job_id) throw new Error("Missing job_id");
-
-  // DEBUG — what does Postgres see?
-    const { data: ctx, error: ctxErr } = await supabase.rpc("debug_auth_context");
-    console.error("ARCHIVE DB CONTEXT", { ctx, ctxErr });
-
+  // archive (guard against double-archive)
   const { error } = await supabase
     .from("jobs")
     .update({ deleted_at: new Date().toISOString() })
-    .eq("id", job_id);
+    .eq("id", job_id)
+    .is("deleted_at", null);
 
   if (error) throw error;
 
