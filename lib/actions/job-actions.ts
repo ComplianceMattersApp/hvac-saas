@@ -7,6 +7,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
  
 
 
@@ -276,18 +278,41 @@ export async function getContractors() {
 
 export async function archiveJobFromForm(formData: FormData) {
   "use server";
-  const supabase = await createClient();
+
+  const cookieStore = await cookies();
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
 
   const { data: u, error: ue } = await supabase.auth.getUser();
   console.error("ARCHIVE AUTH", { uid: u?.user?.id ?? null, err: ue?.message ?? null });
 
-const { data: cu } = await supabase
-  .from("contractor_users")
-  .select("contractor_id")
-  .eq("user_id", u?.user?.id ?? "")
-  .maybeSingle();
+  if (!u?.user) redirect("/login");
 
-console.error("ARCHIVE CU", { contractor_id: cu?.contractor_id ?? null });
+  const { data: cu } = await supabase
+    .from("contractor_users")
+    .select("contractor_id")
+    .eq("user_id", u.user.id)
+    .maybeSingle();
+
+  console.error("ARCHIVE CU", { contractor_id: cu?.contractor_id ?? null });
+
+  // Optional hard safety: ensure ONLY internal users can archive
+  if (cu?.contractor_id) throw new Error("Contractor users cannot archive jobs.");
 
   const job_id = String(formData.get("job_id") ?? "").trim();
   if (!job_id) throw new Error("Missing job_id");
