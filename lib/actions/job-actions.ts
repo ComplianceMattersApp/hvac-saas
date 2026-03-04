@@ -299,6 +299,7 @@ export async function archiveJobFromForm(formData: FormData) {
   );
 
   const { data: u, error: ue } = await supabase.auth.getUser();
+  
   console.error("ARCHIVE AUTH", { uid: u?.user?.id ?? null, err: ue?.message ?? null });
 
   if (!u?.user) redirect("/login");
@@ -310,10 +311,7 @@ const { data: iu, error: iuErr } = await supabase
   .maybeSingle();
 
 if (iuErr) throw iuErr;
-if (!iu?.user_id) throw new Error("Only internal users can archive jobs.");
-
-
-
+if (!iu?.user_id) redirect(`/ops?debug_uid=${u.user.id}&debug_internal=0`);
   
   // Optional hard safety: ensure ONLY internal users can archive
   const job_id = String(formData.get("job_id") ?? "").trim();
