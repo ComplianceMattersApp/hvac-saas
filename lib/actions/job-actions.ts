@@ -7,6 +7,16 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
+ 
+
+
+import {
+  updateJobOpsFromForm,
+  updateJobOpsDetailsFromForm,
+} from "./job-ops-actions";
+
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 
 
@@ -269,13 +279,16 @@ export async function getContractors() {
 export async function archiveJobFromForm(formData: FormData) {
   "use server";
 
+  // IMPORTANT: use the project’s server helper so the DB receives the JWT
   const supabase = await createClient();
 
   const { data: u, error: ue } = await supabase.auth.getUser();
+  console.error("ARCHIVE AUTH", { uid: u?.user?.id ?? null, err: ue?.message ?? null });
+
   if (ue) throw ue;
   if (!u?.user) redirect("/login");
 
-  // Must be internal
+  // Internal-only guard (no redirects for debug — fail loudly)
   const { data: iu, error: iuErr } = await supabase
     .from("internal_users")
     .select("user_id")
@@ -298,6 +311,7 @@ export async function archiveJobFromForm(formData: FormData) {
   revalidatePath("/ops");
   revalidatePath("/jobs");
   revalidatePath(`/jobs/${job_id}`);
+
   redirect(`/ops?saved=job_archived`);
 }
 
