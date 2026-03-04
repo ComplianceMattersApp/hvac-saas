@@ -301,6 +301,10 @@ export async function archiveJobFromForm(formData: FormData) {
   const job_id = String(formData.get("job_id") ?? "").trim();
   if (!job_id) throw new Error("Missing job_id");
 
+  // DEBUG — what does Postgres see?
+    const { data: ctx, error: ctxErr } = await supabase.rpc("debug_auth_context");
+    console.error("ARCHIVE DB CONTEXT", { ctx, ctxErr });
+
   const { error } = await supabase
     .from("jobs")
     .update({ deleted_at: new Date().toISOString() })
