@@ -136,7 +136,7 @@ export default async function PortalPage({
 
   const counts: Record<string, number> = {};
   for (const row of jobs) {
-    const key = row?.ops_status ?? "unknown";
+    const key = String(row?.ops_status ?? "unknown").toLowerCase();
     counts[key] = (counts[key] ?? 0) + 1;
   }
 
@@ -151,8 +151,11 @@ export default async function PortalPage({
     (j) =>
       !!j.follow_up_date &&
       String(j.follow_up_date) <= String(today) &&
-      attentionTodayStatuses.includes((j.ops_status ?? "").toLowerCase())
+      attentionTodayStatuses.includes(String(j.ops_status ?? "").toLowerCase())
   ).length;
+
+  const retestOrFailedCount =
+    (counts["retest_needed"] ?? 0) + (counts["failed"] ?? 0);
 
   const openCount = jobs.length;
 
@@ -163,14 +166,20 @@ export default async function PortalPage({
       (j) =>
         !!j.follow_up_date &&
         String(j.follow_up_date) <= String(today) &&
-        attentionTodayStatuses.includes((j.ops_status ?? "").toLowerCase())
+        attentionTodayStatuses.includes(String(j.ops_status ?? "").toLowerCase())
     );
   } else if (queue === "need_to_schedule") {
-    visibleJobs = jobs.filter((j) => j.ops_status === "need_to_schedule");
+    visibleJobs = jobs.filter(
+      (j) => String(j.ops_status ?? "").toLowerCase() === "need_to_schedule"
+    );
   } else if (queue === "pending_info") {
-    visibleJobs = jobs.filter((j) => j.ops_status === "pending_info");
+    visibleJobs = jobs.filter(
+      (j) => String(j.ops_status ?? "").toLowerCase() === "pending_info"
+    );
   } else if (queue === "retest_needed") {
-    visibleJobs = jobs.filter((j) => j.ops_status === "retest_needed");
+    visibleJobs = jobs.filter((j) =>
+      ["retest_needed", "failed"].includes(String(j.ops_status ?? "").toLowerCase())
+    );
   } else {
     visibleJobs = jobs;
   }
@@ -333,10 +342,10 @@ export default async function PortalPage({
         </Link>
 
         <Link
-          href="/portal?queue=retest_needed"
-          className={queueCardClass(queue === "retest_needed")}
-        >
-          <div
+  href="/portal?queue=retest_needed"
+  className={queueCardClass(queue === "retest_needed")}
+>
+            <div
             className={`text-sm font-medium ${
               queue === "retest_needed"
                 ? "text-white/80 dark:text-gray-600"
@@ -346,7 +355,7 @@ export default async function PortalPage({
             Retest Needed
           </div>
           <div className="mt-1 text-3xl font-semibold">
-            {counts["retest_needed"] ?? 0}
+            {retestOrFailedCount}
           </div>
           <div
             className={`mt-2 text-xs ${
@@ -374,6 +383,16 @@ export default async function PortalPage({
           {visibleJobs.map((j: any) => {
             const isUrgent =
               !!j.follow_up_date && String(j.follow_up_date) <= String(today);
+
+            const displayAddress =
+              j.locations?.address_line1?.trim() ||
+              j.job_address?.trim() ||
+              "No address";
+
+            const displayCity =
+              j.locations?.city?.trim() ||
+              j.city?.trim() ||
+              "—";
 
             return (
               <Link
@@ -403,8 +422,7 @@ export default async function PortalPage({
                     </div>
 
                     <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                      {j.job_address ?? j.locations?.address_line1 ?? "No address"} •{" "}
-                      {j.city ?? j.locations?.city ?? "—"}
+                      {displayAddress} • {displayCity}
                     </div>
 
                     <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
