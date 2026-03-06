@@ -271,9 +271,6 @@ export async function archiveJobFromForm(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { data: ctx, error: ctxErr } = await supabase.rpc("debug_auth_context");
-  console.error("ARCHIVE DB CONTEXT", { ctx, ctxErr });
-
   const job_id = String(formData.get("job_id") ?? "").trim();
   if (!job_id) throw new Error("Missing job_id");
 
@@ -2130,12 +2127,16 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
   if (jtErr) throw jtErr;
 
-  if (jt?.job_type === "service") {
+  if ((jt?.job_type ?? "").toLowerCase() === "service") {
+    // Service jobs go straight into invoice queue after field completion
     updatePayload.ops_status = "invoice_required";
+  } else if ((jt?.job_type ?? "").toLowerCase() === "ecc") {
+    // Option 1: stage marker — do not jump to paperwork_required automatically
+    updatePayload.ops_status = "field_complete";
+    updatePayload.field_complete = true;
+    updatePayload.field_complete_at = new Date().toISOString();
   }
-  // ecc: ops_status handled by ECC test evaluation (failed/paperwork_required)
 }
-
 
     const { error: updErr } = await supabase
       .from("jobs")
@@ -2287,6 +2288,7 @@ export async function completeDataEntryFromForm(formData: FormData) {
     .single();
 
   if (jobErr) throw jobErr;
+
 
   // Service: data entry completion = invoice sent/recorded -> closed
   if (job?.job_type === "service") {

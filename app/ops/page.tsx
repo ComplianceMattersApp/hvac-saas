@@ -78,7 +78,8 @@ function windowToDisplay(start?: string | null, end?: string | null) {
 }
 
 
-type OpsStatus =
+type BucketKey =
+  | "attention"
   | "need_to_schedule"
   | "scheduled"
   | "pending_info"
@@ -87,9 +88,11 @@ type OpsStatus =
   | "retest_needed"
   | "paperwork_required"
   | "invoice_required"
-  | "closed";
+  | "closeout"
+  | "recent_closed";
 
-const OPS_TABS: { key: OpsStatus; label: string }[] = [
+const OPS_TABS: { key: BucketKey; label: string }[] = [
+  { key: "attention", label: "Needs Attention" },
   { key: "need_to_schedule", label: "Need to Schedule" },
   { key: "scheduled", label: "Scheduled" },
   { key: "pending_info", label: "Pending Info" },
@@ -98,7 +101,8 @@ const OPS_TABS: { key: OpsStatus; label: string }[] = [
   { key: "retest_needed", label: "Retest Needed" },
   { key: "paperwork_required", label: "Paperwork Required" },
   { key: "invoice_required", label: "Invoice Required" },
-  { key: "closed", label: "Closed" },
+  { key: "closeout", label: "Closeout" },
+  { key: "recent_closed", label: "Recently Closed" },
 ];
 
 function startOfTodayLocalISO() {
@@ -128,7 +132,7 @@ export default async function OpsPage({
   searchParams?: Promise<{ bucket?: string; contractor?: string; q?: string }>;
 }) {
   const sp = (searchParams ? await searchParams : {}) ?? {};
-  const bucket = (sp.bucket ?? "need_to_schedule") as OpsStatus;
+  const bucket = (sp.bucket ?? "need_to_schedule") as BucketKey;
   const contractor = (sp.contractor ?? "").trim() || null;
   const q = (sp.q ?? "").trim() || null;
 
@@ -149,6 +153,52 @@ if (cuErr) throw cuErr;
 
 if (cu?.contractor_id) {
   redirect("/jobs/new");
+}
+  function digitsOnly(v?: string | null) {
+  return String(v ?? "").replace(/\D/g, "");
+}
+
+function smsHref(phone?: string | null) {
+  const p = digitsOnly(phone);
+  return p ? `sms:${p}` : "";
+}
+
+function telHref(phone?: string | null) {
+  const p = digitsOnly(phone);
+  return p ? `tel:${p}` : "";
+}
+
+function mapsHref(address?: string | null, city?: string | null) {
+  const q = [address, city].filter(Boolean).join(", ").trim();
+  return q
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`
+    : "";
+}
+
+  function addBusinessDays(date: Date, days: number) {
+  const d = new Date(date);
+  let added = 0;
+
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) added += 1; // skip Sun/Sat
+  }
+
+  return d;
+}
+
+function subtractBusinessDays(date: Date, days: number) {
+  const d = new Date(date);
+  let subtracted = 0;
+
+  while (subtracted < days) {
+    d.setDate(d.getDate() - 1);
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) subtracted += 1; // skip Sun/Sat
+  }
+
+  return d;
 }
 
   // ✅ Counts per ops_status (exclude "closed", respect contractor filter)
@@ -179,7 +229,7 @@ for (const row of countRows ?? []) {
 
   // Common job select (keep lightweight)
  const baseSelect =
-  "id, title, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, customer_id, deleted_at, location_id";
+     "id, title, job_type, ops_status, field_complete, certs_complete, invoice_complete, invoice_number, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, customer_id, deleted_at, location_id, created_at";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -208,6 +258,15 @@ for (const row of countRows ?? []) {
 // Canonical LA day boundaries, expressed as UTC ISO instants for timestamptz comparisons
 const startTodayUtc = startOfTodayUtcIsoLA();
 const startTomorrowUtc = startOfTomorrowUtcIsoLA();
+const now = new Date();
+
+// 3 business days ago
+const attentionBusinessCutoffIso = subtractBusinessDays(now, 3).toISOString();
+
+// 14 calendar days ago
+const failedCutoffIso = new Date(
+  now.getTime() - 14 * 24 * 60 * 60 * 1000
+).toISOString();
 
 // 1) TODAY (scheduled jobs where scheduled_date falls within LA "today")
 let todayQ = supabase
@@ -255,17 +314,58 @@ if (upcomingErr) throw upcomingErr;
   const { data: callListJobs, error: callListErr } = await callListQ;
   if (callListErr) throw callListErr;
 
-  // 4) BUCKET list (tabs)
+  // 4) NEEDS ATTENTION preview (aging-based escalation queue)
+    let attentionQ = supabase
+      .from("jobs")
+      .select(baseSelect + ", created_at")
+      .is("deleted_at", null)
+      .or(
+        [
+          // Need to Schedule older than 3 business days
+          `and(ops_status.eq.need_to_schedule,created_at.lte.${attentionBusinessCutoffIso})`,
+
+          // Pending Info older than 3 business days
+          `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
+
+          // Failed older than 14 calendar days
+          `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
+        ].join(",")
+      )
+      .order("created_at", { ascending: true })
+      .limit(10);
+
+    attentionQ = applyCommonFilters(attentionQ);
+
+    const { data: attentionJobs, error: attentionErr } = await attentionQ;
+    const attentionCount = attentionJobs?.length ?? 0;
+    if (attentionErr) throw attentionErr;
+
+  // 5) BUCKET list (tabs)
   let bucketQ = supabase
     .from("jobs")
     .select(baseSelect)
     .is("deleted_at", null)
-    .eq("ops_status", bucket)
     .order("created_at", { ascending: false })
     .limit(100);
 
-  bucketQ = applyCommonFilters(bucketQ);
-
+    if (bucket === "attention") {
+      bucketQ = bucketQ.or(
+        [
+          `and(ops_status.eq.need_to_schedule,created_at.lte.${attentionBusinessCutoffIso})`,
+          `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
+          `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
+        ].join(",")
+      );
+    } else if (bucket === "closeout") {
+      bucketQ = bucketQ.in("ops_status", ["paperwork_required", "invoice_required"]);
+    } else if (bucket === "recent_closed") {
+      bucketQ = bucketQ
+        .eq("ops_status", "closed")
+        .order("created_at", { ascending: false })
+        .limit(15);
+        } else {
+      bucketQ = bucketQ.eq("ops_status", bucket);
+    }
   const { data: bucketJobs, error: bucketErr } = await bucketQ;
   if (bucketErr) throw bucketErr;
 
@@ -274,6 +374,7 @@ const allJobs = [
   ...(todayJobs ?? []),
   ...(upcomingJobs ?? []),
   ...(callListJobs ?? []),
+  ...(attentionJobs ?? []),
   ...(bucketJobs ?? []),
 ] as any[];
 
@@ -417,10 +518,6 @@ function addressLine(j: any) {
       </div>
     </div>
 
-
-
-
-      {/* Today */}
       {/* Today (Scheduled) — Sorted by window_start, grouped by city */}
 <div className="rounded-lg border bg-white p-4">
   <div className="flex items-center justify-between">
@@ -504,30 +601,143 @@ jobs.sort((a: any, b: any) => {
   })()}
 </div>
 
-      {/* Call list preview + Upcoming */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border bg-white p-4 text-gray-900 shadow-sm">
+{/* Needs Attention */}
+<div className="rounded-lg border bg-white p-4">
+  <div className="flex items-center justify-between">
+    <div className="text-sm font-semibold">⚠ Needs Attention</div>
+    <Link
+      className="text-xs underline"
+      href={`/ops${buildQueryString({
+        bucket: "attention",
+        contractor: contractor ?? "",
+        q: q ?? "",
+      })}`}
+    >
+      View all
+    </Link>
+  </div>
 
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold">Call List (Need to Schedule)</div>
-            <Link
-              className="text-xs underline"
-              href={`/ops${buildQueryString({ bucket: "need_to_schedule", contractor: contractor ?? "", q: q ?? "" })}`}
-            >
-              View all
-            </Link>
+  <div className="mt-3 space-y-2">
+    {(attentionJobs ?? []).length === 0 ? (
+      <div className="text-sm text-muted-foreground">
+        No jobs need attention right now.
+      </div>
+    ) : (
+      (attentionJobs ?? []).map((j: any) => (
+        <Link
+          key={j.id}
+          href={`/jobs/${j.id}?tab=ops`}
+          className="block rounded-md border p-3 hover:bg-gray-50"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">{j.title}</div>
+              <div className="text-xs text-muted-foreground">
+                {customerLine(j)}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {addressLine(j)}
+              </div>
+            </div>
+            <div className="text-xs font-medium text-red-600 whitespace-nowrap">
+              {j.ops_status}
+            </div>
           </div>
+        </Link>
+      ))
+    )}
+  </div>
+</div>
 
-          <div className="mt-3 space-y-2">
-            {(callListJobs ?? []).length === 0 ? (
-              <div className="text-sm text-muted-foreground">No jobs in call list.</div>
-            ) : (
-              (callListJobs ?? []).map((j: any) => (
-                <Link
-                  key={j.id}
-                  href={`/jobs/${j.id}?tab=ops`}
-                  className="block rounded-md border p-3 hover:bg-gray-50"
+     {/* Call list preview + Upcoming */}
+<div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+  {/* Call List */}
+  <div className="rounded-lg border bg-white p-4 text-gray-900 shadow-sm">
+    <div className="flex items-center justify-between">
+      <div className="text-sm font-semibold">Call List (Need to Schedule)</div>
+      <Link
+        className="text-xs underline"
+        href={`/ops${buildQueryString({
+          bucket: "need_to_schedule",
+          contractor: contractor ?? "",
+          q: q ?? "",
+        })}`}
+      >
+        View all
+      </Link>
+    </div>
+
+    <div className="mt-3 space-y-2">
+      {(callListJobs ?? []).length === 0 ? (
+        <div className="text-sm text-muted-foreground">No jobs in call list.</div>
+      ) : (
+        (callListJobs ?? []).map((j: any) => (
+          <div
+            key={j.id}
+            className="rounded-md border p-3 hover:bg-gray-50"
+          >
+            <Link
+              href={`/jobs/${j.id}?tab=ops`}
+              className="block"
+            >
+              <div className="text-sm font-medium">{j.title}</div>
+              <div className="text-xs text-muted-foreground">
+                {customerLine(j)}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {addressLine(j)}
+              </div>
+            </Link>
+
+            <div className="mt-2 flex gap-2">
+              {telHref(j.customer_phone) && (
+                <a
+                  href={telHref(j.customer_phone)}
+                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
                 >
+                  📞 Call
+                </a>
+              )}
+
+              {smsHref(j.customer_phone) && (
+                <a
+                  href={smsHref(j.customer_phone)}
+                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                >
+                  💬 Text
+                </a>
+              )}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  </div>
+
+  {/* Upcoming */}
+  <div className="rounded-lg border bg-white p-4 text-gray-900 shadow-sm">
+    <div className="flex items-center justify-between">
+      <div className="text-sm font-semibold">Upcoming (Scheduled)</div>
+      <div className="text-xs text-muted-foreground">
+        {upcomingJobs?.length ?? 0} jobs
+      </div>
+    </div>
+
+    <div className="mt-3 space-y-2">
+      {(upcomingJobs ?? []).length === 0 ? (
+        <div className="text-sm text-muted-foreground">No upcoming scheduled jobs.</div>
+      ) : (
+        (upcomingJobs ?? []).map((j: any) => (
+          <div
+            key={j.id}
+            className="rounded-md border p-3 hover:bg-gray-50"
+          >
+            <Link
+              href={`/jobs/${j.id}`}
+              className="block"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
                   <div className="text-sm font-medium">{j.title}</div>
                   <div className="text-xs text-muted-foreground">
                     {customerLine(j)}
@@ -535,49 +745,49 @@ jobs.sort((a: any, b: any) => {
                   <div className="text-xs text-muted-foreground">
                     {addressLine(j)}
                   </div>
-                </Link>
-              ))
-            )}
-          </div>
-        </div>
+                </div>
+                <div className="text-xs text-muted-foreground text-right">
+                  {j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : "—"}
+                </div>
+              </div>
+            </Link>
 
-        <div className="rounded-lg border bg-white p-4 text-gray-900 shadow-sm">
-
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold">Upcoming (Scheduled)</div>
-            <div className="text-xs text-muted-foreground">{upcomingJobs?.length ?? 0} jobs</div>
-          </div>
-
-          <div className="mt-3 space-y-2">
-            {(upcomingJobs ?? []).length === 0 ? (
-              <div className="text-sm text-muted-foreground">No upcoming scheduled jobs.</div>
-            ) : (
-              (upcomingJobs ?? []).map((j: any) => (
-                <Link
-                  key={j.id}
-                  href={`/jobs/${j.id}`}
-                  className="block rounded-md border p-3 hover:bg-gray-50"
+            <div className="mt-2 flex gap-2">
+              {telHref(j.customer_phone) && (
+                <a
+                  href={telHref(j.customer_phone)}
+                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium">{j.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {customerLine(j)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {addressLine(j)}
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground text-right">
-                      {j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : "—"}
-                    </div>
-                  </div>
-                </Link>
-              ))
-            )}
+                  📞 Call
+                </a>
+              )}
+
+              {smsHref(j.customer_phone) && (
+                <a
+                  href={smsHref(j.customer_phone)}
+                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                >
+                  💬 Text
+                </a>
+              )}
+
+              {mapsHref(j.job_address, j.city) && (
+                <a
+                  href={mapsHref(j.job_address, j.city)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                >
+                  🧭 Navigate
+                </a>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
+        ))
+      )}
+    </div>
+  </div>
+</div>
 
 {/* Queue Tabs */}
 <div className="rounded-lg border bg-white p-4 space-y-3">
@@ -586,12 +796,18 @@ jobs.sort((a: any, b: any) => {
   <div className="flex flex-wrap gap-2">
     {OPS_TABS
   .filter((t) => {
-    const count = counts.get(t.key) ?? 0;
+    const count =
+  t.key === "attention"
+    ? attentionCount
+    : t.key === "recent_closed"
+    ? 0
+    : (counts.get(t.key) ?? 0);
     const active = bucket === t.key;
 
     // Show tab only if it has jobs OR it's the active tab OR it's Closed
-    return count > 0 || active || t.key === "closed";
+    return count > 0 || active || t.key === "recent_closed";
   })
+
   .map((t) => {
     const href = `/ops${buildQueryString({
       bucket: t.key,
@@ -600,7 +816,12 @@ jobs.sort((a: any, b: any) => {
     })}`;
 
     const active = bucket === t.key;
-    const count = counts.get(t.key) ?? 0;
+    const count =
+    t.key === "attention"
+      ? attentionCount
+      : t.key === "recent_closed"
+      ? 0
+      : (counts.get(t.key) ?? 0);
 
     return (
       <Link
@@ -616,16 +837,9 @@ jobs.sort((a: any, b: any) => {
         <span className="flex items-center gap-2">
           {t.label}
 
-          {/* Badge: show only if count > 0 OR it's Closed (always visible) */}
-          {(count > 0 || t.key === "closed") && (
-            <span
-              className={[
-                "rounded-full border px-3 py-1 text-sm transition font-medium",
-                active
-                  ? "bg-black text-white border-black"
-                  : "bg-white text-gray-900 border-gray-300 hover:bg-gray-100",
-              ].join(" ")}
-            >
+          {/* Badge */}
+          {t.key !== "recent_closed" && count > 0 && (
+            <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs">
               {count}
             </span>
           )}
@@ -646,26 +860,51 @@ jobs.sort((a: any, b: any) => {
             <div className="text-sm text-blue-600">No jobs in this queue.</div>
           ) : (
             (bucketJobs ?? []).map((j: any) => (
-              <Link
-                key={j.id}
-                href={`/jobs/${j.id}?tab=ops`}
-                className="block rounded-md border bg-white p-3 hover:bg-gray-50 transition"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium">{j.title}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {customerLine(j)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {addressLine(j)}
-                    </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground text-right">
-                    {j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : ""}
-                  </div>
-                </div>
-              </Link>
+              <div
+  key={j.id}
+  className="rounded-md border p-3 hover:bg-gray-50"
+>
+  <Link href={`/jobs/${j.id}?tab=ops`} className="block">
+    <div className="text-sm font-medium">{j.title}</div>
+    <div className="text-xs text-muted-foreground">
+      {customerLine(j)}
+    </div>
+    <div className="text-xs text-muted-foreground">
+      {addressLine(j)}
+    </div>
+  </Link>
+
+  <div className="mt-3 flex flex-wrap gap-2">
+    {telHref(j.customer_phone) && (
+      <a
+        href={telHref(j.customer_phone)}
+        className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+      >
+        📞 Call
+      </a>
+    )}
+
+    {smsHref(j.customer_phone) && (
+      <a
+        href={smsHref(j.customer_phone)}
+        className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+      >
+        💬 Text
+      </a>
+    )}
+
+    {mapsHref(addressLine(j).split(",")[0], j.city) && (
+      <a
+        href={mapsHref(addressLine(j).split(",")[0], j.city)}
+        target="_blank"
+        rel="noreferrer"
+        className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+      >
+        🧭 Navigate
+      </a>
+    )}
+  </div>
+</div>
             ))
           )}
         </div>

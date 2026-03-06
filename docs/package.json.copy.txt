@@ -1,0 +1,36 @@
+{
+  "name": "hvac-saas",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.91.0",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.562.0",
+    "luxon": "^3.7.2",
+    "next": "16.1.2",
+    "next-pwa": "^5.6.0",
+    "nodemailer": "^8.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/luxon": "^3.7.1",
+    "@types/node": "^20",
+    "@types/nodemailer": "^7.0.11",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.2",
+    "madge": "^8.0.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

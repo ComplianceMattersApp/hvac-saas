@@ -1,0 +1,43 @@
+export type ResolveOpsStatusInput = {
+  status: string | null;
+  job_type: string | null;
+  scheduled_date?: string | null;
+  window_start?: string | null;
+  window_end?: string | null;
+  field_complete?: boolean | null;
+  certs_complete?: boolean | null;
+  invoice_complete?: boolean | null;
+  current_ops_status?: string | null;
+};
+
+export function resolveOpsStatus(job: ResolveOpsStatusInput): string {
+  const status = (job.status ?? "").toLowerCase();
+  const jobType = (job.job_type ?? "").toLowerCase();
+
+  const isScheduled =
+    !!job.scheduled_date || !!job.window_start || !!job.window_end;
+
+  const fieldComplete = !!job.field_complete || status === "completed";
+  const certsComplete = !!job.certs_complete;
+  const invoiceComplete = !!job.invoice_complete;
+
+  // Pre-field workflow
+  if (!fieldComplete) {
+    return isScheduled ? "scheduled" : "need_to_schedule";
+  }
+
+  // Post-field / closeout workflow
+  if (jobType === "ecc") {
+    if (!certsComplete) return "paperwork_required";
+    if (!invoiceComplete) return "invoice_required";
+    return "closed";
+  }
+
+  if (jobType === "service") {
+    if (!invoiceComplete) return "invoice_required";
+    return "closed";
+  }
+
+  // Fallback
+  return job.current_ops_status ?? "need_to_schedule";
+}

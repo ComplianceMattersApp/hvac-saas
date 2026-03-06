@@ -96,7 +96,7 @@ if (user) {
       </form>
 
       <p className="text-xs text-muted-foreground">
-        Use the same email/password you created in Supabase Auth.
+        Log into your Compliance Matters account. If you don't have an account, please contact your administrator.
       </p>
     </div>
   );

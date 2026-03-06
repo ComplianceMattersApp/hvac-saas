@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+
 import SubmitButton from "@/components/SubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
-import { revalidatePath } from "next/cache";
-import { archiveJobFromForm } from "@/lib/actions/job-actions";
 
+import { archiveJobFromForm } from "@/lib/actions/job-actions";
 import {
   getContractors,
   updateJobCustomerFromForm,
@@ -16,16 +16,18 @@ import {
   createRetestJobFromForm,
 } from "@/lib/actions/job-actions";
 
-
-import ServiceStatusActions from "./_components/ServiceStatusActions";
-import { displayDateLA } from "@/lib/utils/schedule-la";
-
 import {
   updateJobOpsFromForm,
   updateJobOpsDetailsFromForm,
+  markJobFieldCompleteFromForm,
+  markCertsCompleteFromForm,
+  markInvoiceCompleteFromForm,
 } from "@/lib/actions/job-ops-actions";
 
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
+
+import ServiceStatusActions from "./_components/ServiceStatusActions";
+import { displayDateLA } from "@/lib/utils/schedule-la";
 
 
 
@@ -137,19 +139,62 @@ function nextStatusLabel(status?: string | null) {
 }
 
 
-type Props = {
-  params: Promise<{ id: string }>;
-  searchParams?: Promise<{ tab?: string; banner?: string }>;
+type JobSearchParams = {
+  tab?: "info" | "ops" | "tests";
+  banner?: string;
+  notice?: string;
 };
 
-export default async function JobDetailPage({ params, searchParams }: Props) {
+type SearchParams = Record<string, string | string[] | undefined>;
+
+export default async function JobDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<SearchParams>;
+}) {
   const { id: jobId } = await params;
 
-  const sp = (await searchParams) ?? {};
-  const tab = (sp.tab ?? "info") as "info" | "ops" | "tests";
+  if (!jobId) {
+    throw new Error("Missing route param: id");
+  }
+
+  const sp: SearchParams = (searchParams ? await searchParams : {}) ?? {};
+
+  const tabRaw = sp.tab;
+  const tab =
+    Array.isArray(tabRaw)
+      ? tabRaw[0]
+      : typeof tabRaw === "string"
+      ? tabRaw
+      : "info";
+
+  const noticeRaw = sp.notice;
+  const notice =
+    Array.isArray(noticeRaw)
+      ? noticeRaw[0]
+      : typeof noticeRaw === "string"
+      ? noticeRaw
+      : "";
+
+  const showEccNotice = notice === "ecc_test_required";
 
   const supabase = await createClient();
   const contractors = await getContractors();
+
+    const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: cu } = await supabase
+    .from("contractor_users")
+    .select("user_id")
+    .eq("user_id", user?.id ?? "")
+    .maybeSingle();
+
+  const isContractorUser = !!cu;
+  const isInternalUser = !isContractorUser;
 
   const { data: job, error: jobError } = await supabase
     .from("jobs")
@@ -167,6 +212,10 @@ export default async function JobDetailPage({ params, searchParams }: Props) {
       created_at,
       contractor_id,
       ops_status,
+      field_complete,
+      certs_complete,
+      invoice_complete,
+      invoice_number,
       pending_info_reason,
       follow_up_date,
       next_action_note,
@@ -420,6 +469,145 @@ if (recipient === "contractor") {
 
       {/* Header */}
 
+      {/* Always-visible Top Actions */}
+
+      {/* Field Completion Action */}
+      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-medium text-gray-700">Field Work Status</div>
+
+          {String(job.ops_status ?? "") !== "field_complete" &&
+            String(job.ops_status ?? "") !== "closed" && (
+              <form action={markJobFieldCompleteFromForm}>
+                <input type="hidden" name="job_id" value={job.id} />
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                >
+                  ✓ Field Work Complete
+                </button>
+              </form>
+            )}
+
+          {String(job.ops_status ?? "") === "field_complete" && (
+            <span className="text-sm font-semibold text-green-700">
+              Field Work Completed
+            </span>
+          )}
+        </div>
+      </div>
+
+          {/* Closeout Actions (Internal Only) */}
+{isInternalUser && (String(job.ops_status ?? "") === "field_complete" || job.status === "completed") && (
+  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 shadow-sm">
+    <div className="flex items-center justify-between">
+      <div className="text-sm font-medium text-gray-700">Closeout</div>
+
+      <div className="flex items-center gap-2">
+        {job.job_type === "ecc" && !job.certs_complete && (
+          <form action={markCertsCompleteFromForm}>
+            <input type="hidden" name="job_id" value={job.id} />
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+            >
+              ✓ Certs Complete
+            </button>
+          </form>
+        )}
+
+        {!job.invoice_complete && (
+          <form action={markInvoiceCompleteFromForm}>
+            <input type="hidden" name="job_id" value={job.id} />
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+            >
+              ✓ Invoice Complete
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
+      {/* Closeout Actions (Internal Only) */}
+{isInternalUser && (String(job.ops_status ?? "") === "field_complete" || job.status === "completed") && (
+  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 shadow-sm">
+    <div className="flex items-center justify-between">
+      <div className="text-sm font-medium text-gray-700">Closeout</div>
+
+      <div className="flex items-center gap-2">
+        {/* ECC only: Certs */}
+        
+        {job.job_type === "ecc" && !job.certs_complete && (
+          <form action={markCertsCompleteFromForm}>
+            <input type="hidden" name="job_id" value={job.id} />
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+            >
+              ✓ Certs Complete
+            </button>
+          </form>
+        )}
+
+        {/* All: Invoice */}
+        {!job.invoice_complete && (
+          <form action={markInvoiceCompleteFromForm}>
+            <input type="hidden" name="job_id" value={job.id} />
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+            >
+              ✓ Invoice Complete
+            </button>
+          </form>
+        )}
+
+        {/* Done state */}
+        {((job.job_type === "service" && job.invoice_complete) ||
+          (job.job_type === "ecc" && job.invoice_complete && job.certs_complete)) && (
+          <span className="text-sm font-semibold text-green-700">Closeout Complete</span>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
+      {/* ✅ Friendly guard-rail message (shows after redirect) */}
+      {showEccNotice && (
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <div className="font-semibold">One step missing</div>
+          <div className="mt-1">
+            This is an <span className="font-semibold">ECC</span> job. Go to the{" "}
+            <span className="font-semibold">Tests</span> tab and complete at least{" "}
+            <span className="font-semibold">one ECC test run</span> before marking{" "}
+            <span className="font-semibold">Field Work Complete</span>.
+          </div>
+        </div>
+      )}
+
+      {sp?.banner === "customer_reused" && (
+        <FlashBanner
+          type="warning"
+          message="Existing customer matched by phone — reused (no duplicate created)."
+        />
+      )}
+
+      {sp?.banner === "customer_created" && (
+        <FlashBanner
+          type="success"
+          message="New customer created and linked to this job."
+        />
+      )}
+
+      <div className="mb-3">
+        <h1 className="text-2xl font-semibold">{job.title}</h1>
+        <p className="text-sm text-gray-600">{serviceCity ?? "No city set"}</p>
+      </div>
+
       {sp?.banner === "customer_reused" && (
   <FlashBanner
     type="warning"
@@ -433,10 +621,6 @@ if (recipient === "contractor") {
     message="New customer created and linked to this job."
   />
 )}
-      <div className="mb-3">
-        <h1 className="text-2xl font-semibold">{job.title}</h1>
-        <p className="text-sm text-gray-600">{serviceCity ?? "No city set"}</p>
-      </div>
 
       {job.status === "completed" && job.ops_status !== "closed" ? (() => {
   const ops = job.ops_status;
