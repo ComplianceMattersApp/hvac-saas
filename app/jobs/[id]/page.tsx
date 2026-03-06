@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-
+import { redirect } from "next/navigation";
 import SubmitButton from "@/components/SubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
-
 import { archiveJobFromForm } from "@/lib/actions/job-actions";
 import {
   getContractors,
@@ -194,6 +193,11 @@ export default async function JobDetailPage({
     .maybeSingle();
 
   const isContractorUser = !!cu;
+
+  if (isContractorUser) {
+    redirect(`/portal/jobs/${jobId}`);
+  }
+
   const isInternalUser = !isContractorUser;
 
   const { data: job, error: jobError } = await supabase

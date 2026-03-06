@@ -1,4 +1,3 @@
-// /portal/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -19,10 +18,7 @@ function statusLabel(ops: string | null | undefined) {
   if (v === "pending_info") return "PENDING INFO";
   if (v === "retest_needed") return "RETEST REQUIRED";
   if (v === "need_to_schedule") return "NEED TO SCHEDULE";
-
-  // Your system has historically used "ready" as scheduled/ready-to-go.
   if (v === "scheduled" || v === "ready") return "SCHEDULED";
-
   if (v === "on_hold") return "ON HOLD";
   if (v === "field_complete") return "FIELD COMPLETE";
   if (v === "closed") return "CLOSED";
@@ -34,39 +30,49 @@ function statusBadgeClass(ops: string | null | undefined) {
   const v = (ops ?? "").toLowerCase();
 
   if (v === "failed")
-    return "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200";
-  if (v === "pending_info")
-    return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200";
+    return "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300";
   if (v === "retest_needed")
-    return "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200";
+    return "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300";
+  if (v === "pending_info")
+    return "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300";
   if (v === "need_to_schedule")
-    return "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200";
+    return "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-300";
   if (v === "scheduled" || v === "ready")
-    return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200";
+    return "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300";
   if (v === "on_hold")
-    return "bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
+    return "border-gray-300 bg-gray-100 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200";
+  if (v === "field_complete")
+    return "border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200";
 
-  return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
+  return "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200";
 }
 
 function rowAccentClass(opts: { isUrgent: boolean; ops_status?: string | null }) {
   const ops = (opts.ops_status ?? "").toLowerCase();
 
-  if (opts.isUrgent) return "border-red-500 bg-red-50 dark:bg-red-950/20";
-  if (ops === "pending_info")
-    return "border-amber-400 bg-amber-50 dark:bg-amber-950/20";
-  if (ops === "retest_needed" || ops === "failed")
-    return "border-red-400 bg-red-50 dark:bg-red-950/15";
-  if (ops === "scheduled" || ops === "ready")
-    return "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20";
+  if (opts.isUrgent) return "border-l-red-500";
+  if (ops === "pending_info") return "border-l-amber-400";
+  if (ops === "retest_needed" || ops === "failed") return "border-l-red-400";
+  if (ops === "scheduled" || ops === "ready") return "border-l-emerald-500";
+  if (ops === "need_to_schedule") return "border-l-blue-500";
+  if (ops === "field_complete") return "border-l-slate-400";
 
-  return "border-transparent";
+  return "border-l-transparent";
 }
 
 type SP = Record<string, string | string[] | undefined>;
 
 function sp1(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v;
+}
+
+function queueCardClass(isActive: boolean) {
+  return [
+    "rounded-xl border p-4 transition-all duration-150",
+    isActive
+      ? "border-gray-900 bg-gray-900 text-white shadow-md dark:border-white dark:bg-white dark:text-gray-900"
+      : "bg-white text-gray-900 hover:shadow-sm hover:-translate-y-[1px] dark:bg-gray-900 dark:text-gray-100 dark:border-gray-800",
+  ].join(" ");
 }
 
 export default async function PortalPage({
@@ -79,12 +85,9 @@ export default async function PortalPage({
   const sp: SP = (searchParams ? await searchParams : {}) ?? {};
   const queue = (sp1(sp.queue) ?? "").toString();
 
-
-  // Must be logged in
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
 
-  // Must be a contractor user (otherwise send internal users to ops)
   const { data: cu, error: cuErr } = await supabase
     .from("contractor_users")
     .select("contractor_id, contractors ( id, name )")
@@ -99,7 +102,6 @@ export default async function PortalPage({
 
   if (!contractorId) redirect("/ops");
 
-
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
     year: "numeric",
@@ -107,45 +109,7 @@ export default async function PortalPage({
     day: "2-digit",
   }).format(new Date());
 
-  const { count: totalActiveCount, error: totalErr } = await supabase
-  .from("jobs")
-  .select("id", { count: "exact", head: true })
-  .eq("contractor_id", contractorId)
-  .is("deleted_at", null);
-
-  if (totalErr) throw totalErr;
-
-  // Base filter: SECURITY + ARCHIVE HIDE
-  const baseJobs = () =>
-    supabase
-      .from("jobs")
-      .select("id", { count: "exact", head: true })
-      .eq("contractor_id", contractorId)
-      .is("deleted_at", null);
-
-  // “Attention Today” count (contractor scoped + not archived)
-  const { count: attentionTodayCount } = await baseJobs()
-    .not("follow_up_date", "is", null)
-    .lte("follow_up_date", today)
-    .in("ops_status", ["need_to_schedule", "pending_info", "retest_needed", "failed"]);
-
-  // Counts by ops_status (contractor scoped + not archived)
-  const { data: countsData, error: countsErr } = await supabase
-    .from("jobs")
-    .select("ops_status")
-    .eq("contractor_id", contractorId)
-    .is("deleted_at", null);
-
-  if (countsErr) throw countsErr;
-
-  const counts: Record<string, number> = {};
-  for (const row of countsData ?? []) {
-    const key = (row as any)?.ops_status ?? "unknown";
-    counts[key] = (counts[key] ?? 0) + 1;
-  }
-
-  // List query (queue-aware)
-  let listQ = supabase
+  const { data: baseJobs, error: baseJobsErr } = await supabase
     .from("jobs")
     .select(
       `
@@ -164,147 +128,273 @@ export default async function PortalPage({
     )
     .eq("contractor_id", contractorId)
     .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(25);
+    .neq("ops_status", "closed");
 
-  if (queue === "attention_today") {
-    listQ = listQ
-      .not("follow_up_date", "is", null)
-      .lte("follow_up_date", today)
-      .in("ops_status", ["need_to_schedule", "pending_info", "retest_needed", "failed"]);
-  } else if (queue === "need_to_schedule") {
-    listQ = listQ.eq("ops_status", "need_to_schedule");
-  } else if (queue === "pending_info") {
-    listQ = listQ.eq("ops_status", "pending_info");
-  } else if (queue === "retest_needed") {
-    listQ = listQ.eq("ops_status", "retest_needed");
+  if (baseJobsErr) throw baseJobsErr;
+
+  const jobs = (baseJobs ?? []) as any[];
+
+  const counts: Record<string, number> = {};
+  for (const row of jobs) {
+    const key = row?.ops_status ?? "unknown";
+    counts[key] = (counts[key] ?? 0) + 1;
   }
 
-  const { data: jobs, error: jobsErr } = await listQ;
-  if (jobsErr) throw jobsErr;
+  const attentionTodayStatuses = [
+    "need_to_schedule",
+    "pending_info",
+    "retest_needed",
+    "failed",
+  ];
 
-  const openCount =
-    (counts["need_to_schedule"] ?? 0) +
-    (counts["pending_info"] ?? 0) +
-    (counts["retest_needed"] ?? 0) +
-    (counts["failed"] ?? 0) +
-    (counts["on_hold"] ?? 0) +
-    (counts["ready"] ?? 0) +
-    (counts["scheduled"] ?? 0);
+  const attentionTodayCount = jobs.filter(
+    (j) =>
+      !!j.follow_up_date &&
+      String(j.follow_up_date) <= String(today) &&
+      attentionTodayStatuses.includes((j.ops_status ?? "").toLowerCase())
+  ).length;
+
+  const openCount = jobs.length;
+
+  let visibleJobs = jobs;
+
+  if (queue === "attention_today") {
+    visibleJobs = jobs.filter(
+      (j) =>
+        !!j.follow_up_date &&
+        String(j.follow_up_date) <= String(today) &&
+        attentionTodayStatuses.includes((j.ops_status ?? "").toLowerCase())
+    );
+  } else if (queue === "need_to_schedule") {
+    visibleJobs = jobs.filter((j) => j.ops_status === "need_to_schedule");
+  } else if (queue === "pending_info") {
+    visibleJobs = jobs.filter((j) => j.ops_status === "pending_info");
+  } else if (queue === "retest_needed") {
+    visibleJobs = jobs.filter((j) => j.ops_status === "retest_needed");
+  } else {
+    visibleJobs = jobs;
+  }
+
+  visibleJobs = [...visibleJobs]
+    .sort((a, b) => {
+      const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bDate - aDate;
+    })
+    .slice(0, 25);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 text-gray-900 dark:text-gray-100">
-      {/* Header */}
-      <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 flex items-start justify-between gap-4 shadow-sm">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Contractor Portal</h1>
-          <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-            {contractorName}
+      <div className="rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800 p-6 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+              Contractor Portal
+            </h1>
+            <div className="mt-1 text-sm font-medium text-gray-600 dark:text-gray-300">
+              {contractorName}
+            </div>
           </div>
+
+          <Link
+            href="/jobs/new"
+            className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+          >
+            + Add Job
+          </Link>
         </div>
 
-        <Link
-          href="/jobs/new"
-          className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-white text-sm font-medium hover:bg-gray-800 transition"
-        >
-          + Add Job
-        </Link>
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Open Jobs
+            </div>
+            <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
+              {openCount}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Attention Today
+            </div>
+            <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
+              {attentionTodayCount}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Current View
+            </div>
+            <div className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {queue ? queue.replaceAll("_", " ") : "all open jobs"}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Tiles */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <Link
-          href="/portal"
-          className="rounded-xl border bg-white dark:bg-gray-900 p-4 hover:shadow-sm transition"
-        >
-          <div className="text-sm text-gray-600 dark:text-gray-300">Recent Jobs</div>
-          <div className="text-3xl font-semibold mt-1">{totalActiveCount ?? 0}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            View all current jobs
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Link href="/portal" className={queueCardClass(!queue)}>
+          <div
+            className={`text-sm font-medium ${
+              !queue ? "text-white/80 dark:text-gray-600" : "text-gray-700 dark:text-gray-300"
+            }`}
+          >
+            Open Jobs
+          </div>
+          <div className="mt-1 text-3xl font-semibold">{openCount}</div>
+          <div
+            className={`mt-2 text-xs ${
+              !queue ? "text-white/70 dark:text-gray-500" : "text-gray-500 dark:text-gray-400"
+            }`}
+          >
+            All active contractor jobs
           </div>
         </Link>
+
         <Link
           href="/portal?queue=attention_today"
-          className="rounded-xl border bg-white dark:bg-gray-900 p-4 hover:shadow-sm transition"
+          className={queueCardClass(queue === "attention_today")}
         >
-          <div className="text-sm text-gray-600 dark:text-gray-300">Attention Today</div>
-          <div className="text-3xl font-semibold mt-1">{attentionTodayCount ?? 0}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+          <div
+            className={`text-sm font-medium ${
+              queue === "attention_today"
+                ? "text-white/80 dark:text-gray-600"
+                : "text-gray-700 dark:text-gray-300"
+            }`}
+          >
+            Attention Today
+          </div>
+          <div className="mt-1 text-3xl font-semibold">{attentionTodayCount}</div>
+          <div
+            className={`mt-2 text-xs ${
+              queue === "attention_today"
+                ? "text-white/70 dark:text-gray-500"
+                : "text-gray-500 dark:text-gray-400"
+            }`}
+          >
             Follow-ups due today or earlier
           </div>
         </Link>
 
         <Link
           href="/portal?queue=need_to_schedule"
-          className="rounded-xl border bg-white dark:bg-gray-900 p-4 hover:shadow-sm transition"
+          className={queueCardClass(queue === "need_to_schedule")}
         >
-          <div className="text-sm text-gray-600 dark:text-gray-300">Need to Schedule</div>
-          <div className="text-3xl font-semibold mt-1">{counts["need_to_schedule"] ?? 0}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Jobs awaiting scheduling info
+          <div
+            className={`text-sm font-medium ${
+              queue === "need_to_schedule"
+                ? "text-white/80 dark:text-gray-600"
+                : "text-gray-700 dark:text-gray-300"
+            }`}
+          >
+            Need to Schedule
+          </div>
+          <div className="mt-1 text-3xl font-semibold">
+            {counts["need_to_schedule"] ?? 0}
+          </div>
+          <div
+            className={`mt-2 text-xs ${
+              queue === "need_to_schedule"
+                ? "text-white/70 dark:text-gray-500"
+                : "text-gray-500 dark:text-gray-400"
+            }`}
+          >
+            Jobs waiting for scheduling
           </div>
         </Link>
 
         <Link
           href="/portal?queue=pending_info"
-          className="rounded-xl border bg-white dark:bg-gray-900 p-4 hover:shadow-sm transition"
+          className={queueCardClass(queue === "pending_info")}
         >
-          <div className="text-sm text-gray-600 dark:text-gray-300">Pending Info</div>
-          <div className="text-3xl font-semibold mt-1">{counts["pending_info"] ?? 0}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Missing permit/info/notes
+          <div
+            className={`text-sm font-medium ${
+              queue === "pending_info"
+                ? "text-white/80 dark:text-gray-600"
+                : "text-gray-700 dark:text-gray-300"
+            }`}
+          >
+            Pending Info
+          </div>
+          <div className="mt-1 text-3xl font-semibold">
+            {counts["pending_info"] ?? 0}
+          </div>
+          <div
+            className={`mt-2 text-xs ${
+              queue === "pending_info"
+                ? "text-white/70 dark:text-gray-500"
+                : "text-gray-500 dark:text-gray-400"
+            }`}
+          >
+            Missing permit, notes, or info
           </div>
         </Link>
 
         <Link
           href="/portal?queue=retest_needed"
-          className="rounded-xl border bg-white dark:bg-gray-900 p-4 hover:shadow-sm transition"
+          className={queueCardClass(queue === "retest_needed")}
         >
-          <div className="text-sm text-gray-600 dark:text-gray-300">Retest Needed</div>
-          <div className="text-3xl font-semibold mt-1">{counts["retest_needed"] ?? 0}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Failed or retest required
+          <div
+            className={`text-sm font-medium ${
+              queue === "retest_needed"
+                ? "text-white/80 dark:text-gray-600"
+                : "text-gray-700 dark:text-gray-300"
+            }`}
+          >
+            Retest Needed
+          </div>
+          <div className="mt-1 text-3xl font-semibold">
+            {counts["retest_needed"] ?? 0}
+          </div>
+          <div
+            className={`mt-2 text-xs ${
+              queue === "retest_needed"
+                ? "text-white/70 dark:text-gray-500"
+                : "text-gray-500 dark:text-gray-400"
+            }`}
+          >
+            Failed jobs awaiting retest
           </div>
         </Link>
       </div>
 
-      {/* List Header */}
       <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold">
-          {queue
-            ? `Queue: ${queue.replaceAll("_", " ")}`
-            : "Recent Jobs"}
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          {queue ? `Queue: ${queue.replaceAll("_", " ")}` : "Open Jobs"}
         </h2>
         <div className="text-sm text-gray-600 dark:text-gray-300">
-          Open items: <span className="font-semibold">{openCount}</span>
+          Showing <span className="font-semibold">{visibleJobs.length}</span>
         </div>
       </div>
 
-      {/* Job List */}
-      <div className="rounded-xl border bg-white dark:bg-gray-900 overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
         <div className="divide-y divide-gray-200 dark:divide-gray-800">
-          {(jobs ?? []).map((j: any) => {
+          {visibleJobs.map((j: any) => {
             const isUrgent =
               !!j.follow_up_date && String(j.follow_up_date) <= String(today);
 
             return (
               <Link
                 key={j.id}
-                href={`/jobs/${j.id}`}
+                href={`/portal/jobs/${j.id}`}
                 className={[
-                  "block p-4 border-l-4 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition",
+                  "block border-l-4 p-4 transition-all duration-150",
+                  "hover:bg-gray-50 hover:shadow-sm dark:hover:bg-gray-800/40",
                   rowAccentClass({ isUrgent, ops_status: j.ops_status }),
                 ].join(" ")}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="font-semibold truncate">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
                         {j.title ?? "Untitled Job"}
                       </div>
+
                       <span
                         className={[
-                          "text-xs font-semibold px-2 py-1 rounded-full",
+                          "rounded-full border px-2.5 py-1 text-xs font-semibold",
                           statusBadgeClass(j.ops_status),
                         ].join(" ")}
                       >
@@ -312,41 +402,42 @@ export default async function PortalPage({
                       </span>
                     </div>
 
-                    <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                    <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                       {j.job_address ?? j.locations?.address_line1 ?? "No address"} •{" "}
                       {j.city ?? j.locations?.city ?? "—"}
                     </div>
 
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-1">
-                      <div>
-                        <span className="font-semibold">ops_status:</span>{" "}
-                        {j.ops_status ?? "—"}
-                      </div>
-
+                    <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
                       {!!j.pending_info_reason && (
                         <div>
-                          <span className="font-semibold">pending_info_reason:</span>{" "}
+                          <span className="font-semibold text-gray-700 dark:text-gray-300">
+                            Pending info:
+                          </span>{" "}
                           {j.pending_info_reason}
                         </div>
                       )}
 
                       {!!j.next_action_note && (
                         <div>
-                          <span className="font-semibold">next_action_note:</span>{" "}
+                          <span className="font-semibold text-gray-700 dark:text-gray-300">
+                            Next action:
+                          </span>{" "}
                           {j.next_action_note}
                         </div>
                       )}
 
                       {!!j.follow_up_date && (
                         <div>
-                          <span className="font-semibold">follow_up_date:</span>{" "}
+                          <span className="font-semibold text-gray-700 dark:text-gray-300">
+                            Follow up:
+                          </span>{" "}
                           {j.follow_up_date}
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
                     {j.created_at ? `Added ${formatDateLA(j.created_at)}` : ""}
                   </div>
                 </div>
@@ -354,9 +445,14 @@ export default async function PortalPage({
             );
           })}
 
-          {(!jobs || jobs.length === 0) && (
-            <div className="p-6 text-sm text-gray-600 dark:text-gray-300">
-              No jobs found for this queue.
+          {visibleJobs.length === 0 && (
+            <div className="p-8 text-center">
+              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                No jobs found in this queue.
+              </div>
+              <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Try another queue or add a new job.
+              </div>
             </div>
           )}
         </div>
