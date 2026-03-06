@@ -747,7 +747,14 @@ jobs.sort((a: any, b: any) => {
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground text-right">
-                  {j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : "—"}
+                  <div>
+                    {j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : "—"}
+                  </div>
+                  {(j.window_start || j.window_end) && (
+                    <div className="mt-1 text-[11px] text-gray-600">
+                      {j.window_start ?? "—"}{j.window_start && j.window_end ? " - " : ""}{j.window_end ?? ""}
+                    </div>
+                  )}
                 </div>
               </div>
             </Link>
@@ -862,15 +869,29 @@ jobs.sort((a: any, b: any) => {
             (bucketJobs ?? []).map((j: any) => (
               <div
   key={j.id}
-  className="rounded-md border p-3 hover:bg-gray-50"
+  className="rounded-md border border-gray-200 bg-white p-3 shadow-sm hover:bg-gray-50 transition"
 >
   <Link href={`/jobs/${j.id}?tab=ops`} className="block">
-    <div className="text-sm font-medium">{j.title}</div>
-    <div className="text-xs text-muted-foreground">
-      {customerLine(j)}
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <div className="text-sm font-medium text-gray-900">{j.title}</div>
+        <div className="text-xs text-gray-700">
+          {customerLine(j)}
+        </div>
+        <div className="text-xs text-gray-600">
+          {addressLine(j)}
+        </div>
+      </div>
+      <div className="text-xs text-gray-500 text-right">
+  <div>
+    {j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : ""}
+  </div>
+  {(j.window_start || j.window_end) && (
+    <div className="mt-1 text-[11px] text-gray-600">
+      {j.window_start ?? "—"}{j.window_start && j.window_end ? " - " : ""}{j.window_end ?? ""}
     </div>
-    <div className="text-xs text-muted-foreground">
-      {addressLine(j)}
+  )}
+</div>
     </div>
   </Link>
 
@@ -878,7 +899,7 @@ jobs.sort((a: any, b: any) => {
     {telHref(j.customer_phone) && (
       <a
         href={telHref(j.customer_phone)}
-        className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+        className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
       >
         📞 Call
       </a>
@@ -887,18 +908,18 @@ jobs.sort((a: any, b: any) => {
     {smsHref(j.customer_phone) && (
       <a
         href={smsHref(j.customer_phone)}
-        className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+        className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
       >
         💬 Text
       </a>
     )}
 
-    {mapsHref(addressLine(j).split(",")[0], j.city) && (
+    {mapsHref(j.job_address, j.city) && (
       <a
-        href={mapsHref(addressLine(j).split(",")[0], j.city)}
+        href={mapsHref(j.job_address, j.city)}
         target="_blank"
         rel="noreferrer"
-        className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+        className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
       >
         🧭 Navigate
       </a>
