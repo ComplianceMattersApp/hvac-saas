@@ -201,16 +201,85 @@ const contractorNotes = (events ?? [])
       ? `${formatTimeLocal((job as any).window_start)}–${formatTimeLocal((job as any).window_end)}`
       : null;
 
-      const loc = (job as any)?.locations ?? null;
+  const loc = (job as any)?.locations ?? null;
 
-const addressLine1 =
-  String(loc?.address_line1 ?? "").trim() ||
-  String((job as any)?.job_address ?? "").trim();
+  const addressLine1 =
+    String(loc?.address_line1 ?? "").trim() ||
+    String((job as any)?.job_address ?? "").trim();
 
-const addressCity =
-  String(loc?.city ?? "").trim() || String((job as any)?.city ?? "").trim();
+  const addressLine2 = String(loc?.address_line2 ?? "").trim();
 
-const addressState = String(loc?.state ?? "").trim();
+  const addressCity =
+    String(loc?.city ?? "").trim() ||
+    String((job as any)?.city ?? "").trim();
+
+  const addressState = String(loc?.state ?? "").trim();
+  const addressZip = String(loc?.zip ?? "").trim();
+
+  function buildAddressLines(opts: {
+    address1?: string | null;
+    address2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip?: string | null;
+  }) {
+    const line1 = [opts.address1, opts.address2]
+      .map((v) => String(v ?? "").trim())
+      .filter(Boolean)
+      .join(" ");
+
+    const cityStateZip = [
+      String(opts.city ?? "").trim(),
+      String(opts.state ?? "").trim(),
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const line2 = [cityStateZip, String(opts.zip ?? "").trim()]
+      .filter(Boolean)
+      .join(" ");
+
+    return {
+      line1: line1 || "",
+      line2: line2 || "",
+    };
+  }
+
+  function titleCaseFromSnake(value: string | null | undefined) {
+    const v = String(value ?? "").trim();
+    if (!v) return "—";
+
+    return v
+      .split("_")
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  }
+
+  function portalStatusLabel(opsStatus: string | null | undefined) {
+    const v = String(opsStatus ?? "").toLowerCase();
+
+    if (v === "failed" || v === "retest_needed") return "Failed / Retest Required";
+    if (v === "pending_info") return "Pending Info";
+    if (v === "need_to_schedule") return "Need to Schedule";
+    if (v === "scheduled" || v === "ready") return "Scheduled";
+    if (v === "field_complete") return "Field Complete";
+    if (v === "on_hold") return "On Hold";
+    if (v === "closed") return "Closed";
+
+    return titleCaseFromSnake(v);
+  }
+
+  const addressDisplay = buildAddressLines({
+    address1: addressLine1,
+    address2: addressLine2,
+    city: addressCity,
+    state: addressState,
+    zip: addressZip,
+  });
+
+  const serviceStatus = titleCaseFromSnake((job as any)?.status);
+  const portalStatus = portalStatusLabel((job as any)?.ops_status);
 
   // Group events/runs by job_id for display
   const chainById = new Map((jobChain ?? []).map((j: any) => [j.id, j]));
@@ -229,16 +298,30 @@ const addressState = String(loc?.state ?? "").trim();
   }
 
     // --- Job Health / Urgency banner (based on latest completed run) ---
-  const latestCompletedRun =
-    (testRuns ?? []).find((r: any) => r.is_completed) ??
-    null;
+    function finalRunPass(run: any): boolean | null {
+    if (!run) return null;
+    return run.override_pass != null ? !!run.override_pass : !!run.computed_pass;
+  }
 
-  const latestPass =
-    latestCompletedRun
-      ? (latestCompletedRun.override_pass != null
-          ? !!latestCompletedRun.override_pass
-          : !!latestCompletedRun.computed_pass)
-      : null;
+  const opsStatus = String((job as any)?.ops_status ?? "").toLowerCase();
+  const isPortalFailed = ["failed", "retest_needed"].includes(opsStatus);
+
+  const latestCompletedRun =
+    (testRuns ?? []).find((r: any) => r.is_completed) ?? null;
+
+  const latestFailedRun =
+    (testRuns ?? []).find(
+      (r: any) => r.is_completed && finalRunPass(r) === false
+    ) ?? null;
+
+  // For contractor health banner:
+  // if the job is marked failed/retest_needed, prefer the latest failed run for explanation
+  const healthRun = isPortalFailed
+    ? (latestFailedRun ?? latestCompletedRun)
+    : latestCompletedRun;
+
+  const topReasons =
+    healthRun ? extractTopReasons(healthRun) : [];
 
 function extractTopReasons(run: any): string[] {
   const computed = run?.computed ?? null;
@@ -267,9 +350,6 @@ function extractTopReasons(run: any): string[] {
 
   return [];
 }
-
-  const topReasons =
-  latestCompletedRun ? extractTopReasons(latestCompletedRun) : [];
 
   async function addContractorNote(formData: FormData) {
   "use server";
@@ -316,10 +396,24 @@ function extractTopReasons(run: any): string[] {
         {job.title ?? "Job"}
       </h1>
 
-      <div className="text-sm text-gray-600 dark:text-gray-300">
-        {addressLine1 ? addressLine1 : "—"}
-        {addressCity ? ` • ${addressCity}` : ""}
-        {addressState ? `, ${addressState}` : ""}
+            <div className="mt-2 space-y-0.5">
+        {addressDisplay.line1 ? (
+          <div className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            {addressDisplay.line1}
+          </div>
+        ) : null}
+
+        {addressDisplay.line2 ? (
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {addressDisplay.line2}
+          </div>
+        ) : null}
+
+        {!addressDisplay.line1 && !addressDisplay.line2 ? (
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Address not available
+          </div>
+        ) : null}
       </div>
     </div>
 
@@ -333,78 +427,64 @@ function extractTopReasons(run: any): string[] {
 </div>
 
 {/* Job Health (Urgency Banner) */}
-{latestCompletedRun ? (
+{(healthRun || isPortalFailed) ? (
   <div
     className={[
-      "rounded-xl border p-5 shadow-sm space-y-2",
-      (() => {
-        const run = latestCompletedRun as any;
-        const finalPass =
-          run.override_pass != null ? !!run.override_pass : !!run.computed_pass;
-
-        return finalPass
-          ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900/40"
-          : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/40";
-      })(),
+      "rounded-xl border p-5 shadow-sm space-y-3",
+      isPortalFailed
+        ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/40"
+        : "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900/40",
     ].join(" ")}
   >
-    {(() => {
-      const run = latestCompletedRun as any;
-      const finalPass =
-        run.override_pass != null ? !!run.override_pass : !!run.computed_pass;
-      const wouldFail = run.computed_pass === false && run.override_pass === true;
-      const reasons = extractTopReasons(run);
+    {isPortalFailed ? (
+      <>
+        <div className="text-base font-semibold text-red-800 dark:text-red-200">
+          FAILED — Retest Required
+        </div>
 
-      if (!finalPass) {
-        return (
-          <>
-            <div className="text-sm font-semibold">FAILED — Retest Required</div>
-            <div className="text-sm text-gray-700 dark:text-gray-200">
-              Latest completed test: {String(run.test_type ?? "Test")} •{" "}
-              {formatDateLA(String(run.created_at))}
-            </div>
-
-            {reasons.length ? (
-              <ul className="list-disc pl-5 text-sm text-gray-800 dark:text-gray-100">
-                {reasons.map((r: string, i: number) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-            ) : (
-              <div className="text-sm text-gray-700 dark:text-gray-200">
-                Next step: submit corrections and supporting photos in the portal.
-              </div>
-            )}
-          </>
-        );
-      }
-
-      return (
-        <>
-          <div className="text-sm font-semibold">
-            {wouldFail
-              ? "PASS (Override) — Review Required"
-              : "PASS — Job meets requirements"}
+        {healthRun ? (
+          <div className="text-sm text-red-900/80 dark:text-red-100/90">
+            Latest failed test: {String(healthRun.test_type ?? "Test")} •{" "}
+            {formatDateLA(String(healthRun.created_at))}
           </div>
-
-          <div className="text-sm text-gray-700 dark:text-gray-200">
-            Latest completed test: {String(run.test_type ?? "Test")} •{" "}
-            {formatDateLA(String(run.created_at))}
+        ) : (
+          <div className="text-sm text-red-900/80 dark:text-red-100/90">
+            This job is currently marked as failed / retest required.
           </div>
+        )}
 
-          {wouldFail && reasons.length ? (
-            <div className="text-sm text-gray-700 dark:text-gray-200">
-              Would have failed without override:
-              <ul className="list-disc pl-5 mt-1">
-                {reasons.map((r: string, i: number) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
+        {topReasons.length > 0 ? (
+          <div className="rounded-lg border border-red-200/70 bg-white/40 dark:border-red-900/40 dark:bg-red-950/10 p-3">
+            <div className="text-sm font-semibold text-red-900 dark:text-red-100">
+              Why it failed
             </div>
-          ) : null}
-        </>
-      );
-    })()}
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-red-900/85 dark:text-red-100/90">
+              {topReasons.map((reason: string, idx: number) => (
+                <li key={`${reason}-${idx}`}>{reason}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {!!job.follow_up_date && (
+          <div className="text-sm text-red-900/80 dark:text-red-100/80">
+            Follow up date:{" "}
+            <span className="font-medium">{String(job.follow_up_date)}</span>
+          </div>
+        )}
+      </>
+    ) : healthRun ? (
+      <>
+        <div className="text-base font-semibold text-green-800 dark:text-green-200">
+          PASS — Job meets requirements
+        </div>
+
+        <div className="text-sm text-green-900/80 dark:text-green-100/90">
+          Latest completed test: {String(healthRun.test_type ?? "Test")} •{" "}
+          {formatDateLA(String(healthRun.created_at))}
+        </div>
+      </>
+    ) : null}
   </div>
 ) : null}
 
@@ -415,30 +495,37 @@ function extractTopReasons(run: any): string[] {
   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
     <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
       <div className="text-xs text-gray-500 dark:text-gray-300">Scheduled</div>
-      <div className="font-medium mt-1">
+      <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
         {(job as any).scheduled_date ? String((job as any).scheduled_date) : "Not scheduled"}
         {windowLabel ? ` • ${windowLabel}` : ""}
       </div>
     </div>
 
     <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
-      <div className="text-xs text-gray-500 dark:text-gray-300">Status</div>
-      <div className="font-medium mt-1">
-        {(job.status ?? "—") as string} • {(job.ops_status ?? "—") as string}
+      <div className="text-xs text-gray-500 dark:text-gray-300">Service Status</div>
+      <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
+        {serviceStatus}
+      </div>
+
+      <div className="mt-3 text-xs text-gray-500 dark:text-gray-300">Portal Status</div>
+      <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
+        {portalStatus}
       </div>
     </div>
 
     {(job as any).permit_number ? (
       <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
         <div className="text-xs text-gray-500 dark:text-gray-300">Permit</div>
-        <div className="font-medium mt-1">{String((job as any).permit_number)}</div>
+        <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
+          {String((job as any).permit_number)}
+        </div>
       </div>
     ) : null}
 
     {(job as any).pending_info_reason || (job as any).next_action_note ? (
       <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
         <div className="text-xs text-gray-500 dark:text-gray-300">Next action</div>
-        <div className="font-medium mt-1">
+        <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
           {String((job as any).pending_info_reason || (job as any).next_action_note)}
         </div>
       </div>

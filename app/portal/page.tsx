@@ -26,6 +26,38 @@ function statusLabel(ops: string | null | undefined) {
   return v ? v.toUpperCase().replaceAll("_", " ") : "UNKNOWN";
 }
 
+function extractTopReasons(run: any): string[] {
+  const computed = run?.computed ?? null;
+  if (!computed) return [];
+
+  const failures = Array.isArray(computed.failures)
+    ? computed.failures.map(String).map((s: string) => s.trim()).filter(Boolean)
+    : [];
+
+  if (failures.length) return failures.slice(0, 3);
+
+  const warnings = Array.isArray(computed.warnings)
+    ? computed.warnings.map(String).map((s: string) => s.trim()).filter(Boolean)
+    : [];
+
+  if (warnings.length) return warnings.slice(0, 3);
+
+  const measured = computed.measured_duct_leakage_cfm;
+  const max = computed.max_leakage_cfm;
+
+  if (typeof measured === "number" && typeof max === "number") {
+    if (measured > max) return [`Duct leakage ${measured} CFM exceeds max ${max} CFM.`];
+    return [`Duct leakage ${measured} CFM (max ${max} CFM).`];
+  }
+
+  return [];
+}
+
+function finalRunPass(run: any): boolean | null {
+  if (!run) return null;
+  return run.override_pass != null ? !!run.override_pass : !!run.computed_pass;
+}
+
 function statusBadgeClass(ops: string | null | undefined) {
   const v = (ops ?? "").toLowerCase();
 
@@ -191,6 +223,27 @@ export default async function PortalPage({
       return bDate - aDate;
     })
     .slice(0, 25);
+
+      const visibleJobIds = visibleJobs.map((j: any) => j.id);
+
+  const { data: visibleRuns, error: visibleRunsErr } = await supabase
+    .from("ecc_test_runs")
+    .select(
+      "job_id, created_at, test_type, computed_pass, override_pass, computed, is_completed"
+    )
+    .in("job_id", visibleJobIds.length ? visibleJobIds : ["00000000-0000-0000-0000-000000000000"])
+    .eq("is_completed", true)
+    .order("created_at", { ascending: false });
+
+  if (visibleRunsErr) throw visibleRunsErr;
+
+  const failedRunByJob = new Map<string, any>();
+
+  for (const run of visibleRuns ?? []) {
+    if (finalRunPass(run) === false && !failedRunByJob.has(run.job_id)) {
+      failedRunByJob.set(run.job_id, run);
+    }
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 text-gray-900 dark:text-gray-100">
@@ -383,7 +436,9 @@ export default async function PortalPage({
           {visibleJobs.map((j: any) => {
             const isUrgent =
               !!j.follow_up_date && String(j.follow_up_date) <= String(today);
-
+            const ops = String(j.ops_status ?? "").toLowerCase();
+            const failedRun = failedRunByJob.get(j.id);
+            const failureReasons = failedRun ? extractTopReasons(failedRun) : [];
             const displayAddress =
               j.locations?.address_line1?.trim() ||
               j.job_address?.trim() ||
@@ -452,6 +507,15 @@ export default async function PortalPage({
                           {j.follow_up_date}
                         </div>
                       )}
+
+                      {["failed", "retest_needed"].includes(ops) && failureReasons.length > 0 && (
+                      <div>
+                        <span className="font-semibold text-gray-700 dark:text-gray-300">
+                          Why failed:
+                        </span>{" "}
+                        {failureReasons[0]}
+                      </div>
+                    )}
                     </div>
                   </div>
 
