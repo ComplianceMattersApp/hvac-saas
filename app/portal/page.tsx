@@ -1,3 +1,4 @@
+//app portal/page
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -9,6 +10,10 @@ function formatDateLA(iso: string) {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date(iso));
+}
+
+function labelWithCount(label: string, count: number) {
+  return count > 0 ? `${label} (${count})` : label;
 }
 
 function statusLabel(ops: string | null | undefined) {
@@ -190,6 +195,17 @@ export default async function PortalPage({
     (counts["retest_needed"] ?? 0) + (counts["failed"] ?? 0);
 
   const openCount = jobs.length;
+  const pendingInfoCount = counts["pending_info"] ?? 0;
+  const needToScheduleCount = counts["need_to_schedule"] ?? 0;
+  const onHoldCount = counts["on_hold"] ?? 0;
+  const scheduledCount = counts["scheduled"] ?? 0;
+
+
+  const needsAttentionTotal =
+    retestOrFailedCount +
+    pendingInfoCount +
+    needToScheduleCount +
+    onHoldCount;
 
   let visibleJobs = jobs;
 
@@ -200,6 +216,10 @@ export default async function PortalPage({
         String(j.follow_up_date) <= String(today) &&
         attentionTodayStatuses.includes(String(j.ops_status ?? "").toLowerCase())
     );
+    } else if (queue === "scheduled") {
+  visibleJobs = jobs.filter(
+    (j) => String(j.ops_status ?? "").toLowerCase() === "scheduled"
+  );
   } else if (queue === "need_to_schedule") {
     visibleJobs = jobs.filter(
       (j) => String(j.ops_status ?? "").toLowerCase() === "need_to_schedule"
@@ -212,6 +232,10 @@ export default async function PortalPage({
     visibleJobs = jobs.filter((j) =>
       ["retest_needed", "failed"].includes(String(j.ops_status ?? "").toLowerCase())
     );
+    } else if (queue === "on_hold") {
+  visibleJobs = jobs.filter(
+    (j) => String(j.ops_status ?? "").toLowerCase() === "on_hold"
+  );
   } else {
     visibleJobs = jobs;
   }
@@ -296,135 +320,199 @@ export default async function PortalPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Link href="/portal" className={queueCardClass(!queue)}>
-          <div
-            className={`text-sm font-medium ${
-              !queue ? "text-white/80 dark:text-gray-600" : "text-gray-700 dark:text-gray-300"
-            }`}
-          >
-            Open Jobs
-          </div>
-          <div className="mt-1 text-3xl font-semibold">{openCount}</div>
-          <div
-            className={`mt-2 text-xs ${
-              !queue ? "text-white/70 dark:text-gray-500" : "text-gray-500 dark:text-gray-400"
-            }`}
-          >
-            All active contractor jobs
-          </div>
-        </Link>
+     <div className="rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800 p-5 shadow-sm">
+  <div className="flex items-start justify-between gap-4">
+    <div>
+      <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+        Needs Your Attention
+      </h2>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+        Jobs waiting on your action, scheduling, or information.
+      </p>
+    </div>
 
+    <div
+      className={`rounded-full border px-3 py-1 text-sm font-semibold ${
+        needsAttentionTotal > 0
+          ? "border-red-300 text-red-700 dark:border-red-800 dark:text-red-300"
+          : "border-gray-300 text-gray-500 dark:border-gray-700 dark:text-gray-400"
+      }`}
+    >
+      {needsAttentionTotal}
+    </div>
+  </div>
+
+  {needsAttentionTotal === 0 ? (
+    <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
+      No contractor action items right now.
+    </div>
+  ) : (
+    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {retestOrFailedCount > 0 ? (
         <Link
-          href="/portal?queue=attention_today"
-          className={queueCardClass(queue === "attention_today")}
+          href="/portal?queue=retest_needed"
+          className="rounded-xl border border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20 p-4 hover:shadow-sm transition"
         >
-          <div
-            className={`text-sm font-medium ${
-              queue === "attention_today"
-                ? "text-white/80 dark:text-gray-600"
-                : "text-gray-700 dark:text-gray-300"
-            }`}
-          >
-            Attention Today
+          <div className="text-sm font-semibold text-red-900 dark:text-red-200">
+            Failed / Retest Required
           </div>
-          <div className="mt-1 text-3xl font-semibold">{attentionTodayCount}</div>
-          <div
-            className={`mt-2 text-xs ${
-              queue === "attention_today"
-                ? "text-white/70 dark:text-gray-500"
-                : "text-gray-500 dark:text-gray-400"
-            }`}
-          >
-            Follow-ups due today or earlier
+          <div className="mt-1 text-2xl font-semibold text-red-900 dark:text-red-100">
+            {retestOrFailedCount}
+          </div>
+          <div className="mt-1 text-xs text-red-800/80 dark:text-red-200/80">
+            Jobs that failed or need retesting
           </div>
         </Link>
+      ) : null}
 
+      {pendingInfoCount > 0 ? (
+        <Link
+          href="/portal?queue=pending_info"
+          className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20 p-4 hover:shadow-sm transition"
+        >
+          <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+            Pending Info
+          </div>
+          <div className="mt-1 text-2xl font-semibold text-amber-900 dark:text-amber-100">
+            {pendingInfoCount}
+          </div>
+          <div className="mt-1 text-xs text-amber-800/80 dark:text-amber-200/80">
+            Waiting on info from you
+          </div>
+        </Link>
+      ) : null}
+
+      {needToScheduleCount > 0 ? (
         <Link
           href="/portal?queue=need_to_schedule"
-          className={queueCardClass(queue === "need_to_schedule")}
+          className="rounded-xl border border-blue-200 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/20 p-4 hover:shadow-sm transition"
         >
-          <div
-            className={`text-sm font-medium ${
-              queue === "need_to_schedule"
-                ? "text-white/80 dark:text-gray-600"
-                : "text-gray-700 dark:text-gray-300"
-            }`}
-          >
+          <div className="text-sm font-semibold text-blue-900 dark:text-blue-200">
             Need to Schedule
           </div>
-          <div className="mt-1 text-3xl font-semibold">
-            {counts["need_to_schedule"] ?? 0}
+          <div className="mt-1 text-2xl font-semibold text-blue-900 dark:text-blue-100">
+            {needToScheduleCount}
           </div>
-          <div
-            className={`mt-2 text-xs ${
-              queue === "need_to_schedule"
-                ? "text-white/70 dark:text-gray-500"
-                : "text-gray-500 dark:text-gray-400"
-            }`}
-          >
+          <div className="mt-1 text-xs text-blue-800/80 dark:text-blue-200/80">
             Jobs waiting for scheduling
           </div>
         </Link>
+      ) : null}
 
+      {onHoldCount > 0 ? (
         <Link
-          href="/portal?queue=pending_info"
-          className={queueCardClass(queue === "pending_info")}
+          href="/portal?queue=on_hold"
+          className="rounded-xl border border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/40 p-4 hover:shadow-sm transition"
         >
-          <div
-            className={`text-sm font-medium ${
-              queue === "pending_info"
-                ? "text-white/80 dark:text-gray-600"
-                : "text-gray-700 dark:text-gray-300"
-            }`}
-          >
-            Pending Info
+          <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            On Hold
           </div>
-          <div className="mt-1 text-3xl font-semibold">
-            {counts["pending_info"] ?? 0}
+          <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            {onHoldCount}
           </div>
-          <div
-            className={`mt-2 text-xs ${
-              queue === "pending_info"
-                ? "text-white/70 dark:text-gray-500"
-                : "text-gray-500 dark:text-gray-400"
-            }`}
-          >
-            Missing permit, notes, or info
+          <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+            Paused on your side
           </div>
         </Link>
+      ) : null}
+    </div>
+  )}
+</div>
 
-        <Link
-  href="/portal?queue=retest_needed"
-  className={queueCardClass(queue === "retest_needed")}
->
-            <div
-            className={`text-sm font-medium ${
-              queue === "retest_needed"
-                ? "text-white/80 dark:text-gray-600"
-                : "text-gray-700 dark:text-gray-300"
-            }`}
-          >
-            Retest Needed
-          </div>
-          <div className="mt-1 text-3xl font-semibold">
-            {retestOrFailedCount}
-          </div>
-          <div
-            className={`mt-2 text-xs ${
-              queue === "retest_needed"
-                ? "text-white/70 dark:text-gray-500"
-                : "text-gray-500 dark:text-gray-400"
-            }`}
-          >
-            Failed jobs awaiting retest
-          </div>
-        </Link>
-      </div>
+<div className="flex flex-wrap gap-2">
+  <Link
+    href="/portal"
+    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+      !queue
+        ? "border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900"
+        : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+    }`}
+  >
+    {labelWithCount("All Open Jobs", openCount)}
+  </Link>
+
+  <Link
+    href="/portal?queue=attention_today"
+    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+      queue === "attention_today"
+        ? "border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900"
+        : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+    }`}
+  >
+    {labelWithCount("Attention Today", attentionTodayCount)}
+  </Link>
+
+  <Link
+    href="/portal?queue=scheduled"
+    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+      queue === "scheduled"
+        ? "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500"
+        : "border-emerald-200 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-900/50 dark:text-emerald-300 dark:hover:bg-emerald-950/20"
+    }`}
+  >
+    {labelWithCount("Scheduled", scheduledCount)}
+  </Link>
+
+  <Link
+    href="/portal?queue=need_to_schedule"
+    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+      queue === "need_to_schedule"
+        ? "border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500"
+        : "border-blue-200 text-blue-800 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-300 dark:hover:bg-blue-950/20"
+    }`}
+  >
+    {labelWithCount("Need to Schedule", needToScheduleCount)}
+  </Link>
+
+  <Link
+    href="/portal?queue=pending_info"
+    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+      queue === "pending_info"
+        ? "border-amber-600 bg-amber-600 text-white dark:border-amber-500 dark:bg-amber-500"
+        : "border-amber-200 text-amber-800 hover:bg-amber-50 dark:border-amber-900/50 dark:text-amber-300 dark:hover:bg-amber-950/20"
+    }`}
+  >
+    {labelWithCount("Pending Info", pendingInfoCount)}
+  </Link>
+
+  <Link
+    href="/portal?queue=retest_needed"
+    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+      queue === "retest_needed"
+        ? "border-red-600 bg-red-600 text-white dark:border-red-500 dark:bg-red-500"
+        : "border-red-200 text-red-800 hover:bg-red-50 dark:border-red-900/50 dark:text-red-300 dark:hover:bg-red-950/20"
+    }`}
+  >
+    {labelWithCount("Failed / Retest", retestOrFailedCount)}
+  </Link>
+
+  <Link
+    href="/portal?queue=on_hold"
+    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+      queue === "on_hold"
+        ? "border-gray-700 bg-gray-700 text-white dark:border-gray-500 dark:bg-gray-500"
+        : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+    }`}
+  >
+    {labelWithCount("On Hold", onHoldCount)}
+  </Link>
+</div>
 
       <div className="flex items-baseline justify-between">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {queue ? `Queue: ${queue.replaceAll("_", " ")}` : "Open Jobs"}
+          {queue === "retest_needed"
+            ? "Queue: Failed / Retest"
+            : queue === "need_to_schedule"
+            ? "Queue: Need to Schedule"
+            : queue === "pending_info"
+            ? "Queue: Pending Info"
+            : queue === "attention_today"
+            ? "Queue: Attention Today"
+            : queue === "on_hold"
+            ? "Queue: On Hold"
+            : queue === "scheduled"
+            ? "Queue: Scheduled"
+            : "Open Jobs"}
         </h2>
         <div className="text-sm text-gray-600 dark:text-gray-300">
           Showing <span className="font-semibold">{visibleJobs.length}</span>

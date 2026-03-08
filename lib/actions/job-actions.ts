@@ -1,4 +1,4 @@
-//lib/actions/job-actions.ts
+//lib/actions/job-actions
 
 "use server";
 
@@ -20,6 +20,8 @@ export type JobStatus =
 
 type CreateJobInput = {
   ops_status?: string | null;
+  parent_job_id?: string | null;
+  service_case_id?: string | null;
   job_type?: string | null;
   customer_id?: string | null;
   location_id?: string | null;
@@ -114,7 +116,7 @@ async function applyRetestResolution(params: {
       meta: { via: "ecc_evaluate" },
     });
 
-    // Parent event + status resolution
+    // Parent breadcrumb
     await insertJobEvent({
       supabase,
       jobId: parentJobId,
@@ -122,7 +124,6 @@ async function applyRetestResolution(params: {
       meta: { child_job_id: childJobId },
     });
 
-    // Resolve parent out of failed if it's currently failed/retest-related
     const { data: parent, error: parentErr } = await supabase
       .from("jobs")
       .select("ops_status")
@@ -133,11 +134,11 @@ async function applyRetestResolution(params: {
 
     const parentOps = String(parent?.ops_status ?? "").trim() || null;
 
-    // Conservative: only auto-change when parent is in a failure state
+    // Resolve parent out of failure workflow, but do NOT auto-close
     if (parentOps === "failed" || parentOps === "retest_needed") {
       const { error: updErr } = await supabase
         .from("jobs")
-        .update({ ops_status: "closed" })
+        .update({ ops_status: "paperwork_required" })
         .eq("id", parentJobId);
 
       if (updErr) throw updErr;
@@ -146,7 +147,11 @@ async function applyRetestResolution(params: {
         supabase,
         jobId: parentJobId,
         event_type: "status_changed",
-        meta: { from: parentOps, to: "closed", reason: "retest_passed" },
+        meta: {
+          from: parentOps,
+          to: "paperwork_required",
+          reason: "retest_passed",
+        },
       });
     }
   }
@@ -199,6 +204,144 @@ type OpsSnapshot = {
   next_action_note: string | null;
   action_required_by: string | null;
 };
+
+  function buildInitialProblemSummary(input: {
+  job_notes?: string | null;
+  title?: string | null;
+}) {
+  const notes = String(input.job_notes ?? "").trim();
+  if (notes) return notes;
+
+  const title = String(input.title ?? "").trim();
+  if (title) return title;
+
+  return null;
+}
+
+async function createServiceCaseForRootJob(params: {
+  supabase: any;
+  customerId: string;
+  locationId: string;
+  problemSummary?: string | null;
+}) {
+  const { supabase, customerId, locationId, problemSummary } = params;
+
+  const { data, error } = await supabase
+    .from("service_cases")
+    .insert({
+      customer_id: customerId,
+      location_id: locationId,
+      problem_summary: problemSummary ?? null,
+      status: "open",
+    })
+    .select("id")
+    .single();
+
+  if (error) throw error;
+  if (!data?.id) throw new Error("Failed to create service case");
+
+  return String(data.id);
+}
+
+async function ensureServiceCaseForJob(params: {
+  supabase: any;
+  jobId: string;
+}) {
+  const { supabase, jobId } = params;
+
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select("id, customer_id, location_id, service_case_id, job_notes, title")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+  if (!job?.id) throw new Error("Job not found while ensuring service case");
+
+  if (job.service_case_id) {
+    return String(job.service_case_id);
+  }
+
+  if (!job.customer_id || !job.location_id) {
+    throw new Error("Cannot create service case: job missing customer_id or location_id");
+  }
+
+  const serviceCaseId = await createServiceCaseForRootJob({
+    supabase,
+    customerId: String(job.customer_id),
+    locationId: String(job.location_id),
+    problemSummary: buildInitialProblemSummary({
+      job_notes: job.job_notes,
+      title: job.title,
+    }),
+  });
+
+  const { error: updErr } = await supabase
+    .from("jobs")
+    .update({ service_case_id: serviceCaseId })
+    .eq("id", jobId);
+
+  if (updErr) throw updErr;
+
+  return serviceCaseId;
+}
+
+async function resolveServiceCaseIdForNewJob(params: {
+  supabase: any;
+  parentJobId?: string | null;
+  customerId?: string | null;
+  locationId?: string | null;
+  title?: string | null;
+  jobNotes?: string | null;
+}) {
+  const {
+    supabase,
+    parentJobId,
+    customerId,
+    locationId,
+    title,
+    jobNotes,
+  } = params;
+
+  const parentId = String(parentJobId ?? "").trim();
+
+  // Child job path: inherit from parent
+  if (parentId) {
+    const { data: parent, error: parentErr } = await supabase
+      .from("jobs")
+      .select("id, service_case_id")
+      .eq("id", parentId)
+      .maybeSingle();
+
+    if (parentErr) throw parentErr;
+    if (!parent?.id) throw new Error("Parent job not found");
+
+    if (parent.service_case_id) {
+      return String(parent.service_case_id);
+    }
+
+    // Repair path during rollout/backfill transition
+    return await ensureServiceCaseForJob({
+      supabase,
+      jobId: parentId,
+    });
+  }
+
+  // Root job path: no service_case_id yet; create after job insert
+  if (!customerId || !locationId) {
+    throw new Error("Cannot resolve root service case without customer_id and location_id");
+  }
+
+  return await createServiceCaseForRootJob({
+    supabase,
+    customerId,
+    locationId,
+    problemSummary: buildInitialProblemSummary({
+      job_notes: jobNotes,
+      title,
+    }),
+  });
+}
 
 function buildOpsChanges(before: OpsSnapshot, after: OpsSnapshot) {
   const keys = Object.keys(after) as (keyof OpsSnapshot)[];
@@ -763,8 +906,22 @@ export async function markRefrigerantChargeExemptFromForm(formData: FormData) {
       ? "conditions_not_met"
       : null;
 
+  const supabase = await createClient();
+
   if (!exemptReason) {
-    throw new Error("Select Package unit or Conditions not met to mark exempt.");
+    const systemId = await resolveSystemIdForRun({
+      supabase,
+      jobId,
+      testRunId,
+      systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+    });
+
+    const q = new URLSearchParams();
+    q.set("t", "refrigerant_charge");
+    if (systemId) q.set("s", systemId);
+    q.set("notice", "rc_exempt_reason_required");
+
+    redirect(`/jobs/${jobId}/tests?${q.toString()}`);
   }
 
   const reasonLabel =
@@ -773,8 +930,6 @@ export async function markRefrigerantChargeExemptFromForm(formData: FormData) {
       : "Conditions not met / weather — charge verification override";
 
   const fullReason = details ? `${reasonLabel}: ${details}` : reasonLabel;
-
-  const supabase = await createClient();
 
   // merge into data for persistence/UI defaults
   const { data: existingRun, error: loadErr } = await supabase
@@ -1402,11 +1557,11 @@ const deleteId = keepId === run.id ? conflict?.id : run.id;
   if (completeErr) throw completeErr;
 
   // 5) If there was a conflict, delete the OTHER row (never delete the clicked one)
-  if (conflict?.id) {
+  if (deleteId) {
     const { error: delErr } = await supabase
       .from("ecc_test_runs")
       .delete()
-      .eq("id", conflict.id)
+      .eq("id", deleteId)
       .eq("job_id", jobId);
 
     if (delErr) throw delErr;
@@ -1428,13 +1583,6 @@ const parentJobId = (childBefore?.parent_job_id ?? null) as string | null;
 
 // Existing behavior (keep)
 await evaluateEccOpsStatus(jobId);
-
-await insertJobEvent({
-  supabase,
-  jobId,
-  event_type: "debug_marker",
-  meta: { note: "after_evaluateEccOpsStatus" },
-});
 
 // AFTER snapshot: child ops_status
 const { data: childAfter, error: childAfterErr } = await supabase
@@ -1531,19 +1679,13 @@ export async function addAlterationCoreTestsFromForm(formData: FormData) {
   redirectToTests({ jobId, systemId });
 }
 
-export async function createJob(input: CreateJobInput): Promise<{ id: string }> {
+export async function createJob(input: CreateJobInput): Promise<{ id: string; service_case_id: string | null }> {
   const supabase = await createClient();
 
-  const normalizeTimestamptz = (v: any) => {
-  const s = typeof v === "string" ? v.trim() : "";
-  if (!s) return null;
-  // Reject time-only strings like "T12:00:00.000Z"
-  if (s.startsWith("T")) return null;
-  return s;
-};
-
-
   const payload = {
+    parent_job_id: input.parent_job_id ?? null,
+    service_case_id: input.service_case_id ?? null,
+
     job_type: input.job_type ?? "ecc",
     project_type: input.project_type ?? "alteration",
 
@@ -1563,8 +1705,7 @@ export async function createJob(input: CreateJobInput): Promise<{ id: string }> 
     customer_last_name: input.customer_last_name ?? null,
     customer_email: input.customer_email ?? null,
     job_notes: input.job_notes ?? null,
-
-        ops_status: input.ops_status ?? null,
+    ops_status: input.ops_status ?? null,
 
     billing_recipient: input.billing_recipient ?? null,
     billing_name: input.billing_name ?? null,
@@ -1577,18 +1718,43 @@ export async function createJob(input: CreateJobInput): Promise<{ id: string }> 
     billing_zip: input.billing_zip ?? null,
   };
 
-
-  
   const { data, error } = await supabase
     .from("jobs")
     .insert(payload)
-    .select(
-      "id"
-    )
+    .select("id, customer_id, location_id, service_case_id, parent_job_id, title, job_notes")
     .single();
 
   if (error) throw error;
-  return data as { id: string };
+  if (!data?.id) throw new Error("Job insert failed");
+
+  let serviceCaseId = data.service_case_id ? String(data.service_case_id) : null;
+
+  // Root job: create case after insert if not already provided
+  if (!serviceCaseId && !data.parent_job_id) {
+    if (!data.customer_id || !data.location_id) {
+      throw new Error("Root job created without customer_id/location_id; cannot create service case");
+    }
+
+    serviceCaseId = await resolveServiceCaseIdForNewJob({
+      supabase,
+      customerId: String(data.customer_id),
+      locationId: String(data.location_id),
+      title: data.title,
+      jobNotes: data.job_notes,
+    });
+
+    const { error: updErr } = await supabase
+      .from("jobs")
+      .update({ service_case_id: serviceCaseId })
+      .eq("id", data.id);
+
+    if (updErr) throw updErr;
+  }
+
+  return {
+    id: String(data.id),
+    service_case_id: serviceCaseId,
+  };
 }
 
 export async function updateJob(input: {
@@ -2105,38 +2271,141 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
   const next = nextMap[current];
 
-  // ✅ stamp only first time entering on_the_way
+  // ECC guard:
+  // do not allow status flow to move into completed unless at least one
+  // completed ECC test run has a real result.
+  if (next === "completed") {
+    const { data: jt, error: jtErr } = await supabase
+      .from("jobs")
+      .select("job_type")
+      .eq("id", id)
+      .single();
+
+    if (jtErr) throw jtErr;
+
+    if ((jt?.job_type ?? "").toLowerCase() === "ecc") {
+      const { data: runs, error: runErr } = await supabase
+        .from("ecc_test_runs")
+        .select("id, is_completed, computed_pass, override_pass")
+        .eq("job_id", id)
+        .eq("is_completed", true);
+
+      if (runErr) throw runErr;
+
+      const hasMeaningfulCompletedRun = (runs ?? []).some((r: any) => {
+        if (!r?.is_completed) return false;
+        if (r?.override_pass === true || r?.override_pass === false) return true;
+        if (r?.computed_pass === true || r?.computed_pass === false) return true;
+        return false;
+      });
+
+      if (!hasMeaningfulCompletedRun) {
+        redirect(`/jobs/${id}?notice=ecc_test_required`);
+      }
+    }
+  }
+
+    // ✅ stamp only first time entering on_the_way
   if (next === "on_the_way" && !job?.on_the_way_at) {
+    const autoScheduleConfirmed =
+      String(formData.get("auto_schedule_confirmed") || "").trim() === "1";
+
+    const { data: scheduleSnapshot, error: scheduleErr } = await supabase
+      .from("jobs")
+      .select("scheduled_date, window_start, window_end")
+      .eq("id", id)
+      .single();
+
+    if (scheduleErr) throw scheduleErr;
+
+    const hasFullSchedule =
+      !!scheduleSnapshot?.scheduled_date &&
+      !!scheduleSnapshot?.window_start &&
+      !!scheduleSnapshot?.window_end;
+
+    const now = new Date();
+
+    const toLocalDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    const toLocalTime = (d: Date) => {
+      const hours = String(d.getHours()).padStart(2, "0");
+      const minutes = String(d.getMinutes()).padStart(2, "0");
+      return `${hours}:${minutes}`;
+    };
+
+    const plusTwoHours = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+
+    if (!hasFullSchedule && !autoScheduleConfirmed) {
+      redirect(`/jobs/${id}?tab=${String(formData.get("tab") || "info")}&schedule_required=1`);
+    }
+
+    const updatePayload: Record<string, any> = {
+      status: "on_the_way",
+      on_the_way_at: now.toISOString(),
+    };
+
+    if (!hasFullSchedule && autoScheduleConfirmed) {
+      updatePayload.scheduled_date = toLocalDate(now);
+      updatePayload.window_start = toLocalTime(now);
+      updatePayload.window_end = toLocalTime(plusTwoHours);
+    }
+
     const { error: updErr } = await supabase
       .from("jobs")
-      .update({ status: "on_the_way", on_the_way_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq("id", id);
 
     if (updErr) throw updErr;
+
+    if (!hasFullSchedule && autoScheduleConfirmed) {
+      await insertJobEvent({
+        supabase,
+        jobId: id,
+        event_type: "schedule_updated",
+        meta: {
+          before: {
+            scheduled_date: scheduleSnapshot?.scheduled_date ?? null,
+            window_start: scheduleSnapshot?.window_start ?? null,
+            window_end: scheduleSnapshot?.window_end ?? null,
+          },
+          after: {
+            scheduled_date: updatePayload.scheduled_date,
+            window_start: updatePayload.window_start,
+            window_end: updatePayload.window_end,
+          },
+          source: "auto_schedule_on_the_way",
+        },
+      });
+    }
   } else {
     const updatePayload: Record<string, any> = { status: next };
 
     // ✅ When field marks completed, push into Data Entry queue
     // When field marks completed, push into the correct Ops queue
   if (next === "completed") {
-  const { data: jt, error: jtErr } = await supabase
-    .from("jobs")
-    .select("job_type")
-    .eq("id", id)
-    .single();
+    const { data: jt, error: jtErr } = await supabase
+      .from("jobs")
+      .select("job_type, ops_status, certs_complete, invoice_complete, scheduled_date, window_start, window_end")
+      .eq("id", id)
+      .single();
 
-  if (jtErr) throw jtErr;
+    if (jtErr) throw jtErr;
 
-  if ((jt?.job_type ?? "").toLowerCase() === "service") {
-    // Service jobs go straight into invoice queue after field completion
-    updatePayload.ops_status = "invoice_required";
-  } else if ((jt?.job_type ?? "").toLowerCase() === "ecc") {
-    // Option 1: stage marker — do not jump to paperwork_required automatically
-    updatePayload.ops_status = "field_complete";
-    updatePayload.field_complete = true;
-    updatePayload.field_complete_at = new Date().toISOString();
+    if ((jt?.job_type ?? "").toLowerCase() === "service") {
+      // Service jobs go straight into invoice queue after field completion
+      updatePayload.ops_status = "invoice_required";
+    } else if ((jt?.job_type ?? "").toLowerCase() === "ecc") {
+      // ECC: mark field lifecycle complete here,
+      // but do NOT guess final ops resolution locally.
+      updatePayload.field_complete = true;
+      updatePayload.field_complete_at = new Date().toISOString();
+    }
   }
-}
 
     const { error: updErr } = await supabase
       .from("jobs")
@@ -2145,13 +2414,67 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     if (updErr) throw updErr;
   }
-  // ✅ timeline: status change
-  await insertJobEvent({
-    supabase,
-    jobId: id,
-    event_type: "status_changed",
-    meta: { from: current, to: next },
-  });
+
+  // ECC canonical resolution:
+  // once the field lifecycle is marked complete, derive ops_status from ecc_test_runs
+  if (next === "completed") {
+    const { data: jt2, error: jt2Err } = await supabase
+      .from("jobs")
+      .select("job_type")
+      .eq("id", id)
+      .single();
+
+    if (jt2Err) throw jt2Err;
+
+    if ((jt2?.job_type ?? "").toLowerCase() === "ecc") {
+      await evaluateEccOpsStatus(id);
+    }
+  }
+    const lifecycleEventMap: Partial<Record<JobStatus, string>> = {
+    on_the_way: "on_my_way",
+    in_process: "job_started",
+    completed: "job_completed",
+  };
+
+  const lifecycleEventType = lifecycleEventMap[next];
+
+  if (lifecycleEventType) {
+    await insertJobEvent({
+      supabase,
+      jobId: id,
+      event_type: lifecycleEventType,
+      meta: { from: current, to: next },
+    });
+  }
+
+    // Retest-specific lifecycle breadcrumb:
+  // if this job is a linked retest child and it enters in_process,
+  // log retest_started on BOTH the child and the parent.
+  const { data: linkedJob, error: linkedErr } = await supabase
+    .from("jobs")
+    .select("parent_job_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (linkedErr) throw linkedErr;
+
+  const parentJobId = String(linkedJob?.parent_job_id ?? "").trim();
+
+  if (parentJobId && next === "in_process") {
+    await insertJobEvent({
+      supabase,
+      jobId: id,
+      event_type: "retest_started",
+      meta: { parent_job_id: parentJobId },
+    });
+
+    await insertJobEvent({
+      supabase,
+      jobId: parentJobId,
+      event_type: "retest_started",
+      meta: { child_job_id: id },
+    });
+  }
 
   revalidatePath(`/jobs/${id}`);
   revalidatePath(`/ops`);
@@ -2270,6 +2593,73 @@ export async function updateJobCustomerFromForm(formData: FormData) {
   redirect(`/jobs/${id}`);
 }
 
+// Job timeline event writers: public_note + internal_note
+export async function addPublicNoteFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const note = String(formData.get("note") || "").trim();
+  const tab = String(formData.get("tab") || "ops").trim() || "ops";
+
+  if (!jobId) throw new Error("Job ID is required");
+  if (!note) {
+    redirect(`/jobs/${jobId}?tab=${tab}`);
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr) throw userErr;
+  if (!user) redirect("/login");
+
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: "public_note",
+    meta: { note },
+    userId: user.id,
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/ops`);
+  redirect(`/jobs/${jobId}?tab=${tab}`);
+}
+
+export async function addInternalNoteFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const note = String(formData.get("note") || "").trim();
+  const tab = String(formData.get("tab") || "ops").trim() || "ops";
+
+  if (!jobId) throw new Error("Job ID is required");
+  if (!note) {
+    redirect(`/jobs/${jobId}?tab=${tab}`);
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr) throw userErr;
+  if (!user) redirect("/login");
+
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: "internal_note",
+    meta: { note },
+    userId: user.id,
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/ops`);
+  redirect(`/jobs/${jobId}?tab=${tab}`);
+}
+
 export async function completeDataEntryFromForm(formData: FormData) {
   const id =
     String(formData.get("id") || "").trim() ||
@@ -2333,9 +2723,10 @@ export async function createRetestJobFromForm(formData: FormData) {
   // 1) Load parent job
   const { data: parentData, error: parentErr } = await supabase
     .from("jobs")
-    .select(
+      .select(
       [
         "id",
+        "service_case_id",
         "job_type",
         "project_type",
         "title",
@@ -2369,8 +2760,17 @@ export async function createRetestJobFromForm(formData: FormData) {
   // 2) Create retest job (unscheduled by default)
   const retestTitle = `Retest — ${parent?.title ?? "Job"}`;
 
-  const payload: any = {
+    const inheritedServiceCaseId =
+    parent?.service_case_id
+      ? String(parent.service_case_id)
+      : await ensureServiceCaseForJob({
+          supabase,
+          jobId: parentJobId,
+        });
+
+  const child = await createJob({
     parent_job_id: parentJobId,
+    service_case_id: inheritedServiceCaseId,
 
     job_type: parent?.job_type ?? "ecc",
     project_type: parent?.project_type ?? "alteration",
@@ -2405,15 +2805,7 @@ export async function createRetestJobFromForm(formData: FormData) {
     billing_city: parent?.billing_city ?? null,
     billing_state: parent?.billing_state ?? null,
     billing_zip: parent?.billing_zip ?? null,
-  };
-
-  const { data: child, error: insErr } = await supabase
-    .from("jobs")
-    .insert(payload)
-    .select("id")
-    .single();
-
-  if (insErr) throw insErr;
+  });
 
   // 3) Timeline events on BOTH jobs
   await insertJobEvent({
@@ -2429,6 +2821,8 @@ export async function createRetestJobFromForm(formData: FormData) {
     event_type: "retest_created",
     meta: { parent_job_id: parentJobId },
   });
+
+  
 
   // ✅ Optional: copy systems + equipment from original → retest
   if (copyEquipment) {

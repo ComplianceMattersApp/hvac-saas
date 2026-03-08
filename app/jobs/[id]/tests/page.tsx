@@ -1,3 +1,4 @@
+// app/jobs/[id]/tests/page
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -44,13 +45,14 @@ export default async function JobTestsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ t?: string; s?: string }>;
+  searchParams?: Promise<{ t?: string; s?: string; notice?: string }>;
 }) {
   const { id } = await params;
   const sp = (await searchParams) ?? {};
 
   const focused = String(sp.t ?? "").trim();
   const selectedSystemIdFromQuery = String(sp.s ?? "").trim();
+  const notice = String(sp.notice ?? "").trim();
 
   type FocusedType = "refrigerant_charge" | "airflow" | "duct_leakage" | "custom" | "";
   const focusedType: FocusedType =

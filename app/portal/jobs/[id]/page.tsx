@@ -1,4 +1,4 @@
-// app/portal/jobs/[id]/page.tsx
+// app/portal/jobs/[id]/page
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";

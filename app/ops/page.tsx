@@ -1,4 +1,4 @@
-// app/ops/page.tsx
+// app/ops/page
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import ContractorFilter from "./_components/ContractorFilter";
@@ -220,6 +220,23 @@ for (const row of countRows ?? []) {
   counts.set(key, (counts.get(key) ?? 0) + 1);
 }
 
+// Parents with at least one successfully resolved retest child should leave active unresolved queues.
+// The parent remains historically failed, but should not stay in active Failed / Attention views.
+const { data: resolvedRetestChildren, error: resolvedRetestErr } = await supabase
+  .from("jobs")
+  .select("parent_job_id, ops_status")
+  .not("parent_job_id", "is", null)
+  .in("ops_status", ["paperwork_required", "invoice_required", "closed"])
+  .is("deleted_at", null);
+
+if (resolvedRetestErr) throw resolvedRetestErr;
+
+const resolvedFailedParentIds = new Set(
+  (resolvedRetestChildren ?? [])
+    .map((r: any) => String(r.parent_job_id ?? "").trim())
+    .filter(Boolean)
+);
+
 
   // Contractors for filter dropdown
   const { data: contractors } = await supabase
@@ -368,6 +385,12 @@ if (upcomingErr) throw upcomingErr;
     }
   const { data: bucketJobs, error: bucketErr } = await bucketQ;
   if (bucketErr) throw bucketErr;
+  const filteredBucketJobs =
+  bucket === "failed" || bucket === "attention"
+    ? (bucketJobs ?? []).filter(
+        (j: any) => !resolvedFailedParentIds.has(String(j.id ?? ""))
+      )
+    : (bucketJobs ?? []);
 
   // --- Customer/Location lookup maps (source-of-truth) ---
 const allJobs = [
@@ -375,7 +398,7 @@ const allJobs = [
   ...(upcomingJobs ?? []),
   ...(callListJobs ?? []),
   ...(attentionJobs ?? []),
-  ...(bucketJobs ?? []),
+  ...(filteredBucketJobs ?? [])
 ] as any[];
 
 const customerIds = Array.from(
@@ -863,10 +886,10 @@ jobs.sort((a: any, b: any) => {
         </div>
 
         <div className="space-y-2">
-          {(bucketJobs ?? []).length === 0 ? (
+          {(filteredBucketJobs ?? []).length === 0 ? (
             <div className="text-sm text-blue-600">No jobs in this queue.</div>
           ) : (
-            (bucketJobs ?? []).map((j: any) => (
+            (filteredBucketJobs ?? []).map((j: any) => (
               <div
   key={j.id}
   className="rounded-md border border-gray-200 bg-white p-3 shadow-sm hover:bg-gray-50 transition"

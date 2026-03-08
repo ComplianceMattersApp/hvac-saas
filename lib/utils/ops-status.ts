@@ -1,3 +1,5 @@
+//lib utils ops-status
+
 export type ResolveOpsStatusInput = {
   status: string | null;
   job_type: string | null;
@@ -13,6 +15,7 @@ export type ResolveOpsStatusInput = {
 export function resolveOpsStatus(job: ResolveOpsStatusInput): string {
   const status = (job.status ?? "").toLowerCase();
   const jobType = (job.job_type ?? "").toLowerCase();
+  const currentOps = (job.current_ops_status ?? "").toLowerCase();
 
   const isScheduled =
     !!job.scheduled_date || !!job.window_start || !!job.window_end;
@@ -24,6 +27,13 @@ export function resolveOpsStatus(job: ResolveOpsStatusInput): string {
   // Pre-field workflow
   if (!fieldComplete) {
     return isScheduled ? "scheduled" : "need_to_schedule";
+  }
+
+  // Preserve unresolved ECC failure states.
+  // Failed originals and retest-needed jobs should not be auto-resolved
+  // by generic closeout actions.
+  if (jobType === "ecc" && (currentOps === "failed" || currentOps === "retest_needed")) {
+    return currentOps;
   }
 
   // Post-field / closeout workflow
