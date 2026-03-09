@@ -655,7 +655,7 @@ const defaultSystemTonnage =
                         type="number"
                         step="0.1"
                         className="w-full rounded-md border px-3 py-2"
-                        defaultValue={runAF.data?.tonnage ?? defaultSystemTonnage}
+                        defaultValue={runDL.data?.tonnage ?? defaultSystemTonnage}
                       />
                     </div>
 
