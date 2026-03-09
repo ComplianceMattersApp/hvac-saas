@@ -29,6 +29,7 @@ type MyContractor = { id: string; name: string } | null;
 
 type ComponentType =
   | "condenser_ac"
+  | "coil"
   | "heat_pump_outdoor"
   | "furnace_gas"
   | "air_handler_electric"

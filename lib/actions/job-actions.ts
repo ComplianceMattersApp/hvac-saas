@@ -1212,7 +1212,7 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
 export async function saveAirflowDataFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
-  const projectType = String(formData.get("project_type") || "").trim(); // "alteration" | "all_new"
+  const projectType = String(formData.get("project_type") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
   if (!testRunId) throw new Error("Missing test_run_id");
@@ -1227,8 +1227,8 @@ export async function saveAirflowDataFromForm(formData: FormData) {
   const measuredTotalCfm = num("measured_total_cfm");
   const tonnage = num("tonnage");
 
+  // Existing simple rule for now; later we can swap this to rule-profiles helper
   const cfmPerTon = projectType === "all_new" ? 350 : 300;
-
   const requiredTotalCfm = tonnage != null ? tonnage * cfmPerTon : null;
 
   const failures: string[] = [];
@@ -1241,9 +1241,19 @@ export async function saveAirflowDataFromForm(formData: FormData) {
 
   if (measuredTotalCfm != null && requiredTotalCfm != null) {
     computedPass = measuredTotalCfm < requiredTotalCfm ? false : true;
-    if (computedPass === false) failures.push(`Airflow below required (${requiredTotalCfm} CFM)`);
+    if (computedPass === false) {
+      failures.push(`Airflow below required (${requiredTotalCfm} CFM)`);
+    }
   } else {
     computedPass = null;
+  }
+
+  // NEW: airflow pass override
+  const airflowOverridePass = String(formData.get("airflow_override_pass") || "").trim() === "true";
+  const airflowOverrideReason = String(formData.get("airflow_override_reason") || "").trim();
+
+  if (airflowOverridePass && !airflowOverrideReason) {
+    throw new Error("Airflow override reason is required when override is enabled.");
   }
 
   const data = {
@@ -1251,6 +1261,10 @@ export async function saveAirflowDataFromForm(formData: FormData) {
     tonnage,
     cfm_per_ton_required: cfmPerTon,
     notes: String(formData.get("notes") || "").trim() || null,
+
+    // breadcrumb for reporting/audit
+    airflow_override_applied: airflowOverridePass || undefined,
+    airflow_override_reason: airflowOverridePass ? airflowOverrideReason : undefined,
   };
 
   const computed = {
@@ -1259,6 +1273,9 @@ export async function saveAirflowDataFromForm(formData: FormData) {
     measured_total_cfm: measuredTotalCfm,
     failures,
     warnings,
+
+    // breadcrumb for reporting/audit
+    override_mode: airflowOverridePass ? "pass_override" : null,
   };
 
   const supabase = await createClient();
@@ -1269,6 +1286,8 @@ export async function saveAirflowDataFromForm(formData: FormData) {
       data,
       computed,
       computed_pass: computedPass,
+      override_pass: airflowOverridePass ? true : null,
+      override_reason: airflowOverridePass ? airflowOverrideReason : null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", testRunId)
@@ -1282,6 +1301,8 @@ export async function saveAirflowDataFromForm(formData: FormData) {
     testRunId,
     systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
   });
+
+  await evaluateEccOpsStatus(jobId);
 
   revalidatePath(`/jobs/${jobId}/tests`);
   revalidatePath(`/jobs/${jobId}`);

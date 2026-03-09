@@ -14,6 +14,17 @@ import {
   saveEccTestOverrideFromForm,
 } from "@/lib/actions/job-actions";
 
+import {
+  getActiveManualAddTests,
+  getTestDefinition,
+  type EccTestType,
+} from "@/lib/ecc/test-registry";
+import {
+  getRequiredTestsForSystem,
+  normalizeProjectTypeToRuleProfile,
+  isPackageSystem,
+} from "@/lib/ecc/rule-profiles";
+
 function getEffectiveResultLabel(t: any) {
   if (t.override_pass === true) return "PASS (override)";
   if (t.override_pass === false) return "FAIL (override)";
@@ -21,6 +32,92 @@ function getEffectiveResultLabel(t: any) {
   if (t.computed_pass === true) return "PASS";
   if (t.computed_pass === false) return "FAIL";
   return "Not computed";
+}
+
+function getPrimaryEquipment(systemEquipment: any[]) {
+  return (
+    systemEquipment.find((eq) => eq.component_type?.startsWith("package")) ??
+    systemEquipment.find((eq) => eq.equipment_role === "condenser") ??
+    systemEquipment.find((eq) => eq.equipment_role === "air_handler") ??
+    systemEquipment.find((eq) => eq.equipment_role === "furnace") ??
+    systemEquipment[0] ??
+    null
+  );
+}
+
+function getTestDisplayLabel(testType: string, packageSystem: boolean) {
+  const baseLabel = getTestDefinition(testType)?.shortLabel ?? testType;
+
+  if (packageSystem && testType === "refrigerant_charge") {
+    return `${baseLabel} — Not Required (Package Unit)`;
+  }
+
+  return baseLabel;
+}
+
+function getRequiredTestStatusForSystem(job: any, systemId: string, testType: EccTestType) {
+  const run = pickRunForSystem(job, testType, systemId);
+
+  if (!run) {
+    return {
+      state: "missing" as const,
+      label: "Missing",
+      tone: "border-red-200 bg-red-50 text-red-700",
+      run,
+    };
+  }
+
+  if (run.override_pass === true) {
+    return {
+      state: "pass_override" as const,
+      label: "Pass (override)",
+      tone: "border-emerald-200 bg-emerald-50 text-emerald-700",
+      run,
+    };
+  }
+
+  if (run.override_pass === false) {
+    return {
+      state: "fail_override" as const,
+      label: "Fail (override)",
+      tone: "border-red-200 bg-red-50 text-red-700",
+      run,
+    };
+  }
+
+  if (run.is_completed !== true) {
+    return {
+      state: "incomplete" as const,
+      label: "In progress",
+      tone: "border-amber-200 bg-amber-50 text-amber-700",
+      run,
+    };
+  }
+
+  if (run.computed_pass === true) {
+    return {
+      state: "pass" as const,
+      label: "Pass",
+      tone: "border-emerald-200 bg-emerald-50 text-emerald-700",
+      run,
+    };
+  }
+
+  if (run.computed_pass === false) {
+    return {
+      state: "fail" as const,
+      label: "Fail",
+      tone: "border-red-200 bg-red-50 text-red-700",
+      run,
+    };
+  }
+
+  return {
+    state: "unknown" as const,
+    label: "Not computed",
+    tone: "border-slate-200 bg-slate-50 text-slate-700",
+    run,
+  };
 }
 
 function pickRunForSystem(job: any, testType: string, systemId: string) {
@@ -53,6 +150,7 @@ export default async function JobTestsPage({
   const focused = String(sp.t ?? "").trim();
   const selectedSystemIdFromQuery = String(sp.s ?? "").trim();
   const notice = String(sp.notice ?? "").trim();
+  
 
   type FocusedType = "refrigerant_charge" | "airflow" | "duct_leakage" | "custom" | "";
   const focusedType: FocusedType =
@@ -82,6 +180,7 @@ export default async function JobTestsPage({
       job_equipment (
         id,
         system_id,
+        component_type,
         equipment_role,
         system_location,
         manufacturer,
@@ -131,6 +230,35 @@ export default async function JobTestsPage({
   const runAF = selectedSystemId ? pickRunForSystem(job, "airflow", selectedSystemId) : null;
   const runRC = selectedSystemId ? pickRunForSystem(job, "refrigerant_charge", selectedSystemId) : null;
 
+  const normalizedProfile = normalizeProjectTypeToRuleProfile(job.project_type);
+  const manualAddTests = getActiveManualAddTests();
+
+  const selectedSystemEquipment = (job.job_equipment ?? []).filter(
+  (eq: any) => String(eq.system_id ?? "") === String(selectedSystemId)
+    );
+
+    const requiredTests = getRequiredTestsForSystem({
+      projectType: job.project_type,
+      systemEquipment: selectedSystemEquipment,
+    });
+
+  const packageSystem = isPackageSystem(selectedSystemEquipment);
+
+const primaryEquipment =
+  selectedSystemEquipment.find((eq: any) =>
+    String(eq?.component_type ?? "").toLowerCase().startsWith("package")
+  ) ??
+  selectedSystemEquipment.find((eq: any) => eq.equipment_role === "condenser") ??
+  selectedSystemEquipment.find((eq: any) => eq.equipment_role === "air_handler") ??
+  selectedSystemEquipment.find((eq: any) => eq.equipment_role === "furnace") ??
+  selectedSystemEquipment[0] ??
+  null;
+
+const defaultSystemTonnage =
+  primaryEquipment?.tonnage != null && primaryEquipment?.tonnage !== ""
+    ? primaryEquipment.tonnage
+    : "";
+
   function effectiveResult(run: any): "pass" | "fail" | "unknown" {
     if (!run) return "unknown";
     if (run.override_pass === true) return "pass";
@@ -160,7 +288,14 @@ export default async function JobTestsPage({
   };
 
   return (
-    <div className="p-6 max-w-3xl space-y-4">
+        <div className="p-6 max-w-3xl space-y-4">
+          {notice === "rc_exempt_reason_required" && (
+      <div className="mb-4 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        Select <span className="font-semibold">Package unit</span> or{" "}
+        <span className="font-semibold">Conditions not met</span> before marking
+        refrigerant charge exempt.
+      </div>
+    )}
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm text-gray-600">Job Tests</div>
@@ -278,6 +413,80 @@ export default async function JobTestsPage({
           </div>
         )}
 
+                {selectedSystemId ? (
+          <div className="rounded-lg border bg-white p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">Required Tests</div>
+                <div className="text-xs text-muted-foreground">
+                  Required for this project type:{" "}
+                  <span className="font-medium">
+                    {normalizedProfile === "alteration"
+                      ? "Alteration"
+                      : normalizedProfile === "new_prescriptive"
+                      ? "New Prescriptive"
+                      : "Other / Custom"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground">
+                {systems.find((s: any) => String(s.id) === String(selectedSystemId))?.name ?? "Selected system"}
+              </div>
+            </div>
+
+            {requiredTests.length === 0 ? (
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                No default required tests for this profile. Use Add Test to build the custom set.
+                <div className="text-xs text-muted-foreground">
+                  Required for this project type:{" "}
+                  <span className="font-medium">
+                    {normalizedProfile === "alteration"
+                      ? "Alteration"
+                      : normalizedProfile === "new_prescriptive"
+                      ? "New Prescriptive"
+                      : "Other / Custom"}
+                  </span>
+                  {packageSystem ? (
+                    <span> · Package system: refrigerant charge excluded</span>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                {requiredTests.map((testType: EccTestType) => {
+                  const status = getRequiredTestStatusForSystem(job, selectedSystemId, testType);
+                  const isRefrigerant = testType === "refrigerant_charge";
+                  const suppressedForPackage = isRefrigerant && packageSystem;
+                  return (
+                    <div
+                      key={testType}
+                      className="flex items-center justify-between rounded-md border px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium">{getTestDisplayLabel(testType, packageSystem)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {status.state === "missing"
+                            ? "No run created yet"
+                            : status.state === "incomplete"
+                            ? "Run exists but is not completed"
+                            : "Tracked on this system"}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status.tone}`}
+                      >
+                        {status.label}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : null}
+
         {/* Add Test panel */}
         {selectedSystemId && focusedType === "custom" ? (
           <div className="rounded-lg border bg-white p-4 space-y-3">
@@ -328,10 +537,12 @@ export default async function JobTestsPage({
                   <option value="" disabled>
                     Select a test
                   </option>
-                  <option value="duct_leakage">Duct Leakage</option>
-                  <option value="airflow">Airflow</option>
-                  <option value="refrigerant_charge">Refrigerant Charge</option>
-                  <option value="custom">Custom (notes only)</option>
+
+                  {manualAddTests.map((test) => (
+                    <option key={test.code} value={test.code}>
+                      {test.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -418,8 +629,11 @@ export default async function JobTestsPage({
 
                 <div className="text-sm text-muted-foreground">
                   <div>
-                    Max Allowed: {runDL.computed?.max_leakage_cfm ?? "—"} CFM{" "}
-                    {runDL.computed?.max_cfm_per_ton ? `(at ${runDL.computed.max_cfm_per_ton} CFM/ton max)` : ""}
+                    Max Allowed: {runDL.computed?.max_leakage_cfm ?? "—"} CFM
+                    {runDL.computed?.leakage_percent_allowed_display != null &&
+                    runDL.computed?.base_airflow_cfm != null
+                      ? ` (at ${runDL.computed.leakage_percent_allowed_display}% of ${runDL.computed.base_airflow_cfm} CFM base airflow)`
+                      : ""}
                   </div>
                   <div>Measured: {runDL.data?.measured_duct_leakage_cfm ?? "—"} CFM</div>
                 </div>
@@ -433,7 +647,7 @@ export default async function JobTestsPage({
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`dl-ton-${runDL.id}`}>
-                        System Tonnage
+                        System Tonnage (auto-filled from equipment if available)
                       </label>
                       <input
                         id={`dl-ton-${runDL.id}`}
@@ -441,7 +655,7 @@ export default async function JobTestsPage({
                         type="number"
                         step="0.1"
                         className="w-full rounded-md border px-3 py-2"
-                        defaultValue={runDL.data?.tonnage ?? ""}
+                        defaultValue={runAF.data?.tonnage ?? defaultSystemTonnage}
                       />
                     </div>
 
@@ -531,58 +745,87 @@ export default async function JobTestsPage({
               </form>
             ) : (
               <>
-                <form action={saveAirflowDataFromForm} className="grid gap-3 border-t pt-3">
-                  <input type="hidden" name="system_id" value={selectedSystemId} />
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <input type="hidden" name="test_run_id" value={runAF.id} />
-                  <input type="hidden" name="project_type" value={job.project_type} />
+              <form action={saveAirflowDataFromForm} className="grid gap-3 border-t pt-3">
+                <input type="hidden" name="system_id" value={selectedSystemId} />
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="test_run_id" value={runAF.id} />
+                <input type="hidden" name="project_type" value={job.project_type} />
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`af-ton-${runAF.id}`}>
-                        System Tonnage
-                      </label>
-                      <input
-                        id={`af-ton-${runAF.id}`}
-                        name="tonnage"
-                        type="number"
-                        step="0.1"
-                        className="w-full rounded-md border px-3 py-2"
-                        defaultValue={runAF.data?.tonnage ?? ""}
-                      />
-                    </div>
-
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`af-meas-${runAF.id}`}>
-                        Measured Total Airflow (CFM)
-                      </label>
-                      <input
-                        id={`af-meas-${runAF.id}`}
-                        name="measured_total_cfm"
-                        type="number"
-                        step="1"
-                        className="w-full rounded-md border px-3 py-2"
-                        defaultValue={runAF.data?.measured_total_cfm ?? ""}
-                      />
-                    </div>
-
-                    <div className="grid gap-1 sm:col-span-2">
-                      <label className="text-sm font-medium" htmlFor={`af-notes-${runAF.id}`}>
-                        Notes (optional)
-                      </label>
-                      <input
-                        id={`af-notes-${runAF.id}`}
-                        name="notes"
-                        className="w-full rounded-md border px-3 py-2"
-                        defaultValue={runAF.data?.notes ?? ""}
-                      />
-                    </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid gap-1">
+                    <label className="text-sm font-medium" htmlFor={`dl-ton-${runDL.id}`}>
+                      System Tonnage (auto-filled from equipment if available)
+                    </label>
+                    <input
+                      id={`dl-ton-${runDL.id}`}
+                      name="tonnage"
+                      type="number"
+                      step="0.1"
+                      className="w-full rounded-md border px-3 py-2"
+                      defaultValue={runDL.data?.tonnage ?? defaultSystemTonnage}
+                    />
                   </div>
 
-                  <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
-                    Save Airflow
-                  </button>
-                </form>
+                  <div className="grid gap-1">
+                    <label className="text-sm font-medium" htmlFor={`af-meas-${runAF.id}`}>
+                      Measured Total Airflow (CFM)
+                    </label>
+                    <input
+                      id={`af-meas-${runAF.id}`}
+                      name="measured_total_cfm"
+                      type="number"
+                      step="1"
+                      className="w-full rounded-md border px-3 py-2"
+                      defaultValue={runAF.data?.measured_total_cfm ?? ""}
+                    />
+                  </div>
+
+                  <div className="grid gap-1 sm:col-span-2">
+                    <label className="text-sm font-medium" htmlFor={`af-notes-${runAF.id}`}>
+                      Notes (optional)
+                    </label>
+                    <input
+                      id={`af-notes-${runAF.id}`}
+                      name="notes"
+                      className="w-full rounded-md border px-3 py-2"
+                      defaultValue={runAF.data?.notes ?? ""}
+                    />
+                  </div>
+
+                  <div className="grid gap-1">
+                    <label className="text-sm font-medium" htmlFor={`af-override-${runAF.id}`}>
+                      Airflow Override Pass
+                    </label>
+                    <select
+                      id={`af-override-${runAF.id}`}
+                      name="airflow_override_pass"
+                      className="w-full rounded-md border px-3 py-2"
+                      defaultValue={runAF.override_pass === true ? "true" : "false"}
+                    >
+                      <option value="false">No</option>
+                      <option value="true">Yes — Mark as Pass</option>
+                    </select>
+                  </div>
+
+                  <div className="grid gap-1 sm:col-span-2">
+                    <label className="text-sm font-medium" htmlFor={`af-override-reason-${runAF.id}`}>
+                      Override Reason
+                    </label>
+                    <textarea
+                      id={`af-override-reason-${runAF.id}`}
+                      name="airflow_override_reason"
+                      rows={3}
+                      className="w-full rounded-md border px-3 py-2"
+                      defaultValue={runAF.override_pass === true ? runAF.override_reason ?? "" : ""}
+                      placeholder="Required only when override pass is used"
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
+                  Save Airflow
+                </button>
+              </form>
 
                 <div className="flex flex-wrap gap-2 items-center">
                   <form action={completeEccTestRunFromForm}>
