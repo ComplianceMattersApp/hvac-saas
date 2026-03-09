@@ -1,8 +1,9 @@
 // app/jobs/[id]/tests/page
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { markRefrigerantChargeExemptFromForm } from "@/lib/actions/job-actions";
+import { resolveEccScenario } from "@/lib/ecc/scenario-resolver";
+import Link from "next/link";
 
 import {
   completeEccTestRunFromForm,
@@ -237,10 +238,18 @@ export default async function JobTestsPage({
   (eq: any) => String(eq.system_id ?? "") === String(selectedSystemId)
     );
 
-    const requiredTests = getRequiredTestsForSystem({
-      projectType: job.project_type,
-      systemEquipment: selectedSystemEquipment,
-    });
+  const scenarioResult = resolveEccScenario({
+  projectType: job.project_type,
+  systemEquipment: selectedSystemEquipment,
+});
+
+  const suggestedTests = scenarioResult.suggestedTests;
+  const scenarioCode = scenarioResult.scenario;
+  const scenarioNotes = scenarioResult.notes;
+
+     const requiredTests = suggestedTests
+   .filter((t) => t.required)
+    .map((t) => t.testType);
 
   const packageSystem = isPackageSystem(selectedSystemEquipment);
 
@@ -344,7 +353,8 @@ const defaultSystemTonnage =
             </div>
           ) : null}
         </div>
-
+        {false && (
+  <div className="rounded-lg border bg-white p-4">
         {/* Test pills */}
         <div className="rounded-lg border bg-white p-4">
           <div className="text-sm font-semibold mb-3 text-gray-900">ECC Tests</div>
@@ -393,25 +403,71 @@ const defaultSystemTonnage =
             </div>
           )}
         </div>
+                  </div>
+)}
 
-        {/* Add Test pill */}
+
+
+
         {selectedSystemId ? (
-          <Link
-            href={focusedType === "custom" ? withS(undefined) : withS("custom")}
-            className={`w-full rounded px-4 py-3 flex items-center justify-between border ${
-              focusedType === "custom"
-                ? "bg-gray-900 text-white"
-                : "bg-white text-gray-900 hover:bg-gray-50"
-            }`}
+  <div className="rounded-lg border bg-white p-4 space-y-3">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <div className="text-sm font-semibold">Detected ECC Scenario</div>
+        <div className="text-xs text-muted-foreground">
+          Based on project type and equipment on this system
+        </div>
+      </div>
+
+      <div className="rounded-full border px-2.5 py-1 text-xs font-medium bg-slate-50 text-slate-700">
+        {scenarioCode.replaceAll("_", " ")}
+      </div>
+    </div>
+
+    {scenarioNotes.length > 0 ? (
+      <div className="grid gap-2">
+        {scenarioNotes.map((note) => (
+          <div
+            key={note}
+            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
           >
-            <div className="font-medium">Add Test</div>
-            <span className="text-xs">{focusedType === "custom" ? "▲" : "▼"}</span>
-          </Link>
-        ) : (
-          <div className="w-full rounded border px-4 py-3 text-sm text-muted-foreground">
-            Select a system first to add tests.
+            {note}
           </div>
-        )}
+        ))}
+      </div>
+    ) : null}
+
+    {suggestedTests.length > 0 ? (
+      <div className="grid gap-2">
+        {suggestedTests.map((rule) => (
+          <div
+            key={rule.testType}
+            className="flex items-center justify-between rounded-md border px-3 py-2"
+          >
+            <div className="min-w-0">
+              <div className="font-medium">{getTestDisplayLabel(rule.testType, packageSystem)}</div>
+              <div className="text-xs text-muted-foreground">
+                {rule.threshold
+                  ? `${String(rule.threshold.operator).toUpperCase()} ${rule.threshold.value} ${rule.threshold.unit}`
+                  : "Standard verification"}
+              </div>
+            </div>
+
+            <div className="rounded-full border px-2.5 py-1 text-xs font-medium bg-slate-50 text-slate-700">
+              Suggested
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        No standard ECC scenario detected yet for this system.
+      </div>
+    )}
+  </div>
+  
+) : null}
+
 
                 {selectedSystemId ? (
           <div className="rounded-lg border bg-white p-4 space-y-3">
@@ -455,33 +511,56 @@ const defaultSystemTonnage =
             ) : (
               <div className="grid gap-2">
                 {requiredTests.map((testType: EccTestType) => {
-                  const status = getRequiredTestStatusForSystem(job, selectedSystemId, testType);
-                  const isRefrigerant = testType === "refrigerant_charge";
-                  const suppressedForPackage = isRefrigerant && packageSystem;
-                  return (
-                    <div
-                      key={testType}
-                      className="flex items-center justify-between rounded-md border px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-medium">{getTestDisplayLabel(testType, packageSystem)}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {status.state === "missing"
-                            ? "No run created yet"
-                            : status.state === "incomplete"
-                            ? "Run exists but is not completed"
-                            : "Tracked on this system"}
-                        </div>
-                      </div>
+  const status = getRequiredTestStatusForSystem(job, selectedSystemId, testType);
+  const testHref = `/jobs/${job.id}/tests?s=${selectedSystemId}&t=${testType}`;
 
-                      <div
-                        className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status.tone}`}
-                      >
-                        {status.label}
-                      </div>
-                    </div>
-                  );
-                })}
+  return (
+    <div
+      key={testType}
+      className="flex items-center justify-between rounded-md border px-3 py-2 gap-3"
+    >
+      <div className="min-w-0">
+        <div className="font-medium">{getTestDisplayLabel(testType, packageSystem)}</div>
+        <div className="text-xs text-muted-foreground">
+          {status.state === "missing"
+            ? "No run created yet"
+            : status.state === "incomplete"
+            ? "Run exists but is not completed"
+            : "Tracked on this system"}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {status.state === "missing" ? (
+          <form action={addEccTestRunFromForm}>
+            <input type="hidden" name="job_id" value={job.id} />
+            <input type="hidden" name="system_id" value={selectedSystemId} />
+            <input type="hidden" name="test_type" value={testType} />
+            <button
+              type="submit"
+              className="rounded-md border px-3 py-1.5 text-xs font-medium"
+            >
+              Add Run
+            </button>
+          </form>
+        ) : (
+          <Link
+            href={testHref}
+            className="rounded-md border px-3 py-1.5 text-xs font-medium"
+          >
+            Open Test
+          </Link>
+        )}
+
+        <div
+          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status.tone}`}
+        >
+          {status.label}
+        </div>
+      </div>
+    </div>
+  );
+})}
               </div>
             )}
           </div>
@@ -552,6 +631,25 @@ const defaultSystemTonnage =
             </form>
           </div>
         ) : null}
+
+                {/* Add Test pill */}
+        {selectedSystemId ? (
+          <Link
+            href={focusedType === "custom" ? withS(undefined) : withS("custom")}
+            className={`w-full rounded px-4 py-3 flex items-center justify-between border ${
+              focusedType === "custom"
+                ? "bg-gray-900 text-white"
+                : "bg-white text-gray-900 hover:bg-gray-50"
+            }`}
+          >
+            <div className="font-medium">Add Test</div>
+            <span className="text-xs">{focusedType === "custom" ? "▲" : "▼"}</span>
+          </Link>
+        ) : (
+          <div className="w-full rounded border px-4 py-3 text-sm text-muted-foreground">
+            Select a system first to add tests.
+          </div>
+        )}
 
         {/* =========================
             DUCT LEAKAGE

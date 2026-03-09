@@ -3,9 +3,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
-import {
-  getRequiredTestsForProjectType,
-} from "@/lib/ecc/rule-profiles";
+import { resolveEccScenario } from "@/lib/ecc/scenario-resolver";
 import type { EccTestType } from "@/lib/ecc/test-registry";
 
 /**
@@ -18,6 +16,7 @@ import type { EccTestType } from "@/lib/ecc/test-registry";
  * - Does NOT overwrite manual locks because we call setOpsStatusIfNotManual.
  * - Does NOT close jobs; paperwork completion remains separate.
  * - ECC resolution must come from completed ecc_test_runs.
+ * - Required tests are resolved PER SYSTEM using the ECC scenario engine.
  */
 export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
   const supabase = await createClient();
@@ -42,6 +41,13 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
   const systemIds = (systems ?? [])
     .map((s) => String(s.id || "").trim())
     .filter(Boolean);
+
+  const { data: equipmentRows, error: eqErr } = await supabase
+    .from("job_equipment")
+    .select("system_id, component_type, equipment_role")
+    .eq("job_id", jobId);
+
+  if (eqErr) throw new Error(eqErr.message);
 
   const { data: runs, error: runsErr } = await supabase
     .from("ecc_test_runs")
@@ -68,17 +74,34 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
     return "unknown";
   };
 
-  const required = getRequiredTestsForProjectType(job.project_type) as EccTestType[];
+  // Resolve required ECC tests PER SYSTEM using the scenario engine.
+  const requiredBySystem: Record<string, EccTestType[]> = {};
 
-  // If this profile has no required tests, do not force ECC ops transitions.
-  if (required.length === 0) return;
+  for (const sid of systemIds) {
+    const systemEquipment = (equipmentRows ?? []).filter(
+      (eq: any) => String(eq?.system_id ?? "").trim() === sid
+    );
+
+    const scenarioResult = resolveEccScenario({
+      projectType: job.project_type,
+      systemEquipment,
+    });
+
+    requiredBySystem[sid] = scenarioResult.suggestedTests
+      .filter((t) => t.required)
+      .map((t) => t.testType as EccTestType);
+  }
+
+  // If there are no required tests across all systems, do not force ECC ops transitions.
+  const hasAnyRequiredTests = systemIds.some((sid) => (requiredBySystem[sid]?.length ?? 0) > 0);
+  if (!hasAnyRequiredTests) return;
 
   type Cell = { hasCompleted: boolean; anyFail: boolean; anyPass: boolean };
   const matrix: Record<string, Record<string, Cell>> = {};
 
   for (const sid of systemIds) {
     matrix[sid] = {};
-    for (const t of required) {
+    for (const t of requiredBySystem[sid] ?? []) {
       matrix[sid][t] = {
         hasCompleted: false,
         anyFail: false,
@@ -89,11 +112,11 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
 
   for (const r of runs ?? []) {
     const sid = String(r?.system_id || "").trim();
-    const t = String(r?.test_type || "").trim().toLowerCase();
+    const t = String(r?.test_type || "").trim().toLowerCase() as EccTestType;
 
-    if (!sid) continue;                 // ignore legacy null system rows
-    if (!matrix[sid]) continue;         // only evaluate declared systems
-    if (!(t in matrix[sid])) continue;  // only evaluate required tests
+    if (!sid) continue; // ignore legacy null system rows
+    if (!matrix[sid]) continue; // only evaluate declared systems
+    if (!(t in matrix[sid])) continue; // only evaluate required tests for that system
     if (!isCompleted(r)) continue;
 
     matrix[sid][t].hasCompleted = true;
@@ -104,7 +127,7 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
   }
 
   const anyRequiredFail = systemIds.some((sid) =>
-    required.some((t) => matrix[sid]?.[t]?.anyFail)
+    (requiredBySystem[sid] ?? []).some((t) => matrix[sid]?.[t]?.anyFail)
   );
 
   if (anyRequiredFail) {
@@ -114,9 +137,12 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
 
   const allRequiredPassed =
     systemIds.length > 0 &&
-    systemIds.every((sid) =>
-      required.every((t) => matrix[sid]?.[t]?.hasCompleted && matrix[sid]?.[t]?.anyPass)
-    );
+    systemIds.every((sid) => {
+      const required = requiredBySystem[sid] ?? [];
+      if (required.length === 0) return true;
+
+      return required.every((t) => matrix[sid]?.[t]?.hasCompleted && matrix[sid]?.[t]?.anyPass);
+    });
 
   if (allRequiredPassed) {
     await setOpsStatusIfNotManual(jobId, "paperwork_required");
