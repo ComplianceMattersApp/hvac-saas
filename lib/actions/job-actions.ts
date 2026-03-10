@@ -32,6 +32,8 @@ type CreateJobInput = {
   status: JobStatus;
   contractor_id?: string | null;
   permit_number?: string | null;
+  jurisdiction?: string | null;
+  permit_date?: string | null;
   window_start?: string | null;
   window_end?: string | null;
   customer_phone?: string | null;
@@ -1317,7 +1319,7 @@ export async function saveAirflowDataFromForm(formData: FormData) {
 export async function saveDuctLeakageDataFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
-  const projectType = String(formData.get("project_type") || "").trim(); // "alteration" | "all_new"
+  const projectType = String(formData.get("project_type") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
   if (!testRunId) throw new Error("Missing test_run_id");
@@ -1332,20 +1334,42 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
   const measuredLeakageCfm = num("measured_duct_leakage_cfm");
   const tonnage = num("tonnage");
 
-  const leakagePerTonMax = projectType === "all_new" ? 20 : 40;
-  const maxLeakageCfm = tonnage != null ? tonnage * leakagePerTonMax : null;
+  // Locked duct leakage basis:
+  // base airflow = tonnage * 400
+  // alteration = 10%
+  // new/all_new = 5%
+  const normalizedProjectType = projectType.toLowerCase();
+
+  const leakagePercentAllowed =
+    normalizedProjectType === "all_new" ||
+    normalizedProjectType === "allnew" ||
+    normalizedProjectType === "new" ||
+    normalizedProjectType === "new_prescriptive"
+      ? 0.05
+      : normalizedProjectType === "alteration"
+      ? 0.10
+      : null;
+
+  const baseAirflowCfm = tonnage != null ? tonnage * 400 : null;
+  const maxLeakageCfm =
+    baseAirflowCfm != null && leakagePercentAllowed != null
+      ? baseAirflowCfm * leakagePercentAllowed
+      : null;
 
   const failures: string[] = [];
   const warnings: string[] = [];
 
   if (tonnage == null) warnings.push("Missing tonnage");
   if (measuredLeakageCfm == null) warnings.push("Missing measured duct leakage");
+  if (leakagePercentAllowed == null) warnings.push("No leakage rule profile found for project type");
 
   let computedPass: boolean | null = null;
 
   if (measuredLeakageCfm != null && maxLeakageCfm != null) {
-    computedPass = measuredLeakageCfm > maxLeakageCfm ? false : true;
-    if (computedPass === false) failures.push(`Duct leakage above max (${maxLeakageCfm} CFM)`);
+    computedPass = measuredLeakageCfm <= maxLeakageCfm;
+    if (computedPass === false) {
+      failures.push(`Duct leakage above max (${maxLeakageCfm} CFM)`);
+    }
   } else {
     computedPass = null;
   }
@@ -1353,12 +1377,14 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
   const data = {
     measured_duct_leakage_cfm: measuredLeakageCfm,
     tonnage,
-    max_cfm_per_ton: leakagePerTonMax,
     notes: String(formData.get("notes") || "").trim() || null,
   };
 
   const computed = {
-    max_cfm_per_ton: leakagePerTonMax,
+    base_airflow_cfm: baseAirflowCfm,
+    leakage_percent_allowed: leakagePercentAllowed,
+    leakage_percent_allowed_display:
+      leakagePercentAllowed != null ? leakagePercentAllowed * 100 : null,
     max_leakage_cfm: maxLeakageCfm,
     measured_duct_leakage_cfm: measuredLeakageCfm,
     failures,
@@ -1386,6 +1412,8 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
     testRunId,
     systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
   });
+
+  await evaluateEccOpsStatus(jobId);
 
   revalidatePath(`/jobs/${jobId}/tests`);
   revalidatePath(`/jobs/${jobId}`);
@@ -1717,6 +1745,8 @@ export async function createJob(input: CreateJobInput): Promise<{ id: string; se
     status: input.status,
     contractor_id: input.contractor_id ?? null,
     permit_number: input.permit_number ?? null,
+    jurisdiction: input.jurisdiction ?? null,
+    permit_date: input.permit_date ?? null,
     window_start: input.window_start ?? null,
     window_end: input.window_end ?? null,
     customer_phone: input.customer_phone ?? null,
@@ -1787,6 +1817,8 @@ export async function updateJob(input: {
   scheduled_date?: string | null;
   contractor_id?: string | null;
   permit_number?: string | null;
+  jurisdiction?: string | null;
+  permit_date?: string | null;
   window_start?: string | null;
   window_end?: string | null;
   customer_phone?: string | null;
@@ -1841,32 +1873,38 @@ export async function createJobFromForm(formData: FormData) {
     | "other"
     | "";
 
-  const billing_name = String(formData.get("billing_name") || "").trim() || null;
-  const billing_email = String(formData.get("billing_email") || "").trim() || null;
-  const billing_phone = String(formData.get("billing_phone") || "").trim() || null;
+const billing_name = String(formData.get("billing_name") || "").trim() || null;
+const billing_email = String(formData.get("billing_email") || "").trim() || null;
+const billing_phone = String(formData.get("billing_phone") || "").trim() || null;
 
-  const billing_address_line1 =
-    String(formData.get("billing_address_line1") || "").trim() || null;
-  const billing_address_line2 =
-    String(formData.get("billing_address_line2") || "").trim() || null;
-  const billing_city = String(formData.get("billing_city") || "").trim() || null;
-  const billing_state = String(formData.get("billing_state") || "").trim() || null;
-  const billing_zip = String(formData.get("billing_zip") || "").trim() || null;
+const billing_address_line1 =
+  String(formData.get("billing_address_line1") || "").trim() || null;
+const billing_address_line2 =
+  String(formData.get("billing_address_line2") || "").trim() || null;
+const billing_city = String(formData.get("billing_city") || "").trim() || null;
+const billing_state = String(formData.get("billing_state") || "").trim() || null;
+const billing_zip = String(formData.get("billing_zip") || "").trim() || null;
 
-  const { scheduled_date, window_start, window_end, ops_status } =
-    deriveScheduleAndOps(formData);
+const { scheduled_date, window_start, window_end, ops_status } =
+  deriveScheduleAndOps(formData);
 
-  const permitNumberRaw = String(formData.get("permit_number") || "").trim();
-  const customerFirstNameRaw = String(formData.get("customer_first_name") || "").trim();
-  const customerLastNameRaw = String(formData.get("customer_last_name") || "").trim();
-  const customerEmailRaw = String(formData.get("customer_email") || "").trim();
-  const jobNotesRaw = String(formData.get("job_notes") || "").trim();
-  const jobAddressRaw = String(formData.get("job_address") || "").trim();
+const permitNumberRaw = String(formData.get("permit_number") || "").trim();
+const permitDateRaw = String(formData.get("permit_date") || "").trim();
+const jurisdictionRaw = String(formData.get("jurisdiction") || "").trim();
 
-  const status = String(formData.get("status") || "open").trim() as JobStatus;
+const customerFirstNameRaw = String(formData.get("customer_first_name") || "").trim();
+const customerLastNameRaw = String(formData.get("customer_last_name") || "").trim();
+const customerEmailRaw = String(formData.get("customer_email") || "").trim();
+const jobNotesRaw = String(formData.get("job_notes") || "").trim();
+const jobAddressRaw = String(formData.get("job_address") || "").trim();
 
-  if (jobType === "service" && !titleFinal) throw new Error("Title is required");
-  if (!city) throw new Error("City is required");
+const jurisdiction = jobType === "service" ? null : (jurisdictionRaw || null);
+const permit_date = jobType === "service" ? null : (permitDateRaw || null);
+const permit_number = jobType === "service" ? null : (permitNumberRaw || null);
+
+const status = String(formData.get("status") || "open").trim() as JobStatus;
+
+if (!city) throw new Error("City is required");
 
 // ----- supabase + identity -----
 const supabase = await createClient();
@@ -2113,6 +2151,8 @@ function canContractorWriteEvent(event_type: string) {
       status,
       contractor_id: contractorIdFinal,
       permit_number: permitNumberRaw ? permitNumberRaw : null,
+      jurisdiction,
+      permit_date,
       window_start,
       window_end,
       customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
@@ -2176,6 +2216,8 @@ function canContractorWriteEvent(event_type: string) {
       status,
       contractor_id: contractorIdFinal,
       permit_number: permitNumberRaw ? permitNumberRaw : null,
+      jurisdiction,
+      permit_date,
       window_start,
       window_end,
       customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
@@ -2236,6 +2278,8 @@ return;
     status,
     contractor_id: contractorIdFinal,
     permit_number: permitNumberRaw ? permitNumberRaw : null,
+    jurisdiction,
+    permit_date,
     window_start,
     window_end,
     customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
@@ -2511,22 +2555,32 @@ export async function updateJobScheduleFromForm(formData: FormData) {
 
   if (!id) throw new Error("Job ID is required");
 
-  const permitNumberRaw = String(formData.get("permit_number") || "").trim();
-
   const supabase = await createClient();
 
   // Read prior scheduling snapshot so we can log changes
   const { data: before, error: beforeErr } = await supabase
     .from("jobs")
-    .select("scheduled_date, window_start, window_end, ops_status")
+    .select(
+      "scheduled_date, window_start, window_end, ops_status, job_type, permit_number, jurisdiction, permit_date"
+    )
     .eq("id", id)
     .single();
 
   if (beforeErr) throw beforeErr;
 
+  const permitNumberRaw = String(formData.get("permit_number") || "").trim();
+  const permitDateRaw = String(formData.get("permit_date") || "").trim();
+  const jurisdictionRaw = String(formData.get("jurisdiction") || "").trim();
+
   // Canonical scheduling + ops_status logic (NO Date parsing)
   const { scheduled_date, window_start, window_end, ops_status } =
     deriveScheduleAndOps(formData);
+
+  const isServiceJob = String(before?.job_type ?? "").toLowerCase() === "service";
+
+  const permit_number = isServiceJob ? null : (permitNumberRaw || null);
+  const jurisdiction = isServiceJob ? null : (jurisdictionRaw || null);
+  const permit_date = isServiceJob ? null : (permitDateRaw || null);
 
   await updateJob({
     id,
@@ -2534,7 +2588,9 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     window_start,
     window_end,
     ops_status,
-    permit_number: permitNumberRaw ? permitNumberRaw : null,
+    permit_number,
+    jurisdiction,
+    permit_date,
   });
 
   const wasScheduled =
@@ -2558,12 +2614,18 @@ export async function updateJobScheduleFromForm(formData: FormData) {
         window_start: before?.window_start ?? null,
         window_end: before?.window_end ?? null,
         ops_status: before?.ops_status ?? null,
+        permit_number: before?.permit_number ?? null,
+        jurisdiction: before?.jurisdiction ?? null,
+        permit_date: before?.permit_date ?? null,
       },
       after: {
         scheduled_date,
         window_start,
         window_end,
         ops_status,
+        permit_number,
+        jurisdiction,
+        permit_date,
       },
     },
   });

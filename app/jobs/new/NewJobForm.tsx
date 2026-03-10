@@ -1,4 +1,4 @@
-// app/jobs/new/NewJobForm.tsx
+// app/jobs/new/NewJobForm
 
 "use client";
 
@@ -566,15 +566,13 @@ const [billingRecipient, setBillingRecipient] = useState<
   </>
 ) : null}
 
-
-       
-          <JobCoreFields
+  <JobCoreFields
   mode={myContractor?.id ? "external" : "internal"}
   titleRequired={jobType === "service"}
   hideCustomer={isExistingCustomer}
   hideServiceLocation={isExistingCustomer}
+  jobType={jobType}
 />
-
         {/* Billing Recipient */}
         <div className="rounded-lg border p-3 space-y-2">
           <label className="block text-sm font-medium">Billing Recipient</label>

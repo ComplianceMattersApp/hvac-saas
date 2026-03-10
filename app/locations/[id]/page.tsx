@@ -1,3 +1,4 @@
+//app/locations/[id]/page
 import { scheduleVisit } from "./schedule-actions";
 import { closeVisit } from "./close-visit-actions";
 import Link from "next/link";

@@ -327,6 +327,8 @@ export default async function JobDetailPage({
       next_action_note,
       action_required_by,
       permit_number,
+      jurisdiction,
+      permit_date,
       window_start,
       window_end,
       customer_phone,
@@ -1067,6 +1069,22 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
                 </div>
               </div>
 
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Jurisdiction</div>
+                <div className="mt-1 text-sm font-semibold text-gray-900">
+                  {(job as any).jurisdiction || "—"}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Permit Date</div>
+                <div className="mt-1 text-sm font-semibold text-gray-900">
+                  {(job as any).permit_date
+                    ? displayDateLA(String((job as any).permit_date))
+                    : "—"}
+                </div>
+              </div>
+
               <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 sm:col-span-2">
                 <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Address</div>
                 <div className="mt-1 text-sm font-semibold text-gray-900 break-words">
@@ -1395,7 +1413,7 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
       <form action={updateJobScheduleFromForm} className="space-y-4">
         <input type="hidden" name="job_id" value={job.id} />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1">
             <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
               Scheduled Date
@@ -1419,6 +1437,34 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
               className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black"
             />
           </div>
+
+          {job.job_type === "ecc" ? (
+            <>
+              <div className="space-y-1">
+                <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                  Jurisdiction
+                </label>
+                <input
+                  name="jurisdiction"
+                  defaultValue={(job as any).jurisdiction ?? ""}
+                  placeholder="City or county permit office"
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                  Permit Date
+                </label>
+                <input
+                  type="date"
+                  name="permit_date"
+                  defaultValue={(job as any).permit_date ?? ""}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+                />
+              </div>
+            </>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

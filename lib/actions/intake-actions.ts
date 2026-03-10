@@ -1,4 +1,4 @@
-// lib/actions/intake-actions.ts
+// lib/actions/intake-actions
 "use server";
 
 import { redirect } from "next/navigation";

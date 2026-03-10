@@ -1,3 +1,4 @@
+// components/jobs/JobCoreFields
 "use client";
 
 type Props = {
@@ -5,6 +6,7 @@ type Props = {
   titleRequired?: boolean;
   hideCustomer?: boolean;
   hideServiceLocation?: boolean;
+  jobType?: "ecc" | "service";
 };
 
 export default function JobCoreFields({
@@ -12,8 +14,10 @@ export default function JobCoreFields({
   titleRequired,
   hideCustomer,
   hideServiceLocation,
+  jobType = "ecc",
 }: Props) {
   const titleIsRequired = Boolean(titleRequired);
+  const showEccPermitFields = jobType !== "service";
 
   return (
     <div className="space-y-4">
@@ -32,14 +36,45 @@ export default function JobCoreFields({
           />
         </div>
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium">Permit Number (optional)</label>
-          <input
-            type="text"
-            name="permit_number"
-            className="w-full border rounded px-3 py-2"
-          />
-        </div>
+        {showEccPermitFields && (
+          <>
+            <div className="space-y-1">
+              <label className="block text-sm font-medium">
+                Permit Number (optional)
+              </label>
+              <input
+                type="text"
+                name="permit_number"
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="block text-sm font-medium">
+                  Jurisdiction (optional)
+                </label>
+                <input
+                  type="text"
+                  name="jurisdiction"
+                  placeholder="City or county permit office"
+                  className="w-full border rounded px-3 py-2"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-sm font-medium">
+                  Permit Date (optional)
+                </label>
+                <input
+                  type="date"
+                  name="permit_date"
+                  className="w-full border rounded px-3 py-2"
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Customer */}
@@ -50,22 +85,38 @@ export default function JobCoreFields({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="block text-sm font-medium">First Name</label>
-              <input type="text" name="customer_first_name" className="w-full border rounded px-3 py-2" />
+              <input
+                type="text"
+                name="customer_first_name"
+                className="w-full border rounded px-3 py-2"
+              />
             </div>
 
             <div className="space-y-1">
               <label className="block text-sm font-medium">Last Name</label>
-              <input type="text" name="customer_last_name" className="w-full border rounded px-3 py-2" />
+              <input
+                type="text"
+                name="customer_last_name"
+                className="w-full border rounded px-3 py-2"
+              />
             </div>
 
             <div className="space-y-1">
               <label className="block text-sm font-medium">Phone</label>
-              <input type="tel" name="customer_phone" className="w-full border rounded px-3 py-2" />
+              <input
+                type="tel"
+                name="customer_phone"
+                className="w-full border rounded px-3 py-2"
+              />
             </div>
 
             <div className="space-y-1">
               <label className="block text-sm font-medium">Email (optional)</label>
-              <input type="email" name="customer_email" className="w-full border rounded px-3 py-2" />
+              <input
+                type="email"
+                name="customer_email"
+                className="w-full border rounded px-3 py-2"
+              />
             </div>
           </div>
         </div>
@@ -78,12 +129,21 @@ export default function JobCoreFields({
 
           <div className="space-y-1">
             <label className="block text-sm font-medium">Address</label>
-            <input type="text" name="address_line1" className="w-full border rounded px-3 py-2" />
+            <input
+              type="text"
+              name="address_line1"
+              className="w-full border rounded px-3 py-2"
+            />
           </div>
 
           <div className="space-y-1">
             <label className="block text-sm font-medium">City</label>
-            <input type="text" name="city" className="w-full border rounded px-3 py-2" required />
+            <input
+              type="text"
+              name="city"
+              className="w-full border rounded px-3 py-2"
+              required
+            />
           </div>
         </div>
       )}
@@ -91,7 +151,11 @@ export default function JobCoreFields({
       {/* Notes */}
       <div className="rounded-lg border p-3 space-y-2">
         <div className="text-sm font-semibold">Additional Comments/Notes</div>
-        <textarea name="job_notes" rows={4} className="w-full border rounded px-3 py-2" />
+        <textarea
+          name="job_notes"
+          rows={4}
+          className="w-full border rounded px-3 py-2"
+        />
       </div>
 
       {mode === "external" ? null : null}

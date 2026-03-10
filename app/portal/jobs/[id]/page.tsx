@@ -47,7 +47,7 @@ const { data: job, error: jobErr } = await supabase
   .select(
     `
     id, title, status, ops_status, city, job_address, location_id, created_at, follow_up_date,
-    scheduled_date, window_start, window_end, permit_number, on_the_way_at,
+    scheduled_date, window_start, window_end, permit_number, jurisdiction, permit_date, on_the_way_at,
     pending_info_reason, next_action_note, parent_job_id,
     locations:location_id ( address_line1, address_line2, city, state, zip )
     `
@@ -546,13 +546,31 @@ function extractTopReasons(run: any): string[] {
       </div>
     </div>
 
-    {(job as any).permit_number ? (
-      <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
-        <div className="text-xs text-gray-500 dark:text-gray-300">Permit</div>
-        <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
-          {String((job as any).permit_number)}
+        {((job as any).permit_number || (job as any).jurisdiction || (job as any).permit_date) ? (
+      <>
+        <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+          <div className="text-xs text-gray-500 dark:text-gray-300">Permit</div>
+          <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
+            {String((job as any).permit_number || "—")}
+          </div>
         </div>
-      </div>
+
+        <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+          <div className="text-xs text-gray-500 dark:text-gray-300">Jurisdiction</div>
+          <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
+            {String((job as any).jurisdiction || "—")}
+          </div>
+        </div>
+
+        <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+          <div className="text-xs text-gray-500 dark:text-gray-300">Permit Date</div>
+          <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
+            {(job as any).permit_date
+              ? formatDateLA(String((job as any).permit_date))
+              : "—"}
+          </div>
+        </div>
+      </>
     ) : null}
 
     {(job as any).pending_info_reason || (job as any).next_action_note ? (
