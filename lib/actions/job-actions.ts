@@ -1728,6 +1728,40 @@ export async function addAlterationCoreTestsFromForm(formData: FormData) {
   redirectToTests({ jobId, systemId });
 }
 
+export async function updateJob(input: {
+  ops_status?: string | null;
+  id: string;
+  title?: string;
+  city?: string;
+  status?: JobStatus;
+  scheduled_date?: string | null;
+  contractor_id?: string | null;
+  permit_number?: string | null;
+  jurisdiction?: string | null;
+  permit_date?: string | null;
+  window_start?: string | null;
+  window_end?: string | null;
+  customer_phone?: string | null;
+  on_the_way_at?: string | null;
+  customer_first_name?: string | null;
+  customer_last_name?: string | null;
+  customer_email?: string | null;
+  job_notes?: string | null;
+}) {
+  const supabase = await createClient();
+  const { id, ...updates } = input;
+
+  const { data, error } = await supabase
+    .from("jobs")
+    .update(updates)
+    .eq("id", id)
+    .select("id")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function createJob(input: CreateJobInput): Promise<{ id: string; service_case_id: string | null }> {
   const supabase = await createClient();
 
@@ -1806,40 +1840,6 @@ export async function createJob(input: CreateJobInput): Promise<{ id: string; se
     id: String(data.id),
     service_case_id: serviceCaseId,
   };
-}
-
-export async function updateJob(input: {
-  ops_status?: string | null;
-  id: string;
-  title?: string;
-  city?: string;
-  status?: JobStatus;
-  scheduled_date?: string | null;
-  contractor_id?: string | null;
-  permit_number?: string | null;
-  jurisdiction?: string | null;
-  permit_date?: string | null;
-  window_start?: string | null;
-  window_end?: string | null;
-  customer_phone?: string | null;
-  on_the_way_at?: string | null;
-  customer_first_name?: string | null;
-  customer_last_name?: string | null;
-  customer_email?: string | null;
-  job_notes?: string | null;
-}) {
-  const supabase = await createClient();
-  const { id, ...updates } = input;
-
-  const { data, error } = await supabase
-    .from("jobs")
-    .update(updates)
-    .eq("id", id)
-    .select("id")
-    .single();
-
-  if (error) throw error;
-  return data;
 }
 
 /**
@@ -1960,6 +1960,43 @@ if (userId) {
   const locationNickname =
     String(formData.get("location_nickname") || "").trim() || null;
   const zip = String(formData.get("zip") || "").trim() || null;
+
+    const normalizeAddressPart = (value: string | null | undefined) =>
+    String(value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+
+  const normalizedAddressLine1 = normalizeAddressPart(address_line1);
+  const normalizedCity = normalizeAddressPart(city);
+  const normalizedZip = normalizeAddressPart(zip);
+
+  async function findReusableLocation(customerId: string) {
+  if (!normalizedAddressLine1 || !normalizedCity) return null;
+
+  const { data: existingLocations, error } = await supabase
+    .from("locations")
+    .select("id, address_line1, city, zip")
+    .eq("customer_id", customerId);
+
+  if (error) throw error;
+
+  const match = (existingLocations || []).find((loc) => {
+    const locAddress = normalizeAddressPart(loc.address_line1);
+    const locCity = normalizeAddressPart(loc.city);
+    const locZip = normalizeAddressPart((loc as any).zip);
+
+    const sameAddress = locAddress === normalizedAddressLine1;
+    const sameCity = locCity === normalizedCity;
+
+    const zipProvided = !!normalizedZip;
+    const sameZip = !zipProvided || locZip === normalizedZip;
+
+    return sameAddress && sameCity && sameZip;
+  });
+
+  return match ?? null;
+}
 
   // ----- equipment payload (optional) + server validation -----
   const equipmentJsonRaw = String(formData.get("equipment_json") || "").trim();
@@ -2150,7 +2187,7 @@ function canContractorWriteEvent(event_type: string) {
       scheduled_date,
       status,
       contractor_id: contractorIdFinal,
-      permit_number: permitNumberRaw ? permitNumberRaw : null,
+      permit_number,
       jurisdiction,
       permit_date,
       window_start,
@@ -2178,12 +2215,19 @@ function canContractorWriteEvent(event_type: string) {
     redirect("/jobs/new?err=missing_address");
   }
 
-  // ---- Branch 2: existing customer + NEW location ----
-  if (existingCustomerId && !existingLocationId) {
-    if (!address_line1) throw new Error("Service Address is required");
-    if (!city) throw new Error("City is required");
-    if (!zip) throw new Error("Zip is required");
+// ---- Branch 2: existing customer + NEW location ----
+if (existingCustomerId && !existingLocationId) {
+  if (!address_line1) throw new Error("Service Address is required");
+  if (!city) throw new Error("City is required");
+  if (!zip) throw new Error("Zip is required");
 
+  let locationIdToUse: string;
+
+  const reusableLocation = await findReusableLocation(existingCustomerId);
+
+  if (reusableLocation?.id) {
+    locationIdToUse = reusableLocation.id;
+  } else {
     const { data: location, error: locationErr } = await supabase
       .from("locations")
       .insert({
@@ -2197,75 +2241,15 @@ function canContractorWriteEvent(event_type: string) {
       .single();
 
     if (locationErr) throw locationErr;
-
-    const created = await createJob({
-      job_type: jobType,
-      project_type: projectType,
-      job_address: jobAddressRaw || null,
-      customer_id: existingCustomerId,
-      location_id: location.id,
-
-      customer_first_name: customerFirstNameRaw || null,
-      customer_last_name: customerLastNameRaw || null,
-      customer_email: customerEmailRaw || null,
-      job_notes: jobNotesRaw || null,
-
-      title: titleFinal,
-      city,
-      scheduled_date,
-      status,
-      contractor_id: contractorIdFinal,
-      permit_number: permitNumberRaw ? permitNumberRaw : null,
-      jurisdiction,
-      permit_date,
-      window_start,
-      window_end,
-      customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
-      ops_status,
-
-      billing_recipient: billingRecipientFinal,
-      billing_name,
-      billing_email,
-      billing_phone,
-      billing_address_line1,
-      billing_address_line2,
-      billing_city,
-      billing_state,
-      billing_zip,
-    });
-
-await postCreate(created.id, "customer_new_location");
-return;
-
+    locationIdToUse = location.id;
   }
-
-  // ---- Branch 3: new customer flow (duplicate-safe) ----
-  const { customerId, reused } = await findOrCreateCustomer({
-    supabase,
-    firstName: customerFirstNameRaw,
-    lastName: customerLastNameRaw,
-    phone: customerPhoneRaw,
-    email: customerEmailRaw,
-  });
-
-  const { data: location, error: locationErr } = await supabase
-    .from("locations")
-    .insert({
-      customer_id: customerId,
-      address_line1,
-      city,
-    })
-    .select("id")
-    .single();
-
-  if (locationErr) throw locationErr;
 
   const created = await createJob({
     job_type: jobType,
     project_type: projectType,
     job_address: jobAddressRaw || null,
-    customer_id: customerId,
-    location_id: location.id,
+    customer_id: existingCustomerId,
+    location_id: locationIdToUse,
 
     customer_first_name: customerFirstNameRaw || null,
     customer_last_name: customerLastNameRaw || null,
@@ -2277,7 +2261,7 @@ return;
     scheduled_date,
     status,
     contractor_id: contractorIdFinal,
-    permit_number: permitNumberRaw ? permitNumberRaw : null,
+    permit_number,
     jurisdiction,
     permit_date,
     window_start,
@@ -2296,8 +2280,79 @@ return;
     billing_zip,
   });
 
+  await postCreate(created.id, "customer_new_location");
+  return;
+}
 
-    const banner = reused ? "customer_reused" : "customer_created";
+// ---- Branch 3: new customer flow (duplicate-safe) ----
+const { customerId, reused } = await findOrCreateCustomer({
+  supabase,
+  firstName: customerFirstNameRaw,
+  lastName: customerLastNameRaw,
+  phone: customerPhoneRaw,
+  email: customerEmailRaw,
+});
+
+let locationIdToUse: string;
+
+const reusableLocation = await findReusableLocation(customerId);
+
+if (reusableLocation?.id) {
+  locationIdToUse = reusableLocation.id;
+} else {
+  const { data: location, error: locationErr } = await supabase
+    .from("locations")
+    .insert({
+      customer_id: customerId,
+      nickname: locationNickname,
+      address_line1,
+      city,
+      zip,
+    })
+    .select("id")
+    .single();
+
+  if (locationErr) throw locationErr;
+  locationIdToUse = location.id;
+}
+
+const created = await createJob({
+  job_type: jobType,
+  project_type: projectType,
+  job_address: jobAddressRaw || null,
+  customer_id: customerId,
+  location_id: locationIdToUse,
+
+  customer_first_name: customerFirstNameRaw || null,
+  customer_last_name: customerLastNameRaw || null,
+  customer_email: customerEmailRaw || null,
+  job_notes: jobNotesRaw || null,
+
+  title: titleFinal,
+  city,
+  scheduled_date,
+  status,
+  contractor_id: contractorIdFinal,
+  permit_number,
+  jurisdiction,
+  permit_date,
+  window_start,
+  window_end,
+  customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
+  ops_status,
+
+  billing_recipient: billingRecipientFinal,
+  billing_name,
+  billing_email,
+  billing_phone,
+  billing_address_line1,
+  billing_address_line2,
+  billing_city,
+  billing_state,
+  billing_zip,
+});
+
+const banner = reused ? "customer_reused" : "customer_created";
 await postCreate(created.id, banner);
 return;
 }
