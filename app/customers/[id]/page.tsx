@@ -1,37 +1,209 @@
+// app/customers/[id]/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { archiveCustomerFromForm } from "@/lib/actions/customer-actions";
 
-
-type CustomerSummaryRow = {
-  customer_id: string;
-  full_name: string | null;
-  phone: string | null;
-  email: string | null;
-  locations_count: number;
-  jobs_count: number;
-  last_scheduled_date: string | null;
+type CustomerRow = {
+  id?: string;
+  customer_id?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  full_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  billing_address_line1?: string | null;
+  billing_address_line2?: string | null;
+  billing_city?: string | null;
+  billing_state?: string | null;
+  billing_zip?: string | null;
+  locations_count?: number | null;
+  jobs_count?: number | null;
+  last_scheduled_date?: string | null;
 };
 
-type CustomerLocationRow = {
-  customer_id: string;
-  location_id: string;
-  nickname: string | null;
-  address_line1: string | null;
-  address_line2: string | null;
+type LocationRow = {
+  id?: string;
+  location_id?: string;
+  customer_id?: string;
+  nickname?: string | null;
+  label?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  postal_code?: string | null;
+  equipment_count?: number | null;
+  jobs_count?: number | null;
+  last_scheduled_date?: string | null;
+};
+
+type JobRow = {
+  id: string;
+  title: string | null;
+  job_address: string | null;
   city: string | null;
-  state: string | null;
-  zip: string | null;
-  equipment_count: number;
-  jobs_count: number;
-  last_scheduled_date: string | null;
+  scheduled_date: string | null;
+  created_at: string | null;
+  ops_status: string | null;
+  contractor_id: string | null;
+  service_case_id: string | null;
+  location_id: string | null;
+  contractors?: {
+    name?: string | null;
+  } | null;
 };
 
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     v
   );
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatPhone(phone?: string | null) {
+  const digits = String(phone ?? "").replace(/\D/g, "");
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  return phone ?? "";
+}
+
+function customerDisplayName(customer: CustomerRow) {
+  const full = String(customer.full_name ?? "").trim();
+  if (full) return full;
+
+  const first = String(customer.first_name ?? "").trim();
+  const last = String(customer.last_name ?? "").trim();
+  const joined = [first, last].filter(Boolean).join(" ").trim();
+
+  return joined || "Unnamed Customer";
+}
+
+function locationDisplayName(loc: LocationRow) {
+  const label = String(loc.label ?? "").trim();
+  const nickname = String(loc.nickname ?? "").trim();
+  if (nickname) return nickname;
+  if (label) return label;
+  return "Location";
+}
+
+function locationAddressLine(loc: LocationRow) {
+  const parts = [loc.address_line1, loc.city, loc.state, loc.zip]
+    .map((v) => String(v ?? "").trim())
+    .filter(Boolean);
+
+  return parts.join(", ");
+}
+
+function billingAddressLine(customer: CustomerRow) {
+  const line1 = String(customer.billing_address_line1 ?? "").trim();
+  const line2 = String(customer.billing_address_line2 ?? "").trim();
+  const city = String(customer.billing_city ?? "").trim();
+  const state = String(customer.billing_state ?? "").trim();
+  const zip = String(customer.billing_zip ?? "").trim();
+
+  const top = [line1, line2].filter(Boolean).join(", ");
+  const bottom = [city, state, zip].filter(Boolean).join(", ");
+
+  return [top, bottom].filter(Boolean).join(" • ");
+}
+
+function makeMapsHref(address?: string | null) {
+  const q = String(address ?? "").trim();
+  if (!q) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+}
+
+function makeTelHref(phone?: string | null) {
+  const digits = String(phone ?? "").replace(/[^\d+]/g, "");
+  if (!digits) return null;
+  return `tel:${digits}`;
+}
+
+function makeSmsHref(phone?: string | null) {
+  const digits = String(phone ?? "").replace(/[^\d+]/g, "");
+  if (!digits) return null;
+  return `sms:${digits}`;
+}
+
+function normalizeOpsStatus(v?: string | null) {
+  return String(v ?? "").trim().toLowerCase();
+}
+
+function opsStatusLabel(v?: string | null) {
+  const s = normalizeOpsStatus(v);
+  if (s === "need_to_schedule") return "Need to Schedule";
+  if (s === "scheduled") return "Scheduled";
+  if (s === "pending_info") return "Pending Info";
+  if (s === "on_hold") return "On Hold";
+  if (s === "failed") return "Failed";
+  if (s === "retest_needed") return "Retest Needed";
+  if (s === "paperwork_required") return "Paperwork Required";
+  if (s === "invoice_required") return "Invoice Required";
+  if (s === "closeout") return "Closeout";
+  if (s === "completed") return "Completed";
+  return s ? s.replace(/_/g, " ") : "Unknown";
+}
+
+function opsBadgeClass(v?: string | null) {
+  const s = normalizeOpsStatus(v);
+
+  if (s === "need_to_schedule") {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+  if (s === "scheduled") {
+    return "border-blue-200 bg-blue-50 text-blue-800";
+  }
+  if (s === "pending_info") {
+    return "border-orange-200 bg-orange-50 text-orange-800";
+  }
+  if (s === "on_hold") {
+    return "border-slate-200 bg-slate-100 text-slate-700";
+  }
+  if (s === "failed") {
+    return "border-red-200 bg-red-50 text-red-800";
+  }
+  if (s === "retest_needed") {
+    return "border-rose-200 bg-rose-50 text-rose-800";
+  }
+  if (s === "paperwork_required") {
+    return "border-purple-200 bg-purple-50 text-purple-800";
+  }
+  if (s === "invoice_required") {
+    return "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800";
+  }
+  if (s === "closeout") {
+    return "border-indigo-200 bg-indigo-50 text-indigo-800";
+  }
+  if (s === "completed") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function summaryOrder() {
+  return [
+    "need_to_schedule",
+    "scheduled",
+    "pending_info",
+    "failed",
+    "retest_needed",
+    "on_hold",
+  ] as const;
 }
 
 export default async function CustomerDetailPage(props: {
@@ -42,25 +214,39 @@ export default async function CustomerDetailPage(props: {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
 
-  // ✅ Next.js: unwrap params
   const { id } = await props.params;
 
-  // ✅ Guard against bad route params (prevents 22P02)
   if (!id || !isUuid(id)) {
     redirect("/customers");
   }
 
   const customerId = id;
 
-  const { data: customerRow, error: customerErr } = await supabase
-    .from("customer_summary")
-    .select("*")
-    .eq("customer_id", customerId)
+  // Customer
+  const { data: customerData, error: customerErr } = await supabase
+    .from("customers")
+    .select(
+      `
+      id,
+      first_name,
+      last_name,
+      full_name,
+      phone,
+      email,
+      notes,
+      billing_address_line1,
+      billing_address_line2,
+      billing_city,
+      billing_state,
+      billing_zip
+    `
+    )
+    .eq("id", customerId)
     .maybeSingle();
 
   if (customerErr) throw customerErr;
 
-  if (!customerRow) {
+  if (!customerData) {
     return (
       <div className="p-6 space-y-2">
         <h1 className="text-2xl font-semibold">Customer not found</h1>
@@ -68,179 +254,489 @@ export default async function CustomerDetailPage(props: {
           Back to Customers
         </Link>
       </div>
-      
     );
   }
-  const customer = customerRow as CustomerSummaryRow;
+
+  const customer = customerData as CustomerRow;
+
+  // Locations
   const { data: locationsData, error: locationsErr } = await supabase
-    .from("customer_locations_summary")
-    .select("*")
+    .from("locations")
+    .select(
+      `
+      id,
+      customer_id,
+      nickname,
+      label,
+      address_line1,
+      address_line2,
+      city,
+      state,
+      zip,
+      postal_code
+    `
+    )
     .eq("customer_id", customerId)
-    .order("last_scheduled_date", { ascending: false, nullsFirst: false });
+    .order("created_at", { ascending: true });
 
   if (locationsErr) throw locationsErr;
 
-  const locations = (locationsData ?? []) as CustomerLocationRow[];
+  const locations = (locationsData ?? []) as LocationRow[];
 
-  // Fetch jobs grouped by location
-const jobsByLocation = new Map<string, any[]>();
-
-for (const loc of locations) {
+  // Jobs across whole customer
   const { data: jobsData, error: jobsErr } = await supabase
     .from("jobs")
-    .select("id, title, status, ops_status, scheduled_date, created_at")
-    .eq("location_id", loc.location_id)
-    .order("scheduled_date", { ascending: false, nullsFirst: false })
+    .select(
+      `
+      id,
+      title,
+      job_address,
+      city,
+      scheduled_date,
+      created_at,
+      ops_status,
+      contractor_id,
+      service_case_id,
+      location_id
+      `
+    )
+    .eq("customer_id", customerId)
     .order("created_at", { ascending: false });
 
   if (jobsErr) throw jobsErr;
 
-  jobsByLocation.set(loc.location_id, jobsData ?? []);
-}
+  const jobs = (jobsData ?? []) as JobRow[];
+
+  // Lightweight service-case awareness
+  const serviceCaseIds = Array.from(
+    new Set(
+      jobs
+        .map((j) => String(j.service_case_id ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  const serviceCaseVisitCounts = new Map<string, number>();
+  if (serviceCaseIds.length > 0) {
+    const { data: serviceCaseJobs, error: scErr } = await supabase
+      .from("jobs")
+      .select("service_case_id")
+      .in("service_case_id", serviceCaseIds);
+
+    if (scErr) throw scErr;
+
+    for (const row of serviceCaseJobs ?? []) {
+      const key = String((row as { service_case_id?: string | null }).service_case_id ?? "").trim();
+      if (!key) continue;
+      serviceCaseVisitCounts.set(key, (serviceCaseVisitCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  const jobsByLocationCount = new Map<string, number>();
+  for (const job of jobs) {
+    const key = String(job.location_id ?? "").trim();
+    if (!key) continue;
+    jobsByLocationCount.set(key, (jobsByLocationCount.get(key) ?? 0) + 1);
+  }
+
+  const opsCounts: Record<string, number> = {};
+  for (const job of jobs) {
+    const key = normalizeOpsStatus(job.ops_status) || "unknown";
+    opsCounts[key] = (opsCounts[key] ?? 0) + 1;
+  }
+
+  const callHref = makeTelHref(customer.phone);
+  const smsHref = makeSmsHref(customer.phone);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="space-y-1">
-        <Link href="/customers" className="text-sm underline">
-          ← Back to Customers
-        </Link>
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-7xl p-4 md:p-6 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-start md:justify-between">
+          <div className="space-y-2">
+            <Link
+              href="/ops"
+              className="inline-flex text-sm text-slate-500 hover:text-slate-900"
+            >
+              ← Back to Ops
+            </Link>
 
-        <Link
-        href={`/jobs/new?customer_id=${customerId}`}
-        className="inline-flex items-center rounded-md bg-black px-3 py-2 text-sm font-medium text-white hover:bg-gray-900"
-      >
-        + Create Job
-      </Link>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
+                {customerDisplayName(customer)}
+              </h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Customer Command Center
+              </p>
+            </div>
 
-        
-
-        <h1 className="text-2xl font-semibold">
-          {customer.full_name ?? "Unnamed Customer"}
-        </h1>
-
-        <div className="text-sm text-muted-foreground">
-          {customer.phone ?? "No phone"}{" "}
-          {customer.email ? `• ${customer.email}` : ""}
-        </div>
-
-        <div className="text-sm text-muted-foreground">
-          {customer.locations_count} location
-          {customer.locations_count === 1 ? "" : "s"} • {customer.jobs_count} job
-          {customer.jobs_count === 1 ? "" : "s"}
-          {customer.last_scheduled_date
-            ? ` • Last scheduled: ${new Date(
-                customer.last_scheduled_date
-              ).toLocaleString()}`
-            : ""}
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <h2 className="text-lg font-semibold">Locations</h2>
-
-        {locations.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
-            No locations found for this customer.
+            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                {locations.length} location{locations.length === 1 ? "" : "s"}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                {jobs.length} job{jobs.length === 1 ? "" : "s"}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                Last scheduled:{" "}
+                {formatDate(
+                  jobs
+                    .map((j) => j.scheduled_date)
+                    .filter(Boolean)
+                    .sort()
+                    .slice(-1)[0] ?? null
+                )}
+              </span>
+            </div>
           </div>
-        ) : (
-          <div className="grid gap-3">
-            {locations.map((l) => (
-              <div
-                key={l.location_id}
-                className="rounded-lg border p-4"
->
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="font-medium">
-                      {l.nickname ?? "Service Location"}
-                    </div>
-                    <div className="text-sm">
-                      {l.address_line1 ?? "No address"}
-                      {l.city ? `, ${l.city}` : ""}
-                      {l.state ? `, ${l.state}` : ""}
-                      {l.zip ? ` ${l.zip}` : ""}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {l.equipment_count} equipment • {l.jobs_count} jobs
-                      {l.last_scheduled_date
-                        ? ` • Last scheduled: ${new Date(
-                            l.last_scheduled_date
-                          ).toLocaleString()}`
-                        : ""}
-                    </div>
-                  </div>
-                  
 
-                  <div className="text-sm text-muted-foreground whitespace-nowrap">
-                    View →
-                  </div>
-                </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/customers/${customerId}/edit`}
+              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+            >
+              Edit Customer
+            </Link>
 
-                <div className="mt-3">
-  <Link
-    href={`/locations/${l.location_id}`}
-    className="text-sm underline text-muted-foreground"
-  >
-    View Location →
-  </Link>
-</div>
+            <Link
+              href={`/jobs/new?customer_id=${customerId}`}
+              className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            >
+              New Job
+            </Link>
 
-                <div className="mt-3 space-y-2">
-  <div className="text-sm font-medium">Jobs</div>
-
-  {(jobsByLocation.get(l.location_id) ?? []).length === 0 ? (
-    <div className="text-sm text-muted-foreground">
-      No jobs for this location.
-    </div>
-  ) : (
-    (jobsByLocation.get(l.location_id) ?? []).map((job) => (
-      <Link
-        key={job.id}
-        href={`/jobs/${job.id}`}
-        className="block rounded-md border px-3 py-2 text-sm hover:bg-muted/50"
-      >
-        <div className="flex justify-between">
-          <span>{job.title ?? "Untitled Job"}</span>
-          <span className="text-muted-foreground">
-            {job.status === "failed"
-              ? "FAILED"
-              : job.status === "completed"
-                ? "Completed"
-                : job.scheduled_date
-                  ? `Scheduled ${new Date(job.scheduled_date).toLocaleDateString()}`
-                  : job.ops_status ?? "Unscheduled"}
-            </span>
+            <form action={archiveCustomerFromForm}>
+              <input type="hidden" name="customer_id" value={customerId} />
+              <button
+                type="submit"
+                className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+              >
+                Archive
+              </button>
+            </form>
+          </div>
         </div>
-      </Link>
-    ))
-  )}
-</div>
+
+        {/* Open status summary */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+              Open Jobs Summary
+            </h2>
+            <span className="text-xs text-slate-500">
+              Derived from jobs.ops_status
+            </span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            {summaryOrder().map((key) => (
+              <div
+                key={key}
+                className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+              >
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  {opsStatusLabel(key)}
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-slate-900">
+                  {opsCounts[key] ?? 0}
+                </div>
               </div>
             ))}
           </div>
-        )}
+        </section>
+
+        {/* Overview */}
+        <section className="grid gap-6 xl:grid-cols-[1.25fr_.9fr]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Customer Overview
+              </h2>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Phone
+                </div>
+                <div className="text-sm text-slate-900">
+                  {customer.phone ? formatPhone(customer.phone) : "—"}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Email
+                </div>
+                <div className="text-sm text-slate-900 break-all">
+                  {customer.email ?? "—"}
+                </div>
+              </div>
+
+              <div className="space-y-1 md:col-span-2">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Notes
+                </div>
+                <div className="min-h-[44px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                  {customer.notes?.trim() || "No notes on file."}
+                </div>
+              </div>
+
+              <div className="space-y-1 md:col-span-2">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Billing Address
+                </div>
+                <div className="text-sm text-slate-900">
+                  {billingAddressLine(customer) || "—"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">Quick Actions</h2>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {callHref ? (
+                <a
+                  href={callHref}
+                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                >
+                  Call Customer
+                </a>
+              ) : null}
+
+              {smsHref ? (
+                <a
+                  href={smsHref}
+                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                >
+                  Text Customer
+                </a>
+              ) : null}
+
+              {customer.email ? (
+                <a
+                  href={`mailto:${customer.email}`}
+                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                >
+                  Email Customer
+                </a>
+              ) : null}
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs uppercase tracking-wide text-slate-500">
+                  Total Jobs
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-slate-900">
+                  {jobs.length}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs uppercase tracking-wide text-slate-500">
+                  Active Work
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-slate-900">
+                  {(opsCounts["need_to_schedule"] ?? 0) +
+                    (opsCounts["scheduled"] ?? 0) +
+                    (opsCounts["pending_info"] ?? 0) +
+                    (opsCounts["failed"] ?? 0) +
+                    (opsCounts["retest_needed"] ?? 0) +
+                    (opsCounts["on_hold"] ?? 0)}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs uppercase tracking-wide text-slate-500">
+                  Completed
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-slate-900">
+                  {opsCounts["completed"] ?? 0}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Locations */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Locations</h2>
+              <p className="text-sm text-slate-500">
+                All service addresses associated with this customer.
+              </p>
+            </div>
+          </div>
+
+          {locations.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+              No locations on file yet.
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {locations.map((loc) => {
+                const locId = String(loc.id ?? loc.location_id ?? "");
+                const address = locationAddressLine(loc);
+                const mapsHref = makeMapsHref(address);
+
+                return (
+                  <div
+                    key={locId}
+                    className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
+                  >
+                    <div className="h-32 border-b border-slate-200 bg-gradient-to-br from-slate-100 to-slate-200">
+                      <div className="flex h-full items-center justify-center px-4 text-center text-sm text-slate-500">
+                        Google address photo placeholder
+                        <br />
+                        Street View / static map ready later
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">
+                            {locationDisplayName(loc)}
+                          </div>
+                          <div className="mt-1 text-sm text-slate-600">
+                            {address || "No address on file"}
+                          </div>
+                        </div>
+
+                        <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
+                          {jobsByLocationCount.get(locId) ?? 0} job
+                          {(jobsByLocationCount.get(locId) ?? 0) === 1 ? "" : "s"}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {mapsHref ? (
+                          <a
+                            href={mapsHref}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                          >
+                            Open in Maps
+                          </a>
+                        ) : null}
+
+                        {locId ? (
+                          <Link
+                            href={`/locations/${locId}`}
+                            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                          >
+                            View Location
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Job history */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Job History</h2>
+              <p className="text-sm text-slate-500">
+                All jobs for this customer across every location.
+              </p>
+            </div>
+          </div>
+
+          {jobs.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+              No jobs found for this customer yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {jobs.map((job) => {
+                const contractorName = job.contractor_id ? "Assigned" : "Unassigned";
+                const serviceCaseVisits = job.service_case_id
+                  ? serviceCaseVisitCounts.get(job.service_case_id) ?? 1
+                  : null;
+
+                const address = [job.job_address, job.city]
+                  .map((v) => String(v ?? "").trim())
+                  .filter(Boolean)
+                  .join(", ");
+
+                return (
+                  <div
+                    key={job.id}
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            href={`/jobs/${job.id}`}
+                            className="text-sm font-semibold text-slate-900 underline-offset-2 hover:underline"
+                          >
+                            {job.title?.trim() || `Job ${job.id.slice(0, 8)}`}
+                          </Link>
+
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${opsBadgeClass(
+                              job.ops_status
+                            )}`}
+                          >
+                            {opsStatusLabel(job.ops_status)}
+                          </span>
+
+                          {job.service_case_id ? (
+                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600">
+                              Service Case · {serviceCaseVisits} visit
+                              {serviceCaseVisits === 1 ? "" : "s"}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-2 xl:grid-cols-4">
+                          <div>
+                            <span className="font-medium text-slate-700">Job ID:</span>{" "}
+                            <span className="font-mono text-xs">{job.id}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-slate-700">Address:</span>{" "}
+                            {address || "—"}
+                          </div>
+                          <div>
+                            <span className="font-medium text-slate-700">Contractor:</span>{" "}
+                            {contractorName}
+                          </div>
+                          <div>
+                            <span className="font-medium text-slate-700">Scheduled:</span>{" "}
+                            {formatDate(job.scheduled_date)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href={`/jobs/${job.id}`}
+                          className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
+                        >
+                          Open Job
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
-
-      {/* 🔴 Danger Zone */}
-<div className="rounded-lg border border-red-200 p-4 space-y-2">
-  <div className="font-semibold text-red-700">Danger zone</div>
-  <div className="text-sm text-gray-600">
-    Archive removes this customer from active lists. Cannot archive if customer has jobs.
-  </div>
-
-  <form action={archiveCustomerFromForm}>
-    <input type="hidden" name="customer_id" value={customerId} />
-    <button
-      type="submit"
-      className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
-    >
-      Archive Customer
-    </button>
-  </form>
-</div>
     </div>
-    
-    
   );
-  
 }

@@ -451,6 +451,21 @@ function addressLine(j: any) {
   return `${addr}, ${city}`;
 }
 
+function customerNameOnly(j: any) {
+  const c = j.customer_id ? customersById.get(j.customer_id) : null;
+  return (
+    c?.full_name ||
+    `${c?.first_name ?? ""} ${c?.last_name ?? ""}`.trim() ||
+    `${j.customer_first_name ?? ""} ${j.customer_last_name ?? ""}`.trim() ||
+    "—"
+  );
+}
+
+function customerPhoneOnly(j: any) {
+  const c = j.customer_id ? customersById.get(j.customer_id) : null;
+  return c?.phone ?? j.customer_phone ?? "";
+}
+
   const selectedContractorName =
     contractor && contractors?.find((c: any) => c.id === contractor)?.name;
 
@@ -590,31 +605,91 @@ jobs.sort((a: any, b: any) => {
 
             <div className="p-3 space-y-2">
               {cityJobs.map((j: any) => (
-                <Link
-                  key={j.id}
-                  href={`/jobs/${j.id}`}
-                  className="block rounded-md border p-3 hover:bg-gray-50"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium">{j.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {(j.customer_first_name ?? "") + " " + (j.customer_last_name ?? "")} •{" "}
-                        {j.customer_phone ?? "—"}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {addressLine(j)}
-                      </div>
+                <div
+                key={j.id}
+                className="rounded-md border p-3 hover:bg-gray-50"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Link
+                      href={`/jobs/${j.id}`}
+                      className="text-sm font-medium text-blue-600 hover:underline"
+                    >
+                      {j.title}
+                    </Link>
+
+                    <div className="text-xs">
+                      {j.customer_id ? (
+                        <Link
+                          href={`/customers/${j.customer_id}`}
+                          className="font-medium text-blue-600 hover:underline"
+                        >
+                          {customerNameOnly(j)}
+                        </Link>
+                      ) : (
+                        <span className="font-medium text-gray-700">{customerNameOnly(j)}</span>
+                      )}
+
+                      <span className="text-muted-foreground"> • {customerPhoneOnly(j) || "—"}</span>
                     </div>
+
+                    <div className="text-xs text-muted-foreground">
+                      {addressLine(j)}
+                    </div>
+                  </div>
 
                   <div className="text-xs text-muted-foreground text-right whitespace-nowrap">
                     {displayWindowLA(j.window_start, j.window_end) || "—"}
                   </div>
+                </div>
 
-                
+                <div className="mt-2 flex gap-2 flex-wrap">
+                  <Link
+                    href={`/jobs/${j.id}`}
+                    className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                  >
+                    Open Job
+                  </Link>
 
-                  </div>
-                </Link>
+                  {j.customer_id ? (
+                    <Link
+                      href={`/customers/${j.customer_id}`}
+                      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                    >
+                      Open Customer
+                    </Link>
+                  ) : null}
+
+                  {telHref(customerPhoneOnly(j)) && (
+                    <a
+                      href={telHref(customerPhoneOnly(j))}
+                      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                    >
+                      📞 Call
+                    </a>
+                  )}
+
+                  {smsHref(customerPhoneOnly(j)) && (
+                    <a
+                      href={smsHref(customerPhoneOnly(j))}
+                      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                    >
+                      💬 Text
+                    </a>
+                  )}
+
+                  {mapsHref(j.job_address, j.city) && (
+                    <a
+                      href={mapsHref(j.job_address, j.city)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                    >
+                      🧭 Navigate
+                    </a>
+                  )}
+                </div>
+              </div>
               ))}
             </div>
           </div>
@@ -647,26 +722,93 @@ jobs.sort((a: any, b: any) => {
       </div>
     ) : (
       (attentionJobs ?? []).map((j: any) => (
-        <Link
+       <div
           key={j.id}
-          href={`/jobs/${j.id}?tab=ops`}
-          className="block rounded-md border p-3 hover:bg-gray-50"
+          className="rounded-md border p-3 hover:bg-gray-50"
         >
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-medium">{j.title}</div>
-              <div className="text-xs text-muted-foreground">
-                {customerLine(j)}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {addressLine(j)}
-              </div>
-            </div>
-            <div className="text-xs font-medium text-red-600 whitespace-nowrap">
-              {j.ops_status}
-            </div>
-          </div>
+  <div>
+    <Link
+      href={`/jobs/${j.id}?tab=ops`}
+      className="text-sm font-medium text-blue-600 hover:underline"
+    >
+      {j.title}
+    </Link>
+
+    <div className="text-xs">
+      {j.customer_id ? (
+        <Link
+          href={`/customers/${j.customer_id}`}
+          className="font-medium text-blue-600 hover:underline"
+        >
+          {customerNameOnly(j)}
         </Link>
+      ) : (
+        <span className="font-medium text-gray-700">{customerNameOnly(j)}</span>
+      )}
+
+      <span className="text-muted-foreground">
+        {" "}• {customerPhoneOnly(j) || "—"}
+      </span>
+    </div>
+
+    <div className="text-xs text-muted-foreground">
+      {addressLine(j)}
+    </div>
+  </div>
+
+  <div className="text-xs font-medium text-red-600 whitespace-nowrap">
+    {j.ops_status}
+  </div>
+</div>
+
+<div className="mt-2 flex gap-2 flex-wrap">
+  <Link
+    href={`/jobs/${j.id}?tab=ops`}
+    className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+  >
+    Open Job
+  </Link>
+
+  {j.customer_id ? (
+    <Link
+      href={`/customers/${j.customer_id}`}
+      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+    >
+      Open Customer
+    </Link>
+  ) : null}
+
+  {telHref(customerPhoneOnly(j)) && (
+    <a
+      href={telHref(customerPhoneOnly(j))}
+      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+    >
+      📞 Call
+    </a>
+  )}
+
+  {smsHref(customerPhoneOnly(j)) && (
+    <a
+      href={smsHref(customerPhoneOnly(j))}
+      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+    >
+      💬 Text
+    </a>
+  )}
+
+  {mapsHref(j.job_address, j.city) && (
+    <a
+      href={mapsHref(j.job_address, j.city)}
+      target="_blank"
+      rel="noreferrer"
+      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+    >
+      🧭 Navigate
+    </a>
+  )}
+</div>
+        </div>
       ))
     )}
   </div>
@@ -699,38 +841,69 @@ jobs.sort((a: any, b: any) => {
             key={j.id}
             className="rounded-md border p-3 hover:bg-gray-50"
           >
+            <div>
             <Link
               href={`/jobs/${j.id}?tab=ops`}
-              className="block"
+              className="text-sm font-medium text-blue-600 hover:underline"
             >
-              <div className="text-sm font-medium">{j.title}</div>
-              <div className="text-xs text-muted-foreground">
-                {customerLine(j)}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {addressLine(j)}
-              </div>
+              {j.title}
             </Link>
 
-            <div className="mt-2 flex gap-2">
-              {telHref(j.customer_phone) && (
-                <a
-                  href={telHref(j.customer_phone)}
-                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+            <div className="text-xs">
+              {j.customer_id ? (
+                <Link
+                  href={`/customers/${j.customer_id}`}
+                  className="font-medium text-blue-600 hover:underline"
                 >
-                  📞 Call
-                </a>
+                  {customerNameOnly(j)}
+                </Link>
+              ) : (
+                <span className="font-medium text-gray-700">{customerNameOnly(j)}</span>
               )}
 
-              {smsHref(j.customer_phone) && (
-                <a
-                  href={smsHref(j.customer_phone)}
-                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                >
-                  💬 Text
-                </a>
-              )}
+              <span className="text-muted-foreground"> • {customerPhoneOnly(j) || "—"}</span>
             </div>
+
+            <div className="text-xs text-muted-foreground">
+              {addressLine(j)}
+            </div>
+          </div>
+
+          <div className="mt-2 flex gap-2 flex-wrap">
+            <Link
+              href={`/jobs/${j.id}?tab=ops`}
+              className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+            >
+              Open Job
+            </Link>
+
+            {j.customer_id ? (
+              <Link
+                href={`/customers/${j.customer_id}`}
+                className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+              >
+                Open Customer
+              </Link>
+            ) : null}
+
+            {telHref(customerPhoneOnly(j)) && (
+              <a
+                href={telHref(customerPhoneOnly(j))}
+                className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+              >
+                📞 Call
+              </a>
+            )}
+
+            {smsHref(customerPhoneOnly(j)) && (
+              <a
+                href={smsHref(customerPhoneOnly(j))}
+                className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+              >
+                💬 Text
+              </a>
+            )}
+          </div>
           </div>
         ))
       )}
@@ -755,15 +928,29 @@ jobs.sort((a: any, b: any) => {
             key={j.id}
             className="rounded-md border p-3 hover:bg-gray-50"
           >
-            <Link
-              href={`/jobs/${j.id}`}
-              className="block"
-            >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium">{j.title}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {customerLine(j)}
+                  <Link
+                    href={`/jobs/${j.id}`}
+                    className="text-sm font-medium text-blue-600 hover:underline"
+                  >
+                    {j.title}
+                  </Link>
+                  <div className="text-xs">
+                    {j.customer_id ? (
+                      <Link
+                        href={`/customers/${j.customer_id}`}
+                        className="font-medium text-blue-600 hover:underline"
+                      >
+                        {customerNameOnly(j)}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-gray-700">{customerNameOnly(j)}</span>
+                    )}
+
+                    <span className="text-muted-foreground">
+                      {" "}• {customerPhoneOnly(j) || "—"}
+                    </span>
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {addressLine(j)}
@@ -780,38 +967,55 @@ jobs.sort((a: any, b: any) => {
                   )}
                 </div>
               </div>
-            </Link>
 
-            <div className="mt-2 flex gap-2">
-              {telHref(j.customer_phone) && (
-                <a
-                  href={telHref(j.customer_phone)}
+              <div className="mt-2 flex gap-2 flex-wrap">
+
+                <Link
+                  href={`/jobs/${j.id}`}
                   className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
                 >
-                  📞 Call
-                </a>
-              )}
+                  Open Job
+                </Link>
 
-              {smsHref(j.customer_phone) && (
-                <a
-                  href={smsHref(j.customer_phone)}
-                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                >
-                  💬 Text
-                </a>
-              )}
+                {j.customer_id ? (
+                  <Link
+                    href={`/customers/${j.customer_id}`}
+                    className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                  >
+                    Open Customer
+                  </Link>
+                ) : null}
 
-              {mapsHref(j.job_address, j.city) && (
-                <a
-                  href={mapsHref(j.job_address, j.city)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                >
-                  🧭 Navigate
-                </a>
-              )}
-            </div>
+                {telHref(customerPhoneOnly(j)) && (
+                  <a
+                    href={telHref(customerPhoneOnly(j))}
+                    className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                  >
+                    📞 Call
+                  </a>
+                )}
+
+                {smsHref(customerPhoneOnly(j)) && (
+                  <a
+                    href={smsHref(customerPhoneOnly(j))}
+                    className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                  >
+                    💬 Text
+                  </a>
+                )}
+
+                {mapsHref(j.job_address, j.city) && (
+                  <a
+                    href={mapsHref(j.job_address, j.city)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                  >
+                    🧭 Navigate
+                  </a>
+                )}
+
+              </div>
           </div>
         ))
       )}
@@ -894,12 +1098,27 @@ jobs.sort((a: any, b: any) => {
   key={j.id}
   className="rounded-md border border-gray-200 bg-white p-3 shadow-sm hover:bg-gray-50 transition"
 >
-  <Link href={`/jobs/${j.id}?tab=ops`} className="block">
     <div className="flex items-start justify-between gap-3">
       <div>
-        <div className="text-sm font-medium text-gray-900">{j.title}</div>
-        <div className="text-xs text-gray-700">
-          {customerLine(j)}
+        <Link
+          href={`/jobs/${j.id}?tab=ops`}
+          className="text-sm font-medium text-blue-600 hover:underline"
+        >
+          {j.title}
+        </Link>
+        <div className="text-xs">
+          {j.customer_id ? (
+            <Link
+              href={`/customers/${j.customer_id}`}
+              className="font-medium text-blue-600 hover:underline"
+            >
+              {customerNameOnly(j)}
+            </Link>
+          ) : (
+            <span className="font-medium text-gray-700">{customerNameOnly(j)}</span>
+          )}
+
+          <span className="text-gray-600"> • {customerPhoneOnly(j) || "—"}</span>
         </div>
         <div className="text-xs text-gray-600">
           {addressLine(j)}
@@ -916,38 +1135,53 @@ jobs.sort((a: any, b: any) => {
   )}
 </div>
     </div>
-  </Link>
 
-  <div className="mt-3 flex flex-wrap gap-2">
-    {telHref(j.customer_phone) && (
-      <a
-        href={telHref(j.customer_phone)}
+      <div className="mt-3 flex flex-wrap gap-2">
+      <Link
+        href={`/jobs/${j.id}?tab=ops`}
         className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
       >
-        📞 Call
-      </a>
-    )}
+        Open Job
+      </Link>
 
-    {smsHref(j.customer_phone) && (
-      <a
-        href={smsHref(j.customer_phone)}
-        className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
-      >
-        💬 Text
-      </a>
-    )}
+      {j.customer_id ? (
+        <Link
+          href={`/customers/${j.customer_id}`}
+          className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
+        >
+          Open Customer
+        </Link>
+      ) : null}
 
-    {mapsHref(j.job_address, j.city) && (
-      <a
-        href={mapsHref(j.job_address, j.city)}
-        target="_blank"
-        rel="noreferrer"
-        className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
-      >
-        🧭 Navigate
-      </a>
-    )}
-  </div>
+      {telHref(customerPhoneOnly(j)) && (
+        <a
+          href={telHref(customerPhoneOnly(j))}
+          className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
+        >
+          📞 Call
+        </a>
+      )}
+
+      {smsHref(customerPhoneOnly(j)) && (
+        <a
+          href={smsHref(customerPhoneOnly(j))}
+          className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
+        >
+          💬 Text
+        </a>
+      )}
+
+      {mapsHref(j.job_address, j.city) && (
+        <a
+          href={mapsHref(j.job_address, j.city)}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
+        >
+          🧭 Navigate
+        </a>
+      )}
+    </div>
 </div>
             ))
           )}

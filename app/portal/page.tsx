@@ -599,7 +599,7 @@ export default async function PortalPage({
                       {["failed", "retest_needed"].includes(ops) && failureReasons.length > 0 && (
                       <div>
                         <span className="font-semibold text-gray-700 dark:text-gray-300">
-                          Why failed:
+                          Why it failed:
                         </span>{" "}
                         {failureReasons[0]}
                       </div>

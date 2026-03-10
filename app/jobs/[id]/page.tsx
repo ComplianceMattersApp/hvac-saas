@@ -753,35 +753,61 @@ const showCloseoutRow =
       : canShowInvoiceButton
   );
 
+const locationId = (job as any).locations?.id ?? null;
+
+const digitsOnly = (v?: string | null) => String(v ?? "").replace(/\D/g, "");
+
+const telLink =
+  customerPhone !== "—" && digitsOnly(customerPhone)
+    ? `tel:${digitsOnly(customerPhone)}`
+    : "";
+
+const serviceMapsLink =
+  serviceAddressDisplay && serviceAddressDisplay !== "No address set"
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(serviceAddressDisplay)}`
+    : "";
+
+const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
+
   return (
     <div className="p-6 max-w-3xl">
 
 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-  <Link
-    href="/ops"
-    className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 hover:bg-gray-50"
-  >
-    ← Back to Ops
-  </Link>
-
-  <div className="flex flex-wrap items-center gap-2">
+  <div className="flex flex-wrap items-center gap-2 text-sm text-gray-300">
     <Link
-      href="/customers"
-      className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 hover:bg-gray-50"
+      href="/ops"
+      className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 font-medium text-gray-900 hover:bg-gray-50"
     >
-      Customers
+      ← Back to Ops
     </Link>
 
+    <span className="hidden sm:inline text-gray-500">/</span>
+
+    {job.customer_id ? (
+      <Link
+        href={`/customers/${job.customer_id}`}
+        className="hover:underline"
+      >
+        {customerName}
+      </Link>
+    ) : (
+      <span>{customerName}</span>
+    )}
+
+    <span className="text-gray-400">/</span>
+
+    <span className="font-medium text-gray-200">{job.title}</span>
+  </div>
+
+  <div className="flex flex-wrap items-center gap-2">
     <Link
       href="/calendar"
       className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 hover:bg-gray-50"
     >
       Calendar
     </Link>
-
   </div>
 </div>
-
       {/* Header */}
 
       {/* Always-visible Top Actions */}
@@ -1064,6 +1090,8 @@ const showCloseoutRow =
                 </div>
               </div>
 
+
+
               <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
                 <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Contractor</div>
                 <div className="mt-1 text-sm font-semibold text-gray-900">
@@ -1131,6 +1159,58 @@ const showCloseoutRow =
               )}
 
               <ServiceStatusActions jobId={jobId} />
+            </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+
+              {job.customer_id && (
+                <Link
+                  href={`/customers/${job.customer_id}`}
+                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                >
+                  Open Customer
+                </Link>
+              )}
+
+              {telLink && (
+                <a
+                  href={telLink}
+                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                >
+                  📞 Call
+                </a>
+              )}
+
+              {customerPhone !== "—" && (
+                <a
+                  href={`sms:${digitsOnly(customerPhone)}`}
+                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                >
+                  💬 Text
+                </a>
+              )}
+
+              {serviceMapsLink && (
+                <a
+                  href={serviceMapsLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                >
+                  🧭 Navigate
+                </a>
+              )}
+
+              {serviceCaseId ? (
+                <a
+                  href="#service-chain"
+                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
+                >
+                  Service Case: {serviceCaseVisitCount} visit{serviceCaseVisitCount === 1 ? "" : "s"}
+                </a>
+              ) : null}
+              
+
             </div>
 
             {job.job_notes ? (
@@ -1443,7 +1523,7 @@ const showCloseoutRow =
         </form>
       </div>
 
-          <section className="rounded-lg border p-4 mb-4">
+          <section id="service-chain" className="rounded-lg border p-4 mb-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">Service Chain</h2>

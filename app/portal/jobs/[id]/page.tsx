@@ -256,19 +256,30 @@ const contractorNotes = (events ?? [])
       .join(" ");
   }
 
+  function readableTestName(type: string | null | undefined) {
+  const v = String(type ?? "").toLowerCase();
+  if (v === "refrigerant_charge") return "Refrigerant Charge";
+  if (v === "airflow") return "Airflow";
+  if (v === "duct_leakage") return "Duct Leakage";
+  if (v === "watt_draw") return "Watt Draw";
+  return titleCaseFromSnake(v);
+}
+
   function portalStatusLabel(opsStatus: string | null | undefined) {
-    const v = String(opsStatus ?? "").toLowerCase();
+  const v = String(opsStatus ?? "").toLowerCase();
 
-    if (v === "failed" || v === "retest_needed") return "Failed / Retest Required";
-    if (v === "pending_info") return "Pending Info";
-    if (v === "need_to_schedule") return "Need to Schedule";
-    if (v === "scheduled" || v === "ready") return "Scheduled";
-    if (v === "field_complete") return "Field Complete";
-    if (v === "on_hold") return "On Hold";
-    if (v === "closed") return "Closed";
+  if (v === "failed") return "Failed — Awaiting correction or review";
+  if (v === "retest_needed") return "Retest Required";
+  if (v === "pending_info") return "Pending Info";
+  if (v === "need_to_schedule") return "Need to Schedule";
+  if (v === "scheduled") return "Retest Scheduled";
+  if (v === "ready") return "Scheduled";
+  if (v === "field_complete") return "Field Complete";
+  if (v === "on_hold") return "On Hold";
+  if (v === "closed") return "Closed";
 
-    return titleCaseFromSnake(v);
-  }
+  return titleCaseFromSnake(v);
+}
 
   const addressDisplay = buildAddressLines({
     address1: addressLine1,
@@ -439,7 +450,12 @@ function extractTopReasons(run: any): string[] {
     {isPortalFailed ? (
       <>
         <div className="text-base font-semibold text-red-800 dark:text-red-200">
-          FAILED — Retest Required
+          FAILED — Action Required
+        </div>
+        <div className="text-sm text-red-900/80 dark:text-red-100/90">
+          This system did not meet ECC requirements.
+          You may submit correction photos or documentation for review.
+          A retest visit may be required.
         </div>
 
         {healthRun ? (
@@ -487,6 +503,23 @@ function extractTopReasons(run: any): string[] {
     ) : null}
   </div>
 ) : null}
+
+{/* Next Step */}
+{isPortalFailed && (
+  <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-2">
+    <div className="text-sm font-semibold">Next step</div>
+
+    <div className="text-sm text-gray-700 dark:text-gray-200">
+      Upload photos or documentation showing the correction. Once submitted,
+      our team will review and determine if the issue is resolved or if a
+      retest visit is required.
+    </div>
+
+    <div className="text-xs text-gray-500 dark:text-gray-300">
+      Tip: include gauge photos, airflow readings, or duct sealing work.
+    </div>
+  </div>
+)}
 
 {/* At a glance */}
 <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
@@ -650,9 +683,10 @@ function extractTopReasons(run: any): string[] {
                     key={r.id}
                     className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3"
                   >
+                    
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-sm font-medium">
-                        {String(r.test_type ?? "Test")}{" "}
+                        {readableTestName(r.test_type)}{" "}
                         <span className="text-xs text-gray-500 dark:text-gray-300">
                           • {instLabel}
                         </span>
@@ -665,7 +699,7 @@ function extractTopReasons(run: any): string[] {
                             : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200",
                         ].join(" ")}
                       >
-                        {pass ? "PASS" : "FAIL"}
+                        {pass ? "PASS" : "FAIL — Needs correction"}
                       </span>
                     </div>
 
@@ -947,11 +981,8 @@ function extractTopReasons(run: any): string[] {
       ),
     },
   ]}
-/>
-
-
-       
-           {/* Attachments (upload + list) */}
+/>      
+      {/* Attachments (upload + list) */}
       <JobAttachments jobId={jobId} initialItems={items} />
 
       {/* Help */}

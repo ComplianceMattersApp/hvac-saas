@@ -292,6 +292,9 @@ export default function JobAttachments({
 </div>
 
 {/* Action */}
+<div className="text-xs text-gray-500 dark:text-gray-300">
+If this job failed testing, choose "Correction / Ready for review".
+</div>
 <button
   type="button"
   onClick={intent === "review" ? submitForReview : uploadOnly}
