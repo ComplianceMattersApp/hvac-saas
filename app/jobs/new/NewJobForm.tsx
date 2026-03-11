@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createJobFromForm } from "@/lib/actions";
 import JobCoreFields from "@/components/jobs/JobCoreFields";
 
@@ -185,16 +185,14 @@ const [billingRecipient, setBillingRecipient] = useState<
   }, [systems]);
 
   // ---- Draft save/restore ----
-  const [draftFound, setDraftFound] = useState(false);
-
-  useEffect(() => {
+  const [draftFound, setDraftFound] = useState(() => {
+    if (typeof window === "undefined") return false;
     try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      setDraftFound(Boolean(raw));
+      return Boolean(localStorage.getItem(DRAFT_KEY));
     } catch {
-      // ignore
+      return false;
     }
-  }, []);
+  });
 
   function saveDraft() {
     try {
@@ -425,7 +423,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       name="project_type"
       className="border rounded w-full p-2"
       value={projectType}
-      onChange={(e) => setProjectType(e.target.value as any)}
+      onChange={(e) => setProjectType(e.target.value as "alteration" | "all_new" | "new_construction")}
     >
       <option value="alteration">Alteration</option>
       <option value="all_new">All New</option>

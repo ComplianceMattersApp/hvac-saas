@@ -4,6 +4,23 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import NewJobForm from "./NewJobForm";
 
+type ExistingCustomerRow = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  email: string | null;
+};
+
+type LocationRow = {
+  id: string;
+  address_line1: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  nickname: string | null;
+};
+
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
@@ -54,8 +71,8 @@ export default async function NewJobPage(props: {
   const customerId = String(sp?.customer_id ?? "").trim();
 
   // Optional: existing customer mode
-  let existingCustomer: any = null;
-  let customerLocations: any[] = [];
+  let existingCustomer: ExistingCustomerRow | null = null;
+  let customerLocations: LocationRow[] = [];
 
   if (customerId && isUuid(customerId)) {
     const { data: cRow, error: cErr } = await supabase

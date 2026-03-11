@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createClient } from "../../lib/supabase/client";
 
 
@@ -96,7 +96,7 @@ if (user) {
       </form>
 
       <p className="text-xs text-muted-foreground">
-        Log into your Compliance Matters account. If you don't have an account, please contact your administrator.
+        Log into your Compliance Matters account. If you don&apos;t have an account, please contact your administrator.
       </p>
     </div>
   );

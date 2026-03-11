@@ -106,28 +106,38 @@ addJobEquipmentFromForm
 
   {job.job_equipment && job.job_equipment.length > 0 ? (
     <div className="space-y-2">
-      {job.job_equipment.map((eq: any) => (
+      {job.job_equipment.map((eq: {
+        id: string;
+        equipment_role: string | null;
+        system_location: string | null;
+        manufacturer: string | null;
+        model: string | null;
+        serial: string | null;
+        tonnage: string | null;
+        refrigerant_type: string | null;
+        notes: string | null;
+      }) => (
         <div key={eq.id} className="rounded-md border p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
               <div className="font-medium text-gray-900">
                 {(eq.equipment_role ?? "equipment").replaceAll("_", " ")}
               </div>
-<label className="text-sm font-medium" htmlFor="system_location">
-  System Location (optional)
-</label>
-<input
-  id="system_location"
-  name="system_location"
-  className="w-full rounded-md border px-3 py-2"
-  defaultValue={eq?.system_location ?? ""}
-/>
+                <label className="text-sm font-medium" htmlFor="system_location">
+                  System Location (optional)
+                </label>
+                <input
+                  id="system_location"
+                  name="system_location"
+                  className="w-full rounded-md border px-3 py-2"
+                  defaultValue={eq?.system_location ?? ""}
+                />
 
-{eq.system_location ? (
-  <div className="text-sm text-muted-foreground">
-    Location: {eq.system_location ?? "—"}
-  </div>
-) : null}
+                {eq.system_location ? (
+                  <div className="text-sm text-muted-foreground">
+                    Location: {eq.system_location ?? "—"}
+                  </div>
+                ) : null}
 
 
               <div className="text-sm text-gray-700">

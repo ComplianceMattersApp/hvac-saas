@@ -46,7 +46,7 @@ const { data: job, error: jobErr } = await supabase
   .from("jobs")
   .select(
     `
-    id, title, status, ops_status, city, job_address, location_id, created_at, follow_up_date,
+    id, title, status, ops_status, city, job_address, location_id, customer_phone, created_at, follow_up_date,
     scheduled_date, window_start, window_end, permit_number, jurisdiction, permit_date, on_the_way_at,
     pending_info_reason, next_action_note, parent_job_id,
     locations:location_id ( address_line1, address_line2, city, state, zip )
@@ -291,6 +291,7 @@ const contractorNotes = (events ?? [])
 
   const serviceStatus = titleCaseFromSnake((job as any)?.status);
   const portalStatus = portalStatusLabel((job as any)?.ops_status);
+  const customerPhone = String((job as any)?.customer_phone ?? "").trim() || "—";
 
   // Group events/runs by job_id for display
   const chainById = new Map((jobChain ?? []).map((j: any) => [j.id, j]));
@@ -543,6 +544,13 @@ function extractTopReasons(run: any): string[] {
       <div className="mt-3 text-xs text-gray-500 dark:text-gray-300">Portal Status</div>
       <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
         {portalStatus}
+      </div>
+    </div>
+
+    <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+      <div className="text-xs text-gray-500 dark:text-gray-300">Customer Phone</div>
+      <div className="mt-1 font-medium text-gray-900 dark:text-gray-100">
+        {customerPhone}
       </div>
     </div>
 

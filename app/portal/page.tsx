@@ -165,7 +165,8 @@ export default async function PortalPage({
     )
     .eq("contractor_id", contractorId)
     .is("deleted_at", null)
-    .neq("ops_status", "closed");
+    .neq("ops_status", "closed")
+    .order("created_at", { ascending: false });
 
   if (baseJobsErr) throw baseJobsErr;
 
@@ -240,13 +241,7 @@ export default async function PortalPage({
     visibleJobs = jobs;
   }
 
-  visibleJobs = [...visibleJobs]
-    .sort((a, b) => {
-      const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return bDate - aDate;
-    })
-    .slice(0, 25);
+  visibleJobs = [...visibleJobs].slice(0, 25);
 
       const visibleJobIds = visibleJobs.map((j: any) => j.id);
 

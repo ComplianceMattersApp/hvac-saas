@@ -129,12 +129,18 @@ function buildQueryString(params: Record<string, string | undefined | null>) {
 export default async function OpsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ bucket?: string; contractor?: string; q?: string }>;
+  searchParams?: Promise<{
+    bucket?: string;
+    contractor?: string;
+    q?: string;
+    sort?: string;
+  }>;
 }) {
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const bucket = (sp.bucket ?? "need_to_schedule") as BucketKey;
   const contractor = (sp.contractor ?? "").trim() || null;
   const q = (sp.q ?? "").trim() || null;
+  const sort = (sp.sort ?? "").trim() || "default";
 
   const supabase = await createClient();
 
@@ -451,6 +457,14 @@ function addressLine(j: any) {
   return `${addr}, ${city}`;
 }
 
+function addressParts(j: any) {
+  const l = j.location_id ? locationsById.get(j.location_id) : null;
+  return {
+    address: l?.address_line1 ?? j.job_address ?? "",
+    city: l?.city ?? j.city ?? "",
+  };
+}
+
 function customerNameOnly(j: any) {
   const c = j.customer_id ? customersById.get(j.customer_id) : null;
   return (
@@ -466,8 +480,71 @@ function customerPhoneOnly(j: any) {
   return c?.phone ?? j.customer_phone ?? "";
 }
 
+function safeDateValue(value?: string | null) {
+  if (!value) return 0;
+  const t = new Date(value).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+function safeText(value?: string | null) {
+  return String(value ?? "")
+    .trim()
+    .toLocaleLowerCase();
+}
+
+function scheduledSortValue(j: any) {
+  const datePart = safeDateValue(j?.scheduled_date);
+  const timePart = safeText(j?.window_start);
+  return { datePart, timePart };
+}
+
+function compareJobs(a: any, b: any, mode: string) {
+  if (mode === "customer") {
+    return customerNameOnly(a).localeCompare(customerNameOnly(b), undefined, {
+      sensitivity: "base",
+      numeric: true,
+    });
+  }
+
+  if (mode === "address") {
+    return addressLine(a).localeCompare(addressLine(b), undefined, {
+      sensitivity: "base",
+      numeric: true,
+    });
+  }
+
+  if (mode === "created") {
+    return safeDateValue(a?.created_at) - safeDateValue(b?.created_at);
+  }
+
+  if (mode === "scheduled") {
+    const av = scheduledSortValue(a);
+    const bv = scheduledSortValue(b);
+
+    if (av.datePart !== bv.datePart) return av.datePart - bv.datePart;
+    return av.timePart.localeCompare(bv.timePart, undefined, {
+      sensitivity: "base",
+      numeric: true,
+    });
+  }
+
+  return 0;
+}
+
+function sortJobs(jobs: any[] | null | undefined, mode: string) {
+  const list = Array.isArray(jobs) ? [...jobs] : [];
+  if (!mode || mode === "default") return list;
+  return list.sort((a, b) => compareJobs(a, b, mode));
+}
+
   const selectedContractorName =
     contractor && contractors?.find((c: any) => c.id === contractor)?.name;
+
+const sortedTodayJobs = sortJobs(todayJobs, sort === "default" ? "scheduled" : sort);
+const sortedUpcomingJobs = sortJobs(upcomingJobs, sort === "default" ? "scheduled" : sort);
+const sortedCallListJobs = sortJobs(callListJobs, sort === "default" ? "created" : sort);
+const sortedAttentionJobs = sortJobs(attentionJobs, sort === "default" ? "created" : sort);
+const sortedBucketJobs = sortJobs(filteredBucketJobs, sort);
 
   return (
   <div className="mx-auto max-w-5xl p-4 space-y-4 text-gray-900">
@@ -531,6 +608,32 @@ function customerPhoneOnly(j: any) {
     <div className="rounded-lg border bg-white p-4 shadow-sm">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
+
+        <div className="grid gap-1">
+          <label className="text-xs text-gray-600">Sort</label>
+          <form action="/ops" method="get" className="flex gap-2">
+            <input type="hidden" name="bucket" value={bucket} />
+            <input type="hidden" name="contractor" value={contractor ?? ""} />
+            <input type="hidden" name="q" value={q ?? ""} />
+            <select
+              name="sort"
+              defaultValue={sort}
+              className="w-full rounded border px-3 py-2 text-sm"
+            >
+              <option value="default">Default queue order</option>
+              <option value="customer">Customer</option>
+              <option value="scheduled">Scheduled date/time</option>
+              <option value="created">Created date</option>
+              <option value="address">Address</option>
+            </select>
+            <button
+              type="submit"
+              className="rounded-md bg-black px-4 py-2 text-sm text-white"
+            >
+              Apply
+            </button>
+          </form>
+        </div>
       </div>
 
       {/* Optional quick search (keep if you want it on Ops page) */}
@@ -539,6 +642,7 @@ function customerPhoneOnly(j: any) {
         <form action="/ops" method="get" className="flex gap-2">
           <input type="hidden" name="bucket" value={bucket} />
           <input type="hidden" name="contractor" value={contractor ?? ""} />
+          <input type="hidden" name="sort" value={sort} />
           <input
             name="q"
             defaultValue={q ?? ""}
@@ -560,28 +664,12 @@ function customerPhoneOnly(j: any) {
 <div className="rounded-lg border bg-white p-4">
   <div className="flex items-center justify-between">
     <div className="text-sm font-semibold">Today (Scheduled)</div>
-    <div className="text-xs text-muted-foreground">{todayJobs?.length ?? 0} jobs</div>
+    <div className="text-xs text-muted-foreground">{sortedTodayJobs?.length ?? 0} jobs</div>
   </div>
 
   {(() => {
-    const jobs = Array.isArray(todayJobs) ? [...todayJobs] : [];
-
-    // 1) Sort by window_start (nulls last)
-jobs.sort((a: any, b: any) => {
-  const at = a?.window_start
-    ? parseInt(a.window_start.slice(0, 2)) * 60 +
-      parseInt(a.window_start.slice(3, 5))
-    : Number.POSITIVE_INFINITY;
-
-  const bt = b?.window_start
-    ? parseInt(b.window_start.slice(0, 2)) * 60 +
-      parseInt(b.window_start.slice(3, 5))
-    : Number.POSITIVE_INFINITY;
-
-  return at - bt;
-});
-
-    // 2) Group by city (fallback to "Unknown City")
+    const jobs = Array.isArray(sortedTodayJobs) ? [...sortedTodayJobs] : [];
+    // 1) Group by city (fallback to "Unknown City")
     const groups = new Map<string, any[]>();
     for (const j of jobs) {
       const city = (j?.city || "").trim() || "Unknown City";
@@ -589,7 +677,7 @@ jobs.sort((a: any, b: any) => {
       groups.get(city)!.push(j);
     }
 
-    // 3) Render
+    // 2) Render
     if (jobs.length === 0) {
       return <div className="mt-3 text-sm text-muted-foreground">No scheduled jobs for today.</div>;
     }
@@ -709,6 +797,7 @@ jobs.sort((a: any, b: any) => {
         bucket: "attention",
         contractor: contractor ?? "",
         q: q ?? "",
+        sort: sort ?? "",
       })}`}
     >
       View all
@@ -716,12 +805,12 @@ jobs.sort((a: any, b: any) => {
   </div>
 
   <div className="mt-3 space-y-2">
-    {(attentionJobs ?? []).length === 0 ? (
+    {(sortedAttentionJobs ?? []).length === 0 ? (
       <div className="text-sm text-muted-foreground">
         No jobs need attention right now.
       </div>
     ) : (
-      (attentionJobs ?? []).map((j: any) => (
+      (sortedAttentionJobs ?? []).map((j: any) => (
        <div
           key={j.id}
           className="rounded-md border p-3 hover:bg-gray-50"
@@ -797,9 +886,9 @@ jobs.sort((a: any, b: any) => {
     </a>
   )}
 
-  {mapsHref(j.job_address, j.city) && (
+  {mapsHref(addressParts(j).address, addressParts(j).city) && (
     <a
-      href={mapsHref(j.job_address, j.city)}
+      href={mapsHref(addressParts(j).address, addressParts(j).city)}
       target="_blank"
       rel="noreferrer"
       className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
@@ -826,6 +915,7 @@ jobs.sort((a: any, b: any) => {
           bucket: "need_to_schedule",
           contractor: contractor ?? "",
           q: q ?? "",
+          sort: sort ?? "",
         })}`}
       >
         View all
@@ -833,10 +923,10 @@ jobs.sort((a: any, b: any) => {
     </div>
 
     <div className="mt-3 space-y-2">
-      {(callListJobs ?? []).length === 0 ? (
+      {(sortedCallListJobs ?? []).length === 0 ? (
         <div className="text-sm text-muted-foreground">No jobs in call list.</div>
       ) : (
-        (callListJobs ?? []).map((j: any) => (
+        (sortedCallListJobs ?? []).map((j: any) => (
           <div
             key={j.id}
             className="rounded-md border p-3 hover:bg-gray-50"
@@ -915,15 +1005,15 @@ jobs.sort((a: any, b: any) => {
     <div className="flex items-center justify-between">
       <div className="text-sm font-semibold">Upcoming (Scheduled)</div>
       <div className="text-xs text-muted-foreground">
-        {upcomingJobs?.length ?? 0} jobs
+        {sortedUpcomingJobs?.length ?? 0} jobs
       </div>
     </div>
 
     <div className="mt-3 space-y-2">
-      {(upcomingJobs ?? []).length === 0 ? (
+      {(sortedUpcomingJobs ?? []).length === 0 ? (
         <div className="text-sm text-muted-foreground">No upcoming scheduled jobs.</div>
       ) : (
-        (upcomingJobs ?? []).map((j: any) => (
+        (sortedUpcomingJobs ?? []).map((j: any) => (
           <div
             key={j.id}
             className="rounded-md border p-3 hover:bg-gray-50"
@@ -1004,9 +1094,9 @@ jobs.sort((a: any, b: any) => {
                   </a>
                 )}
 
-                {mapsHref(j.job_address, j.city) && (
+                {mapsHref(addressParts(j).address, addressParts(j).city) && (
                   <a
-                    href={mapsHref(j.job_address, j.city)}
+                    href={mapsHref(addressParts(j).address, addressParts(j).city)}
                     target="_blank"
                     rel="noreferrer"
                     className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
@@ -1047,6 +1137,7 @@ jobs.sort((a: any, b: any) => {
       bucket: t.key,
       contractor: contractor ?? "",
       q: q ?? "",
+      sort: sort ?? "",
     })}`;
 
     const active = bucket === t.key;
@@ -1090,10 +1181,10 @@ jobs.sort((a: any, b: any) => {
         </div>
 
         <div className="space-y-2">
-          {(filteredBucketJobs ?? []).length === 0 ? (
+          {(sortedBucketJobs ?? []).length === 0 ? (
             <div className="text-sm text-blue-600">No jobs in this queue.</div>
           ) : (
-            (filteredBucketJobs ?? []).map((j: any) => (
+            (sortedBucketJobs ?? []).map((j: any) => (
               <div
   key={j.id}
   className="rounded-md border border-gray-200 bg-white p-3 shadow-sm hover:bg-gray-50 transition"
@@ -1171,9 +1262,9 @@ jobs.sort((a: any, b: any) => {
         </a>
       )}
 
-      {mapsHref(j.job_address, j.city) && (
+      {mapsHref(addressParts(j).address, addressParts(j).city) && (
         <a
-          href={mapsHref(j.job_address, j.city)}
+          href={mapsHref(addressParts(j).address, addressParts(j).city)}
           target="_blank"
           rel="noreferrer"
           className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"

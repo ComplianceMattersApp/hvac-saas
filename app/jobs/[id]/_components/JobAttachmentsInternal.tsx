@@ -68,7 +68,7 @@ export default function JobAttachmentsInternal({
       });
 
     if (upErr) throw new Error(upErr.message);
-    return (tok as any).attachmentId ?? null;
+    return (tok as { attachmentId?: string | null }).attachmentId ?? null;
   }
 
   async function uploadInternal() {
@@ -109,8 +109,8 @@ export default function JobAttachmentsInternal({
         setNote("");
         setOk(`Uploaded ${count} attachment${count === 1 ? "" : "s"}.`);
         router.refresh();
-      } catch (e: any) {
-        setError(e?.message ?? "Upload failed");
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Upload failed");
       }
     });
   }

@@ -284,25 +284,25 @@ export default async function CustomerDetailPage(props: {
   const locations = (locationsData ?? []) as LocationRow[];
 
   // Jobs across whole customer
-  const { data: jobsData, error: jobsErr } = await supabase
-    .from("jobs")
-    .select(
-      `
-      id,
-      title,
-      job_address,
-      city,
-      scheduled_date,
-      created_at,
-      ops_status,
-      contractor_id,
-      service_case_id,
-      location_id
-      `
-    )
-    .eq("customer_id", customerId)
-    .order("created_at", { ascending: false });
-
+const { data: jobsData, error: jobsErr } = await supabase
+  .from("jobs")
+  .select(
+    `
+    id,
+    title,
+    job_address,
+    city,
+    scheduled_date,
+    created_at,
+    ops_status,
+    contractor_id,
+    service_case_id,
+    location_id
+    `
+  )
+  .eq("customer_id", customerId)
+  .order("scheduled_date", { ascending: false, nullsFirst: false })
+  .order("created_at", { ascending: false });
   if (jobsErr) throw jobsErr;
 
   const jobs = (jobsData ?? []) as JobRow[];
