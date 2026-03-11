@@ -130,12 +130,14 @@ export default async function OpsPage({
   searchParams,
 }: {
   searchParams?: Promise<{
-    bucket?: string;
-    contractor?: string;
-    q?: string;
-    sort?: string;
-  }>;
+  bucket?: string;
+  contractor?: string;
+  q?: string;
+  sort?: string;
+  signal?: string;
+}>;
 }) {
+  
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const bucket = (sp.bucket ?? "need_to_schedule") as BucketKey;
   const contractor = (sp.contractor ?? "").trim() || null;
@@ -146,6 +148,8 @@ export default async function OpsPage({
 
 const { data: userData } = await supabase.auth.getUser();
 const user = userData?.user;
+
+const signal = (sp.signal ?? "").trim().toLowerCase() || "";
 
 if (!user) redirect("/login");
 
@@ -210,7 +214,7 @@ function subtractBusinessDays(date: Date, days: number) {
   // ✅ Counts per ops_status (exclude "closed", respect contractor filter)
 let countsQ = supabase
   .from("jobs")
-  .select("ops_status")
+  .select("id, ops_status")
   .neq("ops_status", "closed")
   .is("deleted_at", null);
 
@@ -261,18 +265,21 @@ const resolvedFailedParentIds = new Set(
     // If you want search to work here too (optional), we can filter by name/phone/address.
     // Supabase OR filter is string-based; keep it simple for now.
     if (q) {
-      const like = `%${q}%`;
-      qb = qb.or(
-        [
-          `title.ilike.${like}`,
-          `customer_first_name.ilike.${like}`,
-          `customer_last_name.ilike.${like}`,
-          `customer_phone.ilike.${like}`,
-          `job_address.ilike.${like}`,
-          `city.ilike.${like}`,
-        ].join(",")
-      );
-    }
+  const escaped = q.replace(/"/g, '\\"').trim();
+  const like = `"%${escaped}%"`;
+
+  qb = qb.or(
+    [
+      `title.ilike.${like}`,
+      `customer_first_name.ilike.${like}`,
+      `customer_last_name.ilike.${like}`,
+      `customer_email.ilike.${like}`,
+      `customer_phone.ilike.${like}`,
+      `city.ilike.${like}`,
+      `permit_number.ilike.${like}`,
+    ].join(",")
+  );
+}
 
     return qb;
   };
@@ -483,6 +490,81 @@ function customerPhoneOnly(j: any) {
   return c?.phone ?? j.customer_phone ?? "";
 }
 
+function queueReason(j: any, activeBucket: string) {
+  const status = String(j?.ops_status ?? "").toLowerCase();
+
+  if (activeBucket === "attention") {
+    if (status === "need_to_schedule") {
+      return "Needs attention — no scheduling activity in 3+ business days";
+    }
+    if (status === "pending_info") {
+      return "Needs attention — pending info older than 3 business days";
+    }
+    if (status === "failed") {
+      return "Needs attention — failed job unresolved for 14+ days";
+    }
+    return "Needs attention — requires follow-up";
+  }
+
+  if (activeBucket === "pending_info" || status === "pending_info") {
+    return "Waiting for required information";
+  }
+
+  if (activeBucket === "failed" || status === "failed") {
+    return "Test failed — awaiting correction or retest";
+  }
+
+  if (activeBucket === "need_to_schedule" || status === "need_to_schedule") {
+    return "Waiting to be scheduled";
+  }
+
+  if (activeBucket === "paperwork_required" || status === "paperwork_required") {
+    return "Field work complete — paperwork still needed";
+  }
+
+  if (activeBucket === "invoice_required" || status === "invoice_required") {
+    return "Field work complete — invoice still needed";
+  }
+
+  if (activeBucket === "closeout") {
+    if (status === "paperwork_required") return "Closeout pending — paperwork still needed";
+    if (status === "invoice_required") return "Closeout pending — invoice still needed";
+    return "Closeout pending";
+  }
+
+  return "";
+}
+
+function hasOpenRetestChild(jobId: string, jobs: any[]) {
+  return jobs.some(
+    (j: any) =>
+      String(j.parent_job_id ?? "") === String(jobId) &&
+      String(j.ops_status ?? "").toLowerCase() !== "closed"
+  );
+}
+
+function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJob?: boolean }) {
+  const status = String(j?.ops_status ?? "").toLowerCase();
+
+  if (status === "failed" && opts?.retestReady) return "Create Retest Job";
+  if (status === "failed") return "Await Contractor Correction";
+  if (status === "need_to_schedule" && opts?.newContractorJob) return "Review & Schedule";
+  if (status === "need_to_schedule") return "Schedule Visit";
+  if (status === "pending_info") return "Get Missing Info";
+  if (status === "paperwork_required" || status === "invoice_required") return "Complete Paperwork";
+  if (status === "on_hold") return "Review Hold Reason";
+  if (status === "exception") return "Resolve Exception";
+  if (status === "scheduled") return "Prepare for Visit";
+
+  return "Open Job";
+}
+
+function signalReason(j: any, opts?: { retestReady?: boolean; newContractorJob?: boolean }) {
+  if (opts?.retestReady) return "Contractor says correction is complete and job is ready for retest review";
+  if (opts?.newContractorJob) return "New job submitted by contractor and waiting for internal review";
+  return queueReason(j, bucket);
+}
+
 function safeDateValue(value?: string | null) {
   if (!value) return 0;
   const t = new Date(value).getTime();
@@ -547,9 +629,94 @@ const sortedTodayJobs = sortJobs(todayJobs, sort === "default" ? "scheduled" : s
 const sortedUpcomingJobs = sortJobs(upcomingJobs, sort === "default" ? "scheduled" : sort);
 const sortedCallListJobs = sortJobs(callListJobs, sort === "default" ? "created" : sort);
 const sortedAttentionJobs = sortJobs(attentionJobs, sort === "default" ? "created" : sort);
-const sortedBucketJobs = sortJobs(filteredBucketJobs, sort);
 
+const uniqueAllOpenOpsJobs = Array.from(
+  new Map(
+    allJobs
+      .filter((j: any) => String(j?.ops_status ?? "").toLowerCase() !== "closed")
+      .map((j: any) => [String(j.id ?? ""), j])
+  ).values()
+) as any[];
+
+const allOpenOpsJobIds = uniqueAllOpenOpsJobs
+  .map((j: any) => String(j.id ?? ""))
+  .filter(Boolean);
+
+const { data: signalEvents, error: signalErr } = await supabase
+  .from("job_events")
+  .select("job_id, event_type, created_at, meta")
+  .in(
+    "job_id",
+    allOpenOpsJobIds.length
+      ? allOpenOpsJobIds
+      : ["00000000-0000-0000-0000-000000000000"]
+  )
+  .in("event_type", ["retest_ready_requested", "contractor_job_created"])
+  .order("created_at", { ascending: false });
+
+if (signalErr) throw signalErr;
+
+const latestRetestReadyByJob = new Map<string, any>();
+const latestContractorCreatedByJob = new Map<string, any>();
+
+for (const ev of signalEvents ?? []) {
+  const jobId = String((ev as any).job_id ?? "");
+  const type = String((ev as any).event_type ?? "");
+
+  if (type === "retest_ready_requested" && !latestRetestReadyByJob.has(jobId)) {
+    latestRetestReadyByJob.set(jobId, ev);
+  }
+
+  if (type === "contractor_job_created" && !latestContractorCreatedByJob.has(jobId)) {
+    latestContractorCreatedByJob.set(jobId, ev);
+  }
+}
+
+function hasSignalEventForJob(map: unknown, jobId: string) {
+  return map instanceof Map && map.has(jobId);
+}
+
+const retestReadyCount = uniqueAllOpenOpsJobs.filter((j: any) => {
+  const jobId = String(j?.id ?? "");
+  const status = String(j?.ops_status ?? "").toLowerCase();
   return (
+    status === "failed" &&
+    !resolvedFailedParentIds.has(jobId) &&
+    hasSignalEventForJob(latestRetestReadyByJob, jobId)
+  );
+}).length;
+
+const contractorCreatedCount = uniqueAllOpenOpsJobs.filter((j: any) => {
+  const jobId = String(j?.id ?? "");
+  const status = String(j?.ops_status ?? "").toLowerCase();
+  return status === "need_to_schedule" && hasSignalEventForJob(latestContractorCreatedByJob, jobId);
+}).length;
+
+let signalFilteredBucketJobs = [...(filteredBucketJobs ?? [])];
+
+if (signal === "retest_ready") {
+  signalFilteredBucketJobs = signalFilteredBucketJobs.filter((j: any) => {
+    const status = String(j?.ops_status ?? "").toLowerCase();
+    return (
+      status === "failed" &&
+      hasSignalEventForJob(latestRetestReadyByJob, String(j.id ?? ""))
+    );
+  });
+}
+
+if (signal === "new_contractor") {
+  signalFilteredBucketJobs = signalFilteredBucketJobs.filter((j: any) => {
+    const status = String(j?.ops_status ?? "").toLowerCase();
+    return (
+      status === "need_to_schedule" &&
+      hasSignalEventForJob(latestContractorCreatedByJob, String(j.id ?? ""))
+    );
+  });
+}
+
+const sortedBucketJobs = sortJobs(signalFilteredBucketJobs, sort);
+
+return (
   <div className="mx-auto max-w-5xl p-4 space-y-4 text-gray-900">
 {/* Header */}
 <div className="rounded-xl border bg-gradient-to-b from-white to-gray-50 p-4 sm:p-6 shadow-sm">
@@ -727,6 +894,7 @@ const sortedBucketJobs = sortJobs(filteredBucketJobs, sort);
                     <div className="text-xs text-muted-foreground">
                       {addressLine(j)}
                     </div>
+                    
                   </div>
 
                   <div className="text-xs text-muted-foreground text-right whitespace-nowrap">
@@ -801,7 +969,7 @@ const sortedBucketJobs = sortJobs(filteredBucketJobs, sort);
         contractor: contractor ?? "",
         q: q ?? "",
         sort: sort ?? "",
-      })}`}
+      })}#ops-queues`}
     >
       View all
     </Link>
@@ -919,7 +1087,7 @@ const sortedBucketJobs = sortJobs(filteredBucketJobs, sort);
           contractor: contractor ?? "",
           q: q ?? "",
           sort: sort ?? "",
-        })}`}
+        })}#ops-queues`}
       >
         View all
       </Link>
@@ -1116,65 +1284,119 @@ const sortedBucketJobs = sortJobs(filteredBucketJobs, sort);
   </div>
 </div>
 
-{/* Queue Tabs */}
-<div className="rounded-lg border bg-white p-4 space-y-3">
-  <div className="text-sm font-semibold">Queues</div>
-
-  <div className="flex flex-wrap gap-2">
-    {OPS_TABS
-  .filter((t) => {
-    const count =
-  t.key === "attention"
-    ? attentionCount
-    : t.key === "recent_closed"
-    ? 0
-    : (counts.get(t.key) ?? 0);
-    const active = bucket === t.key;
-
-    // Show tab only if it has jobs OR it's the active tab OR it's Closed
-    return count > 0 || active || t.key === "recent_closed";
-  })
-
-  .map((t) => {
-    const href = `/ops${buildQueryString({
-      bucket: t.key,
+<div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+  <Link
+    href={`/ops${buildQueryString({
+      bucket: "failed",
       contractor: contractor ?? "",
       q: q ?? "",
       sort: sort ?? "",
-    })}`;
+      signal: "retest_ready",
+    })}#ops-queues`}
+    className="rounded-lg border bg-white p-4 shadow-sm hover:bg-gray-50"
+  >
+    <div className="flex items-center justify-between">
+      <div>
+        <div className="text-sm font-semibold">Retest Ready</div>
+        <div className="text-xs text-gray-600">
+          Contractor activity changed the next internal action
+        </div>
+      </div>
+      <div className="text-2xl font-semibold">
+        {retestReadyCount}
+      </div>
+    </div>
+  </Link>
 
-    const active = bucket === t.key;
-    const count =
-    t.key === "attention"
-      ? attentionCount
-      : t.key === "recent_closed"
-      ? 0
-      : (counts.get(t.key) ?? 0);
+  <Link
+    href={`/ops${buildQueryString({
+      bucket: "need_to_schedule",
+      contractor: contractor ?? "",
+      q: q ?? "",
+      sort: sort ?? "",
+      signal: "new_contractor",
+    })}#ops-queues`}
+    className="rounded-lg border bg-white p-4 shadow-sm hover:bg-gray-50"
+  >
+    <div className="flex items-center justify-between">
+      <div>
+        <div className="text-sm font-semibold">New Contractor Jobs</div>
+        <div className="text-xs text-gray-600">
+          New submissions waiting for internal review and scheduling
+        </div>
+      </div>
+      <div className="text-2xl font-semibold">
+        {contractorCreatedCount}
+      </div>
+    </div>
+  </Link>
+</div>
 
-    return (
-      <Link
-        key={t.key}
-        href={href}
-        className={[
-          "rounded-full border px-3 py-1 text-sm transition font-medium",
-          active
-            ? "bg-black text-white border-black"
-            : "bg-white text-gray-900 border-gray-300 hover:bg-gray-100",
-        ].join(" ")}
-      >
-        <span className="flex items-center gap-2">
-          {t.label}
+{/* Queue Tabs */}
+<div id="ops-queues" className="rounded-lg border bg-white p-4 space-y-3 scroll-mt-4">
+  <div className="text-sm font-semibold">Queues</div>
+  <div className="flex flex-wrap gap-2">
+    {OPS_TABS.filter((t) => {
+      const active = bucket === t.key;
+      const count =
+        t.key === "attention"
+          ? attentionCount
+          : t.key === "recent_closed"
+          ? 0
+          : t.key === "failed"
+          ? (countRows ?? []).filter((row: any) => {
+              const status = String((row as any)?.ops_status ?? "").toLowerCase();
+              const jobId = String((row as any)?.id ?? "");
+              return status === "failed" && !resolvedFailedParentIds.has(jobId);
+            }).length
+          : (counts.get(t.key) ?? 0);
 
-          {/* Badge */}
-          {t.key !== "recent_closed" && count > 0 && (
-            <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs">
-              {count}
-            </span>
-          )}
-        </span>
-      </Link>
-    );
-  })}
+      return count > 0 || active || t.key === "recent_closed";
+    }).map((t) => {
+      const href = `/ops${buildQueryString({
+        bucket: t.key,
+        contractor: contractor ?? "",
+        q: q ?? "",
+        sort: sort ?? "",
+        signal: signal ?? "",
+      })}#ops-queues`;
+
+      const active = bucket === t.key;
+      const count =
+        t.key === "attention"
+          ? attentionCount
+          : t.key === "recent_closed"
+          ? 0
+          : t.key === "failed"
+          ? (countRows ?? []).filter((row: any) => {
+              const status = String((row as any)?.ops_status ?? "").toLowerCase();
+              const jobId = String((row as any)?.id ?? "");
+              return status === "failed" && !resolvedFailedParentIds.has(jobId);
+            }).length
+          : (counts.get(t.key) ?? 0);
+
+      return (
+        <Link
+          key={t.key}
+          href={href}
+          className={[
+            "rounded-full border px-3 py-1 text-sm transition font-medium",
+            active
+              ? "bg-black text-white border-black"
+              : "bg-white text-gray-900 border-gray-300 hover:bg-gray-100",
+          ].join(" ")}
+        >
+          <span className="flex items-center gap-2">
+            {t.label}
+            {t.key !== "recent_closed" && count > 0 ? (
+              <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs">
+                {count}
+              </span>
+            ) : null}
+          </span>
+        </Link>
+      );
+    })}
   </div>
 </div>
 
@@ -1217,6 +1439,12 @@ const sortedBucketJobs = sortJobs(filteredBucketJobs, sort);
         <div className="text-xs text-gray-600">
           {addressLine(j)}
         </div>
+
+        {queueReason(j, bucket) ? (
+          <div className="mt-1 text-[11px] font-medium text-amber-700">
+            {queueReason(j, bucket)}
+          </div>
+        ) : null}
       </div>
       <div className="text-xs text-gray-500 text-right">
   <div>
@@ -1228,6 +1456,35 @@ const sortedBucketJobs = sortJobs(filteredBucketJobs, sort);
     </div>
   )}
 </div>
+{(() => {
+  const isRetestReady = hasSignalEventForJob(
+    latestRetestReadyByJob,
+    String(j.id ?? "")
+  );
+  const isNewContractorJob = hasSignalEventForJob(
+    latestContractorCreatedByJob,
+    String(j.id ?? "")
+  );
+
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="text-[11px] font-medium text-amber-700">
+        {signalReason(j, {
+          retestReady: isRetestReady,
+          newContractorJob: isNewContractorJob,
+        })}
+      </div>
+
+      <div className="text-[11px] font-semibold text-gray-900">
+        Next Action:{" "}
+        {nextActionLabel(j, {
+          retestReady: isRetestReady,
+          newContractorJob: isNewContractorJob,
+        })}
+      </div>
+    </div>
+  );
+})()}
     </div>
 
       <div className="mt-3 flex flex-wrap gap-2">

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { requestRetestReadyFromPortal } from "@/lib/actions/job-actions";
 import { createClient } from "@/lib/supabase/server";
 import JobAttachments from "@/components/portal/JobAttachments";
 import { AccordionCards } from "@/components/AccordionCards";
@@ -48,7 +49,7 @@ const { data: job, error: jobErr } = await supabase
     `
     id, title, status, ops_status, city, job_address, location_id, customer_phone, created_at, follow_up_date,
     scheduled_date, window_start, window_end, permit_number, jurisdiction, permit_date, on_the_way_at,
-    pending_info_reason, next_action_note, parent_job_id,
+    pending_info_reason, next_action_note, parent_job_id, contractor_id, service_case_id,
     locations:location_id ( address_line1, address_line2, city, state, zip )
     `
   )
@@ -142,6 +143,7 @@ const { data: job, error: jobErr } = await supabase
     "contractor_note",
     "contractor_correction_submission",
     "attachment_added",
+    "retest_ready_requested",
     // add later if/when you start logging these:
     // "scheduled",
     // "rescheduled",
@@ -179,6 +181,21 @@ const contractorNotes = (events ?? [])
     };
   })
   .filter((n: any) => n.note);
+
+  const retestReadyRequests = (events ?? []).filter(
+  (e: any) => e?.event_type === "retest_ready_requested"
+);
+
+const hasRetestReadyRequest = retestReadyRequests.length > 0;
+
+const openRetestChild =
+  (jobChain ?? []).find(
+    (j: any) =>
+      String(j.parent_job_id ?? "") === String(jobId) &&
+      String(j.ops_status ?? "").toLowerCase() !== "closed"
+  ) ?? null;
+
+const hasOpenRetestChild = !!openRetestChild;
   
 
   // --- Tests (ECC runs across the whole chain) ---
@@ -521,6 +538,34 @@ function extractTopReasons(run: any): string[] {
     </div>
   </div>
 )}
+
+{isPortalFailed && !hasOpenRetestChild ? (
+  <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
+    <div className="text-sm font-semibold">Retest readiness</div>
+
+    {hasRetestReadyRequest ? (
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
+        Retest Ready has already been submitted. Our team has been alerted to review and create the retest visit if needed.
+      </div>
+    ) : (
+      <>
+        <div className="text-sm text-gray-700 dark:text-gray-200">
+          When your correction work is complete, press this button to alert our team that the job is ready for retest review.
+        </div>
+
+        <form action={requestRetestReadyFromPortal}>
+          <input type="hidden" name="job_id" value={jobId} />
+          <button
+            type="submit"
+            className="px-4 py-2 rounded-lg border bg-gray-900 text-white text-sm font-medium hover:opacity-90 transition"
+          >
+            Retest Ready
+          </button>
+        </form>
+      </>
+    )}
+  </div>
+) : null}
 
 {/* At a glance */}
 <div className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">

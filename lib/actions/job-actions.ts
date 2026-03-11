@@ -411,6 +411,117 @@ export async function getContractors() {
   return data ?? [];
 }
 
+async function notifyInternalNextActionChanged(params: {
+  supabase: any;
+  jobId: string;
+  eventType: string;
+  meta?: Record<string, any> | null;
+}) {
+  const { jobId } = params;
+  return { jobId };
+}
+
+export async function requestRetestReadyFromPortal(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  if (!jobId) throw new Error("Missing job_id");
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr) throw userErr;
+  if (!user) redirect("/login");
+
+  const { data: cu, error: cuErr } = await supabase
+    .from("contractor_users")
+    .select("contractor_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (cuErr) throw cuErr;
+  if (!cu?.contractor_id) {
+    throw new Error("Only contractor users can request retest readiness.");
+  }
+
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select("id, contractor_id, ops_status")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+  if (!job?.id) throw new Error("Job not found.");
+
+  if (String(job.contractor_id ?? "") !== String(cu.contractor_id ?? "")) {
+    throw new Error("You do not have access to this job.");
+  }
+
+  if (String(job.ops_status ?? "").toLowerCase() !== "failed") {
+    redirect(`/portal/jobs/${jobId}`);
+  }
+
+  const { data: openRetestChild, error: childErr } = await supabase
+    .from("jobs")
+    .select("id, ops_status")
+    .eq("parent_job_id", jobId)
+    .is("deleted_at", null)
+    .neq("ops_status", "closed")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (childErr) throw childErr;
+  if (openRetestChild?.id) {
+    redirect(`/portal/jobs/${jobId}`);
+  }
+
+  const { data: existingRequest, error: reqErr } = await supabase
+    .from("job_events")
+    .select("id")
+    .eq("job_id", jobId)
+    .eq("event_type", "retest_ready_requested")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (reqErr) throw reqErr;
+
+  if (!existingRequest?.id) {
+    await insertJobEvent({
+      supabase,
+      jobId,
+      event_type: "retest_ready_requested",
+      meta: {
+        source: "contractor_portal",
+        requested_by: "contractor",
+        next_action: "create_retest_job",
+      },
+      userId: user.id,
+    });
+
+    await notifyInternalNextActionChanged({
+      supabase,
+      jobId,
+      eventType: "retest_ready_requested",
+      meta: {
+        next_action: "create_retest_job",
+      },
+    });
+  }
+
+  revalidatePath("/ops");
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/portal/jobs/${jobId}`);
+  revalidatePath("/portal");
+
+  redirect(`/portal/jobs/${jobId}?banner=retest_ready_requested`);
+}
+
 export async function archiveJobFromForm(formData: FormData) {
   "use server";
 
@@ -1933,7 +2044,9 @@ if (userId) {
     contractorIdFinal = cu.contractor_id;
     isContractorUser = true;
   }
+  
 }
+
 
   // ----- billing defaults based on FINAL contractor id -----
   let billingRecipientFinal =
@@ -2120,6 +2233,25 @@ async function logIntakeSubmitted(jobId: string) {
   });
 }
 
+  async function notifyInternalNextActionChanged(params: {
+    supabase: any;
+    jobId: string;
+    eventType: string;
+    meta?: Record<string, any> | null;
+  }) {
+    const { jobId } = params;
+
+    // Intentionally lightweight for now.
+    // This is the seam where email / notification-ledger wiring can be added later.
+    // For this thread, the system notification is:
+    // 1) job_events entry
+    // 2) /ops visibility
+    // 3) revalidation
+    return { jobId };
+  }
+
+
+
 async function postCreate(createdJobId: string, metaSource: string) {
 
   if (!isContractorUser) {
@@ -2133,15 +2265,26 @@ async function postCreate(createdJobId: string, metaSource: string) {
   });
 
   await logIntakeSubmitted(createdJobId);
-} else {
-  // Contractors can only write allowed sandbox events
-  await insertJobEvent({
-    supabase,
-    jobId: createdJobId,
-    event_type: "contractor_note",
-    meta: { note: "Job created via contractor portal", source: metaSource },
-    userId,
-  });
+  } else {
+    await insertJobEvent({
+      supabase,
+      jobId: createdJobId,
+      event_type: "contractor_job_created",
+      meta: {
+        source: "contractor_portal",
+        next_action: "review_and_schedule",
+      },
+      userId,
+    });
+
+    await notifyInternalNextActionChanged({
+      supabase,
+      jobId: createdJobId,
+      eventType: "contractor_job_created",
+      meta: {
+        next_action: "review_and_schedule",
+      },
+    });
 }
 
 await insertEquipmentForJob(createdJobId);
@@ -2163,6 +2306,8 @@ const CONTRACTOR_SANDBOX_ALLOWED = new Set([
   "contractor_note",
   "contractor_correction_submission",
   "attachment_added",
+  "contractor_job_created",
+  "retest_ready_requested",
 ]);
 
 function canContractorWriteEvent(event_type: string) {
@@ -2945,20 +3090,24 @@ export async function createRetestJobFromForm(formData: FormData) {
     billing_zip: parent?.billing_zip ?? null,
   });
 
-  // 3) Timeline events on BOTH jobs
-  await insertJobEvent({
-    supabase,
-    jobId: parentJobId,
-    event_type: "retest_created",
-    meta: { child_job_id: child.id },
-  });
+      // 3) Timeline events on BOTH jobs
+  try {
+    await insertJobEvent({
+      supabase,
+      jobId: parentJobId,
+      event_type: "retest_created",
+      meta: { child_job_id: child.id },
+    });
 
-  await insertJobEvent({
-    supabase,
-    jobId: child.id,
-    event_type: "retest_created",
-    meta: { parent_job_id: parentJobId },
-  });
+    await insertJobEvent({
+      supabase,
+      jobId: child.id,
+      event_type: "retest_created",
+      meta: { parent_job_id: parentJobId },
+    });
+  } catch (e) {
+    console.error("retest_created job_events insert failed:", e);
+  }
 
   
 
