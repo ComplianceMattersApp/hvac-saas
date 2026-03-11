@@ -364,12 +364,12 @@ if (upcomingErr) throw upcomingErr;
     if (attentionErr) throw attentionErr;
 
   // 5) BUCKET list (tabs)
-  let bucketQ = supabase
-    .from("jobs")
-    .select(baseSelect)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(100);
+    let bucketQ = supabase
+      .from("jobs")
+      .select(baseSelect)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(100);
 
     if (bucket === "attention") {
       bucketQ = bucketQ.or(
@@ -386,10 +386,13 @@ if (upcomingErr) throw upcomingErr;
         .eq("ops_status", "closed")
         .order("created_at", { ascending: false })
         .limit(15);
-        } else {
+    } else {
       bucketQ = bucketQ.eq("ops_status", bucket);
     }
-  const { data: bucketJobs, error: bucketErr } = await bucketQ;
+
+    bucketQ = applyCommonFilters(bucketQ);
+
+    const { data: bucketJobs, error: bucketErr } = await bucketQ;
   if (bucketErr) throw bucketErr;
   const filteredBucketJobs =
   bucket === "failed" || bucket === "attention"
