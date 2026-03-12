@@ -1416,6 +1416,8 @@ return (
           ? attentionCount
           : t.key === "recent_closed"
           ? 0
+          : t.key === "closeout"
+          ? (counts.get("paperwork_required") ?? 0) + (counts.get("invoice_required") ?? 0)
           : t.key === "failed"
           ? (countRows ?? []).filter((row: any) => {
               const status = String((row as any)?.ops_status ?? "").toLowerCase();
@@ -1447,6 +1449,8 @@ return (
           ? attentionCount
           : t.key === "recent_closed"
           ? 0
+          : t.key === "closeout"
+          ? (counts.get("paperwork_required") ?? 0) + (counts.get("invoice_required") ?? 0)
           : t.key === "failed"
           ? (countRows ?? []).filter((row: any) => {
               const status = String((row as any)?.ops_status ?? "").toLowerCase();
