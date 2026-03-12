@@ -449,11 +449,22 @@ for (const run of serviceChainRuns ?? []) {
   }
 }
 
+const { data: timelineJobs, error: timelineJobsErr } = await supabase
+  .from("jobs")
+  .select("id")
+  .is("deleted_at", null)
+  .or(`id.eq.${retestRootId},parent_job_id.eq.${retestRootId}`)
+  .limit(50);
+
+if (timelineJobsErr) throw new Error(timelineJobsErr.message);
+
+const timelineJobIds = (timelineJobs ?? []).map((j: any) => String(j.id ?? "")).filter(Boolean);
+
 // --- Unified Timeline (job_events) ---
 const { data: timelineEvents, error: tlErr } = await supabase
   .from("job_events")
   .select("created_at, event_type, message, meta, user_id")
-  .eq("job_id", jobId)
+  .in("job_id", timelineJobIds.length ? timelineJobIds : [jobId])
   .order("created_at", { ascending: false })
   .limit(200);
 if (tlErr) throw new Error(tlErr.message);

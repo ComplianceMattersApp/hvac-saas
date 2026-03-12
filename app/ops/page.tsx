@@ -667,13 +667,21 @@ const { data: signalEvents, error: signalErr } = await supabase
       ? allOpenOpsJobIds
       : ["00000000-0000-0000-0000-000000000000"]
   )
-  .in("event_type", ["retest_ready_requested", "contractor_job_created"])
+  .in("event_type", [
+    "retest_ready_requested",
+    "contractor_job_created",
+    "contractor_note",
+    "contractor_correction_submission",
+    "attachment_added",
+    "permit_info_updated",
+  ])
   .order("created_at", { ascending: false });
 
 if (signalErr) throw signalErr;
 
 const latestRetestReadyByJob = new Map<string, any>();
 const latestContractorCreatedByJob = new Map<string, any>();
+const latestContractorUpdateByJob = new Map<string, any>();
 
 for (const ev of signalEvents ?? []) {
   const jobId = String((ev as any).job_id ?? "");
@@ -685,6 +693,18 @@ for (const ev of signalEvents ?? []) {
 
   if (type === "contractor_job_created" && !latestContractorCreatedByJob.has(jobId)) {
     latestContractorCreatedByJob.set(jobId, ev);
+  }
+
+  if (
+    [
+      "contractor_note",
+      "contractor_correction_submission",
+      "attachment_added",
+      "permit_info_updated",
+    ].includes(type) &&
+    !latestContractorUpdateByJob.has(jobId)
+  ) {
+    latestContractorUpdateByJob.set(jobId, ev);
   }
 }
 
@@ -708,6 +728,11 @@ const contractorCreatedCount = uniqueAllOpenOpsJobs.filter((j: any) => {
   return status === "need_to_schedule" && hasSignalEventForJob(latestContractorCreatedByJob, jobId);
 }).length;
 
+const contractorUpdatesCount = uniqueAllOpenOpsJobs.filter((j: any) => {
+  const jobId = String(j?.id ?? "");
+  return hasSignalEventForJob(latestContractorUpdateByJob, jobId);
+}).length;
+
 let signalFilteredBucketJobs = [...(filteredBucketJobs ?? [])];
 
 if (signal === "retest_ready") {
@@ -728,6 +753,12 @@ if (signal === "new_contractor") {
       hasSignalEventForJob(latestContractorCreatedByJob, String(j.id ?? ""))
     );
   });
+}
+
+if (signal === "contractor_updates") {
+  signalFilteredBucketJobs = signalFilteredBucketJobs.filter((j: any) =>
+    hasSignalEventForJob(latestContractorUpdateByJob, String(j.id ?? ""))
+  );
 }
 
 const sortedBucketJobs = sortJobs(signalFilteredBucketJobs, sort);
@@ -1091,7 +1122,7 @@ return (
 </div>
 
      {/* Call list preview + Upcoming */}
-<div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+<div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
   {/* Call List */}
   <div className="rounded-lg border bg-white p-4 text-gray-900 shadow-sm">
     <div className="flex items-center justify-between">
@@ -1343,6 +1374,29 @@ return (
       </div>
       <div className="text-2xl font-semibold">
         {contractorCreatedCount}
+      </div>
+    </div>
+  </Link>
+
+  <Link
+    href={`/ops${buildQueryString({
+      bucket: bucket,
+      contractor: contractor ?? "",
+      q: q ?? "",
+      sort: sort ?? "",
+      signal: "contractor_updates",
+    })}#ops-queues`}
+    className="rounded-lg border bg-white p-4 shadow-sm hover:bg-gray-50"
+  >
+    <div className="flex items-center justify-between">
+      <div>
+        <div className="text-sm font-semibold">Contractor Updates</div>
+        <div className="text-xs text-gray-600">
+          Notes, correction submissions, attachments, and permit updates
+        </div>
+      </div>
+      <div className="text-2xl font-semibold">
+        {contractorUpdatesCount}
       </div>
     </div>
   </Link>

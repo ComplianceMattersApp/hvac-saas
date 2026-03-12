@@ -2858,6 +2858,29 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     await releasePendingInfoAndRecompute(id, "auto_release_on_permit_save");
   }
 
+  const beforePermitNumber = String(before?.permit_number ?? "").trim();
+  const afterPermitNumber = String(permit_number ?? "").trim();
+
+  if (beforePermitNumber !== afterPermitNumber) {
+    await insertJobEvent({
+      supabase,
+      jobId: id,
+      event_type: "permit_info_updated",
+      meta: {
+        before: {
+          permit_number: before?.permit_number ?? null,
+          jurisdiction: before?.jurisdiction ?? null,
+          permit_date: before?.permit_date ?? null,
+        },
+        after: {
+          permit_number,
+          jurisdiction,
+          permit_date,
+        },
+      },
+    });
+  }
+
   const wasScheduled =
     !!before?.scheduled_date || !!before?.window_start || !!before?.window_end;
   const isScheduled = !!scheduled_date || !!window_start || !!window_end;

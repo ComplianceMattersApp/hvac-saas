@@ -141,6 +141,7 @@ const { data: job, error: jobErr } = await supabase
   const SAFE_EVENT_TYPES = [
     "customer_attempt",
     "contractor_note",
+    "public_note",
     "contractor_correction_submission",
     "attachment_added",
     "retest_ready_requested",
@@ -169,14 +170,19 @@ const { data: job, error: jobErr } = await supabase
 
 const myUid = userData?.user?.id ?? null;
 
-const contractorNotes = (events ?? [])
-  .filter((e: any) => e?.event_type === "contractor_note")
+const sharedNotes = (events ?? [])
+  .filter((e: any) =>
+    ["contractor_note", "public_note", "contractor_correction_submission"].includes(
+      String(e?.event_type ?? "")
+    )
+  )
   .map((e: any) => {
     const meta = typeof e.meta === "string" ? null : e.meta;
     const noteText = meta?.note ? String(meta.note).trim() : "";
     return {
       created_at: e.created_at,
       user_id: e.user_id ?? null,
+      event_type: String(e?.event_type ?? ""),
       note: noteText,
     };
   })
@@ -678,23 +684,30 @@ function extractTopReasons(run: any): string[] {
     <div className="flex items-center justify-between w-full">
       <span>Notes</span>
       <span className="text-xs text-gray-500 dark:text-gray-300">
-        {contractorNotes.length} total
+        {sharedNotes.length} total
       </span>
     </div>
   ),
   children: (
     <>
-      {contractorNotes.length === 0 ? (
+      {sharedNotes.length === 0 ? (
         <div className="text-sm text-gray-600 dark:text-gray-300">
           No notes yet.
         </div>
       ) : (
         <div className="space-y-2">
-          {contractorNotes.map((n: any, idx: number) => {
+          {sharedNotes.map((n: any, idx: number) => {
             const who =
               n.user_id && myUid && n.user_id === myUid
                 ? "You"
                 : `User ${shortUid(n.user_id)}`;
+
+            const typeLabel =
+              n.event_type === "public_note"
+                ? "Office"
+                : n.event_type === "contractor_correction_submission"
+                ? "Correction submission"
+                : "Contractor";
 
             return (
               <div
@@ -703,7 +716,7 @@ function extractTopReasons(run: any): string[] {
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-xs text-gray-500 dark:text-gray-300">
-                    {who}
+                    {typeLabel} • {who}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-300">
                     {n.created_at
