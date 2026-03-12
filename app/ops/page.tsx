@@ -756,7 +756,9 @@ if (signal === "new_contractor") {
 }
 
 if (signal === "contractor_updates") {
-  signalFilteredBucketJobs = signalFilteredBucketJobs.filter((j: any) =>
+  // Cross-bucket signal: source from all open jobs (same dataset as the count card),
+  // not just the current bucket slice, so card count and displayed rows always match.
+  signalFilteredBucketJobs = uniqueAllOpenOpsJobs.filter((j: any) =>
     hasSignalEventForJob(latestContractorUpdateByJob, String(j.id ?? ""))
   );
 }
@@ -1331,7 +1333,7 @@ return (
   </div>
 </div>
 
-<div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+<div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
   <Link
     href={`/ops${buildQueryString({
       bucket: "failed",
@@ -1432,8 +1434,12 @@ return (
       })}#ops-queues`;
 
       const active = bucket === t.key;
+      // When a signal filter is active, the active-bucket chip should reflect the
+      // signal-filtered displayed count so chip badge === rows rendered.
       const count =
-        t.key === "attention"
+        signal && active
+          ? signalFilteredBucketJobs.length
+          : t.key === "attention"
           ? attentionCount
           : t.key === "recent_closed"
           ? 0
