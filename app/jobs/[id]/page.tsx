@@ -348,7 +348,7 @@ export default async function JobDetailPage({
       billing_city,
       billing_state,
       billing_zip,
-      locations:locations (
+      locations:location_id (
         id,
         address_line1,
         address_line2,
@@ -1340,7 +1340,7 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
             <div>
               <span className="text-gray-500">Ops:</span>{" "}
               <span className="font-medium text-white">
-                {job.ops_status ? formatStatus(String(job.ops_status)) : "—"}
+                {formatOpsStatusLabel(job.ops_status)}
               </span>
             </div>
 

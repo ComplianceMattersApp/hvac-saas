@@ -9,15 +9,9 @@ import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
+import type { JobStatus } from "@/lib/types/job";
 
-
-export type JobStatus =
-  | "open"
-  | "on_the_way"
-  | "in_process"
-  | "completed"
-  | "failed"
-  | "cancelled";
+export type { JobStatus } from "@/lib/types/job";
 
 type CreateJobInput = {
   ops_status?: string | null;
