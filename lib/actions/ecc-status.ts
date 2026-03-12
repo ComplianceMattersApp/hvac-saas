@@ -22,10 +22,10 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
   const supabase = await createClient();
 
   const { data: job, error: jobErr } = await supabase
-    .from("jobs")
-    .select("id, job_type, project_type")
-    .eq("id", jobId)
-    .single();
+  .from("jobs")
+  .select("id, job_type, project_type, field_complete, certs_complete, invoice_complete, ops_status")
+  .eq("id", jobId)
+  .single();
 
   if (jobErr) throw new Error(jobErr.message);
   if (!job) return;
@@ -145,9 +145,16 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
     });
 
   if (allRequiredPassed) {
-    await setOpsStatusIfNotManual(jobId, "paperwork_required");
-    return;
-  }
+  await setOpsStatusIfNotManual(jobId, "paperwork_required");
+  return;
+}
 
-  // Otherwise: leave existing ops status alone.
+const isFieldComplete = Boolean((job as any)?.field_complete);
+
+if (isFieldComplete) {
+  await setOpsStatusIfNotManual(jobId, "paperwork_required");
+  return;
+}
+
+// Otherwise: leave existing ops status alone.
 }
