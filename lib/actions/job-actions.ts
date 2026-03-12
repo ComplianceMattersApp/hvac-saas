@@ -2808,7 +2808,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const { data: before, error: beforeErr } = await supabase
     .from("jobs")
     .select(
-      "scheduled_date, window_start, window_end, ops_status, job_type, permit_number, jurisdiction, permit_date"
+      "scheduled_date, window_start, window_end, ops_status, job_type, status, field_complete, permit_number, jurisdiction, permit_date"
     )
     .eq("id", id)
     .single();
@@ -2823,6 +2823,16 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const { scheduled_date, window_start, window_end, ops_status } =
     deriveScheduleAndOps(formData);
 
+  let next_ops_status = ops_status;
+
+  const isEccCompletedOrFieldComplete =
+    String(before?.job_type ?? "").toLowerCase() === "ecc" &&
+    (Boolean(before?.field_complete) || String(before?.status ?? "").toLowerCase() === "completed");
+
+  if (isEccCompletedOrFieldComplete && next_ops_status === "scheduled") {
+    next_ops_status = String(before?.ops_status ?? "").trim() || next_ops_status;
+  }
+
   const isServiceJob = String(before?.job_type ?? "").toLowerCase() === "service";
 
   const permit_number = isServiceJob ? null : (permitNumberRaw || null);
@@ -2834,7 +2844,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     scheduled_date,
     window_start,
     window_end,
-    ops_status,
+    ops_status: next_ops_status,
     permit_number,
     jurisdiction,
     permit_date,
@@ -2869,7 +2879,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
         scheduled_date,
         window_start,
         window_end,
-        ops_status,
+        ops_status: next_ops_status,
         permit_number,
         jurisdiction,
         permit_date,

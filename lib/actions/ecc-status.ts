@@ -28,8 +28,22 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
   .single();
 
   if (jobErr) throw new Error(jobErr.message);
-  if (!job) return;
-  if (job.job_type !== "ecc") return;
+  if (!job) {
+    console.error("[ECC_EVAL]", { jobId, reason: "job_not_found" });
+    return;
+  }
+
+  if (job.job_type !== "ecc") {
+    console.error("[ECC_EVAL]", {
+      jobId,
+      reason: "non_ecc_job",
+      job_type: job.job_type ?? null,
+      current_ops_status: job.ops_status ?? null,
+    });
+    return;
+  }
+
+  const isFieldComplete = Boolean((job as any)?.field_complete);
 
   const { data: systems, error: sysErr } = await supabase
     .from("job_systems")
@@ -94,7 +108,28 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
 
   // If there are no required tests across all systems, do not force ECC ops transitions.
   const hasAnyRequiredTests = systemIds.some((sid) => (requiredBySystem[sid]?.length ?? 0) > 0);
-  if (!hasAnyRequiredTests) return;
+  if (!hasAnyRequiredTests) {
+    if (isFieldComplete) {
+      const setResult = await setOpsStatusIfNotManual(jobId, "paperwork_required");
+      console.error("[ECC_EVAL]", {
+        jobId,
+        current_ops_status: job.ops_status ?? null,
+        computed_next_status: "paperwork_required",
+        reason: "field_complete_no_required_tests",
+        manual_lock_prevented: setResult.manualLockPrevented,
+        final_ops_status: setResult.finalStatus,
+      });
+      return;
+    }
+
+    console.error("[ECC_EVAL]", {
+      jobId,
+      current_ops_status: job.ops_status ?? null,
+      reason: "no_required_tests",
+      field_complete: isFieldComplete,
+    });
+    return;
+  }
 
   type Cell = { hasCompleted: boolean; anyFail: boolean; anyPass: boolean };
   const matrix: Record<string, Record<string, Cell>> = {};
@@ -131,7 +166,15 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
   );
 
   if (anyRequiredFail) {
-    await setOpsStatusIfNotManual(jobId, "failed");
+    const setResult = await setOpsStatusIfNotManual(jobId, "failed");
+    console.error("[ECC_EVAL]", {
+      jobId,
+      current_ops_status: job.ops_status ?? null,
+      computed_next_status: "failed",
+      reason: "required_test_failed",
+      manual_lock_prevented: setResult.manualLockPrevented,
+      final_ops_status: setResult.finalStatus,
+    });
     return;
   }
 
@@ -145,16 +188,38 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
     });
 
   if (allRequiredPassed) {
-  await setOpsStatusIfNotManual(jobId, "paperwork_required");
-  return;
-}
+    const setResult = await setOpsStatusIfNotManual(jobId, "paperwork_required");
+    console.error("[ECC_EVAL]", {
+      jobId,
+      current_ops_status: job.ops_status ?? null,
+      computed_next_status: "paperwork_required",
+      reason: "all_required_passed",
+      manual_lock_prevented: setResult.manualLockPrevented,
+      final_ops_status: setResult.finalStatus,
+    });
+    return;
+  }
 
-const isFieldComplete = Boolean((job as any)?.field_complete);
+  if (isFieldComplete) {
+    const setResult = await setOpsStatusIfNotManual(jobId, "paperwork_required");
+    console.error("[ECC_EVAL]", {
+      jobId,
+      current_ops_status: job.ops_status ?? null,
+      computed_next_status: "paperwork_required",
+      reason: "field_complete_fallback",
+      manual_lock_prevented: setResult.manualLockPrevented,
+      final_ops_status: setResult.finalStatus,
+    });
+    return;
+  }
 
-if (isFieldComplete) {
-  await setOpsStatusIfNotManual(jobId, "paperwork_required");
-  return;
-}
+  console.error("[ECC_EVAL]", {
+    jobId,
+    current_ops_status: job.ops_status ?? null,
+    computed_next_status: null,
+    reason: "incomplete_required_tests",
+    field_complete: isFieldComplete,
+  });
 
 // Otherwise: leave existing ops status alone.
 }

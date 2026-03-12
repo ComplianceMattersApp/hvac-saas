@@ -563,6 +563,14 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
   const beforeOps = beforeJob.ops_status ?? null;
   const beforeFieldComplete = Boolean(beforeJob.field_complete ?? false);
 
+  console.error("[FIELD_COMPLETE]", {
+    jobId,
+    before_status: beforeJob.status ?? null,
+    before_ops_status: beforeOps,
+    before_field_complete: beforeFieldComplete,
+    job_type: beforeJob.job_type ?? null,
+  });
+
   // ECC guard rail:
   // require at least one completed run with a real result before field completion
   if ((beforeJob.job_type ?? "").toLowerCase() === "ecc") {
@@ -629,6 +637,13 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
 
   // ECC jobs: hand canonical ops resolution back to evaluateEccOpsStatus(jobId)
   if (isEccJob) {
+    console.error("[FIELD_COMPLETE]", {
+      jobId,
+      phase: "before_ecc_eval",
+      attempted_next_status: "paperwork_required",
+      before_ops_status: beforeOps,
+    });
+
     await evaluateEccOpsStatus(jobId);
 
     const { data: afterJob, error: afterErr } = await supabase
@@ -639,6 +654,12 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
 
     if (afterErr) throw new Error(afterErr.message);
     nextOps = afterJob?.ops_status ?? null;
+
+    console.error("[FIELD_COMPLETE]", {
+      jobId,
+      phase: "after_ecc_eval",
+      final_ops_status: nextOps,
+    });
   }
 
   const changes = [
