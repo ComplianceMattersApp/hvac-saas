@@ -2695,23 +2695,23 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     // ✅ When field marks completed, push into Data Entry queue
     // When field marks completed, push into the correct Ops queue
-  if (next === "completed") {
-    const { data: jt, error: jtErr } = await supabase
-      .from("jobs")
-      .select("job_type, ops_status, certs_complete, invoice_complete, scheduled_date, window_start, window_end")
-      .eq("id", id)
-      .single();
+    if (next === "completed") {
+      const { data: jt, error: jtErr } = await supabase
+        .from("jobs")
+        .select("job_type, ops_status, certs_complete, invoice_complete, scheduled_date, window_start, window_end")
+        .eq("id", id)
+        .single();
 
-    if (jtErr) throw jtErr;
-    
+      if (jtErr) throw jtErr;
 
-    const jobType = String(jt?.job_type ?? "").trim().toLowerCase();
+      const jobType = String(jt?.job_type ?? "").trim().toLowerCase();
 
-    if (jobType === "ecc") {
-      updatePayload.field_complete = true;
-      updatePayload.field_complete_at = new Date().toISOString();
-    } else {
-      updatePayload.ops_status = "invoice_required";
+      if (jobType === "ecc") {
+        updatePayload.field_complete = true;
+        updatePayload.field_complete_at = new Date().toISOString();
+      } else {
+        updatePayload.ops_status = "invoice_required";
+      }
     }
 
     const { error: updErr } = await supabase
@@ -2720,9 +2720,6 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       .eq("id", id);
 
     if (updErr) throw updErr;
-  }
-  
-  
 
     
 
@@ -2788,6 +2785,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   }
 
   revalidatePath(`/jobs/${id}`);
+  revalidatePath(`/jobs`);
   revalidatePath(`/ops`);
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${id}`);
