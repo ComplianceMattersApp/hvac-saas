@@ -121,6 +121,8 @@ export default async function PortalPage({
 
   const sp: SP = (searchParams ? await searchParams : {}) ?? {};
   const queue = (sp1(sp.queue) ?? "").toString();
+  const q = (sp1(sp.q) ?? "").toString().trim();
+  const sort = (sp1(sp.sort) ?? "newest").toString().trim().toLowerCase();
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
@@ -154,10 +156,14 @@ export default async function PortalPage({
       title,
       status,
       ops_status,
+      permit_number,
       pending_info_reason,
       next_action_note,
       follow_up_date,
       created_at,
+      customer_first_name,
+      customer_last_name,
+      customer_phone,
       city,
       job_address,
       locations:location_id ( address_line1, city, state )
@@ -172,8 +178,88 @@ export default async function PortalPage({
 
   const jobs = (baseJobs ?? []) as any[];
 
+  const normalizedQuery = q.toLowerCase();
+
+  function matchesSearch(job: any) {
+    if (!normalizedQuery) return true;
+
+    const fullName = [
+      String(job.customer_first_name ?? "").trim(),
+      String(job.customer_last_name ?? "").trim(),
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    const haystack = [
+      job.title,
+      fullName,
+      job.customer_phone,
+      job.job_address,
+      job.city,
+      job.locations?.address_line1,
+      job.locations?.city,
+      job.permit_number,
+    ]
+      .map((v) => String(v ?? "").trim().toLowerCase())
+      .filter(Boolean)
+      .join(" ");
+
+    return haystack.includes(normalizedQuery);
+  }
+
+  function sortJobs(inputJobs: any[]) {
+    const out = [...inputJobs];
+
+    if (sort === "oldest") {
+      out.sort(
+        (a, b) =>
+          new Date(String(a.created_at ?? 0)).getTime() -
+          new Date(String(b.created_at ?? 0)).getTime()
+      );
+      return out;
+    }
+
+    if (sort === "follow_up") {
+      out.sort((a, b) => {
+        const aHasFollow = !!a.follow_up_date;
+        const bHasFollow = !!b.follow_up_date;
+
+        if (aHasFollow && bHasFollow) {
+          return String(a.follow_up_date).localeCompare(String(b.follow_up_date));
+        }
+        if (aHasFollow) return -1;
+        if (bHasFollow) return 1;
+
+        return (
+          new Date(String(b.created_at ?? 0)).getTime() -
+          new Date(String(a.created_at ?? 0)).getTime()
+        );
+      });
+      return out;
+    }
+
+    out.sort(
+      (a, b) =>
+        new Date(String(b.created_at ?? 0)).getTime() -
+        new Date(String(a.created_at ?? 0)).getTime()
+    );
+    return out;
+  }
+
+  function portalHref(nextQueue?: string) {
+    const params = new URLSearchParams();
+    if (nextQueue) params.set("queue", nextQueue);
+    if (q) params.set("q", q);
+    if (sort && sort !== "newest") params.set("sort", sort);
+
+    const qs = params.toString();
+    return qs ? `/portal?${qs}` : "/portal";
+  }
+
+  const scopedJobs = jobs.filter(matchesSearch);
+
   const counts: Record<string, number> = {};
-  for (const row of jobs) {
+  for (const row of scopedJobs) {
     const key = String(row?.ops_status ?? "unknown").toLowerCase();
     counts[key] = (counts[key] ?? 0) + 1;
   }
@@ -185,7 +271,7 @@ export default async function PortalPage({
     "failed",
   ];
 
-  const attentionTodayCount = jobs.filter(
+  const attentionTodayCount = scopedJobs.filter(
     (j) =>
       !!j.follow_up_date &&
       String(j.follow_up_date) <= String(today) &&
@@ -195,7 +281,7 @@ export default async function PortalPage({
   const retestOrFailedCount =
     (counts["retest_needed"] ?? 0) + (counts["failed"] ?? 0);
 
-  const openCount = jobs.length;
+  const openCount = scopedJobs.length;
   const pendingInfoCount = counts["pending_info"] ?? 0;
   const needToScheduleCount = counts["need_to_schedule"] ?? 0;
   const onHoldCount = counts["on_hold"] ?? 0;
@@ -208,40 +294,40 @@ export default async function PortalPage({
     needToScheduleCount +
     onHoldCount;
 
-  let visibleJobs = jobs;
+  let visibleJobs = scopedJobs;
 
   if (queue === "attention_today") {
-    visibleJobs = jobs.filter(
+    visibleJobs = scopedJobs.filter(
       (j) =>
         !!j.follow_up_date &&
         String(j.follow_up_date) <= String(today) &&
         attentionTodayStatuses.includes(String(j.ops_status ?? "").toLowerCase())
     );
     } else if (queue === "scheduled") {
-  visibleJobs = jobs.filter(
+  visibleJobs = scopedJobs.filter(
     (j) => String(j.ops_status ?? "").toLowerCase() === "scheduled"
   );
   } else if (queue === "need_to_schedule") {
-    visibleJobs = jobs.filter(
+    visibleJobs = scopedJobs.filter(
       (j) => String(j.ops_status ?? "").toLowerCase() === "need_to_schedule"
     );
   } else if (queue === "pending_info") {
-    visibleJobs = jobs.filter(
+    visibleJobs = scopedJobs.filter(
       (j) => String(j.ops_status ?? "").toLowerCase() === "pending_info"
     );
   } else if (queue === "retest_needed") {
-    visibleJobs = jobs.filter((j) =>
+    visibleJobs = scopedJobs.filter((j) =>
       ["retest_needed", "failed"].includes(String(j.ops_status ?? "").toLowerCase())
     );
     } else if (queue === "on_hold") {
-  visibleJobs = jobs.filter(
+  visibleJobs = scopedJobs.filter(
     (j) => String(j.ops_status ?? "").toLowerCase() === "on_hold"
   );
   } else {
-    visibleJobs = jobs;
+    visibleJobs = scopedJobs;
   }
 
-  visibleJobs = [...visibleJobs].slice(0, 25);
+  visibleJobs = sortJobs(visibleJobs);
 
       const visibleJobIds = visibleJobs.map((j: any) => j.id);
 
@@ -313,6 +399,45 @@ export default async function PortalPage({
             </div>
           </div>
         </div>
+
+        <form method="get" className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px_auto]">
+          {queue ? <input type="hidden" name="queue" value={queue} /> : null}
+
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            placeholder="Search title, customer, phone, address, city, permit"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          />
+
+          <select
+            name="sort"
+            defaultValue={sort || "newest"}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          >
+            <option value="newest">Sort: Newest</option>
+            <option value="oldest">Sort: Oldest</option>
+            <option value="follow_up">Sort: Follow-up Date</option>
+          </select>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              className="rounded-lg border bg-black px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+            >
+              Apply
+            </button>
+            {(q || sort !== "newest") && (
+              <Link
+                href={portalHref(queue || undefined)}
+                className="rounded-lg border px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+              >
+                Reset
+              </Link>
+            )}
+          </div>
+        </form>
       </div>
 
      <div className="rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800 p-5 shadow-sm">
@@ -345,7 +470,7 @@ export default async function PortalPage({
     <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {retestOrFailedCount > 0 ? (
         <Link
-          href="/portal?queue=retest_needed"
+          href={portalHref("retest_needed")}
           className="rounded-xl border border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20 p-4 hover:shadow-sm transition"
         >
           <div className="text-sm font-semibold text-red-900 dark:text-red-200">
@@ -362,7 +487,7 @@ export default async function PortalPage({
 
       {pendingInfoCount > 0 ? (
         <Link
-          href="/portal?queue=pending_info"
+          href={portalHref("pending_info")}
           className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20 p-4 hover:shadow-sm transition"
         >
           <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">
@@ -379,7 +504,7 @@ export default async function PortalPage({
 
       {needToScheduleCount > 0 ? (
         <Link
-          href="/portal?queue=need_to_schedule"
+          href={portalHref("need_to_schedule")}
           className="rounded-xl border border-blue-200 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/20 p-4 hover:shadow-sm transition"
         >
           <div className="text-sm font-semibold text-blue-900 dark:text-blue-200">
@@ -396,7 +521,7 @@ export default async function PortalPage({
 
       {onHoldCount > 0 ? (
         <Link
-          href="/portal?queue=on_hold"
+          href={portalHref("on_hold")}
           className="rounded-xl border border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/40 p-4 hover:shadow-sm transition"
         >
           <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -416,7 +541,7 @@ export default async function PortalPage({
 
 <div className="flex flex-wrap gap-2">
   <Link
-    href="/portal"
+    href={portalHref()}
     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
       !queue
         ? "border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900"
@@ -427,7 +552,7 @@ export default async function PortalPage({
   </Link>
 
   <Link
-    href="/portal?queue=attention_today"
+    href={portalHref("attention_today")}
     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
       queue === "attention_today"
         ? "border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900"
@@ -438,7 +563,7 @@ export default async function PortalPage({
   </Link>
 
   <Link
-    href="/portal?queue=scheduled"
+    href={portalHref("scheduled")}
     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
       queue === "scheduled"
         ? "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500"
@@ -449,7 +574,7 @@ export default async function PortalPage({
   </Link>
 
   <Link
-    href="/portal?queue=need_to_schedule"
+    href={portalHref("need_to_schedule")}
     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
       queue === "need_to_schedule"
         ? "border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500"
@@ -460,7 +585,7 @@ export default async function PortalPage({
   </Link>
 
   <Link
-    href="/portal?queue=pending_info"
+    href={portalHref("pending_info")}
     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
       queue === "pending_info"
         ? "border-amber-600 bg-amber-600 text-white dark:border-amber-500 dark:bg-amber-500"
@@ -471,7 +596,7 @@ export default async function PortalPage({
   </Link>
 
   <Link
-    href="/portal?queue=retest_needed"
+    href={portalHref("retest_needed")}
     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
       queue === "retest_needed"
         ? "border-red-600 bg-red-600 text-white dark:border-red-500 dark:bg-red-500"
@@ -482,7 +607,7 @@ export default async function PortalPage({
   </Link>
 
   <Link
-    href="/portal?queue=on_hold"
+    href={portalHref("on_hold")}
     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
       queue === "on_hold"
         ? "border-gray-700 bg-gray-700 text-white dark:border-gray-500 dark:bg-gray-500"

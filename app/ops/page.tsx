@@ -178,8 +178,12 @@ function telHref(phone?: string | null) {
   return p ? `tel:${p}` : "";
 }
 
-function mapsHref(address?: string | null, city?: string | null) {
-  const q = [address, city].filter(Boolean).join(", ").trim();
+function mapsHref(parts: { address?: string | null; city?: string | null }) {
+  const q = [parts.address, parts.city]
+    .map((v) => String(v ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
+
   return q
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`
     : "";
@@ -460,18 +464,8 @@ function customerLine(j: any) {
 }
 
 function addressLine(j: any) {
-  const l = j.location_id ? locationsById.get(j.location_id) : null;
-
-  const address =
-    String(l?.address_line1 ?? "").trim() ||
-    String(j.address_line1 ?? "").trim() ||
-    String(j.job_address ?? "").trim();
-
-  const city =
-    String(l?.city ?? "").trim() ||
-    String(j.city ?? "").trim();
-
-  const out = [address, city].filter(Boolean).join(", ");
+  const parts = addressParts(j);
+  const out = [parts.address, parts.city].filter(Boolean).join(", ");
   return out || "—";
 }
 
@@ -987,9 +981,9 @@ return (
                     </a>
                   )}
 
-                  {mapsHref(addressParts(j).address, addressParts(j).city) && (
+                  {mapsHref(addressParts(j)) && (
                     <a
-                      href={mapsHref(addressParts(j).address, addressParts(j).city)}
+                      href={mapsHref(addressParts(j))}
                       target="_blank"
                       rel="noreferrer"
                       className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
@@ -1107,9 +1101,9 @@ return (
     </a>
   )}
 
-  {mapsHref(addressParts(j).address, addressParts(j).city) && (
+  {mapsHref(addressParts(j)) && (
     <a
-      href={mapsHref(addressParts(j).address, addressParts(j).city)}
+      href={mapsHref(addressParts(j))}
       target="_blank"
       rel="noreferrer"
       className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
@@ -1315,9 +1309,9 @@ return (
                   </a>
                 )}
 
-                {mapsHref(addressParts(j).address, addressParts(j).city) && (
+                {mapsHref(addressParts(j)) && (
                   <a
-                    href={mapsHref(addressParts(j).address, addressParts(j).city)}
+                    href={mapsHref(addressParts(j))}
                     target="_blank"
                     rel="noreferrer"
                     className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
@@ -1606,9 +1600,9 @@ return (
         </a>
       )}
 
-      {mapsHref(addressParts(j).address, addressParts(j).city) && (
+      {mapsHref(addressParts(j)) && (
         <a
-          href={mapsHref(addressParts(j).address, addressParts(j).city)}
+          href={mapsHref(addressParts(j))}
           target="_blank"
           rel="noreferrer"
           className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"

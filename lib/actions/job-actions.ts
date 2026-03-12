@@ -2789,6 +2789,8 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
   revalidatePath(`/jobs/${id}`);
   revalidatePath(`/ops`);
+  revalidatePath(`/portal`);
+  revalidatePath(`/portal/jobs/${id}`);
 
   redirect(`/jobs/${id}`);
 }
@@ -2920,6 +2922,8 @@ export async function updateJobScheduleFromForm(formData: FormData) {
 
   revalidatePath(`/jobs/${id}`);
   revalidatePath(`/ops`);
+  revalidatePath(`/portal`);
+  revalidatePath(`/portal/jobs/${id}`);
 
   redirect(`/jobs/${id}`);
 }

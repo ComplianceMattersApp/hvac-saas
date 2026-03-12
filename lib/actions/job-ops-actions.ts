@@ -564,6 +564,8 @@ export async function releasePendingInfoAndRecomputeFromForm(formData: FormData)
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
+  revalidatePath(`/portal`);
+  revalidatePath(`/portal/jobs/${jobId}`);
   redirect(`/jobs/${jobId}?tab=ops`);
 }
 
@@ -648,6 +650,8 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   if (eventErr) throw new Error(eventErr.message);
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/portal`);
+  revalidatePath(`/portal/jobs/${jobId}`);
   redirect(`/jobs/${jobId}?tab=ops`);
 }
 
