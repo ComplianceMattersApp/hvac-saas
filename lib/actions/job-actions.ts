@@ -2004,13 +2004,7 @@ const jobType = rawJobType;
       : null;
 
   const title = String(formData.get("title") || "").trim();
-  const city = String(formData.get("city") || "").trim();
-
-  const titleFinal =
-    title ||
-    (jobType === "ecc"
-      ? `ECC ${projectType.replaceAll("_", " ")} — ${city}`
-      : "");
+  const postedCity = String(formData.get("city") || "").trim();
 
   const customerPhoneRaw = String(formData.get("customer_phone") || "").trim();
 
@@ -2043,15 +2037,13 @@ const customerFirstNameRaw = String(formData.get("customer_first_name") || "").t
 const customerLastNameRaw = String(formData.get("customer_last_name") || "").trim();
 const customerEmailRaw = String(formData.get("customer_email") || "").trim();
 const jobNotesRaw = String(formData.get("job_notes") || "").trim();
-const jobAddressRaw = String(formData.get("job_address") || "").trim();
+const jobAddressFormRaw = String(formData.get("job_address") || "").trim();
 
 const jurisdiction = jobType === "service" ? null : (jurisdictionRaw || null);
 const permit_date = jobType === "service" ? null : (permitDateRaw || null);
 const permit_number = jobType === "service" ? null : (permitNumberRaw || null);
 
 const status = String(formData.get("status") || "open").trim() as JobStatus;
-
-if (!city) throw new Error("City is required");
 
 // ----- supabase + identity -----
 const supabase = await createClient();
@@ -2099,12 +2091,38 @@ if (userId) {
   }
 
   // ----- canonical service address input -----
-  const address_line1 =
-    String(formData.get("address_line1") || "").trim() ||
-    String(formData.get("job_address") || "").trim();
-
   const existingCustomerId = String(formData.get("customer_id") || "").trim();
   const existingLocationId = String(formData.get("location_id") || "").trim();
+
+  let existingLocationSnapshot: { address_line1?: string | null; city?: string | null } | null = null;
+
+  if (existingLocationId) {
+    const { data: existingLocation, error: existingLocationErr } = await supabase
+      .from("locations")
+      .select("id, address_line1, city")
+      .eq("id", existingLocationId)
+      .maybeSingle();
+
+    if (existingLocationErr) throw existingLocationErr;
+    existingLocationSnapshot = existingLocation;
+  }
+
+  const address_line1 =
+    String(formData.get("address_line1") || "").trim() ||
+    jobAddressFormRaw ||
+    String(existingLocationSnapshot?.address_line1 ?? "").trim();
+
+  const city = postedCity || String(existingLocationSnapshot?.city ?? "").trim();
+
+  const jobAddressRaw = address_line1;
+
+  const titleFinal =
+    title ||
+    (jobType === "ecc"
+      ? `ECC ${projectType.replaceAll("_", " ")} — ${city}`
+      : "");
+
+  if (!city) throw new Error("City is required");
 
   const locationNickname =
     String(formData.get("location_nickname") || "").trim() || null;

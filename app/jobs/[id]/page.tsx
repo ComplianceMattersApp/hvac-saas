@@ -570,34 +570,38 @@ const customerPhone =
     return null;
   };
 
+  const serviceLocation = Array.isArray((job as any).locations)
+    ? (job as any).locations.find((location: any) => location) ?? null
+    : (job as any).locations ?? null;
+
   const serviceAddressLine1 =
     firstNonEmpty(
-      (job as any).locations?.address_line1,
+      serviceLocation?.address_line1,
       (job as any).address_line1,
       job.job_address
     );
 
   const serviceAddressLine2 =
     firstNonEmpty(
-      (job as any).locations?.address_line2,
+      serviceLocation?.address_line2,
       (job as any).address_line2
     );
 
   const serviceCity =
     firstNonEmpty(
-      (job as any).locations?.city,
+      serviceLocation?.city,
       job.city
     );
 
   const serviceState =
     firstNonEmpty(
-      (job as any).locations?.state,
+      serviceLocation?.state,
       (job as any).state
     );
 
   const serviceZip =
     firstNonEmpty(
-      (job as any).locations?.zip,
+      serviceLocation?.zip,
       (job as any).zip
     );
 
@@ -792,7 +796,7 @@ const showCloseoutRow =
       : canShowInvoiceButton
   );
 
-const locationId = (job as any).locations?.id ?? null;
+const locationId = serviceLocation?.id ?? null;
 
 const digitsOnly = (v?: string | null) => String(v ?? "").replace(/\D/g, "");
 

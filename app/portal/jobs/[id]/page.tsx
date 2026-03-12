@@ -226,7 +226,9 @@ const hasOpenRetestChild = !!openRetestChild;
       ? `${formatTimeLocal((job as any).window_start)}–${formatTimeLocal((job as any).window_end)}`
       : null;
 
-  const loc = (job as any)?.locations ?? null;
+  const loc = Array.isArray((job as any)?.locations)
+    ? (job as any).locations.find((location: any) => location) ?? null
+    : (job as any)?.locations ?? null;
 
   const addressLine1 =
     String(loc?.address_line1 ?? "").trim() ||
