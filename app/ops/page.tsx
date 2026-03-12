@@ -834,6 +834,7 @@ return (
             <input type="hidden" name="bucket" value={bucket} />
             <input type="hidden" name="contractor" value={contractor ?? ""} />
             <input type="hidden" name="q" value={q ?? ""} />
+            <input type="hidden" name="signal" value={signal ?? ""} />
             <select
               name="sort"
               defaultValue={sort}
@@ -1430,14 +1431,17 @@ return (
         contractor: contractor ?? "",
         q: q ?? "",
         sort: sort ?? "",
-        signal: signal ?? "",
+        // Only preserve signal when re-linking the active bucket (same-bucket refresh).
+        // Navigating to a different bucket clears signal to avoid cross-bucket filter contamination.
+        signal: t.key === bucket ? (signal ?? "") : "",
       })}#ops-queues`;
 
       const active = bucket === t.key;
-      // When a signal filter is active, the active-bucket chip should reflect the
-      // signal-filtered displayed count so chip badge === rows rendered.
+      // Active-bucket chip always uses signalFilteredBucketJobs.length so the badge
+      // always equals rows rendered (respects q, signal, and all other active filters).
+      // Inactive chips show raw bucket totals for navigation context.
       const count =
-        signal && active
+        active
           ? signalFilteredBucketJobs.length
           : t.key === "attention"
           ? attentionCount
