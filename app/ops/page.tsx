@@ -1124,7 +1124,7 @@ return (
 </div>
 
      {/* Call list preview + Upcoming */}
-<div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+<div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
   {/* Call List */}
   <div className="rounded-lg border bg-white p-4 text-gray-900 shadow-sm">
     <div className="flex items-center justify-between">
@@ -1142,7 +1142,7 @@ return (
       </Link>
     </div>
 
-    <div className="mt-3 space-y-2">
+    <div className="mt-3 max-h-96 overflow-y-auto space-y-2 pr-0.5">
       {(sortedCallListJobs ?? []).length === 0 ? (
         <div className="text-sm text-muted-foreground">No jobs in call list.</div>
       ) : (
@@ -1229,7 +1229,7 @@ return (
       </div>
     </div>
 
-    <div className="mt-3 space-y-2">
+    <div className="mt-3 max-h-96 overflow-y-auto space-y-2 pr-0.5">
       {(sortedUpcomingJobs ?? []).length === 0 ? (
         <div className="text-sm text-muted-foreground">No upcoming scheduled jobs.</div>
       ) : (
