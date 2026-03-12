@@ -262,24 +262,23 @@ const resolvedFailedParentIds = new Set(
   const applyCommonFilters = (qb: any) => {
     if (contractor) qb = qb.eq("contractor_id", contractor);
 
-    // If you want search to work here too (optional), we can filter by name/phone/address.
-    // Supabase OR filter is string-based; keep it simple for now.
     if (q) {
-  const escaped = q.replace(/"/g, '\\"').trim();
-  const like = `"%${escaped}%"`;
-
-  qb = qb.or(
-    [
-      `title.ilike.${like}`,
-      `customer_first_name.ilike.${like}`,
-      `customer_last_name.ilike.${like}`,
-      `customer_email.ilike.${like}`,
-      `customer_phone.ilike.${like}`,
-      `city.ilike.${like}`,
-      `permit_number.ilike.${like}`,
-    ].join(",")
-  );
-}
+      // Use * as wildcard in .or() strings — % is for direct .ilike() only;
+      // commas/parens must be stripped to avoid breaking the OR clause parser.
+      const safe = q.replace(/[,()\\]/g, "").trim();
+      qb = qb.or(
+        [
+          `title.ilike.*${safe}*`,
+          `customer_first_name.ilike.*${safe}*`,
+          `customer_last_name.ilike.*${safe}*`,
+          `customer_email.ilike.*${safe}*`,
+          `customer_phone.ilike.*${safe}*`,
+          `job_address.ilike.*${safe}*`,
+          `city.ilike.*${safe}*`,
+          `permit_number.ilike.*${safe}*`,
+        ].join(",")
+      );
+    }
 
     return qb;
   };
