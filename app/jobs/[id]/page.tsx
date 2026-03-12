@@ -23,6 +23,7 @@ import {
 import {
   updateJobOpsFromForm,
   updateJobOpsDetailsFromForm,
+  releasePendingInfoAndRecomputeFromForm,
   markJobFieldCompleteFromForm,
   markCertsCompleteFromForm,
   markInvoiceCompleteFromForm,
@@ -1624,6 +1625,15 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
             Save
           </button>
         </form>
+
+        {String(job.ops_status ?? "").toLowerCase() === "pending_info" ? (
+          <form action={releasePendingInfoAndRecomputeFromForm} className="mt-2">
+            <input type="hidden" name="job_id" value={job.id} />
+            <button className="px-3 py-2 rounded border text-sm" type="submit">
+              Release Pending Info
+            </button>
+          </form>
+        ) : null}
       </div>
 
           <section id="service-chain" className="rounded-lg border p-4 mb-4">

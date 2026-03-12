@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
+import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
 
 
 export type JobStatus =
@@ -2849,6 +2850,13 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     jurisdiction,
     permit_date,
   });
+
+  const wasPendingInfo = String(before?.ops_status ?? "").trim().toLowerCase() === "pending_info";
+  const hasPermitNumber = String(permit_number ?? "").trim().length > 0;
+
+  if (wasPendingInfo && hasPermitNumber) {
+    await releasePendingInfoAndRecompute(id, "auto_release_on_permit_save");
+  }
 
   const wasScheduled =
     !!before?.scheduled_date || !!before?.window_start || !!before?.window_end;
