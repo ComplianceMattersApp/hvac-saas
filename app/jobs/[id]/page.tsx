@@ -550,20 +550,44 @@ const customerPhone =
   const contractorName =
     contractors?.find((c: any) => c.id === job.contractor_id)?.name ?? "—";
 
-      const serviceAddressLine1 =
-    (job as any).locations?.address_line1 ?? job.job_address ?? null;
+  const firstNonEmpty = (...values: Array<unknown>) => {
+    for (const v of values) {
+      const s = String(v ?? "").trim();
+      if (s) return s;
+    }
+    return null;
+  };
+
+  const serviceAddressLine1 =
+    firstNonEmpty(
+      (job as any).locations?.address_line1,
+      (job as any).address_line1,
+      job.job_address
+    );
 
   const serviceAddressLine2 =
-    (job as any).locations?.address_line2 ?? null;
+    firstNonEmpty(
+      (job as any).locations?.address_line2,
+      (job as any).address_line2
+    );
 
   const serviceCity =
-    (job as any).locations?.city ?? job.city ?? null;
+    firstNonEmpty(
+      (job as any).locations?.city,
+      job.city
+    );
 
   const serviceState =
-    (job as any).locations?.state ?? null;
+    firstNonEmpty(
+      (job as any).locations?.state,
+      (job as any).state
+    );
 
   const serviceZip =
-    (job as any).locations?.zip ?? null;
+    firstNonEmpty(
+      (job as any).locations?.zip,
+      (job as any).zip
+    );
 
   const serviceAddressParts = [
     serviceAddressLine1,

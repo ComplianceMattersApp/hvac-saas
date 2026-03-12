@@ -256,7 +256,7 @@ const resolvedFailedParentIds = new Set(
 
   // Common job select (keep lightweight)
  const baseSelect =
-     "id, title, job_type, ops_status, field_complete, certs_complete, invoice_complete, invoice_number, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, customer_id, deleted_at, location_id, created_at";
+   "id, title, job_type, ops_status, field_complete, certs_complete, invoice_complete, invoice_number, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, customer_id, deleted_at, location_id, created_at";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -462,16 +462,33 @@ function customerLine(j: any) {
 
 function addressLine(j: any) {
   const l = j.location_id ? locationsById.get(j.location_id) : null;
-  const addr = l?.address_line1 ?? j.job_address ?? "—";
-  const city = l?.city ?? j.city ?? "—";
-  return `${addr}, ${city}`;
+
+  const address =
+    String(l?.address_line1 ?? "").trim() ||
+    String(j.address_line1 ?? "").trim() ||
+    String(j.job_address ?? "").trim();
+
+  const city =
+    String(l?.city ?? "").trim() ||
+    String(j.city ?? "").trim();
+
+  const out = [address, city].filter(Boolean).join(", ");
+  return out || "—";
 }
 
 function addressParts(j: any) {
   const l = j.location_id ? locationsById.get(j.location_id) : null;
+
   return {
-    address: l?.address_line1 ?? j.job_address ?? "",
-    city: l?.city ?? j.city ?? "",
+    address:
+      String(l?.address_line1 ?? "").trim() ||
+      String(j.address_line1 ?? "").trim() ||
+      String(j.job_address ?? "").trim() ||
+      "",
+    city:
+      String(l?.city ?? "").trim() ||
+      String(j.city ?? "").trim() ||
+      "",
   };
 }
 
@@ -937,9 +954,9 @@ return (
                     </a>
                   )}
 
-                  {mapsHref(j.job_address, j.city) && (
+                  {mapsHref(addressParts(j).address, addressParts(j).city) && (
                     <a
-                      href={mapsHref(j.job_address, j.city)}
+                      href={mapsHref(addressParts(j).address, addressParts(j).city)}
                       target="_blank"
                       rel="noreferrer"
                       className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
