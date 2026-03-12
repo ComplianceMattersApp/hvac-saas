@@ -144,6 +144,7 @@ async function applyRetestResolution(params: {
         .eq("id", parentJobId);
 
       if (updErr) throw updErr;
+      
 
       await insertJobEvent({
         supabase,
@@ -397,6 +398,39 @@ async function resolveSystemIdForRun(params: {
 
   const fromRun = String(data?.system_id ?? "").trim();
   return fromRun || null;
+}
+
+export async function updateJobTypeFromForm(formData: FormData) {
+  const supabase = await createClient();
+
+  const jobId = String(formData.get("job_id") ?? "").trim();
+  const rawType = String(formData.get("job_type") ?? "").trim().toLowerCase();
+
+  if (!jobId) {
+    throw new Error("Missing job_id");
+  }
+
+  const allowed = ["ecc", "service"];
+
+  if (!allowed.includes(rawType)) {
+    throw new Error("Invalid job type");
+  }
+
+  const { error } = await supabase
+    .from("jobs")
+    .update({
+      job_type: rawType,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId);
+
+  if (error) {
+    console.error("Job type update failed", error);
+    throw new Error("Unable to update job type");
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/ops`);
 }
 
 export async function getContractors() {
@@ -1946,6 +1980,7 @@ export async function createJob(input: CreateJobInput): Promise<{ id: string; se
 
     if (updErr) throw updErr;
   }
+  
 
   return {
     id: String(data.id),
@@ -1958,7 +1993,13 @@ export async function createJob(input: CreateJobInput): Promise<{ id: string; se
  */
 export async function createJobFromForm(formData: FormData) {
   // ----- basic fields -----
-  const jobType = String(formData.get("job_type") || "ecc").trim();
+  const rawJobType = String(formData.get("job_type") || "").trim().toLowerCase();
+
+  if (rawJobType !== "ecc" && rawJobType !== "service") {
+    throw new Error("Invalid job type");
+  }
+
+const jobType = rawJobType;
   const projectType = String(formData.get("project_type") || "alteration").trim();
 
   const contractorIdRaw = formData.get("contractor_id");
@@ -2626,6 +2667,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       .eq("id", id);
 
     if (updErr) throw updErr;
+    
 
     if (!hasFullSchedule && autoScheduleConfirmed) {
       await insertJobEvent({
@@ -2660,17 +2702,16 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       .single();
 
     if (jtErr) throw jtErr;
+    
 
-    if ((jt?.job_type ?? "").toLowerCase() === "service") {
-      // Service jobs go straight into invoice queue after field completion
-      updatePayload.ops_status = "invoice_required";
-    } else if ((jt?.job_type ?? "").toLowerCase() === "ecc") {
-      // ECC: mark field lifecycle complete here,
-      // but do NOT guess final ops resolution locally.
+    const jobType = String(jt?.job_type ?? "").trim().toLowerCase();
+
+    if (jobType === "ecc") {
       updatePayload.field_complete = true;
       updatePayload.field_complete_at = new Date().toISOString();
+    } else {
+      updatePayload.ops_status = "invoice_required";
     }
-  }
 
     const { error: updErr } = await supabase
       .from("jobs")
@@ -2679,6 +2720,10 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     if (updErr) throw updErr;
   }
+  
+  
+
+    
 
   // ECC canonical resolution:
   // once the field lifecycle is marked complete, derive ops_status from ecc_test_runs
@@ -2745,6 +2790,8 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   revalidatePath(`/ops`);
 
   redirect(`/jobs/${id}`);
+}
+
 }
 
 
@@ -2964,20 +3011,24 @@ export async function completeDataEntryFromForm(formData: FormData) {
 
 
   // Service: data entry completion = invoice sent/recorded -> closed
-  if (job?.job_type === "service") {
-    const { error } = await supabase
-      .from("jobs")
-      .update({
-        ops_status: "closed",
-        invoice_number: invoice,
-        data_entry_completed_at: new Date().toISOString(),
-      })
-      .eq("id", id);
+  const jobType = String(job?.job_type ?? "").trim().toLowerCase();
 
-    if (error) throw error;
+// Any non-ECC job closes here after invoice/data entry.
+// Only ECC stays in paperwork flow.
+if (jobType !== "ecc") {
+  const { error } = await supabase
+    .from("jobs")
+    .update({
+      ops_status: "closed",
+      invoice_number: invoice,
+      data_entry_completed_at: new Date().toISOString(),
+    })
+    .eq("id", id);
 
-    redirect(`/jobs/${id}`);
-  }
+  if (error) throw error;
+
+  redirect(`/jobs/${id}`);
+}
 
   // ECC: data entry completion should NOT close the job
   // ECC must go: paperwork_required -> (paperwork complete) -> closed

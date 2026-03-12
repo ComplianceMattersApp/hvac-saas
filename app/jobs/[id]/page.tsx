@@ -12,6 +12,7 @@ import {
   updateJobContractorFromForm,
   updateJobScheduleFromForm,
   advanceJobStatusFromForm,
+  updateJobTypeFromForm,
   completeDataEntryFromForm,
   type JobStatus,
   createRetestJobFromForm,
@@ -1124,6 +1125,38 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
                 </div>
               </div>
             </div>
+
+            <details className="w-full text-sm">
+              <summary className="cursor-pointer text-gray-600 underline">
+                Change job type
+              </summary>
+
+              <form
+                action={updateJobTypeFromForm}
+                className="mt-3 flex items-center gap-2"
+              >
+                <input type="hidden" name="job_id" value={job.id} />
+                <p className="text-xs text-gray-500">
+                  Current type: {job.job_type ?? "service"}
+                </p>
+
+                <select
+                  name="job_type"
+                  defaultValue={job.job_type ?? "service"}
+                  className="rounded border border-gray-300 px-2 py-1"
+                >
+                  <option value="service">Service</option>
+                  <option value="ecc">ECC</option>
+                </select>
+
+                <button
+                  type="submit"
+                  className="rounded bg-gray-900 px-3 py-1 text-white"
+                >
+                  Update
+                </button>
+              </form>
+            </details>
 
             <div className="mt-4 flex flex-col gap-3">
               <details className="w-full text-sm">
