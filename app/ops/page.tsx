@@ -377,6 +377,7 @@ if (upcomingErr) throw upcomingErr;
       .from("jobs")
       .select(baseSelect)
       .is("deleted_at", null)
+      .neq("ops_status", "closed")
       .eq("field_complete", false)
       .lt("scheduled_date", startTodayUtc)
       .order("scheduled_date", { ascending: true })
