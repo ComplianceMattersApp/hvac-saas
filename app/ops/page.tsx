@@ -573,6 +573,14 @@ function queueReason(j: any, activeBucket: string) {
     return "Test failed — awaiting correction or retest";
   }
 
+  if (activeBucket === "retest_needed" || status === "retest_needed") {
+    return "Retest required — awaiting contractor action";
+  }
+
+  if (activeBucket === "on_hold" || status === "on_hold") {
+    return "On hold — awaiting resolution before closeout";
+  }
+
   if (activeBucket === "need_to_schedule" || status === "need_to_schedule") {
     return "Waiting to be scheduled";
   }
@@ -610,13 +618,14 @@ function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJo
 
   if (status === "failed" && opts?.retestReady) return "Create Retest Job";
   if (status === "failed") return "Await Contractor Correction";
+  if (status === "retest_needed") return "Await Contractor Retest";
   if (status === "need_to_schedule" && opts?.newContractorJob) return "Review & Schedule";
   if (status === "need_to_schedule") return "Schedule Visit";
   if (status === "pending_info") return "Get Missing Info";
+  if (status === "on_hold") return "Review Hold Reason";
   if (needs.needsInvoice && needs.needsCerts) return "Finish Closeout";
   if (needs.needsCerts) return "Send Certs";
   if (needs.needsInvoice) return "Send Invoice";
-  if (status === "on_hold") return "Review Hold Reason";
   if (status === "exception") return "Resolve Exception";
   if (status === "scheduled") return "Prepare for Visit";
 
@@ -849,6 +858,15 @@ const todayDayNumber = laDayNumberFromInstant(startTodayUtc) ?? 0;
 function closeoutNeedsForException(j: any) {
   const ops = String(j?.ops_status ?? "").toLowerCase();
   const needs = getCloseoutNeeds(j);
+  if (needs.isBlockedForCloseout) {
+    return {
+      needsInvoice: false,
+      needsCerts: false,
+      isService: needs.isService,
+      isEccFailed: false,
+    };
+  }
+
   const isEccFailed = !needs.isService && (ops === "failed" || ops === "pending_info" || ops === "retest_needed");
 
   return {

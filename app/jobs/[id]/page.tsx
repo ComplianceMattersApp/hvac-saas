@@ -951,6 +951,11 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
                 title: "Job completed — pending information",
                 body: "Some required info is still missing (ex: permit number, required fields, or notes). Add it to close out.",
               }
+            : ops === "on_hold"
+              ? {
+                  title: "Job completed — on hold",
+                  body: "This job is on hold and is not in the closeout work queue until the hold is cleared.",
+                }
           : ops === "need_to_schedule"
             ? {
                 title: "Job completed — but still in Need to Schedule",
