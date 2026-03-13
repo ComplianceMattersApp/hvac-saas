@@ -736,40 +736,6 @@ if (recipient === "contractor") {
 
 const isFieldComplete = !!job.field_complete;
 
-const banner = (() => {
-  if (job.status === "completed" && job.ops_status === "scheduled") {
-    return {
-      type: "warning",
-      title: "Job Completed — Awaiting Admin Closeout",
-      message:
-        "Field work is complete. This job will remain visible until paperwork and billing are finished.",
-    };
-  }
-
-  if (job.ops_status === "failed") {
-    return {
-      type: "error",
-      title: "Visit completed — failure still unresolved",
-      message:
-        "Current Ops Status: failed. The field visit is complete, but this failed result still needs either correction review approval or a linked retest before certs can be completed.",
-    };
-  }
-
-  if (
-    job.status === "completed" &&
-    ((job.job_type === "service" && job.invoice_complete) ||
-      (job.job_type === "ecc" && job.invoice_complete && job.certs_complete))
-  ) {
-    return {
-      type: "success",
-      title: "Admin Complete",
-      message: "Field work, paperwork, and billing are complete for this job.",
-    };
-  }
-
-  return null;
-})();
-
 const isFailedUnresolved =
   ["failed", "retest_needed"].includes(String(job.ops_status ?? ""));
 
@@ -941,20 +907,6 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
           2-hour window starting now.
         </div>
       )}  
-      {banner && (
-  <div
-    className={`mt-3 mb-4 rounded-md border px-3 py-2 text-sm ${
-      banner.type === "success"
-        ? "border-green-300 bg-green-50 text-green-900"
-        : banner.type === "error"
-        ? "border-red-300 bg-red-50 text-red-900"
-        : "border-yellow-300 bg-yellow-50 text-yellow-900"
-    }`}
-  >
-    <div className="font-semibold">{banner.title}</div>
-    <div className="mt-1">{banner.message}</div>
-  </div>
-)}
 
       {job.status === "completed" && job.ops_status !== "closed" ? (() => {
       const ops = job.ops_status;
