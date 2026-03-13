@@ -246,6 +246,7 @@ export default async function JobTestsPage({
   const suggestedTests = scenarioResult.suggestedTests;
   const scenarioCode = scenarioResult.scenario;
   const scenarioNotes = scenarioResult.notes;
+  const isPlanDrivenNewConstruction = scenarioCode === "new_construction_plan_driven";
 
      const requiredTests = suggestedTests
    .filter((t) => t.required)
@@ -461,7 +462,9 @@ const defaultSystemTonnage =
       </div>
     ) : (
       <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-        No standard ECC scenario detected yet for this system.
+        {isPlanDrivenNewConstruction
+          ? "New Construction is currently plan-driven/custom. Add tests manually with Add Test."
+          : "No standard ECC scenario detected yet for this system."}
       </div>
     )}
   </div>
@@ -493,7 +496,9 @@ const defaultSystemTonnage =
 
             {requiredTests.length === 0 ? (
               <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                No default required tests for this profile. Use Add Test to build the custom set.
+                {isPlanDrivenNewConstruction
+                  ? "New Construction is currently plan-driven/custom. No default required tests are preloaded yet. Use Add Test to build the custom set."
+                  : "No default required tests for this profile. Use Add Test to build the custom set."}
                 <div className="text-xs text-muted-foreground">
                   Required for this project type:{" "}
                   <span className="font-medium">

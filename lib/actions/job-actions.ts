@@ -1484,6 +1484,7 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
     normalizedProjectType === "all_new" ||
     normalizedProjectType === "allnew" ||
     normalizedProjectType === "new" ||
+    normalizedProjectType === "new_construction" ||
     normalizedProjectType === "new_prescriptive"
       ? 0.05
       : normalizedProjectType === "alteration"
