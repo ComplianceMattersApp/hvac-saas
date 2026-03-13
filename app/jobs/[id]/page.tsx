@@ -35,6 +35,7 @@ import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-act
 import ServiceStatusActions from "./_components/ServiceStatusActions";
 import { displayDateLA } from "@/lib/utils/schedule-la";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
+import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 
 import JobAttachmentsInternal from "./_components/JobAttachmentsInternal";
 
@@ -743,6 +744,9 @@ const isAdminComplete =
   (job.job_type === "service" && job.invoice_complete) ||
   (job.job_type === "ecc" && job.invoice_complete && job.certs_complete);
 
+const closeoutNeeds = getCloseoutNeeds(job);
+const isCloseoutPending = isInCloseoutQueue(job);
+
 const canShowCertsButton =
   job.job_type === "ecc" &&
   !job.certs_complete &&
@@ -918,30 +922,34 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
             title: "Admin Complete",
             body: "Field work, paperwork, and billing are complete for this job.",
           }
-        : ops === "paperwork_required"
+        : ops === "failed"
           ? {
-              title: "Job completed — paperwork still required",
-              body: "Upload/attach required documents (invoice/cert) to fully close out the job.",
+              title: "Visit completed — failure still unresolved",
+              body: "The field visit is complete, but this failed result still needs either correction review approval or a linked retest before certs can be completed.",
             }
-          : ops === "pending_info"
-            ? {
-                title: "Job completed — pending information",
-                body: "Some required info is still missing (ex: permit number, required fields, or notes). Add it to close out.",
-              }
-          : ops === "failed"
-            ? {
-                title: "Visit completed — failure still unresolved",
-                body: "The field visit is complete, but this failed result still needs either correction review approval or a linked retest before certs can be completed.",
-              }
           : ops === "retest_needed"
             ? {
                 title: "Visit completed — retest required",
                 body: "The original failed visit is complete. A physical retest is still required before certification can move forward.",
               }
-          : ops === "scheduled"
+          : isCloseoutPending
             ? {
-                title: "Job Completed — Awaiting Admin Closeout",
-                body: "Field work is complete. This job will remain visible until paperwork and billing are finished.",
+                title: "Job completed — closeout still in progress",
+                body: closeoutNeeds.needsInvoice && closeoutNeeds.needsCerts
+                  ? "Field work is complete. Invoice and certs are still pending, so the job remains in closeout until both are finished."
+                  : closeoutNeeds.needsCerts
+                    ? "Field work is complete. Certs are still pending, so the job remains in closeout until closeout paperwork is finished."
+                    : "Field work is complete. Invoice is still pending, so the job remains in closeout until billing is finished.",
+              }
+          : ops === "paperwork_required"
+            ? {
+                title: "Job completed — paperwork still required",
+                body: "Upload/attach required documents (invoice/cert) to fully close out the job.",
+              }
+          : ops === "pending_info"
+            ? {
+                title: "Job completed — pending information",
+                body: "Some required info is still missing (ex: permit number, required fields, or notes). Add it to close out.",
               }
           : ops === "need_to_schedule"
             ? {

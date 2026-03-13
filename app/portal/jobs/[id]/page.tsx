@@ -296,6 +296,8 @@ const hasOpenRetestChild = !!openRetestChild;
   const v = String(opsStatus ?? "").toLowerCase();
 
   if (v === "failed") return "Failed — Awaiting correction or review";
+  if (v === "paperwork_required") return "Certs Pending";
+  if (v === "invoice_required") return "Paperwork Pending";
   if (v === "retest_needed") return "Retest Required";
   if (v === "pending_info") return "Pending Info";
   if (v === "need_to_schedule") return "Need to Schedule";

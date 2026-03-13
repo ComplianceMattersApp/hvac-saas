@@ -20,6 +20,8 @@ function statusLabel(ops: string | null | undefined) {
   const v = (ops ?? "").toLowerCase();
 
   if (v === "failed") return "FAILED";
+  if (v === "paperwork_required") return "CERTS PENDING";
+  if (v === "invoice_required") return "PAPERWORK PENDING";
   if (v === "pending_info") return "PENDING INFO";
   if (v === "retest_needed") return "RETEST REQUIRED";
   if (v === "need_to_schedule") return "NEED TO SCHEDULE";
@@ -68,6 +70,8 @@ function statusBadgeClass(ops: string | null | undefined) {
 
   if (v === "failed")
     return "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300";
+  if (v === "paperwork_required" || v === "invoice_required")
+    return "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-300";
   if (v === "retest_needed")
     return "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300";
   if (v === "pending_info")
@@ -88,6 +92,7 @@ function rowAccentClass(opts: { isUrgent: boolean; ops_status?: string | null })
   const ops = (opts.ops_status ?? "").toLowerCase();
 
   if (opts.isUrgent) return "border-l-red-500";
+  if (ops === "paperwork_required" || ops === "invoice_required") return "border-l-sky-500";
   if (ops === "pending_info") return "border-l-amber-400";
   if (ops === "retest_needed" || ops === "failed") return "border-l-red-400";
   if (ops === "scheduled" || ops === "ready") return "border-l-emerald-500";

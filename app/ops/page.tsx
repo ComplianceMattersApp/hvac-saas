@@ -10,6 +10,7 @@ import {
   startOfTodayUtcIsoLA,
   startOfTomorrowUtcIsoLA,
 } from "@/lib/utils/schedule-la";
+import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -99,9 +100,9 @@ const OPS_TABS: { key: BucketKey; label: string }[] = [
   { key: "on_hold", label: "On Hold" },
   { key: "failed", label: "Failed" },
   { key: "retest_needed", label: "Retest Needed" },
-  { key: "paperwork_required", label: "Paperwork Required" },
-  { key: "invoice_required", label: "Invoice Required" },
-  { key: "closeout", label: "Closeout" },
+  { key: "paperwork_required", label: "Status: Paperwork Required" },
+  { key: "invoice_required", label: "Status: Invoice Required" },
+  { key: "closeout", label: "Closeout Work Queue" },
   { key: "recent_closed", label: "Recently Closed" },
 ];
 
@@ -432,7 +433,9 @@ if (upcomingErr) throw upcomingErr;
         ].join(",")
       );
     } else if (bucket === "closeout") {
-      bucketQ = bucketQ.in("ops_status", ["paperwork_required", "invoice_required"]);
+      bucketQ = bucketQ
+        .eq("field_complete", true)
+        .neq("ops_status", "closed");
     } else if (bucket === "recent_closed") {
       bucketQ = bucketQ
         .eq("ops_status", "closed")
@@ -451,7 +454,9 @@ if (upcomingErr) throw upcomingErr;
     ? (bucketJobs ?? []).filter(
         (j: any) => !resolvedFailedParentIds.has(String(j.id ?? ""))
       )
-    : (bucketJobs ?? []);
+    : bucket === "closeout"
+      ? (bucketJobs ?? []).filter((j: any) => isInCloseoutQueue(j))
+      : (bucketJobs ?? []);
 
   // --- Customer/Location lookup maps (source-of-truth) ---
 const allJobs = [
@@ -573,17 +578,19 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "paperwork_required" || status === "paperwork_required") {
-    return "Field work complete — paperwork still needed";
+    return "Status bucket — certs or closeout paperwork still needed";
   }
 
   if (activeBucket === "invoice_required" || status === "invoice_required") {
-    return "Field work complete — invoice still needed";
+    return "Status bucket — invoice still needed";
   }
 
   if (activeBucket === "closeout") {
-    if (status === "paperwork_required") return "Closeout pending — paperwork still needed";
-    if (status === "invoice_required") return "Closeout pending — invoice still needed";
-    return "Closeout pending";
+    const needs = getCloseoutNeeds(j);
+    if (needs.needsInvoice && needs.needsCerts) return "Closeout work queue — invoice and certs still needed";
+    if (needs.needsCerts) return "Closeout work queue — certs still needed";
+    if (needs.needsInvoice) return "Closeout work queue — invoice still needed";
+    return "Closeout work queue";
   }
 
   return "";
@@ -599,13 +606,16 @@ function hasOpenRetestChild(jobId: string, jobs: any[]) {
 
 function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJob?: boolean }) {
   const status = String(j?.ops_status ?? "").toLowerCase();
+  const needs = getCloseoutNeeds(j);
 
   if (status === "failed" && opts?.retestReady) return "Create Retest Job";
   if (status === "failed") return "Await Contractor Correction";
   if (status === "need_to_schedule" && opts?.newContractorJob) return "Review & Schedule";
   if (status === "need_to_schedule") return "Schedule Visit";
   if (status === "pending_info") return "Get Missing Info";
-  if (status === "paperwork_required" || status === "invoice_required") return "Complete Paperwork";
+  if (needs.needsInvoice && needs.needsCerts) return "Finish Closeout";
+  if (needs.needsCerts) return "Send Certs";
+  if (needs.needsInvoice) return "Send Invoice";
   if (status === "on_hold") return "Review Hold Reason";
   if (status === "exception") return "Resolve Exception";
   if (status === "scheduled") return "Prepare for Visit";
@@ -837,17 +847,16 @@ function dayWord(n: number) {
 const todayDayNumber = laDayNumberFromInstant(startTodayUtc) ?? 0;
 
 function closeoutNeedsForException(j: any) {
-  const jobType = String(j?.job_type ?? "").toLowerCase();
   const ops = String(j?.ops_status ?? "").toLowerCase();
+  const needs = getCloseoutNeeds(j);
+  const isEccFailed = !needs.isService && (ops === "failed" || ops === "pending_info" || ops === "retest_needed");
 
-  const isService = jobType.includes("service");
-  const isEccFailed = !isService && (ops === "failed" || ops === "pending_info");
-
-  // Exception escalation uses completion booleans as the source-of-truth.
-  const needsInvoice = !Boolean(j?.invoice_complete);
-  const needsCerts = !isService && !isEccFailed && !Boolean(j?.certs_complete);
-
-  return { needsInvoice, needsCerts, isService, isEccFailed };
+  return {
+    needsInvoice: needs.needsInvoice,
+    needsCerts: isEccFailed ? false : needs.needsCerts,
+    isService: needs.isService,
+    isEccFailed,
+  };
 }
 
 const exceptionMetaById = new Map<string, { reason: string; aging: string }>();
@@ -911,27 +920,20 @@ const sortedExceptionJobs = sortJobs(
 );
 
 function closeoutNeeds(j: any) {
-  const type = String(j?.job_type ?? "").toLowerCase();
-  const isOutage = type.includes("outage");
-  const hasInvoice = Boolean(j?.invoice_complete) || Boolean(j?.invoice_number);
-  const hasCert = Boolean(j?.certs_complete);
-  const needsInvoice = !hasInvoice;
-  const needsCert = isOutage && !hasCert;
-  return { needsInvoice, needsCert };
+  return getCloseoutNeeds(j);
 }
 
 function closeoutLabel(j: any) {
   const needs = closeoutNeeds(j);
-  if (needs.needsInvoice && needs.needsCert) return "Invoice + certs required";
-  if (needs.needsInvoice) return "Invoice required";
-  if (needs.needsCert) return "Certs required";
+  if (needs.needsInvoice && needs.needsCerts) return "Working closeout — invoice + certs required";
+  if (needs.needsInvoice) return "Working closeout — invoice required";
+  if (needs.needsCerts) return "Working closeout — certs required";
   return "Ready to close";
 }
 
 const closeoutJobs = sortJobs(
   (closeoutSourceJobs ?? []).filter((j: any) => {
-    const needs = closeoutNeeds(j);
-    return needs.needsInvoice || needs.needsCert;
+    return isInCloseoutQueue(j);
   }),
   sort
 );
@@ -990,17 +992,17 @@ const workflowCards = [
   },
   {
     key: "paperwork_required",
-    label: "Paperwork Required",
+    label: "Status: Paperwork Required",
     count: counts.get("paperwork_required") ?? 0,
   },
   {
     key: "invoice_required",
-    label: "Invoice Required",
+    label: "Status: Invoice Required",
     count: counts.get("invoice_required") ?? 0,
   },
   {
     key: "closeout",
-    label: "Closeout",
+    label: "Closeout Work Queue",
     count: closeoutJobs.length,
   },
   {
@@ -1227,7 +1229,7 @@ return (
 
       <div className="rounded-lg border bg-white p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold">Closeout</div>
+          <div className="text-sm font-semibold">Closeout Work Queue</div>
           <div className="flex items-center gap-3">
             <div className="text-xs text-gray-500">{closeoutJobs.length}</div>
             {closeoutJobs.length > PREVIEW_LIMIT ? (
@@ -1288,7 +1290,7 @@ return (
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-sm font-semibold">Queues</div>
-          <div className="text-xs text-gray-500">Click a card to set the active queue below.</div>
+          <div className="text-xs text-gray-500">Closeout is the working bucket. Paperwork and invoice cards show raw projected status buckets.</div>
         </div>
         <div className="w-full sm:w-72">
           <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
