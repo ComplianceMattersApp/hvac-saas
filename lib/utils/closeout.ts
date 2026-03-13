@@ -3,7 +3,6 @@ export type CloseoutProjectionInput = {
   job_type?: string | null;
   ops_status?: string | null;
   invoice_complete?: boolean | null;
-  invoice_number?: string | null;
   certs_complete?: boolean | null;
 };
 
@@ -13,7 +12,8 @@ export function getCloseoutNeeds(job: CloseoutProjectionInput) {
   const isService = jobType === "service";
   const isEcc = jobType === "ecc";
   const isFailureFlow = isEcc && (opsStatus === "failed" || opsStatus === "retest_needed");
-  const needsInvoice = !Boolean(job.invoice_complete) && !Boolean(job.invoice_number);
+  // Use lifecycle completion booleans as source-of-truth for closeout queue projection.
+  const needsInvoice = !Boolean(job.invoice_complete);
   const needsCerts = isEcc && !isFailureFlow && !Boolean(job.certs_complete);
 
   return {
