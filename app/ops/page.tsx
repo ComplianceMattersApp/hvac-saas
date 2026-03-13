@@ -234,6 +234,14 @@ for (const row of countRows ?? []) {
   counts.set(key, (counts.get(key) ?? 0) + 1);
 }
 
+const { count: recentClosedCount, error: recentClosedErr } = await supabase
+  .from("jobs")
+  .select("id", { count: "exact", head: true })
+  .eq("ops_status", "closed")
+  .is("deleted_at", null);
+
+if (recentClosedErr) throw recentClosedErr;
+
 // Parents with at least one successfully resolved retest child should leave active unresolved queues.
 // The parent remains historically failed, but should not stay in active Failed / Attention views.
 const { data: resolvedRetestChildren, error: resolvedRetestErr } = await supabase
@@ -260,7 +268,7 @@ const resolvedFailedParentIds = new Set(
 
   // Common job select (keep lightweight)
  const baseSelect =
-   "id, title, job_type, ops_status, field_complete, certs_complete, invoice_complete, invoice_number, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, customer_id, deleted_at, location_id, created_at";
+     "id, title, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, customer_id, deleted_at, location_id, created_at";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -301,20 +309,20 @@ const failedCutoffIso = new Date(
   now.getTime() - 14 * 24 * 60 * 60 * 1000
 ).toISOString();
 
-// 1) TODAY (scheduled jobs where scheduled_date falls within LA "today")
-let todayQ = supabase
+// 1) FIELD WORK (scheduled today in LA and not field-complete)
+let fieldWorkQ = supabase
   .from("jobs")
   .select(baseSelect)
   .is("deleted_at", null)
-  .eq("ops_status", "scheduled")
+  .eq("field_complete", false)
   .gte("scheduled_date", startTodayUtc)
   .lt("scheduled_date", startTomorrowUtc)
   .order("window_start", { ascending: true });
 
-todayQ = applyCommonFilters(todayQ);
+fieldWorkQ = applyCommonFilters(fieldWorkQ);
 
-const { data: todayJobs, error: todayErr } = await todayQ;
-if (todayErr) throw todayErr;
+const { data: fieldWorkJobs, error: fieldWorkErr } = await fieldWorkQ;
+if (fieldWorkErr) throw fieldWorkErr;
 
 // 2) UPCOMING (scheduled jobs on/after LA tomorrow)
 let upcomingQ = supabase
@@ -347,7 +355,38 @@ if (upcomingErr) throw upcomingErr;
   const { data: callListJobs, error: callListErr } = await callListQ;
   if (callListErr) throw callListErr;
 
-  // 4) NEEDS ATTENTION preview (aging-based escalation queue)
+    // 4) CLOSEOUT COMMAND BOARD (derived from field_complete + remaining office obligations)
+    let closeoutQ = supabase
+      .from("jobs")
+      .select(baseSelect)
+      .is("deleted_at", null)
+      .eq("field_complete", true)
+      .order("field_complete_at", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true })
+      .limit(100);
+
+    closeoutQ = applyCommonFilters(closeoutQ);
+
+    const { data: closeoutSourceJobs, error: closeoutErr } = await closeoutQ;
+    if (closeoutErr) throw closeoutErr;
+
+    // 5) EXCEPTIONS: Still Open (scheduled before today in LA and not field-complete)
+    let stillOpenQ = supabase
+      .from("jobs")
+      .select(baseSelect)
+      .is("deleted_at", null)
+      .eq("field_complete", false)
+      .lt("scheduled_date", startTodayUtc)
+      .order("scheduled_date", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(100);
+
+    stillOpenQ = applyCommonFilters(stillOpenQ);
+
+    const { data: stillOpenJobs, error: stillOpenErr } = await stillOpenQ;
+    if (stillOpenErr) throw stillOpenErr;
+
+    // 6) NEEDS ATTENTION preview (aging-based escalation queue)
     let attentionQ = supabase
       .from("jobs")
       .select(baseSelect + ", created_at")
@@ -373,7 +412,7 @@ if (upcomingErr) throw upcomingErr;
     const attentionCount = attentionJobs?.length ?? 0;
     if (attentionErr) throw attentionErr;
 
-  // 5) BUCKET list (tabs)
+  // 7) BUCKET list (tabs)
     let bucketQ = supabase
       .from("jobs")
       .select(baseSelect)
@@ -413,9 +452,11 @@ if (upcomingErr) throw upcomingErr;
 
   // --- Customer/Location lookup maps (source-of-truth) ---
 const allJobs = [
-  ...(todayJobs ?? []),
+  ...(fieldWorkJobs ?? []),
   ...(upcomingJobs ?? []),
   ...(callListJobs ?? []),
+  ...(closeoutSourceJobs ?? []),
+  ...(stillOpenJobs ?? []),
   ...(attentionJobs ?? []),
   ...(filteredBucketJobs ?? [])
 ] as any[];
@@ -635,11 +676,6 @@ function sortJobs(jobs: any[] | null | undefined, mode: string) {
   const selectedContractorName =
     contractor && contractors?.find((c: any) => c.id === contractor)?.name;
 
-const sortedTodayJobs = sortJobs(todayJobs, sort === "default" ? "scheduled" : sort);
-const sortedUpcomingJobs = sortJobs(upcomingJobs, sort === "default" ? "scheduled" : sort);
-const sortedCallListJobs = sortJobs(callListJobs, sort === "default" ? "created" : sort);
-const sortedAttentionJobs = sortJobs(attentionJobs, sort === "default" ? "created" : sort);
-
 const uniqueAllOpenOpsJobs = Array.from(
   new Map(
     allJobs
@@ -758,70 +794,211 @@ if (signal === "contractor_updates") {
 }
 
 const sortedBucketJobs = sortJobs(signalFilteredBucketJobs, sort);
+const sortedCallListJobs = sortJobs(callListJobs ?? [], sort === "default" ? "created" : sort);
+const sortedFieldWorkJobs = sortJobs(fieldWorkJobs ?? [], sort);
+const sortedExceptionJobs = sortJobs(stillOpenJobs ?? [], sort);
+
+function closeoutNeeds(j: any) {
+  const type = String(j?.job_type ?? "").toLowerCase();
+  const isOutage = type.includes("outage");
+  const hasInvoice = Boolean(j?.invoice_complete) || Boolean(j?.invoice_number);
+  const hasCert = Boolean(j?.certs_complete);
+  const needsInvoice = !hasInvoice;
+  const needsCert = isOutage && !hasCert;
+  return { needsInvoice, needsCert };
+}
+
+function closeoutLabel(j: any) {
+  const needs = closeoutNeeds(j);
+  if (needs.needsInvoice && needs.needsCert) return "Invoice + certs required";
+  if (needs.needsInvoice) return "Invoice required";
+  if (needs.needsCert) return "Certs required";
+  return "Ready to close";
+}
+
+const closeoutJobs = sortJobs(
+  (closeoutSourceJobs ?? []).filter((j: any) => {
+    const needs = closeoutNeeds(j);
+    return needs.needsInvoice || needs.needsCert;
+  }),
+  sort
+);
+
+const activeFailedCount = (countRows ?? []).filter((row: any) => {
+  const status = String((row as any)?.ops_status ?? "").toLowerCase();
+  const jobId = String((row as any)?.id ?? "");
+  return status === "failed" && !resolvedFailedParentIds.has(jobId);
+}).length;
+
+const workflowCards = [
+  {
+    key: "attention",
+    label: "Needs Attention",
+    count: attentionCount,
+  },
+  {
+    key: "need_to_schedule",
+    label: "Need to Schedule",
+    count: counts.get("need_to_schedule") ?? 0,
+  },
+  {
+    key: "scheduled",
+    label: "Scheduled",
+    count: counts.get("scheduled") ?? 0,
+  },
+  {
+    key: "pending_info",
+    label: "Pending Info",
+    count: counts.get("pending_info") ?? 0,
+  },
+  {
+    key: "on_hold",
+    label: "On Hold",
+    count: counts.get("on_hold") ?? 0,
+  },
+  {
+    key: "in_progress",
+    label: "In Progress",
+    count: counts.get("in_progress") ?? 0,
+  },
+  {
+    key: "passed",
+    label: "Passed",
+    count: counts.get("passed") ?? 0,
+  },
+  {
+    key: "failed",
+    label: "Failed",
+    count: activeFailedCount,
+  },
+  {
+    key: "retest_needed",
+    label: "Retest Needed",
+    count: counts.get("retest_needed") ?? 0,
+  },
+  {
+    key: "paperwork_required",
+    label: "Paperwork Required",
+    count: counts.get("paperwork_required") ?? 0,
+  },
+  {
+    key: "invoice_required",
+    label: "Invoice Required",
+    count: counts.get("invoice_required") ?? 0,
+  },
+  {
+    key: "closeout",
+    label: "Closeout",
+    count: closeoutJobs.length,
+  },
+  {
+    key: "recent_closed",
+    label: "Closed",
+    count: recentClosedCount ?? 0,
+  },
+].filter((c) => c.count > 0 || c.key === bucket);
+
+const signalCards = [
+  {
+    key: "retest_ready",
+    bucket: "failed",
+    label: "Retest Ready",
+    count: retestReadyCount,
+  },
+  {
+    key: "new_contractor",
+    bucket: "need_to_schedule",
+    label: "New Contractor Jobs",
+    count: contractorCreatedCount,
+  },
+  {
+    key: "contractor_updates",
+    bucket,
+    label: "Contractor Updates",
+    count: contractorUpdatesCount,
+  },
+];
+
+const activeQueueLabel = OPS_TABS.find((t) => t.key === bucket)?.label ?? bucket;
+const activeSignalLabel =
+  signal === "retest_ready"
+    ? "Retest Ready"
+    : signal === "new_contractor"
+    ? "New Contractor Jobs"
+    : signal === "contractor_updates"
+    ? "Contractor Updates"
+    : "";
+
+function compactRow(j: any, showDate = false, note?: string) {
+  return (
+    <div key={j.id} className="rounded-md border p-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <Link href={`/jobs/${j.id}?tab=ops`} className="text-sm font-medium text-blue-600 hover:underline">
+            {j.title}
+          </Link>
+          <div className="text-xs text-gray-700">{customerNameOnly(j)} • {customerPhoneOnly(j) || "-"}</div>
+          <div className="text-xs text-gray-500">{addressLine(j)}</div>
+          {note ? <div className="mt-1 text-[11px] font-medium text-amber-700">{note}</div> : null}
+        </div>
+        {showDate ? (
+          <div className="text-[11px] text-gray-500 text-right">
+            <div>{j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : "-"}</div>
+            <div>{displayWindowLA(j.window_start, j.window_end) || "-"}</div>
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <Link href={`/jobs/${j.id}?tab=ops`} className="rounded border px-2 py-0.5 text-[11px] hover:bg-gray-100">
+          Open
+        </Link>
+        {telHref(customerPhoneOnly(j)) ? (
+          <a href={telHref(customerPhoneOnly(j))} className="rounded border px-2 py-0.5 text-[11px] hover:bg-gray-100">
+            Call
+          </a>
+        ) : null}
+        {smsHref(customerPhoneOnly(j)) ? (
+          <a href={smsHref(customerPhoneOnly(j))} className="rounded border px-2 py-0.5 text-[11px] hover:bg-gray-100">
+            Text
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 return (
-  <div className="mx-auto max-w-5xl p-4 space-y-4 text-gray-900">
-{/* Header */}
-<div className="rounded-xl border bg-gradient-to-b from-white to-gray-50 p-4 sm:p-6 shadow-sm">
-  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div className="space-y-1">
-      <div className="flex items-center gap-2">
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-gray-900">
-          Ops Dashboard
-        </h1>
-
-        {/* Current bucket pill */}
-        <span className="inline-flex h-6 items-center rounded-full border bg-white px-2 text-xs font-medium text-gray-700">
-         {OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}
-</span>
+  <div className="mx-auto max-w-6xl space-y-4 p-4 text-gray-900">
+    <div className="rounded-xl border bg-gradient-to-b from-white to-gray-50 p-4 shadow-sm sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Ops Dashboard</h1>
+            <span className="inline-flex h-6 items-center rounded-full border bg-white px-2 text-xs font-medium text-gray-700">
+              {OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}
+            </span>
+          </div>
+          <p className="text-sm text-gray-600">
+            {selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/jobs/new" className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white shadow-sm">
+            + New Job
+          </Link>
+          <Link href="/calendar" className="rounded-md border bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50">
+            View Calendar
+          </Link>
+          <Link href="/customers" className="rounded-md border bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50">
+            Search Customers
+          </Link>
+        </div>
       </div>
-      
-
-      <p className="text-sm text-gray-600">
-        {selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
-      </p>
     </div>
 
-    <div className="flex flex-wrap gap-2">
-      <Link
-        href="/jobs/new"
-        className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-white"
-      >
-        + New Job
-      </Link>
-
-      <Link
-  href="/contractors"
-  className="rounded-md border bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
->
-  Add Contractors
-</Link>
-
-
-      <Link
-        href="/calendar"
-        className="rounded-md border bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
-      >
-        View Calendar
-      </Link>
-
-      <Link
-        href="/customers"
-        className="rounded-md border bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
-      >
-        Search Customers
-      </Link>
-    </div>
-  </div>
-</div>
-
-
-
-    {/* Filters */}
     <div className="rounded-lg border bg-white p-4 shadow-sm">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
-
         <div className="grid gap-1">
           <label className="text-xs text-gray-600">Sort</label>
           <form action="/ops" method="get" className="flex gap-2">
@@ -829,792 +1006,192 @@ return (
             <input type="hidden" name="contractor" value={contractor ?? ""} />
             <input type="hidden" name="q" value={q ?? ""} />
             <input type="hidden" name="signal" value={signal ?? ""} />
-            <select
-              name="sort"
-              defaultValue={sort}
-              className="w-full rounded border px-3 py-2 text-sm"
-            >
+            <select name="sort" defaultValue={sort} className="w-full rounded border px-3 py-2 text-sm">
               <option value="default">Default queue order</option>
               <option value="customer">Customer</option>
               <option value="scheduled">Scheduled date/time</option>
               <option value="created">Created date</option>
               <option value="address">Address</option>
             </select>
-            <button
-              type="submit"
-              className="rounded-md bg-black px-4 py-2 text-sm text-white"
-            >
+            <button type="submit" className="rounded-md bg-black px-4 py-2 text-sm text-white">
               Apply
             </button>
           </form>
         </div>
       </div>
-
-      {/* Optional quick search (keep if you want it on Ops page) */}
-      <div className="grid gap-1">
-        <label className="text-xs text-gray-600">Quick search (optional)</label>
+      <div className="mt-3 grid gap-1">
+        <label className="text-xs text-gray-600">Quick search</label>
         <form action="/ops" method="get" className="flex gap-2">
           <input type="hidden" name="bucket" value={bucket} />
           <input type="hidden" name="contractor" value={contractor ?? ""} />
           <input type="hidden" name="sort" value={sort} />
-          <input
-            name="q"
-            defaultValue={q ?? ""}
-            placeholder="Name, phone, address, city, title…"
-            className="w-full rounded border px-3 py-2 text-sm"
-          />
+          <input name="q" defaultValue={q ?? ""} placeholder="Name, phone, address, city, title" className="w-full rounded border px-3 py-2 text-sm" />
           <button className="rounded-md bg-black px-4 py-2 text-sm text-white" type="submit">
             Search
           </button>
         </form>
       </div>
-
-      <div className="text-xs text-muted-foreground">
-        For full customer search and job history, use <span className="font-medium">/customers</span>.
-      </div>
     </div>
 
-      {/* Today (Scheduled) — Sorted by window_start, grouped by city */}
-<div className="rounded-lg border bg-white p-4">
-  <div className="flex items-center justify-between">
-    <div className="text-sm font-semibold">Today (Scheduled)</div>
-    <div className="text-xs text-muted-foreground">{sortedTodayJobs?.length ?? 0} jobs</div>
-  </div>
-
-  {(() => {
-    const jobs = Array.isArray(sortedTodayJobs) ? [...sortedTodayJobs] : [];
-    // 1) Group by city (fallback to "Unknown City")
-    const groups = new Map<string, any[]>();
-    for (const j of jobs) {
-      const city = (j?.city || "").trim() || "Unknown City";
-      if (!groups.has(city)) groups.set(city, []);
-      groups.get(city)!.push(j);
-    }
-
-    // 2) Render
-    if (jobs.length === 0) {
-      return <div className="mt-3 text-sm text-muted-foreground">No scheduled jobs for today.</div>;
-    }
-
-    return (
-      <div className="mt-3 space-y-4">
-        {Array.from(groups.entries()).map(([city, cityJobs]) => (
-          <div key={city} className="rounded-md border">
-            <div className="flex items-center justify-between px-3 py-2 border-b bg-gray-50">
-              <div className="text-sm font-semibold">{city}</div>
-              <div className="text-xs text-muted-foreground">{cityJobs.length} job(s)</div>
-            </div>
-
-            <div className="p-3 space-y-2">
-              {cityJobs.map((j: any) => (
-                <div
-                key={j.id}
-                className="rounded-md border p-3 hover:bg-gray-50"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <Link
-                      href={`/jobs/${j.id}`}
-                      className="text-sm font-medium text-blue-600 hover:underline"
-                    >
-                      {j.title}
-                    </Link>
-
-                    <div className="text-xs">
-                      {j.customer_id ? (
-                        <Link
-                          href={`/customers/${j.customer_id}`}
-                          className="font-medium text-blue-600 hover:underline"
-                        >
-                          {customerNameOnly(j)}
-                        </Link>
-                      ) : (
-                        <span className="font-medium text-gray-700">{customerNameOnly(j)}</span>
-                      )}
-
-                      <span className="text-muted-foreground"> • {customerPhoneOnly(j) || "—"}</span>
-                    </div>
-
-                    <div className="text-xs text-muted-foreground">
-                      {addressLine(j)}
-                    </div>
-                    
-                  </div>
-
-                  <div className="text-xs text-muted-foreground text-right whitespace-nowrap">
-                    {displayWindowLA(j.window_start, j.window_end) || "—"}
-                  </div>
-                </div>
-
-                <div className="mt-2 flex gap-2 flex-wrap">
-                  <Link
-                    href={`/jobs/${j.id}`}
-                    className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                  >
-                    Open Job
-                  </Link>
-
-                  {j.customer_id ? (
-                    <Link
-                      href={`/customers/${j.customer_id}`}
-                      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      Open Customer
-                    </Link>
-                  ) : null}
-
-                  {telHref(customerPhoneOnly(j)) && (
-                    <a
-                      href={telHref(customerPhoneOnly(j))}
-                      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      📞 Call
-                    </a>
-                  )}
-
-                  {smsHref(customerPhoneOnly(j)) && (
-                    <a
-                      href={smsHref(customerPhoneOnly(j))}
-                      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      💬 Text
-                    </a>
-                  )}
-
-                  {mapsHref(addressParts(j)) && (
-                    <a
-                      href={mapsHref(addressParts(j))}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      🧭 Navigate
-                    </a>
-                  )}
-                </div>
-              </div>
-              ))}
-            </div>
-          </div>
-        ))}
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="rounded-lg border bg-white p-4 shadow-sm">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-sm font-semibold">Call List</div>
+          <div className="text-xs text-gray-500">{sortedCallListJobs.length}</div>
+        </div>
+        <div className="space-y-2">{sortedCallListJobs.slice(0, 4).map((j: any) => compactRow(j))}</div>
       </div>
-    );
-  })()}
-</div>
 
-{/* Needs Attention */}
-<div className="rounded-lg border bg-white p-4">
-  <div className="flex items-center justify-between">
-    <div className="text-sm font-semibold">⚠ Needs Attention</div>
-    <Link
-      className="text-xs underline"
-      href={`/ops${buildQueryString({
-        bucket: "attention",
-        contractor: contractor ?? "",
-        q: q ?? "",
-        sort: sort ?? "",
-      })}#ops-queues`}
-    >
-      View all
-    </Link>
-  </div>
-
-  <div className="mt-3 space-y-2">
-    {(sortedAttentionJobs ?? []).length === 0 ? (
-      <div className="text-sm text-muted-foreground">
-        No jobs need attention right now.
+     <div className="rounded-lg border bg-white p-4 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-sm font-semibold">Field Work</div>
+        <div className="text-xs text-gray-500">{sortedFieldWorkJobs.length}</div>
       </div>
-    ) : (
-      (sortedAttentionJobs ?? []).map((j: any) => (
-       <div
-          key={j.id}
-          className="rounded-md border p-3 hover:bg-gray-50"
-        >
-          <div className="flex items-start justify-between gap-3">
-  <div>
-    <Link
-      href={`/jobs/${j.id}?tab=ops`}
-      className="text-sm font-medium text-blue-600 hover:underline"
-    >
-      {j.title}
-    </Link>
 
-    <div className="text-xs">
-      {j.customer_id ? (
-        <Link
-          href={`/customers/${j.customer_id}`}
-          className="font-medium text-blue-600 hover:underline"
-        >
-          {customerNameOnly(j)}
-        </Link>
-      ) : (
-        <span className="font-medium text-gray-700">{customerNameOnly(j)}</span>
-      )}
-
-      <span className="text-muted-foreground">
-        {" "}• {customerPhoneOnly(j) || "—"}
-      </span>
+  {sortedFieldWorkJobs.length === 0 ? (
+    <div className="flex h-32 items-center justify-center text-sm text-gray-500">
+      <span className="text-green-600">✓</span> Field work complete for today
     </div>
-
-    <div className="text-xs text-muted-foreground">
-      {addressLine(j)}
+  ) : (
+    <div className="space-y-2">
+      {sortedFieldWorkJobs
+        .slice(0, 4)
+        .map((j: any) => compactRow(j, true))}
     </div>
-  </div>
-
-  <div className="text-xs font-medium text-red-600 whitespace-nowrap">
-    {j.ops_status}
-  </div>
-</div>
-
-<div className="mt-2 flex gap-2 flex-wrap">
-  <Link
-    href={`/jobs/${j.id}?tab=ops`}
-    className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-  >
-    Open Job
-  </Link>
-
-  {j.customer_id ? (
-    <Link
-      href={`/customers/${j.customer_id}`}
-      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-    >
-      Open Customer
-    </Link>
-  ) : null}
-
-  {telHref(customerPhoneOnly(j)) && (
-    <a
-      href={telHref(customerPhoneOnly(j))}
-      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-    >
-      📞 Call
-    </a>
-  )}
-
-  {smsHref(customerPhoneOnly(j)) && (
-    <a
-      href={smsHref(customerPhoneOnly(j))}
-      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-    >
-      💬 Text
-    </a>
-  )}
-
-  {mapsHref(addressParts(j)) && (
-    <a
-      href={mapsHref(addressParts(j))}
-      target="_blank"
-      rel="noreferrer"
-      className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-    >
-      🧭 Navigate
-    </a>
   )}
 </div>
+
+      <div className="rounded-lg border bg-white p-4 shadow-sm">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-sm font-semibold">Closeout</div>
+          <div className="text-xs text-gray-500">{closeoutJobs.length}</div>
         </div>
-      ))
-    )}
-  </div>
-</div>
-
-     {/* Call list preview + Upcoming */}
-<div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-  {/* Call List */}
-  <div className="rounded-lg border bg-white p-4 text-gray-900 shadow-sm">
-    <div className="flex items-center justify-between">
-      <div className="text-sm font-semibold">Call List (Need to Schedule)</div>
-      <Link
-        className="text-xs underline"
-        href={`/ops${buildQueryString({
-          bucket: "need_to_schedule",
-          contractor: contractor ?? "",
-          q: q ?? "",
-          sort: sort ?? "",
-        })}#ops-queues`}
-      >
-        View all
-      </Link>
-    </div>
-
-    <div className="mt-3 max-h-96 overflow-y-auto space-y-2 pr-0.5">
-      {(sortedCallListJobs ?? []).length === 0 ? (
-        <div className="text-sm text-muted-foreground">No jobs in call list.</div>
-      ) : (
-        (sortedCallListJobs ?? []).map((j: any) => (
-          <div
-            key={j.id}
-            className="rounded-md border p-3 hover:bg-gray-50"
-          >
-            <div>
-            <Link
-              href={`/jobs/${j.id}?tab=ops`}
-              className="text-sm font-medium text-blue-600 hover:underline"
-            >
-              {j.title}
-            </Link>
-
-            <div className="text-xs">
-              {j.customer_id ? (
-                <Link
-                  href={`/customers/${j.customer_id}`}
-                  className="font-medium text-blue-600 hover:underline"
-                >
-                  {customerNameOnly(j)}
-                </Link>
-              ) : (
-                <span className="font-medium text-gray-700">{customerNameOnly(j)}</span>
-              )}
-
-              <span className="text-muted-foreground"> • {customerPhoneOnly(j) || "—"}</span>
-            </div>
-
-            <div className="text-xs text-muted-foreground">
-              {addressLine(j)}
-            </div>
-          </div>
-
-          <div className="mt-2 flex gap-2 flex-wrap">
-            <Link
-              href={`/jobs/${j.id}?tab=ops`}
-              className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-            >
-              Open Job
-            </Link>
-
-            {j.customer_id ? (
-              <Link
-                href={`/customers/${j.customer_id}`}
-                className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-              >
-                Open Customer
-              </Link>
-            ) : null}
-
-            {telHref(customerPhoneOnly(j)) && (
-              <a
-                href={telHref(customerPhoneOnly(j))}
-                className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-              >
-                📞 Call
-              </a>
-            )}
-
-            {smsHref(customerPhoneOnly(j)) && (
-              <a
-                href={smsHref(customerPhoneOnly(j))}
-                className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-              >
-                💬 Text
-              </a>
-            )}
-          </div>
-          </div>
-        ))
-      )}
-    </div>
-  </div>
-
-  {/* Upcoming */}
-  <div className="rounded-lg border bg-white p-4 text-gray-900 shadow-sm">
-    <div className="flex items-center justify-between">
-      <div className="text-sm font-semibold">Upcoming (Scheduled)</div>
-      <div className="text-xs text-muted-foreground">
-        {sortedUpcomingJobs?.length ?? 0} jobs
-      </div>
-    </div>
-
-    <div className="mt-3 max-h-96 overflow-y-auto space-y-2 pr-0.5">
-      {(sortedUpcomingJobs ?? []).length === 0 ? (
-        <div className="text-sm text-muted-foreground">No upcoming scheduled jobs.</div>
-      ) : (
-        (sortedUpcomingJobs ?? []).map((j: any) => (
-          <div
-            key={j.id}
-            className="rounded-md border p-3 hover:bg-gray-50"
-          >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <Link
-                    href={`/jobs/${j.id}`}
-                    className="text-sm font-medium text-blue-600 hover:underline"
-                  >
-                    {j.title}
-                  </Link>
-                  <div className="text-xs">
-                    {j.customer_id ? (
-                      <Link
-                        href={`/customers/${j.customer_id}`}
-                        className="font-medium text-blue-600 hover:underline"
-                      >
-                        {customerNameOnly(j)}
-                      </Link>
-                    ) : (
-                      <span className="font-medium text-gray-700">{customerNameOnly(j)}</span>
-                    )}
-
-                    <span className="text-muted-foreground">
-                      {" "}• {customerPhoneOnly(j) || "—"}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {addressLine(j)}
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground text-right">
-                  <div>
-                    {j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : "—"}
-                  </div>
-                  {(j.window_start || j.window_end) && (
-                    <div className="mt-1 text-[11px] text-gray-600">
-                      {j.window_start ?? "—"}{j.window_start && j.window_end ? " - " : ""}{j.window_end ?? ""}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-2 flex gap-2 flex-wrap">
-
-                <Link
-                  href={`/jobs/${j.id}`}
-                  className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                >
-                  Open Job
-                </Link>
-
-                {j.customer_id ? (
-                  <Link
-                    href={`/customers/${j.customer_id}`}
-                    className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                  >
-                    Open Customer
-                  </Link>
-                ) : null}
-
-                {telHref(customerPhoneOnly(j)) && (
-                  <a
-                    href={telHref(customerPhoneOnly(j))}
-                    className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                  >
-                    📞 Call
-                  </a>
-                )}
-
-                {smsHref(customerPhoneOnly(j)) && (
-                  <a
-                    href={smsHref(customerPhoneOnly(j))}
-                    className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                  >
-                    💬 Text
-                  </a>
-                )}
-
-                {mapsHref(addressParts(j)) && (
-                  <a
-                    href={mapsHref(addressParts(j))}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded border px-2 py-1 text-xs hover:bg-gray-100"
-                  >
-                    🧭 Navigate
-                  </a>
-                )}
-
-              </div>
-          </div>
-        ))
-      )}
-    </div>
-  </div>
-</div>
-
-<div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-  <Link
-    href={`/ops${buildQueryString({
-      bucket: "failed",
-      contractor: contractor ?? "",
-      q: q ?? "",
-      sort: sort ?? "",
-      signal: "retest_ready",
-    })}#ops-queues`}
-    className="rounded-lg border bg-white p-4 shadow-sm hover:bg-gray-50"
-  >
-    <div className="flex items-center justify-between">
-      <div>
-        <div className="text-sm font-semibold">Retest Ready</div>
-        <div className="text-xs text-gray-600">
-          Contractor activity changed the next internal action
-        </div>
-      </div>
-      <div className="text-2xl font-semibold">
-        {retestReadyCount}
-      </div>
-    </div>
-  </Link>
-
-  <Link
-    href={`/ops${buildQueryString({
-      bucket: "need_to_schedule",
-      contractor: contractor ?? "",
-      q: q ?? "",
-      sort: sort ?? "",
-      signal: "new_contractor",
-    })}#ops-queues`}
-    className="rounded-lg border bg-white p-4 shadow-sm hover:bg-gray-50"
-  >
-    <div className="flex items-center justify-between">
-      <div>
-        <div className="text-sm font-semibold">New Contractor Jobs</div>
-        <div className="text-xs text-gray-600">
-          New submissions waiting for internal review and scheduling
-        </div>
-      </div>
-      <div className="text-2xl font-semibold">
-        {contractorCreatedCount}
-      </div>
-    </div>
-  </Link>
-
-  <Link
-    href={`/ops${buildQueryString({
-      bucket: bucket,
-      contractor: contractor ?? "",
-      q: q ?? "",
-      sort: sort ?? "",
-      signal: "contractor_updates",
-    })}#ops-queues`}
-    className="rounded-lg border bg-white p-4 shadow-sm hover:bg-gray-50"
-  >
-    <div className="flex items-center justify-between">
-      <div>
-        <div className="text-sm font-semibold">Contractor Updates</div>
-        <div className="text-xs text-gray-600">
-          Notes, correction submissions, attachments, and permit updates
-        </div>
-      </div>
-      <div className="text-2xl font-semibold">
-        {contractorUpdatesCount}
-      </div>
-    </div>
-  </Link>
-</div>
-
-{/* Queue Tabs */}
-<div id="ops-queues" className="rounded-lg border bg-white p-4 space-y-3 scroll-mt-4">
-  <div className="text-sm font-semibold">Queues</div>
-  <div className="flex flex-wrap gap-2">
-    {OPS_TABS.filter((t) => {
-      const active = bucket === t.key;
-      const count =
-        t.key === "attention"
-          ? attentionCount
-          : t.key === "recent_closed"
-          ? 0
-          : t.key === "closeout"
-          ? (counts.get("paperwork_required") ?? 0) + (counts.get("invoice_required") ?? 0)
-          : t.key === "failed"
-          ? (countRows ?? []).filter((row: any) => {
-              const status = String((row as any)?.ops_status ?? "").toLowerCase();
-              const jobId = String((row as any)?.id ?? "");
-              return status === "failed" && !resolvedFailedParentIds.has(jobId);
-            }).length
-          : (counts.get(t.key) ?? 0);
-
-      return count > 0 || active || t.key === "recent_closed";
-    }).map((t) => {
-      const href = `/ops${buildQueryString({
-        bucket: t.key,
-        contractor: contractor ?? "",
-        q: q ?? "",
-        sort: sort ?? "",
-        // Only preserve signal when re-linking the active bucket (same-bucket refresh).
-        // Navigating to a different bucket clears signal to avoid cross-bucket filter contamination.
-        signal: t.key === bucket ? (signal ?? "") : "",
-      })}#ops-queues`;
-
-      const active = bucket === t.key;
-      // Active-bucket chip always uses signalFilteredBucketJobs.length so the badge
-      // always equals rows rendered (respects q, signal, and all other active filters).
-      // Inactive chips show raw bucket totals for navigation context.
-      const count =
-        active
-          ? signalFilteredBucketJobs.length
-          : t.key === "attention"
-          ? attentionCount
-          : t.key === "recent_closed"
-          ? 0
-          : t.key === "closeout"
-          ? (counts.get("paperwork_required") ?? 0) + (counts.get("invoice_required") ?? 0)
-          : t.key === "failed"
-          ? (countRows ?? []).filter((row: any) => {
-              const status = String((row as any)?.ops_status ?? "").toLowerCase();
-              const jobId = String((row as any)?.id ?? "");
-              return status === "failed" && !resolvedFailedParentIds.has(jobId);
-            }).length
-          : (counts.get(t.key) ?? 0);
-
-      return (
-        <Link
-          key={t.key}
-          href={href}
-          className={[
-            "rounded-full border px-3 py-1 text-sm transition font-medium",
-            active
-              ? "bg-black text-white border-black"
-              : "bg-white text-gray-900 border-gray-300 hover:bg-gray-100",
-          ].join(" ")}
-        >
-          <span className="flex items-center gap-2">
-            {t.label}
-            {t.key !== "recent_closed" && count > 0 ? (
-              <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs">
-                {count}
-              </span>
-            ) : null}
-          </span>
-        </Link>
-      );
-    })}
-  </div>
-</div>
-
- 
-        <div className="text-xs text-blue-600">
-          Showing: <span className="font-medium">{bucket}</span>
-        </div>
-
         <div className="space-y-2">
-          {(sortedBucketJobs ?? []).length === 0 ? (
-            <div className="text-sm text-blue-600">No jobs in this queue.</div>
-          ) : (
-            (sortedBucketJobs ?? []).map((j: any) => (
-              <div
-  key={j.id}
-  className="rounded-md border border-gray-200 bg-white p-3 shadow-sm hover:bg-gray-50 transition"
->
-    <div className="flex items-start justify-between gap-3">
-      <div>
-        <Link
-          href={`/jobs/${j.id}?tab=ops`}
-          className="text-sm font-medium text-blue-600 hover:underline"
-        >
-          {j.title}
-        </Link>
-        <div className="text-xs">
-          {j.customer_id ? (
-            <Link
-              href={`/customers/${j.customer_id}`}
-              className="font-medium text-blue-600 hover:underline"
-            >
-              {customerNameOnly(j)}
-            </Link>
-          ) : (
-            <span className="font-medium text-gray-700">{customerNameOnly(j)}</span>
-          )}
-
-          <span className="text-gray-600"> • {customerPhoneOnly(j) || "—"}</span>
+          {closeoutJobs.slice(0, 4).map((j: any) => compactRow(j, false, closeoutLabel(j)))}
         </div>
-        <div className="text-xs text-gray-600">
-          {addressLine(j)}
-        </div>
+      </div>
+    </div>
 
-        {queueReason(j, bucket) ? (
-          <div className="mt-1 text-[11px] font-medium text-amber-700">
-            {queueReason(j, bucket)}
+    <div className="rounded-lg border bg-white p-4 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-sm font-semibold">Exceptions (Still Open Past Scheduled Date)</div>
+        <div className="text-xs text-red-600">{sortedExceptionJobs.length}</div>
+      </div>
+      <div className="space-y-2">{sortedExceptionJobs.slice(0, 5).map((j: any) => compactRow(j, true, "Scheduled date passed"))}</div>
+    </div>
+
+    <div id="ops-queues" className="rounded-lg border bg-white p-4 shadow-sm">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold">Queues</div>
+          <div className="text-xs text-gray-500">Click a card to set the active queue below.</div>
+        </div>
+        <div className="w-full sm:w-72">
+          <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <div className="mb-3 text-sm font-semibold">Workflow Queues</div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {workflowCards.map((card) => {
+              const isActive = bucket === card.key && !signal;
+              return (
+                <Link
+                  key={card.key}
+                  href={`/ops${buildQueryString({
+                    bucket: card.key,
+                    contractor: contractor ?? "",
+                    q: q ?? "",
+                    sort: sort ?? "",
+                    signal: "",
+                  })}#ops-queues`}
+                  className={[
+                    "rounded-md border p-2.5",
+                    isActive
+                      ? "border-black bg-black text-white"
+                      : "bg-gray-50 hover:bg-gray-100",
+                  ].join(" ")}
+                >
+                  <div className={`text-[11px] ${isActive ? "text-gray-100" : "text-gray-600"}`}>
+                    {card.label}
+                  </div>
+                  <div className="text-lg font-semibold">{card.count}</div>
+                </Link>
+              );
+            })}
           </div>
-        ) : null}
-      </div>
-      <div className="text-xs text-gray-500 text-right">
-  <div>
-    {j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : ""}
-  </div>
-  {(j.window_start || j.window_end) && (
-    <div className="mt-1 text-[11px] text-gray-600">
-      {j.window_start ?? "—"}{j.window_start && j.window_end ? " - " : ""}{j.window_end ?? ""}
-    </div>
-  )}
-</div>
-{(() => {
-  const isRetestReady = hasSignalEventForJob(
-    latestRetestReadyByJob,
-    String(j.id ?? "")
-  );
-  const isNewContractorJob = hasSignalEventForJob(
-    latestContractorCreatedByJob,
-    String(j.id ?? "")
-  );
-
-  return (
-    <div className="mt-2 space-y-1">
-      <div className="text-[11px] font-medium text-amber-700">
-        {signalReason(j, {
-          retestReady: isRetestReady,
-          newContractorJob: isNewContractorJob,
-        })}
-      </div>
-
-      <div className="text-[11px] font-semibold text-gray-900">
-        Next Action:{" "}
-        {nextActionLabel(j, {
-          retestReady: isRetestReady,
-          newContractorJob: isNewContractorJob,
-        })}
-      </div>
-    </div>
-  );
-})()}
-    </div>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-      <Link
-        href={`/jobs/${j.id}?tab=ops`}
-        className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
-      >
-        Open Job
-      </Link>
-
-      {j.customer_id ? (
-        <Link
-          href={`/customers/${j.customer_id}`}
-          className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
-        >
-          Open Customer
-        </Link>
-      ) : null}
-
-      {telHref(customerPhoneOnly(j)) && (
-        <a
-          href={telHref(customerPhoneOnly(j))}
-          className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
-        >
-          📞 Call
-        </a>
-      )}
-
-      {smsHref(customerPhoneOnly(j)) && (
-        <a
-          href={smsHref(customerPhoneOnly(j))}
-          className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
-        >
-          💬 Text
-        </a>
-      )}
-
-      {mapsHref(addressParts(j)) && (
-        <a
-          href={mapsHref(addressParts(j))}
-          target="_blank"
-          rel="noreferrer"
-          className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 hover:bg-gray-100"
-        >
-          🧭 Navigate
-        </a>
-      )}
-    </div>
-</div>
-            ))
-          )}
         </div>
+
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <div className="mb-3 text-sm font-semibold">Signals</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {signalCards.map((card) => {
+              const isActive = signal === card.key;
+              return (
+                <Link
+                  key={card.key}
+                  href={`/ops${buildQueryString({
+                    bucket: card.bucket,
+                    contractor: contractor ?? "",
+                    q: q ?? "",
+                    sort: sort ?? "",
+                    signal: card.key,
+                  })}#ops-queues`}
+                  className={[
+                    "rounded-md border p-2.5",
+                    isActive
+                      ? "border-black bg-black text-white"
+                      : "bg-gray-50 hover:bg-gray-100",
+                  ].join(" ")}
+                >
+                  <div className={`text-[11px] ${isActive ? "text-gray-100" : "text-gray-600"}`}>
+                    {card.label}
+                  </div>
+                  <div className="text-lg font-semibold">{card.count}</div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-lg border bg-gray-50 p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-sm font-semibold">
+            Active Queue: {activeQueueLabel}
+            {activeSignalLabel ? ` (${activeSignalLabel})` : ""}
+          </div>
+          <div className="text-xs text-gray-500">{sortedBucketJobs.length} jobs</div>
+        </div>
+
+        {sortedBucketJobs.length === 0 ? (
+          <div className="text-sm text-gray-500">No jobs in this queue with current filters.</div>
+        ) : (
+          <div className="space-y-2">
+            {sortedBucketJobs.slice(0, 20).map((j: any) => {
+              const isRetestReady = hasSignalEventForJob(
+                latestRetestReadyByJob,
+                String(j.id ?? "")
+              );
+              const isNewContractorJob = hasSignalEventForJob(
+                latestContractorCreatedByJob,
+                String(j.id ?? "")
+              );
+              const note = signal
+                ? signalReason(j, {
+                    retestReady: isRetestReady,
+                    newContractorJob: isNewContractorJob,
+                  })
+                : queueReason(j, bucket);
+
+              return compactRow(j, true, note || undefined);
+            })}
+          </div>
+        )}
+      </div>
     </div>
-  );
+  </div>
+);
 }
