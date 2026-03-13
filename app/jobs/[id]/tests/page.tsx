@@ -151,16 +151,6 @@ export default async function JobTestsPage({
   const focused = String(sp.t ?? "").trim();
   const selectedSystemIdFromQuery = String(sp.s ?? "").trim();
   const notice = String(sp.notice ?? "").trim();
-  
-
-  type FocusedType = "refrigerant_charge" | "airflow" | "duct_leakage" | "custom" | "";
-  const focusedType: FocusedType =
-    focused === "refrigerant_charge" ||
-    focused === "airflow" ||
-    focused === "duct_leakage" ||
-    focused === "custom"
-      ? (focused as FocusedType)
-      : "";
 
   const supabase = await createClient();
 
@@ -233,6 +223,13 @@ export default async function JobTestsPage({
 
   const normalizedProfile = normalizeProjectTypeToRuleProfile(job.project_type);
   const manualAddTests = getActiveManualAddTests();
+  const allowedFocusedTypes = new Set<string>([
+    ...manualAddTests.map((t) => String(t.code)),
+    "custom",
+  ]);
+  const focusedType = allowedFocusedTypes.has(focused)
+    ? (focused as EccTestType | "custom")
+    : "";
 
   const selectedSystemEquipment = (job.job_equipment ?? []).filter(
   (eq: any) => String(eq.system_id ?? "") === String(selectedSystemId)
@@ -251,6 +248,35 @@ export default async function JobTestsPage({
      const requiredTests = suggestedTests
    .filter((t) => t.required)
     .map((t) => t.testType);
+
+  const systemRunTestTypes = selectedSystemId
+    ? Array.from(
+        new Set(
+          (job.ecc_test_runs ?? [])
+            .filter((r: any) => String(r.system_id ?? "") === String(selectedSystemId))
+            .map((r: any) => String(r.test_type ?? "").trim())
+            .filter((testType) => Boolean(testType) && Boolean(getTestDefinition(testType)))
+        )
+      )
+    : [];
+
+  const visibleTestTypes = Array.from(
+    new Set([...(requiredTests as string[]), ...systemRunTestTypes])
+  ) as EccTestType[];
+
+  const focusedCustomTestType =
+    focusedType &&
+    focusedType !== "custom" &&
+    focusedType !== "duct_leakage" &&
+    focusedType !== "airflow" &&
+    focusedType !== "refrigerant_charge"
+      ? (focusedType as EccTestType)
+      : null;
+
+  const focusedCustomRun =
+    selectedSystemId && focusedCustomTestType
+      ? pickRunForSystem(job, focusedCustomTestType, selectedSystemId)
+      : null;
 
   const packageSystem = isPackageSystem(selectedSystemEquipment);
 
@@ -476,9 +502,9 @@ const defaultSystemTonnage =
           <div className="rounded-lg border bg-white p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold">Required Tests</div>
+                <div className="text-sm font-semibold">Tests for this system</div>
                 <div className="text-xs text-muted-foreground">
-                  Required for this project type:{" "}
+                  Default required tests plus manually added tests:{" "}
                   <span className="font-medium">
                     {normalizedProfile === "alteration"
                       ? "Alteration"
@@ -494,7 +520,7 @@ const defaultSystemTonnage =
               </div>
             </div>
 
-            {requiredTests.length === 0 ? (
+            {visibleTestTypes.length === 0 ? (
               <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 {isPlanDrivenNewConstruction
                   ? "New Construction is currently plan-driven/custom. No default required tests are preloaded yet. Use Add Test to build the custom set."
@@ -515,7 +541,7 @@ const defaultSystemTonnage =
               </div>
             ) : (
               <div className="grid gap-2">
-                {requiredTests.map((testType: EccTestType) => {
+                {visibleTestTypes.map((testType: EccTestType) => {
   const status = getRequiredTestStatusForSystem(job, selectedSystemId, testType);
   const testHref = `/jobs/${job.id}/tests?s=${selectedSystemId}&t=${testType}`;
 
@@ -655,6 +681,65 @@ const defaultSystemTonnage =
             Select a system first to add tests.
           </div>
         )}
+
+        {focusedCustomTestType ? (
+          <div className="rounded-md border p-3 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-medium">
+                  {getTestDisplayLabel(focusedCustomTestType, packageSystem)}
+                </div>
+                <div className="mt-1 text-sm">
+                  <span className="font-medium">Result:</span>{" "}
+                  {focusedCustomRun ? getEffectiveResultLabel(focusedCustomRun) : "Not started"}
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {focusedCustomRun?.updated_at
+                  ? new Date(focusedCustomRun.updated_at).toLocaleString()
+                  : null}
+              </div>
+            </div>
+
+            {!focusedCustomRun ? (
+              <form action={addEccTestRunFromForm} className="flex items-center gap-2">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="system_id" value={selectedSystemId} />
+                <input type="hidden" name="test_type" value={focusedCustomTestType} />
+                <button className="rounded-md bg-black px-4 py-2 text-white text-sm" type="submit">
+                  Create Run
+                </button>
+              </form>
+            ) : (
+              <div className="flex flex-wrap gap-2 items-center border-t pt-3">
+                <form action={completeEccTestRunFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={focusedCustomRun.id} />
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+                  <button
+                    type="submit"
+                    className="px-3 py-2 rounded border text-sm"
+                    disabled={!!focusedCustomRun.is_completed}
+                  >
+                    {focusedCustomRun.is_completed ? "Completed ✅" : "Complete Test"}
+                  </button>
+                </form>
+
+                <form action={deleteEccTestRunFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={focusedCustomRun.id} />
+                  <button type="submit" className="rounded-md border px-3 py-2 text-sm">
+                    Delete
+                  </button>
+                </form>
+              </div>
+            )}
+
+            <div className="text-xs text-muted-foreground">
+              This ad hoc test is tracked for this system. Detailed data entry for this test type is not configured yet.
+            </div>
+          </div>
+        ) : null}
 
         {/* =========================
             DUCT LEAKAGE
