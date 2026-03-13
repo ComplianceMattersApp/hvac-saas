@@ -799,7 +799,116 @@ if (signal === "contractor_updates") {
 const sortedBucketJobs = sortJobs(signalFilteredBucketJobs, sort);
 const sortedCallListJobs = sortJobs(callListJobs ?? [], sort === "default" ? "created" : sort);
 const sortedFieldWorkJobs = sortJobs(fieldWorkJobs ?? [], sort);
-const sortedExceptionJobs = sortJobs(stillOpenJobs ?? [], sort);
+
+function dateOnlyDayNumber(value?: string | null) {
+  const s = String(value ?? "").trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  return Math.floor(Date.UTC(y, mo - 1, d) / 86400000);
+}
+
+function laDayNumberFromInstant(value?: string | null) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+
+  const y = Number(parts.find((p) => p.type === "year")?.value);
+  const mo = Number(parts.find((p) => p.type === "month")?.value);
+  const day = Number(parts.find((p) => p.type === "day")?.value);
+
+  if (!y || !mo || !day) return null;
+  return Math.floor(Date.UTC(y, mo - 1, day) / 86400000);
+}
+
+function dayWord(n: number) {
+  return n === 1 ? "day" : "days";
+}
+
+const todayDayNumber = laDayNumberFromInstant(startTodayUtc) ?? 0;
+
+function closeoutNeedsForException(j: any) {
+  const jobType = String(j?.job_type ?? "").toLowerCase();
+  const ops = String(j?.ops_status ?? "").toLowerCase();
+
+  const isService = jobType.includes("service");
+  const isEccFailed = !isService && ops === "failed";
+
+  // Exception escalation uses completion booleans as the source-of-truth.
+  const needsInvoice = !Boolean(j?.invoice_complete);
+  const needsCerts = !isService && !isEccFailed && !Boolean(j?.certs_complete);
+
+  return { needsInvoice, needsCerts, isService, isEccFailed };
+}
+
+const exceptionMetaById = new Map<string, { reason: string; aging: string }>();
+const stillOpenExceptionJobs: any[] = [];
+
+for (const j of stillOpenJobs ?? []) {
+  const id = String(j?.id ?? "");
+  if (!id) continue;
+
+  const status = String(j?.ops_status ?? "").toLowerCase();
+  if (status === "closed") continue;
+
+  const scheduledDay = dateOnlyDayNumber(j?.scheduled_date);
+  if (scheduledDay == null) continue;
+
+  const ageDays = Math.max(1, todayDayNumber - scheduledDay);
+
+  stillOpenExceptionJobs.push(j);
+  exceptionMetaById.set(id, {
+    reason: "Still open from prior day",
+    aging: `${ageDays} ${dayWord(ageDays)} open`,
+  });
+}
+
+const overdueCloseoutExceptionJobs: any[] = [];
+
+for (const j of closeoutSourceJobs ?? []) {
+  const id = String(j?.id ?? "");
+  if (!id) continue;
+
+  const status = String(j?.ops_status ?? "").toLowerCase();
+  if (status === "closed") continue;
+
+  const needs = closeoutNeedsForException(j);
+  if (!needs.needsInvoice && !needs.needsCerts) continue;
+
+  const completeDay =
+    laDayNumberFromInstant(j?.field_complete_at) ?? dateOnlyDayNumber(j?.scheduled_date);
+
+  if (completeDay == null) continue;
+
+  const overdueDays = todayDayNumber - completeDay;
+  if (overdueDays < 1) continue;
+
+  const reason = needs.needsInvoice && needs.needsCerts
+    ? "Invoice + certs overdue"
+    : needs.needsInvoice
+    ? "Invoice overdue"
+    : "Certs overdue";
+
+  overdueCloseoutExceptionJobs.push(j);
+  exceptionMetaById.set(id, {
+    reason,
+    aging: `${overdueDays} ${dayWord(overdueDays)} overdue`,
+  });
+}
+
+const sortedExceptionJobs = sortJobs(
+  [...stillOpenExceptionJobs, ...overdueCloseoutExceptionJobs],
+  sort
+);
 
 function closeoutNeeds(j: any) {
   const type = String(j?.job_type ?? "").toLowerCase();
@@ -1166,7 +1275,13 @@ return (
           ) : null}
         </div>
       </div>
-      <div className="space-y-2">{exceptionVisibleJobs.map((j: any) => compactRow(j, true, "Scheduled date passed"))}</div>
+      <div className="space-y-2">
+        {exceptionVisibleJobs.map((j: any) => {
+          const meta = exceptionMetaById.get(String(j?.id ?? ""));
+          const note = meta ? `${meta.reason} | ${meta.aging}` : "Exception";
+          return compactRow(j, true, note);
+        })}
+      </div>
     </div>
 
     <div id="ops-queues" className="rounded-lg border bg-white p-4 shadow-sm">
