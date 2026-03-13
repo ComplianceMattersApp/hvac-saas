@@ -155,14 +155,43 @@ function pickLatestRunForSystem(job: any, testType: string, systemId: string) {
 }
 
 function fmtValue(value: unknown, unit?: string) {
-  if (value == null || value === "") return "-";
+  if (value == null || value === "") return "—";
   if (typeof value === "number") {
     const rendered = Number.isInteger(value) ? String(value) : value.toFixed(1);
     return unit ? `${rendered} ${unit}` : rendered;
   }
   const rendered = String(value).trim();
-  if (!rendered) return "-";
+  if (!rendered) return "—";
   return unit ? `${rendered} ${unit}` : rendered;
+}
+
+function fallbackText(value: unknown) {
+  const rendered = String(value ?? "").trim();
+  return rendered || "—";
+}
+
+function aggregateField(items: any[], getter: (item: any) => unknown) {
+  const values = Array.from(
+    new Set(
+      items
+        .map((item) => String(getter(item) ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  return values.length ? values.join("; ") : "—";
+}
+
+function exceptionReasonLabel(run: any) {
+  const reason = String(run?.data?.charge_exempt_reason ?? "").trim().toLowerCase();
+  if (reason === "package_unit") return "Package Unit";
+  if (reason === "conditions_not_met") return "Weather";
+
+  const overrideReason = String(run?.override_reason ?? "").toLowerCase();
+  if (overrideReason.includes("package unit")) return "Package Unit";
+  if (overrideReason.includes("weather") || overrideReason.includes("conditions not met")) return "Weather";
+
+  return "—";
 }
 
 function includesFailure(computed: any, needle: string) {
@@ -438,6 +467,14 @@ const defaultSystemTonnage =
       return role === "air_handler" || role === "furnace" || role === "evaporator" || type.includes("indoor") || type.includes("coil");
     });
 
+    const systemLocations = Array.from(
+      new Set(
+        systemEquipment
+          .map((eq: any) => String(eq?.system_location ?? "").trim())
+          .filter(Boolean)
+      )
+    );
+
     return {
       systemId,
       systemName: String(sys.name ?? "System").trim() || "System",
@@ -446,6 +483,7 @@ const defaultSystemTonnage =
       runRefrigerant,
       indoorEquipment,
       outdoorEquipment,
+      systemLocationLabel: systemLocations.length ? systemLocations.join("; ") : "—",
     };
   });
 
@@ -491,6 +529,10 @@ const defaultSystemTonnage =
             {systemSummaries.map((sys) => {
               const rcData = sys.runRefrigerant?.data ?? {};
               const rcComputed = sys.runRefrigerant?.computed ?? {};
+              const isRefrigerantException =
+                Boolean(sys.runRefrigerant?.data?.charge_exempt) ||
+                Boolean(sys.runRefrigerant?.data?.charge_exempt_reason) ||
+                String(sys.runRefrigerant?.computed?.status ?? "").toLowerCase() === "exempt";
 
               return (
                 <div key={sys.systemId} className="rounded-md border p-3 space-y-3">
@@ -498,29 +540,51 @@ const defaultSystemTonnage =
 
                   <div className="grid gap-2 text-sm">
                     <div>
+                      <span className="font-medium">System Label:</span> {fallbackText(sys.systemName)}
+                    </div>
+
+                    <div>
+                      <span className="font-medium">System Location:</span> {fallbackText(sys.systemLocationLabel)}
+                    </div>
+
+                    <div>
                       <span className="font-medium">Equipment Summary:</span>
                       <div className="mt-1 text-gray-700">
                         <div>
-                          Indoor: {sys.indoorEquipment.length
-                            ? sys.indoorEquipment.map((eq: any) => `${eq.model ?? "Unknown model"} (S/N ${eq.serial ?? "Unknown"})`).join("; ")
-                            : "Not found"}
+                          Outdoor Equipment Type: {aggregateField(sys.outdoorEquipment, (eq: any) => eq?.equipment_role ?? eq?.component_type)}
                         </div>
                         <div>
-                          Outdoor: {sys.outdoorEquipment.length
-                            ? sys.outdoorEquipment.map((eq: any) => `${eq.model ?? "Unknown model"} (S/N ${eq.serial ?? "Unknown"})`).join("; ")
-                            : "Not found"}
+                          Outdoor Model: {aggregateField(sys.outdoorEquipment, (eq: any) => eq?.model)}
+                        </div>
+                        <div>
+                          Outdoor Serial: {aggregateField(sys.outdoorEquipment, (eq: any) => eq?.serial)}
+                        </div>
+                        <div>
+                          Indoor Equipment Type: {aggregateField(sys.indoorEquipment, (eq: any) => eq?.equipment_role ?? eq?.component_type)}
+                        </div>
+                        <div>
+                          Indoor Model: {aggregateField(sys.indoorEquipment, (eq: any) => eq?.model)}
+                        </div>
+                        <div>
+                          Indoor Serial: {aggregateField(sys.indoorEquipment, (eq: any) => eq?.serial)}
                         </div>
                       </div>
                     </div>
 
                     <div>
-                      <span className="font-medium">Airflow Result:</span>{" "}
-                      {sys.runAirflow ? getEffectiveResultLabel(sys.runAirflow) : "No run"}
+                      <span className="font-medium">Airflow Summary:</span>
+                      <div className="mt-1 text-gray-700">
+                        <div>Measured Airflow: {fmtValue(sys.runAirflow?.data?.measured_total_cfm, "CFM")}</div>
+                        <div>Result: {sys.runAirflow ? getEffectiveResultLabel(sys.runAirflow) : "No run"}</div>
+                      </div>
                     </div>
 
                     <div>
-                      <span className="font-medium">Duct Leakage Result:</span>{" "}
-                      {sys.runDuct ? getEffectiveResultLabel(sys.runDuct) : "No run"}
+                      <span className="font-medium">Duct Leakage Summary:</span>
+                      <div className="mt-1 text-gray-700">
+                        <div>Entered duct leakage value: {fmtValue(sys.runDuct?.data?.measured_duct_leakage_cfm, "CFM")}</div>
+                        <div>Result: {sys.runDuct ? getEffectiveResultLabel(sys.runDuct) : "No run"}</div>
+                      </div>
                     </div>
                   </div>
 
@@ -529,6 +593,11 @@ const defaultSystemTonnage =
 
                     {!sys.runRefrigerant ? (
                       <div className="text-sm text-gray-600">No refrigerant charge run found for this system.</div>
+                    ) : isRefrigerantException ? (
+                      <div className="text-sm text-gray-700 space-y-1">
+                        <div>Result: Exception</div>
+                        <div>Reason: {exceptionReasonLabel(sys.runRefrigerant)}</div>
+                      </div>
                     ) : (
                       <>
                         <div className="space-y-1 text-sm">
