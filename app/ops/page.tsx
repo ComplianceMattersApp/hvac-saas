@@ -135,6 +135,7 @@ export default async function OpsPage({
   q?: string;
   sort?: string;
   signal?: string;
+  panel?: string;
 }>;
 }) {
   
@@ -143,6 +144,7 @@ export default async function OpsPage({
   const contractor = (sp.contractor ?? "").trim() || null;
   const q = (sp.q ?? "").trim() || null;
   const sort = (sp.sort ?? "").trim() || "default";
+  const panel = (sp.panel ?? "").trim().toLowerCase();
 
   const supabase = await createClient();
 
@@ -929,6 +931,26 @@ const activeSignalLabel =
     ? "Contractor Updates"
     : "";
 
+const PREVIEW_LIMIT = 4;
+const EXCEPTION_PREVIEW_LIMIT = 5;
+const isPanelExpanded = (key: string) => panel === key;
+
+const callListVisibleJobs = isPanelExpanded("call_list")
+  ? sortedCallListJobs
+  : sortedCallListJobs.slice(0, PREVIEW_LIMIT);
+
+const fieldWorkVisibleJobs = isPanelExpanded("field_work")
+  ? sortedFieldWorkJobs
+  : sortedFieldWorkJobs.slice(0, PREVIEW_LIMIT);
+
+const closeoutVisibleJobs = isPanelExpanded("closeout")
+  ? closeoutJobs
+  : closeoutJobs.slice(0, PREVIEW_LIMIT);
+
+const exceptionVisibleJobs = isPanelExpanded("exceptions")
+  ? sortedExceptionJobs
+  : sortedExceptionJobs.slice(0, EXCEPTION_PREVIEW_LIMIT);
+
 function compactRow(j: any, showDate = false, note?: string) {
   return (
     <div key={j.id} className="rounded-md border p-2.5">
@@ -1037,15 +1059,49 @@ return (
       <div className="rounded-lg border bg-white p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-semibold">Call List</div>
-          <div className="text-xs text-gray-500">{sortedCallListJobs.length}</div>
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-gray-500">{sortedCallListJobs.length}</div>
+            {sortedCallListJobs.length > PREVIEW_LIMIT ? (
+              <Link
+                href={`/ops${buildQueryString({
+                  bucket,
+                  contractor: contractor ?? "",
+                  q: q ?? "",
+                  sort: sort ?? "",
+                  signal: signal ?? "",
+                  panel: isPanelExpanded("call_list") ? "" : "call_list",
+                })}`}
+                className="text-xs text-blue-600 hover:underline"
+              >
+                {isPanelExpanded("call_list") ? "Show less" : "View all"}
+              </Link>
+            ) : null}
+          </div>
         </div>
-        <div className="space-y-2">{sortedCallListJobs.slice(0, 4).map((j: any) => compactRow(j))}</div>
+        <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j))}</div>
       </div>
 
      <div className="rounded-lg border bg-white p-4 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <div className="text-sm font-semibold">Field Work</div>
-        <div className="text-xs text-gray-500">{sortedFieldWorkJobs.length}</div>
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-gray-500">{sortedFieldWorkJobs.length}</div>
+          {sortedFieldWorkJobs.length > PREVIEW_LIMIT ? (
+            <Link
+              href={`/ops${buildQueryString({
+                bucket,
+                contractor: contractor ?? "",
+                q: q ?? "",
+                sort: sort ?? "",
+                signal: signal ?? "",
+                panel: isPanelExpanded("field_work") ? "" : "field_work",
+              })}`}
+              className="text-xs text-blue-600 hover:underline"
+            >
+              {isPanelExpanded("field_work") ? "Show less" : "View all"}
+            </Link>
+          ) : null}
+        </div>
       </div>
 
   {sortedFieldWorkJobs.length === 0 ? (
@@ -1054,9 +1110,7 @@ return (
     </div>
   ) : (
     <div className="space-y-2">
-      {sortedFieldWorkJobs
-        .slice(0, 4)
-        .map((j: any) => compactRow(j, true))}
+      {fieldWorkVisibleJobs.map((j: any) => compactRow(j, true))}
     </div>
   )}
 </div>
@@ -1064,10 +1118,27 @@ return (
       <div className="rounded-lg border bg-white p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-semibold">Closeout</div>
-          <div className="text-xs text-gray-500">{closeoutJobs.length}</div>
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-gray-500">{closeoutJobs.length}</div>
+            {closeoutJobs.length > PREVIEW_LIMIT ? (
+              <Link
+                href={`/ops${buildQueryString({
+                  bucket,
+                  contractor: contractor ?? "",
+                  q: q ?? "",
+                  sort: sort ?? "",
+                  signal: signal ?? "",
+                  panel: isPanelExpanded("closeout") ? "" : "closeout",
+                })}`}
+                className="text-xs text-blue-600 hover:underline"
+              >
+                {isPanelExpanded("closeout") ? "Show less" : "View all"}
+              </Link>
+            ) : null}
+          </div>
         </div>
         <div className="space-y-2">
-          {closeoutJobs.slice(0, 4).map((j: any) => compactRow(j, false, closeoutLabel(j)))}
+          {closeoutVisibleJobs.map((j: any) => compactRow(j, false, closeoutLabel(j)))}
         </div>
       </div>
     </div>
@@ -1075,9 +1146,26 @@ return (
     <div className="rounded-lg border bg-white p-4 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <div className="text-sm font-semibold">Exceptions (Still Open Past Scheduled Date)</div>
-        <div className="text-xs text-red-600">{sortedExceptionJobs.length}</div>
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-red-600">{sortedExceptionJobs.length}</div>
+          {sortedExceptionJobs.length > EXCEPTION_PREVIEW_LIMIT ? (
+            <Link
+              href={`/ops${buildQueryString({
+                bucket,
+                contractor: contractor ?? "",
+                q: q ?? "",
+                sort: sort ?? "",
+                signal: signal ?? "",
+                panel: isPanelExpanded("exceptions") ? "" : "exceptions",
+              })}`}
+              className="text-xs text-blue-600 hover:underline"
+            >
+              {isPanelExpanded("exceptions") ? "Show less" : "View all"}
+            </Link>
+          ) : null}
+        </div>
       </div>
-      <div className="space-y-2">{sortedExceptionJobs.slice(0, 5).map((j: any) => compactRow(j, true, "Scheduled date passed"))}</div>
+      <div className="space-y-2">{exceptionVisibleJobs.map((j: any) => compactRow(j, true, "Scheduled date passed"))}</div>
     </div>
 
     <div id="ops-queues" className="rounded-lg border bg-white p-4 shadow-sm">
