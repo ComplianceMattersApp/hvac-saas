@@ -841,7 +841,7 @@ function closeoutNeedsForException(j: any) {
   const ops = String(j?.ops_status ?? "").toLowerCase();
 
   const isService = jobType.includes("service");
-  const isEccFailed = !isService && ops === "failed";
+  const isEccFailed = !isService && (ops === "failed" || ops === "pending_info");
 
   // Exception escalation uses completion booleans as the source-of-truth.
   const needsInvoice = !Boolean(j?.invoice_complete);
