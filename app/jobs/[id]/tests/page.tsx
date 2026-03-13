@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { markRefrigerantChargeExemptFromForm } from "@/lib/actions/job-actions";
 import { resolveEccScenario } from "@/lib/ecc/scenario-resolver";
 import Link from "next/link";
+import PrintButton from "@/components/ui/PrintButton";
 
 import {
   completeEccTestRunFromForm,
@@ -136,6 +137,98 @@ function pickRunForSystem(job: any, testType: string, systemId: string) {
   // prefer an incomplete run if one exists
   const active = runs.find((r: any) => r.is_completed !== true);
   return active ?? runs[0] ?? null;
+}
+
+function pickLatestRunForSystem(job: any, testType: string, systemId: string) {
+  const runs = (job?.ecc_test_runs ?? [])
+    .filter(
+      (r: any) => r.test_type === testType && String(r.system_id ?? "") === String(systemId)
+    )
+    .sort((a: any, b: any) => {
+      const at = new Date(a.updated_at ?? a.created_at ?? 0).getTime();
+      const bt = new Date(b.updated_at ?? b.created_at ?? 0).getTime();
+      return bt - at;
+    });
+
+  const completed = runs.find((r: any) => r.is_completed === true);
+  return completed ?? runs[0] ?? null;
+}
+
+function fmtValue(value: unknown, unit?: string) {
+  if (value == null || value === "") return "-";
+  if (typeof value === "number") {
+    const rendered = Number.isInteger(value) ? String(value) : value.toFixed(1);
+    return unit ? `${rendered} ${unit}` : rendered;
+  }
+  const rendered = String(value).trim();
+  if (!rendered) return "-";
+  return unit ? `${rendered} ${unit}` : rendered;
+}
+
+function includesFailure(computed: any, needle: string) {
+  const failures = Array.isArray(computed?.failures) ? computed.failures : [];
+  return failures.some((f: any) => String(f ?? "").toLowerCase().includes(needle.toLowerCase()));
+}
+
+function includesBlocked(computed: any, needle: string) {
+  const blocked = Array.isArray(computed?.blocked) ? computed.blocked : [];
+  return blocked.some((b: any) => String(b ?? "").toLowerCase().includes(needle.toLowerCase()));
+}
+
+function outdoorQualificationStatus(run: any) {
+  const computed = run?.computed ?? {};
+  if (includesBlocked(computed, "outdoor temp below")) {
+    return "Not Qualified";
+  }
+
+  const outdoor = run?.data?.outdoor_temp_f;
+  if (outdoor != null && outdoor !== "") {
+    return "Qualified";
+  }
+
+  return "Unknown";
+}
+
+function refrigerantComplianceF(run: any) {
+  const computed = run?.computed ?? {};
+  if (includesBlocked(computed, "indoor temp below") || includesBlocked(computed, "outdoor temp below")) {
+    return "Not compliant (temperature qualification not met)";
+  }
+  if (includesFailure(computed, "subcool")) {
+    return "Not compliant (subcool outside allowed tolerance)";
+  }
+
+  const measured = computed?.measured_subcool_f;
+  const target = run?.data?.target_subcool_f;
+  if (measured != null && target != null) {
+    return "Compliant (subcool within stored tolerance check)";
+  }
+
+  return "Insufficient data for compliance determination";
+}
+
+function refrigerantRequirementResultG(run: any) {
+  const computed = run?.computed ?? {};
+  if (includesFailure(computed, "superheat")) return "Failed ECC superheat requirement";
+
+  const measured = computed?.measured_superheat_f;
+  if (measured != null) return "Passed ECC superheat requirement";
+
+  return "Insufficient data for ECC superheat requirement";
+}
+
+function refrigerantComplianceG(run: any) {
+  const computed = run?.computed ?? {};
+  if (includesFailure(computed, "superheat")) {
+    return "Not compliant (superheat threshold exceeded)";
+  }
+
+  const measured = computed?.measured_superheat_f;
+  if (measured != null) {
+    return "Compliant (superheat within stored ECC threshold)";
+  }
+
+  return "Insufficient data for compliance determination";
 }
 
 export default async function JobTestsPage({
@@ -323,8 +416,41 @@ const defaultSystemTonnage =
     return qs ? `${baseHref}?${qs}` : baseHref;
   };
 
-  return (
-        <div className="p-6 max-w-3xl space-y-4">
+  const systemSummaries = systems.map((sys: any) => {
+    const systemId = String(sys.id ?? "");
+    const systemEquipment = (job.job_equipment ?? []).filter(
+      (eq: any) => String(eq.system_id ?? "") === systemId
+    );
+
+    const runAirflow = pickLatestRunForSystem(job, "airflow", systemId);
+    const runDuct = pickLatestRunForSystem(job, "duct_leakage", systemId);
+    const runRefrigerant = pickLatestRunForSystem(job, "refrigerant_charge", systemId);
+
+    const outdoorEquipment = systemEquipment.filter((eq: any) => {
+      const role = String(eq?.equipment_role ?? "").toLowerCase();
+      const type = String(eq?.component_type ?? "").toLowerCase();
+      return role === "condenser" || type.includes("outdoor") || type.includes("package");
+    });
+
+    const indoorEquipment = systemEquipment.filter((eq: any) => {
+      const role = String(eq?.equipment_role ?? "").toLowerCase();
+      const type = String(eq?.component_type ?? "").toLowerCase();
+      return role === "air_handler" || role === "furnace" || role === "evaporator" || type.includes("indoor") || type.includes("coil");
+    });
+
+    return {
+      systemId,
+      systemName: String(sys.name ?? "System").trim() || "System",
+      runAirflow,
+      runDuct,
+      runRefrigerant,
+      indoorEquipment,
+      outdoorEquipment,
+    };
+  });
+
+    return (
+      <div className="p-6 max-w-3xl space-y-4 print:max-w-none print:p-0">
           {notice === "rc_exempt_reason_required" && (
       <div className="mb-4 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         Select <span className="font-semibold">Package unit</span> or{" "}
@@ -332,19 +458,117 @@ const defaultSystemTonnage =
         refrigerant charge exempt.
       </div>
     )}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 print:hidden">
         <div>
           <div className="text-sm text-gray-600">Job Tests</div>
           <h1 className="text-xl font-semibold">{job.title}</h1>
           <div className="text-sm text-gray-600">{job.city ?? "—"}</div>
         </div>
 
-        <Link href={`/jobs/${job.id}`} className="px-3 py-2 rounded border text-sm">
-          ← Back to Job
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href={`#cheers-fast-view`} className="px-3 py-2 rounded border text-sm font-medium bg-white hover:bg-gray-50">
+            CHEERS Fast View
+          </Link>
+          <PrintButton className="px-3 py-2 rounded border text-sm font-medium bg-white hover:bg-gray-50" />
+          <Link href={`/jobs/${job.id}`} className="px-3 py-2 rounded border text-sm">
+            ← Back to Job
+          </Link>
+        </div>
       </div>
 
-      <section className="rounded-lg border p-4 space-y-4">
+      <section id="cheers-fast-view" className="rounded-lg border p-4 space-y-4 bg-white print:border-0 print:p-0">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold">CHEERS Fast View</h2>
+            <p className="text-sm text-gray-600">Read-only summary from ECC canonical test data, grouped by system.</p>
+          </div>
+        </div>
+
+        {systemSummaries.length === 0 ? (
+          <div className="text-sm text-gray-600">No systems available yet.</div>
+        ) : (
+          <div className="space-y-4">
+            {systemSummaries.map((sys) => {
+              const rcData = sys.runRefrigerant?.data ?? {};
+              const rcComputed = sys.runRefrigerant?.computed ?? {};
+
+              return (
+                <div key={sys.systemId} className="rounded-md border p-3 space-y-3">
+                  <div className="text-sm font-semibold">{sys.systemName}</div>
+
+                  <div className="grid gap-2 text-sm">
+                    <div>
+                      <span className="font-medium">Equipment Summary:</span>
+                      <div className="mt-1 text-gray-700">
+                        <div>
+                          Indoor: {sys.indoorEquipment.length
+                            ? sys.indoorEquipment.map((eq: any) => `${eq.model ?? "Unknown model"} (S/N ${eq.serial ?? "Unknown"})`).join("; ")
+                            : "Not found"}
+                        </div>
+                        <div>
+                          Outdoor: {sys.outdoorEquipment.length
+                            ? sys.outdoorEquipment.map((eq: any) => `${eq.model ?? "Unknown model"} (S/N ${eq.serial ?? "Unknown"})`).join("; ")
+                            : "Not found"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="font-medium">Airflow Result:</span>{" "}
+                      {sys.runAirflow ? getEffectiveResultLabel(sys.runAirflow) : "No run"}
+                    </div>
+
+                    <div>
+                      <span className="font-medium">Duct Leakage Result:</span>{" "}
+                      {sys.runDuct ? getEffectiveResultLabel(sys.runDuct) : "No run"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border bg-gray-50 p-3 space-y-3">
+                    <div className="text-sm font-semibold">Refrigerant Charge — Full Detailed Result</div>
+
+                    {!sys.runRefrigerant ? (
+                      <div className="text-sm text-gray-600">No refrigerant charge run found for this system.</div>
+                    ) : (
+                      <>
+                        <div className="space-y-1 text-sm">
+                          <div className="font-medium">F. Data Collection and Calculations</div>
+                          <ol className="list-decimal pl-5 space-y-1">
+                            <li>Lowest Return Air Dry Bulb Temperature: {fmtValue(rcData.lowest_return_air_db_f, "°F")}</li>
+                            <li>Measured Condenser Air Entering Dry-Bulb Temperature: {fmtValue(rcData.condenser_air_entering_db_f, "°F")}</li>
+                            <li>Outdoor Temperature Qualification Status: {outdoorQualificationStatus(sys.runRefrigerant)}</li>
+                            <li>Measured Liquid Line Temperature: {fmtValue(rcData.liquid_line_temp_f, "°F")}</li>
+                            <li>Measured Liquid Line Pressure: {fmtValue(rcData.liquid_line_pressure_psig, "psig")}</li>
+                            <li>Condenser Saturation Temperature: {fmtValue(rcData.condenser_sat_temp_f, "°F")}</li>
+                            <li>Measured Subcooling: {fmtValue(rcComputed.measured_subcool_f, "°F")}</li>
+                            <li>Target Subcooling from Manufacturer: {fmtValue(rcData.target_subcool_f, "°F")}</li>
+                            <li>Compliance Statement: {refrigerantComplianceF(sys.runRefrigerant)}</li>
+                          </ol>
+                        </div>
+
+                        <div className="space-y-1 text-sm">
+                          <div className="font-medium">G. Metering Device Verification</div>
+                          <ol className="list-decimal pl-5 space-y-1">
+                            <li>Measured Suction Line Temperature: {fmtValue(rcData.suction_line_temp_f, "°F")}</li>
+                            <li>Measured Suction Line Pressure: {fmtValue(rcData.suction_line_pressure_psig, "psig")}</li>
+                            <li>Evaporator Saturation Temperature: {fmtValue(rcData.evaporator_sat_temp_f, "°F")}</li>
+                            <li>Measured Superheat: {fmtValue(rcComputed.measured_superheat_f, "°F")}</li>
+                            <li>ECC requirement result: {refrigerantRequirementResultG(sys.runRefrigerant)}</li>
+                            <li>Manufacturer specification statement: Superheat manufacturer target is not stored in canonical ECC run data; evaluation uses the configured ECC threshold in computed rules.</li>
+                            <li>Compliance Statement: {refrigerantComplianceG(sys.runRefrigerant)}</li>
+                          </ol>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-lg border p-4 space-y-4 print:hidden">
         <div>
           <h2 className="text-lg font-semibold">ECC Tests</h2>
           <p className="text-sm text-muted-foreground">
