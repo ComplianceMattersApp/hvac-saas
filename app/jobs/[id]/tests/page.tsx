@@ -182,6 +182,42 @@ function aggregateField(items: any[], getter: (item: any) => unknown) {
   return values.length ? values.join("; ") : "—";
 }
 
+function normalizeToken(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function equipmentKindTokens(eq: any) {
+  return [normalizeToken(eq?.equipment_role), normalizeToken(eq?.component_type)].filter(Boolean);
+}
+
+function isOutdoorEquipment(eq: any) {
+  const tokens = equipmentKindTokens(eq);
+  return tokens.some(
+    (token) =>
+      token.includes("outdoor") ||
+      token.includes("condenser") ||
+      token.includes("heat_pump") ||
+      token.includes("heat pump") ||
+      token.includes("package") ||
+      token.includes("compressor")
+  );
+}
+
+function isIndoorEquipment(eq: any) {
+  const tokens = equipmentKindTokens(eq);
+  return tokens.some(
+    (token) =>
+      token.includes("indoor") ||
+      token.includes("air_handler") ||
+      token.includes("air handler") ||
+      token.includes("furnace") ||
+      token.includes("evaporator") ||
+      token.includes("coil") ||
+      token.includes("fan_coil") ||
+      token.includes("fan coil")
+  );
+}
+
 function exceptionReasonLabel(run: any) {
   const reason = String(run?.data?.charge_exempt_reason ?? "").trim().toLowerCase();
   if (reason === "package_unit") return "Package Unit";
@@ -330,6 +366,9 @@ export default async function JobTestsPage({
   if (!job) return notFound();
 
   const systems = job.job_systems ?? [];
+  const knownSystemIds = new Set(
+    systems.map((sys: any) => String(sys?.id ?? "").trim()).filter(Boolean)
+  );
 
   const selectedSystemId =
     selectedSystemIdFromQuery &&
@@ -447,25 +486,33 @@ const defaultSystemTonnage =
 
   const systemSummaries = systems.map((sys: any) => {
     const systemId = String(sys.id ?? "");
-    const systemEquipment = (job.job_equipment ?? []).filter(
-      (eq: any) => String(eq.system_id ?? "") === systemId
+    const systemName = String(sys.name ?? "").trim();
+
+    const equipmentBySystemId = (job.job_equipment ?? []).filter(
+      (eq: any) => String(eq?.system_id ?? "").trim() === systemId
     );
+
+    const equipmentByLocationFallback = (job.job_equipment ?? []).filter((eq: any) => {
+      const location = normalizeToken(eq?.system_location);
+      const name = normalizeToken(systemName);
+      if (!location || !name || location !== name) return false;
+
+      const eqSystemId = String(eq?.system_id ?? "").trim();
+      return !eqSystemId || !knownSystemIds.has(eqSystemId);
+    });
+
+    const systemEquipment =
+      equipmentBySystemId.length > 0 ? equipmentBySystemId : equipmentByLocationFallback;
 
     const runAirflow = pickLatestRunForSystem(job, "airflow", systemId);
     const runDuct = pickLatestRunForSystem(job, "duct_leakage", systemId);
     const runRefrigerant = pickLatestRunForSystem(job, "refrigerant_charge", systemId);
 
-    const outdoorEquipment = systemEquipment.filter((eq: any) => {
-      const role = String(eq?.equipment_role ?? "").toLowerCase();
-      const type = String(eq?.component_type ?? "").toLowerCase();
-      return role === "condenser" || type.includes("outdoor") || type.includes("package");
-    });
-
-    const indoorEquipment = systemEquipment.filter((eq: any) => {
-      const role = String(eq?.equipment_role ?? "").toLowerCase();
-      const type = String(eq?.component_type ?? "").toLowerCase();
-      return role === "air_handler" || role === "furnace" || role === "evaporator" || type.includes("indoor") || type.includes("coil");
-    });
+    const outdoorEquipment = systemEquipment.filter((eq: any) => isOutdoorEquipment(eq));
+    const indoorEquipment = systemEquipment.filter((eq: any) => isIndoorEquipment(eq));
+    const otherEquipment = systemEquipment.filter(
+      (eq: any) => !isOutdoorEquipment(eq) && !isIndoorEquipment(eq)
+    );
 
     const systemLocations = Array.from(
       new Set(
@@ -483,6 +530,8 @@ const defaultSystemTonnage =
       runRefrigerant,
       indoorEquipment,
       outdoorEquipment,
+      otherEquipment,
+      hasEquipment: systemEquipment.length > 0,
       systemLocationLabel: systemLocations.length ? systemLocations.join("; ") : "—",
     };
   });
@@ -514,18 +563,18 @@ const defaultSystemTonnage =
         </div>
       </div>
 
-      <section id="cheers-fast-view" className="rounded-lg border p-4 space-y-4 bg-white print:border-0 print:p-0">
+      <section id="cheers-fast-view" className="rounded-lg border border-slate-400 bg-slate-50 p-5 space-y-5 text-slate-900 print:border-0 print:bg-white print:p-0">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold">CHEERS Fast View</h2>
-            <p className="text-sm text-gray-600">Read-only summary from ECC canonical test data, grouped by system.</p>
+            <h2 className="text-lg font-bold text-slate-950">CHEERS Fast View</h2>
+            <p className="text-sm text-slate-700">Read-only summary from ECC canonical test data, grouped by system.</p>
           </div>
         </div>
 
         {systemSummaries.length === 0 ? (
           <div className="text-sm text-gray-600">No systems available yet.</div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {systemSummaries.map((sys) => {
               const rcData = sys.runRefrigerant?.data ?? {};
               const rcComputed = sys.runRefrigerant?.computed ?? {};
@@ -535,73 +584,90 @@ const defaultSystemTonnage =
                 String(sys.runRefrigerant?.computed?.status ?? "").toLowerCase() === "exempt";
 
               return (
-                <div key={sys.systemId} className="rounded-md border p-3 space-y-3">
-                  <div className="text-sm font-semibold">{sys.systemName}</div>
+                <div key={sys.systemId} className="rounded-md border border-slate-300 bg-white p-4 space-y-4 shadow-sm">
+                  <div className="text-sm font-bold text-slate-950">{sys.systemName}</div>
 
-                  <div className="grid gap-2 text-sm">
+                  <div className="grid gap-3 text-sm text-slate-900">
                     <div>
-                      <span className="font-medium">System Label:</span> {fallbackText(sys.systemName)}
+                      <span className="font-semibold text-slate-950">System Label:</span> {fallbackText(sys.systemName)}
                     </div>
 
                     <div>
-                      <span className="font-medium">System Location:</span> {fallbackText(sys.systemLocationLabel)}
+                      <span className="font-semibold text-slate-950">System Location:</span> {fallbackText(sys.systemLocationLabel)}
                     </div>
 
                     <div>
-                      <span className="font-medium">Equipment Summary:</span>
-                      <div className="mt-1 text-gray-700">
-                        <div>
-                          Outdoor Equipment Type: {aggregateField(sys.outdoorEquipment, (eq: any) => eq?.equipment_role ?? eq?.component_type)}
+                      <span className="font-semibold text-slate-950">Equipment Summary:</span>
+                      {sys.hasEquipment ? (
+                        <div className="mt-1 space-y-1 text-slate-800">
+                          <div>
+                            Outdoor Equipment Type: {aggregateField(sys.outdoorEquipment, (eq: any) => eq?.equipment_role ?? eq?.component_type)}
+                          </div>
+                          <div>
+                            Outdoor Model: {aggregateField(sys.outdoorEquipment, (eq: any) => eq?.model)}
+                          </div>
+                          <div>
+                            Outdoor Serial: {aggregateField(sys.outdoorEquipment, (eq: any) => eq?.serial)}
+                          </div>
+                          <div>
+                            Indoor Equipment Type: {aggregateField(sys.indoorEquipment, (eq: any) => eq?.equipment_role ?? eq?.component_type)}
+                          </div>
+                          <div>
+                            Indoor Model: {aggregateField(sys.indoorEquipment, (eq: any) => eq?.model)}
+                          </div>
+                          <div>
+                            Indoor Serial: {aggregateField(sys.indoorEquipment, (eq: any) => eq?.serial)}
+                          </div>
+                          {sys.otherEquipment.length > 0 ? (
+                            <>
+                              <div>
+                                Other Equipment Type: {aggregateField(sys.otherEquipment, (eq: any) => eq?.equipment_role ?? eq?.component_type)}
+                              </div>
+                              <div>
+                                Other Model: {aggregateField(sys.otherEquipment, (eq: any) => eq?.model)}
+                              </div>
+                              <div>
+                                Other Serial: {aggregateField(sys.otherEquipment, (eq: any) => eq?.serial)}
+                              </div>
+                            </>
+                          ) : null}
                         </div>
-                        <div>
-                          Outdoor Model: {aggregateField(sys.outdoorEquipment, (eq: any) => eq?.model)}
-                        </div>
-                        <div>
-                          Outdoor Serial: {aggregateField(sys.outdoorEquipment, (eq: any) => eq?.serial)}
-                        </div>
-                        <div>
-                          Indoor Equipment Type: {aggregateField(sys.indoorEquipment, (eq: any) => eq?.equipment_role ?? eq?.component_type)}
-                        </div>
-                        <div>
-                          Indoor Model: {aggregateField(sys.indoorEquipment, (eq: any) => eq?.model)}
-                        </div>
-                        <div>
-                          Indoor Serial: {aggregateField(sys.indoorEquipment, (eq: any) => eq?.serial)}
-                        </div>
-                      </div>
+                      ) : (
+                        <div className="mt-1 text-slate-900">Equipment not located</div>
+                      )}
                     </div>
 
                     <div>
-                      <span className="font-medium">Airflow Summary:</span>
-                      <div className="mt-1 text-gray-700">
+                      <span className="font-semibold text-slate-950">Airflow Summary:</span>
+                      <div className="mt-1 space-y-1 text-slate-800">
                         <div>Measured Airflow: {fmtValue(sys.runAirflow?.data?.measured_total_cfm, "CFM")}</div>
                         <div>Result: {sys.runAirflow ? getEffectiveResultLabel(sys.runAirflow) : "No run"}</div>
                       </div>
                     </div>
 
                     <div>
-                      <span className="font-medium">Duct Leakage Summary:</span>
-                      <div className="mt-1 text-gray-700">
+                      <span className="font-semibold text-slate-950">Duct Leakage Summary:</span>
+                      <div className="mt-1 space-y-1 text-slate-800">
                         <div>Entered duct leakage value: {fmtValue(sys.runDuct?.data?.measured_duct_leakage_cfm, "CFM")}</div>
                         <div>Result: {sys.runDuct ? getEffectiveResultLabel(sys.runDuct) : "No run"}</div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-md border bg-gray-50 p-3 space-y-3">
-                    <div className="text-sm font-semibold">Refrigerant Charge — Full Detailed Result</div>
+                  <div className="rounded-md border border-slate-300 bg-slate-100 p-3 space-y-3">
+                    <div className="text-sm font-bold text-slate-950">Refrigerant Charge — Full Detailed Result</div>
 
                     {!sys.runRefrigerant ? (
-                      <div className="text-sm text-gray-600">No refrigerant charge run found for this system.</div>
+                      <div className="text-sm text-slate-700">No refrigerant charge run found for this system.</div>
                     ) : isRefrigerantException ? (
-                      <div className="text-sm text-gray-700 space-y-1">
+                      <div className="text-sm text-slate-800 space-y-1">
                         <div>Result: Exception</div>
                         <div>Reason: {exceptionReasonLabel(sys.runRefrigerant)}</div>
                       </div>
                     ) : (
                       <>
-                        <div className="space-y-1 text-sm">
-                          <div className="font-medium">F. Data Collection and Calculations</div>
+                        <div className="space-y-1 text-sm text-slate-900">
+                          <div className="font-semibold text-slate-950">F. Data Collection and Calculations</div>
                           <ol className="list-decimal pl-5 space-y-1">
                             <li>Lowest Return Air Dry Bulb Temperature: {fmtValue(rcData.lowest_return_air_db_f, "°F")}</li>
                             <li>Measured Condenser Air Entering Dry-Bulb Temperature: {fmtValue(rcData.condenser_air_entering_db_f, "°F")}</li>
@@ -615,8 +681,8 @@ const defaultSystemTonnage =
                           </ol>
                         </div>
 
-                        <div className="space-y-1 text-sm">
-                          <div className="font-medium">G. Metering Device Verification</div>
+                        <div className="space-y-1 text-sm text-slate-900">
+                          <div className="font-semibold text-slate-950">G. Metering Device Verification</div>
                           <ol className="list-decimal pl-5 space-y-1">
                             <li>Measured Suction Line Temperature: {fmtValue(rcData.suction_line_temp_f, "°F")}</li>
                             <li>Measured Suction Line Pressure: {fmtValue(rcData.suction_line_pressure_psig, "psig")}</li>
