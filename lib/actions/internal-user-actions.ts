@@ -121,7 +121,7 @@ async function assertNotLastActiveAdmin(
   }
 }
 
-export async function createInternalUserFromForm(formData: FormData) {
+export async function createInternalUserFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const {
     userId: actorUserId,
@@ -142,7 +142,7 @@ export async function createInternalUserFromForm(formData: FormData) {
     throw new Error("INTERNAL_USER_ALREADY_EXISTS");
   }
 
-  const { data, error } = await admin
+  const { error } = await admin
     .from("internal_users")
     .insert({
       user_id: targetUserId,
@@ -151,7 +151,7 @@ export async function createInternalUserFromForm(formData: FormData) {
       account_owner_user_id: actorInternalUser.account_owner_user_id,
       created_by: actorUserId,
     })
-    .select("user_id, role, is_active, account_owner_user_id, created_by")
+    .select("user_id")
     .single();
 
   if (error) {
@@ -167,10 +167,9 @@ export async function createInternalUserFromForm(formData: FormData) {
   }
 
   revalidateInternalUserViews();
-  return data;
 }
 
-export async function updateInternalUserRoleFromForm(formData: FormData) {
+export async function updateInternalUserRoleFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { internalUser: actorInternalUser } = await requireInternalRole(
     "admin",
@@ -198,21 +197,20 @@ export async function updateInternalUserRoleFromForm(formData: FormData) {
     target.is_active,
   );
 
-  const { data, error } = await admin
+  const { error } = await admin
     .from("internal_users")
     .update({ role: nextRole })
     .eq("user_id", targetUserId)
     .eq("account_owner_user_id", actorInternalUser.account_owner_user_id)
-    .select("user_id, role, is_active, account_owner_user_id, created_by")
+    .select("user_id")
     .single();
 
   if (error) throw error;
 
   revalidateInternalUserViews();
-  return data;
 }
 
-export async function activateInternalUserFromForm(formData: FormData) {
+export async function activateInternalUserFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { internalUser: actorInternalUser } = await requireInternalRole(
     "admin",
@@ -232,21 +230,20 @@ export async function activateInternalUserFromForm(formData: FormData) {
     targetUserId,
   );
 
-  const { data, error } = await admin
+  const { error } = await admin
     .from("internal_users")
     .update({ is_active: true })
     .eq("user_id", targetUserId)
     .eq("account_owner_user_id", actorInternalUser.account_owner_user_id)
-    .select("user_id, role, is_active, account_owner_user_id, created_by")
+    .select("user_id")
     .single();
 
   if (error) throw error;
 
   revalidateInternalUserViews();
-  return data;
 }
 
-export async function deactivateInternalUserFromForm(formData: FormData) {
+export async function deactivateInternalUserFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { internalUser: actorInternalUser } = await requireInternalRole(
     "admin",
@@ -268,16 +265,15 @@ export async function deactivateInternalUserFromForm(formData: FormData) {
 
   await assertNotLastActiveAdmin(admin, target, target.role, false);
 
-  const { data, error } = await admin
+  const { error } = await admin
     .from("internal_users")
     .update({ is_active: false })
     .eq("user_id", targetUserId)
     .eq("account_owner_user_id", actorInternalUser.account_owner_user_id)
-    .select("user_id, role, is_active, account_owner_user_id, created_by")
+    .select("user_id")
     .single();
 
   if (error) throw error;
 
   revalidateInternalUserViews();
-  return data;
 }
