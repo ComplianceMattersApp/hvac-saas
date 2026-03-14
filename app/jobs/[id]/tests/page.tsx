@@ -170,6 +170,13 @@ function fallbackText(value: unknown) {
   return rendered || "—";
 }
 
+function equipmentSummaryLine(eq: any) {
+  const equipmentType = fallbackText(eq?.equipment_role ?? eq?.component_type);
+  const model = fallbackText(eq?.model);
+  const serial = fallbackText(eq?.serial);
+  return `${equipmentType} | Model: ${model} | Serial: ${serial}`;
+}
+
 function aggregateField(items: any[], getter: (item: any) => unknown) {
   const values = Array.from(
     new Set(
@@ -366,9 +373,6 @@ export default async function JobTestsPage({
   if (!job) return notFound();
 
   const systems = job.job_systems ?? [];
-  const knownSystemIds = new Set(
-    systems.map((sys: any) => String(sys?.id ?? "").trim()).filter(Boolean)
-  );
 
   const selectedSystemId =
     selectedSystemIdFromQuery &&
@@ -486,23 +490,9 @@ const defaultSystemTonnage =
 
   const systemSummaries = systems.map((sys: any) => {
     const systemId = String(sys.id ?? "");
-    const systemName = String(sys.name ?? "").trim();
-
-    const equipmentBySystemId = (job.job_equipment ?? []).filter(
+    const systemEquipment = (job.job_equipment ?? []).filter(
       (eq: any) => String(eq?.system_id ?? "").trim() === systemId
     );
-
-    const equipmentByLocationFallback = (job.job_equipment ?? []).filter((eq: any) => {
-      const location = normalizeToken(eq?.system_location);
-      const name = normalizeToken(systemName);
-      if (!location || !name || location !== name) return false;
-
-      const eqSystemId = String(eq?.system_id ?? "").trim();
-      return !eqSystemId || !knownSystemIds.has(eqSystemId);
-    });
-
-    const systemEquipment =
-      equipmentBySystemId.length > 0 ? equipmentBySystemId : equipmentByLocationFallback;
 
     const runAirflow = pickLatestRunForSystem(job, "airflow", systemId);
     const runDuct = pickLatestRunForSystem(job, "duct_leakage", systemId);
@@ -600,35 +590,36 @@ const defaultSystemTonnage =
                       <span className="font-semibold text-slate-950">Equipment Summary:</span>
                       {sys.hasEquipment ? (
                         <div className="mt-1 space-y-1 text-slate-800">
-                          <div>
-                            Outdoor Equipment Type: {aggregateField(sys.outdoorEquipment, (eq: any) => eq?.equipment_role ?? eq?.component_type)}
-                          </div>
-                          <div>
-                            Outdoor Model: {aggregateField(sys.outdoorEquipment, (eq: any) => eq?.model)}
-                          </div>
-                          <div>
-                            Outdoor Serial: {aggregateField(sys.outdoorEquipment, (eq: any) => eq?.serial)}
-                          </div>
-                          <div>
-                            Indoor Equipment Type: {aggregateField(sys.indoorEquipment, (eq: any) => eq?.equipment_role ?? eq?.component_type)}
-                          </div>
-                          <div>
-                            Indoor Model: {aggregateField(sys.indoorEquipment, (eq: any) => eq?.model)}
-                          </div>
-                          <div>
-                            Indoor Serial: {aggregateField(sys.indoorEquipment, (eq: any) => eq?.serial)}
-                          </div>
+                          <div className="font-semibold text-slate-900">Outdoor Equipment</div>
+                          {sys.outdoorEquipment.length > 0 ? (
+                            sys.outdoorEquipment.map((eq: any, index: number) => (
+                              <div key={String(eq?.id ?? `outdoor-${sys.systemId}-${index}`)}>
+                                {index + 1}. {equipmentSummaryLine(eq)}
+                              </div>
+                            ))
+                          ) : (
+                            <div>—</div>
+                          )}
+
+                          <div className="font-semibold text-slate-900 pt-1">Indoor Equipment</div>
+                          {sys.indoorEquipment.length > 0 ? (
+                            sys.indoorEquipment.map((eq: any, index: number) => (
+                              <div key={String(eq?.id ?? `indoor-${sys.systemId}-${index}`)}>
+                                {index + 1}. {equipmentSummaryLine(eq)}
+                              </div>
+                            ))
+                          ) : (
+                            <div>—</div>
+                          )}
+
                           {sys.otherEquipment.length > 0 ? (
                             <>
-                              <div>
-                                Other Equipment Type: {aggregateField(sys.otherEquipment, (eq: any) => eq?.equipment_role ?? eq?.component_type)}
-                              </div>
-                              <div>
-                                Other Model: {aggregateField(sys.otherEquipment, (eq: any) => eq?.model)}
-                              </div>
-                              <div>
-                                Other Serial: {aggregateField(sys.otherEquipment, (eq: any) => eq?.serial)}
-                              </div>
+                              <div className="font-semibold text-slate-900 pt-1">Other Equipment</div>
+                              {sys.otherEquipment.map((eq: any, index: number) => (
+                                <div key={String(eq?.id ?? `other-${sys.systemId}-${index}`)}>
+                                  {index + 1}. {equipmentSummaryLine(eq)}
+                                </div>
+                              ))}
                             </>
                           ) : null}
                         </div>
