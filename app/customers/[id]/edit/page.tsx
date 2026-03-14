@@ -44,18 +44,26 @@ export default async function CustomerEditPage({
   // Admin diagnostic: look up the row bypassing RLS to determine ownership status
   if (error || !customer) {
     const claimError = sp?.claimError as string | undefined;
-    const admin = createAdminClient();
-    const { data: adminRow } = await admin
-      .from("customers")
-      .select("id, owner_user_id, full_name, created_at")
-      .eq("id", id)
-      .maybeSingle();
 
-    const isOrphaned = adminRow !== null && adminRow.owner_user_id === null;
-    const isOwnedByOther = adminRow !== null && adminRow.owner_user_id !== null && adminRow.owner_user_id !== user?.id;
-    const rowMissing = adminRow === null;
+    let adminRow: { id: string; owner_user_id: string | null; full_name: string | null; created_at: string | null } | null = null;
+    let adminUnavailable = false;
+    try {
+      const admin = createAdminClient();
+      const { data } = await admin
+        .from("customers")
+        .select("id, owner_user_id, full_name, created_at")
+        .eq("id", id)
+        .maybeSingle();
+      adminRow = data;
+    } catch {
+      adminUnavailable = true;
+    }
 
     const claimAction = claimNullOwnerCustomer.bind(null, id);
+
+    const isOrphaned = !adminUnavailable && adminRow !== null && adminRow.owner_user_id === null;
+    const isOwnedByOther = !adminUnavailable && adminRow !== null && adminRow.owner_user_id !== null && adminRow.owner_user_id !== user?.id;
+    const rowMissing = !adminUnavailable && adminRow === null;
 
     return (
       <div className="p-6 max-w-2xl mx-auto space-y-4">
@@ -69,6 +77,13 @@ export default async function CustomerEditPage({
 
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-900 space-y-3">
           <div className="font-semibold">Could not load customer.</div>
+
+          {adminUnavailable && (
+            <div className="text-red-800">
+              This record is not accessible with your current account (RLS: {error?.code ?? "no row returned"}).
+              To investigate ownership, add <code>SUPABASE_SERVICE_ROLE_KEY</code> to your environment variables.
+            </div>
+          )}
 
           {rowMissing && (
             <div className="text-red-800">
