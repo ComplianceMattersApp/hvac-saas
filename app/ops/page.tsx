@@ -1,5 +1,6 @@
 // app/ops/page
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import ContractorFilter from "./_components/ContractorFilter";
 import { redirect } from "next/navigation";
@@ -1083,34 +1084,50 @@ const exceptionVisibleJobs = isPanelExpanded("exceptions")
 
 function compactRow(j: any, showDate = false, note?: string) {
   return (
-    <div key={j.id} className="rounded-md border p-2.5">
+    <div key={j.id} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <Link href={`/jobs/${j.id}?tab=ops`} className="text-sm font-medium text-blue-600 hover:underline">
+          <Link
+            href={`/jobs/${j.id}?tab=ops`}
+            className="text-sm font-semibold text-blue-700 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1"
+          >
             {j.title}
           </Link>
-          <div className="text-xs text-gray-700">{customerNameOnly(j)} • {customerPhoneOnly(j) || "-"}</div>
+          <div className="mt-0.5 text-xs font-medium text-gray-700">{customerNameOnly(j)} • {customerPhoneOnly(j) || "-"}</div>
           <div className="text-xs text-gray-500">{addressLine(j)}</div>
-          {note ? <div className="mt-1 text-[11px] font-medium text-amber-700">{note}</div> : null}
+          {note ? (
+            <div className="mt-1.5 inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+              {note}
+            </div>
+          ) : null}
         </div>
         {showDate ? (
-          <div className="text-[11px] text-gray-500 text-right">
-            <div>{j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : "-"}</div>
+          <div className="text-right text-[11px] text-gray-500">
+            <div className="font-medium text-gray-700">{j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : "-"}</div>
             <div>{displayWindowLA(j.window_start, j.window_end) || "-"}</div>
           </div>
         ) : null}
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        <Link href={`/jobs/${j.id}?tab=ops`} className="rounded border px-2 py-0.5 text-[11px] hover:bg-gray-100">
+        <Link
+          href={`/jobs/${j.id}?tab=ops`}
+          className="rounded-md border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/40"
+        >
           Open
         </Link>
         {telHref(customerPhoneOnly(j)) ? (
-          <a href={telHref(customerPhoneOnly(j))} className="rounded border px-2 py-0.5 text-[11px] hover:bg-gray-100">
+          <a
+            href={telHref(customerPhoneOnly(j))}
+            className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/40"
+          >
             Call
           </a>
         ) : null}
         {smsHref(customerPhoneOnly(j)) ? (
-          <a href={smsHref(customerPhoneOnly(j))} className="rounded border px-2 py-0.5 text-[11px] hover:bg-gray-100">
+          <a
+            href={smsHref(customerPhoneOnly(j))}
+            className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/40"
+          >
             Text
           </a>
         ) : null}
@@ -1119,66 +1136,96 @@ function compactRow(j: any, showDate = false, note?: string) {
   );
 }
 
+function workflowToneClass(key: string) {
+  if (key === "attention") return "border-amber-200 bg-amber-50/70 text-amber-900";
+  if (key === "failed") return "border-rose-200 bg-rose-50/70 text-rose-900";
+  if (key === "retest_needed") return "border-orange-200 bg-orange-50/70 text-orange-900";
+  if (key === "pending_info") return "border-yellow-200 bg-yellow-50/70 text-yellow-900";
+  if (key === "on_hold") return "border-slate-300 bg-slate-100/80 text-slate-800";
+  if (key === "need_to_schedule") return "border-blue-200 bg-blue-50/70 text-blue-900";
+  if (key === "closeout") return "border-emerald-200 bg-emerald-50/70 text-emerald-900";
+  return "border-gray-200 bg-white text-gray-900";
+}
+
+function signalToneClass(key: string) {
+  if (key === "retest_ready") return "border-emerald-200 bg-emerald-50/70 text-emerald-900";
+  if (key === "new_contractor") return "border-blue-200 bg-blue-50/70 text-blue-900";
+  if (key === "contractor_updates") return "border-indigo-200 bg-indigo-50/70 text-indigo-900";
+  return "border-gray-200 bg-white text-gray-900";
+}
+
 return (
-  <div className="mx-auto max-w-6xl space-y-4 p-4 text-gray-900">
-    <div className="rounded-xl border bg-gradient-to-b from-white to-gray-50 p-4 shadow-sm sm:p-6">
+  <div className="mx-auto max-w-6xl space-y-4 p-4 text-gray-900 lg:space-y-5">
+    <div className="rounded-xl border border-gray-200 bg-gradient-to-b from-white to-slate-50/70 p-4 shadow-sm sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm">
+              <Image src="/icon.png" alt="Compliance Matters logo" width={22} height={22} className="h-5.5 w-5.5 rounded-sm" />
+            </div>
+            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+              Compliance Matters
+            </div>
+          </div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Ops Dashboard</h1>
-            <span className="inline-flex h-6 items-center rounded-full border bg-white px-2 text-xs font-medium text-gray-700">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Ops Dashboard</h1>
+            <span className="inline-flex h-6 items-center rounded-full border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 shadow-sm">
               {OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}
             </span>
           </div>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-slate-600">
             {selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/jobs/new" className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white shadow-sm">
-            + New Job
-          </Link>
-          <Link href="/calendar" className="rounded-md border bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50">
-            View Calendar
-          </Link>
-          <Link href="/customers" className="rounded-md border bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50">
-            Search Customers
-          </Link>
         </div>
       </div>
     </div>
 
-    <div className="rounded-lg border bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
         <div className="grid gap-1">
-          <label className="text-xs text-gray-600">Sort</label>
+          <label className="text-xs font-medium uppercase tracking-wide text-gray-600">Sort</label>
           <form action="/ops" method="get" className="flex gap-2">
             <input type="hidden" name="bucket" value={bucket} />
             <input type="hidden" name="contractor" value={contractor ?? ""} />
             <input type="hidden" name="q" value={q ?? ""} />
             <input type="hidden" name="signal" value={signal ?? ""} />
-            <select name="sort" defaultValue={sort} className="w-full rounded border px-3 py-2 text-sm">
+            <select
+              name="sort"
+              defaultValue={sort}
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+            >
               <option value="default">Default queue order</option>
               <option value="customer">Customer</option>
               <option value="scheduled">Scheduled date/time</option>
               <option value="created">Created date</option>
               <option value="address">Address</option>
             </select>
-            <button type="submit" className="rounded-md bg-black px-4 py-2 text-sm text-white">
+            <button
+              type="submit"
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
+            >
               Apply
             </button>
           </form>
         </div>
       </div>
       <div className="mt-3 grid gap-1">
-        <label className="text-xs text-gray-600">Quick search</label>
+        <label className="text-xs font-medium uppercase tracking-wide text-gray-600">Quick search</label>
         <form action="/ops" method="get" className="flex gap-2">
           <input type="hidden" name="bucket" value={bucket} />
           <input type="hidden" name="contractor" value={contractor ?? ""} />
           <input type="hidden" name="sort" value={sort} />
-          <input name="q" defaultValue={q ?? ""} placeholder="Name, phone, address, city, title" className="w-full rounded border px-3 py-2 text-sm" />
-          <button className="rounded-md bg-black px-4 py-2 text-sm text-white" type="submit">
+          <input
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Name, phone, address, city, title"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+          />
+          <button
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
+            type="submit"
+          >
             Search
           </button>
         </form>
@@ -1186,9 +1233,9 @@ return (
     </div>
 
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div className="rounded-lg border bg-white p-4 shadow-sm">
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold">Call List</div>
+          <div className="text-sm font-semibold text-gray-900">Call List</div>
           <div className="flex items-center gap-3">
             <div className="text-xs text-gray-500">{sortedCallListJobs.length}</div>
             {sortedCallListJobs.length > PREVIEW_LIMIT ? (
@@ -1201,7 +1248,7 @@ return (
                   signal: signal ?? "",
                   panel: isPanelExpanded("call_list") ? "" : "call_list",
                 })}`}
-                className="text-xs text-blue-600 hover:underline"
+                className="text-xs font-medium text-blue-700 hover:text-blue-800 hover:underline"
               >
                 {isPanelExpanded("call_list") ? "Show less" : "View all"}
               </Link>
@@ -1211,9 +1258,9 @@ return (
         <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j))}</div>
       </div>
 
-     <div className="rounded-lg border bg-white p-4 shadow-sm">
+     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
-        <div className="text-sm font-semibold">Field Work</div>
+        <div className="text-sm font-semibold text-gray-900">Field Work</div>
         <div className="flex items-center gap-3">
           <div className="text-xs text-gray-500">{sortedFieldWorkJobs.length}</div>
           {sortedFieldWorkJobs.length > PREVIEW_LIMIT ? (
@@ -1226,7 +1273,7 @@ return (
                 signal: signal ?? "",
                 panel: isPanelExpanded("field_work") ? "" : "field_work",
               })}`}
-              className="text-xs text-blue-600 hover:underline"
+              className="text-xs font-medium text-blue-700 hover:text-blue-800 hover:underline"
             >
               {isPanelExpanded("field_work") ? "Show less" : "View all"}
             </Link>
@@ -1235,8 +1282,8 @@ return (
       </div>
 
   {sortedFieldWorkJobs.length === 0 ? (
-    <div className="flex h-32 items-center justify-center text-sm text-gray-500">
-      <span className="text-green-600">✓</span> Field work complete for today
+    <div className="flex h-32 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-sm font-medium text-emerald-800">
+      <span className="mr-1.5 text-emerald-700">✓</span> Field work complete for today
     </div>
   ) : (
     <div className="space-y-2">
@@ -1245,9 +1292,9 @@ return (
   )}
 </div>
 
-      <div className="rounded-lg border bg-white p-4 shadow-sm">
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold">Closeout Work Queue</div>
+          <div className="text-sm font-semibold text-gray-900">Closeout Work Queue</div>
           <div className="flex items-center gap-3">
             <div className="text-xs text-gray-500">{closeoutJobs.length}</div>
             {closeoutJobs.length > PREVIEW_LIMIT ? (
@@ -1260,7 +1307,7 @@ return (
                   signal: signal ?? "",
                   panel: isPanelExpanded("closeout") ? "" : "closeout",
                 })}`}
-                className="text-xs text-blue-600 hover:underline"
+                className="text-xs font-medium text-blue-700 hover:text-blue-800 hover:underline"
               >
                 {isPanelExpanded("closeout") ? "Show less" : "View all"}
               </Link>
@@ -1273,11 +1320,11 @@ return (
       </div>
     </div>
 
-    <div className="rounded-lg border bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
-        <div className="text-sm font-semibold">Exceptions (Still Open Past Scheduled Date)</div>
+        <div className="text-sm font-semibold text-gray-900">Exceptions (Still Open Past Scheduled Date)</div>
         <div className="flex items-center gap-3">
-          <div className="text-xs text-red-600">{sortedExceptionJobs.length}</div>
+          <div className="text-xs font-semibold text-red-700">{sortedExceptionJobs.length}</div>
           {sortedExceptionJobs.length > EXCEPTION_PREVIEW_LIMIT ? (
             <Link
               href={`/ops${buildQueryString({
@@ -1288,7 +1335,7 @@ return (
                 signal: signal ?? "",
                 panel: isPanelExpanded("exceptions") ? "" : "exceptions",
               })}`}
-              className="text-xs text-blue-600 hover:underline"
+              className="text-xs font-medium text-blue-700 hover:text-blue-800 hover:underline"
             >
               {isPanelExpanded("exceptions") ? "Show less" : "View all"}
             </Link>
@@ -1304,11 +1351,11 @@ return (
       </div>
     </div>
 
-    <div id="ops-queues" className="rounded-lg border bg-white p-4 shadow-sm">
+    <div id="ops-queues" className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-sm font-semibold">Queues</div>
-          <div className="text-xs text-gray-500">Closeout is the working bucket. Paperwork and invoice cards show raw projected status buckets.</div>
+          <div className="text-sm font-semibold text-gray-900">Queues</div>
+          <div className="text-xs text-gray-600">Closeout is the working bucket. Paperwork and invoice cards show raw projected status buckets.</div>
         </div>
         <div className="w-full sm:w-72">
           <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
@@ -1316,8 +1363,8 @@ return (
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border bg-white p-4 shadow-sm">
-          <div className="mb-3 text-sm font-semibold">Workflow Queues</div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 text-sm font-semibold text-gray-900">Workflow Queues</div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {workflowCards.map((card) => {
               const isActive = bucket === card.key && !signal;
@@ -1332,13 +1379,13 @@ return (
                     signal: "",
                   })}#ops-queues`}
                   className={[
-                    "rounded-md border p-2.5",
+                    "rounded-md border p-2.5 shadow-sm transition-all hover:-translate-y-[1px] hover:shadow",
                     isActive
-                      ? "border-black bg-black text-white"
-                      : "bg-gray-50 hover:bg-gray-100",
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : `${workflowToneClass(card.key)} hover:bg-white`,
                   ].join(" ")}
                 >
-                  <div className={`text-[11px] ${isActive ? "text-gray-100" : "text-gray-600"}`}>
+                  <div className={`text-[11px] font-medium ${isActive ? "text-slate-200" : "text-current/80"}`}>
                     {card.label}
                   </div>
                   <div className="text-lg font-semibold">{card.count}</div>
@@ -1348,8 +1395,8 @@ return (
           </div>
         </div>
 
-        <div className="rounded-lg border bg-white p-4 shadow-sm">
-          <div className="mb-3 text-sm font-semibold">Signals</div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 text-sm font-semibold text-gray-900">Signals</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {signalCards.map((card) => {
               const isActive = signal === card.key;
@@ -1364,13 +1411,13 @@ return (
                     signal: card.key,
                   })}#ops-queues`}
                   className={[
-                    "rounded-md border p-2.5",
+                    "rounded-md border p-2.5 shadow-sm transition-all hover:-translate-y-[1px] hover:shadow",
                     isActive
-                      ? "border-black bg-black text-white"
-                      : "bg-gray-50 hover:bg-gray-100",
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : `${signalToneClass(card.key)} hover:bg-white`,
                   ].join(" ")}
                 >
-                  <div className={`text-[11px] ${isActive ? "text-gray-100" : "text-gray-600"}`}>
+                  <div className={`text-[11px] font-medium ${isActive ? "text-slate-200" : "text-current/80"}`}>
                     {card.label}
                   </div>
                   <div className="text-lg font-semibold">{card.count}</div>
@@ -1381,17 +1428,19 @@ return (
         </div>
       </div>
 
-      <div className="mt-4 rounded-lg border bg-gray-50 p-3">
+      <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
         <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold">
+          <div className="text-sm font-semibold text-gray-900">
             Active Queue: {activeQueueLabel}
             {activeSignalLabel ? ` (${activeSignalLabel})` : ""}
           </div>
-          <div className="text-xs text-gray-500">{sortedBucketJobs.length} jobs</div>
+          <div className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-600 shadow-sm">{sortedBucketJobs.length} jobs</div>
         </div>
 
         {sortedBucketJobs.length === 0 ? (
-          <div className="text-sm text-gray-500">No jobs in this queue with current filters.</div>
+          <div className="rounded-md border border-dashed border-gray-300 bg-white px-3 py-4 text-sm text-gray-600">
+            No jobs in this queue with current filters.
+          </div>
         ) : (
           <div className="space-y-2">
             {sortedBucketJobs.slice(0, 20).map((j: any) => {
