@@ -29,16 +29,15 @@ export default async function CustomerEditPage({
       "id, first_name, last_name, phone, email, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip"
     )
     .eq("id", id)
-    .maybeSingle();
+    .single();
 
-    
-    const { data: location } = await supabase
-  .from("locations")
-  .select("id, address_line1, address_line2, city, state, zip")
-  .eq("customer_id", id)
-  .order("created_at", { ascending: true })
-  .limit(1)
-  .maybeSingle();
+  const { data: location } = await supabase
+    .from("locations")
+    .select("id, address_line1, address_line2, city, state, zip")
+    .eq("customer_id", id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
 
   
 
@@ -56,9 +55,26 @@ export default async function CustomerEditPage({
           <div>
             <span className="font-medium">Customer ID:</span> {id}
           </div>
-          <div className="mt-2">
-            <span className="font-medium">Error:</span>{" "}
-            {error ? JSON.stringify(error) : "No readable row returned for this customer id"}
+          <div className="mt-2 space-y-1">
+            <div>
+              <span className="font-medium">Signed-in user:</span> {user?.id ?? "(none)"}
+            </div>
+            <div>
+              <span className="font-medium">Error code:</span> {error?.code ?? "(none)"}
+            </div>
+            <div>
+              <span className="font-medium">Message:</span> {error?.message ?? "No readable row returned for this customer id"}
+            </div>
+            {error?.details ? (
+              <div>
+                <span className="font-medium">Details:</span> {error.details}
+              </div>
+            ) : null}
+            {error?.hint ? (
+              <div>
+                <span className="font-medium">Hint:</span> {error.hint}
+              </div>
+            ) : null}
           </div>
         </div>
 
