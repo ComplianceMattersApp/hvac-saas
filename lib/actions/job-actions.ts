@@ -9,6 +9,8 @@ import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
+import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
+import { requireInternalUser } from "@/lib/auth/internal-user";
 import type { JobStatus } from "@/lib/types/job";
 
 export type { JobStatus } from "@/lib/types/job";
@@ -561,20 +563,29 @@ export async function archiveJobFromForm(formData: FormData) {
 
   // Confirm we have an authenticated user
   const { data: u, error: ue } = await supabase.auth.getUser();
-  console.error("ARCHIVE AUTH", { uid: u?.user?.id ?? null, err: ue?.message ?? null });
+  const actingUserId = u?.user?.id ?? null;
+  console.error("ARCHIVE AUTH", { uid: actingUserId, err: ue?.message ?? null });
   if (ue) throw ue;
-  if (!u?.user) redirect("/login");
+  if (!actingUserId) redirect("/login");
 
-  // Confirm internal user (your table)
-  const { data: iu, error: iuErr } = await supabase
-    .from("internal_users")
-    .select("user_id")
-    .eq("user_id", u.user.id)
-    .maybeSingle();
-
-  console.error("ARCHIVE INTERNAL", { ok: !!iu?.user_id, uid: u.user.id, iuErr: iuErr?.message ?? null });
-  if (iuErr) throw iuErr;
-  if (!iu?.user_id) throw new Error("Only internal users can archive jobs.");
+  try {
+    await requireInternalUser({ supabase, userId: actingUserId });
+    console.error("ARCHIVE INTERNAL", {
+      ok: true,
+      uid: actingUserId,
+      iuErr: null,
+    });
+  } catch (error) {
+    console.error("ARCHIVE INTERNAL", {
+      ok: false,
+      uid: actingUserId,
+      iuErr:
+        error instanceof Error
+          ? error.message
+          : "UNKNOWN_INTERNAL_ACCESS_ERROR",
+    });
+    throw error;
+  }
 
   // Do the archive and REQUIRE a returned row (proves success)
   const ts = new Date().toISOString();
@@ -2076,29 +2087,12 @@ if (userId) {
   
 }
 
-// Contractors submit intake, but canonical entities must remain internally owned.
-let canonicalOwnerUserId = userId;
-let canonicalWriteClient: any = supabase;
-
-if (isContractorUser) {
-  if (!contractorIdFinal) throw new Error("Contractor intake missing contractor context");
-
-  const admin = createAdminClient();
-  canonicalWriteClient = admin;
-
-  const { data: contractorOwner, error: contractorOwnerErr } = await admin
-    .from("contractors")
-    .select("owner_user_id")
-    .eq("id", contractorIdFinal)
-    .maybeSingle();
-
-  if (contractorOwnerErr) throw contractorOwnerErr;
-  canonicalOwnerUserId = contractorOwner?.owner_user_id ?? null;
-
-  if (!canonicalOwnerUserId) {
-    throw new Error("Contractor is not mapped to an internal owner_user_id");
-  }
-}
+const { canonicalOwnerUserId, canonicalWriteClient } =
+  await resolveCanonicalOwner({
+    actorUserId: userId,
+    defaultWriteClient: supabase,
+    contractorId: isContractorUser ? contractorIdFinal : null,
+  });
 
 
   // ----- billing defaults based on FINAL contractor id -----

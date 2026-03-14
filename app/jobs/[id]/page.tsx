@@ -2,6 +2,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  isInternalAccessError,
+  requireInternalUser,
+} from "@/lib/auth/internal-user";
 import { redirect } from "next/navigation";
 import SubmitButton from "@/components/SubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
@@ -286,23 +290,36 @@ export default async function JobDetailPage({
   const supabase = await createClient();
   const contractors = await getContractors();
 
-    const {
+  const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: cu } = await supabase
-    .from("contractor_users")
-    .select("user_id")
-    .eq("user_id", user?.id ?? "")
-    .maybeSingle();
+  if (!user) redirect("/login");
 
-  const isContractorUser = !!cu;
+  let isInternalUser = false;
 
-  if (isContractorUser) {
-    redirect(`/portal/jobs/${jobId}`);
+  try {
+    await requireInternalUser({ supabase, userId: user.id });
+    isInternalUser = true;
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      const { data: cu, error: cuErr } = await supabase
+        .from("contractor_users")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (cuErr) throw cuErr;
+
+      if (cu) {
+        redirect(`/portal/jobs/${jobId}`);
+      }
+
+      redirect("/login");
+    }
+
+    throw error;
   }
-
-  const isInternalUser = !isContractorUser;
 
   const { data: job, error: jobError } = await supabase
     .from("jobs")

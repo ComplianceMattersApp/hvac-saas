@@ -1,11 +1,15 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { requireInternalRole } from "@/lib/auth/internal-user";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function createContractorFromForm(formData: FormData) {
   const supabase = await createClient();
+  const { internalUser } = await requireInternalRole(["admin", "office"], {
+    supabase,
+  });
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) throw new Error("Contractor name is required.");
@@ -39,6 +43,7 @@ export async function createContractorFromForm(formData: FormData) {
       billing_city,
       billing_state,
       billing_zip,
+      owner_user_id: internalUser.account_owner_user_id,
     })
     .select("id")
     .single();
@@ -54,6 +59,9 @@ export async function createContractorFromForm(formData: FormData) {
 // keep your existing updateContractorFromForm here (unchanged)
 export async function updateContractorFromForm(formData: FormData) {
   const supabase = await createClient();
+  const { internalUser } = await requireInternalRole(["admin", "office"], {
+    supabase,
+  });
 
   const contractor_id = String(formData.get("contractor_id") ?? "").trim();
   if (!contractor_id) throw new Error("Missing contractor_id");
@@ -73,6 +81,24 @@ export async function updateContractorFromForm(formData: FormData) {
   const billing_state = String(formData.get("billing_state") ?? "").trim() || null;
   const billing_zip = String(formData.get("billing_zip") ?? "").trim() || null;
 
+  const { data: existingContractor, error: existingContractorError } = await supabase
+    .from("contractors")
+    .select("id, owner_user_id")
+    .eq("id", contractor_id)
+    .maybeSingle();
+
+  if (existingContractorError) throw new Error(existingContractorError.message);
+  if (!existingContractor?.id) throw new Error("Contractor not found");
+
+  const owner_user_id =
+    String(existingContractor.owner_user_id ?? "").trim() ||
+    String(internalUser.account_owner_user_id ?? "").trim() ||
+    null;
+
+  if (!owner_user_id) {
+    throw new Error("Contractor must have owner_user_id");
+  }
+
   const { error } = await supabase
     .from("contractors")
     .update({
@@ -88,6 +114,7 @@ export async function updateContractorFromForm(formData: FormData) {
       billing_city,
       billing_state,
       billing_zip,
+      owner_user_id,
     })
     .eq("id", contractor_id);
 

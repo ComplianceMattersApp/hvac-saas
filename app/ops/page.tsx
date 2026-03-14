@@ -4,6 +4,10 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import ContractorFilter from "./_components/ContractorFilter";
 import { redirect } from "next/navigation";
+import {
+  isInternalAccessError,
+  requireInternalUser,
+} from "@/lib/auth/internal-user";
 
 import {
   displayDateLA,
@@ -149,25 +153,40 @@ export default async function OpsPage({
   const panel = (sp.panel ?? "").trim().toLowerCase();
 
   const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
 
-const { data: userData } = await supabase.auth.getUser();
-const user = userData?.user;
+  const signal = (sp.signal ?? "").trim().toLowerCase() || "";
 
-const signal = (sp.signal ?? "").trim().toLowerCase() || "";
+  if (!user) redirect("/login");
 
-if (!user) redirect("/login");
+  let isAdmin = false;
 
-const { data: cu, error: cuErr } = await supabase
-  .from("contractor_users")
-  .select("contractor_id")
-  .eq("user_id", user.id)
-  .maybeSingle();
+  try {
+    const { internalUser } = await requireInternalUser({
+      supabase,
+      userId: user.id,
+    });
+    isAdmin = internalUser.role === "admin";
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      const { data: cu, error: cuErr } = await supabase
+        .from("contractor_users")
+        .select("contractor_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-if (cuErr) throw cuErr;
+      if (cuErr) throw cuErr;
 
-if (cu?.contractor_id) {
-  redirect("/jobs/new");
-}
+      if (cu?.contractor_id) {
+        redirect("/portal");
+      }
+
+      redirect("/login");
+    }
+
+    throw error;
+  }
   function digitsOnly(v?: string | null) {
   return String(v ?? "").replace(/\D/g, "");
 }
@@ -1177,6 +1196,16 @@ return (
             {selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
           </p>
         </div>
+        {isAdmin ? (
+          <div className="flex items-center">
+            <Link
+              href="/ops/admin"
+              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            >
+              Admin
+            </Link>
+          </div>
+        ) : null}
       </div>
     </div>
 

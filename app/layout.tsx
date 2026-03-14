@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import LogoutButton from "@/components/auth/LogoutButton";
+import { getInternalUser } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
 
 const geistSans = Geist({
@@ -37,14 +38,19 @@ export default async function RootLayout({
   let homeHref = "/ops";
 
   if (user) {
-    const { data: cu } = await supabase
-      .from("contractor_users")
-      .select("contractor_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const [{ data: cu }, internalUser] = await Promise.all([
+      supabase
+        .from("contractor_users")
+        .select("contractor_id")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      getInternalUser({ supabase, userId: user.id }),
+    ]);
 
     if (cu?.contractor_id) {
       homeHref = "/portal";
+    } else if (internalUser?.is_active) {
+      homeHref = "/ops";
     }
   }
 

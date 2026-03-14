@@ -2,7 +2,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 
 
@@ -13,9 +14,7 @@ export async function createJobFromIntake(formData: FormData) {
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth?.user?.id ?? null;
 
-  // Canonical ownership context (record owner identity)
-  let canonicalOwnerUserId = userId;
-  let canonicalWriteClient: any = supabase;
+  let contractorId: string | null = null;
 
   if (userId) {
     const { data: cu, error: cuErr } = await supabase
@@ -25,25 +24,15 @@ export async function createJobFromIntake(formData: FormData) {
       .maybeSingle();
 
     if (cuErr) throw cuErr;
-
-    if (cu?.contractor_id) {
-      const admin = createAdminClient();
-      canonicalWriteClient = admin;
-
-      const { data: contractorOwner, error: contractorOwnerErr } = await admin
-        .from("contractors")
-        .select("owner_user_id")
-        .eq("id", cu.contractor_id)
-        .maybeSingle();
-
-      if (contractorOwnerErr) throw contractorOwnerErr;
-      canonicalOwnerUserId = contractorOwner?.owner_user_id ?? null;
-
-      if (!canonicalOwnerUserId) {
-        throw new Error("Contractor is not mapped to an internal owner_user_id");
-      }
-    }
+    contractorId = cu?.contractor_id ?? null;
   }
+
+  const { canonicalOwnerUserId, canonicalWriteClient } =
+    await resolveCanonicalOwner({
+      actorUserId: userId,
+      defaultWriteClient: supabase,
+      contractorId,
+    });
 
   // -----------------------------
   // Read + normalize form fields

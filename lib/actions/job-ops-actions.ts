@@ -7,6 +7,10 @@ import { redirect } from "next/navigation";
 import { resolveOpsStatus } from "@/lib/utils/ops-status";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { forceSetOpsStatus } from "@/lib/actions/ops-status";
+import {
+  isInternalAccessError,
+  requireInternalUser,
+} from "@/lib/auth/internal-user";
 
 const OPS_STATUSES = [
   "need_to_schedule",
@@ -43,6 +47,22 @@ type OpsSnapshot = {
   action_required_by: string | null;
 };
 
+async function requireInternalOpsAccessOrRedirect(
+  supabase: any,
+  userId: string,
+  jobId: string,
+) {
+  try {
+    await requireInternalUser({ supabase, userId });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirect(`/jobs/${jobId}?notice=not_authorized`);
+    }
+
+    throw error;
+  }
+}
+
 function buildOpsChanges(before: OpsSnapshot, after: OpsSnapshot) {
   const keys = Object.keys(after) as (keyof OpsSnapshot)[];
   const changes: Array<{ field: keyof OpsSnapshot; from: any; to: any }> = [];
@@ -75,16 +95,7 @@ export async function resolveFailureByCorrectionReviewFromForm(formData: FormDat
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("contractor_users")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (cu) {
-    redirect(`/jobs/${jobId}?notice=not_authorized`);
-  }
+  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
 
   // Current snapshot
   const { data: job, error: jobErr } = await supabase
@@ -160,16 +171,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("contractor_users")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (cu) {
-    redirect(`/jobs/${jobId}?notice=not_authorized`);
-  }
+  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
 
   // Read current job snapshot
   const { data: job, error: jobErr } = await supabase
@@ -277,16 +279,7 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("contractor_users")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (cu) {
-    redirect(`/jobs/${jobId}?notice=not_authorized`);
-  }
+  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
 
   // Read current job snapshot
   const { data: job, error: jobErr } = await supabase
