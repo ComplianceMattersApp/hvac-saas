@@ -177,6 +177,10 @@ function equipmentSummaryLine(eq: any) {
   return `${equipmentType} | Model: ${model} | Serial: ${serial}`;
 }
 
+function canonicalId(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
 function aggregateField(items: any[], getter: (item: any) => unknown) {
   const values = Array.from(
     new Set(
@@ -372,7 +376,23 @@ export default async function JobTestsPage({
   if (error) throw error;
   if (!job) return notFound();
 
-  const systems = job.job_systems ?? [];
+  const systems = (job.job_systems ?? [])
+    .slice()
+    .sort((a: any, b: any) => {
+      const at = new Date(a?.created_at ?? 0).getTime();
+      const bt = new Date(b?.created_at ?? 0).getTime();
+      if (at !== bt) return at - bt;
+      return String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
+    });
+
+  const equipmentBySystemId = new Map<string, any[]>();
+  for (const eq of job.job_equipment ?? []) {
+    const sid = canonicalId(eq?.system_id);
+    if (!sid) continue;
+    const rows = equipmentBySystemId.get(sid) ?? [];
+    rows.push(eq);
+    equipmentBySystemId.set(sid, rows);
+  }
 
   const selectedSystemId =
     selectedSystemIdFromQuery &&
@@ -396,9 +416,8 @@ export default async function JobTestsPage({
     ? (focused as EccTestType | "custom")
     : "";
 
-  const selectedSystemEquipment = (job.job_equipment ?? []).filter(
-  (eq: any) => String(eq.system_id ?? "") === String(selectedSystemId)
-    );
+  const selectedSystemEquipment =
+    equipmentBySystemId.get(canonicalId(selectedSystemId)) ?? [];
 
   const scenarioResult = resolveEccScenario({
   projectType: job.project_type,
@@ -489,10 +508,15 @@ const defaultSystemTonnage =
   };
 
   const systemSummaries = systems.map((sys: any) => {
-    const systemId = String(sys.id ?? "");
-    const systemEquipment = (job.job_equipment ?? []).filter(
-      (eq: any) => String(eq?.system_id ?? "").trim() === systemId
-    );
+    const systemId = canonicalId(sys.id);
+    const systemEquipment = (equipmentBySystemId.get(systemId) ?? [])
+      .slice()
+      .sort((a: any, b: any) => {
+        const at = new Date(a?.created_at ?? 0).getTime();
+        const bt = new Date(b?.created_at ?? 0).getTime();
+        if (at !== bt) return at - bt;
+        return String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
+      });
 
     const runAirflow = pickLatestRunForSystem(job, "airflow", systemId);
     const runDuct = pickLatestRunForSystem(job, "duct_leakage", systemId);
@@ -537,9 +561,9 @@ const defaultSystemTonnage =
     )}
       <div className="flex items-center justify-between gap-3 print:hidden">
         <div>
-          <div className="text-sm text-gray-600">Job Tests</div>
+          <div className="text-sm text-slate-700">Job Tests</div>
           <h1 className="text-xl font-semibold">{job.title}</h1>
-          <div className="text-sm text-gray-600">{job.city ?? "—"}</div>
+          <div className="text-sm text-slate-700">{job.city ?? "—"}</div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -562,7 +586,7 @@ const defaultSystemTonnage =
         </div>
 
         {systemSummaries.length === 0 ? (
-          <div className="text-sm text-gray-600">No systems available yet.</div>
+          <div className="text-sm text-slate-700">No systems available yet.</div>
         ) : (
           <div className="space-y-5">
             {systemSummaries.map((sys) => {
