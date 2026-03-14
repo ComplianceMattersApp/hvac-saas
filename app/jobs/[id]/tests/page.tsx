@@ -329,9 +329,16 @@ export default async function JobTestsPage({
       `
       id,
       title,
+      job_address,
       city,
       job_type,
       project_type,
+      permit_number,
+      contractor_id,
+      customer_first_name,
+      customer_last_name,
+      customer_phone,
+      customer_email,
       job_systems (
         id,
         name,
@@ -375,6 +382,30 @@ export default async function JobTestsPage({
 
   if (error) throw error;
   if (!job) return notFound();
+
+  const contractorId = String(job.contractor_id ?? "").trim();
+  let contractorName = "—";
+
+  if (contractorId) {
+    const { data: contractor, error: contractorError } = await supabase
+      .from("contractors")
+      .select("name")
+      .eq("id", contractorId)
+      .maybeSingle();
+
+    if (contractorError) throw contractorError;
+    contractorName = fallbackText(contractor?.name);
+  }
+
+  const customerName =
+    [job.customer_first_name, job.customer_last_name]
+      .map((value: unknown) => String(value ?? "").trim())
+      .filter(Boolean)
+      .join(" ") || "—";
+
+  const projectTypeLabel = String(job.project_type ?? "")
+    .trim()
+    .replaceAll("_", " ");
 
   const systems = (job.job_systems ?? [])
     .slice()
@@ -577,31 +608,80 @@ const defaultSystemTonnage =
         </div>
       </div>
 
-      <section id="cheers-fast-view" className="rounded-lg border border-slate-400 bg-slate-50 p-5 space-y-5 text-slate-900 print:border-0 print:bg-white print:p-0">
+      <section className="rounded-lg border border-slate-400 bg-white p-5 space-y-4 text-slate-900 print:rounded-none print:border-slate-500 print:p-3 print:space-y-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-950 print:text-base">Customer / Job Info</h2>
+          <p className="text-sm text-slate-700 print:text-xs">Who and where for this CHEERS packet.</p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 print:grid-cols-2 print:gap-x-6 print:gap-y-2">
+          <div className="space-y-3 print:space-y-2">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Customer Name</div>
+              <div className="text-sm font-medium text-slate-950">{customerName}</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Address</div>
+              <div className="text-sm font-medium text-slate-950">{fallbackText(job.job_address)}</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Phone</div>
+              <div className="text-sm font-medium text-slate-950">{fallbackText(job.customer_phone)}</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Email</div>
+              <div className="text-sm font-medium text-slate-950 break-all">{fallbackText(job.customer_email)}</div>
+            </div>
+          </div>
+
+          <div className="space-y-3 print:space-y-2">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Contractor Attached To</div>
+              <div className="text-sm font-medium text-slate-950">{contractorName}</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">City</div>
+              <div className="text-sm font-medium text-slate-950">{fallbackText(job.city)}</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Permit Number</div>
+              <div className="text-sm font-medium text-slate-950">{fallbackText(job.permit_number)}</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Project Type</div>
+              <div className="text-sm font-medium capitalize text-slate-950">{fallbackText(projectTypeLabel)}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="cheers-fast-view" className="rounded-lg border border-slate-400 bg-slate-50 p-5 space-y-5 text-slate-900 print:border-0 print:bg-white print:p-0 print:space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h2 className="text-lg font-bold text-slate-950">CHEERS Fast View</h2>
-            <p className="text-sm text-slate-700">Read-only summary from ECC canonical test data, grouped by system.</p>
+            <h2 className="text-lg font-bold text-slate-950 print:text-base">Results</h2>
+            <p className="text-sm text-slate-700 print:text-xs">Read-only summary from ECC canonical test data, grouped by system.</p>
           </div>
         </div>
 
         {systemSummaries.length === 0 ? (
           <div className="text-sm text-slate-700">No systems available yet.</div>
         ) : (
-          <div className="space-y-5">
-            {systemSummaries.map((sys) => {
+          <div className="space-y-5 print:space-y-4">
+            {systemSummaries.map((sys, index) => {
               const rcData = sys.runRefrigerant?.data ?? {};
               const rcComputed = sys.runRefrigerant?.computed ?? {};
               const isRefrigerantException =
                 Boolean(sys.runRefrigerant?.data?.charge_exempt) ||
                 Boolean(sys.runRefrigerant?.data?.charge_exempt_reason) ||
                 String(sys.runRefrigerant?.computed?.status ?? "").toLowerCase() === "exempt";
+              const shouldForcePrintBreak =
+                index > 0 && Boolean(sys.runRefrigerant) && !isRefrigerantException;
 
               return (
-                <div key={sys.systemId} className="rounded-md border border-slate-300 bg-white p-4 space-y-4 shadow-sm">
-                  <div className="text-sm font-bold text-slate-950">{sys.systemName}</div>
+                <div key={sys.systemId} className={`break-inside-avoid rounded-md border border-slate-300 bg-white p-4 space-y-4 shadow-sm print:rounded-none print:border-slate-500 print:p-3 print:space-y-3 print:shadow-none ${shouldForcePrintBreak ? "print:break-before-page" : ""}`}>
+                  <div className="text-sm font-bold text-slate-950 print:text-[13px]">{sys.systemName}</div>
 
-                  <div className="grid gap-3 text-sm text-slate-900">
+                  <div className="grid gap-3 text-sm text-slate-900 print:gap-2 print:text-[12px]">
                     <div>
                       <span className="font-semibold text-slate-950">System Label:</span> {fallbackText(sys.systemName)}
                     </div>
@@ -613,7 +693,7 @@ const defaultSystemTonnage =
                     <div>
                       <span className="font-semibold text-slate-950">Equipment Summary:</span>
                       {sys.hasEquipment ? (
-                        <div className="mt-1 space-y-1 text-slate-800">
+                        <div className="mt-1 space-y-1 text-slate-800 print:text-slate-950">
                           <div className="font-semibold text-slate-900">Outdoor Equipment</div>
                           {sys.outdoorEquipment.length > 0 ? (
                             sys.outdoorEquipment.map((eq: any, index: number) => (
@@ -625,7 +705,7 @@ const defaultSystemTonnage =
                             <div>—</div>
                           )}
 
-                          <div className="font-semibold text-slate-900 pt-1">Indoor Equipment</div>
+                          <div className="font-semibold text-slate-900 pt-1 print:pt-0.5">Indoor Equipment</div>
                           {sys.indoorEquipment.length > 0 ? (
                             sys.indoorEquipment.map((eq: any, index: number) => (
                               <div key={String(eq?.id ?? `indoor-${sys.systemId}-${index}`)}>
@@ -638,7 +718,7 @@ const defaultSystemTonnage =
 
                           {sys.otherEquipment.length > 0 ? (
                             <>
-                              <div className="font-semibold text-slate-900 pt-1">Other Equipment</div>
+                              <div className="font-semibold text-slate-900 pt-1 print:pt-0.5">Other Equipment</div>
                               {sys.otherEquipment.map((eq: any, index: number) => (
                                 <div key={String(eq?.id ?? `other-${sys.systemId}-${index}`)}>
                                   {index + 1}. {equipmentSummaryLine(eq)}
@@ -669,19 +749,19 @@ const defaultSystemTonnage =
                     </div>
                   </div>
 
-                  <div className="rounded-md border border-slate-300 bg-slate-100 p-3 space-y-3">
-                    <div className="text-sm font-bold text-slate-950">Refrigerant Charge — Full Detailed Result</div>
+                  <div className="rounded-md border border-slate-300 bg-slate-100 p-3 space-y-3 print:rounded-none print:border-slate-400 print:bg-white print:p-2.5 print:space-y-2">
+                    <div className="text-sm font-bold text-slate-950 print:text-[13px]">Refrigerant Charge — Full Detailed Result</div>
 
                     {!sys.runRefrigerant ? (
-                      <div className="text-sm text-slate-700">No refrigerant charge run found for this system.</div>
+                      <div className="text-sm text-slate-700 print:text-[12px]">No refrigerant charge run found for this system.</div>
                     ) : isRefrigerantException ? (
-                      <div className="text-sm text-slate-800 space-y-1">
+                      <div className="text-sm text-slate-800 space-y-1 print:text-[12px]">
                         <div>Result: Exception</div>
                         <div>Reason: {exceptionReasonLabel(sys.runRefrigerant)}</div>
                       </div>
                     ) : (
                       <>
-                        <div className="space-y-1 text-sm text-slate-900">
+                        <div className="space-y-1 text-sm text-slate-900 print:text-[12px]">
                           <div className="font-semibold text-slate-950">F. Data Collection and Calculations</div>
                           <ol className="list-decimal pl-5 space-y-1">
                             <li>Lowest Return Air Dry Bulb Temperature: {fmtValue(rcData.lowest_return_air_db_f, "°F")}</li>
@@ -696,7 +776,7 @@ const defaultSystemTonnage =
                           </ol>
                         </div>
 
-                        <div className="space-y-1 text-sm text-slate-900">
+                        <div className="space-y-1 text-sm text-slate-900 print:text-[12px]">
                           <div className="font-semibold text-slate-950">G. Metering Device Verification</div>
                           <ol className="list-decimal pl-5 space-y-1">
                             <li>Measured Suction Line Temperature: {fmtValue(rcData.suction_line_temp_f, "°F")}</li>
