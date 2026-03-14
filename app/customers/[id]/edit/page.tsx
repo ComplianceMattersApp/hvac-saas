@@ -41,17 +41,16 @@ export default async function CustomerEditPage({
 
   
 
-  // Admin diagnostic: look up the row bypassing RLS to determine ownership status
   if (error || !customer) {
     const claimError = sp?.claimError as string | undefined;
 
-    let adminRow: { id: string; owner_user_id: string | null; full_name: string | null; created_at: string | null } | null = null;
+    let adminRow: { id: string; owner_user_id: string | null; full_name: string | null } | null = null;
     let adminUnavailable = false;
     try {
       const admin = createAdminClient();
       const { data } = await admin
         .from("customers")
-        .select("id, owner_user_id, full_name, created_at")
+        .select("id, owner_user_id, full_name")
         .eq("id", id)
         .maybeSingle();
       adminRow = data;
@@ -71,7 +70,13 @@ export default async function CustomerEditPage({
 
         {claimError && (
           <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
-            Claim failed: {claimError === "already_owned" ? "This record is owned by another user." : claimError === "row_not_found" ? "Row does not exist." : claimError === "contractors_not_allowed" ? "Contractors cannot claim records." : claimError}
+            {claimError === "already_owned"
+              ? "This record is owned by another account."
+              : claimError === "row_not_found"
+              ? "Customer record not found."
+              : claimError === "contractors_not_allowed"
+              ? "Contractors cannot claim internal records."
+              : "Claim failed. Please try again."}
           </div>
         )}
 
@@ -80,33 +85,31 @@ export default async function CustomerEditPage({
 
           {adminUnavailable && (
             <div className="text-red-800">
-              This record is not accessible with your current account (RLS: {error?.code ?? "no row returned"}).
-              To investigate ownership, add <code>SUPABASE_SERVICE_ROLE_KEY</code> to your environment variables.
+              This record is not accessible with your current account.
             </div>
           )}
 
           {rowMissing && (
             <div className="text-red-800">
-              This customer ID does not exist in the database.
+              This customer record does not exist.
             </div>
           )}
 
           {isOrphaned && (
             <div className="rounded border border-amber-300 bg-amber-50 p-3 text-amber-900 space-y-2">
-              <div className="font-semibold">Unclaimed record detected</div>
+              <div className="font-semibold">Unclaimed record</div>
               <div>
-                This customer row exists but has no owner (<code>owner_user_id</code> is null). It was likely created via a service-role path (e.g. intake form) without associating an owner.
+                This customer exists but has no owner assigned. You can claim it to gain access.
               </div>
-              <div className="text-xs">
-                Customer: <span className="font-medium">{adminRow?.full_name ?? "(unnamed)"}</span>
-                {adminRow?.created_at ? ` — created ${new Date(adminRow.created_at).toLocaleString()}` : ""}
+              <div className="text-xs text-amber-700">
+                Name: <span className="font-medium">{adminRow?.full_name ?? "(unnamed)"}</span>
               </div>
               <form action={claimAction}>
                 <button
                   type="submit"
                   className="mt-1 rounded-md bg-amber-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-800"
                 >
-                  Claim this record (assign to your account)
+                  Claim this record
                 </button>
               </form>
             </div>
@@ -114,15 +117,9 @@ export default async function CustomerEditPage({
 
           {isOwnedByOther && (
             <div className="text-red-800">
-              This record is owned by a different user ({adminRow?.owner_user_id}). It cannot be reassigned automatically.
+              This record is owned by another account and cannot be accessed here.
             </div>
           )}
-
-          <div className="space-y-1 text-xs text-red-700 border-t border-red-200 pt-2">
-            <div><span className="font-medium">Customer ID:</span> {id}</div>
-            <div><span className="font-medium">Signed-in user:</span> {user?.id ?? "(none)"}</div>
-            <div><span className="font-medium">RLS error code:</span> {error?.code ?? "(none)"}</div>
-          </div>
         </div>
 
         <div className="flex gap-2">
@@ -144,32 +141,31 @@ export default async function CustomerEditPage({
   }
 
   return (
-    
-
-        <div className="p-6 max-w-3xl mx-auto space-y-6">
-          {sp?.saved === "1" && (
-  <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-900 shadow">
-          Saved ✅
-        </div>
-      )}
-      <div className="flex items-start justify-between gap-3">
+    <div className="min-h-screen bg-slate-50">
+      <div className="p-6 max-w-3xl mx-auto space-y-6">
+        {sp?.saved === "1" && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-900 shadow">
+            Saved ✓
+          </div>
+        )}
+        <div className="flex items-start justify-between gap-3">
         <div className="space-y-2">
   <h1 className="text-2xl font-semibold">Edit Customer</h1>
 
-  <div className="inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900/60 px-3 py-1 text-xs text-zinc-200">
+  <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-700">
     <span className="font-medium">
       {(customer.first_name ?? "").trim() || "Unknown"}
       {(customer.last_name ?? "").trim() ? ` • ${customer.last_name}` : ""}
     </span>
     {customer.phone ? (
-      <span className="text-zinc-400">• {customer.phone}</span>
+      <span className="text-slate-500">• {customer.phone}</span>
     ) : null}
     {customer.email ? (
-      <span className="text-zinc-400">• {customer.email}</span>
+      <span className="text-slate-500">• {customer.email}</span>
     ) : null}
   </div>
 
-  <div className="text-sm text-zinc-400">
+  <div className="text-sm text-slate-500">
     Update contact info and billing address.
   </div>
 </div>
@@ -188,65 +184,65 @@ export default async function CustomerEditPage({
       <form action={upsertCustomerProfileFromForm} className="space-y-6">
         <input type="hidden" name="customer_id" value={customer.id} />
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 shadow-sm space-y-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
 
-          <div className="text-base font-semibold">Customer</div>
+          <div className="text-base font-semibold text-slate-900">Customer</div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-gray-200">First Name</label>
+              <label className="block text-xs font-medium text-slate-700">First Name</label>
               <input
                 name="first_name"
                 defaultValue={customer.first_name ?? ""}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-gray-200">Last Name</label>
+              <label className="block text-xs font-medium text-slate-700">Last Name</label>
               <input
                 name="last_name"
                 defaultValue={customer.last_name ?? ""}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-gray-200">Phone</label>
+              <label className="block text-xs font-medium text-slate-700">Phone</label>
               <input
                 name="phone"
                 defaultValue={customer.phone ?? ""}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-gray-200">Email</label>
+              <label className="block text-xs font-medium text-slate-700">Email</label>
               <input
                 name="email"
                 defaultValue={customer.email ?? ""}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
               />
             </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 shadow-sm space-y-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
 
-          <div className="text-base font-semibold">Billing Address</div>
+          <div className="text-base font-semibold text-slate-900">Billing Address</div>
 
           <div className="space-y-3">
             <input
               name="billing_address_line1"
               placeholder="Address line 1"
               defaultValue={customer.billing_address_line1 ?? ""}
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
             />
             <input
               name="billing_address_line2"
               placeholder="Address line 2"
               defaultValue={customer.billing_address_line2 ?? ""}
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -254,76 +250,75 @@ export default async function CustomerEditPage({
                 name="billing_city"
                 placeholder="City"
                 defaultValue={customer.billing_city ?? ""}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
               />
               <input
                 name="billing_state"
                 placeholder="State"
                 defaultValue={customer.billing_state ?? ""}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
               />
               <input
                 name="billing_zip"
                 placeholder="ZIP"
                 defaultValue={customer.billing_zip ?? ""}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
               />
             </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 shadow-sm space-y-4">
-  <div className="text-base font-semibold">Service Address</div>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+          <div>
+            <div className="text-base font-semibold text-slate-900">Service Address</div>
+            <div className="text-xs text-slate-500 mt-0.5">Edits the primary location for this customer.</div>
+          </div>
 
-  <div className="space-y-3">
-    <input
-      name="address_line1"
-      placeholder="Address line 1"
-      defaultValue={location?.address_line1 ?? ""}
-      className="w-full rounded-md border px-3 py-2 text-sm"
-    />
-    <input
-      name="address_line2"
-      placeholder="Address line 2"
-      defaultValue={location?.address_line2 ?? ""}
-      className="w-full rounded-md border px-3 py-2 text-sm"
-    />
+          <div className="space-y-3">
+            <input
+              name="address_line1"
+              placeholder="Address line 1"
+              defaultValue={location?.address_line1 ?? ""}
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
+            />
+            <input
+              name="address_line2"
+              placeholder="Address line 2"
+              defaultValue={location?.address_line2 ?? ""}
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
+            />
 
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <input
-        name="city"
-        placeholder="City"
-        defaultValue={location?.city ?? ""}
-        className="w-full rounded-md border px-3 py-2 text-sm"
-      />
-      <input
-        name="state"
-        placeholder="State"
-        defaultValue={location?.state ?? ""}
-        className="w-full rounded-md border px-3 py-2 text-sm"
-      />
-      <input
-        name="zip"
-        placeholder="ZIP"
-        defaultValue={location?.zip ?? ""}
-        className="w-full rounded-md border px-3 py-2 text-sm"
-      />
-    </div>
-  </div>
-</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input
+                name="city"
+                placeholder="City"
+                defaultValue={location?.city ?? ""}
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
+              />
+              <input
+                name="state"
+                placeholder="State"
+                defaultValue={location?.state ?? ""}
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
+              />
+              <input
+                name="zip"
+                placeholder="ZIP"
+                defaultValue={location?.zip ?? ""}
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+        </div>
 
         <button
-  className="rounded-md bg-white text-black px-4 py-2 text-sm font-medium hover:bg-zinc-200"
-  type="submit"
->
-
+          className="rounded-md bg-slate-900 text-white px-4 py-2 text-sm font-medium hover:bg-slate-700"
+          type="submit"
+        >
           Save Customer
         </button>
       </form>
+      </div>
     </div>
-    )
-  ;
-  
-  
+  );
 }
-  

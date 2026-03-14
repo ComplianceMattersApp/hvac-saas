@@ -208,6 +208,7 @@ function summaryOrder() {
 
 export default async function CustomerDetailPage(props: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ err?: string }>;
 }) {
   const supabase = await createClient();
 
@@ -215,6 +216,8 @@ export default async function CustomerDetailPage(props: {
   if (!userData?.user) redirect("/login");
 
   const { id } = await props.params;
+  const sp = props.searchParams ? await props.searchParams : {};
+  const hasJobsError = sp.err === "has_jobs";
 
   if (!id || !isUuid(id)) {
     redirect("/customers");
@@ -354,14 +357,19 @@ const { data: jobsData, error: jobsErr } = await supabase
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl p-4 md:p-6 space-y-6">
+        {hasJobsError && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            This customer has active jobs and cannot be archived. Remove all jobs first.
+          </div>
+        )}
         {/* Header */}
         <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-start md:justify-between">
           <div className="space-y-2">
             <Link
-              href="/ops"
+              href="/customers"
               className="inline-flex text-sm text-slate-500 hover:text-slate-900"
             >
-              ← Back to Ops
+              ← Back to Customers
             </Link>
 
             <div>
@@ -393,28 +401,30 @@ const { data: jobsData, error: jobsErr } = await supabase
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/customers/${customerId}/edit`}
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
-            >
-              Edit Customer
-            </Link>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/customers/${customerId}/edit`}
+                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+              >
+                Edit Customer
+              </Link>
 
-            <Link
-              href={`/jobs/new?customer_id=${customerId}`}
-              className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-            >
-              New Job
-            </Link>
+              <Link
+                href={`/jobs/new?customer_id=${customerId}`}
+                className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              >
+                New Job
+              </Link>
+            </div>
 
             <form action={archiveCustomerFromForm}>
               <input type="hidden" name="customer_id" value={customerId} />
               <button
                 type="submit"
-                className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+                className="inline-flex items-center rounded-lg border border-red-200 px-4 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
               >
-                Archive
+                Archive Customer
               </button>
             </form>
           </div>
@@ -422,13 +432,10 @@ const { data: jobsData, error: jobsErr } = await supabase
 
         {/* Open status summary */}
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
               Open Jobs Summary
             </h2>
-            <span className="text-xs text-slate-500">
-              Derived from jobs.ops_status
-            </span>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
@@ -591,14 +598,6 @@ const { data: jobsData, error: jobsErr } = await supabase
                     key={locId}
                     className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
                   >
-                    <div className="h-32 border-b border-slate-200 bg-gradient-to-br from-slate-100 to-slate-200">
-                      <div className="flex h-full items-center justify-center px-4 text-center text-sm text-slate-500">
-                        Google address photo placeholder
-                        <br />
-                        Street View / static map ready later
-                      </div>
-                    </div>
-
                     <div className="space-y-4 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -663,7 +662,6 @@ const { data: jobsData, error: jobsErr } = await supabase
           ) : (
             <div className="space-y-3">
               {jobs.map((job) => {
-                const contractorName = job.contractor_id ? "Assigned" : "Unassigned";
                 const serviceCaseVisits = job.service_case_id
                   ? serviceCaseVisitCounts.get(job.service_case_id) ?? 1
                   : null;
@@ -704,18 +702,14 @@ const { data: jobsData, error: jobsErr } = await supabase
                           ) : null}
                         </div>
 
-                        <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-3">
                           <div>
                             <span className="font-medium text-slate-700">Job ID:</span>{" "}
-                            <span className="font-mono text-xs">{job.id}</span>
+                            <span className="font-mono text-xs">{job.id.slice(0, 8)}&hellip;</span>
                           </div>
                           <div>
                             <span className="font-medium text-slate-700">Address:</span>{" "}
                             {address || "—"}
-                          </div>
-                          <div>
-                            <span className="font-medium text-slate-700">Contractor:</span>{" "}
-                            {contractorName}
                           </div>
                           <div>
                             <span className="font-medium text-slate-700">Scheduled:</span>{" "}
