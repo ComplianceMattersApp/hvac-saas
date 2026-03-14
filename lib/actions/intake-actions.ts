@@ -2,16 +2,48 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 
 
 export async function createJobFromIntake(formData: FormData) {
   const supabase = await createClient();
 
-  // Auth user (used for owner_user_id where available)
+  // Auth user (creator identity)
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth?.user?.id ?? null;
+
+  // Canonical ownership context (record owner identity)
+  let canonicalOwnerUserId = userId;
+  let canonicalWriteClient: any = supabase;
+
+  if (userId) {
+    const { data: cu, error: cuErr } = await supabase
+      .from("contractor_users")
+      .select("contractor_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (cuErr) throw cuErr;
+
+    if (cu?.contractor_id) {
+      const admin = createAdminClient();
+      canonicalWriteClient = admin;
+
+      const { data: contractorOwner, error: contractorOwnerErr } = await admin
+        .from("contractors")
+        .select("owner_user_id")
+        .eq("id", cu.contractor_id)
+        .maybeSingle();
+
+      if (contractorOwnerErr) throw contractorOwnerErr;
+      canonicalOwnerUserId = contractorOwner?.owner_user_id ?? null;
+
+      if (!canonicalOwnerUserId) {
+        throw new Error("Contractor is not mapped to an internal owner_user_id");
+      }
+    }
+  }
 
   // -----------------------------
   // Read + normalize form fields
@@ -69,7 +101,7 @@ export async function createJobFromIntake(formData: FormData) {
   // -----------------------------
   const fullName = `${firstName} ${lastName}`.trim();
 
-  const { data: customer, error: customerErr } = await supabase
+  const { data: customer, error: customerErr } = await canonicalWriteClient
     .from("customers")
     .insert({
       first_name: firstName,
@@ -77,7 +109,7 @@ export async function createJobFromIntake(formData: FormData) {
       full_name: fullName,
       phone,
       email,
-      owner_user_id: userId,
+      owner_user_id: canonicalOwnerUserId,
     })
     .select("id")
     .single();
@@ -88,13 +120,13 @@ export async function createJobFromIntake(formData: FormData) {
   // -----------------------------
   // 2) Create location (service address)
   // -----------------------------
-  const { data: location, error: locationErr } = await supabase
+  const { data: location, error: locationErr } = await canonicalWriteClient
     .from("locations")
     .insert({
       customer_id: customerId,
       address_line1: addressLine1,
       city,
-      owner_user_id: userId,
+      owner_user_id: canonicalOwnerUserId,
     })
     .select("id")
     .single();

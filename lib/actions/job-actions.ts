@@ -2,7 +2,7 @@
 
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
@@ -2076,6 +2076,30 @@ if (userId) {
   
 }
 
+// Contractors submit intake, but canonical entities must remain internally owned.
+let canonicalOwnerUserId = userId;
+let canonicalWriteClient: any = supabase;
+
+if (isContractorUser) {
+  if (!contractorIdFinal) throw new Error("Contractor intake missing contractor context");
+
+  const admin = createAdminClient();
+  canonicalWriteClient = admin;
+
+  const { data: contractorOwner, error: contractorOwnerErr } = await admin
+    .from("contractors")
+    .select("owner_user_id")
+    .eq("id", contractorIdFinal)
+    .maybeSingle();
+
+  if (contractorOwnerErr) throw contractorOwnerErr;
+  canonicalOwnerUserId = contractorOwner?.owner_user_id ?? null;
+
+  if (!canonicalOwnerUserId) {
+    throw new Error("Contractor is not mapped to an internal owner_user_id");
+  }
+}
+
 
   // ----- billing defaults based on FINAL contractor id -----
   let billingRecipientFinal =
@@ -2428,7 +2452,7 @@ if (existingCustomerId && !existingLocationId) {
   if (reusableLocation?.id) {
     locationIdToUse = reusableLocation.id;
   } else {
-    const { data: location, error: locationErr } = await supabase
+    const { data: location, error: locationErr } = await canonicalWriteClient
       .from("locations")
       .insert({
         customer_id: existingCustomerId,
@@ -2436,6 +2460,7 @@ if (existingCustomerId && !existingLocationId) {
         address_line1,
         city,
         zip,
+        owner_user_id: canonicalOwnerUserId,
       })
       .select("id")
       .single();
@@ -2486,11 +2511,12 @@ if (existingCustomerId && !existingLocationId) {
 
 // ---- Branch 3: new customer flow (duplicate-safe) ----
 const { customerId, reused } = await findOrCreateCustomer({
-  supabase,
+  supabase: canonicalWriteClient,
   firstName: customerFirstNameRaw,
   lastName: customerLastNameRaw,
   phone: customerPhoneRaw,
   email: customerEmailRaw,
+  ownerUserId: canonicalOwnerUserId,
 });
 
 let locationIdToUse: string;
@@ -2500,7 +2526,7 @@ const reusableLocation = await findReusableLocation(customerId);
 if (reusableLocation?.id) {
   locationIdToUse = reusableLocation.id;
 } else {
-  const { data: location, error: locationErr } = await supabase
+  const { data: location, error: locationErr } = await canonicalWriteClient
     .from("locations")
     .insert({
       customer_id: customerId,
@@ -2508,6 +2534,7 @@ if (reusableLocation?.id) {
       address_line1,
       city,
       zip,
+      owner_user_id: canonicalOwnerUserId,
     })
     .select("id")
     .single();
