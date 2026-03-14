@@ -3223,8 +3223,10 @@ export async function createRetestJobFromForm(formData: FormData) {
     // 1) Fetch parent systems
     const { data: parentSystems, error: sysErr } = await supabase
       .from("job_systems")
-      .select("id, name")
-      .eq("job_id", parentJobId);
+      .select("id, name, created_at")
+      .eq("job_id", parentJobId)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
 
     if (sysErr) throw sysErr;
 
@@ -3232,23 +3234,20 @@ export async function createRetestJobFromForm(formData: FormData) {
     const systemIdMap = new Map<string, string>(); // parentSystemId → childSystemId
 
     if (parentSystems?.length) {
-      const insertSystems = parentSystems.map((s: any) => ({
-        job_id: child.id,
-        name: s.name ?? "System",
-      }));
+      for (const parentSys of parentSystems) {
+        const { data: newSystem, error: newSysErr } = await supabase
+          .from("job_systems")
+          .insert({
+            job_id: child.id,
+            name: parentSys?.name ?? "System",
+          })
+          .select("id")
+          .single();
 
-      const { data: newSystems, error: newSysErr } = await supabase
-        .from("job_systems")
-        .insert(insertSystems)
-        .select("id, name");
+        if (newSysErr) throw newSysErr;
 
-      if (newSysErr) throw newSysErr;
-
-      for (let i = 0; i < parentSystems.length; i++) {
-        const parentSys = parentSystems[i];
-        const childSys = newSystems?.[i];
-        if (parentSys?.id && childSys?.id) {
-          systemIdMap.set(String(parentSys.id), String(childSys.id));
+        if (parentSys?.id && newSystem?.id) {
+          systemIdMap.set(String(parentSys.id), String(newSystem.id));
         }
       }
     }
