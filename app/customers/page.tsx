@@ -36,7 +36,27 @@ export default async function CustomersPage(props: {
 
     if (error) throw error;
 
-    results = (data ?? []) as SearchResult[];
+    const rawResults = (data ?? []) as SearchResult[];
+
+    // Guard against search RPC returning IDs the current user cannot read directly
+    // (e.g., ownership/RLS drift across environments).
+    const candidateIds = Array.from(
+      new Set(rawResults.map((r) => String(r.customer_id ?? "").trim()).filter(Boolean))
+    );
+
+    if (candidateIds.length > 0) {
+      const { data: readableRows, error: readableErr } = await supabase
+        .from("customers")
+        .select("id")
+        .in("id", candidateIds);
+
+      if (readableErr) throw readableErr;
+
+      const readableIds = new Set((readableRows ?? []).map((r: any) => String(r.id ?? "")));
+      results = rawResults.filter((r) => readableIds.has(String(r.customer_id ?? "")));
+    } else {
+      results = [];
+    }
   }
 
   return (

@@ -50,12 +50,15 @@ export default async function CustomerEditPage({
 
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-900">
           <div className="font-semibold mb-2">Could not load customer.</div>
+          <div className="mb-2">
+            This customer record is missing or not accessible with your current account.
+          </div>
           <div>
             <span className="font-medium">Customer ID:</span> {id}
           </div>
           <div className="mt-2">
             <span className="font-medium">Error:</span>{" "}
-            {error ? JSON.stringify(error) : "No row returned (customer is null)"}
+            {error ? JSON.stringify(error) : "No readable row returned for this customer id"}
           </div>
         </div>
 

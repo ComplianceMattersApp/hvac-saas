@@ -250,6 +250,9 @@ export default async function CustomerDetailPage(props: {
     return (
       <div className="p-6 space-y-2">
         <h1 className="text-2xl font-semibold">Customer not found</h1>
+        <p className="text-sm text-muted-foreground">
+          This customer record is missing or not accessible with your current account.
+        </p>
         <Link href="/customers" className="text-sm underline">
           Back to Customers
         </Link>
