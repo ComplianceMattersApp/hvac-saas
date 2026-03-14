@@ -59,6 +59,7 @@ const match = (candidates ?? []).find((c: any) => {
       last_name: lastName || null,
       email: email || null,
       phone: phone || null,
+      owner_user_id: userId,
     })
     .select("id")
     .single();

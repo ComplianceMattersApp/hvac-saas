@@ -2,7 +2,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation"
 
 function toFullName(first?: string | null, last?: string | null) {
@@ -193,4 +193,55 @@ export async function archiveCustomerFromForm(formData: FormData) {
   revalidatePath("/jobs");
 
   redirect(`/customers?saved=archived`);
+}
+
+/**
+ * Assigns owner_user_id on a customer row that currently has owner_user_id = NULL.
+ * Only internal (non-contractor) authenticated users may call this.
+ * The row must be truly ownerless — if already owned by another user this is a no-op error.
+ */
+export async function claimNullOwnerCustomer(customerId: string, _formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  if (!user || userErr) redirect("/login");
+
+  // Contractors must not claim internal customer records
+  const { data: cu } = await supabase
+    .from("contractor_users")
+    .select("contractor_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (cu?.contractor_id) {
+    redirect(`/customers/${customerId}/edit?claimError=contractors_not_allowed`);
+  }
+
+  const admin = createAdminClient();
+
+  const { data: row, error: rowErr } = await admin
+    .from("customers")
+    .select("id, owner_user_id")
+    .eq("id", customerId)
+    .maybeSingle();
+
+  if (rowErr || !row) {
+    redirect(`/customers/${customerId}/edit?claimError=row_not_found`);
+  }
+
+  if (row.owner_user_id !== null) {
+    redirect(`/customers/${customerId}/edit?claimError=already_owned`);
+  }
+
+  const { error: updateErr } = await admin
+    .from("customers")
+    .update({ owner_user_id: user.id })
+    .eq("id", customerId)
+    .is("owner_user_id", null); // guard: only update if still null
+
+  if (updateErr) {
+    redirect(`/customers/${customerId}/edit?claimError=${encodeURIComponent(updateErr.message)}`);
+  }
+
+  revalidatePath(`/customers/${customerId}/edit`);
+  revalidatePath(`/customers/${customerId}`);
+  redirect(`/customers/${customerId}/edit`);
 }

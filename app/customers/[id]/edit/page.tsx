@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { upsertCustomerProfileFromForm } from "@/lib/actions/customer-actions";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { upsertCustomerProfileFromForm, claimNullOwnerCustomer } from "@/lib/actions/customer-actions";
 
 export default async function CustomerEditPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ saved?: string }>;
+  searchParams?: Promise<{ saved?: string; claimError?: string }>;
 }) {
   const { id } = await params;
   const sp = searchParams ? await searchParams : {};
@@ -41,40 +41,72 @@ export default async function CustomerEditPage({
 
   
 
-  // ✅ DIAGNOSTIC: show real errors instead of returning 404
+  // Admin diagnostic: look up the row bypassing RLS to determine ownership status
   if (error || !customer) {
+    const claimError = sp?.claimError as string | undefined;
+    const admin = createAdminClient();
+    const { data: adminRow } = await admin
+      .from("customers")
+      .select("id, owner_user_id, full_name, created_at")
+      .eq("id", id)
+      .maybeSingle();
+
+    const isOrphaned = adminRow !== null && adminRow.owner_user_id === null;
+    const isOwnedByOther = adminRow !== null && adminRow.owner_user_id !== null && adminRow.owner_user_id !== user?.id;
+    const rowMissing = adminRow === null;
+
+    const claimAction = claimNullOwnerCustomer.bind(null, id);
+
     return (
       <div className="p-6 max-w-2xl mx-auto space-y-4">
         <div className="text-xl font-semibold">Edit Customer</div>
 
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-          <div className="font-semibold mb-2">Could not load customer.</div>
-          <div className="mb-2">
-            This customer record is missing or not accessible with your current account.
+        {claimError && (
+          <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+            Claim failed: {claimError === "already_owned" ? "This record is owned by another user." : claimError === "row_not_found" ? "Row does not exist." : claimError === "contractors_not_allowed" ? "Contractors cannot claim records." : claimError}
           </div>
-          <div>
-            <span className="font-medium">Customer ID:</span> {id}
-          </div>
-          <div className="mt-2 space-y-1">
-            <div>
-              <span className="font-medium">Signed-in user:</span> {user?.id ?? "(none)"}
+        )}
+
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-900 space-y-3">
+          <div className="font-semibold">Could not load customer.</div>
+
+          {rowMissing && (
+            <div className="text-red-800">
+              This customer ID does not exist in the database.
             </div>
-            <div>
-              <span className="font-medium">Error code:</span> {error?.code ?? "(none)"}
-            </div>
-            <div>
-              <span className="font-medium">Message:</span> {error?.message ?? "No readable row returned for this customer id"}
-            </div>
-            {error?.details ? (
+          )}
+
+          {isOrphaned && (
+            <div className="rounded border border-amber-300 bg-amber-50 p-3 text-amber-900 space-y-2">
+              <div className="font-semibold">Unclaimed record detected</div>
               <div>
-                <span className="font-medium">Details:</span> {error.details}
+                This customer row exists but has no owner (<code>owner_user_id</code> is null). It was likely created via a service-role path (e.g. intake form) without associating an owner.
               </div>
-            ) : null}
-            {error?.hint ? (
-              <div>
-                <span className="font-medium">Hint:</span> {error.hint}
+              <div className="text-xs">
+                Customer: <span className="font-medium">{adminRow?.full_name ?? "(unnamed)"}</span>
+                {adminRow?.created_at ? ` — created ${new Date(adminRow.created_at).toLocaleString()}` : ""}
               </div>
-            ) : null}
+              <form action={claimAction}>
+                <button
+                  type="submit"
+                  className="mt-1 rounded-md bg-amber-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-800"
+                >
+                  Claim this record (assign to your account)
+                </button>
+              </form>
+            </div>
+          )}
+
+          {isOwnedByOther && (
+            <div className="text-red-800">
+              This record is owned by a different user ({adminRow?.owner_user_id}). It cannot be reassigned automatically.
+            </div>
+          )}
+
+          <div className="space-y-1 text-xs text-red-700 border-t border-red-200 pt-2">
+            <div><span className="font-medium">Customer ID:</span> {id}</div>
+            <div><span className="font-medium">Signed-in user:</span> {user?.id ?? "(none)"}</div>
+            <div><span className="font-medium">RLS error code:</span> {error?.code ?? "(none)"}</div>
           </div>
         </div>
 
