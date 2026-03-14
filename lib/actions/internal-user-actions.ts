@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
   requireInternalRole,
@@ -25,6 +26,13 @@ function parseInternalRole(raw: FormDataEntryValue | null): InternalRole {
   throw new Error("INVALID_INTERNAL_ROLE");
 }
 
+function parseInviteRole(raw: FormDataEntryValue | null): InternalRole {
+  const role = String(raw ?? "").trim().toLowerCase();
+
+  if (role === "technician") return "tech";
+  return parseInternalRole(raw);
+}
+
 function revalidateInternalUserViews() {
   revalidatePath("/ops");
   revalidatePath("/ops/admin");
@@ -37,6 +45,11 @@ function isForeignKeyViolation(error: any) {
 
 function isUniqueViolation(error: any) {
   return error?.code === "23505";
+}
+
+function isAlreadyExistsAuthError(error: any) {
+  const msg = String(error?.message ?? "").toLowerCase();
+  return msg.includes("already") || msg.includes("exists") || msg.includes("registered");
 }
 
 function normalizeInternalUserRecord(data: any): InternalUserRecord | null {
@@ -66,6 +79,22 @@ async function getInternalUserRecord(
 
   if (error) throw error;
   return normalizeInternalUserRecord(data);
+}
+
+async function getAuthUserIdByEmail(admin: any, email: string): Promise<string | null> {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) return null;
+
+  const { data, error } = await admin
+    .schema("auth")
+    .from("users")
+    .select("id, email")
+    .ilike("email", normalized)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.id ? String(data.id) : null;
 }
 
 async function requireScopedTarget(
@@ -276,4 +305,104 @@ export async function deactivateInternalUserFromForm(formData: FormData): Promis
   if (error) throw error;
 
   revalidateInternalUserViews();
+}
+
+export async function inviteInternalUserFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const {
+    userId: actorUserId,
+    internalUser: actorInternalUser,
+  } = await requireInternalRole("admin", { supabase });
+
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email) {
+    redirect("/ops/admin/internal-users?invite_status=invalid_email");
+  }
+
+  const role = parseInviteRole(formData.get("role"));
+  const admin = createAdminClient();
+
+  let targetUserId: string | null = null;
+  let inviteRequested = false;
+
+  const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email);
+
+  if (!inviteError) {
+    targetUserId = inviteData?.user?.id ? String(inviteData.user.id) : null;
+    inviteRequested = true;
+  } else if (isAlreadyExistsAuthError(inviteError)) {
+    targetUserId = await getAuthUserIdByEmail(admin, email);
+
+    if (!targetUserId) {
+      redirect("/ops/admin/internal-users?invite_status=email_already_invited");
+    }
+  } else {
+    throw inviteError;
+  }
+
+  if (!targetUserId) {
+    targetUserId = await getAuthUserIdByEmail(admin, email);
+  }
+
+  if (!targetUserId) {
+    redirect("/ops/admin/internal-users?invite_status=target_auth_user_not_found");
+  }
+
+  const existing = await getInternalUserRecord(admin, targetUserId);
+
+  if (existing) {
+    if (existing.account_owner_user_id !== actorInternalUser.account_owner_user_id) {
+      redirect("/ops/admin/internal-users?invite_status=already_internal_other_owner");
+    }
+
+    if (existing.role !== role || !existing.is_active) {
+      const { error: updateError } = await admin
+        .from("internal_users")
+        .update({
+          role,
+          is_active: true,
+          created_by: actorUserId,
+        })
+        .eq("user_id", targetUserId)
+        .eq("account_owner_user_id", actorInternalUser.account_owner_user_id)
+        .select("user_id")
+        .single();
+
+      if (updateError) throw updateError;
+      revalidateInternalUserViews();
+      redirect("/ops/admin/internal-users?invite_status=attached_existing_auth");
+    }
+
+    redirect("/ops/admin/internal-users?invite_status=already_internal");
+  }
+
+  const { error: insertError } = await admin
+    .from("internal_users")
+    .insert({
+      user_id: targetUserId,
+      role,
+      is_active: true,
+      account_owner_user_id: actorInternalUser.account_owner_user_id,
+      created_by: actorUserId,
+    })
+    .select("user_id")
+    .single();
+
+  if (insertError) {
+    if (isUniqueViolation(insertError)) {
+      redirect("/ops/admin/internal-users?invite_status=already_internal");
+    }
+    if (isForeignKeyViolation(insertError)) {
+      redirect("/ops/admin/internal-users?invite_status=target_auth_user_not_found");
+    }
+    throw insertError;
+  }
+
+  revalidateInternalUserViews();
+
+  redirect(
+    inviteRequested
+      ? "/ops/admin/internal-users?invite_status=invited"
+      : "/ops/admin/internal-users?invite_status=attached_existing_auth",
+  );
 }

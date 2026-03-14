@@ -10,6 +10,7 @@ import {
   activateInternalUserFromForm,
   createInternalUserFromForm,
   deactivateInternalUserFromForm,
+  inviteInternalUserFromForm,
   updateInternalUserRoleFromForm,
 } from "@/lib/actions/internal-user-actions";
 
@@ -47,7 +48,54 @@ function roleBadgeTone(role: InternalRole) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-export default async function AdminInternalUsersPage() {
+type SearchParams = Promise<{ invite_status?: string }>;
+
+const INVITE_STATUS_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
+  invited: {
+    tone: "success",
+    message: "Invite email sent and internal user access is now linked.",
+  },
+  attached_existing_auth: {
+    tone: "success",
+    message: "Existing auth user linked/updated in internal users.",
+  },
+  already_internal: {
+    tone: "warn",
+    message: "User is already an internal user for this account owner.",
+  },
+  email_already_invited: {
+    tone: "warn",
+    message: "That email has already been invited. Ask the user to check their email.",
+  },
+  already_internal_other_owner: {
+    tone: "error",
+    message: "That auth user is already linked to a different internal account owner.",
+  },
+  target_auth_user_not_found: {
+    tone: "error",
+    message: "Auth user could not be resolved for that email.",
+  },
+  invalid_email: {
+    tone: "error",
+    message: "Please provide a valid email address.",
+  },
+};
+
+function bannerClass(tone: "success" | "warn" | "error") {
+  if (tone === "success") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (tone === "warn") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-red-200 bg-red-50 text-red-900";
+}
+
+export default async function AdminInternalUsersPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
+  const sp = (searchParams ? await searchParams : {}) ?? {};
+  const inviteStatus = String(sp.invite_status ?? "").trim().toLowerCase();
+  const inviteNotice = INVITE_STATUS_TEXT[inviteStatus];
+
   const { supabase, userId, internalUser } = await requireAdminOrRedirect();
 
   const { data: internalUsers, error } = await supabase
@@ -84,6 +132,43 @@ export default async function AdminInternalUsersPage() {
             </Link>
           </div>
         </div>
+      </div>
+
+      {inviteNotice ? (
+        <div className={`rounded-lg border px-4 py-3 text-sm ${bannerClass(inviteNotice.tone)}`}>
+          {inviteNotice.message}
+        </div>
+      ) : null}
+
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-base font-semibold text-gray-900">Invite Internal User</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          Send an onboarding invite by email and attach internal role access automatically.
+        </p>
+        <form action={inviteInternalUserFromForm} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
+          <input
+            name="email"
+            type="email"
+            placeholder="name@company.com"
+            className="sm:col-span-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+            required
+          />
+          <select
+            name="role"
+            defaultValue="office"
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+          >
+            <option value="admin">admin</option>
+            <option value="office">office</option>
+            <option value="technician">technician</option>
+          </select>
+          <button
+            type="submit"
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+          >
+            Invite User
+          </button>
+        </form>
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
