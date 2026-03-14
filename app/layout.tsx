@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import LogoutButton from "@/components/auth/LogoutButton";
+import { createClient } from "@/lib/supabase/server";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,11 +25,29 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+
+  let homeHref = "/ops";
+
+  if (user) {
+    const { data: cu } = await supabase
+      .from("contractor_users")
+      .select("contractor_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (cu?.contractor_id) {
+      homeHref = "/portal";
+    }
+  }
+
   return (
     <html lang="en">
       <body
@@ -38,8 +58,19 @@ export default function RootLayout({
           {/* Top Bar */}
           <header className="border-b bg-white px-4 py-3 sm:px-6">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="text-sm font-semibold text-slate-900">
-                Compliance Matters
+              <div className="flex items-center gap-2.5">
+                <Link
+                  href={homeHref}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                >
+                  <Image src="/icon.png" alt="Compliance Matters logo" width={18} height={18} className="rounded-sm" />
+                </Link>
+                <Link
+                  href={homeHref}
+                  className="text-sm font-semibold text-slate-900 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                >
+                  Compliance Matters
+                </Link>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
