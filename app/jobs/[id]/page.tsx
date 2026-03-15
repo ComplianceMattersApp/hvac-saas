@@ -798,6 +798,186 @@ const serviceMapsLink =
     : "";
 
 const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
+const equipmentItems = Array.isArray(job.job_equipment) ? job.job_equipment : [];
+const equipmentCount = equipmentItems.length;
+const outdoorEquipment = equipmentItems.find((eq: any) => {
+  const role = String(eq?.equipment_role ?? "").toLowerCase();
+  return role.includes("condenser") || role.includes("outdoor") || role.includes("package");
+});
+const indoorEquipment = equipmentItems.find((eq: any) => {
+  const role = String(eq?.equipment_role ?? "").toLowerCase();
+  return role.includes("air_handler") || role.includes("furnace") || role.includes("indoor") || role.includes("coil");
+});
+const equipmentSummaryLabel =
+  equipmentCount > 0
+    ? `${equipmentCount} item(s) linked to this job`
+    : "No equipment linked to this job yet.";
+
+const timelineItems = timelineEvents ?? [];
+const timelinePreviewItems = timelineItems.slice(0, 3);
+const timelineOverflowItems = timelineItems.slice(3);
+
+const attemptItems = customerAttempts ?? [];
+const contactPreviewItems = attemptItems.slice(0, 3);
+const contactOverflowItems = attemptItems.slice(3);
+
+const showRetestSection =
+  ["failed", "retest_needed"].includes(String(job.ops_status ?? "")) ||
+  !!parentJob ||
+  (childJobs?.length ?? 0) > 0;
+
+const renderAttemptItem = (a: any, key: string) => {
+  const method = a?.meta?.method ? String(a.meta.method) : "";
+  const result = a?.meta?.result ? String(a.meta.result) : "";
+  const when = a?.created_at ? formatDateTimeLAFromIso(String(a.created_at)) : "—";
+
+  const methodIcon = method === "text" ? "💬" : method === "call" ? "📞" : "📝";
+  const resultLabel =
+    result === "no_answer" ? "No Answer" :
+    result === "sent" ? "Sent" :
+    result === "spoke" ? "Spoke" :
+    (result || "—");
+
+  return (
+    <div key={key} className="rounded border p-3 text-sm bg-white">
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-xs text-gray-600">{when}</div>
+        <div className="text-xs text-gray-500">
+          {a?.meta?.attempt_number ? `#${String(a.meta.attempt_number)}` : null}
+        </div>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs">
+          <span>{methodIcon}</span>
+          <span className="capitalize">{method || "—"}</span>
+        </span>
+
+        <span className="inline-flex items-center rounded-full border px-2 py-1 text-xs">
+          {resultLabel}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+const renderTimelineItem = (e: any, key: string) => {
+  const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "—";
+  const type = String(e?.event_type ?? "");
+  const meta = e?.meta ?? {};
+  const noteText = getEventNoteText(meta);
+  const fileSummary = getEventFileSummary(meta);
+
+  const icon =
+    type === "job_created" ? "🆕" :
+    type === "intake_submitted" ? "📥" :
+    type === "retest_created" ? "🔁" :
+    type === "customer_attempt" ? "📞" :
+    type === "status_changed" ? "🔄" :
+    type === "on_my_way" ? "🚗" :
+    type === "job_started" ? "🛠️" :
+    type === "job_completed" ? "🏁" :
+    type === "job_failed" ? "❌" :
+    type === "job_passed" ? "✅" :
+    type === "scheduled" ? "📅" :
+    type === "unscheduled" ? "🗓️" :
+    type === "retest_scheduled" ? "📅" :
+    type === "retest_started" ? "🛠️" :
+    type === "retest_passed" ? "✅" :
+    type === "retest_failed" ? "❌" :
+    type === "schedule_updated" ? "🕒" :
+    type === "contractor_note" ? "💬" :
+    type === "public_note" ? "💬" :
+    type === "internal_note" ? "📝" :
+    type === "failure_resolved_by_correction_review" ? "✅" :
+    type === "contractor_correction_submission" ? "📎" :
+    "📝";
+
+  return (
+    <div key={key} className="rounded border p-3 text-sm bg-white">
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-xs text-gray-600">{when}</div>
+        <div className="text-xs text-gray-500">{icon}</div>
+      </div>
+
+      <div className="mt-2 font-medium">
+        {formatTimelineEvent(type, meta, e?.message)}
+      </div>
+
+      {(type === "contractor_note" ||
+        type === "public_note" ||
+        type === "internal_note" ||
+        type === "contractor_correction_submission") && noteText ? (
+        <div className="mt-2 whitespace-pre-wrap text-sm text-gray-800">
+          {noteText}
+        </div>
+      ) : null}
+
+      {(type === "contractor_note" ||
+        type === "public_note" ||
+        type === "internal_note" ||
+        type === "contractor_correction_submission") && fileSummary ? (
+        <div className="mt-2 text-xs text-gray-600">
+          Files: {fileSummary}
+        </div>
+      ) : null}
+
+      {type === "retest_created" && meta?.child_job_id ? (
+        <div className="mt-1 text-sm">
+          Retest:{" "}
+          <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
+            View linked retest
+          </Link>
+        </div>
+      ) : null}
+
+      {type === "retest_created" && meta?.parent_job_id ? (
+        <div className="mt-1 text-sm">
+          Original:{" "}
+          <Link className="underline" href={`/jobs/${String(meta.parent_job_id)}?tab=ops`}>
+            View original job
+          </Link>
+        </div>
+      ) : null}
+
+      {type === "retest_passed" && meta?.child_job_id ? (
+        <div className="mt-1 text-sm">
+          Resolved by retest:{" "}
+          <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
+            View retest job
+          </Link>
+        </div>
+      ) : null}
+
+      {type === "retest_scheduled" && meta?.child_job_id ? (
+        <div className="mt-1 text-sm">
+          Retest scheduled:{" "}
+          <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
+            View retest job
+          </Link>
+        </div>
+      ) : null}
+
+      {type === "retest_started" && meta?.child_job_id ? (
+        <div className="mt-1 text-sm">
+          Active retest:{" "}
+          <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
+            View retest job
+          </Link>
+        </div>
+      ) : null}
+
+      {type === "retest_failed" && meta?.child_job_id ? (
+        <div className="mt-1 text-sm">
+          Retest failed again:{" "}
+          <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
+            View retest job
+          </Link>
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
   return (
     <div className="p-6 max-w-3xl">
@@ -1388,7 +1568,7 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
         <div>
           <div className="text-base font-semibold">Equipment</div>
           <div className="text-xs text-gray-500">
-            Capture and review equipment tied to this job.
+            Location-based equipment context for this job.
           </div>
         </div>
       </div>
@@ -1398,18 +1578,42 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
           Status
         </div>
         <div className="mt-1 text-sm font-semibold text-gray-900">
-          {job.job_equipment?.length
-            ? `${job.job_equipment.length} item(s) captured`
-            : "No equipment captured yet."}
+          {equipmentSummaryLabel}
         </div>
       </div>
+
+      {equipmentCount > 0 ? (
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 text-sm">
+          <div className="rounded-md border border-gray-200 bg-white px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wide text-gray-500">Outdoor Unit</div>
+            <div className="font-medium text-gray-900">
+              {outdoorEquipment
+                ? `${outdoorEquipment.manufacturer ?? "—"} ${outdoorEquipment.model ?? ""}`.trim()
+                : "—"}
+            </div>
+          </div>
+
+          <div className="rounded-md border border-gray-200 bg-white px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wide text-gray-500">Indoor Unit</div>
+            <div className="font-medium text-gray-900">
+              {indoorEquipment
+                ? `${indoorEquipment.manufacturer ?? "—"} ${indoorEquipment.model ?? ""}`.trim()
+                : "—"}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          No equipment found yet for this job location.
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Link
           href={`/jobs/${job.id}/info?f=equipment`}
           className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
         >
-          Capture Equipment
+          {equipmentCount > 0 ? "View / Edit Equipment" : "Capture Equipment"}
         </Link>
       </div>
     </section>
@@ -1479,118 +1683,290 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
         ) : null}
       </div>
 
-      {/* Scheduling */}
+      {/* Scheduling & Contact */}
       <div className="rounded-xl border bg-white p-5 sm:p-6 text-gray-900 mb-6 shadow-sm">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <div className="text-base font-semibold">Scheduling</div>
-            <div className="text-xs text-gray-500">
-              Set date, arrival window, and permit info.
+        <div className="mb-4">
+          <div className="text-base font-semibold">Scheduling & Contact</div>
+          <div className="text-xs text-gray-500">
+            Dispatch actions, contact outcomes, schedule, and follow-up in one workflow area.
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Launch Actions</div>
+            <div className="mt-2 text-sm font-semibold text-gray-900">{customerName}</div>
+            <div className="text-sm text-gray-700">{customerPhone}</div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {telLink ? (
+                <a
+                  href={telLink}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-100"
+                >
+                  Call
+                </a>
+              ) : null}
+
+              {customerPhone !== "—" ? (
+                <a
+                  href={`sms:${digitsOnly(customerPhone)}`}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-100"
+                >
+                  Text
+                </a>
+              ) : null}
+
+              {serviceMapsLink ? (
+                <a
+                  href={serviceMapsLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-100"
+                >
+                  Navigate
+                </a>
+              ) : null}
+
+              {job.customer_id ? (
+                <Link
+                  href={`/customers/${job.customer_id}`}
+                  className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-100"
+                >
+                  Open Customer
+                </Link>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Logging Actions</div>
+            <div className="mt-1 text-xs text-gray-500">
+              Use these to record contact outcomes separately from Call/Text/Navigate launch actions.
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <form action={logCustomerContactAttemptFromForm}>
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="method" value="call" />
+                <input type="hidden" name="result" value="no_answer" />
+                <SubmitButton className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
+                  Log Call (No Answer)
+                </SubmitButton>
+              </form>
+
+              <form action={logCustomerContactAttemptFromForm}>
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="method" value="text" />
+                <input type="hidden" name="result" value="sent" />
+                <button className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100" type="submit">
+                  Log Text (Sent)
+                </button>
+              </form>
+
+              <form action={logCustomerContactAttemptFromForm}>
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="method" value="call" />
+                <input type="hidden" name="result" value="spoke" />
+                <button className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100" type="submit">
+                  Log Call (Spoke)
+                </button>
+              </form>
+            </div>
+
+            <div className="mt-3 text-xs text-gray-600">
+              Attempts: <span className="font-medium">{attemptCount}</span> • Last: <span className="font-medium">{lastAttemptLabel}</span>
             </div>
           </div>
         </div>
 
-        <form action={updateJobScheduleFromForm} className="space-y-4">
-          <input type="hidden" name="job_id" value={job.id} />
+        <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="text-sm font-semibold mb-3">Scheduling</div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
-                Scheduled Date
-              </label>
+          <form action={updateJobScheduleFromForm} className="space-y-4">
+            <input type="hidden" name="job_id" value={job.id} />
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                  Scheduled Date
+                </label>
+                <input
+                  type="date"
+                  name="scheduled_date"
+                  defaultValue={displayDateLA(job.scheduled_date)}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                  Permit #
+                </label>
+                <input
+                  name="permit_number"
+                  defaultValue={job.permit_number ?? ""}
+                  placeholder="Optional"
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black"
+                />
+              </div>
+
+              {job.job_type === "ecc" ? (
+                <>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                      Jurisdiction
+                    </label>
+                    <input
+                      name="jurisdiction"
+                      defaultValue={(job as any).jurisdiction ?? ""}
+                      placeholder="City or county permit office"
+                      className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                      Permit Date
+                    </label>
+                    <input
+                      type="date"
+                      name="permit_date"
+                      defaultValue={(job as any).permit_date ?? ""}
+                      className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+                    />
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                  Window Start
+                </label>
+                <input
+                  type="time"
+                  name="window_start"
+                  defaultValue={timeToTimeInput(job.window_start)}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+                />
+                <div className="text-[11px] text-gray-500">Example: 08:00</div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                  Window End
+                </label>
+                <input
+                  type="time"
+                  name="window_end"
+                  defaultValue={timeToTimeInput(job.window_end)}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+                />
+                <div className="text-[11px] text-gray-500">Example: 10:00</div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                type="submit"
+              >
+                Save Scheduling
+              </button>
+
+              <Link
+                href="/ops"
+                className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
+              >
+                Back to Ops
+              </Link>
+            </div>
+          </form>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
+          <div className="text-sm font-semibold mb-3">Follow Up</div>
+
+          <form action={updateJobOpsDetailsFromForm} className="grid gap-3">
+            <input type="hidden" name="job_id" value={job.id} />
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Action Required By</label>
+                <select
+                  name="action_required_by"
+                  defaultValue={job.action_required_by ?? ""}
+                  className="w-full rounded border px-2 py-2 text-sm"
+                >
+                  <option value="">—</option>
+                  <option value="rater">Rater</option>
+                  <option value="contractor">Contractor</option>
+                  <option value="customer">Customer</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Follow-up Date</label>
+                <input
+                  type="date"
+                  name="follow_up_date"
+                  defaultValue={job.follow_up_date ? dateToDateInput(String(job.follow_up_date)) : ""}
+                  className="w-full rounded border px-2 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Pending Info Reason</label>
               <input
-                type="date"
-                name="scheduled_date"
-                defaultValue={displayDateLA(job.scheduled_date)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+                name="pending_info_reason"
+                defaultValue={job.pending_info_reason ?? ""}
+                className="w-full rounded border px-2 py-2 text-sm"
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
-                Permit #
-              </label>
-              <input
-                name="permit_number"
-                defaultValue={job.permit_number ?? ""}
-                placeholder="Optional"
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black"
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Next Action Note</label>
+              <textarea
+                name="next_action_note"
+                defaultValue={job.next_action_note ?? ""}
+                className="w-full rounded border px-2 py-2 text-sm"
+                rows={4}
               />
             </div>
 
-            {job.job_type === "ecc" ? (
-              <>
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
-                    Jurisdiction
-                  </label>
-                  <input
-                    name="jurisdiction"
-                    defaultValue={(job as any).jurisdiction ?? ""}
-                    placeholder="City or county permit office"
-                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
-                    Permit Date
-                  </label>
-                  <input
-                    type="date"
-                    name="permit_date"
-                    defaultValue={(job as any).permit_date ?? ""}
-                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
-                  />
-                </div>
-              </>
-            ) : null}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
-                Window Start
-              </label>
-              <input
-                type="time"
-                name="window_start"
-                defaultValue={timeToTimeInput(job.window_start)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
-              />
-              <div className="text-[11px] text-gray-500">Example: 08:00</div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
-                Window End
-              </label>
-              <input
-                type="time"
-                name="window_end"
-                defaultValue={timeToTimeInput(job.window_end)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
-              />
-              <div className="text-[11px] text-gray-500">Example: 10:00</div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button
-              className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-              type="submit"
-            >
-              Save Scheduling
+            <button className="px-3 py-2 rounded bg-black text-white text-sm w-fit" type="submit">
+              Save Follow Up
             </button>
+          </form>
+        </div>
 
-            <Link
-              href="/ops"
-              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
-            >
-              Back to Ops
-            </Link>
-          </div>
-        </form>
+        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
+          <div className="text-sm font-semibold mb-2">Customer Follow-Up History</div>
+
+          {!attemptItems.length ? (
+            <div className="text-sm text-gray-600">No contact attempts logged yet.</div>
+          ) : (
+            <div className="space-y-2">
+              {contactPreviewItems.map((a: any, idx: number) => renderAttemptItem(a, `attempt-preview-${idx}`))}
+
+              {contactOverflowItems.length > 0 ? (
+                <details className="pt-1">
+                  <summary className="cursor-pointer text-sm text-gray-700 underline">
+                    Show all attempts ({attemptItems.length})
+                  </summary>
+                  <div className="mt-2 space-y-2">
+                    {contactOverflowItems.map((a: any, idx: number) =>
+                      renderAttemptItem(a, `attempt-overflow-${idx}`)
+                    )}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          )}
+        </div>
       </div>
 
       <ServiceStatusActions jobId={jobId} />
@@ -1728,6 +2104,7 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
         </section>
 
           {/* Retest + Linked Jobs */}
+{showRetestSection ? (
 <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
   <div className="text-sm font-semibold mb-3">Retest</div>
 
@@ -1787,6 +2164,7 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
     )}
   </div>
 </div>
+) : null}
 
 {isInternalUser &&
  job.job_type === "ecc" &&
@@ -1822,7 +2200,7 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
       </button>
     </form>
   </div>
-)}
+) }
 
 {/* Shared Notes */}
 <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
@@ -1952,281 +2330,51 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
 </div>
 
 {/* Internal Attachments */}
-<JobAttachmentsInternal
-  jobId={job.id}
-  initialItems={attachmentItems}
-/>
+<details className="rounded-lg border bg-white text-gray-900 mb-6">
+  <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">
+    Attachments ({attachmentItems.length})
+  </summary>
+  <div className="px-4 pb-4">
+    <JobAttachmentsInternal
+      jobId={job.id}
+      initialItems={attachmentItems}
+    />
+  </div>
+</details>
 
 {/* Timeline */}
 <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
-  <div className="text-sm font-semibold mb-3">Timeline</div>
+  <div className="text-sm font-semibold mb-1">Timeline</div>
+  <div className="text-xs text-gray-500 mb-3">
+    Showing latest {Math.min(3, timelineItems.length)} of {timelineItems.length} event(s)
+  </div>
 
   <div className="space-y-2">
-    {(timelineEvents ?? []).length ? (
-      (timelineEvents ?? []).map((e: any, idx: number) => {
-        const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "—";
-        const type = String(e?.event_type ?? "");
-        const meta = e?.meta ?? {};
-        const noteText = getEventNoteText(meta);
-        const fileSummary = getEventFileSummary(meta);
+    {timelineItems.length ? (
+      <>
+        {timelinePreviewItems.map((e: any, idx: number) =>
+          renderTimelineItem(e, `timeline-preview-${idx}`)
+        )}
 
-        const icon =
-          type === "job_created" ? "🆕" :
-          type === "intake_submitted" ? "📥" :
-          type === "retest_created" ? "🔁" :
-          type === "customer_attempt" ? "📞" :
-          type === "status_changed" ? "🔄" :
-          type === "on_my_way" ? "🚗" :
-          type === "job_started" ? "🛠️" :
-          type === "job_completed" ? "🏁" :
-          type === "job_failed" ? "❌" :
-          type === "job_passed" ? "✅" :
-          type === "scheduled" ? "📅" :
-          type === "unscheduled" ? "🗓️" :
-          type === "retest_scheduled" ? "📅" :
-          type === "retest_started" ? "🛠️" :
-          type === "retest_passed" ? "✅" :
-          type === "retest_failed" ? "❌" :
-          type === "schedule_updated" ? "🕒" :
-          type === "contractor_note" ? "💬" :
-          type === "public_note" ? "💬" :
-          type === "internal_note" ? "📝" :
-          type === "failure_resolved_by_correction_review" ? "✅" :
-          type === "contractor_correction_submission" ? "📎" :
-          "📝";
-
-        return (
-          <div key={idx} className="rounded border p-3 text-sm bg-white">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs text-gray-600">{when}</div>
-              <div className="text-xs text-gray-500">{icon}</div>
+        {timelineOverflowItems.length > 0 ? (
+          <details className="pt-1">
+            <summary className="cursor-pointer text-sm text-gray-700 underline">
+              Show all timeline entries ({timelineItems.length})
+            </summary>
+            <div className="mt-2 space-y-2">
+              {timelineOverflowItems.map((e: any, idx: number) =>
+                renderTimelineItem(e, `timeline-overflow-${idx}`)
+              )}
             </div>
-
-            <div className="mt-2 font-medium">
-              {formatTimelineEvent(type, meta, e?.message)}
-            </div>
-
-            {(type === "contractor_note" ||
-              type === "public_note" ||
-              type === "internal_note" ||
-              type === "contractor_correction_submission") && noteText ? (
-              <div className="mt-2 whitespace-pre-wrap text-sm text-gray-800">
-                {noteText}
-              </div>
-            ) : null}
-
-            {(type === "contractor_note" ||
-              type === "public_note" ||
-              type === "internal_note" ||
-              type === "contractor_correction_submission") && fileSummary ? (
-              <div className="mt-2 text-xs text-gray-600">
-                Files: {fileSummary}
-              </div>
-            ) : null}
-
-            {type === "retest_created" && meta?.child_job_id ? (
-              <div className="mt-1 text-sm">
-                Retest:{" "}
-                <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
-                  View linked retest
-                </Link>
-              </div>
-            ) : null}
-
-            {type === "retest_created" && meta?.parent_job_id ? (
-              <div className="mt-1 text-sm">
-                Original:{" "}
-                <Link className="underline" href={`/jobs/${String(meta.parent_job_id)}?tab=ops`}>
-                  View original job
-                </Link>
-              </div>
-            ) : null}
-
-            {type === "retest_passed" && meta?.child_job_id ? (
-              <div className="mt-1 text-sm">
-                Resolved by retest:{" "}
-                <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
-                  View retest job
-                </Link>
-              </div>
-            ) : null}
-
-            {type === "retest_scheduled" && meta?.child_job_id ? (
-              <div className="mt-1 text-sm">
-                Retest scheduled:{" "}
-                <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
-                  View retest job
-                </Link>
-              </div>
-            ) : null}
-
-            {type === "retest_started" && meta?.child_job_id ? (
-              <div className="mt-1 text-sm">
-                Active retest:{" "}
-                <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
-                  View retest job
-                </Link>
-              </div>
-            ) : null}
-
-            {type === "retest_failed" && meta?.child_job_id ? (
-              <div className="mt-1 text-sm">
-                Retest failed again:{" "}
-                <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
-                  View retest job
-                </Link>
-              </div>
-            ) : null}
-          </div>
-        );
-      })
+          </details>
+        ) : null}
+      </>
     ) : (
       <div className="text-sm text-gray-600">No timeline events yet.</div>
     )}
   </div>
 </div>
 
-          {/* Follow Up */}
-          <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
-            <div className="text-sm font-semibold mb-3">Follow Up</div>
-
-            <form action={updateJobOpsDetailsFromForm} className="grid gap-3">
-              <input type="hidden" name="job_id" value={job.id} />
-
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Action Required By</label>
-                  <select
-                    name="action_required_by"
-                    defaultValue={job.action_required_by ?? ""}
-                    className="w-full rounded border px-2 py-2 text-sm"
-                  >
-                    <option value="">—</option>
-                    <option value="rater">Rater</option>
-                    <option value="contractor">Contractor</option>
-                    <option value="customer">Customer</option>
-                  </select>
-                </div>
-
-
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Follow-up Date</label>
-                  <input
-                    type="date"
-                    name="follow_up_date"
-                    defaultValue={job.follow_up_date ? dateToDateInput(String(job.follow_up_date)) : ""}
-                    className="w-full rounded border px-2 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Pending Info Reason</label>
-                <input
-                  name="pending_info_reason"
-                  defaultValue={job.pending_info_reason ?? ""}
-                  className="w-full rounded border px-2 py-2 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Next Action Note</label>
-                <textarea
-                  name="next_action_note"
-                  defaultValue={job.next_action_note ?? ""}
-                  className="w-full rounded border px-2 py-2 text-sm"
-                  rows={4}
-                />
-              </div>
-
-              <button className="px-3 py-2 rounded bg-black text-white text-sm w-fit" type="submit">
-                Save Follow Up
-              </button>
-            </form>
-          </div>
-
-          {/* Customer Follow-up Attempts */}
-          {job.ops_status === "need_to_schedule" ? (
-            <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
-              <div className="text-sm font-semibold mb-2">Customer Follow-Up</div>
-
-              <div className="text-xs text-gray-600 mb-3">
-                Attempts: <span className="font-medium">{attemptCount}</span> • Last:{" "}
-                <span className="font-medium">{lastAttemptLabel}</span>
-              </div>
-
-              <div className="flex flex-wrap gap-2 mb-4">
-                <form action={logCustomerContactAttemptFromForm}>
-                  <input type="hidden" name="job_id" value={job.id} />
-
-                  <input type="hidden" name="method" value="call" />
-                  <input type="hidden" name="result" value="no_answer" />
-                  <SubmitButton className="px-3 py-2 rounded border text-sm">
-                    Log Call (No Answer)
-                  </SubmitButton>
-                </form>
-
-                <form action={logCustomerContactAttemptFromForm}>
-                  <input type="hidden" name="job_id" value={job.id} />
-
-                  <input type="hidden" name="method" value="text" />
-                  <input type="hidden" name="result" value="sent" />
-                  <button className="px-3 py-2 rounded border text-sm" type="submit">
-                    Log Text (Sent)
-                  </button>
-                </form>
-
-                <form action={logCustomerContactAttemptFromForm}>
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <input type="hidden" name="method" value="call" />
-                  <input type="hidden" name="result" value="spoke" />
-                  <button className="px-3 py-2 rounded border text-sm" type="submit">
-                    Log Call (Spoke)
-                  </button>
-                  
-                </form>
-              </div>
-
-              <div className="space-y-2">
-                {last3Attempts.map((a: any, idx: number) => {
-  const method = a?.meta?.method ? String(a.meta.method) : "";
-  const result = a?.meta?.result ? String(a.meta.result) : "";
-  const when = a?.created_at ? formatDateTimeLAFromIso(String(a.created_at)) : "—";
-
-  const methodIcon = method === "text" ? "💬" : method === "call" ? "📞" : "📝";
-
-  const resultLabel =
-    result === "no_answer" ? "No Answer" :
-    result === "sent" ? "Sent" :
-    result === "spoke" ? "Spoke" :
-    (result || "—");
-
-  return (
-    <div key={idx} className="rounded border p-3 text-sm bg-white">
-      <div className="flex items-start justify-between gap-3">
-        <div className="text-xs text-gray-600">{when}</div>
-        <div className="text-xs text-gray-500">
-          {a?.meta?.attempt_number ? `#${String(a.meta.attempt_number)}` : null}
-        </div>
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs">
-          <span>{methodIcon}</span>
-          <span className="capitalize">{method || "—"}</span>
-        </span>
-
-        <span className="inline-flex items-center rounded-full border px-2 py-1 text-xs">
-          {resultLabel}
-        </span>
-      </div>
-    </div>
-  );
-})}
-              </div>
-            </div>
-          ) : null}
         </>
       )}
 
