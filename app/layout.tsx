@@ -36,6 +36,7 @@ export default async function RootLayout({
   const user = userData?.user;
 
   let homeHref = "/ops";
+  let isContractor = false;
 
   if (user) {
     const [{ data: cu }, internalUser] = await Promise.all([
@@ -49,6 +50,7 @@ export default async function RootLayout({
 
     if (cu?.contractor_id) {
       homeHref = "/portal";
+      isContractor = true;
     } else if (internalUser?.is_active) {
       homeHref = "/ops";
     }
@@ -86,12 +88,14 @@ export default async function RootLayout({
                 >
                   + New Job
                 </Link>
-                <Link
-                  href="/contractors/new"
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
-                >
-                  + New Contractor
-                </Link>
+                {!isContractor && (
+                  <Link
+                    href="/contractors/new"
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
+                  >
+                    + New Contractor
+                  </Link>
+                )}
                 <Link
                   href="/calendar"
                   className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
