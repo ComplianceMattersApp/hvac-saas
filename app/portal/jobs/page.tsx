@@ -1,4 +1,4 @@
-//app portal/page
+// app/portal/jobs/page.tsx — View all contractor jobs (uncapped)
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -28,21 +28,8 @@ function toDateMs(value: string | null | undefined) {
   return Number.isFinite(t) ? t : 0;
 }
 
-type SP = Record<string, string | string[] | undefined>;
-
-function sp1(v: string | string[] | undefined) {
-  return Array.isArray(v) ? v[0] : v;
-}
-
-export default async function PortalPage({
-  searchParams,
-}: {
-  searchParams?: Promise<SP>;
-}) {
+export default async function PortalAllJobsPage() {
   const supabase = await createClient();
-
-  const sp: SP = (searchParams ? await searchParams : {}) ?? {};
-  const q = (sp1(sp.q) ?? "").toString().trim();
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
@@ -99,62 +86,20 @@ export default async function PortalPage({
   if (baseJobsErr) throw baseJobsErr;
 
   const jobs = (baseJobs ?? []) as any[];
-
-  const normalizedQuery = q.toLowerCase();
-
-  function matchesSearch(job: any) {
-    if (!normalizedQuery) return true;
-
-    const fullName = [
-      String(job.customer_first_name ?? "").trim(),
-      String(job.customer_last_name ?? "").trim(),
-    ]
-      .filter(Boolean)
-      .join(" ");
-
-    const haystack = [
-      job.title,
-      fullName,
-      job.customer_phone,
-      job.job_address,
-      job.city,
-      job.locations?.address_line1,
-      job.locations?.city,
-      job.permit_number,
-      job.id,
-    ]
-      .map((v) => String(v ?? "").trim().toLowerCase())
-      .filter(Boolean)
-      .join(" ");
-
-    return haystack.includes(normalizedQuery);
-  }
-
-  function portalHref() {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-
-    const qs = params.toString();
-    return qs ? `/portal?${qs}` : "/portal";
-  }
-
-  const scopedJobs = jobs.filter(matchesSearch);
-
-  const scopedJobIds = scopedJobs.map((j: any) => j.id);
+  const jobIds = jobs.map((j: any) => j.id);
 
   const { data: visibleRuns, error: visibleRunsErr } = await supabase
     .from("ecc_test_runs")
     .select(
       "job_id, created_at, test_type, computed_pass, override_pass, computed, is_completed"
     )
-    .in("job_id", scopedJobIds.length ? scopedJobIds : ["00000000-0000-0000-0000-000000000000"])
+    .in("job_id", jobIds.length ? jobIds : ["00000000-0000-0000-0000-000000000000"])
     .eq("is_completed", true)
     .order("created_at", { ascending: false });
 
   if (visibleRunsErr) throw visibleRunsErr;
 
   const failedRunByJob = new Map<string, any>();
-
   for (const run of visibleRuns ?? []) {
     if (finalRunPass(run) === false && !failedRunByJob.has(run.job_id)) {
       failedRunByJob.set(run.job_id, run);
@@ -164,7 +109,7 @@ export default async function PortalPage({
   const { data: rawIssueEvents, error: rawIssueEventsErr } = await supabase
     .from("job_events")
     .select("job_id, event_type, created_at, meta")
-    .in("job_id", scopedJobIds.length ? scopedJobIds : ["00000000-0000-0000-0000-000000000000"])
+    .in("job_id", jobIds.length ? jobIds : ["00000000-0000-0000-0000-000000000000"])
     .in("event_type", [
       "contractor_correction_submission",
       "contractor_note",
@@ -172,7 +117,7 @@ export default async function PortalPage({
       "status_changed",
     ])
     .order("created_at", { ascending: false })
-    .limit(1000);
+    .limit(2000);
 
   if (rawIssueEventsErr) throw rawIssueEventsErr;
 
@@ -184,7 +129,7 @@ export default async function PortalPage({
     eventsByJob.get(jobId)!.push(ev);
   }
 
-  const resolvedJobs = scopedJobs.map((job: any) => {
+  const resolvedJobs = jobs.map((job: any) => {
     const failedRun = failedRunByJob.get(job.id);
     const failureReasons = failedRun ? extractFailureReasons(failedRun) : [];
     const issueEvents = eventsByJob.get(String(job.id)) ?? [];
@@ -202,10 +147,7 @@ export default async function PortalPage({
       events: issueEvents,
     });
 
-    return {
-      job,
-      resolved,
-    };
+    return { job, resolved };
   });
 
   const actionRequiredJobs = resolvedJobs
@@ -217,7 +159,6 @@ export default async function PortalPage({
       const urgencyB = Number(
         !!b.job.follow_up_date && String(b.job.follow_up_date) <= String(today)
       );
-
       if (urgencyA !== urgencyB) return urgencyB - urgencyA;
       return toDateMs(b.job.created_at) - toDateMs(a.job.created_at);
     });
@@ -232,14 +173,12 @@ export default async function PortalPage({
       const aResolved = toDateMs(a.job.data_entry_completed_at ?? a.job.created_at);
       const bResolved = toDateMs(b.job.data_entry_completed_at ?? b.job.created_at);
       return bResolved - aResolved;
-    })
-    .slice(0, 50);
+    });
 
   function issueLine(issue: ContractorIssue): string {
     if (issue.group === "needs_info") {
       return `Need information from you - ${issue.headline}`;
     }
-
     return issue.headline;
   }
 
@@ -287,7 +226,6 @@ export default async function PortalPage({
     ]
       .filter(Boolean)
       .join(" ");
-
     return full || "Customer";
   }
 
@@ -296,8 +234,8 @@ export default async function PortalPage({
       String(job.locations?.address_line1 ?? "").trim() ||
       String(job.job_address ?? "").trim() ||
       "No address";
-    const city = String(job.locations?.city ?? "").trim() || String(job.city ?? "").trim();
-
+    const city =
+      String(job.locations?.city ?? "").trim() || String(job.city ?? "").trim();
     return city ? `${addr}, ${city}` : addr;
   }
 
@@ -306,51 +244,25 @@ export default async function PortalPage({
       <div className="rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800 p-6 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-              Contractor Portal
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              <Link href="/portal" className="hover:underline">
+                ← Portal
+              </Link>
+            </div>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+              All Jobs
             </h1>
             <div className="mt-1 text-sm font-medium text-gray-600 dark:text-gray-300">
               {contractorName}
             </div>
           </div>
-
-          <Link
-            href="/jobs/new"
-            className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
-          >
-            + Add Job
-          </Link>
-        </div>
-
-        <form method="get" className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
-
-          <input
-            type="search"
-            name="q"
-            defaultValue={q}
-            placeholder="Search customer, address, city, permit, job title, or reference"
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-          />
-
-          <div className="flex items-center gap-2">
-            <button
-              type="submit"
-              className="rounded-lg border bg-black px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
-            >
-              Apply
-            </button>
-            {q && (
-              <Link
-                href={portalHref()}
-                className="rounded-lg border px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-              >
-                Reset
-              </Link>
-            )}
+          <div className="text-sm text-gray-500 dark:text-gray-400 pt-1">
+            {resolvedJobs.length} total
           </div>
-        </form>
+        </div>
       </div>
 
+      {/* Action Required */}
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -361,69 +273,66 @@ export default async function PortalPage({
           </div>
         </div>
 
-      <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
-        <div className="divide-y divide-gray-200 dark:divide-gray-800">
-          {actionRequiredJobs.slice(0, 5).map(({ job: j, resolved }) => {
-            const isUrgent =
-              !!j.follow_up_date && String(j.follow_up_date) <= String(today);
-            const displayLines = cardIssueLines(resolved);
-
-            return (
-              <Link
-                key={j.id}
-                href={`/portal/jobs/${j.id}`}
-                className={[
-                  "block border-l-4 p-4 transition-all duration-150 border-l-transparent",
-                  "hover:bg-gray-50 hover:shadow-sm dark:hover:bg-gray-800/40",
-                  isUrgent ? "border-l-red-500" : "",
-                ].join(" ")}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
-                      {customerName(j)}
-                    </div>
-
-                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                      <div className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                        {j.title ?? "Untitled Job"}
+        <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
+            {actionRequiredJobs.map(({ job: j, resolved }) => {
+              const isUrgent =
+                !!j.follow_up_date && String(j.follow_up_date) <= String(today);
+              const displayLines = cardIssueLines(resolved);
+              return (
+                <Link
+                  key={j.id}
+                  href={`/portal/jobs/${j.id}`}
+                  className={[
+                    "block border-l-4 p-4 transition-all duration-150 border-l-transparent",
+                    "hover:bg-gray-50 hover:shadow-sm dark:hover:bg-gray-800/40",
+                    isUrgent ? "border-l-red-500" : "",
+                  ].join(" ")}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
+                        {customerName(j)}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                        <div className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
+                          {j.title ?? "Untitled Job"}
+                        </div>
+                      </div>
+                      <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                        {displayAddress(j)}
+                      </div>
+                      <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+                        {displayLines.map((line, idx) => (
+                          <div key={`${j.id}-line-${idx}`}>{line}</div>
+                        ))}
                       </div>
                     </div>
-
-                    <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                      {displayAddress(j)}
-                    </div>
-
-                    <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
-                      {displayLines.map((line, idx) => (
-                        <div key={`${j.id}-line-${idx}`}>{line}</div>
-                      ))}
+                    <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
+                      {j.scheduled_date
+                        ? `Service ${formatDateLA(j.scheduled_date)}`
+                        : "Service date pending"}
                     </div>
                   </div>
+                </Link>
+              );
+            })}
 
-                  <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
-                    {j.scheduled_date ? `Service ${formatDateLA(j.scheduled_date)}` : "Service date pending"}
-                  </div>
+            {actionRequiredJobs.length === 0 && (
+              <div className="p-8 text-center">
+                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  No action-required jobs.
                 </div>
-              </Link>
-            );
-          })}
-
-          {actionRequiredJobs.length === 0 && (
-            <div className="p-8 text-center">
-              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                No action-required jobs.
+                <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  New failed or pending-info jobs will appear here.
+                </div>
               </div>
-              <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                New failed or pending-info jobs will appear here.
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-
       </section>
 
+      {/* In Progress */}
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -436,7 +345,7 @@ export default async function PortalPage({
 
         <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
-            {inProgressJobs.slice(0, 5).map(({ job: j, resolved }) => {
+            {inProgressJobs.map(({ job: j, resolved }) => {
               const displayLines = cardIssueLines(resolved);
               return (
                 <Link
@@ -449,24 +358,22 @@ export default async function PortalPage({
                       <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
                         {customerName(j)}
                       </div>
-
                       <div className="mt-0.5 truncate text-base font-semibold text-gray-900 dark:text-gray-100">
                         {j.title ?? "Untitled Job"}
                       </div>
-
                       <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                         {displayAddress(j)}
                       </div>
-
                       <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
                         {displayLines.map((line, idx) => (
                           <div key={`${j.id}-inprogress-line-${idx}`}>{line}</div>
                         ))}
                       </div>
                     </div>
-
                     <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
-                      {j.scheduled_date ? `Service ${formatDateLA(String(j.scheduled_date))}` : "Schedule pending"}
+                      {j.scheduled_date
+                        ? `Service ${formatDateLA(String(j.scheduled_date))}`
+                        : "Schedule pending"}
                     </div>
                   </div>
                 </Link>
@@ -487,6 +394,7 @@ export default async function PortalPage({
         </div>
       </section>
 
+      {/* Passed */}
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -499,7 +407,7 @@ export default async function PortalPage({
 
         <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
-            {passedJobs.slice(0, 5).map(({ job: j, resolved }) => {
+            {passedJobs.map(({ job: j, resolved }) => {
               const resolvedAt = j.data_entry_completed_at ?? j.created_at;
               const displayLines = cardIssueLines(resolved);
               return (
@@ -513,24 +421,22 @@ export default async function PortalPage({
                       <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
                         {customerName(j)}
                       </div>
-
                       <div className="mt-0.5 truncate text-base font-semibold text-gray-900 dark:text-gray-100">
                         {j.title ?? "Untitled Job"}
                       </div>
-
                       <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                         {displayAddress(j)}
                       </div>
-
                       <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
                         {displayLines.map((line, idx) => (
                           <div key={`${j.id}-passed-line-${idx}`}>{line}</div>
                         ))}
                       </div>
                     </div>
-
                     <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
-                      {resolvedAt ? `Resolved ${formatDateLA(String(resolvedAt))}` : "Resolved recently"}
+                      {resolvedAt
+                        ? `Resolved ${formatDateLA(String(resolvedAt))}`
+                        : "Resolved recently"}
                     </div>
                   </div>
                 </Link>
@@ -550,17 +456,6 @@ export default async function PortalPage({
           </div>
         </div>
       </section>
-
-      {resolvedJobs.length > 5 && (
-        <div className="flex justify-end pb-2">
-          <Link
-            href="/portal/jobs"
-            className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-          >
-            View all {resolvedJobs.length} jobs &rarr;
-          </Link>
-        </div>
-      )}
     </div>
   );
 }

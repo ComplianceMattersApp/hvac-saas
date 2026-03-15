@@ -373,7 +373,7 @@ export default async function PortalJobDetailPage({
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,0.92fr)_minmax(380px,1.08fr)] gap-3 md:items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-[420px_1fr] gap-3 md:items-stretch">
           <div className="space-y-2">
             <div className="text-xs text-gray-500 dark:text-gray-300">Contractor Portal - {contractorName}</div>
 
@@ -393,7 +393,7 @@ export default async function PortalJobDetailPage({
             </div>
           </div>
 
-          <div className="text-sm h-full">
+          <div className="h-full w-full">
             <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 min-h-[260px] md:min-h-[280px] h-full w-full flex items-center justify-center text-xs text-gray-500 dark:text-gray-300">
               Map preview placeholder
             </div>
