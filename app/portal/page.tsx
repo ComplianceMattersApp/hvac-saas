@@ -2,6 +2,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  extractFailureReasons,
+  finalRunPass,
+  resolveContractorIssues,
+  type ContractorIssue,
+} from "@/lib/portal/resolveContractorIssues";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -20,38 +26,6 @@ function toDateMs(value: string | null | undefined) {
   if (!value) return 0;
   const t = new Date(String(value)).getTime();
   return Number.isFinite(t) ? t : 0;
-}
-
-function extractTopReasons(run: any): string[] {
-  const computed = run?.computed ?? null;
-  if (!computed) return [];
-
-  const failures = Array.isArray(computed.failures)
-    ? computed.failures.map(String).map((s: string) => s.trim()).filter(Boolean)
-    : [];
-
-  if (failures.length) return failures.slice(0, 3);
-
-  const warnings = Array.isArray(computed.warnings)
-    ? computed.warnings.map(String).map((s: string) => s.trim()).filter(Boolean)
-    : [];
-
-  if (warnings.length) return warnings.slice(0, 3);
-
-  const measured = computed.measured_duct_leakage_cfm;
-  const max = computed.max_leakage_cfm;
-
-  if (typeof measured === "number" && typeof max === "number") {
-    if (measured > max) return [`Duct leakage ${measured} CFM exceeds max ${max} CFM.`];
-    return [`Duct leakage ${measured} CFM (max ${max} CFM).`];
-  }
-
-  return [];
-}
-
-function finalRunPass(run: any): boolean | null {
-  if (!run) return null;
-  return run.override_pass != null ? !!run.override_pass : !!run.computed_pass;
 }
 
 type SP = Record<string, string | string[] | undefined>;
@@ -105,6 +79,7 @@ export default async function PortalPage({
       permit_number,
       pending_info_reason,
       next_action_note,
+      action_required_by,
       follow_up_date,
       created_at,
       data_entry_completed_at,
@@ -165,47 +140,14 @@ export default async function PortalPage({
 
   const scopedJobs = jobs.filter(matchesSearch);
 
-  const openJobs = scopedJobs.filter(
-    (j: any) => String(j.ops_status ?? "").toLowerCase() !== "closed"
-  );
-
-  const actionRequiredStatuses = new Set([
-    "failed",
-    "retest_needed",
-    "pending_info",
-  ]);
-
-  const actionRequiredJobs = [...openJobs]
-    .filter((j: any) => actionRequiredStatuses.has(String(j.ops_status ?? "").toLowerCase()))
-    .sort((a: any, b: any) => {
-      const urgencyA = Number(
-        !!a.follow_up_date && String(a.follow_up_date) <= String(today)
-      );
-      const urgencyB = Number(
-        !!b.follow_up_date && String(b.follow_up_date) <= String(today)
-      );
-
-      if (urgencyA !== urgencyB) return urgencyB - urgencyA;
-      return toDateMs(b.created_at) - toDateMs(a.created_at);
-    });
-
-  const recentlyCompletedJobs = [...scopedJobs]
-    .filter((j: any) => String(j.ops_status ?? "").toLowerCase() === "closed")
-    .sort((a: any, b: any) => {
-      const aResolved = toDateMs(a.data_entry_completed_at ?? a.created_at);
-      const bResolved = toDateMs(b.data_entry_completed_at ?? b.created_at);
-      return bResolved - aResolved;
-    })
-    .slice(0, 25);
-
-  const actionJobIds = actionRequiredJobs.map((j: any) => j.id);
+  const scopedJobIds = scopedJobs.map((j: any) => j.id);
 
   const { data: visibleRuns, error: visibleRunsErr } = await supabase
     .from("ecc_test_runs")
     .select(
       "job_id, created_at, test_type, computed_pass, override_pass, computed, is_completed"
     )
-    .in("job_id", actionJobIds.length ? actionJobIds : ["00000000-0000-0000-0000-000000000000"])
+    .in("job_id", scopedJobIds.length ? scopedJobIds : ["00000000-0000-0000-0000-000000000000"])
     .eq("is_completed", true)
     .order("created_at", { ascending: false });
 
@@ -217,6 +159,118 @@ export default async function PortalPage({
     if (finalRunPass(run) === false && !failedRunByJob.has(run.job_id)) {
       failedRunByJob.set(run.job_id, run);
     }
+  }
+
+  const { data: rawIssueEvents, error: rawIssueEventsErr } = await supabase
+    .from("job_events")
+    .select("job_id, event_type, created_at, meta")
+    .in("job_id", scopedJobIds.length ? scopedJobIds : ["00000000-0000-0000-0000-000000000000"])
+    .in("event_type", [
+      "contractor_correction_submission",
+      "contractor_note",
+      "retest_ready_requested",
+      "status_changed",
+    ])
+    .order("created_at", { ascending: false })
+    .limit(1000);
+
+  if (rawIssueEventsErr) throw rawIssueEventsErr;
+
+  const eventsByJob = new Map<string, any[]>();
+  for (const ev of rawIssueEvents ?? []) {
+    const jobId = String((ev as any)?.job_id ?? "").trim();
+    if (!jobId) continue;
+    if (!eventsByJob.has(jobId)) eventsByJob.set(jobId, []);
+    eventsByJob.get(jobId)!.push(ev);
+  }
+
+  const resolvedJobs = scopedJobs.map((job: any) => {
+    const failedRun = failedRunByJob.get(job.id);
+    const failureReasons = failedRun ? extractFailureReasons(failedRun) : [];
+    const issueEvents = eventsByJob.get(String(job.id)) ?? [];
+
+    const resolved = resolveContractorIssues({
+      job: {
+        id: String(job.id ?? ""),
+        ops_status: job.ops_status,
+        pending_info_reason: job.pending_info_reason,
+        next_action_note: job.next_action_note,
+        action_required_by: job.action_required_by,
+        scheduled_date: job.scheduled_date,
+      },
+      failureReasons,
+      events: issueEvents,
+    });
+
+    return {
+      job,
+      resolved,
+    };
+  });
+
+  const actionRequiredJobs = resolvedJobs
+    .filter((row) => row.resolved.bucket === "action_required")
+    .sort((a, b) => {
+      const urgencyA = Number(
+        !!a.job.follow_up_date && String(a.job.follow_up_date) <= String(today)
+      );
+      const urgencyB = Number(
+        !!b.job.follow_up_date && String(b.job.follow_up_date) <= String(today)
+      );
+
+      if (urgencyA !== urgencyB) return urgencyB - urgencyA;
+      return toDateMs(b.job.created_at) - toDateMs(a.job.created_at);
+    });
+
+  const inProgressJobs = resolvedJobs
+    .filter((row) => row.resolved.bucket === "in_progress")
+    .sort((a, b) => toDateMs(b.job.created_at) - toDateMs(a.job.created_at));
+
+  const passedJobs = resolvedJobs
+    .filter((row) => row.resolved.bucket === "passed")
+    .sort((a, b) => {
+      const aResolved = toDateMs(a.job.data_entry_completed_at ?? a.job.created_at);
+      const bResolved = toDateMs(b.job.data_entry_completed_at ?? b.job.created_at);
+      return bResolved - aResolved;
+    })
+    .slice(0, 50);
+
+  function issueLine(issue: ContractorIssue): string {
+    if (issue.group === "needs_info") {
+      return `Need information from you - ${issue.headline}`;
+    }
+
+    return issue.headline;
+  }
+
+  function cardIssueLines(input: {
+    primaryIssue: ContractorIssue;
+    secondaryIssues?: ContractorIssue[];
+  }) {
+    const lines: string[] = [];
+
+    lines.push(issueLine(input.primaryIssue));
+
+    const secondaryBlocker = (input.secondaryIssues ?? []).find(
+      (issue) => issue.group === "needs_info" || issue.group === "failed"
+    );
+
+    if (secondaryBlocker) {
+      lines.push(issueLine(secondaryBlocker));
+    }
+
+    const failedIssue =
+      input.primaryIssue.group === "failed"
+        ? input.primaryIssue
+        : (input.secondaryIssues ?? []).find((issue) => issue.group === "failed");
+
+    const failureLines = (failedIssue?.detailLines ?? []).slice(0, 1);
+    for (const reason of failureLines) {
+      if (lines.length >= 3) break;
+      lines.push(`Failed - ${reason}`);
+    }
+
+    return lines.slice(0, 3);
   }
 
   function customerName(job: any) {
@@ -302,26 +356,10 @@ export default async function PortalPage({
 
       <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
         <div className="divide-y divide-gray-200 dark:divide-gray-800">
-          {actionRequiredJobs.map((j: any) => {
+          {actionRequiredJobs.map(({ job: j, resolved }) => {
             const isUrgent =
               !!j.follow_up_date && String(j.follow_up_date) <= String(today);
-            const ops = String(j.ops_status ?? "").toLowerCase();
-            const failedRun = failedRunByJob.get(j.id);
-            const failureReasons = failedRun ? extractTopReasons(failedRun) : [];
-            const displayLines =
-              ["failed", "retest_needed"].includes(ops) && failureReasons.length > 0
-                ? failureReasons.slice(0, 3).map((r) => `Failed - ${r}`)
-                : ops === "failed"
-                ? ["Failed - Review required"]
-                : ops === "retest_needed"
-                ? ["Failed - Retest required"]
-                : ops === "pending_info"
-                ? [
-                    `Need information from you - ${String(j.pending_info_reason ?? "Details requested").trim()}`,
-                  ]
-                : ops === "need_to_schedule"
-                ? ["Waiting for scheduling"]
-                : [];
+            const displayLines = cardIssueLines(resolved);
 
             return (
               <Link
@@ -382,17 +420,17 @@ export default async function PortalPage({
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {labelWithCount("Recently Completed", recentlyCompletedJobs.length)}
+            {labelWithCount("In Progress", inProgressJobs.length)}
           </h2>
           <div className="text-sm text-gray-600 dark:text-gray-300">
-            Sorted by resolution date.
+            Scheduling and active work states.
           </div>
         </div>
 
         <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
-            {recentlyCompletedJobs.map((j: any) => {
-              const resolvedAt = j.data_entry_completed_at ?? j.created_at;
+            {inProgressJobs.map(({ job: j, resolved }) => {
+              const displayLines = cardIssueLines(resolved);
               return (
                 <Link
                   key={j.id}
@@ -413,7 +451,75 @@ export default async function PortalPage({
                         {displayAddress(j)}
                       </div>
 
-                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">Passed</div>
+                      <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+                        {displayLines.map((line, idx) => (
+                          <div key={`${j.id}-inprogress-line-${idx}`}>{line}</div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
+                      {j.scheduled_date ? `Service ${formatDateLA(String(j.scheduled_date))}` : "Schedule pending"}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+
+            {inProgressJobs.length === 0 && (
+              <div className="p-8 text-center">
+                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  No in-progress jobs.
+                </div>
+                <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Jobs that are scheduled or active appear here.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {labelWithCount("Passed", passedJobs.length)}
+          </h2>
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            Passed jobs and completion processing.
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
+            {passedJobs.map(({ job: j, resolved }) => {
+              const resolvedAt = j.data_entry_completed_at ?? j.created_at;
+              const displayLines = cardIssueLines(resolved);
+              return (
+                <Link
+                  key={j.id}
+                  href={`/portal/jobs/${j.id}`}
+                  className="block p-4 transition-all duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-gray-800/40"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
+                        {customerName(j)}
+                      </div>
+
+                      <div className="mt-0.5 truncate text-base font-semibold text-gray-900 dark:text-gray-100">
+                        {j.title ?? "Untitled Job"}
+                      </div>
+
+                      <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                        {displayAddress(j)}
+                      </div>
+
+                      <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+                        {displayLines.map((line, idx) => (
+                          <div key={`${j.id}-passed-line-${idx}`}>{line}</div>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -424,13 +530,13 @@ export default async function PortalPage({
               );
             })}
 
-            {recentlyCompletedJobs.length === 0 && (
+            {passedJobs.length === 0 && (
               <div className="p-8 text-center">
                 <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  No recently completed jobs.
+                  No passed jobs.
                 </div>
                 <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Completed jobs will appear here after closeout.
+                  Passed jobs will appear here.
                 </div>
               </div>
             )}

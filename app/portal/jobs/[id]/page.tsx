@@ -5,6 +5,11 @@ import { revalidatePath } from "next/cache";
 import { requestRetestReadyFromPortal } from "@/lib/actions/job-actions";
 import { createClient } from "@/lib/supabase/server";
 import JobAttachments from "@/components/portal/JobAttachments";
+import {
+  extractFailureReasons,
+  finalRunPass,
+  resolveContractorIssues,
+} from "@/lib/portal/resolveContractorIssues";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -24,30 +29,6 @@ function titleCaseFromSnake(value: string | null | undefined) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function finalRunPass(run: any): boolean | null {
-  if (!run) return null;
-  return run.override_pass != null ? !!run.override_pass : !!run.computed_pass;
-}
-
-function extractTopReasons(run: any): string[] {
-  const computed = run?.computed ?? null;
-  if (!computed) return [];
-
-  const failures = Array.isArray(computed.failures)
-    ? computed.failures.map(String).map((s: string) => s.trim()).filter(Boolean)
-    : [];
-
-  if (failures.length) return failures.slice(0, 3);
-
-  const warnings = Array.isArray(computed.warnings)
-    ? computed.warnings.map(String).map((s: string) => s.trim()).filter(Boolean)
-    : [];
-
-  if (warnings.length) return warnings.slice(0, 3);
-
-  return [];
 }
 
 function formatTimeLocal(value: string | null | undefined) {
@@ -77,15 +58,6 @@ function buildAddressLines(opts: {
     line1: line1 || "",
     line2: line2 || "",
   };
-}
-
-function statusHeadline(opsStatus: string, isFailed: boolean, isPendingInfo: boolean) {
-  if (isFailed) return "Failed";
-  if (isPendingInfo) return "Need information from you";
-  if (opsStatus === "need_to_schedule") return "Waiting for scheduling";
-  if (opsStatus === "closed") return "Passed";
-  if (opsStatus === "paperwork_required" || opsStatus === "invoice_required") return "Passed";
-  return titleCaseFromSnake(opsStatus);
 }
 
 export default async function PortalJobDetailPage({
@@ -285,10 +257,31 @@ export default async function PortalJobDetailPage({
 
   const opsStatus = String((job as any)?.ops_status ?? "").toLowerCase();
   const isPortalFailed = ["failed", "retest_needed"].includes(opsStatus);
-  const isPendingInfo = opsStatus === "pending_info";
 
   const statusRun = isPortalFailed ? (latestFailedRun ?? latestCompletedRun) : latestCompletedRun;
-  const topReasons = statusRun ? extractTopReasons(statusRun) : [];
+  const topReasons = statusRun ? extractFailureReasons(statusRun) : [];
+
+  const resolvedIssues = resolveContractorIssues({
+    job: {
+      id: String((job as any)?.id ?? ""),
+      ops_status: (job as any)?.ops_status,
+      pending_info_reason: (job as any)?.pending_info_reason,
+      next_action_note: (job as any)?.next_action_note,
+      action_required_by: (job as any)?.action_required_by,
+      scheduled_date: (job as any)?.scheduled_date,
+      window_start: (job as any)?.window_start,
+      window_end: (job as any)?.window_end,
+    },
+    failureReasons: topReasons,
+    events: contractorSafeEvents,
+    chain: {
+      hasOpenRetestChild,
+      hasRetestReadyRequest,
+    },
+  });
+
+  const primaryIssue = resolvedIssues.primaryIssue;
+  const secondaryIssues = resolvedIssues.secondaryIssues ?? [];
 
   const loc = Array.isArray((job as any)?.locations)
     ? (job as any).locations.find((location: any) => location) ?? null
@@ -318,18 +311,6 @@ export default async function PortalJobDetailPage({
 
   const customerPhone =
     String((job as any)?.customers?.phone ?? "").trim() || String((job as any)?.customer_phone ?? "").trim() || "-";
-
-  const statusTitle = statusHeadline(opsStatus, isPortalFailed, isPendingInfo);
-
-  const statusDescription = isPortalFailed
-    ? "This job is currently marked failed and needs correction review."
-    : isPendingInfo
-    ? `Need information from you${(job as any)?.pending_info_reason ? `: ${String((job as any).pending_info_reason)}` : "."}`
-    : opsStatus === "need_to_schedule"
-    ? "Waiting for scheduling"
-    : opsStatus === "closed"
-    ? "This job is passed and closed."
-    : titleCaseFromSnake((job as any)?.ops_status);
 
   const latestRaterNote = raterNotes.length > 0 ? raterNotes[0].note : "";
 
@@ -440,12 +421,23 @@ export default async function PortalJobDetailPage({
 
       <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
         <div className="text-sm font-semibold">Status</div>
-        <div className="text-lg font-semibold">{statusTitle}</div>
-        <div className="text-sm text-gray-700 dark:text-gray-200">{statusDescription}</div>
+        <div className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-300">
+          {primaryIssue.group === "needs_info"
+            ? "Need information from you"
+            : primaryIssue.group === "failed"
+            ? "Failed"
+            : primaryIssue.group === "in_progress"
+            ? "In progress"
+            : "Passed"}
+        </div>
+        <div className="text-lg font-semibold">{primaryIssue.headline}</div>
+        {primaryIssue.explanation ? (
+          <div className="text-sm text-gray-700 dark:text-gray-200">{primaryIssue.explanation}</div>
+        ) : null}
 
-        {topReasons.length > 0 ? (
+        {(primaryIssue.detailLines ?? []).slice(0, 4).length > 0 ? (
           <div className="space-y-1 text-sm text-gray-700 dark:text-gray-200">
-            {topReasons.map((reason, idx) => (
+            {(primaryIssue.detailLines ?? []).slice(0, 4).map((reason, idx) => (
               <div key={`${reason}-${idx}`}>Failed - {reason}</div>
             ))}
           </div>
@@ -458,6 +450,22 @@ export default async function PortalJobDetailPage({
           </div>
         ) : null}
       </section>
+
+      {secondaryIssues.length > 0 ? (
+        <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
+          <div className="text-sm font-semibold">Additional Blockers</div>
+          <div className="space-y-2">
+            {secondaryIssues.map((issue, idx) => (
+              <div key={`${issue.group}-${idx}`} className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+                <div className="text-sm font-medium">{issue.headline}</div>
+                {issue.explanation ? (
+                  <div className="mt-1 text-sm text-gray-700 dark:text-gray-200">{issue.explanation}</div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-4">
         <div className="text-sm font-semibold">Contractor Actions</div>
