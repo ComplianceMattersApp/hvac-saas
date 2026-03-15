@@ -1203,10 +1203,10 @@ const renderTimelineItem = (e: any, key: string) => {
     })() : null}
 
       {/* Control Bar: Tabs + Field Workflow */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mt-4 mb-6 flex items-center justify-between">
 
         {/* Tabs */}
-        <div className="flex items-center gap-2">
+        <div className="flex gap-2">
           <Link
             href={`/jobs/${job.id}?tab=info`}
             className={`inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium transition ${
