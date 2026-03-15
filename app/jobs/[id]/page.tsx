@@ -1058,7 +1058,7 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
               <div>
                 <div className="text-base font-semibold">Job Overview</div>
                 <div className="text-xs text-gray-500">
-                  Core service, scheduling, and customer details.
+                  Reference details for office and field context.
                 </div>
               </div>
             </div>
@@ -1230,8 +1230,6 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
                   This job is not linked to a customer yet.
                 </div>
               )}
-
-              <ServiceStatusActions jobId={jobId} />
             </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
@@ -1286,33 +1284,27 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
 
             </div>
 
-            {job.job_notes ? (
-              <div className="mt-5 border-t pt-4">
-                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Job Notes
-                </div>
-                <div className="mt-2 whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
-                  {job.job_notes}
-                </div>
-              </div>
-            ) : null}
+            <details className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <summary className="cursor-pointer text-sm font-medium text-gray-700">
+                Admin archive controls
+              </summary>
 
-            <div className="mt-6 rounded-lg border border-red-200 bg-white p-4 space-y-2">
-              <div className="font-semibold text-red-700">Danger zone</div>
-              <div className="text-sm text-gray-600">
-                Archive hides this job across Ops, portal, and searches. This can be undone later (by clearing deleted_at).
-              </div>
+              <div className="mt-3 space-y-2">
+                <div className="text-sm text-gray-600">
+                  Archive hides this job across Ops, portal, and searches. This can be undone later (by clearing deleted_at).
+                </div>
 
-              <form action={archiveJobFromForm}>
-                <input type="hidden" name="job_id" value={job.id} />
-                <button
-                  type="submit"
-                  className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
-                >
-                  Archive Job
-                </button>
-              </form>
-            </div>
+                <form action={archiveJobFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <button
+                    type="submit"
+                    className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+                  >
+                    Archive Job
+                  </button>
+                </form>
+              </div>
+            </details>
           </div>
         ) : (
 
@@ -1422,152 +1414,6 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
       </div>
     </section>
 
-    {/* Tests */}
-    <section className="rounded-xl border bg-white p-5 sm:p-6 text-gray-900 mb-6 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <div className="text-base font-semibold">Tests</div>
-          <div className="text-xs text-gray-500">
-            Capture and review ECC test results for this job.
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-        <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-          Status
-        </div>
-        <div className="mt-1 text-sm font-semibold text-gray-900">
-          {job.ecc_test_runs?.length
-            ? `${job.ecc_test_runs.length} test run(s) recorded`
-            : "No tests recorded yet."}
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Link
-          href={`/jobs/${job.id}/tests`}
-          className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          Go to Tests
-        </Link>
-      </div>
-    </section>
-
-    {/* Scheduling */}
-    <div className="rounded-xl border bg-white p-5 sm:p-6 text-gray-900 mb-6 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <div className="text-base font-semibold">Scheduling</div>
-          <div className="text-xs text-gray-500">
-            Set date, arrival window, and permit info.
-          </div>
-        </div>
-      </div>
-
-      <form action={updateJobScheduleFromForm} className="space-y-4">
-        <input type="hidden" name="job_id" value={job.id} />
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
-              Scheduled Date
-            </label>
-            <input
-              type="date"
-              name="scheduled_date"
-              defaultValue={displayDateLA(job.scheduled_date)}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
-              Permit #
-            </label>
-            <input
-              name="permit_number"
-              defaultValue={job.permit_number ?? ""}
-              placeholder="Optional"
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black"
-            />
-          </div>
-
-          {job.job_type === "ecc" ? (
-            <>
-              <div className="space-y-1">
-                <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
-                  Jurisdiction
-                </label>
-                <input
-                  name="jurisdiction"
-                  defaultValue={(job as any).jurisdiction ?? ""}
-                  placeholder="City or county permit office"
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
-                  Permit Date
-                </label>
-                <input
-                  type="date"
-                  name="permit_date"
-                  defaultValue={(job as any).permit_date ?? ""}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
-                />
-              </div>
-            </>
-          ) : null}
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
-              Window Start
-            </label>
-            <input
-              type="time"
-              name="window_start"
-              defaultValue={timeToTimeInput(job.window_start)}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
-            />
-            <div className="text-[11px] text-gray-500">Example: 08:00</div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
-              Window End
-            </label>
-            <input
-              type="time"
-              name="window_end"
-              defaultValue={timeToTimeInput(job.window_end)}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
-            />
-            <div className="text-[11px] text-gray-500">Example: 10:00</div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <button
-            className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-            type="submit"
-          >
-            Save Scheduling
-          </button>
-
-          <Link
-            href="/ops"
-            className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
-          >
-            Back to Ops
-          </Link>
-        </div>
-      </form>
-    </div>
-
         </>
       )}
 
@@ -1632,6 +1478,131 @@ const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
           </form>
         ) : null}
       </div>
+
+      {/* Scheduling */}
+      <div className="rounded-xl border bg-white p-5 sm:p-6 text-gray-900 mb-6 shadow-sm">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-base font-semibold">Scheduling</div>
+            <div className="text-xs text-gray-500">
+              Set date, arrival window, and permit info.
+            </div>
+          </div>
+        </div>
+
+        <form action={updateJobScheduleFromForm} className="space-y-4">
+          <input type="hidden" name="job_id" value={job.id} />
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                Scheduled Date
+              </label>
+              <input
+                type="date"
+                name="scheduled_date"
+                defaultValue={displayDateLA(job.scheduled_date)}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                Permit #
+              </label>
+              <input
+                name="permit_number"
+                defaultValue={job.permit_number ?? ""}
+                placeholder="Optional"
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black"
+              />
+            </div>
+
+            {job.job_type === "ecc" ? (
+              <>
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                    Jurisdiction
+                  </label>
+                  <input
+                    name="jurisdiction"
+                    defaultValue={(job as any).jurisdiction ?? ""}
+                    placeholder="City or county permit office"
+                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                    Permit Date
+                  </label>
+                  <input
+                    type="date"
+                    name="permit_date"
+                    defaultValue={(job as any).permit_date ?? ""}
+                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+                  />
+                </div>
+              </>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                Window Start
+              </label>
+              <input
+                type="time"
+                name="window_start"
+                defaultValue={timeToTimeInput(job.window_start)}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+              />
+              <div className="text-[11px] text-gray-500">Example: 08:00</div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-medium uppercase tracking-wide text-gray-600">
+                Window End
+              </label>
+              <input
+                type="time"
+                name="window_end"
+                defaultValue={timeToTimeInput(job.window_end)}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black [color-scheme:light]"
+              />
+              <div className="text-[11px] text-gray-500">Example: 10:00</div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              type="submit"
+            >
+              Save Scheduling
+            </button>
+
+            <Link
+              href="/ops"
+              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
+            >
+              Back to Ops
+            </Link>
+          </div>
+        </form>
+      </div>
+
+      <ServiceStatusActions jobId={jobId} />
+
+      {job.job_notes ? (
+        <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+          <div className="text-sm font-semibold mb-2">Job Notes</div>
+          <div className="whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
+            {job.job_notes}
+          </div>
+        </div>
+      ) : null}
 
           <section id="service-chain" className="rounded-lg border p-4 mb-4">
           <div className="flex items-center justify-between gap-3">

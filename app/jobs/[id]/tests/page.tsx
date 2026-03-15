@@ -59,12 +59,13 @@ function getTestDisplayLabel(testType: string, packageSystem: boolean) {
 
 function getRequiredTestStatusForSystem(job: any, systemId: string, testType: EccTestType) {
   const run = pickRunForSystem(job, testType, systemId);
+  const runDataKeys = run?.data && typeof run.data === "object" ? Object.keys(run.data).length : 0;
 
   if (!run) {
     return {
-      state: "missing" as const,
-      label: "Missing",
-      tone: "border-red-200 bg-red-50 text-red-700",
+      state: "required" as const,
+      label: "Required",
+      tone: "border-amber-200 bg-amber-50 text-amber-700",
       run,
     };
   }
@@ -89,9 +90,12 @@ function getRequiredTestStatusForSystem(job: any, systemId: string, testType: Ec
 
   if (run.is_completed !== true) {
     return {
-      state: "incomplete" as const,
-      label: "In progress",
-      tone: "border-amber-200 bg-amber-50 text-amber-700",
+      state: runDataKeys > 0 ? ("saved" as const) : ("open" as const),
+      label: runDataKeys > 0 ? "Saved" : "Open",
+      tone:
+        runDataKeys > 0
+          ? "border-blue-200 bg-blue-50 text-blue-700"
+          : "border-slate-200 bg-slate-100 text-slate-700",
       run,
     };
   }
@@ -598,9 +602,9 @@ const defaultSystemTonnage =
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href={`#cheers-fast-view`} className="px-3 py-2 rounded border text-sm font-medium bg-white hover:bg-gray-50">
-            CHEERS Fast View
-          </Link>
+          <label htmlFor="completion-report-toggle" className="cursor-pointer px-3 py-2 rounded border text-sm font-medium bg-white hover:bg-gray-50">
+            View Completion Report
+          </label>
           <PrintButton className="px-3 py-2 rounded border text-sm font-medium bg-white hover:bg-gray-50" />
           <Link href={`/jobs/${job.id}`} className="px-3 py-2 rounded border text-sm">
             ← Back to Job
@@ -608,6 +612,15 @@ const defaultSystemTonnage =
         </div>
       </div>
 
+      <input id="completion-report-toggle" type="checkbox" className="peer sr-only" />
+      <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 print:hidden">
+        Completion report is collapsed by default to keep test entry focused.
+        <label htmlFor="completion-report-toggle" className="ml-1 cursor-pointer font-medium text-slate-900 underline">
+          Expand report
+        </label>
+      </div>
+
+      <div className="hidden space-y-4 peer-checked:block print:block">
       <section className="rounded-lg border border-slate-400 bg-white p-5 space-y-4 text-slate-900 print:rounded-none print:border-slate-500 print:p-3 print:space-y-3">
         <div>
           <h2 className="text-lg font-bold text-slate-950 print:text-base">Customer / Job Info</h2>
@@ -798,6 +811,8 @@ const defaultSystemTonnage =
         )}
       </section>
 
+      </div>
+
       <section className="rounded-lg border p-4 space-y-4 print:hidden">
         <div>
           <h2 className="text-lg font-semibold">ECC Tests</h2>
@@ -887,78 +902,13 @@ const defaultSystemTonnage =
                   </div>
 )}
 
-
-
-
-        {selectedSystemId ? (
-  <div className="rounded-lg border bg-white p-4 space-y-3">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <div className="text-sm font-semibold">Detected ECC Scenario</div>
-        <div className="text-xs text-muted-foreground">
-          Based on project type and equipment on this system
-        </div>
-      </div>
-
-      <div className="rounded-full border px-2.5 py-1 text-xs font-medium bg-slate-50 text-slate-700">
-        {scenarioCode.replaceAll("_", " ")}
-      </div>
-    </div>
-
-    {scenarioNotes.length > 0 ? (
-      <div className="grid gap-2">
-        {scenarioNotes.map((note) => (
-          <div
-            key={note}
-            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
-          >
-            {note}
-          </div>
-        ))}
-      </div>
-    ) : null}
-
-    {suggestedTests.length > 0 ? (
-      <div className="grid gap-2">
-        {suggestedTests.map((rule) => (
-          <div
-            key={rule.testType}
-            className="flex items-center justify-between rounded-md border px-3 py-2"
-          >
-            <div className="min-w-0">
-              <div className="font-medium">{getTestDisplayLabel(rule.testType, packageSystem)}</div>
-              <div className="text-xs text-muted-foreground">
-                {rule.threshold
-                  ? `${String(rule.threshold.operator).toUpperCase()} ${rule.threshold.value} ${rule.threshold.unit}`
-                  : "Standard verification"}
-              </div>
-            </div>
-
-            <div className="rounded-full border px-2.5 py-1 text-xs font-medium bg-slate-50 text-slate-700">
-              Suggested
-            </div>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-        {isPlanDrivenNewConstruction
-          ? "New Construction is currently plan-driven/custom. Add tests manually with Add Test."
-          : "No standard ECC scenario detected yet for this system."}
-      </div>
-    )}
-  </div>
-  
-) : null}
-
-
                 {selectedSystemId ? (
           <div className="rounded-lg border bg-white p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold">Tests for this system</div>
+                <div className="text-sm font-semibold">Required and active tests</div>
                 <div className="text-xs text-muted-foreground">
-                  Default required tests plus manually added tests:{" "}
+                  Unified lifecycle list for this system:{" "}
                   <span className="font-medium">
                     {normalizedProfile === "alteration"
                       ? "Alteration"
@@ -998,6 +948,7 @@ const defaultSystemTonnage =
                 {visibleTestTypes.map((testType: EccTestType) => {
   const status = getRequiredTestStatusForSystem(job, selectedSystemId, testType);
   const testHref = `/jobs/${job.id}/tests?s=${selectedSystemId}&t=${testType}`;
+  const isRequired = requiredTests.includes(testType);
 
   return (
     <div
@@ -1005,18 +956,39 @@ const defaultSystemTonnage =
       className="flex items-center justify-between rounded-md border px-3 py-2 gap-3"
     >
       <div className="min-w-0">
-        <div className="font-medium">{getTestDisplayLabel(testType, packageSystem)}</div>
+        <div className="font-medium">
+          {getTestDisplayLabel(testType, packageSystem)}
+          {isRequired ? (
+            <span className="ml-2 rounded-full border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+              Required
+            </span>
+          ) : (
+            <span className="ml-2 rounded-full border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+              Added
+            </span>
+          )}
+        </div>
         <div className="text-xs text-muted-foreground">
-          {status.state === "missing"
-            ? "No run created yet"
-            : status.state === "incomplete"
-            ? "Run exists but is not completed"
+          {status.state === "required"
+            ? "Required test is not started yet"
+            : status.state === "open"
+            ? "Run opened and ready for readings"
+            : status.state === "saved"
+            ? "Readings saved, waiting for completion"
+            : status.state === "pass_override"
+            ? "Completed with pass override"
+            : status.state === "fail_override"
+            ? "Completed with fail override"
+            : status.state === "pass"
+            ? "Completed and passed"
+            : status.state === "fail"
+            ? "Completed and failed"
             : "Tracked on this system"}
         </div>
       </div>
 
       <div className="flex items-center gap-2">
-        {status.state === "missing" ? (
+        {status.state === "required" ? (
           <form action={addEccTestRunFromForm}>
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="system_id" value={selectedSystemId} />
@@ -1025,7 +997,7 @@ const defaultSystemTonnage =
               type="submit"
               className="rounded-md border px-3 py-1.5 text-xs font-medium"
             >
-              Add Run
+              Start Test
             </button>
           </form>
         ) : (
@@ -1033,7 +1005,7 @@ const defaultSystemTonnage =
             href={testHref}
             className="rounded-md border px-3 py-1.5 text-xs font-medium"
           >
-            Open Test
+            Open Workspace
           </Link>
         )}
 
@@ -1048,6 +1020,23 @@ const defaultSystemTonnage =
 })}
               </div>
             )}
+
+            {scenarioNotes.length > 0 ? (
+              <div className="grid gap-2 pt-1">
+                {scenarioNotes.map((note) => (
+                  <div
+                    key={note}
+                    className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                  >
+                    {note}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Scenario: {scenarioCode.replaceAll("_", " ")}
+            </div>
           </div>
         ) : null}
 
