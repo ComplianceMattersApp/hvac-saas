@@ -982,7 +982,7 @@ const renderTimelineItem = (e: any, key: string) => {
   return (
     <div className="p-6 max-w-3xl">
 
-<div className="mb-4 space-y-3">
+<div className="mb-4 space-y-2">
   <div>
     <Link
       href="/ops"
@@ -992,7 +992,7 @@ const renderTimelineItem = (e: any, key: string) => {
     </Link>
   </div>
 
-  <div className="space-y-1">
+  <div className="space-y-2">
     {job.customer_id ? (
       <Link
         href={`/customers/${job.customer_id}`}
@@ -1006,12 +1006,42 @@ const renderTimelineItem = (e: any, key: string) => {
 
     <div className="text-xl font-semibold text-gray-900">{job.title}</div>
 
-    <p className="text-sm text-gray-600 break-words">
-      {serviceAddressDisplay}
-    </p>
+    {serviceMapsLink ? (
+      <a
+        href={serviceMapsLink}
+        target="_blank"
+        rel="noreferrer"
+        className="flex h-36 w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 hover:bg-slate-200"
+      >
+        Map preview - click to navigate
+      </a>
+    ) : (
+      <div className="flex h-36 w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600">
+        Map preview - address unavailable
+      </div>
+    )}
+
+    {serviceMapsLink ? (
+      <a
+        href={serviceMapsLink}
+        target="_blank"
+        rel="noreferrer"
+        className="block text-sm text-gray-600 break-words hover:underline"
+      >
+        {serviceAddressDisplay}
+      </a>
+    ) : (
+      <p className="text-sm text-gray-600 break-words">{serviceAddressDisplay}</p>
+    )}
 
     <p className="text-sm text-gray-600">
-      {customerPhone}
+      {telLink ? (
+        <a href={telLink} className="hover:underline">
+          {customerPhone}
+        </a>
+      ) : (
+        customerPhone
+      )}
       {contractorName && contractorName !== "—" ? ` • Contractor: ${contractorName}` : ""}
     </p>
 
@@ -1251,20 +1281,6 @@ const renderTimelineItem = (e: any, key: string) => {
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Customer</div>
-                <div className="mt-1 text-sm font-semibold text-gray-900">
-                  {customerName || "—"}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Phone</div>
-                <div className="mt-1 text-sm font-semibold text-gray-900">
-                  {customerPhone}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
                 <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Permit</div>
                 <div className="mt-1 text-sm font-semibold text-gray-900">
                   {job.permit_number || "—"}
@@ -1284,13 +1300,6 @@ const renderTimelineItem = (e: any, key: string) => {
                   {(job as any).permit_date
                     ? displayDateLA(String((job as any).permit_date))
                     : "—"}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 sm:col-span-2">
-                <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Address</div>
-                <div className="mt-1 text-sm font-semibold text-gray-900 break-words">
-                  {serviceAddressDisplay || "—"}
                 </div>
               </div>
 
