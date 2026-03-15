@@ -982,40 +982,50 @@ const renderTimelineItem = (e: any, key: string) => {
   return (
     <div className="p-6 max-w-3xl">
 
-<div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-  <div className="flex flex-wrap items-center gap-2 text-sm text-gray-300">
+<div className="mb-4 space-y-3">
+  <div>
     <Link
       href="/ops"
-      className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 font-medium text-gray-900 hover:bg-gray-50"
+      className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 hover:bg-gray-50"
     >
       ← Back to Ops
     </Link>
+  </div>
 
-    <span className="hidden sm:inline text-gray-500">/</span>
-
+  <div className="space-y-1">
     {job.customer_id ? (
       <Link
         href={`/customers/${job.customer_id}`}
-        className="hover:underline"
+        className="block text-3xl font-semibold tracking-tight text-gray-900 hover:underline"
       >
         {customerName}
       </Link>
     ) : (
-      <span>{customerName}</span>
+      <h1 className="text-3xl font-semibold tracking-tight text-gray-900">{customerName}</h1>
     )}
 
-    <span className="text-gray-400">/</span>
+    <div className="text-xl font-semibold text-gray-900">{job.title}</div>
 
-    <span className="font-medium text-gray-200">{job.title}</span>
-  </div>
+    <p className="text-sm text-gray-600 break-words">
+      {serviceAddressDisplay}
+    </p>
 
-  <div className="flex flex-wrap items-center gap-2">
-    <Link
-      href="/calendar"
-      className="inline-flex h-10 items-center rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 hover:bg-gray-50"
-    >
-      Calendar
-    </Link>
+    <p className="text-sm text-gray-600">
+      {customerPhone}
+      {contractorName && contractorName !== "—" ? ` • Contractor: ${contractorName}` : ""}
+    </p>
+
+    <div className="flex flex-wrap items-center gap-2 pt-1">
+      <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">
+        <span className="font-medium">Field:</span>{" "}
+        {formatStatus(job.status)}
+      </div>
+
+      <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">
+        <span className="font-medium">Ops:</span>{" "}
+        {formatOpsStatusLabel(job.ops_status)}
+      </div>
+    </div>
   </div>
 </div>
       {/* Header */}
@@ -1090,17 +1100,6 @@ const renderTimelineItem = (e: any, key: string) => {
           message="New customer created and linked to this job."
         />
       )}
-
-      {/* Job Header */}
-        <div className="mb-4 space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {job.title}
-          </h1>
-
-          <p className="text-sm text-gray-400 break-words">
-            {serviceAddressDisplay}
-          </p>
-        </div>
 
       {sp?.schedule_required === "1" && (
         <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -1486,43 +1485,7 @@ const renderTimelineItem = (e: any, key: string) => {
               </div>
             </details>
           </div>
-        ) : (
-
-        <div className="mb-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">
-              <span className="font-medium">Field:</span>{" "}
-              {formatStatus(job.status)}
-            </div>
-
-            <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">
-              <span className="font-medium">Ops:</span>{" "}
-              {formatOpsStatusLabel(job.ops_status)}
-            </div>
-
-            {customerName ? (
-              <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">
-                <span className="font-medium">Customer:</span>{" "}
-                {customerName}
-              </div>
-            ) : null}
-
-            {job.scheduled_date ? (
-              <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">
-                <span className="font-medium">Scheduled:</span>{" "}
-                {displayDateLA(String(job.scheduled_date))}
-              </div>
-            ) : null}
-
-            {contractorName && contractorName !== "—" ? (
-              <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">
-                <span className="font-medium">Contractor:</span>{" "}
-                {contractorName}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      )}
+        ) : null}
 
 
       {/* TAB: INFO */}
