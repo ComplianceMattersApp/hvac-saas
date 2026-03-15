@@ -107,7 +107,6 @@ export default async function PortalPage({
       next_action_note,
       follow_up_date,
       created_at,
-      updated_at,
       data_entry_completed_at,
       scheduled_date,
       customer_first_name,
@@ -194,8 +193,8 @@ export default async function PortalPage({
   const recentlyCompletedJobs = [...scopedJobs]
     .filter((j: any) => String(j.ops_status ?? "").toLowerCase() === "closed")
     .sort((a: any, b: any) => {
-      const aResolved = toDateMs(a.data_entry_completed_at ?? a.updated_at ?? a.created_at);
-      const bResolved = toDateMs(b.data_entry_completed_at ?? b.updated_at ?? b.created_at);
+      const aResolved = toDateMs(a.data_entry_completed_at ?? a.created_at);
+      const bResolved = toDateMs(b.data_entry_completed_at ?? b.created_at);
       return bResolved - aResolved;
     })
     .slice(0, 25);
@@ -394,7 +393,7 @@ export default async function PortalPage({
         <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {recentlyCompletedJobs.map((j: any) => {
-              const resolvedAt = j.data_entry_completed_at ?? j.updated_at ?? j.created_at;
+              const resolvedAt = j.data_entry_completed_at ?? j.created_at;
               return (
                 <Link
                   key={j.id}
