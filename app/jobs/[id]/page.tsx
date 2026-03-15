@@ -1488,40 +1488,36 @@ const renderTimelineItem = (e: any, key: string) => {
           </div>
         ) : (
 
-        <div className="mb-4 text-sm text-gray-300">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-gray-800 bg-gray-900/40 px-3 py-2">
-            <div>
-              <span className="text-gray-500">Field:</span>{" "}
-              <span className="font-medium text-white">{formatStatus(job.status)}</span>
+        <div className="mb-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">
+              <span className="font-medium">Field:</span>{" "}
+              {formatStatus(job.status)}
             </div>
 
-            <div>
-              <span className="text-gray-500">Ops:</span>{" "}
-              <span className="font-medium text-white">
-                {formatOpsStatusLabel(job.ops_status)}
-              </span>
+            <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">
+              <span className="font-medium">Ops:</span>{" "}
+              {formatOpsStatusLabel(job.ops_status)}
             </div>
 
             {customerName ? (
-              <div>
-                <span className="text-gray-500">Customer:</span>{" "}
-                <span className="font-medium text-white">{customerName}</span>
+              <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">
+                <span className="font-medium">Customer:</span>{" "}
+                {customerName}
               </div>
             ) : null}
 
             {job.scheduled_date ? (
-              <div>
-                <span className="text-gray-500">Scheduled:</span>{" "}
-                <span className="font-medium text-white">
-                  {displayDateLA(String(job.scheduled_date))}
-                </span>
+              <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">
+                <span className="font-medium">Scheduled:</span>{" "}
+                {displayDateLA(String(job.scheduled_date))}
               </div>
             ) : null}
 
             {contractorName && contractorName !== "—" ? (
-              <div>
-                <span className="text-gray-500">Contractor:</span>{" "}
-                <span className="font-medium text-white">{contractorName}</span>
+              <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">
+                <span className="font-medium">Contractor:</span>{" "}
+                {contractorName}
               </div>
             ) : null}
           </div>
