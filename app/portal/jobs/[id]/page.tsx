@@ -388,7 +388,7 @@ export default async function PortalJobDetailPage({
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:items-stretch">
           <div className="space-y-3">
             <div className="text-xs text-gray-500 dark:text-gray-300">Contractor Portal - {contractorName}</div>
 
@@ -406,33 +406,33 @@ export default async function PortalJobDetailPage({
                 <div className="text-sm text-gray-500 dark:text-gray-400">Address not available</div>
               ) : null}
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
-                <div className="text-xs text-gray-500 dark:text-gray-300">Customer Phone</div>
-                <div className="mt-1 font-medium">{customerPhone}</div>
-              </div>
-
-              <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
-                <div className="text-xs text-gray-500 dark:text-gray-300">Current Status</div>
-                <div className="mt-1 font-medium">{titleCaseFromSnake((job as any).status)} / {titleCaseFromSnake((job as any).ops_status)}</div>
-              </div>
-            </div>
           </div>
 
-          <div className="space-y-3 text-sm">
-            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 min-h-[140px] flex items-center justify-center text-xs text-gray-500 dark:text-gray-300">
+          <div className="text-sm">
+            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 min-h-[200px] h-full w-full flex items-center justify-center text-xs text-gray-500 dark:text-gray-300">
               Map preview placeholder
             </div>
+          </div>
+        </div>
 
-            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
-              <div className="text-xs text-gray-500 dark:text-gray-300">Service Date</div>
-              <div className="mt-1 font-medium">
-                {(job as any).scheduled_date ? formatDateLA(String((job as any).scheduled_date)) : "Not scheduled"}
-                {(job as any).window_start && (job as any).window_end
-                  ? ` • ${formatTimeLocal((job as any).window_start)}-${formatTimeLocal((job as any).window_end)}`
-                  : ""}
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 h-full">
+            <div className="text-xs text-gray-500 dark:text-gray-300">Customer Phone</div>
+            <div className="mt-1 font-medium">{customerPhone}</div>
+          </div>
+
+          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 h-full">
+            <div className="text-xs text-gray-500 dark:text-gray-300">Current Status</div>
+            <div className="mt-1 font-medium">{titleCaseFromSnake((job as any).status)} / {titleCaseFromSnake((job as any).ops_status)}</div>
+          </div>
+
+          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 h-full">
+            <div className="text-xs text-gray-500 dark:text-gray-300">Service Date</div>
+            <div className="mt-1 font-medium">
+              {(job as any).scheduled_date ? formatDateLA(String((job as any).scheduled_date)) : "Not scheduled"}
+              {(job as any).window_start && (job as any).window_end
+                ? ` • ${formatTimeLocal((job as any).window_start)}-${formatTimeLocal((job as any).window_end)}`
+                : ""}
             </div>
           </div>
         </div>
