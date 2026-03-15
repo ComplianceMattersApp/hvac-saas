@@ -249,20 +249,27 @@ export default async function PortalPage({
   }) {
     const lines: string[] = [];
 
-    lines.push(issueLine(input.primaryIssue));
+    const failedIssue =
+      input.primaryIssue.group === "failed"
+        ? input.primaryIssue
+        : (input.secondaryIssues ?? []).find((issue) => issue.group === "failed");
+
+    const hasSpecificFailedReason = (failedIssue?.detailLines ?? []).length > 0;
+
+    if (!(input.primaryIssue.group === "failed" && hasSpecificFailedReason)) {
+      lines.push(issueLine(input.primaryIssue));
+    }
 
     const secondaryBlocker = (input.secondaryIssues ?? []).find(
       (issue) => issue.group === "needs_info" || issue.group === "failed"
     );
 
-    if (secondaryBlocker) {
+    if (
+      secondaryBlocker &&
+      !(secondaryBlocker.group === "failed" && hasSpecificFailedReason)
+    ) {
       lines.push(issueLine(secondaryBlocker));
     }
-
-    const failedIssue =
-      input.primaryIssue.group === "failed"
-        ? input.primaryIssue
-        : (input.secondaryIssues ?? []).find((issue) => issue.group === "failed");
 
     const failureLines = (failedIssue?.detailLines ?? []).slice(0, 1);
     for (const reason of failureLines) {

@@ -312,6 +312,10 @@ export default async function PortalJobDetailPage({
   const customerPhone =
     String((job as any)?.customers?.phone ?? "").trim() || String((job as any)?.customer_phone ?? "").trim() || "-";
 
+  const pendingInfoReasonText = String((job as any)?.pending_info_reason ?? "").trim();
+  const showPermitField =
+    primaryIssue.group === "needs_info" && /permit/i.test(pendingInfoReasonText);
+
   const latestRaterNote = raterNotes.length > 0 ? raterNotes[0].note : "";
 
   const timelineEvents = contractorSafeEvents.filter((e: any) => {
@@ -369,8 +373,8 @@ export default async function PortalJobDetailPage({
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:items-stretch">
-          <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,0.92fr)_minmax(380px,1.08fr)] gap-3 md:items-stretch">
+          <div className="space-y-2">
             <div className="text-xs text-gray-500 dark:text-gray-300">Contractor Portal - {contractorName}</div>
 
             <div className="text-2xl font-semibold tracking-tight">{customerName}</div>
@@ -389,14 +393,14 @@ export default async function PortalJobDetailPage({
             </div>
           </div>
 
-          <div className="text-sm">
-            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 min-h-[200px] h-full w-full flex items-center justify-center text-xs text-gray-500 dark:text-gray-300">
+          <div className="text-sm h-full">
+            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 min-h-[260px] md:min-h-[280px] h-full w-full flex items-center justify-center text-xs text-gray-500 dark:text-gray-300">
               Map preview placeholder
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+        <div className={`grid grid-cols-1 ${showPermitField ? "md:grid-cols-4" : "md:grid-cols-3"} gap-3 text-sm`}>
           <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 h-full">
             <div className="text-xs text-gray-500 dark:text-gray-300">Customer Phone</div>
             <div className="mt-1 font-medium">{customerPhone}</div>
@@ -416,6 +420,13 @@ export default async function PortalJobDetailPage({
                 : ""}
             </div>
           </div>
+
+          {showPermitField ? (
+            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 h-full">
+              <div className="text-xs text-gray-500 dark:text-gray-300">Permit #</div>
+              <div className="mt-1 font-medium">{String((job as any).permit_number ?? "").trim() || "-"}</div>
+            </div>
+          ) : null}
         </div>
       </section>
 

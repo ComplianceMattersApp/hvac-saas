@@ -101,7 +101,7 @@ export function resolveContractorIssues(
   if (opsStatus === "pending_info") {
     issues.push({
       group: "needs_info",
-      headline: pendingInfoReason || "Need information from you",
+      headline: pendingInfoReason || "Details requested",
       explanation:
         nextActionNote || "Please provide the requested information so work can continue.",
       detailLines: pendingInfoReason ? [pendingInfoReason] : undefined,
