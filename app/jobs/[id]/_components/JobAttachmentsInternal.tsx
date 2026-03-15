@@ -3,7 +3,10 @@
 import React, { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { createJobAttachmentUploadToken } from "@/lib/actions/attachment-actions";
+import {
+  createJobAttachmentUploadToken,
+  shareJobAttachmentToContractor,
+} from "@/lib/actions/attachment-actions";
 
 type Item = {
   id: string;
@@ -34,6 +37,7 @@ export default function JobAttachmentsInternal({
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [sharingId, setSharingId] = useState<string | null>(null);
 
   const hasFiles = files.length > 0;
   const canAct = !isPending && hasFiles;
@@ -113,6 +117,26 @@ export default function JobAttachmentsInternal({
         setError(e instanceof Error ? e.message : "Upload failed");
       }
     });
+  }
+
+  async function shareToContractor(attachment: Item) {
+    setError(null);
+    setOk(null);
+    setSharingId(attachment.id);
+
+    try {
+      await shareJobAttachmentToContractor({
+        jobId,
+        attachmentId: attachment.id,
+      });
+
+      setOk(`Shared "${attachment.file_name}" to contractor.`);
+      router.refresh();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Share failed");
+    } finally {
+      setSharingId(null);
+    }
   }
 
   return (
@@ -219,6 +243,15 @@ export default function JobAttachmentsInternal({
                         <div className="text-xs text-gray-600">
                           {a.caption ? a.caption : "—"}
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => shareToContractor(a)}
+                          disabled={isPending || sharingId === a.id}
+                          className="mt-2 inline-flex px-2.5 py-1 rounded-md border text-xs font-medium hover:bg-gray-100 transition disabled:opacity-50"
+                        >
+                          {sharingId === a.id ? "Sharing..." : "Share to Contractor"}
+                        </button>
                       </div>
 
                       {a.signedUrl ? (

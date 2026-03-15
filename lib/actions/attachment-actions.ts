@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireInternalUser } from "@/lib/auth/internal-user";
 
 function safeFileName(name: string) {
   return name.replace(/[^\w.\- ()]/g, "_");
@@ -58,4 +59,65 @@ export async function createJobAttachmentUploadToken(input: {
 
 export async function revalidatePortalJob(jobId: string) {
   revalidatePath(`/portal/jobs/${jobId}`);
+}
+
+export async function shareJobAttachmentToContractor(input: {
+  jobId: string;
+  attachmentId: string;
+  note?: string;
+}) {
+  const jobId = String(input.jobId ?? "").trim();
+  const attachmentId = String(input.attachmentId ?? "").trim();
+  const note = String(input.note ?? "").trim();
+
+  if (!jobId) throw new Error("Missing jobId");
+  if (!attachmentId) throw new Error("Missing attachmentId");
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr) throw userErr;
+  if (!user) throw new Error("Not authenticated");
+
+  await requireInternalUser({ supabase, userId: user.id });
+
+  const { data: attachment, error: attErr } = await supabase
+    .from("attachments")
+    .select("id, entity_type, entity_id, file_name")
+    .eq("id", attachmentId)
+    .maybeSingle();
+
+  if (attErr) throw attErr;
+  if (!attachment?.id) throw new Error("Attachment not found");
+
+  if (
+    String(attachment.entity_type ?? "") !== "job" ||
+    String(attachment.entity_id ?? "") !== jobId
+  ) {
+    throw new Error("Attachment is not linked to this job");
+  }
+
+  const fallbackNote = `Shared file: ${String(attachment.file_name ?? "Attachment")}`;
+
+  const { error: evErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "public_note",
+    user_id: user.id,
+    meta: {
+      note: note || fallbackNote,
+      attachment_ids: [attachmentId],
+      file_names: [String(attachment.file_name ?? "")],
+      source: "internal_share",
+    },
+  });
+
+  if (evErr) throw evErr;
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/portal/jobs/${jobId}`);
+  revalidatePath("/portal");
 }

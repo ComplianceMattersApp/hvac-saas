@@ -16,21 +16,10 @@ function labelWithCount(label: string, count: number) {
   return count > 0 ? `${label} (${count})` : label;
 }
 
-function statusLabel(ops: string | null | undefined) {
-  const v = (ops ?? "").toLowerCase();
-
-  if (v === "failed") return "FAILED";
-  if (v === "paperwork_required") return "CERTS PENDING";
-  if (v === "invoice_required") return "PAPERWORK PENDING";
-  if (v === "pending_info") return "PENDING INFO";
-  if (v === "retest_needed") return "RETEST REQUIRED";
-  if (v === "need_to_schedule") return "NEED TO SCHEDULE";
-  if (v === "scheduled" || v === "ready") return "SCHEDULED";
-  if (v === "on_hold") return "ON HOLD";
-  if (v === "field_complete") return "FIELD COMPLETE";
-  if (v === "closed") return "CLOSED";
-
-  return v ? v.toUpperCase().replaceAll("_", " ") : "UNKNOWN";
+function toDateMs(value: string | null | undefined) {
+  if (!value) return 0;
+  const t = new Date(String(value)).getTime();
+  return Number.isFinite(t) ? t : 0;
 }
 
 function extractTopReasons(run: any): string[] {
@@ -65,56 +54,10 @@ function finalRunPass(run: any): boolean | null {
   return run.override_pass != null ? !!run.override_pass : !!run.computed_pass;
 }
 
-function statusBadgeClass(ops: string | null | undefined) {
-  const v = (ops ?? "").toLowerCase();
-
-  if (v === "failed")
-    return "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300";
-  if (v === "paperwork_required" || v === "invoice_required")
-    return "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-300";
-  if (v === "retest_needed")
-    return "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300";
-  if (v === "pending_info")
-    return "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300";
-  if (v === "need_to_schedule")
-    return "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-300";
-  if (v === "scheduled" || v === "ready")
-    return "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300";
-  if (v === "on_hold")
-    return "border-gray-300 bg-gray-100 text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200";
-  if (v === "field_complete")
-    return "border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200";
-
-  return "border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200";
-}
-
-function rowAccentClass(opts: { isUrgent: boolean; ops_status?: string | null }) {
-  const ops = (opts.ops_status ?? "").toLowerCase();
-
-  if (opts.isUrgent) return "border-l-red-500";
-  if (ops === "paperwork_required" || ops === "invoice_required") return "border-l-sky-500";
-  if (ops === "pending_info") return "border-l-amber-400";
-  if (ops === "retest_needed" || ops === "failed") return "border-l-red-400";
-  if (ops === "scheduled" || ops === "ready") return "border-l-emerald-500";
-  if (ops === "need_to_schedule") return "border-l-blue-500";
-  if (ops === "field_complete") return "border-l-slate-400";
-
-  return "border-l-transparent";
-}
-
 type SP = Record<string, string | string[] | undefined>;
 
 function sp1(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v;
-}
-
-function queueCardClass(isActive: boolean) {
-  return [
-    "rounded-xl border p-4 transition-all duration-150",
-    isActive
-      ? "border-gray-900 bg-gray-900 text-white shadow-md dark:border-white dark:bg-white dark:text-gray-900"
-      : "bg-white text-gray-900 hover:shadow-sm hover:-translate-y-[1px] dark:bg-gray-900 dark:text-gray-100 dark:border-gray-800",
-  ].join(" ");
 }
 
 export default async function PortalPage({
@@ -125,9 +68,7 @@ export default async function PortalPage({
   const supabase = await createClient();
 
   const sp: SP = (searchParams ? await searchParams : {}) ?? {};
-  const queue = (sp1(sp.queue) ?? "").toString();
   const q = (sp1(sp.q) ?? "").toString().trim();
-  const sort = (sp1(sp.sort) ?? "newest").toString().trim().toLowerCase();
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
@@ -166,6 +107,9 @@ export default async function PortalPage({
       next_action_note,
       follow_up_date,
       created_at,
+      updated_at,
+      data_entry_completed_at,
+      scheduled_date,
       customer_first_name,
       customer_last_name,
       customer_phone,
@@ -176,7 +120,6 @@ export default async function PortalPage({
     )
     .eq("contractor_id", contractorId)
     .is("deleted_at", null)
-    .neq("ops_status", "closed")
     .order("created_at", { ascending: false });
 
   if (baseJobsErr) throw baseJobsErr;
@@ -204,6 +147,7 @@ export default async function PortalPage({
       job.locations?.address_line1,
       job.locations?.city,
       job.permit_number,
+      job.id,
     ]
       .map((v) => String(v ?? "").trim().toLowerCase())
       .filter(Boolean)
@@ -212,50 +156,9 @@ export default async function PortalPage({
     return haystack.includes(normalizedQuery);
   }
 
-  function sortJobs(inputJobs: any[]) {
-    const out = [...inputJobs];
-
-    if (sort === "oldest") {
-      out.sort(
-        (a, b) =>
-          new Date(String(a.created_at ?? 0)).getTime() -
-          new Date(String(b.created_at ?? 0)).getTime()
-      );
-      return out;
-    }
-
-    if (sort === "follow_up") {
-      out.sort((a, b) => {
-        const aHasFollow = !!a.follow_up_date;
-        const bHasFollow = !!b.follow_up_date;
-
-        if (aHasFollow && bHasFollow) {
-          return String(a.follow_up_date).localeCompare(String(b.follow_up_date));
-        }
-        if (aHasFollow) return -1;
-        if (bHasFollow) return 1;
-
-        return (
-          new Date(String(b.created_at ?? 0)).getTime() -
-          new Date(String(a.created_at ?? 0)).getTime()
-        );
-      });
-      return out;
-    }
-
-    out.sort(
-      (a, b) =>
-        new Date(String(b.created_at ?? 0)).getTime() -
-        new Date(String(a.created_at ?? 0)).getTime()
-    );
-    return out;
-  }
-
-  function portalHref(nextQueue?: string) {
+  function portalHref() {
     const params = new URLSearchParams();
-    if (nextQueue) params.set("queue", nextQueue);
     if (q) params.set("q", q);
-    if (sort && sort !== "newest") params.set("sort", sort);
 
     const qs = params.toString();
     return qs ? `/portal?${qs}` : "/portal";
@@ -263,85 +166,48 @@ export default async function PortalPage({
 
   const scopedJobs = jobs.filter(matchesSearch);
 
-  const counts: Record<string, number> = {};
-  for (const row of scopedJobs) {
-    const key = String(row?.ops_status ?? "unknown").toLowerCase();
-    counts[key] = (counts[key] ?? 0) + 1;
-  }
+  const openJobs = scopedJobs.filter(
+    (j: any) => String(j.ops_status ?? "").toLowerCase() !== "closed"
+  );
 
-  const attentionTodayStatuses = [
-    "need_to_schedule",
-    "pending_info",
-    "retest_needed",
+  const actionRequiredStatuses = new Set([
     "failed",
-  ];
+    "retest_needed",
+    "pending_info",
+    "need_to_schedule",
+  ]);
 
-  const attentionTodayCount = scopedJobs.filter(
-    (j) =>
-      !!j.follow_up_date &&
-      String(j.follow_up_date) <= String(today) &&
-      attentionTodayStatuses.includes(String(j.ops_status ?? "").toLowerCase())
-  ).length;
+  const actionRequiredJobs = [...openJobs]
+    .filter((j: any) => actionRequiredStatuses.has(String(j.ops_status ?? "").toLowerCase()))
+    .sort((a: any, b: any) => {
+      const urgencyA = Number(
+        !!a.follow_up_date && String(a.follow_up_date) <= String(today)
+      );
+      const urgencyB = Number(
+        !!b.follow_up_date && String(b.follow_up_date) <= String(today)
+      );
 
-  const retestOrFailedCount =
-    (counts["retest_needed"] ?? 0) + (counts["failed"] ?? 0);
+      if (urgencyA !== urgencyB) return urgencyB - urgencyA;
+      return toDateMs(b.created_at) - toDateMs(a.created_at);
+    });
 
-  const openCount = scopedJobs.length;
-  const pendingInfoCount = counts["pending_info"] ?? 0;
-  const needToScheduleCount = counts["need_to_schedule"] ?? 0;
-  const onHoldCount = counts["on_hold"] ?? 0;
-  const scheduledCount = counts["scheduled"] ?? 0;
+  const recentlyCompletedJobs = [...scopedJobs]
+    .filter((j: any) => String(j.ops_status ?? "").toLowerCase() === "closed")
+    .sort((a: any, b: any) => {
+      const aResolved = toDateMs(a.data_entry_completed_at ?? a.updated_at ?? a.created_at);
+      const bResolved = toDateMs(b.data_entry_completed_at ?? b.updated_at ?? b.created_at);
+      return bResolved - aResolved;
+    })
+    .slice(0, 25);
 
-
-  const needsAttentionTotal =
-    retestOrFailedCount +
-    pendingInfoCount +
-    needToScheduleCount +
-    onHoldCount;
-
-  let visibleJobs = scopedJobs;
-
-  if (queue === "attention_today") {
-    visibleJobs = scopedJobs.filter(
-      (j) =>
-        !!j.follow_up_date &&
-        String(j.follow_up_date) <= String(today) &&
-        attentionTodayStatuses.includes(String(j.ops_status ?? "").toLowerCase())
-    );
-    } else if (queue === "scheduled") {
-  visibleJobs = scopedJobs.filter(
-    (j) => String(j.ops_status ?? "").toLowerCase() === "scheduled"
-  );
-  } else if (queue === "need_to_schedule") {
-    visibleJobs = scopedJobs.filter(
-      (j) => String(j.ops_status ?? "").toLowerCase() === "need_to_schedule"
-    );
-  } else if (queue === "pending_info") {
-    visibleJobs = scopedJobs.filter(
-      (j) => String(j.ops_status ?? "").toLowerCase() === "pending_info"
-    );
-  } else if (queue === "retest_needed") {
-    visibleJobs = scopedJobs.filter((j) =>
-      ["retest_needed", "failed"].includes(String(j.ops_status ?? "").toLowerCase())
-    );
-    } else if (queue === "on_hold") {
-  visibleJobs = scopedJobs.filter(
-    (j) => String(j.ops_status ?? "").toLowerCase() === "on_hold"
-  );
-  } else {
-    visibleJobs = scopedJobs;
-  }
-
-  visibleJobs = sortJobs(visibleJobs);
-
-      const visibleJobIds = visibleJobs.map((j: any) => j.id);
+  const actionJobIds = actionRequiredJobs.map((j: any) => j.id);
 
   const { data: visibleRuns, error: visibleRunsErr } = await supabase
     .from("ecc_test_runs")
     .select(
       "job_id, created_at, test_type, computed_pass, override_pass, computed, is_completed"
     )
-    .in("job_id", visibleJobIds.length ? visibleJobIds : ["00000000-0000-0000-0000-000000000000"])
+    .in("job_id", actionJobIds.length ? actionJobIds : ["00000000-0000-0000-0000-000000000000"])
     .eq("is_completed", true)
     .order("created_at", { ascending: false });
 
@@ -353,6 +219,27 @@ export default async function PortalPage({
     if (finalRunPass(run) === false && !failedRunByJob.has(run.job_id)) {
       failedRunByJob.set(run.job_id, run);
     }
+  }
+
+  function customerName(job: any) {
+    const full = [
+      String(job.customer_first_name ?? "").trim(),
+      String(job.customer_last_name ?? "").trim(),
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return full || "Customer";
+  }
+
+  function displayAddress(job: any) {
+    const addr =
+      String(job.locations?.address_line1 ?? "").trim() ||
+      String(job.job_address ?? "").trim() ||
+      "No address";
+    const city = String(job.locations?.city ?? "").trim() || String(job.city ?? "").trim();
+
+    return city ? `${addr}, ${city}` : addr;
   }
 
   return (
@@ -376,55 +263,15 @@ export default async function PortalPage({
           </Link>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 px-4 py-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Open Jobs
-            </div>
-            <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
-              {openCount}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 px-4 py-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Attention Today
-            </div>
-            <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
-              {attentionTodayCount}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 px-4 py-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Current View
-            </div>
-            <div className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {queue ? queue.replaceAll("_", " ") : "all open jobs"}
-            </div>
-          </div>
-        </div>
-
-        <form method="get" className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px_auto]">
-          {queue ? <input type="hidden" name="queue" value={queue} /> : null}
+        <form method="get" className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
 
           <input
             type="search"
             name="q"
             defaultValue={q}
-            placeholder="Search title, customer, phone, address, city, permit"
+            placeholder="Search customer, address, city, permit, job title, or reference"
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           />
-
-          <select
-            name="sort"
-            defaultValue={sort || "newest"}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-black dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-          >
-            <option value="newest">Sort: Newest</option>
-            <option value="oldest">Sort: Oldest</option>
-            <option value="follow_up">Sort: Follow-up Date</option>
-          </select>
 
           <div className="flex items-center gap-2">
             <button
@@ -433,9 +280,9 @@ export default async function PortalPage({
             >
               Apply
             </button>
-            {(q || sort !== "newest") && (
+            {q && (
               <Link
-                href={portalHref(queue || undefined)}
+                href={portalHref()}
                 className="rounded-lg border px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
               >
                 Reset
@@ -445,313 +292,153 @@ export default async function PortalPage({
         </form>
       </div>
 
-     <div className="rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800 p-5 shadow-sm">
-  <div className="flex items-start justify-between gap-4">
-    <div>
-      <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-        Needs Your Attention
-      </h2>
-      <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-        Jobs waiting on your action, scheduling, or information.
-      </p>
-    </div>
-
-    <div
-      className={`rounded-full border px-3 py-1 text-sm font-semibold ${
-        needsAttentionTotal > 0
-          ? "border-red-300 text-red-700 dark:border-red-800 dark:text-red-300"
-          : "border-gray-300 text-gray-500 dark:border-gray-700 dark:text-gray-400"
-      }`}
-    >
-      {needsAttentionTotal}
-    </div>
-  </div>
-
-  {needsAttentionTotal === 0 ? (
-    <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
-      No contractor action items right now.
-    </div>
-  ) : (
-    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {retestOrFailedCount > 0 ? (
-        <Link
-          href={portalHref("retest_needed")}
-          className="rounded-xl border border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20 p-4 hover:shadow-sm transition"
-        >
-          <div className="text-sm font-semibold text-red-900 dark:text-red-200">
-            Failed / Retest Required
+      <section className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {labelWithCount("Action Required", actionRequiredJobs.length)}
+          </h2>
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            Failed and missing-information items are prioritized.
           </div>
-          <div className="mt-1 text-2xl font-semibold text-red-900 dark:text-red-100">
-            {retestOrFailedCount}
-          </div>
-          <div className="mt-1 text-xs text-red-800/80 dark:text-red-200/80">
-            Jobs that failed or need retesting
-          </div>
-        </Link>
-      ) : null}
-
-      {pendingInfoCount > 0 ? (
-        <Link
-          href={portalHref("pending_info")}
-          className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20 p-4 hover:shadow-sm transition"
-        >
-          <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-            Pending Info
-          </div>
-          <div className="mt-1 text-2xl font-semibold text-amber-900 dark:text-amber-100">
-            {pendingInfoCount}
-          </div>
-          <div className="mt-1 text-xs text-amber-800/80 dark:text-amber-200/80">
-            Waiting on info from you
-          </div>
-        </Link>
-      ) : null}
-
-      {needToScheduleCount > 0 ? (
-        <Link
-          href={portalHref("need_to_schedule")}
-          className="rounded-xl border border-blue-200 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/20 p-4 hover:shadow-sm transition"
-        >
-          <div className="text-sm font-semibold text-blue-900 dark:text-blue-200">
-            Need to Schedule
-          </div>
-          <div className="mt-1 text-2xl font-semibold text-blue-900 dark:text-blue-100">
-            {needToScheduleCount}
-          </div>
-          <div className="mt-1 text-xs text-blue-800/80 dark:text-blue-200/80">
-            Jobs waiting for scheduling
-          </div>
-        </Link>
-      ) : null}
-
-      {onHoldCount > 0 ? (
-        <Link
-          href={portalHref("on_hold")}
-          className="rounded-xl border border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/40 p-4 hover:shadow-sm transition"
-        >
-          <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            On Hold
-          </div>
-          <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
-            {onHoldCount}
-          </div>
-          <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-            Paused on your side
-          </div>
-        </Link>
-      ) : null}
-    </div>
-  )}
-</div>
-
-<div className="flex flex-wrap gap-2">
-  <Link
-    href={portalHref()}
-    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-      !queue
-        ? "border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900"
-        : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-    }`}
-  >
-    {labelWithCount("All Open Jobs", openCount)}
-  </Link>
-
-  <Link
-    href={portalHref("attention_today")}
-    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-      queue === "attention_today"
-        ? "border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900"
-        : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-    }`}
-  >
-    {labelWithCount("Attention Today", attentionTodayCount)}
-  </Link>
-
-  <Link
-    href={portalHref("scheduled")}
-    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-      queue === "scheduled"
-        ? "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500"
-        : "border-emerald-200 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-900/50 dark:text-emerald-300 dark:hover:bg-emerald-950/20"
-    }`}
-  >
-    {labelWithCount("Scheduled", scheduledCount)}
-  </Link>
-
-  <Link
-    href={portalHref("need_to_schedule")}
-    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-      queue === "need_to_schedule"
-        ? "border-blue-600 bg-blue-600 text-white dark:border-blue-500 dark:bg-blue-500"
-        : "border-blue-200 text-blue-800 hover:bg-blue-50 dark:border-blue-900/50 dark:text-blue-300 dark:hover:bg-blue-950/20"
-    }`}
-  >
-    {labelWithCount("Need to Schedule", needToScheduleCount)}
-  </Link>
-
-  <Link
-    href={portalHref("pending_info")}
-    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-      queue === "pending_info"
-        ? "border-amber-600 bg-amber-600 text-white dark:border-amber-500 dark:bg-amber-500"
-        : "border-amber-200 text-amber-800 hover:bg-amber-50 dark:border-amber-900/50 dark:text-amber-300 dark:hover:bg-amber-950/20"
-    }`}
-  >
-    {labelWithCount("Pending Info", pendingInfoCount)}
-  </Link>
-
-  <Link
-    href={portalHref("retest_needed")}
-    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-      queue === "retest_needed"
-        ? "border-red-600 bg-red-600 text-white dark:border-red-500 dark:bg-red-500"
-        : "border-red-200 text-red-800 hover:bg-red-50 dark:border-red-900/50 dark:text-red-300 dark:hover:bg-red-950/20"
-    }`}
-  >
-    {labelWithCount("Failed / Retest", retestOrFailedCount)}
-  </Link>
-
-  <Link
-    href={portalHref("on_hold")}
-    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-      queue === "on_hold"
-        ? "border-gray-700 bg-gray-700 text-white dark:border-gray-500 dark:bg-gray-500"
-        : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-    }`}
-  >
-    {labelWithCount("On Hold", onHoldCount)}
-  </Link>
-</div>
-
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {queue === "retest_needed"
-            ? "Queue: Failed / Retest"
-            : queue === "need_to_schedule"
-            ? "Queue: Need to Schedule"
-            : queue === "pending_info"
-            ? "Queue: Pending Info"
-            : queue === "attention_today"
-            ? "Queue: Attention Today"
-            : queue === "on_hold"
-            ? "Queue: On Hold"
-            : queue === "scheduled"
-            ? "Queue: Scheduled"
-            : "Open Jobs"}
-        </h2>
-        <div className="text-sm text-gray-600 dark:text-gray-300">
-          Showing <span className="font-semibold">{visibleJobs.length}</span>
         </div>
-      </div>
 
       <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
         <div className="divide-y divide-gray-200 dark:divide-gray-800">
-          {visibleJobs.map((j: any) => {
+          {actionRequiredJobs.map((j: any) => {
             const isUrgent =
               !!j.follow_up_date && String(j.follow_up_date) <= String(today);
             const ops = String(j.ops_status ?? "").toLowerCase();
             const failedRun = failedRunByJob.get(j.id);
             const failureReasons = failedRun ? extractTopReasons(failedRun) : [];
-            const displayAddress =
-              j.locations?.address_line1?.trim() ||
-              j.job_address?.trim() ||
-              "No address";
-
-            const displayCity =
-              j.locations?.city?.trim() ||
-              j.city?.trim() ||
-              "—";
+            const displayLines =
+              ["failed", "retest_needed"].includes(ops) && failureReasons.length > 0
+                ? failureReasons.slice(0, 3).map((r) => `Failed - ${r}`)
+                : ops === "failed"
+                ? ["Failed - Review required"]
+                : ops === "retest_needed"
+                ? ["Failed - Retest required"]
+                : ops === "pending_info"
+                ? [
+                    `Need information from you - ${String(j.pending_info_reason ?? "Details requested").trim()}`,
+                  ]
+                : ops === "need_to_schedule"
+                ? ["Need information from you - Scheduling details required"]
+                : [];
 
             return (
               <Link
                 key={j.id}
                 href={`/portal/jobs/${j.id}`}
                 className={[
-                  "block border-l-4 p-4 transition-all duration-150",
+                  "block border-l-4 p-4 transition-all duration-150 border-l-transparent",
                   "hover:bg-gray-50 hover:shadow-sm dark:hover:bg-gray-800/40",
-                  rowAccentClass({ isUrgent, ops_status: j.ops_status }),
+                  isUrgent ? "border-l-red-500" : "",
                 ].join(" ")}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
+                      {customerName(j)}
+                    </div>
+
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
                       <div className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
                         {j.title ?? "Untitled Job"}
                       </div>
-
-                      <span
-                        className={[
-                          "rounded-full border px-2.5 py-1 text-xs font-semibold",
-                          statusBadgeClass(j.ops_status),
-                        ].join(" ")}
-                      >
-                        {statusLabel(j.ops_status)}
-                      </span>
                     </div>
 
                     <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                      {displayAddress} • {displayCity}
+                      {displayAddress(j)}
                     </div>
 
                     <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
-                      {!!j.pending_info_reason && (
-                        <div>
-                          <span className="font-semibold text-gray-700 dark:text-gray-300">
-                            Pending info:
-                          </span>{" "}
-                          {j.pending_info_reason}
-                        </div>
-                      )}
-
-                      {!!j.next_action_note && (
-                        <div>
-                          <span className="font-semibold text-gray-700 dark:text-gray-300">
-                            Next action:
-                          </span>{" "}
-                          {j.next_action_note}
-                        </div>
-                      )}
-
-                      {!!j.follow_up_date && (
-                        <div>
-                          <span className="font-semibold text-gray-700 dark:text-gray-300">
-                            Follow up:
-                          </span>{" "}
-                          {j.follow_up_date}
-                        </div>
-                      )}
-
-                      {["failed", "retest_needed"].includes(ops) && failureReasons.length > 0 && (
-                      <div>
-                        <span className="font-semibold text-gray-700 dark:text-gray-300">
-                          Why it failed:
-                        </span>{" "}
-                        {failureReasons[0]}
-                      </div>
-                    )}
+                      {displayLines.map((line, idx) => (
+                        <div key={`${j.id}-line-${idx}`}>{line}</div>
+                      ))}
                     </div>
                   </div>
 
                   <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
-                    {j.created_at ? `Added ${formatDateLA(j.created_at)}` : ""}
+                    {j.scheduled_date ? `Service ${formatDateLA(j.scheduled_date)}` : "Service date pending"}
                   </div>
                 </div>
               </Link>
             );
           })}
 
-          {visibleJobs.length === 0 && (
+          {actionRequiredJobs.length === 0 && (
             <div className="p-8 text-center">
               <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                No jobs found in this queue.
+                No action-required jobs.
               </div>
               <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Try another queue or add a new job.
+                New failed or pending-info jobs will appear here.
               </div>
             </div>
           )}
         </div>
       </div>
+
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {labelWithCount("Recently Completed", recentlyCompletedJobs.length)}
+          </h2>
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            Sorted by resolution date.
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
+            {recentlyCompletedJobs.map((j: any) => {
+              const resolvedAt = j.data_entry_completed_at ?? j.updated_at ?? j.created_at;
+              return (
+                <Link
+                  key={j.id}
+                  href={`/portal/jobs/${j.id}`}
+                  className="block p-4 transition-all duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-gray-800/40"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
+                        {customerName(j)}
+                      </div>
+
+                      <div className="mt-0.5 truncate text-base font-semibold text-gray-900 dark:text-gray-100">
+                        {j.title ?? "Untitled Job"}
+                      </div>
+
+                      <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                        {displayAddress(j)}
+                      </div>
+
+                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">Passed</div>
+                    </div>
+
+                    <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
+                      {resolvedAt ? `Resolved ${formatDateLA(String(resolvedAt))}` : "Resolved recently"}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+
+            {recentlyCompletedJobs.length === 0 && (
+              <div className="p-8 text-center">
+                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  No recently completed jobs.
+                </div>
+                <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Completed jobs will appear here after closeout.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
