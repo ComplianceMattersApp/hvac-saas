@@ -63,57 +63,61 @@ export default async function RootLayout({
       >
         <div className="min-h-screen flex flex-col">
 
-          {/* Top Bar */}
-          <header className="border-b bg-white px-4 py-3 sm:px-6">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-center gap-2.5">
-                <Link
-                  href={homeHref}
-                  className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                >
-                  <Image src="/icon.png" alt="Compliance Matters logo" width={18} height={18} className="rounded-sm" />
-                </Link>
-                <Link
-                  href={homeHref}
-                  className="text-sm font-semibold text-slate-900 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                >
-                  Compliance Matters
-                </Link>
-              </div>
+          {user ? (
+            <>
+              {/* Top Bar */}
+              <header className="border-b bg-white px-4 py-3 sm:px-6">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Link
+                      href={homeHref}
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                    >
+                      <Image src="/icon.png" alt="Compliance Matters logo" width={18} height={18} className="rounded-sm" />
+                    </Link>
+                    <Link
+                      href={homeHref}
+                      className="text-sm font-semibold text-slate-900 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                    >
+                      Compliance Matters
+                    </Link>
+                  </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href="/jobs/new"
-                  className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 sm:px-4 sm:py-2 sm:text-sm"
-                >
-                  + New Job
-                </Link>
-                {!isContractor && (
-                  <Link
-                    href="/contractors/new"
-                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
-                  >
-                    + New Contractor
-                  </Link>
-                )}
-                <Link
-                  href="/calendar"
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
-                >
-                  View Calendar
-                </Link>
-                <Link
-                  href="/customers"
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
-                >
-                  Search Customers
-                </Link>
-                <div className="ml-1 sm:ml-2">
-                  <LogoutButton />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      href="/jobs/new"
+                      className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 sm:px-4 sm:py-2 sm:text-sm"
+                    >
+                      + New Job
+                    </Link>
+                    {!isContractor && (
+                      <Link
+                        href="/contractors/new"
+                        className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
+                      >
+                        + New Contractor
+                      </Link>
+                    )}
+                    <Link
+                      href="/calendar"
+                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
+                    >
+                      View Calendar
+                    </Link>
+                    <Link
+                      href="/customers"
+                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
+                    >
+                      Search Customers
+                    </Link>
+                    <div className="ml-1 sm:ml-2">
+                      <LogoutButton />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </header>
+              </header>
+            </>
+          ) : null}
 
           {/* Main Content */}
           <main className="flex-1 p-6">
