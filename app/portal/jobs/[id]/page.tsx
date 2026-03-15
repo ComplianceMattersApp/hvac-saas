@@ -82,6 +82,7 @@ function buildAddressLines(opts: {
 function statusHeadline(opsStatus: string, isFailed: boolean, isPendingInfo: boolean) {
   if (isFailed) return "Failed";
   if (isPendingInfo) return "Need information from you";
+  if (opsStatus === "need_to_schedule") return "Waiting for scheduling";
   if (opsStatus === "closed") return "Passed";
   if (opsStatus === "paperwork_required" || opsStatus === "invoice_required") return "Passed";
   return titleCaseFromSnake(opsStatus);
@@ -324,6 +325,8 @@ export default async function PortalJobDetailPage({
     ? "This job is currently marked failed and needs correction review."
     : isPendingInfo
     ? `Need information from you${(job as any)?.pending_info_reason ? `: ${String((job as any).pending_info_reason)}` : "."}`
+    : opsStatus === "need_to_schedule"
+    ? "Waiting for scheduling"
     : opsStatus === "closed"
     ? "This job is passed and closed."
     : titleCaseFromSnake((job as any)?.ops_status);

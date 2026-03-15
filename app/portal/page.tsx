@@ -173,7 +173,6 @@ export default async function PortalPage({
     "failed",
     "retest_needed",
     "pending_info",
-    "need_to_schedule",
   ]);
 
   const actionRequiredJobs = [...openJobs]
@@ -321,7 +320,7 @@ export default async function PortalPage({
                     `Need information from you - ${String(j.pending_info_reason ?? "Details requested").trim()}`,
                   ]
                 : ops === "need_to_schedule"
-                ? ["Need information from you - Scheduling details required"]
+                ? ["Waiting for scheduling"]
                 : [];
 
             return (
