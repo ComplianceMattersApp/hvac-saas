@@ -373,7 +373,7 @@ export default async function PortalJobDetailPage({
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[420px_1fr] gap-3 md:items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-3 md:items-stretch">
           <div className="space-y-2">
             <div className="text-xs text-gray-500 dark:text-gray-300">Contractor Portal - {contractorName}</div>
 
