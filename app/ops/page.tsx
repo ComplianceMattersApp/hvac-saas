@@ -16,7 +16,6 @@ import {
   startOfTomorrowUtcIsoLA,
 } from "@/lib/utils/schedule-la";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
-import { resolveContractorResponseTracking } from "@/lib/portal/resolveContractorIssues";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -755,17 +754,11 @@ if (signalErr) throw signalErr;
 
 const latestRetestReadyByJob = new Map<string, any>();
 const latestContractorCreatedByJob = new Map<string, any>();
-const signalEventsByJob = new Map<string, any[]>();
+const latestContractorUpdateByJob = new Map<string, any>();
 
 for (const ev of signalEvents ?? []) {
   const jobId = String((ev as any).job_id ?? "");
   const type = String((ev as any).event_type ?? "");
-
-  if (jobId) {
-    const list = signalEventsByJob.get(jobId) ?? [];
-    list.push(ev);
-    signalEventsByJob.set(jobId, list);
-  }
 
   if (type === "retest_ready_requested" && !latestRetestReadyByJob.has(jobId)) {
     latestRetestReadyByJob.set(jobId, ev);
@@ -774,12 +767,18 @@ for (const ev of signalEvents ?? []) {
   if (type === "contractor_job_created" && !latestContractorCreatedByJob.has(jobId)) {
     latestContractorCreatedByJob.set(jobId, ev);
   }
-}
 
-const jobsWithContractorResponse = new Set<string>();
-for (const [jobId, eventsForJob] of signalEventsByJob.entries()) {
-  const tracking = resolveContractorResponseTracking(eventsForJob as any);
-  if (tracking.hasContractorResponse) jobsWithContractorResponse.add(jobId);
+  if (
+    [
+      "contractor_note",
+      "contractor_correction_submission",
+      "attachment_added",
+      "permit_info_updated",
+    ].includes(type) &&
+    !latestContractorUpdateByJob.has(jobId)
+  ) {
+    latestContractorUpdateByJob.set(jobId, ev);
+  }
 }
 
 function hasSignalEventForJob(map: unknown, jobId: string) {
@@ -804,7 +803,7 @@ const contractorCreatedCount = uniqueAllOpenOpsJobs.filter((j: any) => {
 
 const contractorUpdatesCount = uniqueAllOpenOpsJobs.filter((j: any) => {
   const jobId = String(j?.id ?? "");
-  return hasSignalEventForJob(jobsWithContractorResponse, jobId);
+  return hasSignalEventForJob(latestContractorUpdateByJob, jobId);
 }).length;
 
 let signalFilteredBucketJobs = [...(filteredBucketJobs ?? [])];
@@ -833,7 +832,7 @@ if (signal === "contractor_updates") {
   // Cross-bucket signal: source from all open jobs (same dataset as the count card),
   // not just the current bucket slice, so card count and displayed rows always match.
   signalFilteredBucketJobs = uniqueAllOpenOpsJobs.filter((j: any) =>
-    hasSignalEventForJob(jobsWithContractorResponse, String(j.id ?? ""))
+    hasSignalEventForJob(latestContractorUpdateByJob, String(j.id ?? ""))
   );
 }
 
