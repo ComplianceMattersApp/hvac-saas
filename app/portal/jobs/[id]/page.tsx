@@ -513,7 +513,7 @@ export default async function PortalJobDetailPage({
             ) : null}
 
             <div className="pt-1"><span className="font-medium">Next Step:</span> {String(latestSentReportMeta.next_step ?? "-")}</div>
-            <div className="pt-1 whitespace-pre-wrap"><span className="font-medium">Report Body:</span>{"\n"}{String(latestSentReportMeta.body_text ?? "-")}</div>
+            {false && <div>{latestSentReportMeta.body_text}</div>}
           </div>
         </section>
       ) : null}
