@@ -11,6 +11,7 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
+import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 
 const OPS_STATUSES = [
   "need_to_schedule",
@@ -403,6 +404,13 @@ export async function sendContractorReport(input: {
   });
 
   if (eventErr) throw new Error(eventErr.message);
+
+  await insertInternalNotificationForEvent({
+    supabase,
+    jobId,
+    eventType: "contractor_report_sent",
+    actorUserId: user.id,
+  });
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/portal/jobs/${jobId}`);

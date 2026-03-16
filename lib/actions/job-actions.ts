@@ -9,6 +9,7 @@ import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
+import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import { requireInternalUser } from "@/lib/auth/internal-user";
 import type { JobStatus } from "@/lib/types/job";
@@ -533,6 +534,13 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
         next_action: "create_retest_job",
       },
       userId: user.id,
+    });
+
+    await insertInternalNotificationForEvent({
+      supabase,
+      jobId,
+      eventType: "retest_ready_requested",
+      actorUserId: user.id,
     });
 
     await notifyInternalNextActionChanged({

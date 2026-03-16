@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requestRetestReadyFromPortal } from "@/lib/actions/job-actions";
+import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import { createClient } from "@/lib/supabase/server";
 import JobAttachments from "@/components/portal/JobAttachments";
 import {
@@ -369,6 +370,13 @@ export default async function PortalJobDetailPage({
     });
 
     if (insErr) throw insErr;
+
+    await insertInternalNotificationForEvent({
+      supabase: nextSupabase,
+      jobId: nextJobId,
+      eventType: "contractor_note",
+      actorUserId: nextUserData.user.id,
+    });
 
     revalidatePath(`/portal/jobs/${nextJobId}`);
     redirect(`/portal/jobs/${nextJobId}`);
