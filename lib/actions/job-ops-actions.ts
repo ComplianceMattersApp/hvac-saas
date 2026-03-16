@@ -76,6 +76,343 @@ function buildOpsChanges(before: OpsSnapshot, after: OpsSnapshot) {
   return changes;
 }
 
+type ContractorReportKind = "failed" | "pending_info";
+
+export type ContractorReportPreview = {
+  title: string;
+  location_text: string;
+  customer_name: string;
+  contractor_name: string | null;
+  service_date_text: string;
+  reasons: string[];
+  next_step: string;
+  body_text: string;
+};
+
+type ContractorReportResolved = ContractorReportPreview & {
+  report_kind: ContractorReportKind;
+  ops_status: string;
+};
+
+function finalRunPass(run: any): boolean | null {
+  if (!run) return null;
+  return run.override_pass != null ? Boolean(run.override_pass) : Boolean(run.computed_pass);
+}
+
+function extractFailureReasons(run: any): string[] {
+  const computed = run?.computed ?? null;
+  if (!computed) return [];
+
+  const failures = Array.isArray(computed.failures)
+    ? computed.failures.map(String).map((s: string) => s.trim()).filter(Boolean)
+    : [];
+
+  if (failures.length > 0) return Array.from(new Set(failures));
+  return [];
+}
+
+function formatServiceDateText(job: any, failedRunCreatedAt?: string | null) {
+  const scheduledDate = String(job?.scheduled_date ?? "").trim();
+  const windowStart = String(job?.window_start ?? "").trim();
+  const windowEnd = String(job?.window_end ?? "").trim();
+
+  if (scheduledDate && windowStart && windowEnd) {
+    return `${scheduledDate} ${windowStart.slice(0, 5)}-${windowEnd.slice(0, 5)}`;
+  }
+
+  if (scheduledDate) return scheduledDate;
+
+  if (failedRunCreatedAt) {
+    const d = new Date(failedRunCreatedAt);
+    if (Number.isFinite(d.getTime())) {
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Los_Angeles",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d);
+    }
+  }
+
+  return "Service/Test date not available";
+}
+
+function formatLocationText(job: any) {
+  const loc = Array.isArray(job?.locations)
+    ? job.locations.find((x: any) => x) ?? null
+    : job?.locations ?? null;
+
+  const addressLine =
+    String(loc?.address_line1 ?? "").trim() ||
+    String(job?.job_address ?? "").trim();
+
+  const city = String(loc?.city ?? "").trim() || String(job?.city ?? "").trim();
+  const state = String(loc?.state ?? "").trim();
+  const zip = String(loc?.zip ?? "").trim();
+
+  const cityStateZip = [city, [state, zip].filter(Boolean).join(" ")]
+    .filter(Boolean)
+    .join(", ");
+
+  if (addressLine && cityStateZip) return `${addressLine}, ${cityStateZip}`;
+  if (addressLine) return addressLine;
+  if (cityStateZip) return cityStateZip;
+  return "Location not available";
+}
+
+function buildReportBody(args: {
+  title: string;
+  locationText: string;
+  reasons: string[];
+  nextStep: string;
+  contractorNote?: string | null;
+}) {
+  const reasonLabel = args.reasons.length === 1 ? "Reason" : "Reasons";
+  const reasonsBlock = args.reasons.map((r) => `- ${r}`).join("\n");
+  const note = String(args.contractorNote ?? "").trim();
+
+  const sections = [
+    args.title,
+    `Location: ${args.locationText}`,
+    `${reasonLabel}:\n${reasonsBlock}`,
+    `Next Step:\n${args.nextStep}`,
+  ];
+
+  if (note) sections.push(`Contractor Note:\n${note}`);
+
+  return sections.join("\n\n");
+}
+
+async function requireInternalUserOrThrow(supabase: any) {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error) throw new Error(error.message);
+  if (!user) throw new Error("Not authenticated");
+
+  try {
+    await requireInternalUser({ supabase, userId: user.id });
+  } catch {
+    throw new Error("Not authorized");
+  }
+
+  return user;
+}
+
+async function resolveContractorReportForJob(params: {
+  supabase: any;
+  jobId: string;
+}): Promise<ContractorReportResolved> {
+  const { supabase, jobId } = params;
+
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select(
+      `
+      id,
+      ops_status,
+      contractor_id,
+      pending_info_reason,
+      scheduled_date,
+      window_start,
+      window_end,
+      customer_first_name,
+      customer_last_name,
+      city,
+      job_address,
+      locations:location_id (address_line1, city, state, zip),
+      contractors:contractor_id (name)
+      `
+    )
+    .eq("id", jobId)
+    .single();
+
+  if (jobErr) throw new Error(jobErr.message);
+  if (!job?.id) throw new Error("Job not found");
+
+  const opsStatus = String(job.ops_status ?? "").trim().toLowerCase();
+  if (opsStatus !== "failed" && opsStatus !== "pending_info") {
+    throw new Error("Contractor report is only available for failed or pending_info jobs");
+  }
+
+  const customerName =
+    [String(job.customer_first_name ?? "").trim(), String(job.customer_last_name ?? "").trim()]
+      .filter(Boolean)
+      .join(" ") || "Customer";
+
+  const contractorName =
+    String((job as any)?.contractors?.name ?? "").trim() || null;
+
+  const locationText = formatLocationText(job);
+
+  if (opsStatus === "failed") {
+    const { data: runs, error: runsErr } = await supabase
+      .from("ecc_test_runs")
+      .select("created_at, computed, computed_pass, override_pass, is_completed")
+      .eq("job_id", jobId)
+      .eq("is_completed", true)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (runsErr) throw new Error(runsErr.message);
+
+    const failedRun = (runs ?? []).find((r: any) => finalRunPass(r) === false) ?? null;
+    const extracted = failedRun ? extractFailureReasons(failedRun) : [];
+    const reasons =
+      extracted.length > 0
+        ? extracted
+        : ["Test failed. Please review and correct."];
+
+    const nextStep = "Correct the issue and upload photos in the contractor portal.";
+    const title = "FAILED TEST";
+
+    return {
+      report_kind: "failed",
+      ops_status: opsStatus,
+      title,
+      location_text: locationText,
+      customer_name: customerName,
+      contractor_name: contractorName,
+      service_date_text: formatServiceDateText(job, failedRun?.created_at ?? null),
+      reasons,
+      next_step: nextStep,
+      body_text: buildReportBody({
+        title,
+        locationText,
+        reasons,
+        nextStep,
+      }),
+    };
+  }
+
+  const pendingReason = String(job.pending_info_reason ?? "").trim();
+  const reasons =
+    pendingReason.length > 0
+      ? [pendingReason]
+      : ["Additional information is required to proceed."];
+
+  const nextStep = "Provide the requested information in the contractor portal.";
+  const title = "INFORMATION NEEDED";
+
+  return {
+    report_kind: "pending_info",
+    ops_status: opsStatus,
+    title,
+    location_text: locationText,
+    customer_name: customerName,
+    contractor_name: contractorName,
+    service_date_text: formatServiceDateText(job),
+    reasons,
+    next_step: nextStep,
+    body_text: buildReportBody({
+      title,
+      locationText,
+      reasons,
+      nextStep,
+    }),
+  };
+}
+
+function sanitizeContractorNote(raw: unknown) {
+  if (typeof raw !== "string") return null;
+  const sanitized = raw.replace(/\u0000/g, "").trim();
+  if (!sanitized) return null;
+  return sanitized.slice(0, 4000);
+}
+
+export async function generateContractorReportPreview(input: {
+  jobId: string;
+}): Promise<ContractorReportPreview> {
+  const supabase = await createClient();
+  const jobId = String(input.jobId ?? "").trim();
+  if (!jobId) throw new Error("Missing jobId");
+
+  await requireInternalUserOrThrow(supabase);
+  const report = await resolveContractorReportForJob({ supabase, jobId });
+
+  return {
+    title: report.title,
+    location_text: report.location_text,
+    customer_name: report.customer_name,
+    contractor_name: report.contractor_name,
+    service_date_text: report.service_date_text,
+    reasons: report.reasons,
+    next_step: report.next_step,
+    body_text: report.body_text,
+  };
+}
+
+export async function sendContractorReport(input: {
+  jobId: string;
+  contractorNote?: string | null;
+}): Promise<{ ok: true }> {
+  const supabase = await createClient();
+  const jobId = String(input.jobId ?? "").trim();
+  if (!jobId) throw new Error("Missing jobId");
+
+  const user = await requireInternalUserOrThrow(supabase);
+  const report = await resolveContractorReportForJob({ supabase, jobId });
+
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select("id, contractor_id")
+    .eq("id", jobId)
+    .single();
+
+  if (jobErr) throw new Error(jobErr.message);
+  if (!job?.id) throw new Error("Job not found");
+
+  if (!job.contractor_id) {
+    throw new Error("Cannot send contractor report: no contractor is assigned to this job.");
+  }
+
+  const contractorNote = sanitizeContractorNote(input.contractorNote);
+  const sentAtIso = new Date().toISOString();
+
+  const bodyText = buildReportBody({
+    title: report.title,
+    locationText: report.location_text,
+    reasons: report.reasons,
+    nextStep: report.next_step,
+    contractorNote,
+  });
+
+  const { error: eventErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "contractor_report_sent",
+    message: "Contractor report sent",
+    meta: {
+      report_kind: report.report_kind,
+      report_version: 1,
+      sent_at_iso: sentAtIso,
+      generated_from: {
+        ops_status: report.ops_status,
+      },
+      customer_name: report.customer_name,
+      location_text: report.location_text,
+      contractor_name: report.contractor_name,
+      service_date_text: report.service_date_text,
+      reasons: report.reasons,
+      contractor_note: contractorNote,
+      next_step: report.next_step,
+      body_text: bodyText,
+    },
+    user_id: user.id,
+  });
+
+  if (eventErr) throw new Error(eventErr.message);
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/portal/jobs/${jobId}`);
+  revalidatePath(`/portal`);
+  revalidatePath(`/portal/jobs`);
+  revalidatePath(`/ops`);
+
+  return { ok: true };
+}
+
 export async function resolveFailureByCorrectionReviewFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
 

@@ -40,6 +40,7 @@ import ServiceStatusActions from "./_components/ServiceStatusActions";
 import { displayDateLA } from "@/lib/utils/schedule-la";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
+import ContractorReportPanel from "./_components/ContractorReportPanel";
 
 import JobAttachmentsInternal from "./_components/JobAttachmentsInternal";
 
@@ -2169,6 +2170,10 @@ const renderTimelineItem = (e: any, key: string) => {
     </form>
   </div>
 ) }
+
+{isInternalUser && ["failed", "pending_info"].includes(String(job.ops_status ?? "")) ? (
+  <ContractorReportPanel jobId={job.id} />
+) : null}
 
 {/* Shared Notes */}
 <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">

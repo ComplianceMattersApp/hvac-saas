@@ -130,6 +130,7 @@ export default async function PortalJobDetailPage({
     "job_failed",
     "job_passed",
     "status_changed",
+    "contractor_report_sent",
   ];
 
   const { data: events, error: evErr } = await supabase
@@ -318,6 +319,17 @@ export default async function PortalJobDetailPage({
 
   const latestRaterNote = raterNotes.length > 0 ? raterNotes[0].note : "";
 
+  const latestSentReportEvent = contractorSafeEvents.find(
+    (e: any) =>
+      String(e?.event_type ?? "") === "contractor_report_sent" &&
+      String(e?.job_id ?? "") === String(jobId)
+  );
+
+  const latestSentReportMeta =
+    latestSentReportEvent && typeof latestSentReportEvent.meta !== "string"
+      ? latestSentReportEvent.meta
+      : null;
+
   const timelineEvents = contractorSafeEvents.filter((e: any) => {
     const type = String(e?.event_type ?? "");
     return [
@@ -330,6 +342,7 @@ export default async function PortalJobDetailPage({
       "job_failed",
       "job_passed",
       "status_changed",
+      "contractor_report_sent",
     ].includes(type);
   });
 
@@ -461,6 +474,41 @@ export default async function PortalJobDetailPage({
           </div>
         ) : null}
       </section>
+
+      {latestSentReportMeta ? (
+        <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
+          <div className="text-sm font-semibold">Latest Contractor Report</div>
+
+          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 text-sm space-y-1">
+            <div><span className="font-medium">Type:</span> {String(latestSentReportMeta.report_kind ?? "").trim() === "pending_info" ? "INFORMATION NEEDED" : "FAILED TEST"}</div>
+            <div><span className="font-medium">Customer:</span> {String(latestSentReportMeta.customer_name ?? "-")}</div>
+            <div><span className="font-medium">Location:</span> {String(latestSentReportMeta.location_text ?? "-")}</div>
+            <div><span className="font-medium">Contractor:</span> {String(latestSentReportMeta.contractor_name ?? "").trim() || "Not assigned"}</div>
+            <div><span className="font-medium">Service/Test Date:</span> {String(latestSentReportMeta.service_date_text ?? "-")}</div>
+
+            <div className="pt-1">
+              <div className="font-medium">Reasons</div>
+              <ul className="list-disc pl-5">
+                {(Array.isArray(latestSentReportMeta.reasons) ? latestSentReportMeta.reasons : []).map(
+                  (reason: any, idx: number) => (
+                    <li key={`${String(reason)}-${idx}`}>{String(reason)}</li>
+                  )
+                )}
+              </ul>
+            </div>
+
+            {String(latestSentReportMeta.contractor_note ?? "").trim() ? (
+              <div className="pt-1">
+                <div className="font-medium">Contractor Note</div>
+                <div className="whitespace-pre-wrap">{String(latestSentReportMeta.contractor_note)}</div>
+              </div>
+            ) : null}
+
+            <div className="pt-1"><span className="font-medium">Next Step:</span> {String(latestSentReportMeta.next_step ?? "-")}</div>
+            <div className="pt-1 whitespace-pre-wrap"><span className="font-medium">Report Body:</span>{"\n"}{String(latestSentReportMeta.body_text ?? "-")}</div>
+          </div>
+        </section>
+      ) : null}
 
       {secondaryIssues.length > 0 ? (
         <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
@@ -601,6 +649,8 @@ export default async function PortalJobDetailPage({
                   ? "Result: Passed"
                   : type === "status_changed"
                   ? `Result update: ${titleCaseFromSnake(String(meta?.to ?? ""))}`
+                  : type === "contractor_report_sent"
+                  ? "Contractor report sent"
                   : titleCaseFromSnake(type);
 
               return (
