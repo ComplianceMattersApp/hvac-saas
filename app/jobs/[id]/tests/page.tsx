@@ -569,11 +569,14 @@ const defaultSystemTonnage =
     const runDuct = pickLatestRunForSystem(job, "duct_leakage", systemId);
     const runRefrigerant = pickLatestRunForSystem(job, "refrigerant_charge", systemId);
 
+    const packageSystem = isPackageSystem(systemEquipment);
+    const packageEquipment = systemEquipment.filter((eq: any) => isPackageEquipment(eq));
+
     const outdoorEquipment = systemEquipment.filter((eq: any) => isOutdoorEquipment(eq));
     const indoorEquipment = systemEquipment.filter((eq: any) => isIndoorEquipment(eq));
-    const otherEquipment = systemEquipment.filter(
-      (eq: any) => !isOutdoorEquipment(eq) && !isIndoorEquipment(eq)
-    );
+    const otherEquipment = packageSystem
+      ? systemEquipment.filter((eq: any) => !isPackageEquipment(eq))
+      : systemEquipment.filter((eq: any) => !isOutdoorEquipment(eq) && !isIndoorEquipment(eq));
 
     const systemLocations = Array.from(
       new Set(
@@ -589,6 +592,8 @@ const defaultSystemTonnage =
       runAirflow,
       runDuct,
       runRefrigerant,
+      packageSystem,
+      packageEquipment,
       indoorEquipment,
       outdoorEquipment,
       otherEquipment,
@@ -722,26 +727,43 @@ const defaultSystemTonnage =
                       <span className="font-semibold text-slate-950">Equipment Summary:</span>
                       {sys.hasEquipment ? (
                         <div className="mt-1 space-y-1 text-slate-800 print:text-slate-950">
-                          <div className="font-semibold text-slate-900">Outdoor Equipment</div>
-                          {sys.outdoorEquipment.length > 0 ? (
-                            sys.outdoorEquipment.map((eq: any, index: number) => (
-                              <div key={String(eq?.id ?? `outdoor-${sys.systemId}-${index}`)}>
-                                {index + 1}. {equipmentSummaryLine(eq)}
-                              </div>
-                            ))
+                          {sys.packageSystem ? (
+                            <>
+                              <div className="font-semibold text-slate-900">Package Unit</div>
+                              {sys.packageEquipment.length > 0 ? (
+                                sys.packageEquipment.map((eq: any, index: number) => (
+                                  <div key={String(eq?.id ?? `package-${sys.systemId}-${index}`)}>
+                                    {index + 1}. {equipmentSummaryLine(eq)}
+                                  </div>
+                                ))
+                              ) : (
+                                <div>—</div>
+                              )}
+                            </>
                           ) : (
-                            <div>—</div>
-                          )}
+                            <>
+                              <div className="font-semibold text-slate-900">Outdoor Equipment</div>
+                              {sys.outdoorEquipment.length > 0 ? (
+                                sys.outdoorEquipment.map((eq: any, index: number) => (
+                                  <div key={String(eq?.id ?? `outdoor-${sys.systemId}-${index}`)}>
+                                    {index + 1}. {equipmentSummaryLine(eq)}
+                                  </div>
+                                ))
+                              ) : (
+                                <div>—</div>
+                              )}
 
-                          <div className="font-semibold text-slate-900 pt-1 print:pt-0.5">Indoor Equipment</div>
-                          {sys.indoorEquipment.length > 0 ? (
-                            sys.indoorEquipment.map((eq: any, index: number) => (
-                              <div key={String(eq?.id ?? `indoor-${sys.systemId}-${index}`)}>
-                                {index + 1}. {equipmentSummaryLine(eq)}
-                              </div>
-                            ))
-                          ) : (
-                            <div>—</div>
+                              <div className="font-semibold text-slate-900 pt-1 print:pt-0.5">Indoor Equipment</div>
+                              {sys.indoorEquipment.length > 0 ? (
+                                sys.indoorEquipment.map((eq: any, index: number) => (
+                                  <div key={String(eq?.id ?? `indoor-${sys.systemId}-${index}`)}>
+                                    {index + 1}. {equipmentSummaryLine(eq)}
+                                  </div>
+                                ))
+                              ) : (
+                                <div>—</div>
+                              )}
+                            </>
                           )}
 
                           {sys.otherEquipment.length > 0 ? (
