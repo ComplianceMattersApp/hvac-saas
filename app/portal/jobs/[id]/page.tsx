@@ -63,10 +63,15 @@ function buildAddressLines(opts: {
 
 export default async function PortalJobDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id: jobId } = await params;
+  const sp = (searchParams ? await searchParams : {}) ?? {};
+  const noteErrorRaw = sp.note_error;
+  const noteError = Array.isArray(noteErrorRaw) ? noteErrorRaw[0] : noteErrorRaw;
 
   const supabase = await createClient();
 
@@ -354,7 +359,9 @@ export default async function PortalJobDetailPage({
     const note = String(formData.get("note") || "").trim();
 
     if (!nextJobId) throw new Error("Missing job_id");
-    if (!note) throw new Error("Note is required");
+    if (!note) {
+      redirect(`/portal/jobs/${nextJobId}?note_error=empty_note`);
+    }
 
     const nextSupabase = await createClient();
 
@@ -560,6 +567,11 @@ export default async function PortalJobDetailPage({
 
         <div className="space-y-2">
           <div className="text-sm font-medium">Add contractor note</div>
+          {noteError === "empty_note" ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Please enter a note before sending.
+            </div>
+          ) : null}
           <form action={addContractorNote} className="space-y-3">
             <input type="hidden" name="job_id" value={jobId} />
             <textarea
