@@ -1360,6 +1360,7 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
     systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
   });
 
+  await evaluateEccOpsStatus(jobId);
   revalidatePath(`/jobs/${jobId}/tests`);
   revalidatePath(`/jobs/${jobId}`);
   redirectToTests({ jobId, testType: "refrigerant_charge", systemId });

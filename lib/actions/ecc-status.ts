@@ -2,7 +2,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
+import { setOpsStatusIfNotManual, forceSetOpsStatus } from "@/lib/actions/ops-status";
 import { resolveEccScenario } from "@/lib/ecc/scenario-resolver";
 import type { EccTestType } from "@/lib/ecc/test-registry";
 
@@ -13,7 +13,9 @@ import type { EccTestType } from "@/lib/ecc/test-registry";
  * - Otherwise: do not force to paperwork/failed (leave schedule/call list/etc)
  *
  * Guardrails:
- * - Does NOT overwrite manual locks because we call setOpsStatusIfNotManual.
+ * - Does NOT overwrite true admin holds (pending_info, on_hold) when setting ops_status.
+ * - Canonical failure (anyRequiredFail) uses forceSetOpsStatus to override ECC-derived
+ *   states like paperwork_required that must be re-derivable after test edits.
  * - Does NOT close jobs; paperwork completion remains separate.
  * - ECC resolution must come from completed ecc_test_runs.
  * - Required tests are resolved PER SYSTEM using the ECC scenario engine.
@@ -165,16 +167,33 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
     (requiredBySystem[sid] ?? []).some((t) => matrix[sid]?.[t]?.anyFail)
   );
 
+  // True admin holds must never be overridden by ECC evaluation.
+  // Everything else (paperwork_required, retest_needed, invoice_required, closed, …)
+  // is an ECC-derived or workflow state that canonical failure MUST be able to override.
+  const ECC_HARD_LOCKS = new Set<string>(["pending_info", "on_hold"]);
+
   if (anyRequiredFail) {
-    const setResult = await setOpsStatusIfNotManual(jobId, "failed");
-    console.error("[ECC_EVAL]", {
-      jobId,
-      current_ops_status: job.ops_status ?? null,
-      computed_next_status: "failed",
-      reason: "required_test_failed",
-      manual_lock_prevented: setResult.manualLockPrevented,
-      final_ops_status: setResult.finalStatus,
-    });
+    const currentOps = job.ops_status ?? "";
+    if (ECC_HARD_LOCKS.has(currentOps)) {
+      console.error("[ECC_EVAL]", {
+        jobId,
+        current_ops_status: currentOps,
+        computed_next_status: "failed",
+        reason: "required_test_failed",
+        manual_lock_prevented: true,
+        final_ops_status: currentOps,
+      });
+    } else {
+      await forceSetOpsStatus(jobId, "failed");
+      console.error("[ECC_EVAL]", {
+        jobId,
+        current_ops_status: currentOps,
+        computed_next_status: "failed",
+        reason: "required_test_failed",
+        manual_lock_prevented: false,
+        final_ops_status: "failed",
+      });
+    }
     return;
   }
 

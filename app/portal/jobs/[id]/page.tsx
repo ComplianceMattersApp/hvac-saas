@@ -6,6 +6,7 @@ import { requestRetestReadyFromPortal } from "@/lib/actions/job-actions";
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import { createClient } from "@/lib/supabase/server";
 import JobAttachments from "@/components/portal/JobAttachments";
+import SubmitButton from "@/components/SubmitButton";
 import {
   extractFailureReasons,
   finalRunPass,
@@ -370,6 +371,24 @@ export default async function PortalJobDetailPage({
     if (userErr) throw userErr;
     if (!nextUserData?.user) redirect("/login");
 
+    // Idempotency guard: if the same actor submits the same note back-to-back,
+    // keep only one canonical contractor_note event.
+    const { data: recentDuplicate, error: dupErr } = await nextSupabase
+      .from("job_events")
+      .select("id")
+      .eq("job_id", nextJobId)
+      .eq("event_type", "contractor_note")
+      .eq("user_id", nextUserData.user.id)
+      .contains("meta", { note })
+      .gte("created_at", new Date(Date.now() - 15_000).toISOString())
+      .maybeSingle();
+
+    if (dupErr) throw dupErr;
+    if (recentDuplicate?.id) {
+      revalidatePath(`/portal/jobs/${nextJobId}`);
+      redirect(`/portal/jobs/${nextJobId}`);
+    }
+
     const { error: insErr } = await nextSupabase.from("job_events").insert({
       job_id: nextJobId,
       event_type: "contractor_note",
@@ -581,12 +600,9 @@ export default async function PortalJobDetailPage({
               placeholder="Type your note here..."
               className="w-full border rounded-md px-3 py-2 bg-white dark:bg-gray-900"
             />
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-lg border bg-gray-900 text-white text-sm font-medium hover:opacity-90 transition"
-            >
+            <SubmitButton className="px-4 py-2 rounded-lg border bg-gray-900 text-white text-sm font-medium hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed">
               Save Note
-            </button>
+            </SubmitButton>
           </form>
         </div>
       </section>
