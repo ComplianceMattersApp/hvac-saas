@@ -265,7 +265,7 @@ async function resolveContractorReportForJob(params: {
         ? extracted
         : ["Test failed. Please review and correct."];
 
-    const nextStep = "Correct the issue and upload photos in the contractor portal.";
+    const nextStep = "Correct the issue and submit your response in the contractor portal.";
     const title = "FAILED TEST";
 
     return {
