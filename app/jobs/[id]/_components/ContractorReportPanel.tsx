@@ -9,8 +9,12 @@ import {
 
 export default function ContractorReportPanel({
   jobId,
+  contractorResponseLabel,
+  contractorResponseSubLabel,
 }: {
   jobId: string;
+  contractorResponseLabel?: string | null;
+  contractorResponseSubLabel?: string | null;
 }) {
   const [preview, setPreview] = useState<ContractorReportPreview | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -62,6 +66,17 @@ export default function ContractorReportPanel({
   return (
     <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
       <div className="text-sm font-semibold mb-3">Contractor Report</div>
+
+      {contractorResponseLabel ? (
+        <div className="mb-3 flex items-center gap-2">
+          <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-800">
+            {contractorResponseLabel}
+          </span>
+          {contractorResponseSubLabel ? (
+            <span className="text-xs text-gray-500">{contractorResponseSubLabel}</span>
+          ) : null}
+        </div>
+      ) : null}
 
       {error ? (
         <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

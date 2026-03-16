@@ -41,6 +41,7 @@ import { displayDateLA } from "@/lib/utils/schedule-la";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import ContractorReportPanel from "./_components/ContractorReportPanel";
+import { resolveContractorResponseTracking } from "@/lib/portal/resolveContractorIssues";
 
 import JobAttachmentsInternal from "./_components/JobAttachmentsInternal";
 
@@ -482,11 +483,38 @@ const timelineJobIds = (timelineJobs ?? []).map((j: any) => String(j.id ?? "")).
 // --- Unified Timeline (job_events) ---
 const { data: timelineEvents, error: tlErr } = await supabase
   .from("job_events")
-  .select("created_at, event_type, message, meta, user_id")
+  .select("job_id, created_at, event_type, message, meta, user_id")
   .in("job_id", timelineJobIds.length ? timelineJobIds : [jobId])
   .order("created_at", { ascending: false })
   .limit(200);
 if (tlErr) throw new Error(tlErr.message);
+
+const eventsForCurrentJob = (timelineEvents ?? []).filter(
+  (e: any) => String(e?.job_id ?? "") === String(job.id ?? "")
+);
+
+const contractorResponseTracking = resolveContractorResponseTracking(eventsForCurrentJob as any[]);
+
+const contractorResponseLabel = contractorResponseTracking.latestReportSentAt
+  ? contractorResponseTracking.waitingOnContractor
+    ? "Waiting on contractor"
+    : contractorResponseTracking.hasContractorResponse && contractorResponseTracking.lastResponseType === "note"
+    ? "Contractor responded"
+    : contractorResponseTracking.hasContractorResponse && contractorResponseTracking.lastResponseType === "correction"
+    ? "Correction submitted"
+    : contractorResponseTracking.hasContractorResponse && contractorResponseTracking.lastResponseType === "retest"
+    ? "Retest requested"
+    : contractorResponseTracking.hasContractorResponse
+    ? "Contractor responded"
+    : null
+  : null;
+
+const contractorResponseSubLabel =
+  contractorResponseTracking.latestReportSentAt &&
+  contractorResponseTracking.hasContractorResponse &&
+  contractorResponseTracking.awaitingInternalReview
+    ? "Awaiting internal review"
+    : null;
 
 const { data: attachmentRows, error: attachmentErr } = await supabase
   .from("attachments")
@@ -2172,7 +2200,11 @@ const renderTimelineItem = (e: any, key: string) => {
 ) }
 
 {isInternalUser && ["failed", "pending_info"].includes(String(job.ops_status ?? "")) ? (
-  <ContractorReportPanel jobId={job.id} />
+  <ContractorReportPanel
+    jobId={job.id}
+    contractorResponseLabel={contractorResponseLabel}
+    contractorResponseSubLabel={contractorResponseSubLabel}
+  />
 ) : null}
 
 {/* Shared Notes */}

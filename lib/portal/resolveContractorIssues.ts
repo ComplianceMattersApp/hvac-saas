@@ -41,6 +41,17 @@ export type ResolveContractorIssuesOutput = {
   secondaryIssues?: ContractorIssue[];
 };
 
+export type ContractorResponseType = "note" | "correction" | "retest";
+
+export type ContractorResponseTracking = {
+  latestReportSentAt: string | null;
+  hasContractorResponse: boolean;
+  waitingOnContractor: boolean;
+  awaitingInternalReview: boolean;
+  lastResponseType: ContractorResponseType | null;
+  lastResponseAt: string | null;
+};
+
 const PRIORITY: Record<ContractorIssueGroup, number> = {
   needs_info: 1,
   failed: 2,
@@ -81,6 +92,106 @@ function inProgressHeadline(opsStatus: string): string {
   if (opsStatus === "scheduled") return "Scheduled";
   if (opsStatus === "on_hold") return "On hold";
   return "In progress";
+}
+
+function toMs(value: string | null | undefined): number | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const t = new Date(raw).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+function responseTypeForEvent(type: string): ContractorResponseType | null {
+  if (type === "contractor_note") return "note";
+  if (type === "contractor_correction_submission") return "correction";
+  if (type === "retest_ready_requested") return "retest";
+  return null;
+}
+
+export function resolveContractorResponseTracking(
+  eventsInput?: ContractorSafeEvent[]
+): ContractorResponseTracking {
+  const events = eventsInput ?? [];
+
+  const reportEvents = events.filter(
+    (e) => normalize(e?.event_type) === "contractor_report_sent"
+  );
+
+  if (reportEvents.length === 0) {
+    return {
+      latestReportSentAt: null,
+      hasContractorResponse: false,
+      waitingOnContractor: false,
+      awaitingInternalReview: false,
+      lastResponseType: null,
+      lastResponseAt: null,
+    };
+  }
+
+  const latestReport = reportEvents.reduce((latest, current) => {
+    if (!latest) return current;
+    const latestMs = toMs(latest.created_at);
+    const currentMs = toMs(current.created_at);
+
+    if (latestMs == null && currentMs != null) return current;
+    if (latestMs != null && currentMs == null) return latest;
+    if (latestMs == null && currentMs == null) return latest;
+
+    return currentMs! > latestMs! ? current : latest;
+  }, null as ContractorSafeEvent | null);
+
+  const latestReportSentAt = String(latestReport?.created_at ?? "").trim() || null;
+  const latestReportMs = toMs(latestReport?.created_at);
+
+  const postReportEvents =
+    latestReportMs == null
+      ? []
+      : events.filter((e) => {
+          const ms = toMs(e?.created_at);
+          return ms != null && ms > latestReportMs;
+        });
+
+  const responseEvents = postReportEvents
+    .map((e) => {
+      const eventType = normalize(e?.event_type);
+      const responseType = responseTypeForEvent(eventType);
+      return responseType
+        ? {
+            responseType,
+            createdAt: String(e?.created_at ?? "").trim() || null,
+            createdAtMs: toMs(e?.created_at),
+          }
+        : null;
+    })
+    .filter((e): e is { responseType: ContractorResponseType; createdAt: string | null; createdAtMs: number | null } => Boolean(e));
+
+  if (responseEvents.length === 0) {
+    return {
+      latestReportSentAt,
+      hasContractorResponse: false,
+      waitingOnContractor: true,
+      awaitingInternalReview: false,
+      lastResponseType: null,
+      lastResponseAt: null,
+    };
+  }
+
+  const lastResponse = responseEvents.reduce((latest, current) => {
+    if (!latest) return current;
+    if (latest.createdAtMs == null && current.createdAtMs != null) return current;
+    if (latest.createdAtMs != null && current.createdAtMs == null) return latest;
+    if (latest.createdAtMs == null && current.createdAtMs == null) return latest;
+    return current.createdAtMs! > latest.createdAtMs! ? current : latest;
+  }, null as { responseType: ContractorResponseType; createdAt: string | null; createdAtMs: number | null } | null);
+
+  return {
+    latestReportSentAt,
+    hasContractorResponse: true,
+    waitingOnContractor: false,
+    awaitingInternalReview: true,
+    lastResponseType: lastResponse?.responseType ?? null,
+    lastResponseAt: lastResponse?.createdAt ?? null,
+  };
 }
 
 export function resolveContractorIssues(
