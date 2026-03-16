@@ -16,6 +16,7 @@ import {
   startOfTomorrowUtcIsoLA,
 } from "@/lib/utils/schedule-la";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
+import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -293,7 +294,7 @@ const resolvedFailedParentIds = new Set(
 
   // Common job select (keep lightweight)
  const baseSelect =
-     "id, title, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, customer_id, deleted_at, location_id, created_at";
+   "id, title, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, permit_number, pending_info_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -576,8 +577,61 @@ function customerPhoneOnly(j: any) {
   return c?.phone ?? j.customer_phone ?? "";
 }
 
+function contractorNameOnly(j: any) {
+  const relationName = String((j as any)?.contractors?.name ?? "").trim();
+  if (relationName) return relationName;
+
+  const byIdName = String(
+    contractors?.find((c: any) => String(c?.id ?? "") === String(j?.contractor_id ?? ""))?.name ?? ""
+  ).trim();
+  if (byIdName) return byIdName;
+
+  return "Unassigned";
+}
+
+function normalizeFailureLine(line: string, testTypeRaw: string): string {
+  const text = String(line ?? "").trim();
+  const testType = String(testTypeRaw ?? "").trim().toLowerCase();
+  const lower = text.toLowerCase();
+
+  if (testType === "refrigerant_charge") {
+    if (
+      lower.includes("subcool") ||
+      lower.includes("superheat") ||
+      lower.includes("filter drier") ||
+      lower.includes("outdoor temp") ||
+      lower.includes("indoor temp")
+    ) {
+      return "Failed - refrigerant charge out of range";
+    }
+    return text ? `Failed - refrigerant charge: ${text}` : "Failed - refrigerant charge out of range";
+  }
+
+  if (testType === "duct_leakage") {
+    if (lower.includes("above") || lower.includes("leakage") || lower.includes("max")) {
+      return "Failed - duct leakage above threshold";
+    }
+    return text ? `Failed - duct leakage: ${text}` : "Failed - duct leakage above threshold";
+  }
+
+  if (testType === "airflow") {
+    if (lower.includes("below") || lower.includes("required") || lower.includes("target")) {
+      return "Failed - airflow below target";
+    }
+    return text ? `Failed - airflow: ${text}` : "Failed - airflow below target";
+  }
+
+  return text ? `Failed - ${text}` : "Failed - test requirement not met";
+}
+
+function toEpochMs(value?: string | null) {
+  const t = new Date(String(value ?? "")).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
 function queueReason(j: any, activeBucket: string) {
   const status = String(j?.ops_status ?? "").toLowerCase();
+  const jobId = String(j?.id ?? "");
 
   if (activeBucket === "attention") {
     if (status === "need_to_schedule") {
@@ -593,15 +647,22 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "pending_info" || status === "pending_info") {
-    return "Waiting for required information";
+    const pendingInfoReason = String(j?.pending_info_reason ?? "").trim();
+    if (/permit/i.test(pendingInfoReason) || !String(j?.permit_number ?? "").trim()) {
+      return "Pending info — missing permit number";
+    }
+    return pendingInfoReason ? `Pending info — ${pendingInfoReason}` : "Pending info — waiting for required information";
   }
 
   if (activeBucket === "failed" || status === "failed") {
-    return "Test failed — awaiting correction or retest";
+    return primaryFailureReasonByJob.get(jobId) ?? "Failed — awaiting correction or retest";
   }
 
   if (activeBucket === "retest_needed" || status === "retest_needed") {
-    return "Retest required — awaiting contractor action";
+    if (hasSignalEventForJob(latestRetestReadyByJob, jobId)) {
+      return "Retest needed — contractor marked correction complete";
+    }
+    return "Retest needed — awaiting contractor action";
   }
 
   if (activeBucket === "on_hold" || status === "on_hold") {
@@ -613,7 +674,11 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "paperwork_required" || status === "paperwork_required") {
-    return "Status bucket — certs or closeout paperwork still needed";
+    const needs = getCloseoutNeeds(j);
+    if (needs.needsCerts && needs.needsInvoice) return "Paperwork required — certs and invoice pending";
+    if (needs.needsCerts) return "Paperwork required — certs pending";
+    if (needs.needsInvoice) return "Paperwork required — invoice pending";
+    return "Paperwork required — closeout processing pending";
   }
 
   if (activeBucket === "invoice_required" || status === "invoice_required") {
@@ -662,6 +727,14 @@ function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJo
 function signalReason(j: any, opts?: { retestReady?: boolean; newContractorJob?: boolean }) {
   if (opts?.retestReady) return "Contractor says correction is complete and job is ready for retest review";
   if (opts?.newContractorJob) return "New job submitted by contractor and waiting for internal review";
+  if (signal === "contractor_updates") {
+    const updateType = String(latestContractorUpdateByJob.get(String(j?.id ?? ""))?.event_type ?? "").toLowerCase();
+    if (updateType === "permit_info_updated") return "Contractor updated permit information";
+    if (updateType === "contractor_schedule_updated") return "Contractor updated schedule details";
+    if (updateType === "contractor_correction_submission") return "Contractor submitted correction details";
+    if (updateType === "attachment_added") return "Contractor uploaded attachments";
+    if (updateType === "contractor_note") return "Contractor added a note";
+  }
   return queueReason(j, bucket);
 }
 
@@ -759,6 +832,53 @@ const { data: signalEvents, error: signalErr } = await supabase
   .order("created_at", { ascending: false });
 
 if (signalErr) throw signalErr;
+
+const { data: failedRuns, error: failedRunsErr } = await supabase
+  .from("ecc_test_runs")
+  .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, updated_at, created_at")
+  .in(
+    "job_id",
+    allOpenOpsJobIds.length
+      ? allOpenOpsJobIds
+      : ["00000000-0000-0000-0000-000000000000"]
+  )
+  .eq("is_completed", true)
+  .or("override_pass.eq.false,computed_pass.eq.false");
+
+if (failedRunsErr) throw failedRunsErr;
+
+const latestFailedRunByJob = new Map<string, any>();
+for (const run of failedRuns ?? []) {
+  const jobId = String((run as any)?.job_id ?? "").trim();
+  if (!jobId) continue;
+
+  const current = latestFailedRunByJob.get(jobId);
+  if (!current) {
+    latestFailedRunByJob.set(jobId, run);
+    continue;
+  }
+
+  const currentMs = Math.max(
+    toEpochMs((current as any)?.updated_at),
+    toEpochMs((current as any)?.created_at)
+  );
+  const nextMs = Math.max(
+    toEpochMs((run as any)?.updated_at),
+    toEpochMs((run as any)?.created_at)
+  );
+
+  if (nextMs > currentMs) {
+    latestFailedRunByJob.set(jobId, run);
+  }
+}
+
+const primaryFailureReasonByJob = new Map<string, string>();
+for (const [jobId, run] of latestFailedRunByJob.entries()) {
+  const reasons = extractFailureReasons(run);
+  const primaryLine = reasons[0] ?? "";
+  const formatted = normalizeFailureLine(primaryLine, String((run as any)?.test_type ?? ""));
+  primaryFailureReasonByJob.set(jobId, formatted);
+}
 
 const latestRetestReadyByJob = new Map<string, any>();
 const latestContractorCreatedByJob = new Map<string, any>();
@@ -1122,6 +1242,7 @@ function compactRow(j: any, showDate = false, note?: string) {
             {j.title}
           </Link>
           <div className="mt-0.5 text-xs font-medium text-gray-700">{customerNameOnly(j)} • {customerPhoneOnly(j) || "-"}</div>
+          <div className="text-xs text-gray-600">Contractor: {contractorNameOnly(j)}</div>
           <div className="text-xs text-gray-500">{addressLine(j)}</div>
           {note ? (
             <div className="mt-1.5 inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
