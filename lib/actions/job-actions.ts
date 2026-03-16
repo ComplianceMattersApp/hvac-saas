@@ -2908,18 +2908,11 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   }
 
   let next_ops_status = ops_status;
-  const lifecycleStatus = String(before?.status ?? "").toLowerCase();
   const isUnscheduledAfterSave = !scheduled_date && !window_start && !window_end;
 
-  // Unschedule behavior should follow lifecycle state.
-  // Open jobs return to call list, but active field jobs keep their current ops lane.
-  if (isUnscheduledAfterSave) {
-    if (lifecycleStatus === "open") {
-      next_ops_status = "need_to_schedule";
-    } else {
-      const priorOps = String(before?.ops_status ?? "").trim();
-      if (priorOps) next_ops_status = priorOps;
-    }
+  // Policy: explicit Unschedule always returns the job to the call list.
+  if (unscheduleRequested && isUnscheduledAfterSave) {
+    next_ops_status = "need_to_schedule";
   }
 
   const isEccCompletedOrFieldComplete =
@@ -2936,12 +2929,19 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const jurisdiction = isServiceJob ? null : (jurisdictionRaw || null);
   const permit_date = isServiceJob ? null : (permitDateRaw || null);
 
+  const nextLifecycleStatus =
+    unscheduleRequested && isUnscheduledAfterSave ? "open" : undefined;
+  const nextOnTheWayAt =
+    unscheduleRequested && isUnscheduledAfterSave ? null : undefined;
+
   await updateJob({
     id,
     scheduled_date,
     window_start,
     window_end,
     ops_status: next_ops_status,
+    status: nextLifecycleStatus,
+    on_the_way_at: nextOnTheWayAt,
     permit_number,
     jurisdiction,
     permit_date,
@@ -2981,8 +2981,9 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     !!before?.scheduled_date || !!before?.window_start || !!before?.window_end;
   const isScheduled = !!scheduled_date || !!window_start || !!window_end;
 
-  const event_type =
-    !wasScheduled && isScheduled
+  const event_type = unscheduleRequested
+    ? "unscheduled"
+    : !wasScheduled && isScheduled
       ? "scheduled"
       : wasScheduled && !isScheduled
       ? "unscheduled"
@@ -2998,6 +2999,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
         window_start: before?.window_start ?? null,
         window_end: before?.window_end ?? null,
         ops_status: before?.ops_status ?? null,
+        status: before?.status ?? null,
         permit_number: before?.permit_number ?? null,
         jurisdiction: before?.jurisdiction ?? null,
         permit_date: before?.permit_date ?? null,
@@ -3007,6 +3009,8 @@ export async function updateJobScheduleFromForm(formData: FormData) {
         window_start,
         window_end,
         ops_status: next_ops_status,
+        status: nextLifecycleStatus ?? before?.status ?? null,
+        on_the_way_at: nextOnTheWayAt,
         permit_number,
         jurisdiction,
         permit_date,
@@ -3016,6 +3020,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
 
   revalidatePath(`/jobs/${id}`);
   revalidatePath(`/ops`);
+  revalidatePath(`/calendar`);
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${id}`);
 
