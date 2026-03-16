@@ -2366,6 +2366,28 @@ async function postCreate(createdJobId: string, metaSource: string) {
         next_action: "review_and_schedule",
       },
     });
+
+    if (scheduled_date) {
+      await insertJobEvent({
+        supabase,
+        jobId: createdJobId,
+        event_type: "contractor_schedule_updated",
+        meta: {
+          source: "contractor_portal",
+          scheduled_date,
+          window_start: window_start ?? null,
+          window_end: window_end ?? null,
+        },
+        userId,
+      });
+
+      await insertInternalNotificationForEvent({
+        supabase,
+        jobId: createdJobId,
+        eventType: "contractor_schedule_updated",
+        actorUserId: userId,
+      });
+    }
 }
 
 await insertEquipmentForJob(createdJobId);
@@ -2388,6 +2410,7 @@ const CONTRACTOR_SANDBOX_ALLOWED = new Set([
   "contractor_correction_submission",
   "attachment_added",
   "contractor_job_created",
+  "contractor_schedule_updated",
   "retest_ready_requested",
 ]);
 
@@ -2732,6 +2755,13 @@ export async function advanceJobStatusFromForm(formData: FormData) {
         },
       });
     }
+
+    await insertJobEvent({
+      supabase,
+      jobId: id,
+      event_type: "on_my_way",
+      meta: { from: current, to: next },
+    });
   } else {
     const updatePayload: Record<string, any> = { status: next };
 
@@ -2863,10 +2893,34 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const jurisdictionRaw = String(formData.get("jurisdiction") || "").trim();
 
   // Canonical scheduling + ops_status logic (NO Date parsing)
-  const { scheduled_date, window_start, window_end, ops_status } =
-    deriveScheduleAndOps(formData);
+  const derived = deriveScheduleAndOps(formData);
+  const unscheduleRequested = String(formData.get("unschedule") || "").trim() === "1";
+
+  let scheduled_date = derived.scheduled_date;
+  let window_start = derived.window_start;
+  let window_end = derived.window_end;
+  const ops_status = derived.ops_status;
+
+  if (unscheduleRequested) {
+    scheduled_date = null;
+    window_start = null;
+    window_end = null;
+  }
 
   let next_ops_status = ops_status;
+  const lifecycleStatus = String(before?.status ?? "").toLowerCase();
+  const isUnscheduledAfterSave = !scheduled_date && !window_start && !window_end;
+
+  // Unschedule behavior should follow lifecycle state.
+  // Open jobs return to call list, but active field jobs keep their current ops lane.
+  if (isUnscheduledAfterSave) {
+    if (lifecycleStatus === "open") {
+      next_ops_status = "need_to_schedule";
+    } else {
+      const priorOps = String(before?.ops_status ?? "").trim();
+      if (priorOps) next_ops_status = priorOps;
+    }
+  }
 
   const isEccCompletedOrFieldComplete =
     String(before?.job_type ?? "").toLowerCase() === "ecc" &&

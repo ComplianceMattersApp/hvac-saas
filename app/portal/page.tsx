@@ -8,6 +8,7 @@ import {
   resolveContractorIssues,
   type ContractorIssue,
 } from "@/lib/portal/resolveContractorIssues";
+import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -402,7 +403,7 @@ export default async function PortalPage({
                   </div>
 
                   <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
-                    {j.scheduled_date ? `Service ${formatDateLA(j.scheduled_date)}` : "Service date pending"}
+                    {j.scheduled_date ? `Service ${formatBusinessDateUS(String(j.scheduled_date))}` : "Service date pending"}
                   </div>
                 </div>
               </Link>
@@ -466,7 +467,7 @@ export default async function PortalPage({
                     </div>
 
                     <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
-                      {j.scheduled_date ? `Service ${formatDateLA(String(j.scheduled_date))}` : "Schedule pending"}
+                      {j.scheduled_date ? `Service ${formatBusinessDateUS(String(j.scheduled_date))}` : "Schedule pending"}
                     </div>
                   </div>
                 </Link>

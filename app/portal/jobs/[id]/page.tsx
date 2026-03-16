@@ -11,6 +11,7 @@ import {
   finalRunPass,
   resolveContractorIssues,
 } from "@/lib/portal/resolveContractorIssues";
+import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -442,7 +443,7 @@ export default async function PortalJobDetailPage({
           <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 h-full">
             <div className="text-xs text-gray-500 dark:text-gray-300">Service Date</div>
             <div className="mt-1 font-medium">
-              {(job as any).scheduled_date ? formatDateLA(String((job as any).scheduled_date)) : "Not scheduled"}
+              {(job as any).scheduled_date ? formatBusinessDateUS(String((job as any).scheduled_date)) : "Not scheduled"}
               {(job as any).window_start && (job as any).window_end
                 ? ` • ${formatTimeLocal((job as any).window_start)}-${formatTimeLocal((job as any).window_end)}`
                 : ""}

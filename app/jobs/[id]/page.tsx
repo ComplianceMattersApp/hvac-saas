@@ -37,8 +37,9 @@ import {
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 
 import ServiceStatusActions from "./_components/ServiceStatusActions";
-import { displayDateLA } from "@/lib/utils/schedule-la";
+import { displayDateLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
+import UnscheduleButton from "./_components/UnscheduleButton";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import ContractorReportPanel from "./_components/ContractorReportPanel";
 import { resolveContractorResponseTracking } from "@/lib/portal/resolveContractorIssues";
@@ -1335,7 +1336,7 @@ const renderTimelineItem = (e: any, key: string) => {
               <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
                 <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Scheduled</div>
                 <div className="mt-1 text-sm font-semibold text-gray-900">
-                  {job.scheduled_date ? displayDateLA(String(job.scheduled_date)) : "—"}
+                  {job.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "—"}
                 </div>
               </div>
 
@@ -1872,6 +1873,10 @@ const renderTimelineItem = (e: any, key: string) => {
               >
                 Save Scheduling
               </button>
+
+              {(job.scheduled_date || job.window_start || job.window_end) ? (
+                <UnscheduleButton />
+              ) : null}
 
               <Link
                 href="/ops"

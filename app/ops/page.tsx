@@ -10,7 +10,7 @@ import {
 } from "@/lib/auth/internal-user";
 
 import {
-  displayDateLA,
+  formatBusinessDateUS,
   displayWindowLA,
   startOfTodayUtcIsoLA,
   startOfTomorrowUtcIsoLA,
@@ -241,7 +241,7 @@ function subtractBusinessDays(date: Date, days: number) {
   // ✅ Counts per ops_status (exclude "closed", respect contractor filter)
 let countsQ = supabase
   .from("jobs")
-  .select("id, ops_status")
+  .select("id, ops_status, status")
   .neq("ops_status", "closed")
   .is("deleted_at", null);
 
@@ -253,7 +253,9 @@ if (countsErr) throw countsErr;
 const counts = new Map<string, number>();
 for (const row of countRows ?? []) {
   const key = String((row as any).ops_status ?? "");
+  const lifecycle = String((row as any).status ?? "").toLowerCase();
   if (!key) continue;
+  if ((key === "need_to_schedule" || key === "scheduled") && lifecycle !== "open") continue;
   counts.set(key, (counts.get(key) ?? 0) + 1);
 }
 
@@ -352,6 +354,7 @@ let upcomingQ = supabase
   .from("jobs")
   .select(baseSelect)
   .is("deleted_at", null)
+  .eq("status", "open")
   .eq("ops_status", "scheduled")
   .gte("scheduled_date", startTomorrowUtc)
   .order("scheduled_date", { ascending: true })
@@ -369,6 +372,7 @@ if (upcomingErr) throw upcomingErr;
     .from("jobs")
     .select(baseSelect)
     .is("deleted_at", null)
+    .eq("status", "open")
     .eq("ops_status", "need_to_schedule")
     .order("created_at", { ascending: false })
     .limit(10);
@@ -418,7 +422,7 @@ if (upcomingErr) throw upcomingErr;
       .or(
         [
           // Need to Schedule older than 3 business days
-          `and(ops_status.eq.need_to_schedule,created_at.lte.${attentionBusinessCutoffIso})`,
+          `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
 
           // Pending Info older than 3 business days
           `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
@@ -447,7 +451,7 @@ if (upcomingErr) throw upcomingErr;
     if (bucket === "attention") {
       bucketQ = bucketQ.or(
         [
-          `and(ops_status.eq.need_to_schedule,created_at.lte.${attentionBusinessCutoffIso})`,
+          `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
           `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
           `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
         ].join(",")
@@ -463,6 +467,9 @@ if (upcomingErr) throw upcomingErr;
         .limit(15);
     } else {
       bucketQ = bucketQ.eq("ops_status", bucket);
+      if (bucket === "need_to_schedule" || bucket === "scheduled") {
+        bucketQ = bucketQ.eq("status", "open");
+      }
     }
 
     bucketQ = applyCommonFilters(bucketQ);
@@ -601,7 +608,7 @@ function queueReason(j: any, activeBucket: string) {
     return "On hold — awaiting resolution before closeout";
   }
 
-  if (activeBucket === "need_to_schedule" || status === "need_to_schedule") {
+  if (status === "need_to_schedule") {
     return "Waiting to be scheduled";
   }
 
@@ -745,6 +752,7 @@ const { data: signalEvents, error: signalErr } = await supabase
     "contractor_report_sent",
     "contractor_note",
     "contractor_correction_submission",
+    "contractor_schedule_updated",
     "attachment_added",
     "permit_info_updated",
   ])
@@ -772,6 +780,7 @@ for (const ev of signalEvents ?? []) {
     [
       "contractor_note",
       "contractor_correction_submission",
+      "contractor_schedule_updated",
       "attachment_added",
       "permit_info_updated",
     ].includes(type) &&
@@ -801,7 +810,7 @@ const contractorCreatedCount = uniqueAllOpenOpsJobs.filter((j: any) => {
   return status === "need_to_schedule" && hasSignalEventForJob(latestContractorCreatedByJob, jobId);
 }).length;
 
-const contractorUpdatesCount = uniqueAllOpenOpsJobs.filter((j: any) => {
+const contractorUpdatesCount = (filteredBucketJobs ?? []).filter((j: any) => {
   const jobId = String(j?.id ?? "");
   return hasSignalEventForJob(latestContractorUpdateByJob, jobId);
 }).length;
@@ -829,9 +838,8 @@ if (signal === "new_contractor") {
 }
 
 if (signal === "contractor_updates") {
-  // Cross-bucket signal: source from all open jobs (same dataset as the count card),
-  // not just the current bucket slice, so card count and displayed rows always match.
-  signalFilteredBucketJobs = uniqueAllOpenOpsJobs.filter((j: any) =>
+  // Keep contractor updates within the active queue's scope.
+  signalFilteredBucketJobs = signalFilteredBucketJobs.filter((j: any) =>
     hasSignalEventForJob(latestContractorUpdateByJob, String(j.id ?? ""))
   );
 }
@@ -1123,7 +1131,7 @@ function compactRow(j: any, showDate = false, note?: string) {
         </div>
         {showDate ? (
           <div className="text-right text-[11px] text-gray-500">
-            <div className="font-medium text-gray-700">{j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : "-"}</div>
+            <div className="font-medium text-gray-700">{j.scheduled_date ? formatBusinessDateUS(String(j.scheduled_date)) : "-"}</div>
             <div>{displayWindowLA(j.window_start, j.window_end) || "-"}</div>
           </div>
         ) : null}
