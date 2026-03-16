@@ -51,19 +51,43 @@ export type RuleProfile = {
 };
 
 
-const PACKAGE_COMPONENT_TYPES = new Set([
+const PACKAGE_ALIASES = new Set([
+  "pack_unit",
+  "package",
+  "package_unit",
   "package_gas_electric",
   "package_heat_pump",
 ]);
 
 type SystemEquipmentLike = {
   component_type?: string | null;
+  equipment_role?: string | null;
 };
 
+function normalizeEquipmentType(value: string | null | undefined): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
 export function isPackageSystem(systemEquipment: SystemEquipmentLike[] | null | undefined): boolean {
-  return (systemEquipment ?? []).some((eq) =>
-    PACKAGE_COMPONENT_TYPES.has(String(eq?.component_type ?? "").trim().toLowerCase())
-  );
+  return (systemEquipment ?? []).some((eq) => {
+    const componentType = normalizeEquipmentType(eq?.component_type);
+    const equipmentRole = normalizeEquipmentType(eq?.equipment_role);
+
+    if (PACKAGE_ALIASES.has(componentType) || PACKAGE_ALIASES.has(equipmentRole)) {
+      return true;
+    }
+
+    // Legacy fallback: treat explicit package-like free-text as package systems.
+    return (
+      componentType.includes("package") ||
+      componentType.includes("pack_unit") ||
+      equipmentRole.includes("package") ||
+      equipmentRole.includes("pack_unit")
+    );
+  });
 }
 
 export function getRequiredTestsForSystem(args: {

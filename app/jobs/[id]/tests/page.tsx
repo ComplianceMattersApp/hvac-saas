@@ -202,10 +202,25 @@ function normalizeToken(value: unknown) {
 }
 
 function equipmentKindTokens(eq: any) {
-  return [normalizeToken(eq?.equipment_role), normalizeToken(eq?.component_type)].filter(Boolean);
+  return [normalizeToken(eq?.equipment_role), normalizeToken(eq?.component_type)]
+    .map((token) => token.replace(/[\s-]+/g, "_"))
+    .filter(Boolean);
+}
+
+function isPackageEquipment(eq: any) {
+  const tokens = equipmentKindTokens(eq);
+  return tokens.some(
+    (token) =>
+      token === "package_unit" ||
+      token === "pack_unit" ||
+      token === "package_gas_electric" ||
+      token === "package_heat_pump" ||
+      token.includes("package")
+  );
 }
 
 function isOutdoorEquipment(eq: any) {
+  if (isPackageEquipment(eq)) return true;
   const tokens = equipmentKindTokens(eq);
   return tokens.some(
     (token) =>
@@ -213,7 +228,6 @@ function isOutdoorEquipment(eq: any) {
       token.includes("condenser") ||
       token.includes("heat_pump") ||
       token.includes("heat pump") ||
-      token.includes("package") ||
       token.includes("compressor")
   );
 }
@@ -500,9 +514,7 @@ export default async function JobTestsPage({
   const packageSystem = isPackageSystem(selectedSystemEquipment);
 
 const primaryEquipment =
-  selectedSystemEquipment.find((eq: any) =>
-    String(eq?.component_type ?? "").toLowerCase().startsWith("package")
-  ) ??
+  selectedSystemEquipment.find((eq: any) => isPackageEquipment(eq)) ??
   selectedSystemEquipment.find((eq: any) => eq.equipment_role === "condenser") ??
   selectedSystemEquipment.find((eq: any) => eq.equipment_role === "air_handler") ??
   selectedSystemEquipment.find((eq: any) => eq.equipment_role === "furnace") ??
@@ -621,6 +633,9 @@ const defaultSystemTonnage =
       </div>
 
       <div className="hidden space-y-4 peer-checked:block print:block">
+      <div className="hidden border-b border-slate-400 pb-2 print:block">
+        <h1 className="text-lg font-bold text-slate-950">Compliance Matters Test Results</h1>
+      </div>
       <section className="rounded-lg border border-slate-400 bg-white p-5 space-y-4 text-slate-900 print:rounded-none print:border-slate-500 print:p-3 print:space-y-3">
         <div>
           <h2 className="text-lg font-bold text-slate-950 print:text-base">Customer / Job Info</h2>

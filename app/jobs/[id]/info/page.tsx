@@ -195,7 +195,7 @@ addJobEquipmentFromForm
         <option value="air_handler">Air Handler</option>
         <option value="furnace">Furnace</option>
         <option value="heat_pump">Heat Pump</option>
-        <option value="other">Pack Unit</option>
+        <option value="package_unit">Pack Unit</option>
         <option value="other">Other</option>
       </select>
     </div>
