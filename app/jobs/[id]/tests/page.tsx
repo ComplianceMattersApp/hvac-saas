@@ -27,6 +27,7 @@ import {
   normalizeProjectTypeToRuleProfile,
   isPackageSystem,
 } from "@/lib/ecc/rule-profiles";
+import { equipmentRoleLabel } from "@/lib/utils/equipment-display";
 
 function getEffectiveResultLabel(t: any) {
   if (t.override_pass === true) return "PASS (override)";
@@ -176,7 +177,8 @@ function fallbackText(value: unknown) {
 }
 
 function equipmentSummaryLine(eq: any) {
-  const equipmentType = fallbackText(eq?.equipment_role ?? eq?.component_type);
+  const rawType = String(eq?.equipment_role ?? eq?.component_type ?? "").trim();
+  const equipmentType = rawType ? equipmentRoleLabel(rawType) : "—";
   const model = fallbackText(eq?.model);
   const serial = fallbackText(eq?.serial);
   return `${equipmentType} | Model: ${model} | Serial: ${serial}`;
@@ -735,11 +737,7 @@ const defaultSystemTonnage =
 
                   <div className="grid gap-3 text-sm text-slate-900 print:gap-2 print:text-[12px]">
                     <div>
-                      <span className="font-semibold text-slate-950">System Label:</span> {fallbackText(sys.systemName)}
-                    </div>
-
-                    <div>
-                      <span className="font-semibold text-slate-950">System Location:</span> {fallbackText(sys.systemLocationLabel)}
+                      <span className="font-semibold text-slate-950">System:</span> {fallbackText(sys.systemLocationLabel)}
                     </div>
 
                     <div>
@@ -761,7 +759,7 @@ const defaultSystemTonnage =
                             </>
                           ) : (
                             <>
-                              <div className="font-semibold text-slate-900">Outdoor Equipment</div>
+                              <div className="font-semibold text-slate-900">Condenser</div>
                               {sys.outdoorEquipment.length > 0 ? (
                                 sys.outdoorEquipment.map((eq: any, index: number) => (
                                   <div key={String(eq?.id ?? `outdoor-${sys.systemId}-${index}`)}>
@@ -1095,8 +1093,8 @@ const defaultSystemTonnage =
 
         {selectedSystemId ? (
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">System / Equipment Reference</div>
-            <div className="text-sm font-medium text-slate-900">{selectedSystemName}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Equipment Reference</div>
+            <div className="text-sm font-medium text-slate-900">System: {selectedSystemName}</div>
             {equipmentReferenceItems.length > 0 ? (
               <div className="space-y-1 text-xs text-slate-700">
                 {equipmentReferenceItems.map((eq: any, index: number) => (

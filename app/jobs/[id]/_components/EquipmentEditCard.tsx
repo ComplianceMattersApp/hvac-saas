@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { updateJobEquipmentFromForm, deleteJobEquipmentFromForm } from "@/lib/actions/job-actions";
 import SubmitButton from "@/components/SubmitButton";
+import {
+  EQUIPMENT_ROLE_OPTIONS,
+  equipmentRoleLabel,
+  equipmentUsesRefrigerant,
+} from "@/lib/utils/equipment-display";
 
 type SystemRow = { id: string; name: string | null };
 
@@ -17,23 +22,6 @@ type EquipmentRow = {
   refrigerant_type: string | null;
   notes: string | null;
 };
-
-// These roles don't use refrigerant and the field is hidden/cleared.
-const NO_REFRIGERANT_ROLES = new Set(["furnace", "air_handler"]);
-
-function roleLabel(role: string | null) {
-  const r = role ?? "equipment";
-  const map: Record<string, string> = {
-    outdoor_unit: "Outdoor Unit",
-    indoor_unit: "Coil",
-    air_handler: "Air Handler",
-    furnace: "Furnace",
-    heat_pump: "Heat Pump",
-    package_unit: "Pack Unit",
-    other: "Other",
-  };
-  return map[r] ?? r.replaceAll("_", " ");
-}
 
 export default function EquipmentEditCard({
   eq,
@@ -61,7 +49,7 @@ export default function EquipmentEditCard({
   );
   const isCustomSys = sysChoice === "__custom__";
 
-  const showRefrigerant = !NO_REFRIGERANT_ROLES.has(role);
+  const showRefrigerant = equipmentUsesRefrigerant(role);
 
   // ── VIEW MODE ──────────────────────────────────────────────────────────────
   if (!editing) {
@@ -69,19 +57,19 @@ export default function EquipmentEditCard({
       <div className="rounded-md border bg-white p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1 min-w-0">
-            <div className="font-medium text-gray-900">{roleLabel(eq.equipment_role)}</div>
+            <div className="font-medium text-gray-900">{equipmentRoleLabel(eq.equipment_role)}</div>
             {eq.system_location ? (
-              <div className="text-sm text-gray-600">Location: {eq.system_location}</div>
+              <div className="text-sm text-gray-600">System: {eq.system_location}</div>
             ) : null}
             <div className="text-sm text-gray-700">
               {[eq.manufacturer, eq.model].filter(Boolean).join(" ") || "—"}
             </div>
             <div className="text-xs text-gray-500">
               {eq.serial ? `S/N: ${eq.serial}` : null}
-              {eq.serial && (eq.tonnage || eq.refrigerant_type) ? " • " : null}
+              {eq.serial && (eq.tonnage || (showRefrigerant && eq.refrigerant_type)) ? " • " : null}
               {eq.tonnage ? `${eq.tonnage} ton` : null}
-              {eq.tonnage && eq.refrigerant_type ? " • " : null}
-              {eq.refrigerant_type ?? null}
+              {eq.tonnage && showRefrigerant && eq.refrigerant_type ? " • " : null}
+              {showRefrigerant ? eq.refrigerant_type ?? null : null}
             </div>
             {eq.notes ? (
               <div className="text-xs text-gray-500">Notes: {eq.notes}</div>
@@ -142,20 +130,18 @@ export default function EquipmentEditCard({
             value={role}
             onChange={(e) => setRole(e.target.value)}
           >
-            <option value="outdoor_unit">Outdoor Unit</option>
-            <option value="indoor_unit">Coil</option>
-            <option value="air_handler">Air Handler</option>
-            <option value="furnace">Furnace</option>
-            <option value="heat_pump">Heat Pump</option>
-            <option value="package_unit">Pack Unit</option>
-            <option value="other">Other</option>
+            {EQUIPMENT_ROLE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
 
         {/* System Location */}
         <div className="grid gap-1">
           <label className="text-sm font-medium text-gray-900" htmlFor={`sysloc-${eq.id}`}>
-            System Location
+            System
           </label>
           {existingSystemNames.length > 0 ? (
             <>

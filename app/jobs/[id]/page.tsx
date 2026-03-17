@@ -873,7 +873,7 @@ const indoorEquipment = equipmentItems.find((eq: any) => {
 const equipmentSummaryLabel =
   equipmentCount > 0
     ? `${equipmentCount} item(s) linked to this job`
-    : "No equipment linked to this job yet.";
+    : "No equipment on file yet.";
 
 const timelineItems = timelineEvents ?? [];
 const timelinePreviewItems = timelineItems.slice(0, 3);
@@ -1615,7 +1615,7 @@ const renderTimelineItem = (e: any, key: string) => {
       {equipmentCount > 0 ? (
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 text-sm">
           <div className="rounded-md border border-gray-200 bg-white px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wide text-gray-500">Outdoor Unit</div>
+            <div className="text-[11px] uppercase tracking-wide text-gray-500">Condenser</div>
             <div className="font-medium text-gray-900">
               {outdoorEquipment
                 ? `${outdoorEquipment.manufacturer ?? "—"} ${outdoorEquipment.model ?? ""}`.trim()
@@ -1624,7 +1624,7 @@ const renderTimelineItem = (e: any, key: string) => {
           </div>
 
           <div className="rounded-md border border-gray-200 bg-white px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wide text-gray-500">Indoor Unit</div>
+            <div className="text-[11px] uppercase tracking-wide text-gray-500">Indoor Equipment</div>
             <div className="font-medium text-gray-900">
               {indoorEquipment
                 ? `${indoorEquipment.manufacturer ?? "—"} ${indoorEquipment.model ?? ""}`.trim()
@@ -1632,11 +1632,7 @@ const renderTimelineItem = (e: any, key: string) => {
             </div>
           </div>
         </div>
-      ) : (
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          No equipment found yet for this job location.
-        </div>
-      )}
+      ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Link

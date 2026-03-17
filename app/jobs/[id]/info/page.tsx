@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import SystemLocationPicker from "@/components/jobs/SystemLocationPicker";
 
-import { addJobEquipmentFromForm } from "@/lib/actions/job-actions";
 import EquipmentEditCard from "../_components/EquipmentEditCard";
+import EquipmentCreateForm from "../_components/EquipmentCreateForm";
 
 export default async function JobInfoPage({
   params,
@@ -109,10 +108,14 @@ if (error || !job) return notFound();
 </div>
 
 {/* Existing Equipment */}
-<div>
-
-  <div className="text-base font-semibold text-gray-900 mb-2">
-    Existing Equipment ({job.job_equipment?.length ?? 0})
+<div className="space-y-3">
+  <div className="flex items-center justify-between gap-3">
+    <div className="text-base font-semibold text-gray-900">
+      Equipment on this job
+    </div>
+    {job.job_equipment && job.job_equipment.length > 0 ? (
+      <div className="text-sm text-gray-500">{job.job_equipment.length} item(s)</div>
+    ) : null}
   </div>
 
   {job.job_equipment && job.job_equipment.length > 0 ? (
@@ -127,127 +130,13 @@ if (error || !job) return notFound();
       ))}
     </div>
   ) : (
-    <div className="text-sm text-gray-600">No equipment added yet.</div>
+    <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-600">
+      No equipment has been added yet.
+    </div>
   )}
 </div>
-          
-{/* Add Equipment */}
-  <form action={addJobEquipmentFromForm} className="mt-4 grid gap-3">
-    <input type="hidden" name="job_id" value={job.id} />
-    <div className="grid gap-1">
-       <label className="text-sm font-medium text-gray-900" htmlFor="equipment_role">
-        Equipment Role
-      </label>
-      <select
-        id="equipment_role"
-        name="equipment_role"
-        className="w-full rounded-md border px-3 py-2 text-gray-900"
-        defaultValue="outdoor_unit"
-        required
-      >
-        <option value="outdoor_unit">Outdoor Unit</option>
-        <option value="indoor_unit">Coil</option>
-        <option value="air_handler">Air Handler</option>
-        <option value="furnace">Furnace</option>
-        <option value="heat_pump">Heat Pump</option>
-        <option value="package_unit">Pack Unit</option>
-        <option value="other">Other</option>
-      </select>
-    </div>
-     
-     <SystemLocationPicker systems={systems ?? []} />
 
-
- 
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <div className="grid gap-1">
-         <label className="text-sm font-medium text-gray-900" htmlFor="manufacturer">
-          Manufacturer (optional)
-        </label>
-        <input
-          id="manufacturer"
-          name="manufacturer"
-          className="w-full rounded-md border px-3 py-2 text-gray-900"
-          placeholder="York"
-        />
-      </div>
-
-      <div className="grid gap-1">
-        <label className="text-sm font-medium text-gray-900" htmlFor="model">
-          Model (optional)
-        </label>
-        <input
-          id="model"
-          name="model"
-          className="w-full rounded-md border px-3 py-2 text-gray-900"
-          placeholder="Model #"
-        />
-      </div>
-
-      <div className="grid gap-1">
-        <label className="text-sm font-medium text-gray-900" htmlFor="serial">
-          Serial (optional)
-        </label>
-        <input
-          id="serial"
-          name="serial"
-          className="w-full rounded-md border px-3 py-2 text-gray-900"
-          placeholder="Serial #"
-        />
-      </div>
-
-      <div className="grid gap-1">
-        <label className="text-sm font-medium text-gray-900" htmlFor="tonnage">
-          Tonnage (optional)
-        </label>
-        <input
-          id="tonnage"
-          name="tonnage"
-          type="number"
-          step="0.5"
-          min="0"
-          className="w-full rounded-md border px-3 py-2 text-gray-900"
-          placeholder="5"
-        />
-      </div>
-
-<div className="grid gap-1">
-  <label className="text-sm font-medium text-gray-900" htmlFor="refrigerant_type">
-    Refrigerant Type (optional)
-  </label>
-  <select
-    id="refrigerant_type"
-    name="refrigerant_type"
-    className="w-full rounded-md border px-3 py-2 text-gray-900"
-    defaultValue=""
-  >
-    <option value="">Select refrigerant</option>
-    <option value="R-410A">R-410A</option>
-    <option value="R-32">R-32</option>
-    <option value="R-454B">R-454B</option>
-    <option value="R-22">R-22</option>
-    <option value="Other">Other</option>
-  </select>
-</div>
-
-
-      <div className="grid gap-1 sm:col-span-2">
-        <label className="text-sm font-medium text-gray-900" htmlFor="notes">
-          Notes (optional)
-        </label>
-        <input
-          id="notes"
-          name="notes"
-          className="w-full rounded-md border px-3 py-2 text-gray-900"
-          placeholder="Any extra details..."
-        />
-      </div>
-    </div>
-
-    <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
-      Add Equipment
-    </button>
-  </form>
+<EquipmentCreateForm jobId={job.id} systems={systems ?? []} />
         </div>
       ) : (
         <div className="text-sm text-gray-600">Choose an option above to begin.</div>
