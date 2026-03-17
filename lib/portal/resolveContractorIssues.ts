@@ -1,3 +1,5 @@
+import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
+
 export type ContractorIssueGroup = "needs_info" | "failed" | "in_progress" | "passed";
 
 export type ContractorBucket = "action_required" | "in_progress" | "passed";
@@ -32,6 +34,9 @@ export type ResolveContractorIssuesInput = {
   chain?: {
     hasOpenRetestChild?: boolean;
     hasRetestReadyRequest?: boolean;
+    retestScheduledDate?: string | null;
+    retestWindowStart?: string | null;
+    retestWindowEnd?: string | null;
   };
 };
 
@@ -39,6 +44,10 @@ export type ResolveContractorIssuesOutput = {
   bucket: ContractorBucket;
   primaryIssue: ContractorIssue;
   secondaryIssues?: ContractorIssue[];
+  statusLabel: string;
+  nextStep: string;
+  actionRequired: boolean;
+  retestState: "none" | "pending_scheduling" | "scheduled";
 };
 
 export type ContractorResponseType = "note" | "correction" | "retest";
@@ -58,6 +67,18 @@ const PRIORITY: Record<ContractorIssueGroup, number> = {
   in_progress: 3,
   passed: 4,
 };
+
+function formatRetestSchedule(chain?: ResolveContractorIssuesInput["chain"]): string {
+  const date = String(chain?.retestScheduledDate ?? "").trim();
+  const start = String(chain?.retestWindowStart ?? "").trim() || null;
+  const end = String(chain?.retestWindowEnd ?? "").trim() || null;
+
+  const renderedDate = date ? formatBusinessDateUS(date) : "";
+  const renderedWindow = displayWindowLA(start, end);
+
+  if (renderedDate && renderedWindow) return `${renderedDate} ${renderedWindow}`;
+  return renderedDate || renderedWindow || "";
+}
 
 function normalize(value: string | null | undefined) {
   return String(value ?? "").trim().toLowerCase();
@@ -206,6 +227,14 @@ export function resolveContractorIssues(
   const hasCorrectionSubmission = events.some(
     (e) => normalize(e?.event_type) === "contractor_correction_submission"
   );
+  const hasOpenRetestChild = Boolean(input.chain?.hasOpenRetestChild);
+  const retestSchedule = hasOpenRetestChild ? formatRetestSchedule(input.chain) : "";
+  const retestState: "none" | "pending_scheduling" | "scheduled" =
+    hasOpenRetestChild
+      ? retestSchedule
+        ? "scheduled"
+        : "pending_scheduling"
+      : "none";
 
   const issues: ContractorIssue[] = [];
 
@@ -221,21 +250,37 @@ export function resolveContractorIssues(
   }
 
   if (opsStatus === "failed" || opsStatus === "retest_needed") {
-    const stage = hasCorrectionSubmission ? "awaiting_review" : "action_needed";
+    if (retestState === "scheduled") {
+      issues.push({
+        group: "in_progress",
+        headline: `Retest scheduled: ${retestSchedule}`,
+        explanation: "Retest visit is scheduled. No immediate action is required.",
+        stage: "retest_scheduled",
+      });
+    } else if (retestState === "pending_scheduling") {
+      issues.push({
+        group: "failed",
+        headline: "Retest Pending Scheduling",
+        explanation: "Retest child exists but still needs a scheduled date/time.",
+        stage: "retest_pending_scheduling",
+      });
+    } else {
+      const stage = hasCorrectionSubmission ? "awaiting_review" : "action_needed";
 
-    issues.push({
-      group: "failed",
-      headline:
-        stage === "awaiting_review"
-          ? "Failed - Awaiting review"
-          : "Failed - Action needed",
-      explanation:
-        stage === "awaiting_review"
-          ? "Corrections submitted. Our team is reviewing your submission."
-          : "Please correct the failed items and submit for review.",
-      detailLines: failureReasons.length > 0 ? failureReasons : undefined,
-      stage,
-    });
+      issues.push({
+        group: "failed",
+        headline:
+          stage === "awaiting_review"
+            ? "Failed - Awaiting review"
+            : "Failed - Action needed",
+        explanation:
+          stage === "awaiting_review"
+            ? "Corrections submitted. Our team is reviewing your submission."
+            : "Please correct the failed items and submit for review.",
+        detailLines: failureReasons.length > 0 ? failureReasons : undefined,
+        stage,
+      });
+    }
   }
 
   if (["need_to_schedule", "scheduled", "on_hold"].includes(opsStatus)) {
@@ -290,9 +335,38 @@ export function resolveContractorIssues(
     ? "in_progress"
     : "passed";
 
+  let statusLabel = primaryIssue.group === "failed"
+    ? "Failed"
+    : primaryIssue.group === "needs_info"
+    ? "Needs Info"
+    : primaryIssue.group === "passed"
+    ? "Passed"
+    : "In Progress";
+
+  let nextStep = primaryIssue.explanation ?? primaryIssue.headline;
+
+  if (opsStatus === "failed" || opsStatus === "retest_needed") {
+    if (retestState === "scheduled") {
+      statusLabel = "Retest Scheduled";
+      nextStep = `Retest scheduled for ${retestSchedule}`;
+    } else if (retestState === "pending_scheduling") {
+      statusLabel = "Retest Pending Scheduling";
+      nextStep = "Retest needs to be scheduled.";
+    } else {
+      statusLabel = "Failed";
+      nextStep = "Retest decision needed.";
+    }
+  }
+
+  const actionRequired = bucket === "action_required";
+
   return {
     bucket,
     primaryIssue,
     secondaryIssues: secondaryIssues.length > 0 ? secondaryIssues : undefined,
+    statusLabel,
+    nextStep,
+    actionRequired,
+    retestState,
   };
 }

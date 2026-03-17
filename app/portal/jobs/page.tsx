@@ -8,7 +8,7 @@ import {
   resolveContractorIssues,
   type ContractorIssue,
 } from "@/lib/portal/resolveContractorIssues";
-import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -68,10 +68,13 @@ export default async function PortalAllJobsPage() {
       pending_info_reason,
       next_action_note,
       action_required_by,
+      parent_job_id,
       follow_up_date,
       created_at,
       data_entry_completed_at,
       scheduled_date,
+      window_start,
+      window_end,
       customer_first_name,
       customer_last_name,
       customer_phone,
@@ -87,6 +90,17 @@ export default async function PortalAllJobsPage() {
   if (baseJobsErr) throw baseJobsErr;
 
   const jobs = (baseJobs ?? []) as any[];
+  const openRetestChildByParentId = new Map<string, any>();
+  for (const candidate of jobs) {
+    const parentId = String(candidate.parent_job_id ?? "").trim();
+    if (!parentId) continue;
+    if (String(candidate.ops_status ?? "").toLowerCase() === "closed") continue;
+
+    const current = openRetestChildByParentId.get(parentId);
+    if (!current || toDateMs(candidate.created_at) > toDateMs(current.created_at)) {
+      openRetestChildByParentId.set(parentId, candidate);
+    }
+  }
   const jobIds = jobs.map((j: any) => j.id);
 
   const { data: visibleRuns, error: visibleRunsErr } = await supabase
@@ -134,6 +148,10 @@ export default async function PortalAllJobsPage() {
     const failedRun = failedRunByJob.get(job.id);
     const failureReasons = failedRun ? extractFailureReasons(failedRun) : [];
     const issueEvents = eventsByJob.get(String(job.id)) ?? [];
+    const openRetestChild = openRetestChildByParentId.get(String(job.id)) ?? null;
+    const hasRetestReadyRequest = issueEvents.some(
+      (ev: any) => String(ev?.event_type ?? "").trim().toLowerCase() === "retest_ready_requested"
+    );
 
     const resolved = resolveContractorIssues({
       job: {
@@ -143,12 +161,21 @@ export default async function PortalAllJobsPage() {
         next_action_note: job.next_action_note,
         action_required_by: job.action_required_by,
         scheduled_date: job.scheduled_date,
+        window_start: job.window_start,
+        window_end: job.window_end,
       },
       failureReasons,
       events: issueEvents,
+      chain: {
+        hasOpenRetestChild: !!openRetestChild,
+        hasRetestReadyRequest,
+        retestScheduledDate: openRetestChild?.scheduled_date ?? null,
+        retestWindowStart: openRetestChild?.window_start ?? null,
+        retestWindowEnd: openRetestChild?.window_end ?? null,
+      },
     });
 
-    return { job, resolved };
+    return { job, resolved, openRetestChild };
   });
 
   const actionRequiredJobs = resolvedJobs
@@ -240,6 +267,44 @@ export default async function PortalAllJobsPage() {
     return city ? `${addr}, ${city}` : addr;
   }
 
+  function retestScheduleLabel(child: any) {
+    if (!child) return "";
+    const date = child.scheduled_date ? formatBusinessDateUS(String(child.scheduled_date)) : "";
+    const window = displayWindowLA(child.window_start, child.window_end);
+    if (date && window) return `${date} ${window}`;
+    return date || window || "";
+  }
+
+  function cardStatusMeta(row: { job: any; resolved: any; openRetestChild?: any }) {
+    const lifecycle = String(row.job.status ?? "").trim().toLowerCase();
+    const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
+    const resolvedLabel = String(row.resolved?.statusLabel ?? "").trim();
+
+    if (resolvedLabel === "Retest Scheduled") return { label: resolvedLabel, tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
+    if (resolvedLabel === "Retest Pending Scheduling") return { label: resolvedLabel, tone: "border-amber-200 bg-amber-50 text-amber-800" };
+    if (resolvedLabel === "Failed") return { label: resolvedLabel, tone: "border-rose-200 bg-rose-50 text-rose-800" };
+    if (lifecycle === "on_the_way") return { label: "On the Way", tone: "border-sky-200 bg-sky-50 text-sky-800" };
+    if (lifecycle === "in_progress") return { label: "In Progress", tone: "border-blue-200 bg-blue-50 text-blue-800" };
+    if (ops === "scheduled") return { label: "Scheduled", tone: "border-slate-200 bg-slate-50 text-slate-800" };
+    if (row.resolved.bucket === "passed") return { label: "Passed", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
+    return { label: "In Progress", tone: "border-slate-200 bg-slate-50 text-slate-800" };
+  }
+
+  function nextStepText(row: { job: any; resolved: any; openRetestChild?: any }) {
+    const lifecycle = String(row.job.status ?? "").trim().toLowerCase();
+    if (row.resolved?.retestState === "scheduled" || row.resolved?.retestState === "pending_scheduling") {
+      return `Next step: ${String(row.resolved?.nextStep ?? "")}`;
+    }
+    if (lifecycle === "on_the_way") return "Next step: Technician is on the way.";
+    if (lifecycle === "in_progress") return "Next step: Work is currently underway.";
+    if (row.resolved.bucket === "action_required") {
+      return `Next step: ${row.resolved.primaryIssue?.explanation ?? row.resolved.primaryIssue?.headline ?? "Action required."}`;
+    }
+    if (String(row.job.ops_status ?? "").trim().toLowerCase() === "scheduled") return "Next step: Await scheduled visit.";
+    if (row.resolved.bucket === "passed") return "Next step: Final processing is underway.";
+    return "Next step: Monitor job progress.";
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 text-gray-900 dark:text-gray-100">
       <div className="rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800 p-6 shadow-sm">
@@ -277,9 +342,12 @@ export default async function PortalAllJobsPage() {
         <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {actionRequiredJobs.map(({ job: j, resolved }) => {
+              const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const isUrgent =
+                Boolean(resolved?.actionRequired) &&
                 !!j.follow_up_date && String(j.follow_up_date) <= String(today);
               const displayLines = cardIssueLines(resolved);
+              const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
               return (
                 <Link
                   key={j.id}
@@ -302,6 +370,17 @@ export default async function PortalAllJobsPage() {
                       </div>
                       <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                         {displayAddress(j)}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
+                          {statusMeta.label}
+                        </span>
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${isUrgent ? "border-red-200 bg-red-50 text-red-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+                          {resolved?.actionRequired ? "Action Required" : "No Immediate Action"}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+                        {nextStepText({ job: j, resolved, openRetestChild })}
                       </div>
                       <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
                         {displayLines.map((line, idx) => (
@@ -347,7 +426,9 @@ export default async function PortalAllJobsPage() {
         <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {inProgressJobs.map(({ job: j, resolved }) => {
+              const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const displayLines = cardIssueLines(resolved);
+              const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
               return (
                 <Link
                   key={j.id}
@@ -364,6 +445,17 @@ export default async function PortalAllJobsPage() {
                       </div>
                       <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                         {displayAddress(j)}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
+                          {statusMeta.label}
+                        </span>
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${resolved?.actionRequired ? "border-red-200 bg-red-50 text-red-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+                          {resolved?.actionRequired ? "Action Required" : "No Immediate Action"}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+                        {nextStepText({ job: j, resolved, openRetestChild })}
                       </div>
                       <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
                         {displayLines.map((line, idx) => (

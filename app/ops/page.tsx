@@ -294,7 +294,7 @@ const resolvedFailedParentIds = new Set(
 
   // Common job select (keep lightweight)
  const baseSelect =
-   "id, title, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, permit_number, pending_info_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at";
+   "id, title, status, parent_job_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, permit_number, pending_info_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -477,7 +477,7 @@ if (upcomingErr) throw upcomingErr;
 
     const { data: bucketJobs, error: bucketErr } = await bucketQ;
   if (bucketErr) throw bucketErr;
-  const filteredBucketJobs =
+  const baseFilteredBucketJobs =
   bucket === "failed" || bucket === "attention"
     ? (bucketJobs ?? []).filter(
         (j: any) => !resolvedFailedParentIds.has(String(j.id ?? ""))
@@ -494,7 +494,7 @@ const allJobs = [
   ...(closeoutSourceJobs ?? []),
   ...(stillOpenJobs ?? []),
   ...(attentionJobs ?? []),
-  ...(filteredBucketJobs ?? [])
+  ...(baseFilteredBucketJobs ?? [])
 ] as any[];
 
 const customerIds = Array.from(
@@ -632,6 +632,17 @@ function toEpochMs(value?: string | null) {
 function queueReason(j: any, activeBucket: string) {
   const status = String(j?.ops_status ?? "").toLowerCase();
   const jobId = String(j?.id ?? "");
+  const retestState = retestStateForJob(jobId);
+  const retestSchedule = retestScheduleLabelForJob(jobId);
+
+  if (status === "failed" || status === "retest_needed") {
+    if (retestState === "pending_scheduling") {
+      return "Retest pending scheduling — retest child exists but is not scheduled";
+    }
+    if (retestState === "scheduled") {
+      return `Retest scheduled: ${retestSchedule}`;
+    }
+  }
 
   if (activeBucket === "attention") {
     if (status === "need_to_schedule") {
@@ -704,10 +715,13 @@ function hasOpenRetestChild(jobId: string, jobs: any[]) {
   );
 }
 
-function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJob?: boolean }) {
+function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJob?: boolean; scheduledRetest?: boolean }) {
   const status = String(j?.ops_status ?? "").toLowerCase();
+  const retestState = retestStateForJob(String(j?.id ?? ""));
   const needs = getCloseoutNeeds(j);
 
+  if (opts?.scheduledRetest) return "No immediate action";
+  if (retestState === "pending_scheduling") return "Schedule Retest";
   if (status === "failed" && opts?.retestReady) return "Create Retest Job";
   if (status === "failed") return "Await Contractor Correction";
   if (status === "retest_needed") return "Await Contractor Retest";
@@ -724,7 +738,15 @@ function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJo
   return "Open Job";
 }
 
-function signalReason(j: any, opts?: { retestReady?: boolean; newContractorJob?: boolean }) {
+function signalReason(j: any, opts?: { retestReady?: boolean; newContractorJob?: boolean; scheduledRetest?: boolean }) {
+  const retestState = retestStateForJob(String(j?.id ?? ""));
+  if (retestState === "pending_scheduling") {
+    return "Retest pending scheduling — retest child needs date/time";
+  }
+  if (opts?.scheduledRetest) {
+    const retestSchedule = retestScheduleLabelForJob(String(j?.id ?? ""));
+    return retestSchedule ? `Retest scheduled: ${retestSchedule}` : "Retest visit already scheduled";
+  }
   if (opts?.retestReady) return "Contractor says correction is complete and job is ready for retest review";
   if (opts?.newContractorJob) return "New job submitted by contractor and waiting for internal review";
   if (signal === "contractor_updates") {
@@ -805,6 +827,44 @@ const uniqueAllOpenOpsJobs = Array.from(
       .map((j: any) => [String(j.id ?? ""), j])
   ).values()
 ) as any[];
+
+const openRetestChildByParentId = new Map<string, any>();
+for (const j of uniqueAllOpenOpsJobs) {
+  const parentId = String(j?.parent_job_id ?? "").trim();
+  if (!parentId) continue;
+  if (String(j?.ops_status ?? "").toLowerCase() === "closed") continue;
+
+  const current = openRetestChildByParentId.get(parentId);
+  if (!current || safeDateValue(j?.created_at) > safeDateValue(current?.created_at)) {
+    openRetestChildByParentId.set(parentId, j);
+  }
+}
+
+function retestScheduleLabelForJob(jobId: string) {
+  const child = openRetestChildByParentId.get(jobId);
+  if (!child) return "";
+  const date = child?.scheduled_date ? formatBusinessDateUS(String(child.scheduled_date)) : "";
+  const window = displayWindowLA(child?.window_start, child?.window_end);
+  if (date && window) return `${date} ${window}`;
+  return date || window || "";
+}
+
+function retestStateForJob(jobId: string): "none" | "pending_scheduling" | "scheduled" {
+  const child = openRetestChildByParentId.get(jobId);
+  if (!child) return "none";
+  return retestScheduleLabelForJob(jobId) ? "scheduled" : "pending_scheduling";
+}
+
+function hasScheduledRetestForJob(jobId: string) {
+  return !!retestScheduleLabelForJob(jobId);
+}
+
+const filteredBucketJobs =
+  bucket === "failed" || bucket === "attention" || bucket === "retest_needed"
+    ? (baseFilteredBucketJobs ?? []).filter(
+        (j: any) => !hasScheduledRetestForJob(String(j?.id ?? ""))
+      )
+    : (baseFilteredBucketJobs ?? []);
 
 const allOpenOpsJobIds = uniqueAllOpenOpsJobs
   .map((j: any) => String(j.id ?? ""))
@@ -920,6 +980,7 @@ const retestReadyCount = uniqueAllOpenOpsJobs.filter((j: any) => {
   return (
     status === "failed" &&
     !resolvedFailedParentIds.has(jobId) &&
+    !hasScheduledRetestForJob(jobId) &&
     hasSignalEventForJob(latestRetestReadyByJob, jobId)
   );
 }).length;
@@ -932,7 +993,11 @@ const contractorCreatedCount = uniqueAllOpenOpsJobs.filter((j: any) => {
 
 const contractorUpdatesCount = (filteredBucketJobs ?? []).filter((j: any) => {
   const jobId = String(j?.id ?? "");
-  return hasSignalEventForJob(latestContractorUpdateByJob, jobId);
+  return (
+    hasSignalEventForJob(latestContractorUpdateByJob, jobId) &&
+    !(String(j?.ops_status ?? "").toLowerCase() === "need_to_schedule" &&
+      hasSignalEventForJob(latestContractorCreatedByJob, jobId))
+  );
 }).length;
 
 let signalFilteredBucketJobs = [...(filteredBucketJobs ?? [])];
@@ -959,9 +1024,14 @@ if (signal === "new_contractor") {
 
 if (signal === "contractor_updates") {
   // Keep contractor updates within the active queue's scope.
-  signalFilteredBucketJobs = signalFilteredBucketJobs.filter((j: any) =>
-    hasSignalEventForJob(latestContractorUpdateByJob, String(j.id ?? ""))
-  );
+  signalFilteredBucketJobs = signalFilteredBucketJobs.filter((j: any) => {
+    const jobId = String(j.id ?? "");
+    const isNewContractorJob =
+      String(j?.ops_status ?? "").toLowerCase() === "need_to_schedule" &&
+      hasSignalEventForJob(latestContractorCreatedByJob, jobId);
+
+    return hasSignalEventForJob(latestContractorUpdateByJob, jobId) && !isNewContractorJob;
+  });
 }
 
 const sortedBucketJobs = sortJobs(signalFilteredBucketJobs, sort);
@@ -1108,14 +1178,19 @@ const closeoutJobs = sortJobs(
 const activeFailedCount = (countRows ?? []).filter((row: any) => {
   const status = String((row as any)?.ops_status ?? "").toLowerCase();
   const jobId = String((row as any)?.id ?? "");
-  return status === "failed" && !resolvedFailedParentIds.has(jobId);
+  return status === "failed" && !resolvedFailedParentIds.has(jobId) && !hasScheduledRetestForJob(jobId);
+}).length;
+
+const adjustedAttentionCount = (attentionJobs ?? []).filter((j: any) => {
+  const jobId = String(j?.id ?? "");
+  return !hasScheduledRetestForJob(jobId);
 }).length;
 
 const workflowCards = [
   {
     key: "attention",
     label: "Needs Attention",
-    count: attentionCount,
+    count: adjustedAttentionCount,
   },
   {
     key: "need_to_schedule",
@@ -1231,6 +1306,38 @@ const exceptionVisibleJobs = isPanelExpanded("exceptions")
   : sortedExceptionJobs.slice(0, EXCEPTION_PREVIEW_LIMIT);
 
 function compactRow(j: any, showDate = false, note?: string) {
+  const jobId = String(j?.id ?? "");
+  const retestState = retestStateForJob(jobId);
+  const scheduledRetestLabel = retestScheduleLabelForJob(jobId);
+  const lifecycleStatus = String(j?.status ?? "").toLowerCase();
+  const opsStatus = String(j?.ops_status ?? "").toLowerCase();
+  const statusMeta = retestState === "pending_scheduling"
+    ? { label: "Retest Pending Scheduling", tone: "border-amber-200 bg-amber-50 text-amber-800" }
+    : scheduledRetestLabel
+    ? { label: "Retest Scheduled", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" }
+    : lifecycleStatus === "on_the_way"
+    ? { label: "On the Way", tone: "border-sky-200 bg-sky-50 text-sky-800" }
+    : lifecycleStatus === "in_progress"
+    ? { label: "In Progress", tone: "border-blue-200 bg-blue-50 text-blue-800" }
+    : opsStatus === "failed"
+    ? { label: "Failed", tone: "border-rose-200 bg-rose-50 text-rose-800" }
+    : opsStatus === "scheduled"
+    ? { label: "Scheduled", tone: "border-slate-200 bg-slate-50 text-slate-800" }
+    : { label: "Open", tone: "border-slate-200 bg-slate-50 text-slate-800" };
+  const isImmediateActionRequired =
+    retestState !== "scheduled" && ["failed", "retest_needed", "pending_info", "need_to_schedule", "on_hold"].includes(opsStatus);
+  const nextStep = retestState === "pending_scheduling"
+    ? "Retest needs to be scheduled"
+    : scheduledRetestLabel
+    ? "Await retest visit"
+    : nextActionLabel(j, {
+        retestReady: hasSignalEventForJob(latestRetestReadyByJob, jobId),
+        newContractorJob:
+          String(j?.ops_status ?? "").toLowerCase() === "need_to_schedule" &&
+          hasSignalEventForJob(latestContractorCreatedByJob, jobId),
+        scheduledRetest: !!scheduledRetestLabel,
+      });
+
   return (
     <div key={j.id} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
@@ -1244,6 +1351,17 @@ function compactRow(j: any, showDate = false, note?: string) {
           <div className="mt-0.5 text-xs font-medium text-gray-700">{customerNameOnly(j)} • {customerPhoneOnly(j) || "-"}</div>
           <div className="text-xs text-gray-600">Contractor: {contractorNameOnly(j)}</div>
           <div className="text-xs text-gray-500">{addressLine(j)}</div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
+              {statusMeta.label}
+            </span>
+            <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${isImmediateActionRequired ? "border-red-200 bg-red-50 text-red-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+              {isImmediateActionRequired ? "Action Required" : "No Immediate Action"}
+            </span>
+          </div>
+          <div className="mt-1 text-xs font-medium text-gray-700">
+            {scheduledRetestLabel ? `Retest scheduled: ${scheduledRetestLabel}` : `Next step: ${nextStep}`}
+          </div>
           {note ? (
             <div className="mt-1.5 inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
               {note}
@@ -1615,6 +1733,7 @@ return (
                 ? signalReason(j, {
                     retestReady: isRetestReady,
                     newContractorJob: isNewContractorJob,
+                    scheduledRetest: hasScheduledRetestForJob(String(j.id ?? "")),
                   })
                 : queueReason(j, bucket);
 
