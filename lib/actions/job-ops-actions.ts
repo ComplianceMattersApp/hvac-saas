@@ -815,20 +815,75 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
   const currentOps = String(before.ops_status ?? "").trim().toLowerCase();
   if (currentOps !== "pending_info") return before.ops_status ?? null;
 
+  return releaseAndReevaluate(jobId, source);
+}
+
+export async function releaseAndReevaluate(
+  jobId: string,
+  source = "manual_release_and_reevaluate"
+): Promise<string | null> {
+  const supabase = await createClient();
+
+  const { data: before, error: beforeErr } = await supabase
+    .from("jobs")
+    .select(
+      "id, status, job_type, ops_status, field_complete, certs_complete, invoice_complete, scheduled_date, window_start, window_end, pending_info_reason, follow_up_date, next_action_note, action_required_by"
+    )
+    .eq("id", jobId)
+    .single();
+
+  if (beforeErr) throw new Error(beforeErr.message);
+  if (!before?.id) throw new Error("Job not found");
+
+  const currentOps = String(before.ops_status ?? "").trim().toLowerCase();
+  const releasable = new Set([
+    "pending_info",
+    "on_hold",
+    "failed",
+    "retest_needed",
+    "paperwork_required",
+    "invoice_required",
+  ]);
+
+  if (!releasable.has(currentOps)) return before.ops_status ?? null;
+
   const isEcc = String(before.job_type ?? "").trim().toLowerCase() === "ecc";
   const isFieldCompleteOrCompleted =
     Boolean(before.field_complete) ||
     String(before.status ?? "").trim().toLowerCase() === "completed";
+  const hasSchedule =
+    Boolean(before.scheduled_date) ||
+    Boolean(before.window_start) ||
+    Boolean(before.window_end);
+
+  const shouldSetCompletedLifecycle =
+    Boolean(before.field_complete) &&
+    String(before.status ?? "").trim().toLowerCase() !== "completed";
 
   let nextOps: string | null = null;
 
   if (isEcc && isFieldCompleteOrCompleted) {
-    const hasSchedule =
-      Boolean(before.scheduled_date) ||
-      Boolean(before.window_start) ||
-      Boolean(before.window_end);
+    const neutralOps = hasSchedule ? "scheduled" : "need_to_schedule";
 
-    await forceSetOpsStatus(jobId, hasSchedule ? "scheduled" : "need_to_schedule");
+    const releasePatch: Record<string, any> = {
+      ops_status: neutralOps,
+      pending_info_reason: null,
+      follow_up_date: null,
+      next_action_note: null,
+      action_required_by: null,
+    };
+
+    if (shouldSetCompletedLifecycle) {
+      releasePatch.status = "completed";
+    }
+
+    const { error: releaseErr } = await supabase
+      .from("jobs")
+      .update(releasePatch)
+      .eq("id", jobId);
+
+    if (releaseErr) throw new Error(releaseErr.message);
+
     await evaluateEccOpsStatus(jobId);
 
     const { data: afterEcc, error: afterEccErr } = await supabase
@@ -841,7 +896,7 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
     nextOps = afterEcc?.ops_status ?? null;
   } else {
     nextOps = resolveOpsStatus({
-      status: before.status,
+      status: shouldSetCompletedLifecycle ? "completed" : before.status,
       job_type: before.job_type,
       scheduled_date: before.scheduled_date,
       window_start: before.window_start,
@@ -852,9 +907,21 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
       current_ops_status: before.ops_status,
     });
 
+    const releasePatch: Record<string, any> = {
+      ops_status: nextOps,
+      pending_info_reason: null,
+      follow_up_date: null,
+      next_action_note: null,
+      action_required_by: null,
+    };
+
+    if (shouldSetCompletedLifecycle) {
+      releasePatch.status = "completed";
+    }
+
     const { error: upErr } = await supabase
       .from("jobs")
-      .update({ ops_status: nextOps })
+      .update(releasePatch)
       .eq("id", jobId);
 
     if (upErr) throw new Error(upErr.message);
@@ -863,10 +930,10 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
   const changes = buildOpsChanges(
     {
       ops_status: before.ops_status ?? null,
-      pending_info_reason: null,
-      follow_up_date: null,
-      next_action_note: null,
-      action_required_by: null,
+      pending_info_reason: before.pending_info_reason ?? null,
+      follow_up_date: before.follow_up_date ?? null,
+      next_action_note: before.next_action_note ?? null,
+      action_required_by: before.action_required_by ?? null,
     },
     {
       ops_status: nextOps,
@@ -881,10 +948,13 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
     const { error: eventErr } = await supabase.from("job_events").insert({
       job_id: jobId,
       event_type: "ops_update",
-      message: "Pending info released and status recomputed",
+      message: "Released and re-evaluated",
       meta: {
         changes,
         source,
+        release_from: before.ops_status ?? null,
+        release_to: nextOps,
+        lifecycle_normalized: shouldSetCompletedLifecycle,
       },
     });
 
@@ -899,6 +969,19 @@ export async function releasePendingInfoAndRecomputeFromForm(formData: FormData)
   if (!jobId) throw new Error("Missing job_id");
 
   await releasePendingInfoAndRecompute(jobId, "manual_release_pending_info");
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/ops`);
+  revalidatePath(`/portal`);
+  revalidatePath(`/portal/jobs/${jobId}`);
+  redirect(`/jobs/${jobId}?tab=ops`);
+}
+
+export async function releaseAndReevaluateFromForm(formData: FormData): Promise<void> {
+  const jobId = String(formData.get("job_id") ?? "").trim();
+  if (!jobId) throw new Error("Missing job_id");
+
+  await releaseAndReevaluate(jobId, "manual_release_and_reevaluate");
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);

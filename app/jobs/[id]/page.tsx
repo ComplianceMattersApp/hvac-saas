@@ -27,7 +27,7 @@ import {
 import {
   updateJobOpsFromForm,
   updateJobOpsDetailsFromForm,
-  releasePendingInfoAndRecomputeFromForm,
+  releaseAndReevaluateFromForm,
   markJobFieldCompleteFromForm,
   markCertsCompleteFromForm,
   markInvoiceCompleteFromForm,
@@ -484,7 +484,7 @@ const timelineJobIds = (timelineJobs ?? []).map((j: any) => String(j.id ?? "")).
 // --- Unified Timeline (job_events) ---
 const { data: timelineEvents, error: tlErr } = await supabase
   .from("job_events")
-  .select("job_id, created_at, event_type, message, meta, user_id")
+  .select("id, job_id, created_at, event_type, message, meta, user_id")
   .in("job_id", timelineJobIds.length ? timelineJobIds : [jobId])
   .order("created_at", { ascending: false })
   .limit(200);
@@ -493,6 +493,12 @@ if (tlErr) throw new Error(tlErr.message);
 const eventsForCurrentJob = (timelineEvents ?? []).filter(
   (e: any) => String(e?.job_id ?? "") === String(job.id ?? "")
 );
+
+const latestContractorReportEvent = eventsForCurrentJob.find(
+  (e: any) => String(e?.event_type ?? "") === "contractor_report_sent"
+);
+
+const latestContractorReportEventId = String(latestContractorReportEvent?.id ?? "").trim();
 
 const contractorResponseTracking = resolveContractorResponseTracking(eventsForCurrentJob as any[]);
 
@@ -555,6 +561,23 @@ const attachmentItems = await Promise.all(
   const internalNotes = (timelineEvents ?? []).filter(
     (e: any) => String(e?.event_type ?? "") === "internal_note"
   );
+
+  const reportFollowUpContextNotes = internalNotes.filter((e: any) => {
+    const meta = e && typeof e.meta === "object" && !Array.isArray(e.meta) ? e.meta : null;
+    return String(meta?.context ?? "") === "contractor_report_review";
+  });
+
+  const anchoredReportFollowUpNotes = latestContractorReportEventId
+    ? reportFollowUpContextNotes.filter((e: any) => {
+        const meta = e && typeof e.meta === "object" && !Array.isArray(e.meta) ? e.meta : null;
+        return String(meta?.anchor_event_id ?? "").trim() === latestContractorReportEventId;
+      })
+    : [];
+
+  const reportFollowUpNotes =
+    anchoredReportFollowUpNotes.length > 0
+      ? anchoredReportFollowUpNotes
+      : reportFollowUpContextNotes;
 
   const { data: customerAttempts, error: attemptsErr } = await supabase
     .from("job_events")
@@ -812,6 +835,15 @@ const showCloseoutRow =
       ? (canShowCertsButton || canShowInvoiceButton)
       : canShowInvoiceButton
   );
+
+const canShowReleaseAndReevaluate = [
+  "pending_info",
+  "on_hold",
+  "failed",
+  "retest_needed",
+  "paperwork_required",
+  "invoice_required",
+].includes(String(job.ops_status ?? "").toLowerCase());
 
 const locationId = serviceLocation?.id ?? null;
 
@@ -1671,11 +1703,13 @@ const renderTimelineItem = (e: any, key: string) => {
           </button>
         </form>
 
-        {String(job.ops_status ?? "").toLowerCase() === "pending_info" ? (
-          <form action={releasePendingInfoAndRecomputeFromForm} className="mt-2">
+        {canShowReleaseAndReevaluate ? (
+          <form action={releaseAndReevaluateFromForm} className="mt-2">
             <input type="hidden" name="job_id" value={job.id} />
             <button className="px-3 py-2 rounded border text-sm" type="submit">
-              Release Pending Info
+              {String(job.ops_status ?? "").toLowerCase() === "pending_info"
+                ? "Release Pending Info & Re-evaluate"
+                : "Release & Re-evaluate"}
             </button>
           </form>
         ) : null}
@@ -2205,11 +2239,79 @@ const renderTimelineItem = (e: any, key: string) => {
 ) }
 
 {isInternalUser && ["failed", "pending_info"].includes(String(job.ops_status ?? "")) ? (
-  <ContractorReportPanel
-    jobId={job.id}
-    contractorResponseLabel={contractorResponseLabel}
-    contractorResponseSubLabel={contractorResponseSubLabel}
-  />
+  <>
+    <ContractorReportPanel
+      jobId={job.id}
+      contractorResponseLabel={contractorResponseLabel}
+      contractorResponseSubLabel={contractorResponseSubLabel}
+    />
+
+    <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
+      <div className="text-sm font-semibold mb-1">Internal Follow-Up Note</div>
+      <div className="text-xs text-gray-600 mb-3">
+        Internal-only note tied to contractor report/review activity.
+      </div>
+
+      <form action={addInternalNoteFromForm} className="space-y-3">
+        <input type="hidden" name="job_id" value={job.id} />
+        <input type="hidden" name="tab" value={tab} />
+        <input type="hidden" name="context" value="contractor_report_review" />
+        <input type="hidden" name="anchor_event_type" value="contractor_report_sent" />
+        <input
+          type="hidden"
+          name="anchor_event_id"
+          value={latestContractorReportEventId}
+        />
+
+        <textarea
+          name="note"
+          rows={3}
+          placeholder="Add an internal follow-up note for this contractor report..."
+          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+        />
+
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100"
+          >
+            Save follow-up note
+          </button>
+        </div>
+      </form>
+
+      <div className="mt-4 border-t border-gray-200 pt-3">
+        <div className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">
+          Report Follow-Up Notes
+        </div>
+
+        {reportFollowUpNotes.length ? (
+          <div className="space-y-2">
+            {reportFollowUpNotes.map((e: any, idx: number) => {
+              const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "—";
+              const meta = e && typeof e.meta === "object" && !Array.isArray(e.meta) ? e.meta : null;
+              const noteText = getEventNoteText(meta);
+
+              return (
+                <div key={`report-follow-up-${String(e?.id ?? idx)}`} className="rounded-md border border-gray-200 bg-gray-50 p-3">
+                  <div className="text-xs text-gray-600">{when}</div>
+                  {noteText ? (
+                    <div className="mt-2 whitespace-pre-wrap text-sm text-gray-800">
+                      {noteText}
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-sm text-gray-500">(No note text)</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-sm text-gray-600">No report follow-up notes yet.</div>
+        )}
+      </div>
+    </div>
+  </>
 ) : null}
 
 {/* Shared Notes */}

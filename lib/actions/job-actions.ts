@@ -3106,6 +3106,9 @@ export async function addInternalNoteFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const note = String(formData.get("note") || "").trim();
   const tab = String(formData.get("tab") || "ops").trim() || "ops";
+  const context = String(formData.get("context") || "").trim() || null;
+  const anchorEventId = String(formData.get("anchor_event_id") || "").trim() || null;
+  const anchorEventType = String(formData.get("anchor_event_type") || "").trim() || null;
 
   if (!jobId) throw new Error("Job ID is required");
   if (!note) {
@@ -3122,11 +3125,21 @@ export async function addInternalNoteFromForm(formData: FormData) {
   if (userErr) throw userErr;
   if (!user) redirect("/login");
 
+  const hasContextFields = !!(context || anchorEventId || anchorEventType);
+  const meta = hasContextFields
+    ? {
+        note,
+        ...(context ? { context } : {}),
+        ...(anchorEventId ? { anchor_event_id: anchorEventId } : {}),
+        ...(anchorEventType ? { anchor_event_type: anchorEventType } : {}),
+      }
+    : { note };
+
   await insertJobEvent({
     supabase,
     jobId,
     event_type: "internal_note",
-    meta: { note },
+    meta,
     userId: user.id,
   });
 
