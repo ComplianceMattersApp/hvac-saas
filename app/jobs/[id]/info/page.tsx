@@ -3,10 +3,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SystemLocationPicker from "@/components/jobs/SystemLocationPicker";
 
-import {
-  addJobEquipmentFromForm,
-  deleteJobEquipmentFromForm,
-} from "@/lib/actions/job-actions";
+import { addJobEquipmentFromForm } from "@/lib/actions/job-actions";
+import EquipmentEditCard from "../_components/EquipmentEditCard";
 
 export default async function JobInfoPage({
   params,
@@ -119,69 +117,13 @@ if (error || !job) return notFound();
 
   {job.job_equipment && job.job_equipment.length > 0 ? (
     <div className="space-y-2">
-      {job.job_equipment.map((eq: {
-        id: string;
-        equipment_role: string | null;
-        system_location: string | null;
-        manufacturer: string | null;
-        model: string | null;
-        serial: string | null;
-        tonnage: string | null;
-        refrigerant_type: string | null;
-        notes: string | null;
-      }) => (
-        <div key={eq.id} className="rounded-md border p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
-              <div className="font-medium text-gray-900">
-                {(eq.equipment_role ?? "equipment").replaceAll("_", " ")}
-              </div>
-                <label className="text-sm font-medium" htmlFor="system_location">
-                  System Location (optional)
-                </label>
-                <input
-                  id="system_location"
-                  name="system_location"
-                  className="w-full rounded-md border px-3 py-2"
-                  defaultValue={eq?.system_location ?? ""}
-                />
-
-                {eq.system_location ? (
-                  <div className="text-sm text-muted-foreground">
-                    Location: {eq.system_location ?? "—"}
-                  </div>
-                ) : null}
-
-
-              <div className="text-sm text-gray-700">
-                {[eq.manufacturer, eq.model].filter(Boolean).join(" ") || "—"}
-              </div>
-
-              <div className="text-xs text-gray-600">
-                {eq.serial ? `S/N: ${eq.serial}` : null}
-                {eq.serial && (eq.tonnage || eq.refrigerant_type) ? " • " : null}
-                {eq.tonnage ? `${eq.tonnage} ton` : null}
-                {eq.tonnage && eq.refrigerant_type ? " • " : null}
-                {eq.refrigerant_type ? eq.refrigerant_type : null}
-              </div>
-
-              {eq.notes ? (
-                <div className="text-xs text-gray-600">Notes: {eq.notes}</div>
-              ) : null}
-            </div>
-
-            <form action={deleteJobEquipmentFromForm}>
-              <input type="hidden" name="job_id" value={job.id} />
-              <input type="hidden" name="equipment_id" value={eq.id} />
-              <button
-                type="submit"
-                className="px-3 py-2 rounded border text-sm hover:bg-gray-50"
-              >
-                Delete
-              </button>
-            </form>
-          </div>
-        </div>
+      {job.job_equipment.map((eq) => (
+        <EquipmentEditCard
+          key={eq.id}
+          eq={eq}
+          systems={systems ?? []}
+          jobId={job.id}
+        />
       ))}
     </div>
   ) : (

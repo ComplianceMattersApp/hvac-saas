@@ -751,6 +751,7 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
   if (error) throw error;
 
   revalidatePath(`/jobs/${jobId}/info`);
+  revalidatePath(`/jobs/${jobId}/tests`);
   redirect(`/jobs/${jobId}/info?f=equipment`);
 }
 
