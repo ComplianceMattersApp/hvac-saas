@@ -600,6 +600,7 @@ export default async function PortalPage({
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {passedJobs.slice(0, 5).map(({ job: j, resolved }) => {
               const resolvedAt = j.data_entry_completed_at ?? j.created_at;
+              const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const displayLines = cardIssueLines(resolved);
               return (
                 <Link
@@ -619,6 +620,10 @@ export default async function PortalPage({
 
                       <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                         {displayAddress(j)}
+                      </div>
+
+                      <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+                        {nextStepText({ job: j, resolved, openRetestChild })}
                       </div>
 
                       <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">

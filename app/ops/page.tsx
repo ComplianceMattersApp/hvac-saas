@@ -640,7 +640,7 @@ function queueReason(j: any, activeBucket: string) {
       return "Retest pending scheduling — retest child exists but is not scheduled";
     }
     if (retestState === "scheduled") {
-      return `Retest scheduled: ${retestSchedule}`;
+      return `Retest scheduled for ${retestSchedule}`;
     }
   }
 
@@ -720,7 +720,7 @@ function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJo
   const retestState = retestStateForJob(String(j?.id ?? ""));
   const needs = getCloseoutNeeds(j);
 
-  if (opts?.scheduledRetest) return "No immediate action";
+  if (opts?.scheduledRetest) return "No Immediate Action";
   if (retestState === "pending_scheduling") return "Schedule Retest";
   if (status === "failed" && opts?.retestReady) return "Create Retest Job";
   if (status === "failed") return "Await Contractor Correction";
@@ -745,7 +745,7 @@ function signalReason(j: any, opts?: { retestReady?: boolean; newContractorJob?:
   }
   if (opts?.scheduledRetest) {
     const retestSchedule = retestScheduleLabelForJob(String(j?.id ?? ""));
-    return retestSchedule ? `Retest scheduled: ${retestSchedule}` : "Retest visit already scheduled";
+    return retestSchedule ? `Retest scheduled for ${retestSchedule}` : "Retest scheduled for upcoming visit";
   }
   if (opts?.retestReady) return "Contractor says correction is complete and job is ready for retest review";
   if (opts?.newContractorJob) return "New job submitted by contractor and waiting for internal review";
@@ -993,8 +993,12 @@ const contractorCreatedCount = uniqueAllOpenOpsJobs.filter((j: any) => {
 
 const contractorUpdatesCount = (filteredBucketJobs ?? []).filter((j: any) => {
   const jobId = String(j?.id ?? "");
+  const isRetestReadyJob =
+    String(j?.ops_status ?? "").toLowerCase() === "failed" &&
+    hasSignalEventForJob(latestRetestReadyByJob, jobId);
   return (
     hasSignalEventForJob(latestContractorUpdateByJob, jobId) &&
+    !isRetestReadyJob &&
     !(String(j?.ops_status ?? "").toLowerCase() === "need_to_schedule" &&
       hasSignalEventForJob(latestContractorCreatedByJob, jobId))
   );
@@ -1026,11 +1030,14 @@ if (signal === "contractor_updates") {
   // Keep contractor updates within the active queue's scope.
   signalFilteredBucketJobs = signalFilteredBucketJobs.filter((j: any) => {
     const jobId = String(j.id ?? "");
+    const isRetestReadyJob =
+      String(j?.ops_status ?? "").toLowerCase() === "failed" &&
+      hasSignalEventForJob(latestRetestReadyByJob, jobId);
     const isNewContractorJob =
       String(j?.ops_status ?? "").toLowerCase() === "need_to_schedule" &&
       hasSignalEventForJob(latestContractorCreatedByJob, jobId);
 
-    return hasSignalEventForJob(latestContractorUpdateByJob, jobId) && !isNewContractorJob;
+    return hasSignalEventForJob(latestContractorUpdateByJob, jobId) && !isRetestReadyJob && !isNewContractorJob;
   });
 }
 
@@ -1311,6 +1318,11 @@ function compactRow(j: any, showDate = false, note?: string) {
   const scheduledRetestLabel = retestScheduleLabelForJob(jobId);
   const lifecycleStatus = String(j?.status ?? "").toLowerCase();
   const opsStatus = String(j?.ops_status ?? "").toLowerCase();
+  const activeFieldStatus = lifecycleStatus === "on_the_way"
+    ? { label: "On the Way", tone: "border-sky-300 bg-sky-100 text-sky-900" }
+    : lifecycleStatus === "in_progress"
+    ? { label: "In Progress", tone: "border-blue-300 bg-blue-100 text-blue-900" }
+    : null;
   const statusMeta = retestState === "pending_scheduling"
     ? { label: "Retest Pending Scheduling", tone: "border-amber-200 bg-amber-50 text-amber-800" }
     : scheduledRetestLabel
@@ -1348,19 +1360,29 @@ function compactRow(j: any, showDate = false, note?: string) {
           >
             {j.title}
           </Link>
+          {activeFieldStatus ? (
+            <div className="mt-1">
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${activeFieldStatus.tone}`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+                {activeFieldStatus.label}
+              </span>
+            </div>
+          ) : null}
           <div className="mt-0.5 text-xs font-medium text-gray-700">{customerNameOnly(j)} • {customerPhoneOnly(j) || "-"}</div>
           <div className="text-xs text-gray-600">Contractor: {contractorNameOnly(j)}</div>
           <div className="text-xs text-gray-500">{addressLine(j)}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-            <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
-              {statusMeta.label}
-            </span>
+            {!activeFieldStatus ? (
+              <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
+                {statusMeta.label}
+              </span>
+            ) : null}
             <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${isImmediateActionRequired ? "border-red-200 bg-red-50 text-red-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
               {isImmediateActionRequired ? "Action Required" : "No Immediate Action"}
             </span>
           </div>
           <div className="mt-1 text-xs font-medium text-gray-700">
-            {scheduledRetestLabel ? `Retest scheduled: ${scheduledRetestLabel}` : `Next step: ${nextStep}`}
+            {scheduledRetestLabel ? `Retest scheduled for ${scheduledRetestLabel}` : `Next step: ${nextStep}`}
           </div>
           {note ? (
             <div className="mt-1.5 inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">

@@ -253,8 +253,8 @@ export function resolveContractorIssues(
     if (retestState === "scheduled") {
       issues.push({
         group: "in_progress",
-        headline: `Retest scheduled: ${retestSchedule}`,
-        explanation: "Retest visit is scheduled. No immediate action is required.",
+        headline: `Retest scheduled for ${retestSchedule}`,
+        explanation: "Retest scheduled for visit. No Immediate Action is required.",
         stage: "retest_scheduled",
       });
     } else if (retestState === "pending_scheduling") {
@@ -351,7 +351,7 @@ export function resolveContractorIssues(
       nextStep = `Retest scheduled for ${retestSchedule}`;
     } else if (retestState === "pending_scheduling") {
       statusLabel = "Retest Pending Scheduling";
-      nextStep = "Retest needs to be scheduled.";
+      nextStep = "Retest needs to be scheduled";
     } else {
       statusLabel = "Failed";
       nextStep = "Retest decision needed.";
