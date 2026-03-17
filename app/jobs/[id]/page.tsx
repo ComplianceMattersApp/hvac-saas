@@ -1135,24 +1135,24 @@ const renderTimelineItem = (e: any, key: string) => {
           {canShowCertsButton && (
             <form action={markCertsCompleteFromForm}>
               <input type="hidden" name="job_id" value={job.id} />
-              <button
-                type="submit"
+              <SubmitButton
+                loadingText="Saving..."
                 className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
               >
                 ✓ Certs Complete
-              </button>
+              </SubmitButton>
             </form>
           )}
 
         {canShowInvoiceButton && (
           <form action={markInvoiceCompleteFromForm}>
             <input type="hidden" name="job_id" value={job.id} />
-            <button
-              type="submit"
+            <SubmitButton
+              loadingText="Saving..."
               className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
             >
               ✓ Invoice Complete
-            </button>
+            </SubmitButton>
           </form>
         )}
 
@@ -1423,7 +1423,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
                 <button
                   type="submit"
-                  className="rounded bg-gray-900 px-3 py-1 text-white"
+                  className="inline-flex min-h-11 items-center rounded bg-gray-900 px-3 py-1 text-white transition-colors hover:bg-black"
                 >
                   Update
                 </button>
@@ -1458,12 +1458,12 @@ const renderTimelineItem = (e: any, key: string) => {
                       </select>
                     </div>
 
-                    <button
-                      type="submit"
+                    <SubmitButton
+                      loadingText="Saving..."
                       className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100"
                     >
                       Save contractor
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
               </details>
@@ -1546,12 +1546,12 @@ const renderTimelineItem = (e: any, key: string) => {
 
                 <form action={archiveJobFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
-                  <button
-                    type="submit"
+                  <SubmitButton
+                    loadingText="Archiving..."
                     className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
                   >
                     Archive Job
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
             </details>
@@ -1581,12 +1581,12 @@ const renderTimelineItem = (e: any, key: string) => {
         />
       </div>
     
-      <button
-        type="submit"
+      <SubmitButton
+        loadingText="Saving..."
         className="px-3 py-2 rounded border text-sm bg-black text-white"
       >
         Mark Data Entry Complete
-      </button>
+      </SubmitButton>
     </form>
   </div>
 ) : null}
@@ -1698,19 +1698,19 @@ const renderTimelineItem = (e: any, key: string) => {
       </p>
           </div>
 
-          <button className="px-3 py-2 rounded bg-black text-white text-sm" type="submit">
+          <SubmitButton loadingText="Saving..." className="px-3 py-2 rounded bg-black text-white text-sm">
             Save
-          </button>
+          </SubmitButton>
         </form>
 
         {canShowReleaseAndReevaluate ? (
           <form action={releaseAndReevaluateFromForm} className="mt-2">
             <input type="hidden" name="job_id" value={job.id} />
-            <button className="px-3 py-2 rounded border text-sm" type="submit">
+            <SubmitButton loadingText="Updating..." className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
               {String(job.ops_status ?? "").toLowerCase() === "pending_info"
                 ? "Release Pending Info & Re-evaluate"
                 : "Release & Re-evaluate"}
-            </button>
+            </SubmitButton>
           </form>
         ) : null}
       </div>
@@ -1782,7 +1782,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="method" value="call" />
                 <input type="hidden" name="result" value="no_answer" />
-                <SubmitButton className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
+                <SubmitButton loadingText="Logging..." className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
                   Log Call (No Answer)
                 </SubmitButton>
               </form>
@@ -1791,18 +1791,18 @@ const renderTimelineItem = (e: any, key: string) => {
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="method" value="text" />
                 <input type="hidden" name="result" value="sent" />
-                <button className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100" type="submit">
+                <SubmitButton loadingText="Logging..." className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
                   Log Text (Sent)
-                </button>
+                </SubmitButton>
               </form>
 
               <form action={logCustomerContactAttemptFromForm}>
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="method" value="call" />
                 <input type="hidden" name="result" value="spoke" />
-                <button className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100" type="submit">
+                <SubmitButton loadingText="Logging..." className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
                   Log Call (Spoke)
-                </button>
+                </SubmitButton>
               </form>
             </div>
 
@@ -1901,12 +1901,12 @@ const renderTimelineItem = (e: any, key: string) => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              <button
+              <SubmitButton
+                loadingText="Saving..."
                 className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-                type="submit"
               >
                 Save Scheduling
-              </button>
+              </SubmitButton>
 
               {(job.scheduled_date || job.window_start || job.window_end) ? (
                 <UnscheduleButton />
@@ -1973,9 +1973,9 @@ const renderTimelineItem = (e: any, key: string) => {
               />
             </div>
 
-            <button className="px-3 py-2 rounded bg-black text-white text-sm w-fit" type="submit">
+            <SubmitButton loadingText="Saving..." className="px-3 py-2 rounded bg-black text-white text-sm w-fit">
               Save Follow Up
-            </button>
+            </SubmitButton>
           </form>
         </div>
 

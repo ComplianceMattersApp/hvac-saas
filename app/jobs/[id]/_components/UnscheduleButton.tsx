@@ -9,7 +9,7 @@ export default function UnscheduleButton({ className }: UnscheduleButtonProps) {
     <button
       className={
         className ??
-        "inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100"
+        "inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-100"
       }
       type="submit"
       name="unschedule"

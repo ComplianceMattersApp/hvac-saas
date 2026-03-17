@@ -2,6 +2,7 @@
 
 import { markServiceComplete, markInvoiceSent } from "@/lib/actions/service-actions";
 import { createClient } from "@/lib/supabase/server";
+import SubmitButton from "@/components/SubmitButton";
 
 export default async function ServiceStatusActions({ jobId }: { jobId: string }) {
   const supabase = await createClient();
@@ -44,21 +45,21 @@ export default async function ServiceStatusActions({ jobId }: { jobId: string })
 
       <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <form action={completeAction}>
-          <button
-            type="submit"
-            className="w-full rounded-lg border px-3 py-2 text-sm font-medium"
+          <SubmitButton
+            loadingText="Updating..."
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50"
           >
             Mark Service Complete → Invoice Required
-          </button>
+          </SubmitButton>
         </form>
 
         <form action={invoiceSentAction}>
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white"
+          <SubmitButton
+            loadingText="Updating..."
+            className="w-full rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
           >
             Mark Invoice Sent → Closed
-          </button>
+          </SubmitButton>
         </form>
       </div>
 

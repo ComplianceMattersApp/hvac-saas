@@ -79,22 +79,35 @@ if (error || !job) return notFound();
     <div className="grid gap-2">
       <Link
         href={`/jobs/${job.id}/info?f=equipment`}
-        className="w-full px-4 py-3 rounded bg-blue-600 text-white text-center"
+        className="w-full inline-flex min-h-11 items-center justify-center px-4 py-3 rounded bg-blue-600 text-white text-center"
       >
         Equipment
+      </Link>
+      <Link
+        href={`/jobs/${job.id}/tests`}
+        className="w-full inline-flex min-h-11 items-center justify-center px-4 py-3 rounded border border-gray-300 bg-white text-gray-900 text-center hover:bg-gray-50"
+      >
+        Go to Tests
       </Link>
     </div>
   </div>
 ) : null}
-
-
-addJobEquipmentFromForm
 
       {/* Focused content */}
       {focused === "equipment" ? (
         <div className="rounded-lg border bg-white p-4 space-y-4">
           <div className="text-base font-semibold text-gray-900 border-b pb-2">
   Equipment
+</div>
+
+<div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+  <div>Next step after equipment capture: run or complete ECC tests for this job.</div>
+  <Link
+    href={`/jobs/${job.id}/tests`}
+    className="inline-flex min-h-11 items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+  >
+    Go to Tests
+  </Link>
 </div>
 
 {/* Existing Equipment */}

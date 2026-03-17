@@ -21,23 +21,29 @@ export default function ContractorReportPanel({
   const [contractorNote, setContractorNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState<"generate" | "send" | null>(null);
+  const [sent, setSent] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const canSend = !!preview && !isPending;
+  const canSend = !!preview && !isPending && !sent;
 
   function onGenerate() {
     setError(null);
     setSuccess(null);
+    setLastAction("generate");
 
     startTransition(async () => {
       try {
         const nextPreview = await generateContractorReportPreview({ jobId });
         setPreview(nextPreview);
         setIsExpanded(true);
+        setSent(false);
       } catch (e) {
         setPreview(null);
         setIsExpanded(false);
         setError(e instanceof Error ? e.message : "Failed to generate report preview");
+      } finally {
+        setLastAction(null);
       }
     });
   }
@@ -47,6 +53,7 @@ export default function ContractorReportPanel({
 
     setError(null);
     setSuccess(null);
+    setLastAction("send");
 
     startTransition(async () => {
       try {
@@ -57,8 +64,11 @@ export default function ContractorReportPanel({
 
         setSuccess("Contractor report published to portal.");
         setIsExpanded(false);
+        setSent(true);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to send contractor report");
+      } finally {
+        setLastAction(null);
       }
     });
   }
@@ -95,18 +105,22 @@ export default function ContractorReportPanel({
           type="button"
           onClick={onGenerate}
           disabled={isPending}
-          className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-50 disabled:opacity-50"
+          className="inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-50 disabled:opacity-50"
         >
-          {isPending ? "Generating..." : "Generate Contractor Report"}
+          {isPending && lastAction === "generate" ? "Generating..." : "Generate Contractor Report"}
         </button>
 
         <button
           type="button"
           onClick={onSend}
           disabled={!canSend}
-          className="px-3 py-2 rounded bg-black text-white text-sm disabled:opacity-50"
+          className="inline-flex min-h-11 items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isPending ? "Sending..." : "Send to Contractor"}
+          {sent
+            ? "Sent ✓"
+            : isPending && lastAction === "send"
+            ? "Sending..."
+            : "Send to Contractor"}
         </button>
       </div>
 

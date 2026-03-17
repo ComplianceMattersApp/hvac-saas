@@ -5,21 +5,25 @@ import { useFormStatus } from "react-dom";
 export default function SubmitButton({
   children,
   className,
-}: {
-  children: React.ReactNode;
-  className?: string;
+  loadingText,
+  disabled,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  loadingText?: string;
 }) {
   const { pending } = useFormStatus();
+  const isDisabled = pending || !!disabled;
 
   return (
     <button
       type="submit"
-      disabled={pending}
-      className={`${className ?? ""} ${
-        pending ? "opacity-60 cursor-not-allowed" : ""
+      disabled={isDisabled}
+      className={`inline-flex min-h-11 items-center justify-center transition-colors ${className ?? ""} ${
+        isDisabled ? "opacity-60 cursor-not-allowed" : "hover:brightness-95"
       }`}
+      {...props}
     >
-      {pending ? "Logging..." : children}
+      {pending ? loadingText ?? "Saving..." : children}
     </button>
   );
 }

@@ -38,6 +38,9 @@ export default function JobAttachmentsInternal({
   const [ok, setOk] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [sharedAttachmentIds, setSharedAttachmentIds] = useState<Set<string>>(
+    () => new Set()
+  );
 
   const hasFiles = files.length > 0;
   const canAct = !isPending && hasFiles;
@@ -120,6 +123,8 @@ export default function JobAttachmentsInternal({
   }
 
   async function shareToContractor(attachment: Item) {
+    if (sharedAttachmentIds.has(attachment.id)) return;
+
     setError(null);
     setOk(null);
     setSharingId(attachment.id);
@@ -130,6 +135,7 @@ export default function JobAttachmentsInternal({
         attachmentId: attachment.id,
       });
 
+      setSharedAttachmentIds((prev) => new Set(prev).add(attachment.id));
       setOk(`Shared "${attachment.file_name}" to contractor.`);
       router.refresh();
     } catch (e: unknown) {
@@ -166,7 +172,7 @@ export default function JobAttachmentsInternal({
             type="button"
             onClick={openPicker}
             disabled={isPending}
-            className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 transition disabled:opacity-50"
+            className="inline-flex min-h-11 items-center justify-center px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             Choose Files
           </button>
@@ -199,7 +205,7 @@ export default function JobAttachmentsInternal({
           type="button"
           onClick={uploadInternal}
           disabled={!canAct}
-          className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 transition disabled:opacity-50"
+          className="inline-flex min-h-11 items-center justify-center px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors disabled:opacity-50"
         >
           {isPending ? "Uploading…" : "Upload Files"}
         </button>
@@ -214,6 +220,7 @@ export default function JobAttachmentsInternal({
                   !!a.content_type &&
                   a.content_type.toLowerCase().startsWith("image/");
                 const hasThumb = isImage && !!a.signedUrl;
+                const isShared = sharedAttachmentIds.has(a.id);
 
                 return (
                   <div
@@ -247,10 +254,14 @@ export default function JobAttachmentsInternal({
                         <button
                           type="button"
                           onClick={() => shareToContractor(a)}
-                          disabled={isPending || sharingId === a.id}
-                          className="mt-2 inline-flex px-2.5 py-1 rounded-md border text-xs font-medium hover:bg-gray-100 transition disabled:opacity-50"
+                          disabled={isPending || sharingId === a.id || isShared}
+                          className="mt-2 inline-flex min-h-11 items-center px-3 rounded-md border text-xs font-medium hover:bg-gray-100 transition-colors disabled:opacity-50"
                         >
-                          {sharingId === a.id ? "Sharing..." : "Share to Contractor"}
+                          {isShared
+                            ? "Shared ✓"
+                            : sharingId === a.id
+                            ? "Sharing..."
+                            : "Share to Contractor"}
                         </button>
                       </div>
 

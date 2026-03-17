@@ -1344,7 +1344,7 @@ return (
         <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
         <div className="grid gap-1">
           <label className="text-xs font-medium uppercase tracking-wide text-gray-600">Sort</label>
-          <form action="/ops" method="get" className="flex gap-2">
+          <form action="/ops" method="get" className="flex flex-col gap-2 sm:flex-row">
             <input type="hidden" name="bucket" value={bucket} />
             <input type="hidden" name="contractor" value={contractor ?? ""} />
             <input type="hidden" name="q" value={q ?? ""} />
@@ -1362,7 +1362,7 @@ return (
             </select>
             <button
               type="submit"
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
+              className="inline-flex min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
             >
               Apply
             </button>
@@ -1371,7 +1371,7 @@ return (
       </div>
       <div className="mt-3 grid gap-1">
         <label className="text-xs font-medium uppercase tracking-wide text-gray-600">Quick search</label>
-        <form action="/ops" method="get" className="flex gap-2">
+        <form action="/ops" method="get" className="flex flex-col gap-2 sm:flex-row">
           <input type="hidden" name="bucket" value={bucket} />
           <input type="hidden" name="contractor" value={contractor ?? ""} />
           <input type="hidden" name="sort" value={sort} />
@@ -1382,7 +1382,7 @@ return (
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
           />
           <button
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
             type="submit"
           >
             Search

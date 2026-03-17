@@ -1,6 +1,7 @@
 "use client";
 
 import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";
+import { useFormStatus } from "react-dom";
 
 type JobFieldActionButtonProps = {
   jobId: string;
@@ -8,6 +9,20 @@ type JobFieldActionButtonProps = {
   tab: string;
   hasFullSchedule: boolean;
 };
+
+function FieldActionSubmitButton({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="inline-flex min-h-11 items-center justify-center rounded-md border border-blue-600 bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {pending ? "Updating..." : label}
+    </button>
+  );
+}
 
 export function JobFieldActionButton({
   jobId,
@@ -63,12 +78,7 @@ export function JobFieldActionButton({
       <input type="hidden" name="tab" value={tab} />
       <input type="hidden" name="auto_schedule_confirmed" value="0" />
 
-      <button
-        type="submit"
-        className="inline-flex h-10 items-center justify-center rounded-md border border-blue-600 bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
-      >
-        {label}
-      </button>
+      <FieldActionSubmitButton label={label} />
     </form>
   );
 }

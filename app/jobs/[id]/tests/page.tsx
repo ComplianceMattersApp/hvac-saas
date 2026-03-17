@@ -5,6 +5,7 @@ import { markRefrigerantChargeExemptFromForm } from "@/lib/actions/job-actions";
 import { resolveEccScenario } from "@/lib/ecc/scenario-resolver";
 import Link from "next/link";
 import PrintButton from "@/components/ui/PrintButton";
+import SubmitButton from "@/components/SubmitButton";
 
 import {
   completeEccTestRunFromForm,
@@ -521,10 +522,28 @@ const primaryEquipment =
   selectedSystemEquipment[0] ??
   null;
 
+const fallbackTonnageEquipment =
+  selectedSystemEquipment.find((eq: any) => eq?.tonnage != null && String(eq.tonnage).trim() !== "") ?? null;
+
 const defaultSystemTonnage =
   primaryEquipment?.tonnage != null && primaryEquipment?.tonnage !== ""
     ? primaryEquipment.tonnage
+    : fallbackTonnageEquipment?.tonnage != null && String(fallbackTonnageEquipment.tonnage).trim() !== ""
+    ? fallbackTonnageEquipment.tonnage
     : "";
+
+  const selectedSystemName =
+    systems.find((sys: any) => String(sys.id) === String(selectedSystemId))?.name ?? "Selected system";
+
+  const equipmentReferenceItems = selectedSystemEquipment
+    .slice()
+    .sort((a: any, b: any) => {
+      const at = new Date(a?.created_at ?? 0).getTime();
+      const bt = new Date(b?.created_at ?? 0).getTime();
+      if (at !== bt) return at - bt;
+      return String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
+    })
+    .slice(0, 3);
 
   function effectiveResult(run: any): "pass" | "fail" | "unknown" {
     if (!run) return "unknown";
@@ -1026,16 +1045,13 @@ const defaultSystemTonnage =
 
       <div className="flex items-center gap-2">
         {status.state === "required" ? (
-          <form action={addEccTestRunFromForm}>
+            <form action={addEccTestRunFromForm}>
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="system_id" value={selectedSystemId} />
             <input type="hidden" name="test_type" value={testType} />
-            <button
-              type="submit"
-              className="rounded-md border px-3 py-1.5 text-xs font-medium"
-            >
+              <SubmitButton loadingText="Starting..." className="rounded-md border px-3 py-1.5 text-xs font-medium bg-white hover:bg-gray-50">
               Start Test
-            </button>
+              </SubmitButton>
           </form>
         ) : (
           <Link
@@ -1073,6 +1089,30 @@ const defaultSystemTonnage =
 
             <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
               Scenario: {scenarioCode.replaceAll("_", " ")}
+            </div>
+          </div>
+        ) : null}
+
+        {selectedSystemId ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">System / Equipment Reference</div>
+            <div className="text-sm font-medium text-slate-900">{selectedSystemName}</div>
+            {equipmentReferenceItems.length > 0 ? (
+              <div className="space-y-1 text-xs text-slate-700">
+                {equipmentReferenceItems.map((eq: any, index: number) => (
+                  <div key={String(eq?.id ?? `${selectedSystemId}-ref-${index}`)} className="break-words">
+                    {equipmentSummaryLine(eq)}
+                  </div>
+                ))}
+                {selectedSystemEquipment.length > equipmentReferenceItems.length ? (
+                  <div className="text-slate-600">+{selectedSystemEquipment.length - equipmentReferenceItems.length} more item(s)</div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-600">No equipment linked to this system yet.</div>
+            )}
+            <div className="text-xs text-slate-700">
+              Suggested tonnage default: <span className="font-medium">{fmtValue(defaultSystemTonnage, "ton")}</span>
             </div>
           </div>
         ) : null}
@@ -1136,9 +1176,9 @@ const defaultSystemTonnage =
                 </select>
               </div>
 
-              <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
+              <SubmitButton loadingText="Adding..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
                 Add Test
-              </button>
+              </SubmitButton>
             </form>
           </div>
         ) : null}
@@ -1186,9 +1226,9 @@ const defaultSystemTonnage =
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="test_type" value={focusedCustomTestType} />
-                <button className="rounded-md bg-black px-4 py-2 text-white text-sm" type="submit">
+                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
                   Create Run
-                </button>
+                </SubmitButton>
               </form>
             ) : (
               <div className="flex flex-wrap gap-2 items-center border-t pt-3">
@@ -1225,7 +1265,7 @@ const defaultSystemTonnage =
             DUCT LEAKAGE
             ========================= */}
         {focusedType === "duct_leakage" ? (
-          <div className="rounded-md border p-3 space-y-3">
+          <div className="rounded-lg border bg-white p-4 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="font-medium">Duct Leakage</div>
@@ -1238,74 +1278,25 @@ const defaultSystemTonnage =
               </div>
             </div>
 
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <div className="font-semibold text-slate-800">System Reference</div>
+              <div>{selectedSystemName}</div>
+              <div>Suggested tonnage: {fmtValue(defaultSystemTonnage, "ton")}</div>
+            </div>
+
             {!runDL ? (
               <form action={addEccTestRunFromForm} className="flex items-center gap-2">
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="test_type" value="duct_leakage" />
                                 
-                <button className="rounded-md bg-black px-4 py-2 text-white text-sm" type="submit">
+                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
                   Create Duct Leakage Run
-                </button>
+                </SubmitButton>
               </form>
             ) : (
               <>
-                <form action={saveEccTestOverrideFromForm} className="grid gap-3 border-t pt-3">
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <input type="hidden" name="test_run_id" value={runDL.id} />
-                    <input type="hidden" name="system_id" value={selectedSystemId} />
-                    <input type="hidden" name="test_type" value="duct_leakage" />
-
-
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`ovr-${runDL.id}`}>
-                        Manual Override
-                      </label>
-                      <select
-                        id={`ovr-${runDL.id}`}
-                        name="override"
-                        className="w-full rounded-md border px-3 py-2"
-                        defaultValue={
-                          runDL.override_pass === true ? "pass" : runDL.override_pass === false ? "fail" : "none"
-                        }
-                      >
-                        <option value="none">None</option>
-                        <option value="pass">Smoke Test (Pass)</option>
-                      </select>
-                    </div>
-
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`ovr-reason-${runDL.id}`}>
-                        Override Reason (required if override set)
-                      </label>
-                      <input
-                        id={`ovr-reason-${runDL.id}`}
-                        name="override_reason"
-                        className="w-full rounded-md border px-3 py-2"
-                        defaultValue={runDL.override_reason ?? ""}
-                        placeholder="Explain why you're overriding the computed result..."
-                      />
-                    </div>
-                  </div>
-
-                  <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
-                    Save Override
-                  </button>
-                </form>
-
-                <div className="text-sm text-muted-foreground">
-                  <div>
-                    Max Allowed: {runDL.computed?.max_leakage_cfm ?? "—"} CFM
-                    {runDL.computed?.leakage_percent_allowed_display != null &&
-                    runDL.computed?.base_airflow_cfm != null
-                      ? ` (at ${runDL.computed.leakage_percent_allowed_display}% of ${runDL.computed.base_airflow_cfm} CFM base airflow)`
-                      : ""}
-                  </div>
-                  <div>Measured: {runDL.data?.measured_duct_leakage_cfm ?? "—"} CFM</div>
-                </div>
-
+                <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
                 <form action={saveDuctLeakageDataFromForm} className="grid gap-3 border-t pt-3">
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
@@ -1353,29 +1344,85 @@ const defaultSystemTonnage =
                       />
                     </div>
                   </div>
-   <div className="flex flex-wrap gap-2 items-center">
-  {/* SAVE */}
-  <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
-    Save Duct Leakage
-  </button>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <SubmitButton loadingText="Saving..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
+                      Save Duct Leakage
+                    </SubmitButton>
 
-  {/* COMPLETE — uses SAME form payload (includes tonnage/measured/notes) */}
-  <button
-    type="submit"
-    formAction={completeEccTestRunFromForm}
-    className="px-3 py-2 rounded border text-sm"
-    disabled={!!runDL.is_completed}
-  >
-    {runDL.is_completed ? "Completed ✅" : "Complete Duct Leakage Test"}
-  </button>
-</div>
-</form>
+                    <button
+                      type="submit"
+                      formAction={completeEccTestRunFromForm}
+                      className="inline-flex min-h-11 items-center px-3 py-2 rounded border text-sm bg-white hover:bg-gray-50"
+                      disabled={!!runDL.is_completed}
+                    >
+                      {runDL.is_completed ? "Completed ✅" : "Complete Duct Leakage Test"}
+                    </button>
+                  </div>
+                </form>
+
+                <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
+                <div className="text-sm text-muted-foreground rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div>
+                    Max Allowed: {runDL.computed?.max_leakage_cfm ?? "—"} CFM
+                    {runDL.computed?.leakage_percent_allowed_display != null &&
+                    runDL.computed?.base_airflow_cfm != null
+                      ? ` (at ${runDL.computed.leakage_percent_allowed_display}% of ${runDL.computed.base_airflow_cfm} CFM base airflow)`
+                      : ""}
+                  </div>
+                  <div>Measured: {runDL.data?.measured_duct_leakage_cfm ?? "—"} CFM</div>
+                </div>
+
+                <div className="text-sm font-semibold text-slate-900">Override (Optional)</div>
+                <form action={saveEccTestOverrideFromForm} className="grid gap-3 border-t pt-3">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="test_run_id" value={runDL.id} />
+                    <input type="hidden" name="system_id" value={selectedSystemId} />
+                    <input type="hidden" name="test_type" value="duct_leakage" />
+
+
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`ovr-${runDL.id}`}>
+                        Manual Override
+                      </label>
+                      <select
+                        id={`ovr-${runDL.id}`}
+                        name="override"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={
+                          runDL.override_pass === true ? "pass" : runDL.override_pass === false ? "fail" : "none"
+                        }
+                      >
+                        <option value="none">None</option>
+                        <option value="pass">Smoke Test (Pass)</option>
+                      </select>
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`ovr-reason-${runDL.id}`}>
+                        Override Reason (required if override set)
+                      </label>
+                      <input
+                        id={`ovr-reason-${runDL.id}`}
+                        name="override_reason"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runDL.override_reason ?? ""}
+                        placeholder="Explain why you're overriding the computed result..."
+                      />
+                    </div>
+                  </div>
+
+                  <SubmitButton loadingText="Saving..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
+                    Save Override
+                  </SubmitButton>
+                </form>
 
 {/* DELETE stays separate */}
 <form action={deleteEccTestRunFromForm}>
   <input type="hidden" name="job_id" value={job.id} />
   <input type="hidden" name="test_run_id" value={runDL.id} />
-  <button type="submit" className="rounded-md border px-3 py-2 text-sm">
+  <button type="submit" className="inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50">
     Delete
   </button>
 </form>
@@ -1389,7 +1436,7 @@ const defaultSystemTonnage =
             AIRFLOW
             ========================= */}
         {focusedType === "airflow" ? (
-          <div className="rounded-md border p-3 space-y-3">
+          <div className="rounded-lg border bg-white p-4 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="font-medium">Airflow</div>
@@ -1402,17 +1449,24 @@ const defaultSystemTonnage =
               </div>
             </div>
 
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <div className="font-semibold text-slate-800">System Reference</div>
+              <div>{selectedSystemName}</div>
+              <div>Suggested tonnage: {fmtValue(defaultSystemTonnage, "ton")}</div>
+            </div>
+
             {!runAF ? (
               <form action={addEccTestRunFromForm} className="flex items-center gap-2">
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="test_type" value="airflow" />
-                <button className="rounded-md bg-black px-4 py-2 text-white text-sm" type="submit">
+                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
                   Create Airflow Run
-                </button>
+                </SubmitButton>
               </form>
             ) : (
               <>
+              <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
               <form action={saveAirflowDataFromForm} className="grid gap-3 border-t pt-3">
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="job_id" value={job.id} />
@@ -1421,16 +1475,16 @@ const defaultSystemTonnage =
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="grid gap-1">
-                    <label className="text-sm font-medium" htmlFor={`dl-ton-${runDL.id}`}>
+                    <label className="text-sm font-medium" htmlFor={`af-ton-${runAF.id}`}>
                       System Tonnage (auto-filled from equipment if available)
                     </label>
                     <input
-                      id={`dl-ton-${runDL.id}`}
+                      id={`af-ton-${runAF.id}`}
                       name="tonnage"
                       type="number"
                       step="0.1"
                       className="w-full rounded-md border px-3 py-2"
-                      defaultValue={runDL.data?.tonnage ?? defaultSystemTonnage}
+                      defaultValue={runAF.data?.tonnage ?? defaultSystemTonnage}
                     />
                   </div>
 
@@ -1458,6 +1512,11 @@ const defaultSystemTonnage =
                       className="w-full rounded-md border px-3 py-2"
                       defaultValue={runAF.data?.notes ?? ""}
                     />
+                  </div>
+
+                  <div className="grid gap-1 sm:col-span-2">
+                    <div className="text-sm font-semibold text-slate-900">Override (Optional)</div>
+                    <div className="text-xs text-slate-600">Use only when manual pass override is required.</div>
                   </div>
 
                   <div className="grid gap-1">
@@ -1490,17 +1549,23 @@ const defaultSystemTonnage =
                   </div>
                 </div>
 
-                <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
+                <SubmitButton loadingText="Saving..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
                   Save Airflow
-                </button>
+                </SubmitButton>
               </form>
+
+                <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <div>Required Total Airflow: {fmtValue(runAF.computed?.required_total_cfm, "CFM")}</div>
+                  <div>Measured Total Airflow: {fmtValue(runAF.data?.measured_total_cfm, "CFM")}</div>
+                </div>
 
                 <div className="flex flex-wrap gap-2 items-center">
                   <form action={completeEccTestRunFromForm}>
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runAF.id} />
                     <input type="hidden" name="system_id" value={selectedSystemId} />
-                    <button type="submit" className="px-3 py-2 rounded border text-sm" disabled={!!runAF.is_completed}>
+                    <button type="submit" className="inline-flex min-h-11 items-center px-3 py-2 rounded border text-sm bg-white hover:bg-gray-50" disabled={!!runAF.is_completed}>
                       {runAF.is_completed ? "Completed ✅" : "Complete Airflow Test"}
                     </button>
                   </form>
@@ -1508,7 +1573,7 @@ const defaultSystemTonnage =
                   <form action={deleteEccTestRunFromForm}>
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runAF.id} />
-                    <button type="submit" className="rounded-md border px-3 py-2 text-sm">
+                    <button type="submit" className="inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50">
                       Delete
                     </button>
                   </form>
@@ -1522,7 +1587,7 @@ const defaultSystemTonnage =
             REFRIGERANT CHARGE
             ========================= */}
         {focusedType === "refrigerant_charge" ? (
-          <div className="rounded-md border p-3 space-y-3">
+          <div className="rounded-lg border bg-white p-4 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="font-medium">Refrigerant Charge</div>
@@ -1535,17 +1600,24 @@ const defaultSystemTonnage =
               </div>
             </div>
 
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <div className="font-semibold text-slate-800">System Reference</div>
+              <div>{selectedSystemName}</div>
+              <div>Refrigerant type on run: {fallbackText(runRC?.data?.refrigerant_type)}</div>
+            </div>
+
             {!runRC ? (
               <form action={addEccTestRunFromForm} className="flex items-center gap-2">
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="test_type" value="refrigerant_charge" />
-                <button className="rounded-md bg-black px-4 py-2 text-white text-sm" type="submit">
+                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
                   Create Refrigerant Charge Run
-                </button>
+                </SubmitButton>
               </form>
             ) : (
               <>
+                <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
                 <form action={saveRefrigerantChargeDataFromForm} className="grid gap-3 border-t pt-3">
                   {/* ✅ critical: system_id must be included or server redirect can produce &s= */}
                   <input type="hidden" name="system_id" value={selectedSystemId} />
@@ -1726,11 +1798,19 @@ const defaultSystemTonnage =
                     </div>
                   </div>
 
-                  <button type="submit" className="w-fit rounded-md bg-black px-4 py-2 text-white">
+                  <SubmitButton loadingText="Saving..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
                     Save Refrigerant Charge Readings
-                  </button>
+                  </SubmitButton>
                 </form>
+
+                <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <div>Measured Subcool: {fmtValue(runRC.computed?.measured_subcool_f, "°F")}</div>
+                  <div>Measured Superheat: {fmtValue(runRC.computed?.measured_superheat_f, "°F")}</div>
+                  <div>Status: {fallbackText(runRC.computed?.status)}</div>
+                </div>
                 
+                <div className="text-sm font-semibold text-slate-900">Override (Optional)</div>
                 <form action={markRefrigerantChargeExemptFromForm} className="rounded-md border p-3 mt-3 sm:col-span-2">
   <input type="hidden" name="job_id" value={job.id} />
   <input type="hidden" name="test_run_id" value={runRC.id} />
@@ -1767,9 +1847,9 @@ const defaultSystemTonnage =
   </div>
 
   <div className="mt-3">
-    <button type="submit" className="rounded-md bg-black px-4 py-2 text-white text-sm">
+    <SubmitButton loadingText="Saving..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
       Mark Exempt (Pass)
-    </button>
+    </SubmitButton>
   </div>
 </form>
 
@@ -1778,7 +1858,7 @@ const defaultSystemTonnage =
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runRC.id} />
                     <input type="hidden" name="system_id" value={selectedSystemId} />
-                    <button type="submit" className="px-3 py-2 rounded border text-sm" disabled={!!runRC.is_completed}>
+                    <button type="submit" className="inline-flex min-h-11 items-center px-3 py-2 rounded border text-sm bg-white hover:bg-gray-50" disabled={!!runRC.is_completed}>
                       {runRC.is_completed ? "Completed ✅" : "Complete Refrigerant Charge Test"}
                     </button>
                   </form>
@@ -1786,7 +1866,7 @@ const defaultSystemTonnage =
                   <form action={deleteEccTestRunFromForm}>
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runRC.id} />
-                    <button type="submit" className="rounded-md border px-3 py-2 text-sm">
+                    <button type="submit" className="inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50">
                       Delete
                     </button>
                   </form>
