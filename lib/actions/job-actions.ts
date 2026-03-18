@@ -2496,6 +2496,32 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
   // ----- canonical service address input -----
   const existingCustomerId = String(formData.get("customer_id") || "").trim();
   const existingLocationId = String(formData.get("location_id") || "").trim();
+  let existingCustomerSnapshot: {
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  } | null = null;
+
+  if (existingCustomerId) {
+    const { data: existingCustomerRow, error: existingCustomerErr } = await supabase
+      .from("customers")
+      .select("first_name, last_name, email, phone")
+      .eq("id", existingCustomerId)
+      .maybeSingle();
+
+    if (existingCustomerErr) throw existingCustomerErr;
+    existingCustomerSnapshot = existingCustomerRow;
+  }
+
+  const customerFirstNameSnapshot =
+    customerFirstNameRaw || String(existingCustomerSnapshot?.first_name ?? "").trim() || null;
+  const customerLastNameSnapshot =
+    customerLastNameRaw || String(existingCustomerSnapshot?.last_name ?? "").trim() || null;
+  const customerEmailSnapshot =
+    customerEmailRaw || String(existingCustomerSnapshot?.email ?? "").trim() || null;
+  const customerPhoneSnapshot =
+    customerPhoneRaw || String(existingCustomerSnapshot?.phone ?? "").trim() || null;
 
   let existingLocationSnapshot: { address_line1?: string | null; city?: string | null } | null = null;
 
@@ -2802,9 +2828,9 @@ function canContractorWriteEvent(event_type: string) {
       customer_id: existingCustomerId,
       location_id: existingLocationId,
 
-      customer_first_name: customerFirstNameRaw || null,
-      customer_last_name: customerLastNameRaw || null,
-      customer_email: customerEmailRaw || null,
+      customer_first_name: customerFirstNameSnapshot,
+      customer_last_name: customerLastNameSnapshot,
+      customer_email: customerEmailSnapshot,
       job_notes: jobNotesRaw || null,
 
       title: titleFinal,
@@ -2817,7 +2843,7 @@ function canContractorWriteEvent(event_type: string) {
       permit_date,
       window_start,
       window_end,
-      customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
+      customer_phone: customerPhoneSnapshot,
       ops_status,
 
       billing_recipient: billingRecipientFinal,
@@ -2877,9 +2903,9 @@ if (existingCustomerId && !existingLocationId) {
     customer_id: existingCustomerId,
     location_id: locationIdToUse,
 
-    customer_first_name: customerFirstNameRaw || null,
-    customer_last_name: customerLastNameRaw || null,
-    customer_email: customerEmailRaw || null,
+    customer_first_name: customerFirstNameSnapshot,
+    customer_last_name: customerLastNameSnapshot,
+    customer_email: customerEmailSnapshot,
     job_notes: jobNotesRaw || null,
 
     title: titleFinal,
@@ -2892,7 +2918,7 @@ if (existingCustomerId && !existingLocationId) {
     permit_date,
     window_start,
     window_end,
-    customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
+    customer_phone: customerPhoneSnapshot,
     ops_status,
 
     billing_recipient: billingRecipientFinal,
