@@ -474,11 +474,8 @@ export async function sendContractorReport(input: {
 
   const appUrl = resolveAppUrl();
   const portalJobUrl = appUrl ? `${appUrl}/portal/jobs/${jobId}` : null;
-  const deliveryBody = [bodyText, portalJobUrl ? `Portal Link: ${portalJobUrl}` : null]
-    .filter(Boolean)
-    .join("\n\n");
   const emailHtml = buildContractorReportEmailHtml({
-    bodyText: deliveryBody,
+    bodyText: bodyText,
     portalJobUrl,
   });
 
@@ -491,7 +488,7 @@ export async function sendContractorReport(input: {
       eventId,
       dedupeKey,
       subject,
-      body: deliveryBody,
+      body: bodyText,
       status: "queued",
     });
 
