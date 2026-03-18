@@ -1830,10 +1830,29 @@ export async function updateJobContractorFromForm(formData: FormData) {
   revalidatePath("/jobs");
 }
 
+function normalizeJobTab(raw: string): "info" | "ops" | "tests" {
+  const value = String(raw ?? "").trim().toLowerCase();
+  if (value === "ops" || value === "tests") return value;
+  return "info";
+}
+
+function redirectToJobWithBanner(params: {
+  jobId: string;
+  banner: string;
+  tabRaw?: string;
+}) {
+  const tab = normalizeJobTab(String(params.tabRaw ?? ""));
+  const q = new URLSearchParams();
+  q.set("tab", tab);
+  q.set("banner", params.banner);
+  redirect(`/jobs/${params.jobId}?${q.toString()}`);
+}
+
 export async function assignJobAssigneeFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const userId = String(formData.get("user_id") || "").trim();
   const makePrimary = String(formData.get("make_primary") || "").trim() === "1";
+  const tabRaw = String(formData.get("tab") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
   if (!userId) throw new Error("Missing user_id");
@@ -1869,11 +1888,18 @@ export async function assignJobAssigneeFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/ops");
   revalidatePath("/ops/field");
+
+  redirectToJobWithBanner({
+    jobId,
+    banner: makePrimary ? "assignment_added_primary" : "assignment_added",
+    tabRaw,
+  });
 }
 
 export async function setPrimaryJobAssigneeFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const userId = String(formData.get("user_id") || "").trim();
+  const tabRaw = String(formData.get("tab") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
   if (!userId) throw new Error("Missing user_id");
@@ -1900,11 +1926,18 @@ export async function setPrimaryJobAssigneeFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/ops");
   revalidatePath("/ops/field");
+
+  redirectToJobWithBanner({
+    jobId,
+    banner: "assignment_primary_set",
+    tabRaw,
+  });
 }
 
 export async function removeJobAssigneeFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const userId = String(formData.get("user_id") || "").trim();
+  const tabRaw = String(formData.get("tab") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
   if (!userId) throw new Error("Missing user_id");
@@ -1931,6 +1964,12 @@ export async function removeJobAssigneeFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/ops");
   revalidatePath("/ops/field");
+
+  redirectToJobWithBanner({
+    jobId,
+    banner: "assignment_removed",
+    tabRaw,
+  });
 }
 
 /** =========================

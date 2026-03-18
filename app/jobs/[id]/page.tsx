@@ -1242,6 +1242,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 <form action={setPrimaryJobAssigneeFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="user_id" value={assignee.user_id} />
+                  <input type="hidden" name="tab" value={tab} />
                   <button
                     type="submit"
                     className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
@@ -1255,6 +1256,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 <form action={removeJobAssigneeFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="user_id" value={assignee.user_id} />
+                  <input type="hidden" name="tab" value={tab} />
                   <button
                     type="submit"
                     className="rounded-full border border-red-300 bg-white px-2 py-0.5 text-[11px] font-medium text-red-700 hover:bg-red-50"
@@ -1273,6 +1275,7 @@ const renderTimelineItem = (e: any, key: string) => {
       {isInternalUser ? (
         <form action={assignJobAssigneeFromForm} className="mt-3 flex flex-wrap items-center gap-2">
           <input type="hidden" name="job_id" value={job.id} />
+          <input type="hidden" name="tab" value={tab} />
           <select
             name="user_id"
             className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
@@ -1389,6 +1392,34 @@ const renderTimelineItem = (e: any, key: string) => {
         <FlashBanner
           type="success"
           message="New customer created and linked to this job."
+        />
+      )}
+
+      {sp?.banner === "assignment_added" && (
+        <FlashBanner
+          type="success"
+          message="Team member assigned to this job."
+        />
+      )}
+
+      {sp?.banner === "assignment_added_primary" && (
+        <FlashBanner
+          type="success"
+          message="Team member assigned and set as primary."
+        />
+      )}
+
+      {sp?.banner === "assignment_primary_set" && (
+        <FlashBanner
+          type="success"
+          message="Primary assignee updated."
+        />
+      )}
+
+      {sp?.banner === "assignment_removed" && (
+        <FlashBanner
+          type="success"
+          message="Assignee removed from this job."
         />
       )}
 
