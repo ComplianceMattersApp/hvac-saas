@@ -17,7 +17,8 @@ import {
   insertInternalNotificationForEvent,
   markContractorReportEmailDeliveryNotification,
 } from "@/lib/actions/notification-actions";
-import { sendContractorReportEmail } from "@/lib/email/smtp";
+import { resolveAppUrl, renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
+import { sendEmail } from "@/lib/email/sendEmail";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
 
 const OPS_STATUSES = [
@@ -189,6 +190,24 @@ function buildReportBody(args: {
   if (note) sections.push(`Contractor Note:\n${note}`);
 
   return sections.join("\n\n");
+}
+
+function buildContractorReportEmailHtml(args: { bodyText: string; portalJobUrl?: string | null }) {
+  const bodyHtml = escapeHtml(args.bodyText).replace(/\n/g, "<br />");
+  const portalUrl = String(args.portalJobUrl ?? "").trim();
+
+  const portalSection = portalUrl
+    ? `<p style="margin-top:16px;">Open your job in the portal: <a href="${escapeHtml(portalUrl)}">${escapeHtml(portalUrl)}</a></p>`
+    : "";
+
+  return renderSystemEmailLayout({
+    title: "Compliance Matters Report",
+    bodyHtml: `
+      <p style="margin: 0 0 12px 0;">Please review and address the report details below.</p>
+      <div style="white-space: normal;">${bodyHtml}</div>
+      ${portalSection}
+    `,
+  });
 }
 
 async function requireInternalUserOrThrow(supabase: any) {
@@ -426,7 +445,7 @@ export async function sendContractorReport(input: {
   });
 
   const contractorEmail = String((job as any)?.contractors?.email ?? "").trim().toLowerCase();
-  const subject = `[Compliance Matters] ${report.title} - ${report.customer_name}`;
+  const subject = `Compliance Matters Report - Action Required`;
 
   if (!contractorEmail) {
     await insertContractorReportEmailDeliveryNotification({
@@ -451,6 +470,16 @@ export async function sendContractorReport(input: {
     dedupeKey,
   });
 
+  const appUrl = resolveAppUrl();
+  const portalJobUrl = appUrl ? `${appUrl}/portal/jobs/${jobId}` : null;
+  const deliveryBody = [bodyText, portalJobUrl ? `Portal Link: ${portalJobUrl}` : null]
+    .filter(Boolean)
+    .join("\n\n");
+  const emailHtml = buildContractorReportEmailHtml({
+    bodyText: deliveryBody,
+    portalJobUrl,
+  });
+
   if (!existingDelivery?.id) {
     const deliveryRow = await insertContractorReportEmailDeliveryNotification({
       supabase,
@@ -460,15 +489,15 @@ export async function sendContractorReport(input: {
       eventId,
       dedupeKey,
       subject,
-      body: bodyText,
+      body: deliveryBody,
       status: "queued",
     });
 
     try {
-      await sendContractorReportEmail({
+      await sendEmail({
         to: contractorEmail,
         subject,
-        text: bodyText,
+        html: emailHtml,
       });
 
       await markContractorReportEmailDeliveryNotification({

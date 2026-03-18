@@ -13,8 +13,11 @@ import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import { requireInternalUser } from "@/lib/auth/internal-user";
+import { renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
+import { sendEmail } from "@/lib/email/sendEmail";
 import { assertAssignableInternalUser } from "@/lib/staffing/human-layer";
 import type { JobStatus } from "@/lib/types/job";
+import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
 export type { JobStatus } from "@/lib/types/job";
 
@@ -197,6 +200,66 @@ async function insertJobEvent(params: {
   });
 
   if (error) throw error;
+}
+
+function toTitleCase(value: string) {
+  return value
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function formatServiceAddress(job: any) {
+  const loc = Array.isArray(job?.locations)
+    ? job.locations.find((x: any) => x) ?? null
+    : job?.locations ?? null;
+
+  const line1 = String(loc?.address_line1 ?? "").trim() || String(job?.job_address ?? "").trim();
+  const line2 = String(loc?.address_line2 ?? "").trim();
+  const city = String(loc?.city ?? "").trim() || String(job?.city ?? "").trim();
+  const state = String(loc?.state ?? "").trim();
+  const zip = String(loc?.zip ?? "").trim();
+
+  const cityStateZip = [city, [state, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  return [line1, line2, cityStateZip].filter(Boolean).join(", ");
+}
+
+function buildCustomerScheduledEmailHtml(args: {
+  customerName: string;
+  customerPhone: string | null;
+  customerEmail: string;
+  serviceAddress: string;
+  scheduledDate: string;
+  scheduledWindow: string;
+  serviceType: string | null;
+}) {
+  const details: string[] = [
+    `<li><strong>Customer:</strong> ${escapeHtml(args.customerName)}</li>`,
+    `<li><strong>Service Address:</strong> ${escapeHtml(args.serviceAddress)}</li>`,
+    `<li><strong>Scheduled Date:</strong> ${escapeHtml(args.scheduledDate)}</li>`,
+    `<li><strong>Time Window:</strong> ${escapeHtml(args.scheduledWindow)}</li>`,
+  ];
+
+  if (args.serviceType) {
+    details.push(`<li><strong>Service Type:</strong> ${escapeHtml(args.serviceType)}</li>`);
+  }
+
+  details.push(`<li><strong>Customer Email:</strong> ${escapeHtml(args.customerEmail)}</li>`);
+
+  if (args.customerPhone) {
+    details.push(`<li><strong>Customer Phone:</strong> ${escapeHtml(args.customerPhone)}</li>`);
+  }
+
+  return renderSystemEmailLayout({
+    title: "Your Job Is Scheduled",
+    bodyHtml: `
+      <p style="margin: 0 0 12px 0;">Your upcoming service has been scheduled.</p>
+      <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
+      <p style="margin: 0 0 12px 0;">Please ensure someone 18+ can provide access to the service location during the scheduled time window.</p>
+      <p style="margin: 0;">If you need to make changes, please contact us as soon as possible.</p>
+    `,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -3485,6 +3548,79 @@ export async function updateJobScheduleFromForm(formData: FormData) {
       },
     },
   });
+
+  if (event_type === "scheduled") {
+    const { data: scheduledJob, error: scheduledJobErr } = await supabase
+      .from("jobs")
+      .select(
+        `
+        id,
+        job_type,
+        customer_first_name,
+        customer_last_name,
+        customer_phone,
+        customer_email,
+        job_address,
+        city,
+        scheduled_date,
+        window_start,
+        window_end,
+        locations:location_id (address_line1, address_line2, city, state, zip)
+        `
+      )
+      .eq("id", id)
+      .single();
+
+    if (scheduledJobErr) {
+      console.error("Customer scheduled email job snapshot failed:", scheduledJobErr);
+    } else {
+      const customerEmail = String(scheduledJob?.customer_email ?? "").trim().toLowerCase();
+
+      if (customerEmail) {
+        const customerName =
+          [
+            String(scheduledJob?.customer_first_name ?? "").trim(),
+            String(scheduledJob?.customer_last_name ?? "").trim(),
+          ]
+            .filter(Boolean)
+            .join(" ") || "Customer";
+
+        const customerPhone = String(scheduledJob?.customer_phone ?? "").trim() || null;
+        const serviceAddress = formatServiceAddress(scheduledJob) || "Address not available";
+        const scheduledDateText = formatBusinessDateUS(String(scheduledJob?.scheduled_date ?? "").trim()) || "Not available";
+        const scheduledWindowText =
+          displayWindowLA(
+            String(scheduledJob?.window_start ?? "").trim() || null,
+            String(scheduledJob?.window_end ?? "").trim() || null,
+          ) || "Not available";
+
+        const serviceTypeRaw = String(scheduledJob?.job_type ?? "").trim();
+        const serviceType = serviceTypeRaw ? toTitleCase(serviceTypeRaw) : null;
+
+        try {
+          await sendEmail({
+            to: customerEmail,
+            subject: "Job Scheduled - Compliance Matters",
+            html: buildCustomerScheduledEmailHtml({
+              customerName,
+              customerPhone,
+              customerEmail,
+              serviceAddress,
+              scheduledDate: scheduledDateText,
+              scheduledWindow: scheduledWindowText,
+              serviceType,
+            }),
+          });
+        } catch (error) {
+          console.error("Customer scheduled email send failed:", {
+            jobId: id,
+            customerEmail,
+            error: error instanceof Error ? error.message : "Unknown send error",
+          });
+        }
+      }
+    }
+  }
 
   revalidatePath(`/jobs/${id}`);
   revalidatePath(`/ops`);
