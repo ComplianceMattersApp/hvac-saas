@@ -445,7 +445,9 @@ export async function sendContractorReport(input: {
   });
 
   const contractorEmail = String((job as any)?.contractors?.email ?? "").trim().toLowerCase();
-  const subject = `Compliance Matters Report - Action Required`;
+  const customerName = String(report.customer_name ?? "").trim() || "Customer";
+  const jobAddress = String(report.location_text ?? "").trim() || "Location not available";
+  const subject = `Compliance Matters Report – ${customerName} – ${jobAddress}`;
 
   if (!contractorEmail) {
     await insertContractorReportEmailDeliveryNotification({
