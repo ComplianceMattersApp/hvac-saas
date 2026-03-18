@@ -203,48 +203,32 @@ export default async function PortalAllJobsPage() {
       return bResolved - aResolved;
     });
 
-  function issueLine(issue: ContractorIssue): string {
-    if (issue.group === "needs_info") {
-      return `Need information from you - ${issue.headline}`;
-    }
-    return issue.headline;
-  }
-
-  function cardIssueLines(input: {
+  function cardDetailLine(input: {
     primaryIssue: ContractorIssue;
     secondaryIssues?: ContractorIssue[];
   }) {
-    const lines: string[] = [];
 
     const failedIssue =
       input.primaryIssue.group === "failed"
         ? input.primaryIssue
         : (input.secondaryIssues ?? []).find((issue) => issue.group === "failed");
 
-    const hasSpecificFailedReason = (failedIssue?.detailLines ?? []).length > 0;
-
-    if (!(input.primaryIssue.group === "failed" && hasSpecificFailedReason)) {
-      lines.push(issueLine(input.primaryIssue));
+    const firstFailure = String((failedIssue?.detailLines ?? [])[0] ?? "").trim();
+    if (firstFailure) {
+      return firstFailure.toLowerCase().startsWith("failed") ? firstFailure : `Failed - ${firstFailure}`;
     }
 
-    const secondaryBlocker = (input.secondaryIssues ?? []).find(
-      (issue) => issue.group === "needs_info" || issue.group === "failed"
-    );
+    const needsInfoIssue =
+      input.primaryIssue.group === "needs_info"
+        ? input.primaryIssue
+        : (input.secondaryIssues ?? []).find((issue) => issue.group === "needs_info");
 
-    if (
-      secondaryBlocker &&
-      !(secondaryBlocker.group === "failed" && hasSpecificFailedReason)
-    ) {
-      lines.push(issueLine(secondaryBlocker));
+    const needsInfoHeadline = String(needsInfoIssue?.headline ?? "").trim();
+    if (needsInfoHeadline) {
+      return `Missing info: ${needsInfoHeadline}`;
     }
 
-    const failureLines = (failedIssue?.detailLines ?? []).slice(0, 1);
-    for (const reason of failureLines) {
-      if (lines.length >= 3) break;
-      lines.push(`Failed - ${reason}`);
-    }
-
-    return lines.slice(0, 3);
+    return "";
   }
 
   function customerName(job: any) {
@@ -292,17 +276,15 @@ export default async function PortalAllJobsPage() {
 
   function nextStepText(row: { job: any; resolved: any; openRetestChild?: any }) {
     const lifecycle = String(row.job.status ?? "").trim().toLowerCase();
-    if (row.resolved?.retestState === "scheduled" || row.resolved?.retestState === "pending_scheduling") {
-      return `Next step: ${String(row.resolved?.nextStep ?? "")}`;
+    const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
+    if (row.resolved?.retestState === "scheduled" || row.resolved?.bucket === "passed") return "Next step: No Immediate Action";
+    if (ops === "pending_info" || row.resolved?.primaryIssue?.group === "needs_info") return "Next step: Provide Requested Information";
+    if (ops === "failed" || ops === "retest_needed" || row.resolved?.primaryIssue?.group === "failed") return "Next step: Await Contractor Correction";
+    if (["paperwork_required", "invoice_required"].includes(ops)) return "Next step: Finish Closeout";
+    if (row.resolved?.retestState === "pending_scheduling" || lifecycle === "on_the_way" || lifecycle === "in_progress" || ops === "scheduled") {
+      return "Next step: Await Scheduled Visit";
     }
-    if (lifecycle === "on_the_way") return "Next step: Technician is on the way.";
-    if (lifecycle === "in_progress") return "Next step: Work is currently underway.";
-    if (row.resolved.bucket === "action_required") {
-      return `Next step: ${row.resolved.primaryIssue?.explanation ?? row.resolved.primaryIssue?.headline ?? "Action required."}`;
-    }
-    if (String(row.job.ops_status ?? "").trim().toLowerCase() === "scheduled") return "Next step: Await scheduled visit.";
-    if (row.resolved.bucket === "passed") return "Next step: Final processing is underway.";
-    return "Next step: Monitor job progress.";
+    return "Next step: No Immediate Action";
   }
 
   return (
@@ -328,11 +310,11 @@ export default async function PortalAllJobsPage() {
         </div>
       </div>
 
-      {/* Action Required */}
+      {/* Needs Attention */}
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {labelWithCount("Action Required", actionRequiredJobs.length)}
+            {labelWithCount("Needs Attention", actionRequiredJobs.length)}
           </h2>
           <div className="text-sm text-gray-600 dark:text-gray-300">
             Failed and missing-information items are prioritized.
@@ -343,19 +325,15 @@ export default async function PortalAllJobsPage() {
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {actionRequiredJobs.map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
-              const isUrgent =
-                Boolean(resolved?.actionRequired) &&
-                !!j.follow_up_date && String(j.follow_up_date) <= String(today);
-              const displayLines = cardIssueLines(resolved);
+              const detailLine = cardDetailLine(resolved);
               const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
               return (
                 <Link
                   key={j.id}
                   href={`/portal/jobs/${j.id}`}
                   className={[
-                    "block border-l-4 p-4 transition-all duration-150 border-l-transparent",
+                    "block p-4 transition-all duration-150",
                     "hover:bg-gray-50 hover:shadow-sm dark:hover:bg-gray-800/40",
-                    isUrgent ? "border-l-red-500" : "",
                   ].join(" ")}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -375,18 +353,13 @@ export default async function PortalAllJobsPage() {
                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
                           {statusMeta.label}
                         </span>
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${isUrgent ? "border-red-200 bg-red-50 text-red-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
-                          {resolved?.actionRequired ? "Action Required" : "No Immediate Action"}
-                        </span>
                       </div>
                       <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
                         {nextStepText({ job: j, resolved, openRetestChild })}
                       </div>
-                      <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
-                        {displayLines.map((line, idx) => (
-                          <div key={`${j.id}-line-${idx}`}>{line}</div>
-                        ))}
-                      </div>
+                      {detailLine ? (
+                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{detailLine}</div>
+                      ) : null}
                     </div>
                     <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
                       {j.scheduled_date
@@ -401,7 +374,7 @@ export default async function PortalAllJobsPage() {
             {actionRequiredJobs.length === 0 && (
               <div className="p-8 text-center">
                 <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  No action-required jobs.
+                  No jobs need attention.
                 </div>
                 <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   New failed or pending-info jobs will appear here.
@@ -427,7 +400,7 @@ export default async function PortalAllJobsPage() {
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {inProgressJobs.map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
-              const displayLines = cardIssueLines(resolved);
+              const detailLine = cardDetailLine(resolved);
               const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
               return (
                 <Link
@@ -450,18 +423,13 @@ export default async function PortalAllJobsPage() {
                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
                           {statusMeta.label}
                         </span>
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${resolved?.actionRequired ? "border-red-200 bg-red-50 text-red-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
-                          {resolved?.actionRequired ? "Action Required" : "No Immediate Action"}
-                        </span>
                       </div>
                       <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
                         {nextStepText({ job: j, resolved, openRetestChild })}
                       </div>
-                      <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
-                        {displayLines.map((line, idx) => (
-                          <div key={`${j.id}-inprogress-line-${idx}`}>{line}</div>
-                        ))}
-                      </div>
+                      {detailLine ? (
+                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{detailLine}</div>
+                      ) : null}
                     </div>
                     <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
                       {j.scheduled_date
@@ -503,7 +471,8 @@ export default async function PortalAllJobsPage() {
             {passedJobs.map(({ job: j, resolved }) => {
               const resolvedAt = j.data_entry_completed_at ?? j.created_at;
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
-              const displayLines = cardIssueLines(resolved);
+              const detailLine = cardDetailLine(resolved);
+              const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
               return (
                 <Link
                   key={j.id}
@@ -521,14 +490,17 @@ export default async function PortalAllJobsPage() {
                       <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                         {displayAddress(j)}
                       </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
+                          {statusMeta.label}
+                        </span>
+                      </div>
                       <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
                         {nextStepText({ job: j, resolved, openRetestChild })}
                       </div>
-                      <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
-                        {displayLines.map((line, idx) => (
-                          <div key={`${j.id}-passed-line-${idx}`}>{line}</div>
-                        ))}
-                      </div>
+                      {detailLine ? (
+                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{detailLine}</div>
+                      ) : null}
                     </div>
                     <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
                       {resolvedAt

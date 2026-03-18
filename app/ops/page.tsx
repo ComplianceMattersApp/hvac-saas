@@ -717,25 +717,25 @@ function hasOpenRetestChild(jobId: string, jobs: any[]) {
 
 function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJob?: boolean; scheduledRetest?: boolean }) {
   const status = String(j?.ops_status ?? "").toLowerCase();
+  const lifecycle = String(j?.status ?? "").toLowerCase();
   const retestState = retestStateForJob(String(j?.id ?? ""));
   const needs = getCloseoutNeeds(j);
 
   if (opts?.scheduledRetest) return "No Immediate Action";
-  if (retestState === "pending_scheduling") return "Schedule Retest";
-  if (status === "failed" && opts?.retestReady) return "Create Retest Job";
-  if (status === "failed") return "Await Contractor Correction";
-  if (status === "retest_needed") return "Await Contractor Retest";
-  if (status === "need_to_schedule" && opts?.newContractorJob) return "Review & Schedule";
-  if (status === "need_to_schedule") return "Schedule Visit";
-  if (status === "pending_info") return "Get Missing Info";
-  if (status === "on_hold") return "Review Hold Reason";
-  if (needs.needsInvoice && needs.needsCerts) return "Finish Closeout";
-  if (needs.needsCerts) return "Send Certs";
-  if (needs.needsInvoice) return "Send Invoice";
-  if (status === "exception") return "Resolve Exception";
-  if (status === "scheduled") return "Prepare for Visit";
+  if (status === "pending_info" || status === "on_hold") return "Provide Requested Information";
+  if (status === "failed" || status === "retest_needed") return "Await Contractor Correction";
+  if (needs.needsInvoice || needs.needsCerts) return "Finish Closeout";
+  if (
+    status === "scheduled" ||
+    status === "need_to_schedule" ||
+    lifecycle === "on_the_way" ||
+    lifecycle === "in_progress" ||
+    retestState === "pending_scheduling"
+  ) {
+    return "Await Scheduled Visit";
+  }
 
-  return "Open Job";
+  return "No Immediate Action";
 }
 
 function signalReason(j: any, opts?: { retestReady?: boolean; newContractorJob?: boolean; scheduledRetest?: boolean }) {
@@ -1318,11 +1318,6 @@ function compactRow(j: any, showDate = false, note?: string) {
   const scheduledRetestLabel = retestScheduleLabelForJob(jobId);
   const lifecycleStatus = String(j?.status ?? "").toLowerCase();
   const opsStatus = String(j?.ops_status ?? "").toLowerCase();
-  const activeFieldStatus = lifecycleStatus === "on_the_way"
-    ? { label: "On the Way", tone: "border-sky-300 bg-sky-100 text-sky-900" }
-    : lifecycleStatus === "in_progress"
-    ? { label: "In Progress", tone: "border-blue-300 bg-blue-100 text-blue-900" }
-    : null;
   const statusMeta = retestState === "pending_scheduling"
     ? { label: "Retest Pending Scheduling", tone: "border-amber-200 bg-amber-50 text-amber-800" }
     : scheduledRetestLabel
@@ -1336,19 +1331,20 @@ function compactRow(j: any, showDate = false, note?: string) {
     : opsStatus === "scheduled"
     ? { label: "Scheduled", tone: "border-slate-200 bg-slate-50 text-slate-800" }
     : { label: "Open", tone: "border-slate-200 bg-slate-50 text-slate-800" };
-  const isImmediateActionRequired =
-    retestState !== "scheduled" && ["failed", "retest_needed", "pending_info", "need_to_schedule", "on_hold"].includes(opsStatus);
-  const nextStep = retestState === "pending_scheduling"
-    ? "Retest needs to be scheduled"
-    : scheduledRetestLabel
-    ? "Await retest visit"
-    : nextActionLabel(j, {
+  const nextStep = nextActionLabel(j, {
         retestReady: hasSignalEventForJob(latestRetestReadyByJob, jobId),
         newContractorJob:
           String(j?.ops_status ?? "").toLowerCase() === "need_to_schedule" &&
           hasSignalEventForJob(latestContractorCreatedByJob, jobId),
         scheduledRetest: !!scheduledRetestLabel,
       });
+  const noteText = String(note ?? "").trim();
+  const nextStepNorm = nextStep.toLowerCase();
+  const detailLine = scheduledRetestLabel
+    ? `Retest scheduled for ${scheduledRetestLabel}`
+    : noteText && noteText.toLowerCase() !== nextStepNorm
+    ? noteText
+    : "";
 
   return (
     <div key={j.id} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
@@ -1360,33 +1356,20 @@ function compactRow(j: any, showDate = false, note?: string) {
           >
             {j.title}
           </Link>
-          {activeFieldStatus ? (
-            <div className="mt-1">
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${activeFieldStatus.tone}`}>
-                <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
-                {activeFieldStatus.label}
-              </span>
-            </div>
-          ) : null}
           <div className="mt-0.5 text-xs font-medium text-gray-700">{customerNameOnly(j)} • {customerPhoneOnly(j) || "-"}</div>
           <div className="text-xs text-gray-600">Contractor: {contractorNameOnly(j)}</div>
           <div className="text-xs text-gray-500">{addressLine(j)}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-            {!activeFieldStatus ? (
-              <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
-                {statusMeta.label}
-              </span>
-            ) : null}
-            <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${isImmediateActionRequired ? "border-red-200 bg-red-50 text-red-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
-              {isImmediateActionRequired ? "Action Required" : "No Immediate Action"}
+            <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
+              {statusMeta.label}
             </span>
           </div>
           <div className="mt-1 text-xs font-medium text-gray-700">
-            {scheduledRetestLabel ? `Retest scheduled for ${scheduledRetestLabel}` : `Next step: ${nextStep}`}
+            {`Next step: ${nextStep}`}
           </div>
-          {note ? (
-            <div className="mt-1.5 inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
-              {note}
+          {detailLine ? (
+            <div className="mt-1 text-xs text-gray-600">
+              {detailLine}
             </div>
           ) : null}
         </div>
