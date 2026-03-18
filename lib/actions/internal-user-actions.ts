@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
 import {
   requireInternalRole,
   type InternalRole,
@@ -325,7 +326,9 @@ export async function inviteInternalUserFromForm(formData: FormData): Promise<vo
   let targetUserId: string | null = null;
   let inviteRequested = false;
 
-  const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email);
+  const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo: resolveInviteRedirectTo(),
+  });
 
   if (!inviteError) {
     targetUserId = inviteData?.user?.id ? String(inviteData.user.id) : null;

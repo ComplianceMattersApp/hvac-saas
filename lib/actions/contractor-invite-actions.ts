@@ -2,15 +2,10 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { sendInviteEmail } from "@/lib/email/smtp";
+import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
-}
-
-function requireAppUrl() {
-  const url = process.env.NEXT_PUBLIC_APP_URL;
-  if (!url) throw new Error("Missing NEXT_PUBLIC_APP_URL");
-  return url.replace(/\/$/, "");
 }
 
 export async function inviteContractor(args: {
@@ -99,14 +94,14 @@ export async function inviteContractor(args: {
 
   // 3) Generate invite link (admin) but send via SMTP ourselves
   const admin = createAdminClient();
-  const appUrl = requireAppUrl();
+  const redirectTo = resolveInviteRedirectTo();
 
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
     type: "invite",
     email,
     options: {
       // Where Supabase sends the user after they click the invite + finish auth
-      redirectTo: `${appUrl}/auth/callback`,
+      redirectTo,
       // This is the magic: trigger reads these values on auth.users insert
       data: {
         contractor_id: contractorId,
