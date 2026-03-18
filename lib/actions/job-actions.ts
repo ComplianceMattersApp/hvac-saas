@@ -1830,6 +1830,109 @@ export async function updateJobContractorFromForm(formData: FormData) {
   revalidatePath("/jobs");
 }
 
+export async function assignJobAssigneeFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const userId = String(formData.get("user_id") || "").trim();
+  const makePrimary = String(formData.get("make_primary") || "").trim() === "1";
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!userId) throw new Error("Missing user_id");
+
+  const supabase = await createClient();
+  const { userId: actorUserId } = await requireInternalUser({ supabase });
+
+  const { data: jobExists, error: jobErr } = await supabase
+    .from("jobs")
+    .select("id")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+  if (!jobExists?.id) throw new Error("Job not found");
+
+  await ensureActiveAssignmentForUser({
+    supabase,
+    jobId,
+    userId,
+    actorUserId,
+  });
+
+  if (makePrimary) {
+    await setPrimaryJobAssignment({
+      supabase,
+      jobId,
+      userId,
+      actorUserId,
+    });
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/ops");
+  revalidatePath("/ops/field");
+}
+
+export async function setPrimaryJobAssigneeFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const userId = String(formData.get("user_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!userId) throw new Error("Missing user_id");
+
+  const supabase = await createClient();
+  const { userId: actorUserId } = await requireInternalUser({ supabase });
+
+  const { data: jobExists, error: jobErr } = await supabase
+    .from("jobs")
+    .select("id")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+  if (!jobExists?.id) throw new Error("Job not found");
+
+  await setPrimaryJobAssignment({
+    supabase,
+    jobId,
+    userId,
+    actorUserId,
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/ops");
+  revalidatePath("/ops/field");
+}
+
+export async function removeJobAssigneeFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const userId = String(formData.get("user_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!userId) throw new Error("Missing user_id");
+
+  const supabase = await createClient();
+  const { userId: actorUserId } = await requireInternalUser({ supabase });
+
+  const { data: jobExists, error: jobErr } = await supabase
+    .from("jobs")
+    .select("id")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+  if (!jobExists?.id) throw new Error("Job not found");
+
+  await softRemoveJobAssignment({
+    supabase,
+    jobId,
+    userId,
+    removedBy: actorUserId,
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/ops");
+  revalidatePath("/ops/field");
+}
+
 /** =========================
  * SAVE: REFRIGERANT CHARGE
  * - merges existing data

@@ -12,6 +12,9 @@ import FlashBanner from "@/components/ui/FlashBanner";
 import { archiveJobFromForm } from "@/lib/actions/job-actions";
 import {
   getContractors,
+  assignJobAssigneeFromForm,
+  setPrimaryJobAssigneeFromForm,
+  removeJobAssigneeFromForm,
   updateJobCustomerFromForm,
   updateJobContractorFromForm,
   updateJobScheduleFromForm,
@@ -44,6 +47,7 @@ import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import ContractorReportPanel from "./_components/ContractorReportPanel";
 import { resolveContractorResponseTracking } from "@/lib/portal/resolveContractorIssues";
 import {
+  getAssignableInternalUsers,
   getActiveJobAssignmentDisplayMap,
   resolveUserDisplayMap,
 } from "@/lib/staffing/human-layer";
@@ -488,6 +492,20 @@ export default async function JobDetailPage({
 
   const assignedTeam =
     activeAssignmentDisplayMap[String(job.id ?? jobId)] ?? [];
+
+  const assignableInternalUsers = isInternalUser
+    ? await getAssignableInternalUsers({ supabase })
+    : [];
+
+  const assignedUserIds = new Set(
+    assignedTeam
+      .map((row) => String(row.user_id ?? "").trim())
+      .filter(Boolean),
+  );
+
+  const assignmentCandidates = assignableInternalUsers.filter(
+    (row) => !assignedUserIds.has(String(row.user_id ?? "").trim()),
+  );
 
   // --- Linked Jobs (Parent + Children) ---
 const parentJobId = (job as any).parent_job_id as string | null;
@@ -1219,12 +1237,73 @@ const renderTimelineItem = (e: any, key: string) => {
                   Primary
                 </span>
               ) : null}
+
+              {isInternalUser && !assignee.is_primary ? (
+                <form action={setPrimaryJobAssigneeFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="user_id" value={assignee.user_id} />
+                  <button
+                    type="submit"
+                    className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+                  >
+                    Make Primary
+                  </button>
+                </form>
+              ) : null}
+
+              {isInternalUser ? (
+                <form action={removeJobAssigneeFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="user_id" value={assignee.user_id} />
+                  <button
+                    type="submit"
+                    className="rounded-full border border-red-300 bg-white px-2 py-0.5 text-[11px] font-medium text-red-700 hover:bg-red-50"
+                  >
+                    Remove
+                  </button>
+                </form>
+              ) : null}
             </div>
           ))}
         </div>
       ) : (
         <div className="mt-1 text-sm text-gray-500">Unassigned</div>
       )}
+
+      {isInternalUser ? (
+        <form action={assignJobAssigneeFromForm} className="mt-3 flex flex-wrap items-center gap-2">
+          <input type="hidden" name="job_id" value={job.id} />
+          <select
+            name="user_id"
+            className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+            required
+            defaultValue=""
+            disabled={assignmentCandidates.length === 0}
+          >
+            <option value="" disabled>
+              {assignmentCandidates.length === 0 ? "No available assignees" : "Select assignee"}
+            </option>
+            {assignmentCandidates.map((candidate) => (
+              <option key={candidate.user_id} value={candidate.user_id}>
+                {candidate.display_name}
+              </option>
+            ))}
+          </select>
+
+          <label className="inline-flex items-center gap-1 text-xs text-gray-600">
+            <input type="checkbox" name="make_primary" value="1" className="h-3.5 w-3.5" />
+            Set as primary
+          </label>
+
+          <button
+            type="submit"
+            disabled={assignmentCandidates.length === 0}
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Assign
+          </button>
+        </form>
+      ) : null}
     </div>
 
     <div className="flex flex-wrap items-center gap-2 pt-1">
