@@ -406,3 +406,63 @@ export async function inviteInternalUserFromForm(formData: FormData): Promise<vo
       : "/ops/admin/internal-users?invite_status=attached_existing_auth",
   );
 }
+
+export async function deleteInternalUserFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const { internalUser: actorInternalUser } = await requireInternalRole(
+    "admin",
+    { supabase },
+  );
+
+  const admin = createAdminClient();
+
+  const targetUserId = String(formData.get("user_id") ?? "").trim();
+  if (!targetUserId) {
+    throw new Error("MISSING_TARGET_USER_ID");
+  }
+
+  const target = await requireScopedTarget(
+    admin,
+    actorInternalUser.account_owner_user_id,
+    targetUserId,
+  );
+
+  // Prevent deletion of last active admin
+  if (target.role === "admin" && target.is_active) {
+    const activeAdminCount = await countActiveAdmins(
+      admin,
+      target.account_owner_user_id,
+    );
+    if (activeAdminCount <= 1) {
+      throw new Error("CANNOT_DELETE_LAST_ACTIVE_ADMIN");
+    }
+  }
+
+  // Check for active assignments
+  const { data: activeAssignments, error: assignmentError } = await admin
+    .from("job_assignments")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", targetUserId)
+    .eq("is_active", true);
+
+  if (assignmentError) throw assignmentError;
+
+  if ((activeAssignments?.length ?? 0) > 0) {
+    throw new Error(
+      "CANNOT_DELETE_USER_WITH_ACTIVE_ASSIGNMENTS",
+    );
+  }
+
+  // Delete the internal user record
+  const { error: deleteError } = await admin
+    .from("internal_users")
+    .delete()
+    .eq("user_id", targetUserId)
+    .eq("account_owner_user_id", actorInternalUser.account_owner_user_id)
+    .select("user_id")
+    .single();
+
+  if (deleteError) throw deleteError;
+
+  revalidateInternalUserViews();
+}

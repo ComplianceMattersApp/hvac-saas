@@ -49,9 +49,9 @@ export default async function OpsAdminPage() {
     },
     {
       title: "Contractors",
-      description: "Future admin tools for contractor account controls.",
-      href: "#",
-      enabled: false,
+      description: "Manage contractor organizations and team membership.",
+      href: "/ops/admin/contractors",
+      enabled: true,
     },
     {
       title: "Access",

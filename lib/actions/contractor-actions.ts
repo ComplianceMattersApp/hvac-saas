@@ -125,3 +125,69 @@ export async function updateContractorFromForm(formData: FormData) {
   revalidatePath("/ops");
   redirect(`/contractors/${contractor_id}/edit?saved=1`);
 }
+
+export async function updateContractorNameAndEmailFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalRole("admin", {
+    supabase,
+  });
+
+  const contractor_id = String(formData.get("contractor_id") ?? "").trim();
+  if (!contractor_id) throw new Error("Missing contractor_id");
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) throw new Error("Contractor name is required.");
+
+  const email = String(formData.get("email") ?? "").trim() || null;
+
+  const { data: existingContractor, error: existingContractorError } = await supabase
+    .from("contractors")
+    .select("id, owner_user_id")
+    .eq("id", contractor_id)
+    .maybeSingle();
+
+  if (existingContractorError) throw new Error(existingContractorError.message);
+  if (!existingContractor?.id) throw new Error("Contractor not found");
+
+  if (existingContractor.owner_user_id !== internalUser.account_owner_user_id) {
+    throw new Error("Access denied");
+  }
+
+  const { error } = await supabase
+    .from("contractors")
+    .update({
+      name,
+      email,
+    })
+    .eq("id", contractor_id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/ops/admin/contractors");
+}
+
+export async function createQuickContractorFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalRole("admin", {
+    supabase,
+  });
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) throw new Error("Contractor name is required.");
+
+  const email = String(formData.get("email") ?? "").trim() || null;
+
+  const { data, error } = await supabase
+    .from("contractors")
+    .insert({
+      name,
+      email,
+      owner_user_id: internalUser.account_owner_user_id,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/ops/admin/contractors");
+}

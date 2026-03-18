@@ -11,6 +11,7 @@ import {
   activateInternalUserFromForm,
   createInternalUserFromForm,
   deactivateInternalUserFromForm,
+  deleteInternalUserFromForm,
   inviteInternalUserFromForm,
   updateInternalUserRoleFromForm,
 } from "@/lib/actions/internal-user-actions";
@@ -294,6 +295,29 @@ export default async function AdminInternalUsersPage({
                         </button>
                       </form>
                     )}
+
+                    {!row.is_active ? (
+                      <form
+                        action={deleteInternalUserFromForm}
+                        onSubmit={(e) => {
+                          if (
+                            !confirm(
+                              `Are you sure you want to permanently delete ${displayName}? This cannot be undone.`,
+                            )
+                          ) {
+                            e.preventDefault();
+                          }
+                        }}
+                      >
+                        <input type="hidden" name="user_id" value={row.user_id} />
+                        <button
+                          type="submit"
+                          className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      </form>
+                    ) : null}
                   </div>
                 </div>
               </div>
