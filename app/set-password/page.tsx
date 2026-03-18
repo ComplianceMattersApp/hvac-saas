@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export default function SetPasswordPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -19,18 +23,25 @@ export default function SetPasswordPage() {
     let isMounted = true;
 
     async function ensureSession() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      // Invite session hand-off can arrive slightly after initial hydration.
+      // Retry getUser briefly before deciding session is missing.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (!isMounted) return;
+        if (!isMounted) return;
 
-      if (!session) {
-        router.replace("/login");
-        return;
+        if (user) {
+          setCheckingSession(false);
+          return;
+        }
+
+        await sleep(250);
       }
 
-      setCheckingSession(false);
+      if (!isMounted) return;
+      router.replace("/login");
     }
 
     void ensureSession();

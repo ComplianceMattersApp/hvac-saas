@@ -69,6 +69,11 @@ const INVITE_STATUS_TEXT: Record<string, { tone: "success" | "warn" | "error"; m
     tone: "warn",
     message: "That email has already been invited. Ask the user to check their email.",
   },
+  email_rate_limited: {
+    tone: "warn",
+    message:
+      "Invite email limit reached. Please wait a few minutes and try again.",
+  },
   already_internal_other_owner: {
     tone: "error",
     message: "That auth user is already linked to a different internal account owner.",

@@ -2,16 +2,37 @@ import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
-function redirectUrl(requestUrl: string, path: string) {
+function redirectUrl(requestUrl: string, path: string, query?: Record<string, string>) {
   const url = new URL(requestUrl);
   url.pathname = path;
   url.search = "";
+  if (query) {
+    for (const [key, value] of Object.entries(query)) {
+      url.searchParams.set(key, value);
+    }
+  }
   return url;
 }
 
-function shouldRequirePasswordSetup(type: string | null): boolean {
+function shouldRequirePasswordSetup(params: {
+  type: string | null;
+  code: string | null;
+  tokenHash: string | null;
+}): boolean {
+  const { type, code, tokenHash } = params;
   const normalized = String(type ?? "").trim().toLowerCase();
-  return normalized === "invite" || normalized === "recovery";
+
+  if (normalized === "invite" || normalized === "recovery") return true;
+
+  // Some invite links arrive as PKCE code callbacks without type.
+  // In this app, /auth/callback is dedicated to email invite/recovery completion.
+  if (code) return true;
+
+  // Token-hash callbacks without a recognized type should still continue
+  // through password setup after successful verification.
+  if (tokenHash) return true;
+
+  return false;
 }
 
 export async function GET(request: Request) {
@@ -48,8 +69,10 @@ export async function GET(request: Request) {
     return NextResponse.redirect(redirectUrl(request.url, "/login"));
   }
 
-  if (shouldRequirePasswordSetup(type)) {
-    return NextResponse.redirect(redirectUrl(request.url, "/set-password"));
+  if (shouldRequirePasswordSetup({ type, code, tokenHash })) {
+    return NextResponse.redirect(
+      redirectUrl(request.url, "/set-password", { mode: "invite" }),
+    );
   }
 
   const { data: cu, error: cuErr } = await supabase

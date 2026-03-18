@@ -53,6 +53,18 @@ function isAlreadyExistsAuthError(error: any) {
   return msg.includes("already") || msg.includes("exists") || msg.includes("registered");
 }
 
+function isInviteRateLimitError(error: any) {
+  const code = String(error?.code ?? "").trim().toLowerCase();
+  const status = Number(error?.status ?? 0);
+  const msg = String(error?.message ?? "").trim().toLowerCase();
+
+  return (
+    code === "over_email_send_rate_limit" ||
+    status === 429 ||
+    msg.includes("rate limit")
+  );
+}
+
 function normalizeInternalUserRecord(data: any): InternalUserRecord | null {
   if (!data?.user_id || !data?.account_owner_user_id) return null;
   if (data.role !== "admin" && data.role !== "office" && data.role !== "tech") {
@@ -333,6 +345,8 @@ export async function inviteInternalUserFromForm(formData: FormData): Promise<vo
   if (!inviteError) {
     targetUserId = inviteData?.user?.id ? String(inviteData.user.id) : null;
     inviteRequested = true;
+  } else if (isInviteRateLimitError(inviteError)) {
+    redirect("/ops/admin/internal-users?invite_status=email_rate_limited");
   } else if (isAlreadyExistsAuthError(inviteError)) {
     targetUserId = await getAuthUserIdByEmail(admin, email);
 
