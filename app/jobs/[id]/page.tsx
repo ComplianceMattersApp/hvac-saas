@@ -43,7 +43,10 @@ import UnscheduleButton from "./_components/UnscheduleButton";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import ContractorReportPanel from "./_components/ContractorReportPanel";
 import { resolveContractorResponseTracking } from "@/lib/portal/resolveContractorIssues";
-import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
+import {
+  getActiveJobAssignmentDisplayMap,
+  resolveUserDisplayMap,
+} from "@/lib/staffing/human-layer";
 
 import JobAttachmentsInternal from "./_components/JobAttachmentsInternal";
 
@@ -477,6 +480,14 @@ export default async function JobDetailPage({
     .single();
 
   if (jobError || !job) return notFound();
+
+  const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
+    supabase,
+    jobIds: [String(job.id ?? jobId)],
+  });
+
+  const assignedTeam =
+    activeAssignmentDisplayMap[String(job.id ?? jobId)] ?? [];
 
   // --- Linked Jobs (Parent + Children) ---
 const parentJobId = (job as any).parent_job_id as string | null;
@@ -1192,6 +1203,29 @@ const renderTimelineItem = (e: any, key: string) => {
       )}
       {contractorName && contractorName !== "—" ? ` • Contractor: ${contractorName}` : ""}
     </p>
+
+    <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+      <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Assigned Team</div>
+      {assignedTeam.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {assignedTeam.map((assignee) => (
+            <div
+              key={`${assignee.job_id}-${assignee.user_id}`}
+              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-800"
+            >
+              <span>{assignee.display_name}</span>
+              {assignee.is_primary ? (
+                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                  Primary
+                </span>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-1 text-sm text-gray-500">Unassigned</div>
+      )}
+    </div>
 
     <div className="flex flex-wrap items-center gap-2 pt-1">
       <div className="rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700">

@@ -187,3 +187,79 @@ export async function resolveUserDisplayMap(params: {
 
   return map;
 }
+
+export type ActiveJobAssignmentDisplay = {
+  job_id: string;
+  user_id: string;
+  display_name: string;
+  is_primary: boolean;
+  created_at: string;
+};
+
+export async function getActiveJobAssignmentDisplayMap(params: {
+  jobIds: string[];
+  supabase?: any;
+}): Promise<Record<string, ActiveJobAssignmentDisplay[]>> {
+  const supabase = params.supabase ?? (await createClient());
+
+  const jobIds = Array.from(
+    new Set(
+      (params.jobIds ?? [])
+        .map((id) => String(id ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (!jobIds.length) return {};
+
+  const { data: rows, error } = await supabase
+    .from("job_assignments")
+    .select("job_id, user_id, is_primary, created_at")
+    .in("job_id", jobIds)
+    .eq("is_active", true);
+
+  if (error) throw error;
+
+  const userDisplayMap = await resolveUserDisplayMap({
+    supabase,
+    userIds: (rows ?? [])
+      .map((row: any) => String(row?.user_id ?? "").trim())
+      .filter(Boolean),
+  });
+
+  const map: Record<string, ActiveJobAssignmentDisplay[]> = {};
+
+  for (const row of rows ?? []) {
+    const jobId = String(row?.job_id ?? "").trim();
+    const userId = String(row?.user_id ?? "").trim();
+    if (!jobId || !userId) continue;
+
+    if (!map[jobId]) map[jobId] = [];
+
+    const resolved = String(userDisplayMap[userId] ?? "").trim();
+
+    map[jobId].push({
+      job_id: jobId,
+      user_id: userId,
+      display_name: resolved && resolved !== "User" ? resolved : "Unknown User",
+      is_primary: Boolean(row?.is_primary),
+      created_at: String(row?.created_at ?? ""),
+    });
+  }
+
+  for (const jobId of Object.keys(map)) {
+    map[jobId].sort((left, right) => {
+      const primaryDiff = Number(right.is_primary) - Number(left.is_primary);
+      if (primaryDiff !== 0) return primaryDiff;
+
+      const createdDiff = String(left.created_at).localeCompare(String(right.created_at));
+      if (createdDiff !== 0) return createdDiff;
+
+      return left.display_name.localeCompare(right.display_name, undefined, {
+        sensitivity: "base",
+      });
+    });
+  }
+
+  return map;
+}

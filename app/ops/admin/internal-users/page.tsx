@@ -6,6 +6,7 @@ import {
   type InternalRole,
 } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
+import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import {
   activateInternalUserFromForm,
   createInternalUserFromForm,
@@ -105,6 +106,13 @@ export default async function AdminInternalUsersPage({
     .order("created_at", { ascending: true });
 
   if (error) throw error;
+
+  const userDisplayMap = await resolveUserDisplayMap({
+    supabase,
+    userIds: (internalUsers ?? [])
+      .map((row: any) => String(row?.user_id ?? "").trim())
+      .filter(Boolean),
+  });
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 text-gray-900 sm:p-6">
@@ -210,13 +218,17 @@ export default async function AdminInternalUsersPage({
           {(internalUsers ?? []).map((row: any) => {
             const role = row.role as InternalRole;
             const isSelf = row.user_id === userId;
+            const displayName = (() => {
+              const resolved = String(userDisplayMap[String(row.user_id ?? "").trim()] ?? "").trim();
+              return resolved && resolved !== "User" ? resolved : "Unknown User";
+            })();
 
             return (
               <div key={row.user_id} className="px-4 py-4 sm:px-5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">{row.user_id}</span>
+                      <span className="text-sm font-medium text-gray-900">{displayName}</span>
                       <span
                         className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${roleBadgeTone(
                           role,

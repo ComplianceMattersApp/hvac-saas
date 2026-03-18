@@ -13,7 +13,7 @@ import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import { requireInternalUser } from "@/lib/auth/internal-user";
-import { renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
+import { renderSystemEmailLayout, escapeHtml, resolveAppUrl } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { assertAssignableInternalUser } from "@/lib/staffing/human-layer";
 import type { JobStatus } from "@/lib/types/job";
@@ -256,8 +256,58 @@ function buildCustomerScheduledEmailHtml(args: {
     bodyHtml: `
       <p style="margin: 0 0 12px 0;">Your upcoming service has been scheduled.</p>
       <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
-      <p style="margin: 0 0 12px 0;">Please ensure someone 18+ can provide access to the service location during the scheduled time window.</p>
+      <p style="margin: 0 0 12px 0;">Please ensure someone can provide access to the service location during the scheduled time window.</p>
       <p style="margin: 0;">If you need to make changes, please contact us as soon as possible.</p>
+    `,
+  });
+}
+
+function buildContractorScheduledEmailHtml(args: {
+  customerName: string;
+  customerPhone: string | null;
+  customerEmail: string | null;
+  serviceAddress: string;
+  scheduledDate: string;
+  scheduledWindow: string;
+  serviceType: string | null;
+  permitNumber: string | null;
+  portalJobUrl: string | null;
+}) {
+  const details: string[] = [
+    `<li><strong>Customer:</strong> ${escapeHtml(args.customerName)}</li>`,
+    `<li><strong>Service Address:</strong> ${escapeHtml(args.serviceAddress)}</li>`,
+    `<li><strong>Scheduled Date:</strong> ${escapeHtml(args.scheduledDate)}</li>`,
+    `<li><strong>Time Window:</strong> ${escapeHtml(args.scheduledWindow)}</li>`,
+  ];
+
+  if (args.customerPhone) {
+    details.push(`<li><strong>Customer Phone:</strong> ${escapeHtml(args.customerPhone)}</li>`);
+  }
+
+  if (args.customerEmail) {
+    details.push(`<li><strong>Customer Email:</strong> ${escapeHtml(args.customerEmail)}</li>`);
+  }
+
+  if (args.serviceType) {
+    details.push(`<li><strong>Service Type:</strong> ${escapeHtml(args.serviceType)}</li>`);
+  }
+
+  if (args.permitNumber) {
+    details.push(`<li><strong>Permit Number:</strong> ${escapeHtml(args.permitNumber)}</li>`);
+  }
+
+  const portalSection = args.portalJobUrl
+    ? `<p style="margin: 0 0 12px 0;">Portal Job Link: <a href="${escapeHtml(args.portalJobUrl)}">${escapeHtml(args.portalJobUrl)}</a></p>`
+    : "";
+
+  return renderSystemEmailLayout({
+    title: "Compliance Matters Schedule",
+    bodyHtml: `
+      <p style="margin: 0 0 12px 0;">A job has been scheduled.</p>
+      <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
+      <p style="margin: 0 0 12px 0;">Please ensure someone can provide access to the property and equipment if needed.</p>
+      ${portalSection}
+      <p style="margin: 0;">For questions or changes, please contact us directly.</p>
     `,
   });
 }
@@ -269,8 +319,6 @@ async function sendCustomerScheduledEmailForJob({
   supabase: any;
   jobId: string;
 }): Promise<void> {
-  console.log("[CUSTOMER SCHEDULE EMAIL DEBUG] helper start", { jobId });
-
   const { data: scheduledJob, error: scheduledJobErr } = await supabase
     .from("jobs")
     .select(
@@ -293,15 +341,12 @@ async function sendCustomerScheduledEmailForJob({
     .single();
 
   if (scheduledJobErr) {
-    console.error("[CUSTOMER SCHEDULE EMAIL DEBUG] job snapshot query failed", { jobId, error: scheduledJobErr });
+    console.error("Customer scheduled email job snapshot failed:", scheduledJobErr);
     return;
   }
 
   const customerEmail = String(scheduledJob?.customer_email ?? "").trim().toLowerCase();
-  if (!customerEmail) {
-    console.log("[CUSTOMER SCHEDULE EMAIL DEBUG] skipping — no customer_email on job", { jobId, customer_email: scheduledJob?.customer_email ?? null });
-    return;
-  }
+  if (!customerEmail) return;
 
   const customerName =
     [
@@ -327,20 +372,8 @@ async function sendCustomerScheduledEmailForJob({
     : "Date TBD";
   const subject = `Job Scheduled \u2013 ${customerName} \u2013 ${subjectDate}`;
 
-  console.log("[CUSTOMER SCHEDULE EMAIL DEBUG] pre-send payload", {
-    jobId,
-    to: customerEmail,
-    subject,
-    customerName,
-    customerPhone,
-    serviceAddress,
-    scheduledDate: scheduledDateText,
-    scheduledWindow: scheduledWindowText,
-    serviceType,
-  });
-
   try {
-    const result = await sendEmail({
+    await sendEmail({
       to: customerEmail,
       subject,
       html: buildCustomerScheduledEmailHtml({
@@ -353,11 +386,112 @@ async function sendCustomerScheduledEmailForJob({
         serviceType,
       }),
     });
-    console.log("[CUSTOMER SCHEDULE EMAIL DEBUG] sendEmail result", { jobId, result });
   } catch (error) {
-    console.error("[CUSTOMER SCHEDULE EMAIL DEBUG] sendEmail threw", {
+    console.error("Customer scheduled email send failed:", {
       jobId,
       customerEmail,
+      error: error instanceof Error ? error.message : "Unknown send error",
+    });
+  }
+}
+
+async function sendContractorScheduledEmailForJob({
+  supabase,
+  jobId,
+}: {
+  supabase: any;
+  jobId: string;
+}): Promise<void> {
+  const { data: scheduledJob, error: scheduledJobErr } = await supabase
+    .from("jobs")
+    .select(
+      `
+      id,
+      job_type,
+      permit_number,
+      customer_first_name,
+      customer_last_name,
+      customer_phone,
+      customer_email,
+      job_address,
+      city,
+      scheduled_date,
+      window_start,
+      window_end,
+      contractor_id,
+      contractors:contractor_id ( email ),
+      locations:location_id (address_line1, address_line2, city, state, zip)
+      `
+    )
+    .eq("id", jobId)
+    .single();
+
+  if (scheduledJobErr) {
+    console.error("Contractor scheduled email job snapshot failed:", scheduledJobErr);
+    return;
+  }
+
+  const contractorId = String(scheduledJob?.contractor_id ?? "").trim();
+  if (!contractorId) return;
+
+  const contractorEmail = String((scheduledJob as any)?.contractors?.email ?? "").trim().toLowerCase();
+  if (!contractorEmail) {
+    console.error("Contractor scheduled email skipped: contractor email is missing.", {
+      jobId,
+      contractorId,
+    });
+    return;
+  }
+
+  const customerName =
+    [
+      String(scheduledJob?.customer_first_name ?? "").trim(),
+      String(scheduledJob?.customer_last_name ?? "").trim(),
+    ]
+      .filter(Boolean)
+      .join(" ") || "Customer";
+
+  const customerPhone = String(scheduledJob?.customer_phone ?? "").trim() || null;
+  const customerEmail = String(scheduledJob?.customer_email ?? "").trim().toLowerCase() || null;
+  const serviceAddress = formatServiceAddress(scheduledJob) || "Address not available";
+  const scheduledDateText = formatBusinessDateUS(String(scheduledJob?.scheduled_date ?? "").trim()) || "Not available";
+  const scheduledWindowText =
+    displayWindowLA(
+      String(scheduledJob?.window_start ?? "").trim() || null,
+      String(scheduledJob?.window_end ?? "").trim() || null,
+    ) || "Not available";
+
+  const serviceTypeRaw = String(scheduledJob?.job_type ?? "").trim();
+  const serviceType = serviceTypeRaw ? toTitleCase(serviceTypeRaw) : null;
+  const permitNumber = String(scheduledJob?.permit_number ?? "").trim() || null;
+  const subjectDate = scheduledDateText && scheduledDateText !== "Not available"
+    ? scheduledDateText
+    : "Date TBD";
+  const subject = `Compliance Matters Schedule \u2013 ${customerName} \u2013 ${subjectDate}`;
+
+  const appUrl = resolveAppUrl();
+  const portalJobUrl = appUrl ? `${appUrl}/portal/jobs/${jobId}` : null;
+
+  try {
+    await sendEmail({
+      to: contractorEmail,
+      subject,
+      html: buildContractorScheduledEmailHtml({
+        customerName,
+        customerPhone,
+        customerEmail,
+        serviceAddress,
+        scheduledDate: scheduledDateText,
+        scheduledWindow: scheduledWindowText,
+        serviceType,
+        permitNumber,
+        portalJobUrl,
+      }),
+    });
+  } catch (error) {
+    console.error("Contractor scheduled email send failed:", {
+      jobId,
+      contractorEmail,
       error: error instanceof Error ? error.message : "Unknown send error",
     });
   }
@@ -2864,6 +2998,7 @@ async function postCreate(createdJobId: string, metaSource: string) {
       userId,
     });
     await sendCustomerScheduledEmailForJob({ supabase, jobId: createdJobId });
+    await sendContractorScheduledEmailForJob({ supabase, jobId: createdJobId });
   }
   } else {
     await insertJobEvent({
@@ -3694,6 +3829,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
 
   if (event_type === "scheduled") {
     await sendCustomerScheduledEmailForJob({ supabase, jobId: id });
+    await sendContractorScheduledEmailForJob({ supabase, jobId: id });
   }
 
   revalidatePath(`/jobs/${id}`);

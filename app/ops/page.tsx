@@ -17,6 +17,7 @@ import {
 } from "@/lib/utils/schedule-la";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
+import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -870,6 +871,21 @@ const allOpenOpsJobIds = uniqueAllOpenOpsJobs
   .map((j: any) => String(j.id ?? ""))
   .filter(Boolean);
 
+const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
+  supabase,
+  jobIds: allOpenOpsJobIds,
+});
+
+function assignmentSummaryForJob(jobId: string) {
+  const assignments = activeAssignmentDisplayMap[jobId] ?? [];
+  if (!assignments.length) return "Unassigned";
+
+  const [primaryAssignee, ...overflow] = assignments;
+  return overflow.length > 0
+    ? `${primaryAssignee.display_name} +${overflow.length}`
+    : primaryAssignee.display_name;
+}
+
 const { data: signalEvents, error: signalErr } = await supabase
   .from("job_events")
   .select("job_id, event_type, created_at, meta")
@@ -1314,6 +1330,7 @@ const exceptionVisibleJobs = isPanelExpanded("exceptions")
 
 function compactRow(j: any, showDate = false, note?: string) {
   const jobId = String(j?.id ?? "");
+  const assignmentSummary = assignmentSummaryForJob(jobId);
   const retestState = retestStateForJob(jobId);
   const scheduledRetestLabel = retestScheduleLabelForJob(jobId);
   const lifecycleStatus = String(j?.status ?? "").toLowerCase();
@@ -1358,6 +1375,7 @@ function compactRow(j: any, showDate = false, note?: string) {
           </Link>
           <div className="mt-0.5 text-xs font-medium text-gray-700">{customerNameOnly(j)} • {customerPhoneOnly(j) || "-"}</div>
           <div className="text-xs text-gray-600">Contractor: {contractorNameOnly(j)}</div>
+          <div className="text-xs text-gray-600">Assigned: {assignmentSummary}</div>
           <div className="text-xs text-gray-500">{addressLine(j)}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
             <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
@@ -1452,13 +1470,28 @@ return (
         {isAdmin ? (
           <div className="flex items-center">
             <Link
+              href="/ops/field"
+              className="mr-2 inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            >
+              My Work
+            </Link>
+            <Link
               href="/ops/admin"
               className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
             >
               Admin
             </Link>
           </div>
-        ) : null}
+        ) : (
+          <div className="flex items-center">
+            <Link
+              href="/ops/field"
+              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            >
+              My Work
+            </Link>
+          </div>
+        )}
       </div>
     </div>
 

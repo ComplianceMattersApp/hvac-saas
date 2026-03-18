@@ -234,7 +234,7 @@ export default async function PortalJobDetailPage({
 
   const { data: events, error: evErr } = await supabase
     .from("job_events")
-    .select("job_id, created_at, event_type, meta, user_id")
+    .select("job_id, created_at, event_type, meta")
     .in("job_id", chainJobIds.length ? chainJobIds : [jobId])
     .in("event_type", SAFE_EVENT_TYPES)
     .order("created_at", { ascending: false })
