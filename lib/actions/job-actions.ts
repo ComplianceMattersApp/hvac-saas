@@ -3596,11 +3596,16 @@ export async function updateJobScheduleFromForm(formData: FormData) {
 
         const serviceTypeRaw = String(scheduledJob?.job_type ?? "").trim();
         const serviceType = serviceTypeRaw ? toTitleCase(serviceTypeRaw) : null;
+        const subjectName = customerName || "Customer";
+        const subjectDate = scheduledDateText && scheduledDateText !== "Not available"
+          ? scheduledDateText
+          : "Date TBD";
+        const subject = `Job Scheduled – ${subjectName} – ${subjectDate}`;
 
         try {
           await sendEmail({
             to: customerEmail,
-            subject: "Job Scheduled - Compliance Matters",
+            subject,
             html: buildCustomerScheduledEmailHtml({
               customerName,
               customerPhone,
