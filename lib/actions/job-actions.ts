@@ -312,6 +312,186 @@ function buildContractorScheduledEmailHtml(args: {
   });
 }
 
+function resolveOpsAlertAppUrl(): string | null {
+  const candidates = [
+    String(process.env.APP_URL ?? "").trim(),
+    resolveAppUrl(),
+    String(process.env.SITE_URL ?? "").trim(),
+  ].filter(Boolean) as string[];
+
+  for (const raw of candidates) {
+    try {
+      const parsed = new URL(raw);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        return raw.replace(/\/$/, "");
+      }
+    } catch {
+      // Ignore invalid URL values and continue scanning candidates.
+    }
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    return "http://localhost:3000";
+  }
+
+  return null;
+}
+
+function formatCreatedDateTimeLA(value: string | null): string {
+  if (!value) return "Unknown";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+
+  return date.toLocaleString("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
+function buildContractorIntakeAlertEmailHtml(args: {
+  contractorName: string;
+  customerName: string;
+  serviceAddress: string;
+  serviceType: string;
+  createdAtText: string;
+  jobUrl: string | null;
+}) {
+  const details: string[] = [
+    `<li><strong>Contractor:</strong> ${escapeHtml(args.contractorName)}</li>`,
+    `<li><strong>Customer:</strong> ${escapeHtml(args.customerName)}</li>`,
+    `<li><strong>Address:</strong> ${escapeHtml(args.serviceAddress)}</li>`,
+    `<li><strong>Service/Test Type:</strong> ${escapeHtml(args.serviceType)}</li>`,
+    `<li><strong>Created:</strong> ${escapeHtml(args.createdAtText)}</li>`,
+  ];
+
+  const linkBlock = args.jobUrl
+    ? `<p style="margin: 0 0 12px 0;"><strong>Job Link:</strong> <a href="${escapeHtml(args.jobUrl)}">${escapeHtml(args.jobUrl)}</a></p>`
+    : "";
+
+  return renderSystemEmailLayout({
+    title: "New Contractor Intake Job",
+    bodyHtml: `
+      <p style="margin: 0 0 12px 0;">A contractor submitted a new job that needs office/admin review.</p>
+      <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
+      ${linkBlock}
+      <p style="margin: 0;">Please review scheduling and next steps in Ops.</p>
+    `,
+  });
+}
+
+async function sendInternalContractorIntakeAlertEmail(params: {
+  jobId: string;
+  accountOwnerUserId: string;
+}): Promise<void> {
+  const { jobId, accountOwnerUserId } = params;
+  const admin = createAdminClient();
+
+  const { data: internalRows, error: internalErr } = await admin
+    .from("internal_users")
+    .select("user_id, role, is_active")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("is_active", true)
+    .in("role", ["admin", "office"]);
+
+  if (internalErr) throw internalErr;
+
+  const recipientUserIds = Array.from(
+    new Set(
+      (internalRows ?? [])
+        .map((row: any) => String(row?.user_id ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (recipientUserIds.length === 0) return;
+
+  const { data: profileRows, error: profileErr } = await admin
+    .from("profiles")
+    .select("id, email")
+    .in("id", recipientUserIds);
+
+  if (profileErr) throw profileErr;
+
+  const recipientEmails = Array.from(
+    new Set(
+      (profileRows ?? [])
+        .map((row: any) => String(row?.email ?? "").trim().toLowerCase())
+        .filter((email: string) => email.includes("@")),
+    ),
+  );
+
+  if (recipientEmails.length === 0) return;
+
+  const { data: jobSnapshot, error: jobErr } = await admin
+    .from("jobs")
+    .select(
+      `
+      id,
+      created_at,
+      job_type,
+      project_type,
+      city,
+      job_address,
+      customer_first_name,
+      customer_last_name,
+      contractor_id,
+      contractors:contractor_id ( name ),
+      locations:location_id (address_line1, address_line2, city, state, zip)
+      `,
+    )
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+  if (!jobSnapshot?.id) return;
+
+  const customerName =
+    [
+      String((jobSnapshot as any)?.customer_first_name ?? "").trim(),
+      String((jobSnapshot as any)?.customer_last_name ?? "").trim(),
+    ]
+      .filter(Boolean)
+      .join(" ") || "Customer";
+
+  const contractorName =
+    String((jobSnapshot as any)?.contractors?.name ?? "").trim() || "Contractor";
+
+  const serviceAddress = formatServiceAddress(jobSnapshot) || "Address not available";
+
+  const jobTypeRaw = String((jobSnapshot as any)?.job_type ?? "").trim();
+  const projectTypeRaw = String((jobSnapshot as any)?.project_type ?? "").trim();
+  const serviceType = [toTitleCase(jobTypeRaw), toTitleCase(projectTypeRaw)]
+    .filter(Boolean)
+    .join(" / ") || "Not specified";
+
+  const createdAtText = formatCreatedDateTimeLA(
+    String((jobSnapshot as any)?.created_at ?? "").trim() || null,
+  );
+
+  const appUrl = resolveOpsAlertAppUrl();
+  const jobUrl = appUrl ? `${appUrl}/jobs/${jobId}` : null;
+
+  const subject = `New Contractor Job Intake - ${customerName} - ${serviceAddress}`;
+
+  await sendEmail({
+    to: recipientEmails,
+    subject,
+    html: buildContractorIntakeAlertEmailHtml({
+      contractorName,
+      customerName,
+      serviceAddress,
+      serviceType,
+      createdAtText,
+      jobUrl,
+    }),
+  });
+}
+
 async function sendCustomerScheduledEmailForJob({
   supabase,
   jobId,
@@ -3020,6 +3200,19 @@ async function postCreate(createdJobId: string, metaSource: string) {
         next_action: "review_and_schedule",
       },
     });
+
+    try {
+      await sendInternalContractorIntakeAlertEmail({
+        jobId: createdJobId,
+        accountOwnerUserId: canonicalOwnerUserId,
+      });
+    } catch (error) {
+      console.error("Internal contractor intake alert email send failed:", {
+        jobId: createdJobId,
+        accountOwnerUserId: canonicalOwnerUserId,
+        error: error instanceof Error ? error.message : "Unknown send error",
+      });
+    }
 
     if (scheduled_date) {
       await insertJobEvent({

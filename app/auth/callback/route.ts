@@ -9,6 +9,11 @@ function redirectUrl(requestUrl: string, path: string) {
   return url;
 }
 
+function shouldRequirePasswordSetup(type: string | null): boolean {
+  const normalized = String(type ?? "").trim().toLowerCase();
+  return normalized === "invite" || normalized === "recovery";
+}
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
@@ -41,6 +46,10 @@ export async function GET(request: Request) {
 
   if (!user) {
     return NextResponse.redirect(redirectUrl(request.url, "/login"));
+  }
+
+  if (shouldRequirePasswordSetup(type)) {
+    return NextResponse.redirect(redirectUrl(request.url, "/set-password"));
   }
 
   const { data: cu, error: cuErr } = await supabase
