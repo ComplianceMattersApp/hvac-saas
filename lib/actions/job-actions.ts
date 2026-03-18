@@ -262,6 +262,107 @@ function buildCustomerScheduledEmailHtml(args: {
   });
 }
 
+async function sendCustomerScheduledEmailForJob({
+  supabase,
+  jobId,
+}: {
+  supabase: any;
+  jobId: string;
+}): Promise<void> {
+  console.log("[CUSTOMER SCHEDULE EMAIL DEBUG] helper start", { jobId });
+
+  const { data: scheduledJob, error: scheduledJobErr } = await supabase
+    .from("jobs")
+    .select(
+      `
+      id,
+      job_type,
+      customer_first_name,
+      customer_last_name,
+      customer_phone,
+      customer_email,
+      job_address,
+      city,
+      scheduled_date,
+      window_start,
+      window_end,
+      locations:location_id (address_line1, address_line2, city, state, zip)
+      `
+    )
+    .eq("id", jobId)
+    .single();
+
+  if (scheduledJobErr) {
+    console.error("[CUSTOMER SCHEDULE EMAIL DEBUG] job snapshot query failed", { jobId, error: scheduledJobErr });
+    return;
+  }
+
+  const customerEmail = String(scheduledJob?.customer_email ?? "").trim().toLowerCase();
+  if (!customerEmail) {
+    console.log("[CUSTOMER SCHEDULE EMAIL DEBUG] skipping — no customer_email on job", { jobId, customer_email: scheduledJob?.customer_email ?? null });
+    return;
+  }
+
+  const customerName =
+    [
+      String(scheduledJob?.customer_first_name ?? "").trim(),
+      String(scheduledJob?.customer_last_name ?? "").trim(),
+    ]
+      .filter(Boolean)
+      .join(" ") || "Customer";
+
+  const customerPhone = String(scheduledJob?.customer_phone ?? "").trim() || null;
+  const serviceAddress = formatServiceAddress(scheduledJob) || "Address not available";
+  const scheduledDateText = formatBusinessDateUS(String(scheduledJob?.scheduled_date ?? "").trim()) || "Not available";
+  const scheduledWindowText =
+    displayWindowLA(
+      String(scheduledJob?.window_start ?? "").trim() || null,
+      String(scheduledJob?.window_end ?? "").trim() || null,
+    ) || "Not available";
+
+  const serviceTypeRaw = String(scheduledJob?.job_type ?? "").trim();
+  const serviceType = serviceTypeRaw ? toTitleCase(serviceTypeRaw) : null;
+  const subjectDate = scheduledDateText && scheduledDateText !== "Not available"
+    ? scheduledDateText
+    : "Date TBD";
+  const subject = `Job Scheduled \u2013 ${customerName} \u2013 ${subjectDate}`;
+
+  console.log("[CUSTOMER SCHEDULE EMAIL DEBUG] pre-send payload", {
+    jobId,
+    to: customerEmail,
+    subject,
+    customerName,
+    customerPhone,
+    serviceAddress,
+    scheduledDate: scheduledDateText,
+    scheduledWindow: scheduledWindowText,
+    serviceType,
+  });
+
+  try {
+    const result = await sendEmail({
+      to: customerEmail,
+      subject,
+      html: buildCustomerScheduledEmailHtml({
+        customerName,
+        customerPhone,
+        customerEmail,
+        serviceAddress,
+        scheduledDate: scheduledDateText,
+        scheduledWindow: scheduledWindowText,
+        serviceType,
+      }),
+    });
+    console.log("[CUSTOMER SCHEDULE EMAIL DEBUG] sendEmail result", { jobId, result });
+  } catch (error) {
+    console.error("[CUSTOMER SCHEDULE EMAIL DEBUG] sendEmail threw", {
+      jobId,
+      customerEmail,
+      error: error instanceof Error ? error.message : "Unknown send error",
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // PH2-B: Staffing helpers — job_assignments table
 // All helpers are unexported; wire into server actions directly.
@@ -2748,6 +2849,22 @@ async function postCreate(createdJobId: string, metaSource: string) {
   });
 
   await logIntakeSubmitted(createdJobId);
+
+  if (scheduled_date) {
+    await insertJobEvent({
+      supabase,
+      jobId: createdJobId,
+      event_type: "scheduled",
+      meta: {
+        scheduled_date,
+        window_start: window_start ?? null,
+        window_end: window_end ?? null,
+        source: "create",
+      },
+      userId,
+    });
+    await sendCustomerScheduledEmailForJob({ supabase, jobId: createdJobId });
+  }
   } else {
     await insertJobEvent({
       supabase,
@@ -3576,81 +3693,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   });
 
   if (event_type === "scheduled") {
-    const { data: scheduledJob, error: scheduledJobErr } = await supabase
-      .from("jobs")
-      .select(
-        `
-        id,
-        job_type,
-        customer_first_name,
-        customer_last_name,
-        customer_phone,
-        customer_email,
-        job_address,
-        city,
-        scheduled_date,
-        window_start,
-        window_end,
-        locations:location_id (address_line1, address_line2, city, state, zip)
-        `
-      )
-      .eq("id", id)
-      .single();
-
-    if (scheduledJobErr) {
-      console.error("Customer scheduled email job snapshot failed:", scheduledJobErr);
-    } else {
-      const customerEmail = String(scheduledJob?.customer_email ?? "").trim().toLowerCase();
-
-      if (customerEmail) {
-        const customerName =
-          [
-            String(scheduledJob?.customer_first_name ?? "").trim(),
-            String(scheduledJob?.customer_last_name ?? "").trim(),
-          ]
-            .filter(Boolean)
-            .join(" ") || "Customer";
-
-        const customerPhone = String(scheduledJob?.customer_phone ?? "").trim() || null;
-        const serviceAddress = formatServiceAddress(scheduledJob) || "Address not available";
-        const scheduledDateText = formatBusinessDateUS(String(scheduledJob?.scheduled_date ?? "").trim()) || "Not available";
-        const scheduledWindowText =
-          displayWindowLA(
-            String(scheduledJob?.window_start ?? "").trim() || null,
-            String(scheduledJob?.window_end ?? "").trim() || null,
-          ) || "Not available";
-
-        const serviceTypeRaw = String(scheduledJob?.job_type ?? "").trim();
-        const serviceType = serviceTypeRaw ? toTitleCase(serviceTypeRaw) : null;
-        const subjectName = customerName || "Customer";
-        const subjectDate = scheduledDateText && scheduledDateText !== "Not available"
-          ? scheduledDateText
-          : "Date TBD";
-        const subject = `Job Scheduled – ${subjectName} – ${subjectDate}`;
-
-        try {
-          await sendEmail({
-            to: customerEmail,
-            subject,
-            html: buildCustomerScheduledEmailHtml({
-              customerName,
-              customerPhone,
-              customerEmail,
-              serviceAddress,
-              scheduledDate: scheduledDateText,
-              scheduledWindow: scheduledWindowText,
-              serviceType,
-            }),
-          });
-        } catch (error) {
-          console.error("Customer scheduled email send failed:", {
-            jobId: id,
-            customerEmail,
-            error: error instanceof Error ? error.message : "Unknown send error",
-          });
-        }
-      }
-    }
+    await sendCustomerScheduledEmailForJob({ supabase, jobId: id });
   }
 
   revalidatePath(`/jobs/${id}`);
