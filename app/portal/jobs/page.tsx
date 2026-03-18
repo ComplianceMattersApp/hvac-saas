@@ -178,7 +178,13 @@ export default async function PortalAllJobsPage() {
     return { job, resolved, openRetestChild };
   });
 
-  const actionRequiredJobs = resolvedJobs
+  // Exclude parent jobs that have an active (non-closed) retest child.
+  // The retest child is the actionable job; the parent should not appear in active portal views.
+  const activeResolvedJobs = resolvedJobs.filter(
+    ({ job }) => !openRetestChildByParentId.has(String(job.id))
+  );
+
+  const actionRequiredJobs = activeResolvedJobs
     .filter((row) => row.resolved.bucket === "action_required")
     .sort((a, b) => {
       const urgencyA = Number(
@@ -191,11 +197,11 @@ export default async function PortalAllJobsPage() {
       return toDateMs(b.job.created_at) - toDateMs(a.job.created_at);
     });
 
-  const inProgressJobs = resolvedJobs
+  const inProgressJobs = activeResolvedJobs
     .filter((row) => row.resolved.bucket === "in_progress")
     .sort((a, b) => toDateMs(b.job.created_at) - toDateMs(a.job.created_at));
 
-  const passedJobs = resolvedJobs
+  const passedJobs = activeResolvedJobs
     .filter((row) => row.resolved.bucket === "passed")
     .sort((a, b) => {
       const aResolved = toDateMs(a.job.data_entry_completed_at ?? a.job.created_at);
