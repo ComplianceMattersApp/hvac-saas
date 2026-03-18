@@ -68,13 +68,15 @@ export default async function JobsPage({
 const { count: attentionTodayCount } = await supabase
   .from("jobs")
   .select("id", { count: "exact", head: true })
+  .is("deleted_at", null)
   .not("follow_up_date", "is", null)
   .lte("follow_up_date", today)
   .in("ops_status", ["need_to_schedule", "pending_info", "retest_needed"]);
 
   const { data: countsData } = await supabase
   .from("jobs")
-  .select("ops_status", { count: "exact" });
+  .select("ops_status", { count: "exact" })
+  .is("deleted_at", null);
 
 const counts: Record<string, number> = {};
 
@@ -90,7 +92,8 @@ if (countsData) {
     .from("jobs")
     .select(
       "id, title, status, scheduled_date, created_at, ops_status, follow_up_date, next_action_note, pending_info_reason, job_notes, customer_id, location_id, customer_first_name, customer_last_name, customer_phone, job_address, city"
-    );
+    )
+    .is("deleted_at", null);
 
   if (queue === "attention_today") {
   query = query

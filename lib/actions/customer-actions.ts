@@ -173,7 +173,8 @@ export async function archiveCustomerFromForm(formData: FormData) {
   const { count: jobsCount, error: jobsErr } = await supabase
     .from("jobs")
     .select("id", { count: "exact", head: true })
-    .eq("customer_id", customer_id);
+    .eq("customer_id", customer_id)
+    .is("deleted_at", null);
 
   if (jobsErr) throw jobsErr;
   if ((jobsCount ?? 0) > 0) {

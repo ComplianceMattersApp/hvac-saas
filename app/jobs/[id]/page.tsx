@@ -139,18 +139,88 @@ function getEventNoteText(meta?: any) {
   ).trim();
 }
 
-function getEventFileSummary(meta?: any) {
-  if (!meta) return "";
+function getEventAttachmentCount(meta?: any) {
+  if (!meta) return 0;
+  const explicitCount = Number(meta.count ?? 0);
+  if (Number.isFinite(explicitCount) && explicitCount > 0) return explicitCount;
+  if (Array.isArray(meta.attachment_ids) && meta.attachment_ids.length > 0) {
+    return meta.attachment_ids.length;
+  }
   if (Array.isArray(meta.file_names) && meta.file_names.length > 0) {
-    if (meta.file_names.length > 5) {
-      return `${meta.file_names.slice(0, 5).join(", ")} + ${meta.file_names.length - 5} more`;
-    }
-    return meta.file_names.join(", ");
+    return meta.file_names.length;
   }
   if (typeof meta.file_name === "string" && meta.file_name.trim()) {
-    return meta.file_name.trim();
+    return 1;
   }
-  return "";
+  return 0;
+}
+
+function getEventAttachmentLabel(meta?: any) {
+  const count = getEventAttachmentCount(meta);
+  return count > 0 ? `${count} attachment${count === 1 ? "" : "s"}` : "";
+}
+
+function summarizePlainText(value?: string | null, maxLength = 140) {
+  const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function formatSharedHistoryHeading(type?: string | null, meta?: any) {
+  const attachmentLabel = getEventAttachmentLabel(meta);
+
+  if (type === "public_note") {
+    return attachmentLabel ? "Update shared with contractor" : "Note shared with contractor";
+  }
+  if (type === "contractor_note") {
+    return attachmentLabel ? "Contractor response received" : "Contractor note received";
+  }
+  if (type === "contractor_correction_submission") {
+    return "Correction submission received";
+  }
+
+  return formatTimelineEvent(type, meta);
+}
+
+function formatTimelineDetail(type?: string | null, meta?: any, message?: string | null) {
+  const noteSummary = summarizePlainText(getEventNoteText(meta), 160);
+  const attachmentLabel = getEventAttachmentLabel(meta);
+  const cleanMessage = summarizePlainText(message, 160);
+
+  if (type === "customer_attempt") {
+    const method = summarizePlainText(String(meta?.method ?? "").replace(/_/g, " "), 40);
+    const result = summarizePlainText(String(meta?.result ?? "").replace(/_/g, " "), 60);
+    return [method, result].filter(Boolean).join(" - ");
+  }
+
+  if (type === "status_changed") {
+    const from = summarizePlainText(String(meta?.from ?? "").replace(/_/g, " "), 40);
+    const to = summarizePlainText(String(meta?.to ?? "").replace(/_/g, " "), 40);
+    if (from && to) return `${from} -> ${to}`;
+    return to || from || cleanMessage;
+  }
+
+  if (type === "attachment_added") {
+    const actor =
+      meta?.source === "internal"
+        ? "Internal upload"
+        : meta?.source === "contractor"
+        ? "Contractor upload"
+        : "Upload";
+    if (attachmentLabel && noteSummary) return `${actor} - ${attachmentLabel} - ${noteSummary}`;
+    if (attachmentLabel) return `${actor} - ${attachmentLabel}`;
+    return noteSummary || cleanMessage;
+  }
+
+  if (["public_note", "contractor_note", "internal_note", "contractor_correction_submission"].includes(String(type ?? ""))) {
+    if (noteSummary && attachmentLabel) return `${noteSummary} - ${attachmentLabel}`;
+    if (noteSummary) return noteSummary;
+    if (attachmentLabel) return `Included ${attachmentLabel}`;
+    return "";
+  }
+
+  return cleanMessage;
 }
 
 
@@ -927,8 +997,10 @@ const renderTimelineItem = (e: any, key: string) => {
   const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "—";
   const type = String(e?.event_type ?? "");
   const meta = e?.meta ?? {};
-  const noteText = getEventNoteText(meta);
-  const fileSummary = getEventFileSummary(meta);
+  const detailText = formatTimelineDetail(type, meta, e?.message);
+  const title = ["public_note", "contractor_note", "contractor_correction_submission"].includes(type)
+    ? formatSharedHistoryHeading(type, meta)
+    : formatTimelineEvent(type, meta, e?.message);
 
   const icon =
     type === "job_created" ? "🆕" :
@@ -958,29 +1030,17 @@ const renderTimelineItem = (e: any, key: string) => {
   return (
     <div key={key} className="rounded border p-3 text-sm bg-white">
       <div className="flex items-start justify-between gap-3">
-        <div className="text-xs text-gray-600">{when}</div>
+        <div className="text-xs font-medium text-gray-600">{when}</div>
         <div className="text-xs text-gray-500">{icon}</div>
       </div>
 
-      <div className="mt-2 font-medium">
-        {formatTimelineEvent(type, meta, e?.message)}
+      <div className="mt-2 font-medium text-gray-900">
+        {title}
       </div>
 
-      {(type === "contractor_note" ||
-        type === "public_note" ||
-        type === "internal_note" ||
-        type === "contractor_correction_submission") && noteText ? (
-        <div className="mt-2 whitespace-pre-wrap text-sm text-gray-800">
-          {noteText}
-        </div>
-      ) : null}
-
-      {(type === "contractor_note" ||
-        type === "public_note" ||
-        type === "internal_note" ||
-        type === "contractor_correction_submission") && fileSummary ? (
-        <div className="mt-2 text-xs text-gray-600">
-          Files: {fileSummary}
+      {detailText ? (
+        <div className="mt-1 text-sm text-gray-700">
+          {detailText}
         </div>
       ) : null}
 
@@ -2342,7 +2402,7 @@ const renderTimelineItem = (e: any, key: string) => {
         const type = String(e?.event_type ?? "");
         const meta = e?.meta ?? {};
         const noteText = getEventNoteText(meta);
-        const fileSummary = getEventFileSummary(meta);
+        const attachmentLabel = getEventAttachmentLabel(meta);
 
         return (
           <div key={idx} className="rounded-md border border-gray-200 bg-gray-50 p-3">
@@ -2360,7 +2420,7 @@ const renderTimelineItem = (e: any, key: string) => {
             </div>
 
             <div className="mt-2 text-sm font-medium text-gray-900">
-              {formatTimelineEvent(type, meta)}
+              {formatSharedHistoryHeading(type, meta)}
             </div>
 
             {noteText ? (
@@ -2369,9 +2429,9 @@ const renderTimelineItem = (e: any, key: string) => {
               </div>
             ) : null}
 
-            {fileSummary ? (
-              <div className="mt-2 text-xs text-gray-600">
-                Files: {fileSummary}
+            {attachmentLabel ? (
+              <div className="mt-2 inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+                {attachmentLabel}
               </div>
             ) : null}
           </div>

@@ -23,6 +23,27 @@ function formatDateLA(iso: string) {
   }).format(new Date(iso));
 }
 
+function formatDateTimeLA(iso: string) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "-";
+
+  const date = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+
+  const time = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+
+  return `${date} ${time}`;
+}
+
 function titleCaseFromSnake(value: string | null | undefined) {
   const v = String(value ?? "").trim();
   if (!v) return "-";
@@ -37,6 +58,76 @@ function titleCaseFromSnake(value: string | null | undefined) {
 function formatTimeLocal(value: string | null | undefined) {
   const s = String(value || "").slice(0, 5);
   return s || "-";
+}
+
+function getEventNoteText(meta?: any) {
+  if (!meta) return "";
+  return String(meta.note ?? meta.message ?? meta.caption ?? "").trim();
+}
+
+function getEventAttachmentCount(meta?: any) {
+  if (!meta) return 0;
+  const explicitCount = Number(meta.count ?? 0);
+  if (Number.isFinite(explicitCount) && explicitCount > 0) return explicitCount;
+  if (Array.isArray(meta.attachment_ids) && meta.attachment_ids.length > 0) return meta.attachment_ids.length;
+  if (Array.isArray(meta.file_names) && meta.file_names.length > 0) return meta.file_names.length;
+  if (typeof meta.file_name === "string" && meta.file_name.trim()) return 1;
+  return 0;
+}
+
+function getEventAttachmentLabel(meta?: any) {
+  const count = getEventAttachmentCount(meta);
+  return count > 0 ? `${count} attachment${count === 1 ? "" : "s"}` : "";
+}
+
+function summarizePlainText(value?: string | null, maxLength = 140) {
+  const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function formatPortalTimelineLabel(type?: string | null, meta?: any) {
+  if (type === "contractor_note") {
+    return getEventAttachmentCount(meta) > 0 ? "Contractor response received" : "Contractor note received";
+  }
+  if (type === "contractor_correction_submission") return "Correction submission received";
+  if (type === "attachment_added") return "Attachment received";
+  if (type === "customer_attempt") return "Contact attempt logged";
+  if (type === "retest_ready_requested") return "Retest ready requested";
+  if (type === "contractor_report_sent") return "Contractor report shared";
+  if (type === "status_changed") return `Status updated: ${titleCaseFromSnake(String(meta?.to ?? ""))}`;
+  if (type === "job_failed") return "Result recorded: Failed";
+  if (type === "job_passed") return "Result recorded: Passed";
+  if (type === "job_created") return "Job created";
+  return titleCaseFromSnake(type);
+}
+
+function formatPortalTimelineDetail(type?: string | null, meta?: any) {
+  const noteSummary = summarizePlainText(getEventNoteText(meta), 160);
+  const attachmentLabel = getEventAttachmentLabel(meta);
+
+  if (type === "customer_attempt") {
+    const method = summarizePlainText(String(meta?.method ?? "").replace(/_/g, " "), 40);
+    const result = summarizePlainText(String(meta?.result ?? "").replace(/_/g, " "), 60);
+    return [method, result].filter(Boolean).join(" - ");
+  }
+
+  if (["contractor_note", "contractor_correction_submission", "attachment_added"].includes(String(type ?? ""))) {
+    if (noteSummary && attachmentLabel) return `${noteSummary} - ${attachmentLabel}`;
+    if (noteSummary) return noteSummary;
+    if (attachmentLabel) return `Included ${attachmentLabel}`;
+  }
+
+  if (type === "retest_ready_requested") {
+    return "Contractor marked corrections complete and asked for retest review.";
+  }
+
+  if (type === "contractor_report_sent") {
+    return "Shared with contractor for review and next steps.";
+  }
+
+  return "";
 }
 
 function buildAddressLines(opts: {
@@ -668,41 +759,26 @@ export default async function PortalJobDetailPage({
               const meta = typeof e.meta === "string" ? null : e.meta;
 
               const label =
-                type === "job_created"
-                  ? "Job created"
-                  : type === "customer_attempt"
-                  ? "Contact attempt"
-                  : type === "contractor_note"
-                  ? "Contractor note added"
-                  : type === "contractor_correction_submission"
-                  ? "Corrections submitted"
-                  : type === "attachment_added"
-                  ? "Attachment uploaded"
-                  : type === "retest_ready_requested"
-                  ? "Retest ready requested"
-                  : type === "job_failed"
-                  ? "Result: Failed"
-                  : type === "job_passed"
-                  ? "Result: Passed"
-                  : type === "status_changed"
-                  ? `Result update: ${titleCaseFromSnake(String(meta?.to ?? ""))}`
-                  : type === "contractor_report_sent"
-                  ? "Contractor report sent"
-                  : titleCaseFromSnake(type);
+                formatPortalTimelineLabel(type, meta);
+              const detail = formatPortalTimelineDetail(type, meta);
 
               return (
                 <div key={`${String(e.created_at)}-${idx}`} className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium">{label}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-300">
-                      {e.created_at ? formatDateLA(String(e.created_at)) : "-"}
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-300">
+                      {e.created_at ? formatDateTimeLA(String(e.created_at)) : "-"}
                     </div>
                   </div>
 
+                  <div className="mt-2 text-sm font-medium">{label}</div>
+
+                  {detail ? (
+                    <div className="mt-1 text-sm text-gray-700 dark:text-gray-200">{detail}</div>
+                  ) : null}
+
                   {type === "customer_attempt" ? (
-                    <div className="mt-1 text-sm text-gray-700 dark:text-gray-200">
-                      {meta?.method ? String(meta.method) : "Attempt"}
-                      {meta?.result ? ` - ${String(meta.result)}` : ""}
+                    <div className="text-xs text-gray-500 dark:text-gray-300">
+                      Operational contact history recorded for this job.
                     </div>
                   ) : null}
                 </div>

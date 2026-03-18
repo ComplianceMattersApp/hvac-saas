@@ -51,6 +51,7 @@ type JobRow = {
   contractor_id: string | null;
   service_case_id: string | null;
   location_id: string | null;
+  deleted_at: string | null;
   contractors?: {
     name?: string | null;
   } | null;
@@ -303,7 +304,8 @@ const { data: jobsData, error: jobsErr } = await supabase
     ops_status,
     contractor_id,
     service_case_id,
-    location_id
+    location_id,
+    deleted_at
     `
   )
   .eq("customer_id", customerId)
@@ -312,6 +314,7 @@ const { data: jobsData, error: jobsErr } = await supabase
   if (jobsErr) throw jobsErr;
 
   const jobs = (jobsData ?? []) as JobRow[];
+  const activeJobs = jobs.filter((job) => !job.deleted_at);
 
   // Lightweight service-case awareness
   const serviceCaseIds = Array.from(
@@ -339,17 +342,23 @@ const { data: jobsData, error: jobsErr } = await supabase
   }
 
   const jobsByLocationCount = new Map<string, number>();
-  for (const job of jobs) {
+  for (const job of activeJobs) {
     const key = String(job.location_id ?? "").trim();
     if (!key) continue;
     jobsByLocationCount.set(key, (jobsByLocationCount.get(key) ?? 0) + 1);
   }
 
   const opsCounts: Record<string, number> = {};
-  for (const job of jobs) {
+  for (const job of activeJobs) {
     const key = normalizeOpsStatus(job.ops_status) || "unknown";
     opsCounts[key] = (opsCounts[key] ?? 0) + 1;
   }
+
+  const lastScheduledActiveDate = activeJobs
+    .map((j) => j.scheduled_date)
+    .filter(Boolean)
+    .sort()
+    .slice(-1)[0] ?? null;
 
   const callHref = makeTelHref(customer.phone);
   const smsHref = makeSmsHref(customer.phone);
@@ -389,14 +398,11 @@ const { data: jobsData, error: jobsErr } = await supabase
                 {jobs.length} job{jobs.length === 1 ? "" : "s"}
               </span>
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                {activeJobs.length} active job{activeJobs.length === 1 ? "" : "s"}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
                 Last scheduled:{" "}
-                {formatDate(
-                  jobs
-                    .map((j) => j.scheduled_date)
-                    .filter(Boolean)
-                    .sort()
-                    .slice(-1)[0] ?? null
-                )}
+                {formatDate(lastScheduledActiveDate)}
               </span>
             </div>
           </div>
@@ -561,7 +567,7 @@ const { data: jobsData, error: jobsErr } = await supabase
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-xs uppercase tracking-wide text-slate-500">
-                  Completed
+                  Completed (Active)
                 </div>
                 <div className="mt-2 text-2xl font-semibold text-slate-900">
                   {opsCounts["completed"] ?? 0}
@@ -665,6 +671,7 @@ const { data: jobsData, error: jobsErr } = await supabase
                 const serviceCaseVisits = job.service_case_id
                   ? serviceCaseVisitCounts.get(job.service_case_id) ?? 1
                   : null;
+                const isArchived = Boolean(job.deleted_at);
 
                 const address = [job.job_address, job.city]
                   .map((v) => String(v ?? "").trim())
@@ -674,7 +681,12 @@ const { data: jobsData, error: jobsErr } = await supabase
                 return (
                   <div
                     key={job.id}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                    className={[
+                      "rounded-xl border p-4",
+                      isArchived
+                        ? "border-slate-200 bg-slate-100/70"
+                        : "border-slate-200 bg-slate-50",
+                    ].join(" ")}
                   >
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0 space-y-2">
@@ -693,6 +705,12 @@ const { data: jobsData, error: jobsErr } = await supabase
                           >
                             {opsStatusLabel(job.ops_status)}
                           </span>
+
+                          {isArchived ? (
+                            <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                              Archived
+                            </span>
+                          ) : null}
 
                           {job.service_case_id ? (
                             <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600">
