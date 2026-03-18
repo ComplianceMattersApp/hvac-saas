@@ -9,6 +9,7 @@ import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
+import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions/job-event-meta";
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import { requireInternalUser } from "@/lib/auth/internal-user";
@@ -196,6 +197,293 @@ async function insertJobEvent(params: {
 
   if (error) throw error;
 }
+
+// ---------------------------------------------------------------------------
+// PH2-B: Staffing helpers — job_assignments table
+// All helpers are unexported; wire into server actions directly.
+// Structure is intentionally extract-ready: no external dependencies,
+// uniform (supabase, ...) signature pattern, self-contained error handling.
+// ---------------------------------------------------------------------------
+
+type JobAssignment = {
+  id: string;
+  job_id: string;
+  user_id: string;
+  assigned_by: string | null;
+  is_active: boolean;
+  is_primary: boolean;
+  created_at: string;
+  removed_at: string | null;
+  removed_by: string | null;
+};
+
+/** Returns all currently-active assignment rows for a job. */
+async function listActiveJobAssignments(params: {
+  supabase: any;
+  jobId: string;
+}): Promise<JobAssignment[]> {
+  const { supabase, jobId } = params;
+
+  const { data, error } = await supabase
+    .from("job_assignments")
+    .select(
+      "id, job_id, user_id, assigned_by, is_active, is_primary, created_at, removed_at, removed_by"
+    )
+    .eq("job_id", jobId)
+    .eq("is_active", true);
+
+  if (error) throw error;
+  return (data ?? []) as JobAssignment[];
+}
+
+/**
+ * Inserts a new active assignment row.
+ * Throws on duplicate active assignment for the same (job_id, user_id) —
+ * use ensureActiveAssignmentForUser for the idempotent path.
+ * Emits assignment_added on actual insert.
+ */
+async function addJobAssignment(params: {
+  supabase: any;
+  jobId: string;
+  userId: string;
+  assignedBy: string;
+  isPrimary?: boolean;
+}): Promise<JobAssignment> {
+  const { supabase, jobId, userId, assignedBy, isPrimary = false } = params;
+
+  const { data, error } = await supabase
+    .from("job_assignments")
+    .insert({
+      job_id: jobId,
+      user_id: userId,
+      assigned_by: assignedBy,
+      is_active: true,
+      is_primary: isPrimary,
+    })
+    .select(
+      "id, job_id, user_id, assigned_by, is_active, is_primary, created_at, removed_at, removed_by"
+    )
+    .single();
+
+  if (error) throw error;
+
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: "assignment_added",
+    meta: {
+      actor_user_id: assignedBy,
+      affected_user_id: userId,
+      is_primary: isPrimary,
+      staffing_snapshot: buildStaffingSnapshotMeta(),
+      source_action: "add_job_assignment",
+    },
+    userId: assignedBy,
+  });
+
+  return data as JobAssignment;
+}
+
+/**
+ * Soft-removes an active assignment.
+ * Sets is_active = false, removed_at = now(), removed_by = actor.
+ * Targets only active rows; no-ops (no event) if the user is already inactive.
+ * Emits assignment_removed only on actual row change.
+ */
+async function softRemoveJobAssignment(params: {
+  supabase: any;
+  jobId: string;
+  userId: string;
+  removedBy: string;
+}): Promise<void> {
+  const { supabase, jobId, userId, removedBy } = params;
+
+  const { data: removed, error } = await supabase
+    .from("job_assignments")
+    .update({
+      is_active: false,
+      removed_at: new Date().toISOString(),
+      removed_by: removedBy,
+    })
+    .eq("job_id", jobId)
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .select("id");
+
+  if (error) throw error;
+
+  // Zero rows updated = user was already inactive; skip event to avoid duplicate
+  if (!removed || removed.length === 0) return;
+
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: "assignment_removed",
+    meta: {
+      actor_user_id: removedBy,
+      affected_user_id: userId,
+      staffing_snapshot: buildStaffingSnapshotMeta(),
+      source_action: "soft_remove_job_assignment",
+    },
+    userId: removedBy,
+  });
+}
+
+/**
+ * Makes userId the sole primary assignment on the job.
+ * Verifies the target has an active row before acting (hardening).
+ * No-ops (and emits no event) if the target is already primary.
+ * Clears is_primary on all other active rows first, then sets the target.
+ * Only acts on active rows; does NOT activate an inactive assignment.
+ * Emits assignment_primary_set on actual change only.
+ */
+async function setPrimaryJobAssignment(params: {
+  supabase: any;
+  jobId: string;
+  userId: string;
+  actorUserId: string;
+}): Promise<void> {
+  const { supabase, jobId, userId, actorUserId } = params;
+
+  // Hardening: verify the target user has an active assignment.
+  // Also detect no-op: if already primary, skip everything.
+  const { data: targetRow, error: readErr } = await supabase
+    .from("job_assignments")
+    .select("id, is_primary")
+    .eq("job_id", jobId)
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (readErr) throw readErr;
+
+  if (!targetRow) {
+    throw new Error(
+      `Cannot set primary: no active assignment found for user ${userId} on job ${jobId}`
+    );
+  }
+
+  // Already primary — no change, no event
+  if (targetRow.is_primary) return;
+
+  // Clear existing primary on all active rows for this job
+  const { error: clearErr } = await supabase
+    .from("job_assignments")
+    .update({ is_primary: false })
+    .eq("job_id", jobId)
+    .eq("is_active", true)
+    .eq("is_primary", true);
+
+  if (clearErr) throw clearErr;
+
+  // Promote the target user
+  const { error: setErr } = await supabase
+    .from("job_assignments")
+    .update({ is_primary: true })
+    .eq("job_id", jobId)
+    .eq("user_id", userId)
+    .eq("is_active", true);
+
+  if (setErr) throw setErr;
+
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: "assignment_primary_set",
+    meta: {
+      actor_user_id: actorUserId,
+      affected_user_id: userId,
+      staffing_snapshot: buildStaffingSnapshotMeta(),
+      source_action: "set_primary_job_assignment",
+    },
+    userId: actorUserId,
+  });
+}
+
+/**
+ * Returns the existing active assignment for userId, or creates one.
+ * Concurrency-safe: on a 23505 unique-violation (parallel insert race),
+ * re-selects and returns the surviving active row instead of throwing.
+ */
+async function ensureActiveAssignmentForUser(params: {
+  supabase: any;
+  jobId: string;
+  userId: string;
+  actorUserId: string;
+}): Promise<JobAssignment> {
+  const { supabase, jobId, userId, actorUserId } = params;
+
+  // Fast path: active row already exists
+  const { data: existing, error: selectErr } = await supabase
+    .from("job_assignments")
+    .select(
+      "id, job_id, user_id, assigned_by, is_active, is_primary, created_at, removed_at, removed_by"
+    )
+    .eq("job_id", jobId)
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (selectErr) throw selectErr;
+  if (existing) return existing as JobAssignment;
+
+  // Slow path: create via addJobAssignment so assignment_added fires.
+  // On 23505 unique-violation (parallel insert race), the winning call already
+  // emitted assignment_added — re-select the surviving row without re-emitting.
+  try {
+    return await addJobAssignment({
+      supabase,
+      jobId,
+      userId,
+      assignedBy: actorUserId,
+      isPrimary: false,
+    });
+  } catch (addErr: any) {
+    if (addErr?.code === "23505") {
+      const { data: raced, error: racedErr } = await supabase
+        .from("job_assignments")
+        .select(
+          "id, job_id, user_id, assigned_by, is_active, is_primary, created_at, removed_at, removed_by"
+        )
+        .eq("job_id", jobId)
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (racedErr) throw racedErr;
+      if (!raced) {
+        throw new Error(
+          "Concurrent assignment insert detected but no active row found after race"
+        );
+      }
+      return raced as JobAssignment;
+    }
+    throw addErr;
+  }
+}
+
+/** Returns the current primary active assignment, or null if none is set. */
+async function getPrimaryActiveAssignment(params: {
+  supabase: any;
+  jobId: string;
+}): Promise<JobAssignment | null> {
+  const { supabase, jobId } = params;
+
+  const { data, error } = await supabase
+    .from("job_assignments")
+    .select(
+      "id, job_id, user_id, assigned_by, is_active, is_primary, created_at, removed_at, removed_by"
+    )
+    .eq("job_id", jobId)
+    .eq("is_active", true)
+    .eq("is_primary", true)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data ?? null) as JobAssignment | null;
+}
+
+// ---------------------------------------------------------------------------
 
 
 type OpsSnapshot = {
@@ -1029,6 +1317,23 @@ export async function updateJobContractorFromForm(formData: FormData) {
   const contractor_id = contractorIdRaw ? contractorIdRaw : null;
 
   const supabase = await createClient();
+
+  const { data: beforeJob, error: beforeErr } = await supabase
+    .from("jobs")
+    .select("contractor_id")
+    .eq("id", jobId)
+    .single();
+
+  if (beforeErr) throw beforeErr;
+
+  // Hardening: contractor changes are jobs.contractor_id-only and must not
+  // mutate staffing history in job_assignments. Also skip no-op rewrites.
+  const currentContractorId = beforeJob?.contractor_id ? String(beforeJob.contractor_id) : null;
+  if (currentContractorId === contractor_id) {
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath("/jobs");
+    return;
+  }
 
   const { error } = await supabase
     .from("jobs")
@@ -2718,6 +3023,19 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       redirect(`/jobs/${id}?tab=${String(formData.get("tab") || "info")}&schedule_required=1`);
     }
 
+    // PH2-D: resolve acting internal user before any DB write.
+    // Fails fast with an auth error if the session is not an active internal user.
+    const { userId: actingUserId } = await requireInternalUser({ supabase });
+
+    // PH2-D refinement: ensure staffing before status update so assignment
+    // failures cannot leave the job advanced without attribution.
+    const actingAssignment = await ensureActiveAssignmentForUser({
+      supabase,
+      jobId: id,
+      userId: actingUserId,
+      actorUserId: actingUserId,
+    });
+
     const updatePayload: Record<string, any> = {
       status: "on_the_way",
       on_the_way_at: now.toISOString(),
@@ -2729,13 +3047,46 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       updatePayload.window_end = toLocalTime(plusTwoHours);
     }
 
-    const { error: updErr } = await supabase
+    const { data: onTheWayApplied, error: updErr } = await supabase
       .from("jobs")
       .update(updatePayload)
-      .eq("id", id);
+      .eq("id", id)
+      .eq("status", current)
+      .is("on_the_way_at", null)
+      .select("id")
+      .maybeSingle();
 
     if (updErr) throw updErr;
-    
+
+    // Concurrency hardening: if another request already advanced this job,
+    // do not emit duplicate transition events on this stale request.
+    if (!onTheWayApplied?.id) {
+      revalidatePath(`/jobs/${id}`);
+      revalidatePath(`/jobs`);
+      revalidatePath(`/ops`);
+      revalidatePath(`/portal`);
+      revalidatePath(`/portal/jobs/${id}`);
+      redirect(`/jobs/${id}`);
+    }
+
+    // Keep on_my_way close to user intent in event order.
+    // assignment_added (if any) -> on_my_way -> schedule_updated (if any)
+    await insertJobEvent({
+      supabase,
+      jobId: id,
+      event_type: "on_my_way",
+      meta: {
+        ...buildMovementEventMeta({
+          from: current,
+          to: next,
+          trigger: "field_action",
+          sourceAction: "advance_job_status_from_form",
+        }),
+        actor_user_id: actingUserId,
+        assignment_id: actingAssignment.id,
+      },
+      userId: actingUserId,
+    });
 
     if (!hasFullSchedule && autoScheduleConfirmed) {
       await insertJobEvent({
@@ -2757,13 +3108,6 @@ export async function advanceJobStatusFromForm(formData: FormData) {
         },
       });
     }
-
-    await insertJobEvent({
-      supabase,
-      jobId: id,
-      event_type: "on_my_way",
-      meta: { from: current, to: next },
-    });
   } else {
     const updatePayload: Record<string, any> = { status: next };
 
@@ -2788,12 +3132,26 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       }
     }
 
-    const { error: updErr } = await supabase
+    const { data: transitionApplied, error: updErr } = await supabase
       .from("jobs")
       .update(updatePayload)
-      .eq("id", id);
+      .eq("id", id)
+      .eq("status", current)
+      .select("id")
+      .maybeSingle();
 
     if (updErr) throw updErr;
+
+    // Concurrency/no-op hardening: stale retries should not emit duplicate
+    // lifecycle events when a parallel request already moved status forward.
+    if (!transitionApplied?.id) {
+      revalidatePath(`/jobs/${id}`);
+      revalidatePath(`/jobs`);
+      revalidatePath(`/ops`);
+      revalidatePath(`/portal`);
+      revalidatePath(`/portal/jobs/${id}`);
+      redirect(`/jobs/${id}`);
+    }
 
     
 
@@ -2814,19 +3172,121 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   }
     const lifecycleEventMap: Partial<Record<JobStatus, string>> = {
     on_the_way: "on_my_way",
-    in_process: "job_started",
     completed: "job_completed",
   };
 
-  const lifecycleEventType = lifecycleEventMap[next];
+  if (next === "in_process") {
+    // PH2-E: person-level arrival event, additive to legacy visit-level start.
+    // Order is intentional for downstream consumers: tech_arrived -> job_started.
+    const {
+      data: { user },
+      error: userErr,
+    } = await supabase.auth.getUser();
 
-  if (lifecycleEventType) {
+    if (userErr) throw userErr;
+
+    const actingUserId = user?.id ?? null;
+
+    let assignmentId: string | null = null;
+    if (actingUserId) {
+      const { data: activeAssignment, error: assignmentErr } = await supabase
+        .from("job_assignments")
+        .select("id")
+        .eq("job_id", id)
+        .eq("user_id", actingUserId)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (assignmentErr) throw assignmentErr;
+      assignmentId = String(activeAssignment?.id ?? "").trim() || null;
+    }
+
+    const movementMeta = buildMovementEventMeta({
+      from: current,
+      to: next,
+      trigger: "field_action",
+      sourceAction: "advance_job_status_from_form",
+    });
+
+    const transitionMeta = {
+      ...movementMeta,
+      actor_user_id: actingUserId,
+      ...(assignmentId ? { assignment_id: assignmentId } : {}),
+    };
+
     await insertJobEvent({
       supabase,
       jobId: id,
-      event_type: lifecycleEventType,
-      meta: { from: current, to: next },
+      event_type: "tech_arrived",
+      meta: transitionMeta,
+      userId: actingUserId,
     });
+
+    await insertJobEvent({
+      supabase,
+      jobId: id,
+      event_type: "job_started",
+      meta: transitionMeta,
+      userId: actingUserId,
+    });
+  } else {
+    const lifecycleEventType = lifecycleEventMap[next];
+
+    if (lifecycleEventType) {
+      if (lifecycleEventType === "job_completed") {
+        const {
+          data: { user },
+          error: userErr,
+        } = await supabase.auth.getUser();
+
+        if (userErr) throw userErr;
+
+        const actingUserId = user?.id ?? null;
+
+        let assignmentId: string | null = null;
+        if (actingUserId) {
+          const { data: activeAssignment, error: assignmentErr } = await supabase
+            .from("job_assignments")
+            .select("id")
+            .eq("job_id", id)
+            .eq("user_id", actingUserId)
+            .eq("is_active", true)
+            .maybeSingle();
+
+          if (assignmentErr) throw assignmentErr;
+          assignmentId = String(activeAssignment?.id ?? "").trim() || null;
+        }
+
+        await insertJobEvent({
+          supabase,
+          jobId: id,
+          event_type: lifecycleEventType,
+          meta: {
+            ...buildMovementEventMeta({
+              from: current,
+              to: next,
+              trigger: "field_action",
+              sourceAction: "advance_job_status_from_form",
+            }),
+            actor_user_id: actingUserId,
+            ...(assignmentId ? { assignment_id: assignmentId } : {}),
+          },
+          userId: actingUserId,
+        });
+      } else {
+        await insertJobEvent({
+          supabase,
+          jobId: id,
+          event_type: lifecycleEventType,
+          meta: buildMovementEventMeta({
+            from: current,
+            to: next,
+            trigger: "field_action",
+            sourceAction: "advance_job_status_from_form",
+          }),
+        });
+      }
+    }
   }
 
     // Retest-specific lifecycle breadcrumb:

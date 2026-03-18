@@ -37,3 +37,21 @@ export async function sendInviteEmail(args: {
     html: args.html,
   });
 }
+
+export async function sendContractorReportEmail(args: {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+}) {
+  const from = requireEnv("EMAIL_FROM");
+  const transporter = getSmtpTransport();
+
+  await transporter.sendMail({
+    from,
+    to: args.to,
+    subject: args.subject,
+    text: args.text,
+    html: args.html,
+  });
+}

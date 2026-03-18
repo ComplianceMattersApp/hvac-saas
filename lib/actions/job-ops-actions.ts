@@ -11,7 +11,14 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
-import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
+import {
+  findExistingContractorReportEmailDelivery,
+  insertContractorReportEmailDeliveryNotification,
+  insertInternalNotificationForEvent,
+  markContractorReportEmailDeliveryNotification,
+} from "@/lib/actions/notification-actions";
+import { sendContractorReportEmail } from "@/lib/email/smtp";
+import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
 
 const OPS_STATUSES = [
   "need_to_schedule",
@@ -358,7 +365,7 @@ export async function sendContractorReport(input: {
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
-    .select("id, contractor_id")
+    .select("id, contractor_id, contractors:contractor_id ( email )")
     .eq("id", jobId)
     .single();
 
@@ -380,30 +387,36 @@ export async function sendContractorReport(input: {
     contractorNote,
   });
 
-  const { error: eventErr } = await supabase.from("job_events").insert({
-    job_id: jobId,
-    event_type: "contractor_report_sent",
-    message: "Contractor report sent",
-    meta: {
-      report_kind: report.report_kind,
-      report_version: 1,
-      sent_at_iso: sentAtIso,
-      generated_from: {
-        ops_status: report.ops_status,
+  const { data: insertedEvent, error: eventErr } = await supabase
+    .from("job_events")
+    .insert({
+      job_id: jobId,
+      event_type: "contractor_report_sent",
+      message: "Contractor report sent",
+      meta: {
+        report_kind: report.report_kind,
+        report_version: 1,
+        sent_at_iso: sentAtIso,
+        generated_from: {
+          ops_status: report.ops_status,
+        },
+        customer_name: report.customer_name,
+        location_text: report.location_text,
+        contractor_name: report.contractor_name,
+        service_date_text: report.service_date_text,
+        reasons: report.reasons,
+        contractor_note: contractorNote,
+        next_step: report.next_step,
+        body_text: bodyText,
       },
-      customer_name: report.customer_name,
-      location_text: report.location_text,
-      contractor_name: report.contractor_name,
-      service_date_text: report.service_date_text,
-      reasons: report.reasons,
-      contractor_note: contractorNote,
-      next_step: report.next_step,
-      body_text: bodyText,
-    },
-    user_id: user.id,
-  });
+      user_id: user.id,
+    })
+    .select("id")
+    .single();
 
   if (eventErr) throw new Error(eventErr.message);
+  const eventId = String(insertedEvent?.id ?? "").trim();
+  if (!eventId) throw new Error("Failed to capture contractor_report_sent event id");
 
   await insertInternalNotificationForEvent({
     supabase,
@@ -411,6 +424,71 @@ export async function sendContractorReport(input: {
     eventType: "contractor_report_sent",
     actorUserId: user.id,
   });
+
+  const contractorEmail = String((job as any)?.contractors?.email ?? "").trim().toLowerCase();
+  const subject = `[Compliance Matters] ${report.title} - ${report.customer_name}`;
+
+  if (!contractorEmail) {
+    await insertContractorReportEmailDeliveryNotification({
+      supabase,
+      jobId,
+      contractorId: String(job.contractor_id ?? "").trim() || null,
+      recipientEmail: null,
+      eventId,
+      dedupeKey: null,
+      subject,
+      body: "Contractor report email was not sent because contractor email is missing.",
+      status: "failed",
+      errorDetail: "missing_contractor_email",
+    });
+
+    throw new Error("Cannot send contractor report email: contractor email is missing.");
+  }
+
+  const dedupeKey = `email:contractor_report:${eventId}:${contractorEmail}`;
+  const existingDelivery = await findExistingContractorReportEmailDelivery({
+    supabase,
+    dedupeKey,
+  });
+
+  if (!existingDelivery?.id) {
+    const deliveryRow = await insertContractorReportEmailDeliveryNotification({
+      supabase,
+      jobId,
+      contractorId: String(job.contractor_id ?? "").trim() || null,
+      recipientEmail: contractorEmail,
+      eventId,
+      dedupeKey,
+      subject,
+      body: bodyText,
+      status: "queued",
+    });
+
+    try {
+      await sendContractorReportEmail({
+        to: contractorEmail,
+        subject,
+        text: bodyText,
+      });
+
+      await markContractorReportEmailDeliveryNotification({
+        supabase,
+        notificationId: deliveryRow.id,
+        status: "sent",
+      });
+    } catch (error) {
+      const errMessage = error instanceof Error ? error.message : "Unknown transport error";
+
+      await markContractorReportEmailDeliveryNotification({
+        supabase,
+        notificationId: deliveryRow.id,
+        status: "failed",
+        errorDetail: errMessage,
+      });
+
+      throw new Error(`Failed to send contractor report email: ${errMessage}`);
+    }
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/portal/jobs/${jobId}`);
@@ -1195,6 +1273,53 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
     });
   }
 
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr) throw new Error(userErr.message);
+
+  const actingUserId = user?.id ?? null;
+
+  let assignmentId: string | null = null;
+  if (actingUserId) {
+    const { data: activeAssignment, error: assignmentErr } = await supabase
+      .from("job_assignments")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("user_id", actingUserId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (assignmentErr) throw new Error(assignmentErr.message);
+    assignmentId = String(activeAssignment?.id ?? "").trim() || null;
+  }
+
+  const completionMeta = {
+    ...buildMovementEventMeta({
+      from: beforeJob.status ?? "in_process",
+      to: "completed",
+      trigger: "ops_action",
+      sourceAction: "mark_job_field_complete_from_form",
+    }),
+    actor_user_id: actingUserId,
+    ...(assignmentId ? { assignment_id: assignmentId } : {}),
+  };
+
+  // PH2-F duplicate protection: if this path is reached after status was already
+  // completed elsewhere, skip emitting a second job_completed event.
+  if (beforeJob.status !== "completed") {
+    const { error: completionEventErr } = await supabase.from("job_events").insert({
+      job_id: jobId,
+      event_type: "job_completed",
+      meta: completionMeta,
+      user_id: actingUserId,
+    });
+
+    if (completionEventErr) throw new Error(completionEventErr.message);
+  }
+
   const changes = [
     { field: "status", from: beforeJob.status ?? null, to: "completed" },
     { field: "field_complete", from: beforeFieldComplete, to: true },
@@ -1208,6 +1333,7 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
     meta: {
       changes,
       source: "job_detail_top_action",
+      ...completionMeta,
     },
   });
 
