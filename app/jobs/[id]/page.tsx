@@ -43,6 +43,7 @@ import UnscheduleButton from "./_components/UnscheduleButton";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import ContractorReportPanel from "./_components/ContractorReportPanel";
 import { resolveContractorResponseTracking } from "@/lib/portal/resolveContractorIssues";
+import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 
 import JobAttachmentsInternal from "./_components/JobAttachmentsInternal";
 
@@ -560,6 +561,25 @@ const { data: timelineEvents, error: tlErr } = await supabase
   .limit(200);
 if (tlErr) throw new Error(tlErr.message);
 
+const timelineActorIds = Array.from(
+  new Set(
+    (timelineEvents ?? [])
+      .flatMap((e: any) => {
+        const meta = e?.meta && typeof e.meta === "object" && !Array.isArray(e.meta) ? e.meta : null;
+        return [
+          String(e?.user_id ?? "").trim(),
+          String(meta?.actor_user_id ?? "").trim(),
+        ];
+      })
+      .filter(Boolean),
+  ),
+);
+
+const actorDisplayMap = await resolveUserDisplayMap({
+  supabase,
+  userIds: timelineActorIds,
+});
+
 const eventsForCurrentJob = (timelineEvents ?? []).filter(
   (e: any) => String(e?.job_id ?? "") === String(job.id ?? "")
 );
@@ -997,6 +1017,8 @@ const renderTimelineItem = (e: any, key: string) => {
   const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "—";
   const type = String(e?.event_type ?? "");
   const meta = e?.meta ?? {};
+  const actorUserId = String(meta?.actor_user_id ?? e?.user_id ?? "").trim();
+  const actorDisplayName = actorUserId ? actorDisplayMap[actorUserId] ?? "User" : "";
   const detailText = formatTimelineDetail(type, meta, e?.message);
   const title = ["public_note", "contractor_note", "contractor_correction_submission"].includes(type)
     ? formatSharedHistoryHeading(type, meta)
@@ -1042,6 +1064,10 @@ const renderTimelineItem = (e: any, key: string) => {
         <div className="mt-1 text-sm text-gray-700">
           {detailText}
         </div>
+      ) : null}
+
+      {actorDisplayName ? (
+        <div className="mt-1 text-xs text-gray-500">By {actorDisplayName}</div>
       ) : null}
 
       {type === "retest_created" && meta?.child_job_id ? (

@@ -13,6 +13,7 @@ import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import { requireInternalUser } from "@/lib/auth/internal-user";
+import { assertAssignableInternalUser } from "@/lib/staffing/human-layer";
 import type { JobStatus } from "@/lib/types/job";
 
 export type { JobStatus } from "@/lib/types/job";
@@ -250,6 +251,11 @@ async function addJobAssignment(params: {
   isPrimary?: boolean;
 }): Promise<JobAssignment> {
   const { supabase, jobId, userId, assignedBy, isPrimary = false } = params;
+
+  await assertAssignableInternalUser({
+    supabase,
+    userId,
+  });
 
   const { data, error } = await supabase
     .from("job_assignments")
