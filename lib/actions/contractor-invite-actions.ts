@@ -12,7 +12,6 @@ export async function inviteContractor(args: {
   email: string;
   contractorId?: string;       // preferred if inviting from contractor page
   contractorName?: string;     // used only if contractorId missing
-  role?: "member" | "owner";   // accepted for compatibility; contractor access is uniform
 }) {
   const email = normalizeEmail(args.email);
   if (!email.includes("@")) throw new Error("Invalid email");
@@ -28,7 +27,6 @@ export async function inviteContractor(args: {
 
   const ownerUserId = session.user.id;
   const invitedBy = session.user.id;
-  const role = "member";
 
   // 1) Resolve contractor (create if missing)
   let contractorId = args.contractorId;
@@ -80,7 +78,6 @@ export async function inviteContractor(args: {
         contractor_id: contractorId,
         email,
         invited_by: invitedBy,
-        role,
         status: "pending",
       },
       { onConflict: "owner_user_id,contractor_id,lower(email)" as any }
@@ -152,7 +149,6 @@ export async function inviteContractor(args: {
       contractor_id: contractorId,
       email,
       status: "pending",
-      role,
     },
   };
 }

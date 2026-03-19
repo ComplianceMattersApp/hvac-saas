@@ -10,7 +10,6 @@ create table if not exists public.contractor_invites (
   sent_count integer not null default 1,
   last_sent_at timestamp with time zone,
   invited_by uuid references auth.users(id) on delete set null,
-  role text default 'member' check (role in ('member', 'owner')),
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now()
 );
