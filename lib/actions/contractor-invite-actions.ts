@@ -1,11 +1,33 @@
-"use server";
+﻿"use server";
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { sendInviteEmail } from "@/lib/email/smtp";
 import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
 
+// Mirrors the isAlreadyExistsAuthError helper used in internal-user-actions.ts
+function isAlreadyExistsError(err: any): boolean {
+  const msg = String(err?.message ?? "").toLowerCase();
+  return (
+    msg.includes("already") ||
+    msg.includes("exists") ||
+    msg.includes("registered") ||
+    msg.includes("database error saving new user") // Supabase wraps dupe-email as this
+  );
+}
+
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+async function getAuthUserIdByEmail(admin: any, email: string): Promise<string | null> {
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id, email")
+    .ilike("email", email)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.id ? String(data.id) : null;
 }
 
 export async function inviteContractor(args: {
@@ -87,73 +109,75 @@ export async function inviteContractor(args: {
 
   if (upErr) throw new Error(upErr.message);
 
-  // 3) Generate invite link (admin) but send via SMTP ourselves
+  // 3) Create / invite the auth user.
+  //    We use inviteUserByEmail (POST /auth/v1/invite) — the same endpoint used
+  //    by the proven internal-user invite flow — NOT generateLink("invite") which
+  //    calls POST /auth/v1/admin/generate_link, a different GoTrue code path that
+  //    fails with "Database error saving new user" for this project's setup.
+  //
+  //    inviteUserByEmail also triggers Supabase's own invite email automatically.
+  //    Our branded SMTP email is sent below via the recovery link (step 5).
   const admin = createAdminClient();
   const redirectTo = resolveInviteRedirectTo();
 
-  let actionLink: string | undefined;
   let authUserId: string | undefined;
 
-  const { data: inviteLinkData, error: inviteLinkErr } = await admin.auth.admin.generateLink({
-    type: "invite",
-    email,
-    options: {
-      // Where Supabase sends the user after they click the invite + finish auth
-      redirectTo,
-      // Trigger reads these values on auth.users insert
-      data: {
-        contractor_id: contractorId,
-        owner_user_id: ownerUserId,
-        invite_id: inviteRow.id,
-      },
-    },
+  const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo,
   });
 
-  if (inviteLinkErr) {
-    // The email already exists in auth.users — generateLink("invite") tries to INSERT
-    // a new user and fails with "Database error saving new user".
-    // Fall back to a recovery link so the existing user can access the portal.
-    const { data: recoveryData, error: recoveryErr } = await admin.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: { redirectTo },
-    });
-
-    if (recoveryErr) {
-      // Surface the original invite error plus the recovery fallback error
-      throw new Error(
-        `Invite failed (${inviteLinkErr.message}) and recovery fallback also failed (${recoveryErr.message})`
-      );
-    }
-
-    actionLink =
-      (recoveryData as any)?.properties?.action_link ||
-      (recoveryData as any)?.action_link;
-    authUserId = (recoveryData as any)?.user?.id;
+  if (!inviteErr) {
+    // Fresh user created successfully.
+    authUserId = inviteData?.user?.id ? String(inviteData.user.id) : undefined;
+  } else if (isAlreadyExistsError(inviteErr)) {
+    // User already exists in auth.users — look up their id for the recovery path.
+    const found = await getAuthUserIdByEmail(admin, email);
+    authUserId = found ?? undefined;
   } else {
-    actionLink =
-      (inviteLinkData as any)?.properties?.action_link ||
-      (inviteLinkData as any)?.action_link;
-    authUserId = (inviteLinkData as any)?.user?.id;
+    // Genuine unexpected failure — surface the real message.
+    throw new Error(`Auth invite failed: ${inviteErr.message}`);
   }
+
+  // 4) Generate a recovery link for our custom branded email.
+  //    Recovery links are handled by hashType==="recovery" in auth/callback, which
+  //    routes to /set-password?mode=invite — same destination as an invite link.
+  //    generateLink("recovery") works for both newly-created and existing users.
+  const { data: recoveryData, error: recoveryErr } = await admin.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo },
+  });
+
+  if (recoveryErr) {
+    throw new Error(`Could not generate invite link: ${recoveryErr.message}`);
+  }
+
+  const actionLink =
+    (recoveryData as any)?.properties?.action_link ||
+    (recoveryData as any)?.action_link;
 
   if (!actionLink) throw new Error("Invite link missing from generateLink response");
 
-  // 4) Send email
-  const subject = "You’ve been invited to Compliance Matters";
+  if (!authUserId) {
+    authUserId = (recoveryData as any)?.user?.id;
+  }
+
+  // 5) Send our branded SMTP email with the recovery link.
+  const subject = "You've been invited to Compliance Matters";
   const html = `
     <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height: 1.4;">
       <h2>Contractor Portal Invite</h2>
-      <p>You’ve been invited to join a contractor portal.</p>
+      <p>You have been invited to join a contractor portal.</p>
       <p><a href="${actionLink}">Accept your invite</a></p>
-      <p>If the button doesn’t work, copy/paste this link:</p>
+      <p>If the button does not work, copy/paste this link:</p>
       <p style="word-break: break-all;">${actionLink}</p>
     </div>
   `;
 
   await sendInviteEmail({ to: email, subject, html });
 
-  // 5) Update tracking fields (also persist auth_user_id if we resolved it)
+  // 6) Update tracking fields.
+  //    auth_user_id column added via migration 20260319_contractor_invites_auth_user_column.sql
   const trackUpdate: Record<string, unknown> = {
     sent_count: (inviteRow.sent_count ?? 0) + 1,
     last_sent_at: new Date().toISOString(),
