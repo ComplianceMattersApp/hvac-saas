@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const [status, setStatus] = useState("Processing authentication...");
+  const [status, setStatus] = useState("Signing you in...");
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -30,15 +30,7 @@ export default function AuthCallbackPage() {
         const hasCodeFlow = !!code;
         const hasOtpFlow = !!(tokenHash && queryType);
 
-        setStatus(
-          hasHashTokens
-            ? `Hash flow: type=${hashType}`
-            : hasCodeFlow
-              ? "Code exchange flow..."
-              : hasOtpFlow
-                ? `OTP verification: type=${queryType}`
-                : "No auth params found"
-        );
+        setStatus("Signing you in...");
 
         // Handler 1: Hash-token flow (invite/recovery from Supabase verify redirect)
         if (hasHashTokens) {
@@ -48,14 +40,14 @@ export default function AuthCallbackPage() {
           });
 
           if (sessionError) {
-            setStatus(`Session error: ${sessionError.message}`);
+            setStatus("We could not complete sign-in. Redirecting to login...");
             setTimeout(() => router.push("/login"), 1500);
             return;
           }
 
           // Invite or recovery: send to password setup
           if (hashType === "invite" || hashType === "recovery") {
-            setStatus("Session established, routing to set-password...");
+            setStatus("Redirecting to set password...");
             router.push("/set-password?mode=invite");
             return;
           }
@@ -70,12 +62,12 @@ export default function AuthCallbackPage() {
           const { error: codeError } = await supabase.auth.exchangeCodeForSession(code);
 
           if (codeError) {
-            setStatus(`Code exchange error: ${codeError.message}`);
+            setStatus("We could not complete sign-in. Redirecting to login...");
             setTimeout(() => router.push("/login"), 1500);
             return;
           }
 
-          setStatus("Code exchanged, routing by role...");
+          setStatus("Finishing sign-in...");
           await routeByRole(supabase, router, setStatus);
           return;
         }
@@ -88,28 +80,28 @@ export default function AuthCallbackPage() {
           });
 
           if (otpError) {
-            setStatus(`OTP error: ${otpError.message}`);
+            setStatus("We could not complete sign-in. Redirecting to login...");
             setTimeout(() => router.push("/login"), 1500);
             return;
           }
 
           // OTP flows: if invite or recovery, to password setup
           if (queryType === "invite" || queryType === "recovery") {
-            setStatus("OTP verified, routing to set-password...");
+            setStatus("Redirecting to set password...");
             router.push("/set-password?mode=invite");
             return;
           }
 
-          setStatus("OTP verified, routing by role...");
+          setStatus("Finishing sign-in...");
           await routeByRole(supabase, router, setStatus);
           return;
         }
 
         // No recognized auth params
-        setStatus("No authentication parameters found");
+        setStatus("Invalid or expired sign-in link. Redirecting to login...");
         setTimeout(() => router.push("/login"), 1500);
       } catch (error) {
-        setStatus(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+        setStatus("We could not complete sign-in. Redirecting to login...");
         setTimeout(() => router.push("/login"), 2000);
       }
     };
@@ -137,7 +129,7 @@ async function routeByRole(
 ) {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) {
-    setStatus("No user found after auth");
+    setStatus("Session could not be confirmed. Redirecting to login...");
     setTimeout(() => router.push("/login"), 1500);
     return;
   }
@@ -149,10 +141,10 @@ async function routeByRole(
     .maybeSingle();
 
   if (contractorData?.contractor_id) {
-    setStatus("Routing to portal...");
+    setStatus("Redirecting...");
     router.push("/portal");
   } else {
-    setStatus("Routing to ops...");
+    setStatus("Redirecting...");
     router.push("/ops");
   }
 }
