@@ -491,7 +491,7 @@ export async function CalendarView(props: Props) {
         </div>
       </div>
 
-      <div className={`grid gap-5 ${selectedJob ? 'xl:grid-cols-[220px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[220px_minmax(0,1fr)]'}`}>
+      <div className={`grid gap-5 ${selectedJob ? 'xl:grid-cols-[260px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[260px_minmax(0,1fr)]'}`}>
         <aside>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unscheduled Jobs</h3>
           <div className="mt-2 max-h-[70vh] space-y-1 overflow-y-auto pr-1">
