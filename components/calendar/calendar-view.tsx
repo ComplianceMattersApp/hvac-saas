@@ -224,15 +224,8 @@ function DispatchGrid(props: {
   mode: DispatchViewMode;
   date: string;
   selectedJobId?: string;
-  selectedJob?: DispatchJob | null;
-  detailPanelProps?: {
-    returnTo: string;
-    assignableUsers: Array<{ user_id: string; display_name: string }>;
-    view: CalendarUIView;
-    date: string;
-  };
 }) {
-  const { jobs, mode, date, selectedJobId, selectedJob, detailPanelProps } = props;
+  const { jobs, mode, date, selectedJobId } = props;
   const startHour = 6;
   const endHour = 18;
   const hourHeight = 50;
@@ -345,34 +338,12 @@ function DispatchGrid(props: {
     Array.from(techMap.entries()).map(([user_id, display_name]) => ({ user_id, display_name })),
   );
 
-  const columnIndexByUserId = new Map(columns.map((col, index) => [col.user_id, index]));
-
   const totalGridHeight = (endHour - startHour) * hourHeight;
 
   const isTodayColumn = String(date) === todayYmdLA();
   const nowMinutes = currentMinutesLA();
   const showNowLine = isTodayColumn && nowMinutes != null && nowMinutes >= gridStartMinutes && nowMinutes <= gridEndMinutes;
   const nowTop = showNowLine ? ((Number(nowMinutes) - gridStartMinutes) / 60) * hourHeight : 0;
-
-  let selectedAnchor:
-    | {
-        user_id: string;
-        top: number;
-      }
-    | null = null;
-
-  if (selectedJobId) {
-    for (const col of columns) {
-      const row = (laneItemsByUser.get(col.user_id) ?? []).find((laneRow) => laneRow.job.id === selectedJobId);
-      if (row) {
-        selectedAnchor = {
-          user_id: col.user_id,
-          top: ((row.start - gridStartMinutes) / 60) * hourHeight,
-        };
-        break;
-      }
-    }
-  }
 
   if (!columns.length) {
     return <div className="py-10 text-sm text-slate-500">No assigned scheduled jobs for this {mode}.</div>;
@@ -487,25 +458,6 @@ function DispatchGrid(props: {
                 );
               })}
 
-            {selectedAnchor && selectedJob && detailPanelProps && selectedAnchor.user_id === col.user_id ? (
-              <div
-                className={`absolute z-30 hidden xl:block ${
-                  (columnIndexByUserId.get(col.user_id) ?? 0) < columns.length - 1
-                    ? 'left-[calc(100%+0.5rem)]'
-                    : 'right-[calc(100%+0.5rem)]'
-                }`}
-                style={{ top: `${Math.max(selectedAnchor.top - 12, 0)}px`, width: '340px' }}
-              >
-                <DetailPanel
-                  job={selectedJob}
-                  returnTo={detailPanelProps.returnTo}
-                  assignableUsers={detailPanelProps.assignableUsers}
-                  view={detailPanelProps.view}
-                  date={detailPanelProps.date}
-                  className="max-h-[78vh] rounded-md border border-slate-200 bg-white shadow-xl"
-                />
-              </div>
-            ) : null}
           </div>
         ))}
       </div>
@@ -705,14 +657,6 @@ export async function CalendarView(props: Props) {
     data.unassignedScheduledJobs.find((job) => job.id === selectedJobId) ||
     null;
 
-  const selectedJobCanAnchorInGrid = Boolean(
-    selectedJob &&
-      selectedJob.scheduled_date &&
-      selectedJob.window_start &&
-      selectedJob.assignments.length > 0 &&
-      String(selectedJob.ops_status ?? '').toLowerCase() !== 'on_hold',
-  );
-
   return (
     <div className="space-y-4 pb-6">
       {banner ? (
@@ -779,13 +723,6 @@ export async function CalendarView(props: Props) {
                 mode={mode}
                 date={data.day.date}
                 selectedJobId={selectedJobId}
-                selectedJob={selectedJobCanAnchorInGrid ? selectedJob : null}
-                detailPanelProps={{
-                  returnTo,
-                  assignableUsers: data.assignableUsers,
-                  view: uiView,
-                  date: data.anchorDate,
-                }}
               />
             </section>
           ) : (
@@ -801,17 +738,6 @@ export async function CalendarView(props: Props) {
                     mode={mode}
                     date={day.date}
                     selectedJobId={selectedJobId}
-                    selectedJob={
-                      selectedJobCanAnchorInGrid && String(selectedJob?.scheduled_date ?? '') === day.date
-                        ? selectedJob
-                        : null
-                    }
-                    detailPanelProps={{
-                      returnTo,
-                      assignableUsers: data.assignableUsers,
-                      view: uiView,
-                      date: data.anchorDate,
-                    }}
                   />
                 </div>
               ))}
@@ -820,8 +746,8 @@ export async function CalendarView(props: Props) {
         </main>
       </div>
 
-      {selectedJob && (!selectedJobCanAnchorInGrid || uiView === 'list') ? (
-        <div className="fixed inset-y-4 right-3 z-30 hidden w-[340px] xl:block">
+      {selectedJob ? (
+        <div className="fixed inset-y-4 right-3 z-30 hidden w-[380px] xl:block">
           <DetailPanel
             job={selectedJob}
             returnTo={returnTo}
