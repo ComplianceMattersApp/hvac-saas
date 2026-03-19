@@ -1508,10 +1508,14 @@ const renderTimelineItem = (e: any, key: string) => {
                 title: "Job completed — but still in Need to Schedule",
                 body: "This job is marked completed, but ops status indicates scheduling is still needed. Review status flow.",
               }
-          : {
-              title: "Job completed — but compliance is not fully resolved",
-              body: "Complete remaining ECC items (tests, paperwork, invoice/cert) to fully close out the job.",
-            };
+          : job.job_type === "ecc"
+            ? {
+                title: "Job completed — but compliance is not fully resolved",
+                body: "Complete remaining ECC items (tests, paperwork, invoice/cert) to fully close out the job.",
+              }
+            : null;
+
+      if (!meta) return null;
                     
       return (
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 mt-3">
