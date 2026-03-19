@@ -52,6 +52,7 @@ function dispatchBlockClass(status?: string | null) {
   if (value === 'failed') return 'border-red-200 bg-red-100 text-red-900';
   if (value === 'pending_info') return 'border-amber-200 bg-amber-100 text-amber-900';
   if (value === 'on_hold') return 'border-slate-300 bg-slate-100 text-slate-900';
+  if (value === 'closed') return 'border-slate-300 border-dashed bg-slate-100 text-slate-500';
   if (value === 'scheduled') return 'border-blue-200 bg-blue-100 text-blue-900';
   return 'border-indigo-200 bg-indigo-50 text-indigo-900';
 }
@@ -126,6 +127,14 @@ function parseMinutes(value?: string | null): number | null {
   if (!Number.isFinite(h) || !Number.isFinite(min)) return null;
   if (h < 0 || h > 23 || min < 0 || min > 59) return null;
   return h * 60 + min;
+}
+
+function isDispatchVisibleForLayout(job: DispatchJob) {
+  const ops = String(job.ops_status ?? '').toLowerCase();
+  if (!job.scheduled_date || !job.window_start) return false;
+  if (!Array.isArray(job.assignments) || job.assignments.length === 0) return false;
+  if (ops === 'on_hold') return false;
+  return true;
 }
 
 function blockTimeLabel(startMinutes: number, endMinutes: number) {
@@ -223,11 +232,9 @@ function DispatchGrid(props: {
   const gridStartMinutes = startHour * 60;
   const gridEndMinutes = endHour * 60;
 
-  const gridJobs = jobs
-    .filter((job) => {
-      if (!job.scheduled_date || !job.window_start) return false;
-      return Array.isArray(job.assignments) && job.assignments.length > 0;
-    })
+  const visibleJobs = jobs.filter((job) => isDispatchVisibleForLayout(job));
+
+  const gridJobs = visibleJobs
     .flatMap((job) =>
       job.assignments.map((assignment) => ({
         job,
@@ -238,6 +245,90 @@ function DispatchGrid(props: {
       if (mode === 'day') return String(item.job.scheduled_date) === date;
       return true;
     });
+
+  type LaneItem = {
+    id: string;
+    user_id: string;
+    job: DispatchJob;
+    start: number;
+    end: number;
+    lane: number;
+    laneCount: number;
+  };
+
+  const laneItemsByUser = new Map<string, LaneItem[]>();
+
+  for (const item of gridJobs) {
+    const start = parseMinutes(item.job.window_start);
+    const parsedEnd = parseMinutes(item.job.window_end);
+    if (start == null) continue;
+
+    const clampedStart = Math.max(start, gridStartMinutes);
+    const clampedEnd = Math.min(
+      Math.max(parsedEnd ?? clampedStart + 60, clampedStart + 30),
+      gridEndMinutes,
+    );
+
+    const row: LaneItem = {
+      id: `${item.job.id}-${item.user_id}`,
+      user_id: item.user_id,
+      job: item.job,
+      start: clampedStart,
+      end: clampedEnd,
+      lane: 0,
+      laneCount: 1,
+    };
+
+    if (!laneItemsByUser.has(item.user_id)) laneItemsByUser.set(item.user_id, []);
+    laneItemsByUser.get(item.user_id)!.push(row);
+  }
+
+  for (const [userId, rows] of laneItemsByUser.entries()) {
+    rows.sort((a, b) => (a.start - b.start) || (a.end - b.end));
+
+    const laneEndTimes: number[] = [];
+    let groupStart = 0;
+    let groupEnd = -1;
+
+    const finalizeGroup = (startIndex: number, endIndex: number) => {
+      if (endIndex < startIndex) return;
+      let maxLane = 0;
+      for (let i = startIndex; i <= endIndex; i += 1) {
+        if (rows[i].lane > maxLane) maxLane = rows[i].lane;
+      }
+      const count = Math.max(maxLane + 1, 1);
+      for (let i = startIndex; i <= endIndex; i += 1) {
+        rows[i].laneCount = count;
+      }
+    };
+
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i];
+
+      let laneIndex = laneEndTimes.findIndex((end) => end <= row.start);
+      if (laneIndex < 0) {
+        laneIndex = laneEndTimes.length;
+        laneEndTimes.push(row.end);
+      } else {
+        laneEndTimes[laneIndex] = row.end;
+      }
+      row.lane = laneIndex;
+
+      if (i === 0) {
+        groupStart = 0;
+        groupEnd = row.end;
+      } else if (row.start < groupEnd) {
+        groupEnd = Math.max(groupEnd, row.end);
+      } else {
+        finalizeGroup(groupStart, i - 1);
+        groupStart = i;
+        groupEnd = row.end;
+      }
+    }
+
+    finalizeGroup(groupStart, rows.length - 1);
+    laneItemsByUser.set(userId, rows);
+  }
 
   const techMap = new Map<string, string>();
   for (const item of gridJobs) {
@@ -317,30 +408,33 @@ function DispatchGrid(props: {
             })}
             {showNowLine ? <div className="absolute left-0 right-0 border-t border-rose-400/70" style={{ top: `${nowTop}px` }} /> : null}
 
-            {gridJobs
-              .filter((item) => item.user_id === col.user_id)
-              .map(({ job }) => {
-                const start = parseMinutes(job.window_start);
-                const end = parseMinutes(job.window_end) ?? (start != null ? start + 60 : null);
-                if (start == null) return null;
-
-                const clampedStart = Math.max(start, gridStartMinutes);
-                const clampedEnd = Math.min(Math.max(end ?? clampedStart + 60, clampedStart + 30), gridEndMinutes);
-                const top = ((clampedStart - gridStartMinutes) / 60) * hourHeight;
-                const height = Math.max(((clampedEnd - clampedStart) / 60) * hourHeight, 36);
+            {(laneItemsByUser.get(col.user_id) ?? []).map((row) => {
+                const { job } = row;
+                const top = ((row.start - gridStartMinutes) / 60) * hourHeight;
+                const height = Math.max(((row.end - row.start) / 60) * hourHeight, 36);
                 const isSelected = selectedJobId === job.id;
                 const assignees = Array.isArray(job.assignments) ? job.assignments : [];
                 const colorBars = assignees.slice(0, 3);
                 const overflowCount = Math.max(assignees.length - colorBars.length, 0);
                 const initials = assignees.slice(0, 2).map((a) => initialsFromName(a.display_name)).join(' ');
 
+                const laneWidthPct = 100 / Math.max(row.laneCount, 1);
+                const laneLeftPct = row.lane * laneWidthPct;
+                const laneGapPx = 3;
+
                 return (
                   <Link
-                    key={`${job.id}-${col.user_id}`}
+                    key={row.id}
                     href={buildCalendarHref(mode, date, { job: job.id })}
                     scroll={false}
                     className={`absolute left-1 right-1 rounded-md border py-0.5 pr-1.5 pl-5 shadow-sm transition hover:cursor-pointer hover:shadow-md hover:brightness-[1.03] ${dispatchBlockClass(job.ops_status)} ${isSelected ? 'ring-2 ring-slate-800/45 border-slate-700' : ''}`}
-                    style={{ top: `${top}px`, height: `${height}px` }}
+                    style={{
+                      top: `${top}px`,
+                      height: `${height}px`,
+                      left: `calc(${laneLeftPct}% + ${laneGapPx}px)`,
+                      width: `calc(${laneWidthPct}% - ${laneGapPx * 2}px)`,
+                      right: 'auto',
+                    }}
                   >
                     <div className="absolute inset-y-1 left-1 flex items-start gap-0.5">
                       {colorBars.map((assignment) => (
@@ -359,7 +453,7 @@ function DispatchGrid(props: {
                     <p className="truncate text-xs font-semibold leading-4">{shortTitle(job)}</p>
                     <p className="truncate text-[11px] leading-4 opacity-90">{job.city || job.contractor_name || 'No city or contractor'}</p>
                     <div className="mt-0.5 flex items-center justify-between gap-2">
-                      <p className="truncate text-[10px] font-medium uppercase tracking-wide opacity-80">{blockTimeLabel(clampedStart, clampedEnd)}</p>
+                      <p className="truncate text-[10px] font-medium uppercase tracking-wide opacity-80">{blockTimeLabel(row.start, row.end)}</p>
                       {initials ? <p className="truncate text-[9px] font-semibold uppercase tracking-wide opacity-70">{initials}</p> : null}
                     </div>
                   </Link>
@@ -380,11 +474,8 @@ function AgendaList(props: {
   const { jobs, mode, date } = props;
 
   const listJobs = jobs
-    .filter((job) => {
-      if (!job.scheduled_date || !job.window_start || !job.assignments.length) return false;
-      if (mode === 'day') return String(job.scheduled_date) === date;
-      return true;
-    })
+    .filter((job) => isDispatchVisibleForLayout(job))
+    .filter((job) => (mode === 'day' ? String(job.scheduled_date) === date : true))
     .slice()
     .sort((a, b) => {
       const at = parseMinutes(a.window_start) ?? 0;
