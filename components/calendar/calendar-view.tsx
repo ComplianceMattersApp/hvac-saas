@@ -31,23 +31,8 @@ function bannerMessage(banner?: string) {
   return map[key] ?? null;
 }
 
-function statusPillClass(status?: string | null) {
-  const value = String(status ?? '').toLowerCase();
-  if (value === 'failed') return 'bg-red-100 text-red-800 border-red-200';
-  if (value === 'retest_needed') return 'bg-amber-100 text-amber-800 border-amber-200';
-  if (value === 'scheduled') return 'bg-blue-100 text-blue-800 border-blue-200';
-  if (value === 'need_to_schedule') return 'bg-gray-100 text-gray-800 border-gray-200';
-  if (value === 'pending_info') return 'bg-orange-100 text-orange-800 border-orange-200';
-  return 'bg-slate-100 text-slate-800 border-slate-200';
-}
-
-function statusBlockClass(status?: string | null) {
-  const value = String(status ?? '').toLowerCase();
-  if (value === 'failed') return 'border-red-300 bg-red-100 text-red-900';
-  if (value === 'on_hold') return 'border-gray-300 bg-gray-100 text-gray-900';
-  if (value === 'pending_info') return 'border-amber-300 bg-amber-100 text-amber-900';
-  if (value === 'scheduled') return 'border-blue-300 bg-blue-100 text-blue-900';
-  return 'border-slate-300 bg-slate-100 text-slate-900';
+function dispatchBlockClass() {
+  return 'border-blue-300 bg-blue-100 text-blue-900';
 }
 
 function customerName(job: DispatchJob) {
@@ -248,7 +233,7 @@ function DispatchGrid(props: {
                   <Link
                     key={`${job.id}-${col.user_id}`}
                     href={buildCalendarHref(mode, date, { job: job.id })}
-                    className={`absolute left-1 right-1 rounded-md border px-2 py-1 shadow-sm transition hover:brightness-95 ${statusBlockClass(job.ops_status)}`}
+                    className={`absolute left-1 right-1 rounded-md border px-2 py-1 shadow-sm transition hover:brightness-95 ${dispatchBlockClass()}`}
                     style={{ top: `${top}px`, height: `${height}px` }}
                   >
                     <p className="truncate text-xs font-semibold leading-4">{shortTitle(job)}</p>
@@ -282,9 +267,6 @@ function DetailPanel(props: {
             <h3 className="text-base font-semibold text-gray-900">{job.title || `Job ${job.id.slice(0, 8)}`}</h3>
             <p className="mt-1 text-xs text-gray-600">{customerName(job)} • {job.city || 'No city'}</p>
           </div>
-          <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusPillClass(job.ops_status)}`}>
-            {job.ops_status || 'unknown'}
-          </span>
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
@@ -410,11 +392,6 @@ export async function CalendarView(props: Props) {
     (job) => !job.scheduled_date || !job.window_start,
   ).length;
 
-  const needsAttentionCount = jobsForRange.filter((job) => {
-    const status = String(job.ops_status ?? '').toLowerCase();
-    return status === 'failed' || status === 'pending_info' || status === 'on_hold';
-  }).length;
-
   return (
     <div className="space-y-4">
       {banner ? (
@@ -452,19 +429,15 @@ export async function CalendarView(props: Props) {
           </section>
 
           <section className="rounded-lg border bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">Queue Snapshot</h3>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <h3 className="text-sm font-semibold text-gray-900">Scheduling Summary</h3>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-center">
               <div className="rounded border bg-gray-50 px-2 py-2">
                 <p className="text-xs text-gray-500">Assigned</p>
                 <p className="text-lg font-semibold text-gray-900">{assignedScheduledCount}</p>
               </div>
               <div className="rounded border bg-amber-50 px-2 py-2">
-                <p className="text-xs text-amber-700">Needs Scheduling</p>
+                <p className="text-xs text-amber-700">Unscheduled</p>
                 <p className="text-lg font-semibold text-amber-900">{needsSchedulingCount}</p>
-              </div>
-              <div className="rounded border bg-red-50 px-2 py-2">
-                <p className="text-xs text-red-700">Needs Attention</p>
-                <p className="text-lg font-semibold text-red-900">{needsAttentionCount}</p>
               </div>
             </div>
           </section>
@@ -472,7 +445,7 @@ export async function CalendarView(props: Props) {
           <section className="rounded-lg border bg-white p-4">
             <h3 className="text-sm font-semibold text-gray-900">Unassigned Jobs</h3>
             <p className="mt-1 text-xs text-gray-600">Scheduled jobs without internal technician assignment.</p>
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1">
               {data.unassignedScheduledJobs.length ? (
                 data.unassignedScheduledJobs.map((job) => (
                   <Link
