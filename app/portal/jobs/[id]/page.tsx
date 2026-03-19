@@ -7,6 +7,7 @@ import { insertInternalNotificationForEvent } from "@/lib/actions/notification-a
 import { createClient } from "@/lib/supabase/server";
 import JobAttachments from "@/components/portal/JobAttachments";
 import SubmitButton from "@/components/SubmitButton";
+import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import {
   extractFailureReasons,
   finalRunPass,
@@ -533,9 +534,13 @@ export default async function PortalJobDetailPage({
           </div>
 
           <div className="h-full w-full">
-            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 min-h-[260px] md:min-h-[280px] h-full w-full flex items-center justify-center text-xs text-gray-500 dark:text-gray-300">
-              Map preview placeholder
-            </div>
+            <JobLocationPreview
+              addressLine1={String(loc?.address_line1 ?? "").trim() || String((job as any)?.job_address ?? "").trim()}
+              addressLine2={String(loc?.address_line2 ?? "").trim()}
+              city={String(loc?.city ?? "").trim() || String((job as any)?.city ?? "").trim()}
+              state={String(loc?.state ?? "").trim()}
+              zip={String(loc?.zip ?? "").trim()}
+            />
           </div>
         </div>
 

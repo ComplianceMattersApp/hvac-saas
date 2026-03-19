@@ -9,6 +9,24 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function handoffRedirectAfterPasswordSet(
+  supabase: ReturnType<typeof createClient>,
+  target: "/portal" | "/ops"
+) {
+  // After updateUser(), session persistence can lag a moment. Wait briefly so
+  // the destination SSR route sees the committed session on first load.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session) break;
+    await sleep(150);
+  }
+
+  window.location.replace(target);
+}
+
 export default function SetPasswordPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -85,16 +103,8 @@ export default function SetPasswordPage() {
     // needed) and determine whether to route to /portal or /ops.
     const { isContractor } = await ensureContractorMembershipFromInvite();
 
-    setLoading(false);
-
-    if (isContractor) {
-      router.replace("/portal");
-      router.refresh();
-      return;
-    }
-
-    router.replace("/ops");
-    router.refresh();
+    const target = isContractor ? "/portal" : "/ops";
+    await handoffRedirectAfterPasswordSet(supabase, target);
   }
 
   if (checkingSession) {
