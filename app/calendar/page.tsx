@@ -8,6 +8,7 @@ export default async function CalendarPage({
     view?: string;
     date?: string;
     banner?: string;
+    job?: string;
   }>;
 }) {
   const sp = (searchParams ? await searchParams : {}) ?? {};
@@ -25,7 +26,7 @@ export default async function CalendarPage({
         </div>
 
         <div className="p-8">
-          <CalendarView view={sp.view} date={sp.date} banner={sp.banner} />
+          <CalendarView view={sp.view} date={sp.date} banner={sp.banner} job={sp.job} />
         </div>
       </div>
     </div>
