@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { ensureContractorMembershipFromInvite } from "@/lib/actions/contractor-acceptance-actions";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -80,30 +81,13 @@ export default function SetPasswordPage() {
 
     setSuccessMsg("Password updated. Redirecting...");
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setLoading(false);
-      router.replace("/login");
-      return;
-    }
-
-    const { data: cu, error: cuErr } = await supabase
-      .from("contractor_users")
-      .select("contractor_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    // Ensure contractor membership exists (creates it from pending invite if
+    // needed) and determine whether to route to /portal or /ops.
+    const { isContractor } = await ensureContractorMembershipFromInvite();
 
     setLoading(false);
 
-    if (cuErr) {
-      router.replace("/login");
-      return;
-    }
-
-    if (cu?.contractor_id) {
+    if (isContractor) {
       router.replace("/portal");
       router.refresh();
       return;
