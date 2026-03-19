@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { X } from 'lucide-react';
 
 import SubmitButton from '@/components/SubmitButton';
 import {
@@ -18,6 +19,19 @@ type Props = {
   banner?: string;
   job?: string;
 };
+
+const TECH_COLOR_PALETTE = [
+  'bg-blue-500',
+  'bg-emerald-500',
+  'bg-violet-500',
+  'bg-orange-500',
+  'bg-teal-500',
+  'bg-cyan-500',
+  'bg-lime-500',
+  'bg-sky-500',
+  'bg-fuchsia-500',
+  'bg-amber-500',
+];
 
 function bannerMessage(banner?: string) {
   const map: Record<string, string> = {
@@ -90,6 +104,19 @@ function todayYmdLA(now = new Date()) {
   }).format(now);
 }
 
+function currentMinutesLA(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const h = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
+  const m = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return h * 60 + m;
+}
+
 function parseMinutes(value?: string | null): number | null {
   const raw = String(value ?? '').trim();
   const m = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
@@ -130,6 +157,37 @@ function uniqueById(users: Array<{ user_id: string; display_name: string }>) {
   return out;
 }
 
+function splitTechnicianLabel(displayName: string, userId: string) {
+  const rawName = String(displayName ?? '').trim() || 'Technician';
+  const emailMatch = rawName.match(/([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i);
+  const emailFromName = emailMatch ? emailMatch[1] : '';
+  const userIsEmail = /@/.test(String(userId ?? '')) ? String(userId) : '';
+  const email = emailFromName || userIsEmail || 'email unavailable';
+  const name = emailFromName ? rawName.replace(emailFromName, '').replace(/[()]/g, '').trim() || 'Technician' : rawName;
+  return { name, email };
+}
+
+function colorClassForUserId(userId: string) {
+  let hash = 0;
+  const raw = String(userId ?? '');
+  for (let i = 0; i < raw.length; i += 1) {
+    hash = (hash * 31 + raw.charCodeAt(i)) >>> 0;
+  }
+  return TECH_COLOR_PALETTE[hash % TECH_COLOR_PALETTE.length];
+}
+
+function initialsFromName(name: string) {
+  const parts = String(name ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return 'T';
+  const first = parts[0]?.[0] ?? '';
+  const second = parts[1]?.[0] ?? '';
+  const letters = `${first}${second}`.trim();
+  return (letters || first || 'T').toUpperCase();
+}
+
 function NavLinks(props: { view: CalendarUIView; date: string }) {
   const { view, date } = props;
   const offset = view === 'week' ? 7 : 1;
@@ -156,11 +214,12 @@ function DispatchGrid(props: {
   jobs: DispatchJob[];
   mode: DispatchViewMode;
   date: string;
+  selectedJobId?: string;
 }) {
-  const { jobs, mode, date } = props;
+  const { jobs, mode, date, selectedJobId } = props;
   const startHour = 6;
   const endHour = 18;
-  const hourHeight = 56;
+  const hourHeight = 50;
   const gridStartMinutes = startHour * 60;
   const gridEndMinutes = endHour * 60;
 
@@ -192,12 +251,13 @@ function DispatchGrid(props: {
 
   const totalGridHeight = (endHour - startHour) * hourHeight;
 
+  const isTodayColumn = String(date) === todayYmdLA();
+  const nowMinutes = currentMinutesLA();
+  const showNowLine = isTodayColumn && nowMinutes != null && nowMinutes >= gridStartMinutes && nowMinutes <= gridEndMinutes;
+  const nowTop = showNowLine ? ((Number(nowMinutes) - gridStartMinutes) / 60) * hourHeight : 0;
+
   if (!columns.length) {
-    return (
-      <div className="rounded-lg border bg-white p-8 text-sm text-gray-600">
-        No assigned scheduled jobs for this {mode}.
-      </div>
-    );
+    return <div className="py-10 text-sm text-slate-500">No assigned scheduled jobs for this {mode}.</div>;
   }
 
   const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i);
@@ -205,18 +265,21 @@ function DispatchGrid(props: {
   return (
     <div className="overflow-hidden bg-white">
       <div className="grid" style={{ gridTemplateColumns: `84px repeat(${columns.length}, minmax(190px, 1fr))` }}>
-        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Time</div>
-        {columns.map((col) => (
-          <div key={col.user_id} className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-800">
-            {col.display_name}
+        <div className="border-b border-r border-slate-100 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Time</div>
+        {columns.map((col) => {
+          const tech = splitTechnicianLabel(col.display_name, col.user_id);
+          return (
+          <div key={col.user_id} className="border-b border-r border-slate-100 bg-slate-50 px-3 py-2.5">
+            <p className="truncate text-sm font-semibold text-slate-900">{tech.name}</p>
+            <p className="truncate text-[11px] text-slate-500">{tech.email}</p>
           </div>
-        ))}
+        )})}
 
-        <div className="relative border-r border-slate-200 bg-white" style={{ height: `${totalGridHeight}px` }}>
+        <div className="relative border-r border-slate-100 bg-white" style={{ height: `${totalGridHeight}px` }}>
           {Array.from({ length: endHour - startHour }, (_, i) => (
             <div
               key={`shade-${i}`}
-              className={i % 2 === 0 ? 'absolute left-0 right-0 bg-slate-50/55' : 'absolute left-0 right-0 bg-white'}
+              className={i % 2 === 0 ? 'absolute left-0 right-0 bg-slate-50/40' : 'absolute left-0 right-0 bg-white'}
               style={{ top: `${i * hourHeight}px`, height: `${hourHeight}px` }}
             />
           ))}
@@ -229,21 +292,30 @@ function DispatchGrid(props: {
               </div>
             );
           })}
+          {showNowLine ? (
+            <>
+              <div className="absolute left-0 right-0 border-t border-rose-400/70" style={{ top: `${nowTop}px` }} />
+              <div className="absolute left-2 -translate-y-1/2 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700" style={{ top: `${nowTop}px` }}>
+                Now
+              </div>
+            </>
+          ) : null}
         </div>
 
         {columns.map((col) => (
-          <div key={col.user_id} className="relative border-r border-slate-200 bg-white" style={{ height: `${totalGridHeight}px` }}>
+          <div key={col.user_id} className="relative border-r border-slate-100 bg-white" style={{ height: `${totalGridHeight}px` }}>
             {Array.from({ length: endHour - startHour }, (_, i) => (
               <div
                 key={`col-${col.user_id}-shade-${i}`}
-                className={i % 2 === 0 ? 'absolute left-0 right-0 bg-slate-50/45' : 'absolute left-0 right-0 bg-white'}
+                className={i % 2 === 0 ? 'absolute left-0 right-0 bg-slate-50/35' : 'absolute left-0 right-0 bg-white'}
                 style={{ top: `${i * hourHeight}px`, height: `${hourHeight}px` }}
               />
             ))}
             {hours.map((hour) => {
               const y = (hour - startHour) * hourHeight;
-              return <div key={hour} className="absolute left-0 right-0 border-t border-slate-100" style={{ top: `${y}px` }} />;
+              return <div key={hour} className="absolute left-0 right-0 border-t border-slate-100/70" style={{ top: `${y}px` }} />;
             })}
+            {showNowLine ? <div className="absolute left-0 right-0 border-t border-rose-400/70" style={{ top: `${nowTop}px` }} /> : null}
 
             {gridJobs
               .filter((item) => item.user_id === col.user_id)
@@ -256,17 +328,40 @@ function DispatchGrid(props: {
                 const clampedEnd = Math.min(Math.max(end ?? clampedStart + 60, clampedStart + 30), gridEndMinutes);
                 const top = ((clampedStart - gridStartMinutes) / 60) * hourHeight;
                 const height = Math.max(((clampedEnd - clampedStart) / 60) * hourHeight, 36);
+                const isSelected = selectedJobId === job.id;
+                const assignees = Array.isArray(job.assignments) ? job.assignments : [];
+                const colorBars = assignees.slice(0, 3);
+                const overflowCount = Math.max(assignees.length - colorBars.length, 0);
+                const initials = assignees.slice(0, 2).map((a) => initialsFromName(a.display_name)).join(' ');
 
                 return (
                   <Link
                     key={`${job.id}-${col.user_id}`}
                     href={buildCalendarHref(mode, date, { job: job.id })}
-                    className={`absolute left-1 right-1 rounded-md border px-2 py-1 shadow-sm transition hover:brightness-95 ${dispatchBlockClass(job.ops_status)}`}
+                    scroll={false}
+                    className={`absolute left-1 right-1 rounded-md border py-0.5 pr-1.5 pl-5 shadow-sm transition hover:cursor-pointer hover:shadow-md hover:brightness-[1.03] ${dispatchBlockClass(job.ops_status)} ${isSelected ? 'ring-2 ring-slate-800/45 border-slate-700' : ''}`}
                     style={{ top: `${top}px`, height: `${height}px` }}
                   >
+                    <div className="absolute inset-y-1 left-1 flex items-start gap-0.5">
+                      {colorBars.map((assignment) => (
+                        <span
+                          key={`${job.id}-${assignment.user_id}-bar`}
+                          className={`inline-block rounded-sm ${colorClassForUserId(assignment.user_id)} ${isSelected ? 'w-1.5' : 'w-1'} h-full`}
+                          title={assignment.display_name}
+                        />
+                      ))}
+                      {overflowCount > 0 ? (
+                        <span className="inline-flex h-3 min-w-3 items-center justify-center rounded-sm bg-slate-700/75 px-0.5 text-[9px] font-semibold text-white">
+                          +{overflowCount}
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="truncate text-xs font-semibold leading-4">{shortTitle(job)}</p>
                     <p className="truncate text-[11px] leading-4 opacity-90">{job.city || job.contractor_name || 'No city or contractor'}</p>
-                    <p className="mt-1 text-[10px] font-medium uppercase tracking-wide opacity-80">{blockTimeLabel(clampedStart, clampedEnd)}</p>
+                    <div className="mt-0.5 flex items-center justify-between gap-2">
+                      <p className="truncate text-[10px] font-medium uppercase tracking-wide opacity-80">{blockTimeLabel(clampedStart, clampedEnd)}</p>
+                      {initials ? <p className="truncate text-[9px] font-semibold uppercase tracking-wide opacity-70">{initials}</p> : null}
+                    </div>
                   </Link>
                 );
               })}
@@ -307,6 +402,7 @@ function AgendaList(props: {
         <Link
           key={`list-${job.id}`}
           href={buildCalendarHref('list', date, { job: job.id })}
+          scroll={false}
           className="block rounded px-3 py-2 hover:bg-slate-50"
         >
           <div className="flex items-start justify-between gap-3">
@@ -343,6 +439,14 @@ function DetailPanel(props: {
             <h3 className="text-base font-semibold text-gray-900">{job.title || `Job ${job.id.slice(0, 8)}`}</h3>
             <p className="mt-1 text-xs text-gray-600">{customerName(job)} • {job.city || 'No city'}</p>
           </div>
+          <Link
+            href={buildCalendarHref(view, date)}
+            scroll={false}
+            aria-label="Close details"
+            className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+          >
+            <X className="h-4 w-4" />
+          </Link>
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
@@ -354,9 +458,6 @@ function DetailPanel(props: {
           </Link>
           <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
             Open Location
-          </Link>
-          <Link href={buildCalendarHref(view, date)} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-            Close
           </Link>
         </div>
 
@@ -500,6 +601,7 @@ export async function CalendarView(props: Props) {
                   <Link
                     key={`unassigned-${job.id}`}
                     href={buildCalendarHref(uiView, data.anchorDate, { job: job.id })}
+                    scroll={false}
                     className="block rounded px-2 py-2 hover:bg-slate-50"
                   >
                     <p className="truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
@@ -520,7 +622,7 @@ export async function CalendarView(props: Props) {
             </section>
           ) : mode === 'day' ? (
             <section className="overflow-x-auto">
-              <DispatchGrid jobs={data.day.jobs} mode={mode} date={data.day.date} />
+              <DispatchGrid jobs={data.day.jobs} mode={mode} date={data.day.date} selectedJobId={selectedJobId} />
             </section>
           ) : (
             <section className="space-y-6 overflow-x-auto">
@@ -530,7 +632,7 @@ export async function CalendarView(props: Props) {
                     <h3 className="text-sm font-semibold text-slate-900">{formatBusinessDateUS(day.date)}</h3>
                     <p className="text-xs text-slate-500">{day.jobs.length} jobs</p>
                   </div>
-                  <DispatchGrid jobs={day.jobs} mode={mode} date={day.date} />
+                  <DispatchGrid jobs={day.jobs} mode={mode} date={day.date} selectedJobId={selectedJobId} />
                 </div>
               ))}
             </section>
@@ -545,7 +647,7 @@ export async function CalendarView(props: Props) {
               assignableUsers={data.assignableUsers}
               view={uiView}
               date={data.anchorDate}
-              className="sticky top-4 h-[calc(100vh-6rem)]"
+              className="sticky top-3 h-[calc(100vh-1.5rem)]"
             />
           </div>
         ) : null}
