@@ -42,6 +42,12 @@ export default async function OpsAdminPage() {
 
   const cards: AdminCard[] = [
     {
+      title: "User Command Center",
+      description: "Unified internal and contractor user lifecycle controls.",
+      href: "/ops/admin/users",
+      enabled: true,
+    },
+    {
       title: "Internal Users",
       description: "Manage admin, office, and tech membership for your internal account.",
       href: "/ops/admin/internal-users",
