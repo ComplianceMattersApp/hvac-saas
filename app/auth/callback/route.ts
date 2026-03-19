@@ -35,11 +35,21 @@ function shouldRequirePasswordSetup(params: {
   return false;
 }
 
+function resolveInviteDebugMethod(params: {
+  code: string | null;
+  tokenHash: string | null;
+}): string {
+  if (params.code) return "code";
+  if (params.tokenHash) return "token_hash";
+  return "unknown";
+}
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const tokenHash = requestUrl.searchParams.get("token_hash");
   const type = requestUrl.searchParams.get("type");
+  const requiresPasswordSetup = shouldRequirePasswordSetup({ type, code, tokenHash });
 
   const supabase = await createClient();
 
@@ -61,18 +71,22 @@ export async function GET(request: Request) {
     }
   }
 
+  if (requiresPasswordSetup) {
+    return NextResponse.redirect(
+      redirectUrl(request.url, "/auth/invite-debug", {
+        callback: "1",
+        method: resolveInviteDebugMethod({ code, tokenHash }),
+        next: "/set-password?mode=invite",
+      }),
+    );
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
     return NextResponse.redirect(redirectUrl(request.url, "/login"));
-  }
-
-  if (shouldRequirePasswordSetup({ type, code, tokenHash })) {
-    return NextResponse.redirect(
-      redirectUrl(request.url, "/set-password", { mode: "invite" }),
-    );
   }
 
   const { data: cu, error: cuErr } = await supabase

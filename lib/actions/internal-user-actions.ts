@@ -99,8 +99,7 @@ async function getAuthUserIdByEmail(admin: any, email: string): Promise<string |
   if (!normalized) return null;
 
   const { data, error } = await admin
-    .schema("auth")
-    .from("users")
+    .from("profiles")
     .select("id, email")
     .ilike("email", normalized)
     .limit(1)

@@ -22,7 +22,9 @@ export async function middleware(req: NextRequest) {
 
   // Allow login + auth routes without a session
   const isAuthRoute =
-    pathname.startsWith("/login") || pathname.startsWith("/auth");
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/set-password");
 
   let res = NextResponse.next();
 

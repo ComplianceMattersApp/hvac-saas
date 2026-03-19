@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 function sleep(ms: number) {
@@ -10,6 +10,7 @@ function sleep(ms: number) {
 
 export default function SetPasswordPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
 
   const [password, setPassword] = useState("");
@@ -18,6 +19,7 @@ export default function SetPasswordPage() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [debugAuthResult, setDebugAuthResult] = useState("page_reached");
 
   useEffect(() => {
     let isMounted = true;
@@ -26,6 +28,8 @@ export default function SetPasswordPage() {
       // Invite session hand-off can arrive slightly after initial hydration.
       // Retry getUser briefly before deciding session is missing.
       for (let attempt = 0; attempt < 3; attempt += 1) {
+        setDebugAuthResult(`checking_auth_attempt_${attempt + 1}`);
+
         const {
           data: { user },
         } = await supabase.auth.getUser();
@@ -33,6 +37,7 @@ export default function SetPasswordPage() {
         if (!isMounted) return;
 
         if (user) {
+          setDebugAuthResult(`user_resolved:${user.id}`);
           setCheckingSession(false);
           return;
         }
@@ -41,6 +46,7 @@ export default function SetPasswordPage() {
       }
 
       if (!isMounted) return;
+      setDebugAuthResult("no_user_redirecting_login");
       router.replace("/login");
     }
 
@@ -116,8 +122,14 @@ export default function SetPasswordPage() {
   if (checkingSession) {
     return (
       <div className="mx-auto max-w-md p-6">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-700">
-          Validating invite session...
+        <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-700">
+          <div>Validating invite session...</div>
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+            <div><strong>Debug:</strong> set-password page reached</div>
+            <div><strong>Mode:</strong> {searchParams.get("mode") ?? "none"}</div>
+            <div><strong>Auth check:</strong> {debugAuthResult}</div>
+            <div><strong>Redirecting to login:</strong> {debugAuthResult === "no_user_redirecting_login" ? "Yes" : "No"}</div>
+          </div>
         </div>
       </div>
     );
@@ -125,6 +137,13 @@ export default function SetPasswordPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-4 p-6">
+      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+        <div><strong>Debug:</strong> set-password page reached</div>
+        <div><strong>Mode:</strong> {searchParams.get("mode") ?? "none"}</div>
+        <div><strong>Auth check:</strong> {debugAuthResult}</div>
+        <div><strong>Redirecting to login:</strong> No</div>
+      </div>
+
       <h1 className="text-2xl font-semibold text-gray-900">Set Your Password</h1>
       <p className="text-sm text-gray-600">
         Create a password to finish setting up your Compliance Matters account.
