@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { sendEmail } from "@/lib/email/sendEmail";
 
 function requireEnv(name: string) {
   const v = process.env[name];
@@ -26,14 +27,9 @@ export async function sendInviteEmail(args: {
   html: string;
   text?: string;
 }) {
-  const from = requireEnv("EMAIL_FROM");
-  const transporter = getSmtpTransport();
-
-  await transporter.sendMail({
-    from,
+  await sendEmail({
     to: args.to,
     subject: args.subject,
-    text: args.text,
     html: args.html,
   });
 }
