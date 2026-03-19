@@ -1,148 +1,386 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
+import { getActiveJobAssignmentDisplayMap, getAssignableInternalUsers } from '@/lib/staffing/human-layer';
 
-export type CalendarEvent = {
+export type DispatchViewMode = 'day' | 'week';
+
+export type DispatchJob = {
   id: string;
   title: string;
-  description: string | null;
-  start_at: string;
-  end_at: string | null;
-  job_id: string | null;
-  service_id: string | null;
+  job_type: string | null;
   status: string | null;
+  ops_status: string | null;
+  parent_job_id: string | null;
+  scheduled_date: string | null;
+  window_start: string | null;
+  window_end: string | null;
+  city: string | null;
+  job_address: string | null;
+  customer_first_name: string | null;
+  customer_last_name: string | null;
+  contractor_id: string | null;
   contractor_name?: string | null;
-  permit_number?: string | null;
-  window_start?: string | null;
-  window_end?: string | null;
+  assignments: Array<{
+    user_id: string;
+    display_name: string;
+    is_primary: boolean;
+  }>;
+  assignment_names: string[];
+  assignment_primary_name: string | null;
+  latest_event_type: string | null;
+  latest_event_at: string | null;
 };
 
-export async function getCalendarEvents(month: Date) {
-  const supabase = await createClient();
+export type DispatchCalendarData = {
+  mode: DispatchViewMode;
+  anchorDate: string;
+  day: {
+    date: string;
+    jobs: DispatchJob[];
+  };
+  week: {
+    startDate: string;
+    endDate: string;
+    days: Array<{ date: string; jobs: DispatchJob[] }>;
+  };
+  unassignedScheduledJobs: DispatchJob[];
+  assignableUsers: Array<{
+    user_id: string;
+    display_name: string;
+  }>;
+};
 
-  const monthStart = startOfWeek(startOfMonth(month));
-  const monthEnd = endOfWeek(endOfMonth(month));
+type JobDispatchRow = {
+  id: string;
+  title: string | null;
+  job_type: string | null;
+  status: string | null;
+  ops_status: string | null;
+  parent_job_id: string | null;
+  scheduled_date: string | null;
+  window_start: string | null;
+  window_end: string | null;
+  city: string | null;
+  job_address: string | null;
+  customer_first_name: string | null;
+  customer_last_name: string | null;
+  contractor_id: string | null;
+  contractors: { name: string | null } | { name: string | null }[] | null;
+  created_at: string | null;
+};
 
-  // Jobs (join contractors)
-  const { data: jobs, error: jobsError } = await supabase
-    .from('jobs')
-    .select(`
-id,
-title,
-city,
-status,
-scheduled_date,
-permit_number,
-window_start,
-window_end,
-contractors ( name )
-`)
-    .gte('scheduled_date', monthStart.toISOString())
-    .lte('scheduled_date', monthEnd.toISOString())
-    .order('scheduled_date', { ascending: true });
+type ParentIdRow = {
+  parent_job_id: string | null;
+};
 
-  if (jobsError) throw jobsError;
+type JobEventRow = {
+  job_id: string | null;
+  event_type: string | null;
+  created_at: string | null;
+};
 
-  // Services (no join yet — your DB has no FK services -> jobs)
-  const { data: services, error: servicesError } = await supabase
-    .from('services')
-    .select(`
-  id,
-  scheduled_date,
-  title,
-  city,
-  status,
-  job_id,
-  jobs (
-    contractors ( name ),
-    permit_number,
-    window_start,
-    window_end
-  )
-`)
-    .gte('scheduled_date', monthStart.toISOString())
-    .lte('scheduled_date', monthEnd.toISOString());
-
-  if (servicesError) throw servicesError;
-
-  const jobsWithContractor = (jobs ?? []).map((j: any) => ({
-    ...j,
-    contractor_name: j.contractors?.name ?? null,
-  }));
-
-  const events: CalendarEvent[] = [
-    ...jobsWithContractor.map((j: any) => ({
-      id: j.id,
-      title: `${j.title}${j.city ? ` – ${j.city}` : ''}`,
-      description: null,
-      start_at: j.scheduled_date,
-      end_at: null,
-      job_id: j.id,
-      service_id: null,
-      status: j.status ?? null,
-      contractor_name: j.contractors?.name ?? 'Compliance Matters',
-      permit_number: j.permit_number ?? null,
-      window_start: j.window_start ?? null,
-      window_end: j.window_end ?? null,
-    })),
-    ...(services ?? []).map((s: any) => ({
-      id: s.id,
-      title: `${s.title}${s.city ? ` – ${s.city}` : ''} (${s.jobs?.contractors?.name ?? 'Compliance Matters'})`,
-      description: null,
-      start_at: s.scheduled_date,
-      end_at: null,
-      job_id: null,
-      service_id: s.id,
-      status: s.status ?? null,
-      contractor_name: null,
-      permit_number: s.jobs?.permit_number ?? null,
-      window_start: s.jobs?.window_start ?? null,
-      window_end: s.jobs?.window_end ?? null,
-    })),
-  ].filter((e) => !!e.start_at);
-
-  function formatWindow(start?: string | null, end?: string | null) {
-  if (!start || !end) return null;
-  const s = new Date(start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  const e = new Date(end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  return `${s} – ${e}`;
+function laTodayYmd(now = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
 }
+
+function parseYmd(value: string) {
+  const m = String(value).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
+}
+
+function ymdToUtcDate(value: string): Date | null {
+  const parsed = parseYmd(value);
+  if (!parsed) return null;
+  return new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day, 12, 0, 0));
+}
+
+function dateToYmdUtc(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function addDaysYmd(ymd: string, days: number): string {
+  const d = ymdToUtcDate(ymd);
+  if (!d) return ymd;
+  d.setUTCDate(d.getUTCDate() + days);
+  return dateToYmdUtc(d);
+}
+
+function startOfWeekYmd(ymd: string): string {
+  const d = ymdToUtcDate(ymd);
+  if (!d) return ymd;
+  const weekday = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() - weekday);
+  return dateToYmdUtc(d);
+}
+
+function normalizeAnchorDate(input?: string | null): string {
+  const raw = String(input ?? '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  return laTodayYmd();
+}
+
+function assignmentFieldsFromMap(
+  map: Record<string, Array<{ user_id: string; display_name: string; is_primary: boolean }>>,
+  jobId: string,
+) {
+  const rows = map[jobId] ?? [];
+  const assignments = rows
+    .map((row) => ({
+      user_id: String(row.user_id ?? '').trim(),
+      display_name: String(row.display_name ?? '').trim(),
+      is_primary: Boolean(row.is_primary),
+    }))
+    .filter((row) => row.user_id && row.display_name);
+  const assignment_names = assignments.map((row) => row.display_name);
   return {
-    jobs: jobsWithContractor,
-    services: services ?? [],
-    events,
+    assignments,
+    assignment_names,
+    assignment_primary_name: assignment_names[0] ?? null,
   };
 }
 
-export async function updateJobSchedule(jobId: string, scheduledDate: string) {
-  const supabase = await createClient();
+function mergeJobRow(params: {
+  row: JobDispatchRow;
+  assignmentMap: Record<string, Array<{ user_id: string; display_name: string; is_primary: boolean }>>;
+  latestEventByJob: Map<string, { event_type: string | null; created_at: string | null }>;
+}): DispatchJob {
+  const { row, assignmentMap, latestEventByJob } = params;
+  const jobId = String(row?.id ?? '');
+  const assignment = assignmentFieldsFromMap(assignmentMap, jobId);
+  const latestEvent = latestEventByJob.get(jobId);
 
-  const { error } = await supabase
-    .from('jobs')
-    .update({ scheduled_date: scheduledDate })
-    .eq('id', jobId);
-
-  if (error) {
-    console.error('SUPABASE updateJobSchedule ERROR:', error);
-    throw error;
-  }
-
-  return { success: true };
+  return {
+    id: jobId,
+    title: String(row?.title ?? ''),
+    job_type: row?.job_type ? String(row.job_type) : null,
+    status: row?.status ? String(row.status) : null,
+    ops_status: row?.ops_status ? String(row.ops_status) : null,
+    parent_job_id: row?.parent_job_id ? String(row.parent_job_id) : null,
+    scheduled_date: row?.scheduled_date ? String(row.scheduled_date) : null,
+    window_start: row?.window_start ? String(row.window_start) : null,
+    window_end: row?.window_end ? String(row.window_end) : null,
+    city: row?.city ? String(row.city) : null,
+    job_address: row?.job_address ? String(row.job_address) : null,
+    customer_first_name: row?.customer_first_name ? String(row.customer_first_name) : null,
+    customer_last_name: row?.customer_last_name ? String(row.customer_last_name) : null,
+    contractor_id: row?.contractor_id ? String(row.contractor_id) : null,
+    contractor_name: Array.isArray(row.contractors)
+      ? (row.contractors[0]?.name ? String(row.contractors[0].name) : null)
+      : (row.contractors?.name ? String(row.contractors.name) : null),
+    assignments: assignment.assignments,
+    assignment_names: assignment.assignment_names,
+    assignment_primary_name: assignment.assignment_primary_name,
+    latest_event_type: latestEvent?.event_type ?? null,
+    latest_event_at: latestEvent?.created_at ?? null,
+  };
 }
 
-export async function updateServiceSchedule(serviceId: string, scheduledDate: string) {
+function suppressRetestParentRows(rows: JobDispatchRow[], params: {
+  openRetestParentIds: Set<string>;
+  resolvedFailedParentIds: Set<string>;
+}) {
+  return rows.filter((row) => {
+    const jobId = String(row?.id ?? '').trim();
+    if (!jobId) return false;
+
+    const ops = String(row?.ops_status ?? '').toLowerCase();
+    if (ops !== 'failed') return true;
+
+    if (params.openRetestParentIds.has(jobId)) return false;
+    if (params.resolvedFailedParentIds.has(jobId)) return false;
+    return true;
+  });
+}
+
+export async function getDispatchCalendarData(params: {
+  mode: DispatchViewMode;
+  anchorDate?: string | null;
+}): Promise<DispatchCalendarData> {
   const supabase = await createClient();
+  const mode = params.mode === 'week' ? 'week' : 'day';
+  const anchorDate = normalizeAnchorDate(params.anchorDate);
 
-  const { error } = await supabase
-    .from('services')
-    .update({ scheduled_date: scheduledDate })
-    .eq('id', serviceId);
+  const weekStart = startOfWeekYmd(anchorDate);
+  const weekEnd = addDaysYmd(weekStart, 6);
 
-  if (error) {
-    console.error('SUPABASE updateServiceSchedule ERROR:', error);
-    throw error;
+  const baseSelect = [
+    'id',
+    'title',
+    'job_type',
+    'status',
+    'ops_status',
+    'parent_job_id',
+    'scheduled_date',
+    'window_start',
+    'window_end',
+    'city',
+    'job_address',
+    'customer_first_name',
+    'customer_last_name',
+    'contractor_id',
+    'contractors(name)',
+    'created_at',
+  ].join(', ');
+
+  const { data: dayRows, error: dayErr } = await supabase
+    .from('jobs')
+    .select(baseSelect)
+    .is('deleted_at', null)
+    .eq('scheduled_date', anchorDate)
+    .neq('ops_status', 'closed')
+    .order('window_start', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  if (dayErr) throw dayErr;
+
+  const { data: weekRows, error: weekErr } = await supabase
+    .from('jobs')
+    .select(baseSelect)
+    .is('deleted_at', null)
+    .neq('ops_status', 'closed')
+    .gte('scheduled_date', weekStart)
+    .lte('scheduled_date', weekEnd)
+    .order('scheduled_date', { ascending: true })
+    .order('window_start', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  if (weekErr) throw weekErr;
+
+  const { data: unassignedRows, error: unassignedErr } = await supabase
+    .from('jobs')
+    .select(baseSelect)
+    .is('deleted_at', null)
+    .eq('status', 'open')
+    .eq('ops_status', 'scheduled')
+    .gte('scheduled_date', anchorDate)
+    .order('scheduled_date', { ascending: true })
+    .order('window_start', { ascending: true })
+    .limit(100);
+
+  if (unassignedErr) throw unassignedErr;
+
+  const { data: openRetestChildren, error: openRetestErr } = await supabase
+    .from('jobs')
+    .select('parent_job_id')
+    .not('parent_job_id', 'is', null)
+    .is('deleted_at', null)
+    .neq('ops_status', 'closed');
+
+  if (openRetestErr) throw openRetestErr;
+
+  const { data: resolvedRetestChildren, error: resolvedRetestErr } = await supabase
+    .from('jobs')
+    .select('parent_job_id')
+    .not('parent_job_id', 'is', null)
+    .is('deleted_at', null)
+    .in('ops_status', ['paperwork_required', 'invoice_required', 'closed']);
+
+  if (resolvedRetestErr) throw resolvedRetestErr;
+
+  const openRetestParentIds = new Set(
+    ((openRetestChildren ?? []) as ParentIdRow[])
+      .map((row) => String(row?.parent_job_id ?? '').trim())
+      .filter(Boolean),
+  );
+
+  const resolvedFailedParentIds = new Set(
+    ((resolvedRetestChildren ?? []) as ParentIdRow[])
+      .map((row) => String(row?.parent_job_id ?? '').trim())
+      .filter(Boolean),
+  );
+
+  const filteredDayRows = suppressRetestParentRows(((dayRows ?? []) as unknown) as JobDispatchRow[], {
+    openRetestParentIds,
+    resolvedFailedParentIds,
+  });
+  const filteredWeekRows = suppressRetestParentRows(((weekRows ?? []) as unknown) as JobDispatchRow[], {
+    openRetestParentIds,
+    resolvedFailedParentIds,
+  });
+  const filteredUnassignedRows = suppressRetestParentRows(((unassignedRows ?? []) as unknown) as JobDispatchRow[], {
+    openRetestParentIds,
+    resolvedFailedParentIds,
+  });
+
+  const allJobIds = Array.from(
+    new Set(
+      [...filteredDayRows, ...filteredWeekRows, ...filteredUnassignedRows]
+        .map((row) => String(row?.id ?? '').trim())
+        .filter(Boolean),
+    ),
+  );
+
+  const assignmentMap = await getActiveJobAssignmentDisplayMap({
+    supabase,
+    jobIds: allJobIds,
+  });
+
+  const unassignedJobIds = allJobIds.filter((jobId) => !(assignmentMap[jobId] ?? []).length);
+
+  const { data: eventRows, error: eventErr } = await supabase
+    .from('job_events')
+    .select('job_id, event_type, created_at')
+    .in('job_id', allJobIds.length ? allJobIds : ['00000000-0000-0000-0000-000000000000'])
+    .order('created_at', { ascending: false });
+
+  if (eventErr) throw eventErr;
+
+  const latestEventByJob = new Map<string, { event_type: string | null; created_at: string | null }>();
+  for (const event of (eventRows ?? []) as JobEventRow[]) {
+    const jobId = String(event?.job_id ?? '').trim();
+    if (!jobId || latestEventByJob.has(jobId)) continue;
+    latestEventByJob.set(jobId, {
+      event_type: event?.event_type ? String(event.event_type) : null,
+      created_at: event?.created_at ? String(event.created_at) : null,
+    });
   }
 
-  return { success: true };
+  const dayJobs = filteredDayRows.map((row) =>
+    mergeJobRow({ row, assignmentMap, latestEventByJob }),
+  );
+
+  const weekJobs = filteredWeekRows.map((row) =>
+    mergeJobRow({ row, assignmentMap, latestEventByJob }),
+  );
+
+  const unassignedScheduledJobs = filteredUnassignedRows
+    .filter((row) => unassignedJobIds.includes(String(row?.id ?? '').trim()))
+    .map((row) => mergeJobRow({ row, assignmentMap, latestEventByJob }));
+
+  const weekDays = Array.from({ length: 7 }).map((_, index) => {
+    const date = addDaysYmd(weekStart, index);
+    const jobs = weekJobs.filter((job) => String(job.scheduled_date ?? '') === date);
+    return { date, jobs };
+  });
+
+  const assignableUsers = (await getAssignableInternalUsers({ supabase })).map((user) => ({
+    user_id: String(user.user_id),
+    display_name: String(user.display_name),
+  }));
+
+  return {
+    mode,
+    anchorDate,
+    day: {
+      date: anchorDate,
+      jobs: dayJobs,
+    },
+    week: {
+      startDate: weekStart,
+      endDate: weekEnd,
+      days: weekDays,
+    },
+    unassignedScheduledJobs,
+    assignableUsers,
+  };
 }
