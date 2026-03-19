@@ -80,13 +80,11 @@ export async function inviteContractor(args: {
         invited_by: invitedBy,
         status: "pending",
       },
-      { onConflict: "owner_user_id,contractor_id,lower(email)" as any }
+      { onConflict: "owner_user_id,contractor_id,email" }
     )
     .select("*")
     .single();
 
-  // Note: supabase-js doesn’t natively accept expression indexes in onConflict typing.
-  // If this complains in TS, we’ll switch to: select existing -> update/insert manually.
   if (upErr) throw new Error(upErr.message);
 
   // 3) Generate invite link (admin) but send via SMTP ourselves

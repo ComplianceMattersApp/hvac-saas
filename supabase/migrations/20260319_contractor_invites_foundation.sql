@@ -14,10 +14,10 @@ create table if not exists public.contractor_invites (
   updated_at timestamp with time zone not null default now()
 );
 
--- Unique index on (owner_user_id, contractor_id, lower(email)) to support upsert logic.
--- This allows one invite per (owner, contractor, email) tuple. Resends update the existing row.
+-- Unique index on (owner_user_id, contractor_id, email) to support upsert conflict resolution.
+-- Email is always stored lowercase (normalized in application code before insert).
 create unique index if not exists contractor_invites_owner_contractor_email_idx
-  on public.contractor_invites (owner_user_id, contractor_id, lower(email));
+  on public.contractor_invites (owner_user_id, contractor_id, email);
 
 -- Indexes for common query patterns
 create index if not exists contractor_invites_owner_user_id_idx
