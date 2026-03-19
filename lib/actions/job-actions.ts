@@ -4,7 +4,7 @@
 
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, refresh } from "next/cache";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
@@ -1794,6 +1794,8 @@ export async function createContractorFromForm(formData: FormData) {
 export async function updateJobContractorFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const contractorIdRaw = String(formData.get("contractor_id") || "").trim();
+  const tabRaw = String(formData.get("tab") || "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
 
@@ -1808,7 +1810,14 @@ export async function updateJobContractorFromForm(formData: FormData) {
     .eq("id", jobId)
     .single();
 
-  if (beforeErr) throw beforeErr;
+  if (beforeErr) {
+    redirectToJobWithBanner({
+      jobId,
+      banner: "contractor_update_failed",
+      tabRaw,
+      returnToRaw,
+    });
+  }
 
   // Hardening: contractor changes are jobs.contractor_id-only and must not
   // mutate staffing history in job_assignments. Also skip no-op rewrites.
@@ -1816,7 +1825,12 @@ export async function updateJobContractorFromForm(formData: FormData) {
   if (currentContractorId === contractor_id) {
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath("/jobs");
-    return;
+    redirectToJobWithBanner({
+      jobId,
+      banner: "contractor_unchanged",
+      tabRaw,
+      returnToRaw,
+    });
   }
 
   const { error } = await supabase
@@ -1824,10 +1838,31 @@ export async function updateJobContractorFromForm(formData: FormData) {
     .update({ contractor_id })
     .eq("id", jobId);
 
-  if (error) throw error;
+  if (error) {
+    redirectToJobWithBanner({
+      jobId,
+      banner: "contractor_update_failed",
+      tabRaw,
+      returnToRaw,
+    });
+  }
 
-  revalidatePath(`/jobs/${jobId}`);
-  revalidatePath("/jobs");
+  revalidatePath(`/jobs/${jobId}`, "page");
+  revalidatePath("/jobs", "page");
+  if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
+    const [pathOnly] = returnToRaw.split("?");
+    if (pathOnly) revalidatePath(pathOnly, "page");
+  }
+
+  // Ensure the client route reflects the post-mutation server state immediately.
+  refresh();
+  redirectToJobWithBanner({
+    jobId,
+    banner: "contractor_updated",
+    tabRaw,
+    returnToRaw,
+    cacheBust: true,
+  });
 }
 
 function normalizeJobTab(raw: string): "info" | "ops" | "tests" {
@@ -1841,6 +1876,7 @@ function redirectToJobWithBanner(params: {
   banner: string;
   tabRaw?: string;
   returnToRaw?: string;
+  cacheBust?: boolean;
 }) {
   const tab = normalizeJobTab(String(params.tabRaw ?? ""));
   const returnToRaw = String(params.returnToRaw ?? "").trim();
@@ -1849,12 +1885,14 @@ function redirectToJobWithBanner(params: {
     const [pathOnly, searchRaw = ""] = returnToRaw.split("?");
     const search = new URLSearchParams(searchRaw);
     search.set("banner", params.banner);
+    if (params.cacheBust) search.set("rv", Date.now().toString());
     redirect(`${pathOnly}?${search.toString()}`);
   }
 
   const q = new URLSearchParams();
   q.set("tab", tab);
   q.set("banner", params.banner);
+  if (params.cacheBust) q.set("rv", Date.now().toString());
   redirect(`/jobs/${params.jobId}?${q.toString()}`);
 }
 
@@ -4592,4 +4630,69 @@ export async function createRetestJobFromForm(formData: FormData) {
   revalidatePath(`/ops`);
 
   redirect(`/jobs/${child.id}?tab=ops`);
+}
+
+/**
+ * CANCEL JOB: Sets status = "cancelled" and writes job_event
+ * Used from job detail page to mark a job as cancelled
+ */
+export async function cancelJobFromForm(formData: FormData) {
+  "use server";
+  const id =
+    String(formData.get("id") || "").trim() ||
+    String(formData.get("job_id") || "").trim();
+
+  if (!id) throw new Error("Job ID is required");
+
+  const supabase = await createClient();
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  if (!user || userErr) redirect("/login");
+
+  // Read current job state
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select("id, status, ops_status")
+    .eq("id", id)
+    .single();
+
+  if (jobErr) throw jobErr;
+  if (!job) throw new Error("Job not found");
+
+  const previousStatus = job.status;
+  const previousOpsStatus = job.ops_status;
+
+  // Update status to cancelled
+  const { error: updateErr } = await supabase
+    .from("jobs")
+    .update({
+      status: "cancelled",
+    })
+    .eq("id", id);
+
+  if (updateErr) throw updateErr;
+
+  // Record the cancellation event
+  const { error: eventErr } = await supabase
+    .from("job_events")
+    .insert({
+      job_id: id,
+      event_type: "job_cancelled",
+      message: "Job cancelled",
+      meta: {
+        from_status: previousStatus,
+        from_ops_status: previousOpsStatus,
+        cancelled_at: new Date().toISOString(),
+        user_id: user.id,
+      },
+      user_id: user.id,
+    });
+
+  if (eventErr) throw eventErr;
+
+  revalidatePath(`/jobs/${id}`);
+  revalidatePath(`/jobs`);
+  revalidatePath(`/ops`);
+  revalidatePath(`/portal`);
+
+  redirect(`/jobs/${id}?banner=job_cancelled`);
 }

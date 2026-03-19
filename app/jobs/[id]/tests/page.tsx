@@ -28,6 +28,7 @@ import {
   isPackageSystem,
 } from "@/lib/ecc/rule-profiles";
 import { equipmentRoleLabel } from "@/lib/utils/equipment-display";
+import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
 function getEffectiveResultLabel(t: any) {
   if (t.override_pass === true) return "PASS (override)";
@@ -700,6 +701,14 @@ const defaultSystemTonnage =
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Permit Number</div>
               <div className="text-sm font-medium text-slate-950">{fallbackText(job.permit_number)}</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Jurisdiction</div>
+              <div className="text-sm font-medium text-slate-950">{fallbackText((job as any).jurisdiction)}</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Permit Date</div>
+              <div className="text-sm font-medium text-slate-950">{fallbackText((job as any).permit_date ? formatBusinessDateUS((job as any).permit_date) : null)}</div>
             </div>
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Project Type</div>

@@ -58,6 +58,26 @@ type EquipmentSystem = {
 
 const DRAFT_KEY = "cm:newjob:draft:v1";
 
+type NewJobDraft = {
+  windowStart?: string;
+  windowEnd?: string;
+  scheduledDate?: string;
+  contractorId?: string;
+  jobType?: "ecc" | "service";
+  billingRecipient?: "contractor" | "customer" | "other";
+  projectType?: "alteration" | "all_new" | "new_construction";
+  billingName?: string;
+  billingEmail?: string;
+  billingPhone?: string;
+  billingAddr1?: string;
+  billingAddr2?: string;
+  billingCity?: string;
+  billingState?: string;
+  billingZip?: string;
+  systems?: EquipmentSystem[];
+  locationId?: string;
+};
+
 function uid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
@@ -82,6 +102,27 @@ function componentLabel(t: ComponentType) {
       return "Mini-Split Indoor Head";
     default:
       return "Other";
+  }
+}
+
+function readValidDraft(): NewJobDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      localStorage.removeItem(DRAFT_KEY);
+      return null;
+    }
+    return parsed as NewJobDraft;
+  } catch {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // ignore storage cleanup failures
+    }
+    return null;
   }
 }
 
@@ -112,6 +153,7 @@ export default function NewJobForm({
 
   const [windowStart, setWindowStart] = useState("");
   const [windowEnd, setWindowEnd] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
 
   // Contractor selection (internal/admin only). Contractor users are auto-tied.
  const [contractorId, setContractorId] = useState<string>(() => myContractor?.id ?? "");
@@ -186,12 +228,7 @@ const [billingRecipient, setBillingRecipient] = useState<
 
   // ---- Draft save/restore ----
   const [draftFound, setDraftFound] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return Boolean(localStorage.getItem(DRAFT_KEY));
-    } catch {
-      return false;
-    }
+    return Boolean(readValidDraft());
   });
 
   function saveDraft() {
@@ -199,6 +236,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       const draft = {
         windowStart,
         windowEnd,
+        scheduledDate,
         contractorId,
         jobType,
         billingRecipient,
@@ -223,33 +261,34 @@ const [billingRecipient, setBillingRecipient] = useState<
   }
 
   function restoreDraft() {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const d = JSON.parse(raw);
-      setWindowStart(d.windowStart ?? "");
-      setWindowEnd(d.windowEnd ?? "");
-      setContractorId(d.contractorId ?? "");
-      setJobType(d.jobType ?? "ecc");
-      setBillingRecipient(d.billingRecipient ?? (myContractor?.id ? "contractor" : "customer"));
-      setProjectType(d.projectType ?? "alteration");
-
-      setBillingName(d.billingName ?? "");
-      setBillingEmail(d.billingEmail ?? "");
-      setBillingPhone(d.billingPhone ?? "");
-      setBillingAddr1(d.billingAddr1 ?? "");
-      setBillingAddr2(d.billingAddr2 ?? "");
-      setBillingCity(d.billingCity ?? "");
-      setBillingState(d.billingState ?? "CA");
-      setBillingZip(d.billingZip ?? "");
-
-      setSystems(d.systems ?? []);
-      if (!myContractor?.id) setLocationId(d.locationId ?? locationId);
-
-      alert("Draft restored.");
-    } catch {
+    const d = readValidDraft();
+    if (!d) {
+      setDraftFound(false);
       alert("Draft was corrupted and could not be restored.");
+      return;
     }
+
+    setWindowStart(d.windowStart ?? "");
+    setWindowEnd(d.windowEnd ?? "");
+    setScheduledDate(d.scheduledDate ?? "");
+    setContractorId(d.contractorId ?? "");
+    setJobType(d.jobType ?? "ecc");
+    setBillingRecipient(d.billingRecipient ?? (myContractor?.id ? "contractor" : "customer"));
+    setProjectType(d.projectType ?? "alteration");
+
+    setBillingName(d.billingName ?? "");
+    setBillingEmail(d.billingEmail ?? "");
+    setBillingPhone(d.billingPhone ?? "");
+    setBillingAddr1(d.billingAddr1 ?? "");
+    setBillingAddr2(d.billingAddr2 ?? "");
+    setBillingCity(d.billingCity ?? "");
+    setBillingState(d.billingState ?? "CA");
+    setBillingZip(d.billingZip ?? "");
+
+    setSystems(Array.isArray(d.systems) ? d.systems : []);
+    if (isExistingCustomer) setLocationId(d.locationId ?? locationId);
+
+    alert("Draft restored.");
   }
 
   function discardDraft() {
@@ -438,6 +477,8 @@ const [billingRecipient, setBillingRecipient] = useState<
     type="date"
     name="scheduled_date"
     className="border rounded w-full p-2"
+    value={scheduledDate}
+    onChange={(e) => setScheduledDate(e.target.value)}
   />
 </div>
 

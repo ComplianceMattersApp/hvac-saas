@@ -341,6 +341,7 @@ let fieldWorkQ = supabase
   .from("jobs")
   .select(baseSelect)
   .is("deleted_at", null)
+  .neq("status", "cancelled")
   .eq("field_complete", false)
   .gte("scheduled_date", startTodayUtc)
   .lt("scheduled_date", startTomorrowUtc)
@@ -356,6 +357,7 @@ let upcomingQ = supabase
   .from("jobs")
   .select(baseSelect)
   .is("deleted_at", null)
+  .neq("status", "cancelled")
   .eq("status", "open")
   .eq("ops_status", "scheduled")
   .gte("scheduled_date", startTomorrowUtc)
@@ -374,6 +376,7 @@ if (upcomingErr) throw upcomingErr;
     .from("jobs")
     .select(baseSelect)
     .is("deleted_at", null)
+    .neq("status", "cancelled")
     .eq("status", "open")
     .eq("ops_status", "need_to_schedule")
     .order("created_at", { ascending: false })
@@ -389,6 +392,7 @@ if (upcomingErr) throw upcomingErr;
       .from("jobs")
       .select(baseSelect)
       .is("deleted_at", null)
+      .neq("status", "cancelled")
       .eq("field_complete", true)
       .order("field_complete_at", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true })
@@ -404,6 +408,7 @@ if (upcomingErr) throw upcomingErr;
       .from("jobs")
       .select(baseSelect)
       .is("deleted_at", null)
+      .neq("status", "cancelled")
       .neq("ops_status", "closed")
       .eq("field_complete", false)
       .lt("scheduled_date", startTodayUtc)
@@ -721,20 +726,21 @@ function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJo
   const lifecycle = String(j?.status ?? "").toLowerCase();
   const retestState = retestStateForJob(String(j?.id ?? ""));
   const needs = getCloseoutNeeds(j);
+  const isFieldComplete = Boolean(j?.field_complete);
 
   if (opts?.scheduledRetest) return "No Immediate Action";
   if (status === "pending_info" || status === "on_hold") return "Provide Requested Information";
   if (status === "failed" || status === "retest_needed") return "Await Contractor Correction";
-  if (needs.needsInvoice || needs.needsCerts) return "Finish Closeout";
+  if (status === "need_to_schedule") return "Need to Schedule Visit";
   if (
     status === "scheduled" ||
-    status === "need_to_schedule" ||
     lifecycle === "on_the_way" ||
     lifecycle === "in_progress" ||
     retestState === "pending_scheduling"
   ) {
     return "Await Scheduled Visit";
   }
+  if (isFieldComplete && (needs.needsInvoice || needs.needsCerts)) return "Finish Closeout";
 
   return "No Immediate Action";
 }
@@ -1403,7 +1409,7 @@ function compactRow(j: any, showDate = false, note?: string) {
           href={`/jobs/${j.id}?tab=ops`}
           className="rounded-md border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/40"
         >
-          Open
+          View Job
         </Link>
         {telHref(customerPhoneOnly(j)) ? (
           <a

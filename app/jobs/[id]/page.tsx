@@ -25,6 +25,7 @@ import {
   createRetestJobFromForm,
   addPublicNoteFromForm,
   addInternalNoteFromForm,
+  cancelJobFromForm,
 } from "@/lib/actions/job-actions";
 
 import {
@@ -1423,6 +1424,34 @@ const renderTimelineItem = (e: any, key: string) => {
         />
       )}
 
+      {sp?.banner === "contractor_updated" && (
+        <FlashBanner
+          type="success"
+          message="Contractor assignment updated."
+        />
+      )}
+
+      {sp?.banner === "contractor_unchanged" && (
+        <FlashBanner
+          type="warning"
+          message="Contractor assignment was unchanged."
+        />
+      )}
+
+      {sp?.banner === "contractor_update_failed" && (
+        <FlashBanner
+          type="warning"
+          message="Unable to update contractor assignment. Please try again or contact support if it continues."
+        />
+      )}
+
+      {sp?.banner === "job_cancelled" && (
+        <FlashBanner
+          type="success"
+          message="Job cancelled successfully. This job is no longer in active queues."
+        />
+      )}
+
       {sp?.schedule_required === "1" && (
         <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           This job is missing a full schedule. If you continue, the system will auto-fill today with a
@@ -1534,7 +1563,7 @@ const renderTimelineItem = (e: any, key: string) => {
         </div>
 
         {/* Field Workflow */}
-        <div className="flex items-center">
+        <div className="flex items-center gap-3">
           {!isFieldComplete ? (
             <JobFieldActionButton
               jobId={job.id}
@@ -1546,6 +1575,23 @@ const renderTimelineItem = (e: any, key: string) => {
             <span className="inline-flex h-10 items-center rounded-md border border-green-600 bg-green-600 px-4 text-sm font-semibold text-white shadow-sm">
               ✓ Field Complete
             </span>
+          )}
+          
+          {!["completed", "failed", "cancelled"].includes(job.status) && (
+            <form action={cancelJobFromForm} style={{ display: 'inline' }}>
+              <input type="hidden" name="job_id" value={job.id} />
+              <button
+                type="submit"
+                className="inline-flex h-10 items-center rounded-md border border-red-200 bg-red-50 px-4 text-sm font-medium text-red-600 hover:bg-red-100"
+                onClick={(e) => {
+                  if (!window.confirm("Cancel this job? This action cannot be undone.")) {
+                    e.preventDefault();
+                  }
+                }}
+              >
+                📋 Cancel Job
+              </button>
+            </form>
           )}
         </div>
 
@@ -1669,6 +1715,8 @@ const renderTimelineItem = (e: any, key: string) => {
                 <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-3">
                   <form action={updateJobContractorFromForm} className="flex flex-col gap-3 sm:flex-row sm:items-end">
                     <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="tab" value="info" />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=info`} />
 
                     <div className="flex-1">
                       <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-600">
@@ -2354,7 +2402,7 @@ const renderTimelineItem = (e: any, key: string) => {
                           href={`/jobs/${visit.id}?tab=ops`}
                           className="text-sm underline"
                         >
-                          Open
+                          View Job
                         </Link>
                       ) : null}
                     </div>
