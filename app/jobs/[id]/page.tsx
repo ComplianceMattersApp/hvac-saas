@@ -25,8 +25,8 @@ import {
   createRetestJobFromForm,
   addPublicNoteFromForm,
   addInternalNoteFromForm,
-  cancelJobFromForm,
 } from "@/lib/actions/job-actions";
+import CancelJobButton from "@/components/jobs/CancelJobButton";
 
 import {
   updateJobOpsFromForm,
@@ -1578,20 +1578,7 @@ const renderTimelineItem = (e: any, key: string) => {
           )}
           
           {!["completed", "failed", "cancelled"].includes(job.status) && (
-            <form action={cancelJobFromForm} style={{ display: 'inline' }}>
-              <input type="hidden" name="job_id" value={job.id} />
-              <button
-                type="submit"
-                className="inline-flex h-10 items-center rounded-md border border-red-200 bg-red-50 px-4 text-sm font-medium text-red-600 hover:bg-red-100"
-                onClick={(e) => {
-                  if (!window.confirm("Cancel this job? This action cannot be undone.")) {
-                    e.preventDefault();
-                  }
-                }}
-              >
-                📋 Cancel Job
-              </button>
-            </form>
+            <CancelJobButton jobId={job.id} />
           )}
         </div>
 
