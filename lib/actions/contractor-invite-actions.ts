@@ -18,15 +18,15 @@ export async function inviteContractor(args: {
 
   const supabase = await createClient();
   const {
-    data: { session },
-    error: sessErr,
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
 
-  if (sessErr) throw new Error(sessErr.message);
-  if (!session) throw new Error("Not authenticated");
+  if (userErr) throw new Error(userErr.message);
+  if (!user) throw new Error("Not authenticated");
 
-  const ownerUserId = session.user.id;
-  const invitedBy = session.user.id;
+  const ownerUserId = user.id;
+  const invitedBy = user.id;
 
   // 1) Resolve contractor (create if missing)
   let contractorId = args.contractorId;
@@ -91,13 +91,16 @@ export async function inviteContractor(args: {
   const admin = createAdminClient();
   const redirectTo = resolveInviteRedirectTo();
 
-  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+  let actionLink: string | undefined;
+  let authUserId: string | undefined;
+
+  const { data: inviteLinkData, error: inviteLinkErr } = await admin.auth.admin.generateLink({
     type: "invite",
     email,
     options: {
       // Where Supabase sends the user after they click the invite + finish auth
       redirectTo,
-      // This is the magic: trigger reads these values on auth.users insert
+      // Trigger reads these values on auth.users insert
       data: {
         contractor_id: contractorId,
         owner_user_id: ownerUserId,
@@ -106,10 +109,33 @@ export async function inviteContractor(args: {
     },
   });
 
-  if (linkErr) throw new Error(linkErr.message);
+  if (inviteLinkErr) {
+    // The email already exists in auth.users — generateLink("invite") tries to INSERT
+    // a new user and fails with "Database error saving new user".
+    // Fall back to a recovery link so the existing user can access the portal.
+    const { data: recoveryData, error: recoveryErr } = await admin.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo },
+    });
 
-  const actionLink =
-    (linkData as any)?.properties?.action_link || (linkData as any)?.action_link;
+    if (recoveryErr) {
+      // Surface the original invite error plus the recovery fallback error
+      throw new Error(
+        `Invite failed (${inviteLinkErr.message}) and recovery fallback also failed (${recoveryErr.message})`
+      );
+    }
+
+    actionLink =
+      (recoveryData as any)?.properties?.action_link ||
+      (recoveryData as any)?.action_link;
+    authUserId = (recoveryData as any)?.user?.id;
+  } else {
+    actionLink =
+      (inviteLinkData as any)?.properties?.action_link ||
+      (inviteLinkData as any)?.action_link;
+    authUserId = (inviteLinkData as any)?.user?.id;
+  }
 
   if (!actionLink) throw new Error("Invite link missing from generateLink response");
 
@@ -127,14 +153,17 @@ export async function inviteContractor(args: {
 
   await sendInviteEmail({ to: email, subject, html });
 
-  // 5) Update tracking fields
+  // 5) Update tracking fields (also persist auth_user_id if we resolved it)
+  const trackUpdate: Record<string, unknown> = {
+    sent_count: (inviteRow.sent_count ?? 0) + 1,
+    last_sent_at: new Date().toISOString(),
+    status: "pending",
+  };
+  if (authUserId) trackUpdate.auth_user_id = authUserId;
+
   const { error: tErr } = await supabase
     .from("contractor_invites")
-    .update({
-      sent_count: (inviteRow.sent_count ?? 0) + 1,
-      last_sent_at: new Date().toISOString(),
-      status: "pending",
-    })
+    .update(trackUpdate)
     .eq("id", inviteRow.id)
     .eq("owner_user_id", ownerUserId);
 
