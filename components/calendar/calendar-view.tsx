@@ -10,6 +10,8 @@ import {
 import { getDispatchCalendarData, type DispatchJob, type DispatchViewMode } from '@/lib/actions/calendar';
 import { displayWindowLA, formatBusinessDateUS } from '@/lib/utils/schedule-la';
 
+type CalendarUIView = 'day' | 'week' | 'list';
+
 type Props = {
   view?: string;
   date?: string;
@@ -31,8 +33,13 @@ function bannerMessage(banner?: string) {
   return map[key] ?? null;
 }
 
-function dispatchBlockClass() {
-  return 'border-blue-300 bg-blue-100 text-blue-900';
+function dispatchBlockClass(status?: string | null) {
+  const value = String(status ?? '').toLowerCase();
+  if (value === 'failed') return 'border-red-200 bg-red-100 text-red-900';
+  if (value === 'pending_info') return 'border-amber-200 bg-amber-100 text-amber-900';
+  if (value === 'on_hold') return 'border-slate-300 bg-slate-100 text-slate-900';
+  if (value === 'scheduled') return 'border-blue-200 bg-blue-100 text-blue-900';
+  return 'border-indigo-200 bg-indigo-50 text-indigo-900';
 }
 
 function customerName(job: DispatchJob) {
@@ -40,20 +47,27 @@ function customerName(job: DispatchJob) {
   return name || 'Customer not set';
 }
 
-function buildReturnTo(mode: DispatchViewMode, date: string) {
+function buildReturnTo(view: CalendarUIView, date: string) {
   const q = new URLSearchParams();
-  q.set('view', mode);
+  q.set('view', view);
   q.set('date', date);
   return `/calendar?${q.toString()}`;
 }
 
-function buildCalendarHref(mode: DispatchViewMode, date: string, params?: { banner?: string; job?: string | null }) {
+function buildCalendarHref(view: CalendarUIView, date: string, params?: { banner?: string; job?: string | null }) {
   const q = new URLSearchParams();
-  q.set('view', mode);
+  q.set('view', view);
   q.set('date', date);
   if (params?.banner) q.set('banner', params.banner);
   if (params?.job) q.set('job', params.job);
   return `/calendar?${q.toString()}`;
+}
+
+function normalizeView(view?: string): CalendarUIView {
+  const raw = String(view ?? '').trim().toLowerCase();
+  if (raw === 'day') return 'day';
+  if (raw === 'week') return 'week';
+  return 'list';
 }
 
 function addDaysYmd(ymd: string, days: number): string {
@@ -116,22 +130,22 @@ function uniqueById(users: Array<{ user_id: string; display_name: string }>) {
   return out;
 }
 
-function NavLinks(props: { mode: DispatchViewMode; date: string }) {
-  const { mode, date } = props;
-  const offset = mode === 'week' ? 7 : 1;
+function NavLinks(props: { view: CalendarUIView; date: string }) {
+  const { view, date } = props;
+  const offset = view === 'week' ? 7 : 1;
   const prev = addDaysYmd(date, -offset);
   const next = addDaysYmd(date, offset);
   const today = todayYmdLA();
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Link href={buildCalendarHref(mode, prev)} className="rounded border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+      <Link href={buildCalendarHref(view, prev)} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
         Previous
       </Link>
-      <Link href={buildCalendarHref(mode, today)} className="rounded border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+      <Link href={buildCalendarHref(view, today)} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
         Today
       </Link>
-      <Link href={buildCalendarHref(mode, next)} className="rounded border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+      <Link href={buildCalendarHref(view, next)} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
         Next
       </Link>
     </div>
@@ -189,32 +203,46 @@ function DispatchGrid(props: {
   const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i);
 
   return (
-    <div className="overflow-hidden rounded-lg border bg-white">
+    <div className="overflow-hidden bg-white">
       <div className="grid" style={{ gridTemplateColumns: `84px repeat(${columns.length}, minmax(190px, 1fr))` }}>
-        <div className="border-b border-r bg-gray-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Time</div>
+        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Time</div>
         {columns.map((col) => (
-          <div key={col.user_id} className="border-b border-r bg-gray-50 px-3 py-3 text-sm font-semibold text-gray-800">
+          <div key={col.user_id} className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-800">
             {col.display_name}
           </div>
         ))}
 
-        <div className="relative border-r bg-white" style={{ height: `${totalGridHeight}px` }}>
+        <div className="relative border-r border-slate-200 bg-white" style={{ height: `${totalGridHeight}px` }}>
+          {Array.from({ length: endHour - startHour }, (_, i) => (
+            <div
+              key={`shade-${i}`}
+              className={i % 2 === 0 ? 'absolute left-0 right-0 bg-slate-50/55' : 'absolute left-0 right-0 bg-white'}
+              style={{ top: `${i * hourHeight}px`, height: `${hourHeight}px` }}
+            />
+          ))}
           {hours.map((hour) => {
             const y = (hour - startHour) * hourHeight;
             const label = hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`;
             return (
               <div key={hour} className="absolute left-0 right-0" style={{ top: `${y}px` }}>
-                <div className="-translate-y-1/2 px-3 text-xs text-gray-500">{label}</div>
+                <div className="-translate-y-1/2 px-3 text-xs text-slate-500">{label}</div>
               </div>
             );
           })}
         </div>
 
         {columns.map((col) => (
-          <div key={col.user_id} className="relative border-r bg-white" style={{ height: `${totalGridHeight}px` }}>
+          <div key={col.user_id} className="relative border-r border-slate-200 bg-white" style={{ height: `${totalGridHeight}px` }}>
+            {Array.from({ length: endHour - startHour }, (_, i) => (
+              <div
+                key={`col-${col.user_id}-shade-${i}`}
+                className={i % 2 === 0 ? 'absolute left-0 right-0 bg-slate-50/45' : 'absolute left-0 right-0 bg-white'}
+                style={{ top: `${i * hourHeight}px`, height: `${hourHeight}px` }}
+              />
+            ))}
             {hours.map((hour) => {
               const y = (hour - startHour) * hourHeight;
-              return <div key={hour} className="absolute left-0 right-0 border-t border-gray-100" style={{ top: `${y}px` }} />;
+              return <div key={hour} className="absolute left-0 right-0 border-t border-slate-100" style={{ top: `${y}px` }} />;
             })}
 
             {gridJobs
@@ -233,7 +261,7 @@ function DispatchGrid(props: {
                   <Link
                     key={`${job.id}-${col.user_id}`}
                     href={buildCalendarHref(mode, date, { job: job.id })}
-                    className={`absolute left-1 right-1 rounded-md border px-2 py-1 shadow-sm transition hover:brightness-95 ${dispatchBlockClass()}`}
+                    className={`absolute left-1 right-1 rounded-md border px-2 py-1 shadow-sm transition hover:brightness-95 ${dispatchBlockClass(job.ops_status)}`}
                     style={{ top: `${top}px`, height: `${height}px` }}
                   >
                     <p className="truncate text-xs font-semibold leading-4">{shortTitle(job)}</p>
@@ -249,18 +277,66 @@ function DispatchGrid(props: {
   );
 }
 
+function AgendaList(props: {
+  jobs: DispatchJob[];
+  mode: DispatchViewMode;
+  date: string;
+}) {
+  const { jobs, mode, date } = props;
+
+  const listJobs = jobs
+    .filter((job) => {
+      if (!job.scheduled_date || !job.window_start || !job.assignments.length) return false;
+      if (mode === 'day') return String(job.scheduled_date) === date;
+      return true;
+    })
+    .slice()
+    .sort((a, b) => {
+      const at = parseMinutes(a.window_start) ?? 0;
+      const bt = parseMinutes(b.window_start) ?? 0;
+      return at - bt;
+    });
+
+  if (!listJobs.length) {
+    return <div className="py-8 text-sm text-slate-500">No scheduled assigned jobs for this period.</div>;
+  }
+
+  return (
+    <div className="space-y-1">
+      {listJobs.map((job) => (
+        <Link
+          key={`list-${job.id}`}
+          href={buildCalendarHref('list', date, { job: job.id })}
+          className="block rounded px-3 py-2 hover:bg-slate-50"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">{shortTitle(job)}</p>
+              <p className="text-xs text-slate-600">{job.city || job.contractor_name || 'No city or contractor'}</p>
+            </div>
+            <div className="text-right text-xs text-slate-500">
+              <p>{displayWindowLA(job.window_start, job.window_end) || 'No window'}</p>
+              <p>{job.assignment_names.join(', ')}</p>
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 function DetailPanel(props: {
   job: DispatchJob;
   returnTo: string;
   assignableUsers: Array<{ user_id: string; display_name: string }>;
-  mode: DispatchViewMode;
+  view: CalendarUIView;
   date: string;
+  className?: string;
 }) {
-  const { job, returnTo, assignableUsers, mode, date } = props;
+  const { job, returnTo, assignableUsers, view, date, className = '' } = props;
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/25 p-0">
-      <aside className="h-full w-full max-w-md overflow-y-auto border-l bg-white p-4 shadow-xl">
+    <aside className={`h-full overflow-y-auto border-l border-slate-200 bg-white p-4 ${className}`}>
         <div className="mb-3 flex items-start justify-between gap-2 border-b pb-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Job Details</p>
@@ -279,7 +355,7 @@ function DetailPanel(props: {
           <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
             Open Location
           </Link>
-          <Link href={buildCalendarHref(mode, date)} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+          <Link href={buildCalendarHref(view, date)} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
             Close
           </Link>
         </div>
@@ -358,19 +434,19 @@ function DetailPanel(props: {
             ) : null}
           </section>
         </div>
-      </aside>
-    </div>
+    </aside>
   );
 }
 
 export async function CalendarView(props: Props) {
-  const mode: DispatchViewMode = props.view === 'week' ? 'week' : 'day';
+  const uiView = normalizeView(props.view);
+  const mode: DispatchViewMode = uiView === 'week' ? 'week' : 'day';
   const data = await getDispatchCalendarData({
     mode,
     anchorDate: props.date,
   });
 
-  const returnTo = buildReturnTo(data.mode, data.anchorDate);
+  const returnTo = buildReturnTo(uiView, data.anchorDate);
   const banner = bannerMessage(props.banner);
   const selectedJobId = String(props.job ?? '').trim();
 
@@ -384,117 +460,108 @@ export async function CalendarView(props: Props) {
     data.unassignedScheduledJobs.find((job) => job.id === selectedJobId) ||
     null;
 
-  const assignedScheduledCount = jobsForRange.filter(
-    (job) => job.scheduled_date && job.window_start && job.assignments.length > 0,
-  ).length;
-
-  const needsSchedulingCount = jobsForRange.filter(
-    (job) => !job.scheduled_date || !job.window_start,
-  ).length;
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-6">
       {banner ? (
         <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">{banner}</div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="space-y-4">
-          <section className="rounded-lg border bg-white p-4">
-            <h2 className="text-base font-semibold text-gray-900">Dispatch Board</h2>
-            <p className="mt-1 text-xs text-gray-600">
-              {data.mode === 'day'
-                ? `Day view for ${formatBusinessDateUS(data.day.date)}`
-                : `Week view ${formatBusinessDateUS(data.week.startDate)} - ${formatBusinessDateUS(data.week.endDate)}`}
-            </p>
-
-            <div className="mt-3 flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Dispatch Workspace</h2>
+          <p className="mt-1 text-xs text-slate-600">
+            {mode === 'day'
+              ? `Day view for ${formatBusinessDateUS(data.day.date)}`
+              : `Week view ${formatBusinessDateUS(data.week.startDate)} - ${formatBusinessDateUS(data.week.endDate)}`}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center rounded bg-slate-100 p-1">
+            {(['day', 'week', 'list'] as CalendarUIView[]).map((viewValue) => (
               <Link
-                href={buildCalendarHref('day', data.anchorDate)}
-                className={`rounded px-3 py-2 text-sm font-medium ${data.mode === 'day' ? 'bg-gray-900 text-white' : 'border text-gray-700 hover:bg-gray-50'}`}
+                key={viewValue}
+                href={buildCalendarHref(viewValue, data.anchorDate)}
+                className={`rounded px-3 py-1.5 text-sm font-medium ${uiView === viewValue ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-200'}`}
               >
-                Day
+                {viewValue.charAt(0).toUpperCase() + viewValue.slice(1)}
               </Link>
-              <Link
-                href={buildCalendarHref('week', data.anchorDate)}
-                className={`rounded px-3 py-2 text-sm font-medium ${data.mode === 'week' ? 'bg-gray-900 text-white' : 'border text-gray-700 hover:bg-gray-50'}`}
-              >
-                Week
-              </Link>
-            </div>
+            ))}
+          </div>
+          <NavLinks view={uiView} date={data.anchorDate} />
+        </div>
+      </div>
 
-            <div className="mt-3">
-              <NavLinks mode={data.mode} date={data.anchorDate} />
-            </div>
-          </section>
-
-          <section className="rounded-lg border bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">Scheduling Summary</h3>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-              <div className="rounded border bg-gray-50 px-2 py-2">
-                <p className="text-xs text-gray-500">Assigned</p>
-                <p className="text-lg font-semibold text-gray-900">{assignedScheduledCount}</p>
-              </div>
-              <div className="rounded border bg-amber-50 px-2 py-2">
-                <p className="text-xs text-amber-700">Unscheduled</p>
-                <p className="text-lg font-semibold text-amber-900">{needsSchedulingCount}</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-lg border bg-white p-4">
-            <h3 className="text-sm font-semibold text-gray-900">Unassigned Jobs</h3>
-            <p className="mt-1 text-xs text-gray-600">Scheduled jobs without internal technician assignment.</p>
-            <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1">
+      <div className={`grid gap-5 ${selectedJob ? 'xl:grid-cols-[220px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[220px_minmax(0,1fr)]'}`}>
+        <aside>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unscheduled Jobs</h3>
+          <div className="mt-2 max-h-[70vh] space-y-1 overflow-y-auto pr-1">
               {data.unassignedScheduledJobs.length ? (
                 data.unassignedScheduledJobs.map((job) => (
                   <Link
                     key={`unassigned-${job.id}`}
-                    href={buildCalendarHref(data.mode, data.anchorDate, { job: job.id })}
-                    className="block rounded border bg-gray-50 px-3 py-2 hover:bg-gray-100"
+                    href={buildCalendarHref(uiView, data.anchorDate, { job: job.id })}
+                    className="block rounded px-2 py-2 hover:bg-slate-50"
                   >
-                    <p className="truncate text-xs font-semibold text-gray-900">{shortTitle(job)}</p>
-                    <p className="truncate text-[11px] text-gray-600">{job.city || job.contractor_name || 'No city or contractor'}</p>
-                    <p className="mt-1 text-[11px] text-gray-500">{displayWindowLA(job.window_start, job.window_end) || 'No window'}</p>
+                    <p className="truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
+                    <p className="truncate text-[11px] text-slate-600">{job.city || job.contractor_name || 'No city or contractor'}</p>
                   </Link>
                 ))
               ) : (
-                <div className="rounded border border-dashed p-3 text-xs text-gray-500">No unassigned scheduled jobs.</div>
+                <div className="py-2 text-xs text-slate-500">No unscheduled jobs.</div>
               )}
-            </div>
-          </section>
+          </div>
 
         </aside>
 
-        <main className="space-y-4">
-          {data.mode === 'day' ? (
-            <section>
-              <DispatchGrid jobs={data.day.jobs} mode={data.mode} date={data.day.date} />
+        <main className="min-w-0 space-y-4">
+          {uiView === 'list' ? (
+            <section className="px-1">
+              <AgendaList jobs={jobsForRange} mode={mode} date={data.anchorDate} />
+            </section>
+          ) : mode === 'day' ? (
+            <section className="overflow-x-auto">
+              <DispatchGrid jobs={data.day.jobs} mode={mode} date={data.day.date} />
             </section>
           ) : (
-            <section className="space-y-4">
+            <section className="space-y-6 overflow-x-auto">
               {data.week.days.map((day) => (
                 <div key={day.date}>
                   <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-900">{formatBusinessDateUS(day.date)}</h3>
-                    <p className="text-xs text-gray-500">{day.jobs.length} jobs</p>
+                    <h3 className="text-sm font-semibold text-slate-900">{formatBusinessDateUS(day.date)}</h3>
+                    <p className="text-xs text-slate-500">{day.jobs.length} jobs</p>
                   </div>
-                  <DispatchGrid jobs={day.jobs} mode={data.mode} date={day.date} />
+                  <DispatchGrid jobs={day.jobs} mode={mode} date={day.date} />
                 </div>
               ))}
             </section>
           )}
         </main>
+
+        {selectedJob ? (
+          <div className="hidden xl:block">
+            <DetailPanel
+              job={selectedJob}
+              returnTo={returnTo}
+              assignableUsers={data.assignableUsers}
+              view={uiView}
+              date={data.anchorDate}
+              className="sticky top-4 h-[calc(100vh-6rem)]"
+            />
+          </div>
+        ) : null}
       </div>
 
       {selectedJob ? (
-        <DetailPanel
-          job={selectedJob}
-          returnTo={returnTo}
-          assignableUsers={data.assignableUsers}
-          mode={data.mode}
-          date={data.anchorDate}
-        />
+        <div className="fixed inset-0 z-40 bg-black/30 p-3 xl:hidden">
+          <DetailPanel
+            job={selectedJob}
+            returnTo={returnTo}
+            assignableUsers={data.assignableUsers}
+            view={uiView}
+            date={data.anchorDate}
+            className="ml-auto max-w-md"
+          />
+        </div>
       ) : null}
     </div>
   );
