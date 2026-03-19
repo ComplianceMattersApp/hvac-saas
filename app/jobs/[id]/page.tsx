@@ -10,6 +10,7 @@ import { redirect } from "next/navigation";
 import SubmitButton from "@/components/SubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
 import { archiveJobFromForm } from "@/lib/actions/job-actions";
+import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import {
   getContractors,
   assignJobAssigneeFromForm,
@@ -1184,33 +1185,15 @@ const renderTimelineItem = (e: any, key: string) => {
 
     <div className="text-xl font-semibold text-gray-900">{job.title}</div>
 
-    {serviceMapsLink ? (
-      <a
-        href={serviceMapsLink}
-        target="_blank"
-        rel="noreferrer"
-        className="flex h-36 w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 hover:bg-slate-200"
-      >
-        Map preview - click to navigate
-      </a>
-    ) : (
-      <div className="flex h-36 w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600">
-        Map preview - address unavailable
-      </div>
-    )}
+    <JobLocationPreview
+      addressLine1={serviceAddressLine1}
+      addressLine2={serviceAddressLine2}
+      city={serviceCity}
+      state={serviceState}
+      zip={serviceZip}
+    />
 
-    {serviceMapsLink ? (
-      <a
-        href={serviceMapsLink}
-        target="_blank"
-        rel="noreferrer"
-        className="block text-sm text-gray-600 break-words hover:underline"
-      >
-        {serviceAddressDisplay}
-      </a>
-    ) : (
-      <p className="text-sm text-gray-600 break-words">{serviceAddressDisplay}</p>
-    )}
+    <p className="text-sm text-gray-600 break-words">{serviceAddressDisplay}</p>
 
     <p className="text-sm text-gray-600">
       {telLink ? (
