@@ -5,8 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { X, ExternalLink, Calendar } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
-import { useState } from 'react';
-import { updateJobSchedule, updateServiceSchedule } from '@/lib/actions/calendar';
 
 const statusColors: Record<string, 'default' | 'success' | 'warning' | 'danger' | 'info'> = {
   need_to_schedule: 'warning',
@@ -23,35 +21,12 @@ const statusColors: Record<string, 'default' | 'success' | 'warning' | 'danger' 
 export function EventDetailsModal({
   event,
   onClose,
-  onUpdate,
 }: {
   event: { type: 'job' | 'service'; data: any };
   onClose: () => void;
-  onUpdate: () => void;
 }) {
-  const [isRescheduling, setIsRescheduling] = useState(false);
-  const [newDateTime, setNewDateTime] = useState('');
-
   const isJob = event.type === 'job';
   const data = event.data;
-
-  const handleReschedule = async () => {
-    if (!newDateTime) return;
-
-    try {
-      if (isJob) {
-        await updateJobSchedule(data.id, newDateTime);
-      } else {
-        await updateServiceSchedule(data.id, newDateTime);
-      }
-      
-      onUpdate();
-      onClose();
-    } catch (error) {
-      console.error('Failed to reschedule:', error);
-      alert('Failed to reschedule. Please try again.');
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -111,41 +86,6 @@ export function EventDetailsModal({
               </span>
             </div>
           </div>
-
-          {/* Reschedule Section */}
-          {!isRescheduling ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsRescheduling(true)}
-            >
-              Reschedule
-            </Button>
-          ) : (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <label className="mb-2 block text-sm font-medium text-gray-900">
-                New Date & Time
-              </label>
-              <input
-                type="datetime-local"
-                value={newDateTime}
-                onChange={(e) => setNewDateTime(e.target.value)}
-                className="mb-3 w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleReschedule} disabled={!newDateTime}>
-                  Confirm Reschedule
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsRescheduling(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
 
           {/* View Full Details Link */}
           <div className="border-t pt-4">
