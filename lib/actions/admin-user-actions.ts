@@ -31,11 +31,6 @@ function parseInternalRoleForInvite(raw: FormDataEntryValue | null): "admin" | "
   return "office";
 }
 
-function parseContractorRole(raw: FormDataEntryValue | null): "member" | "owner" {
-  const role = String(raw ?? "").trim().toLowerCase();
-  return role === "owner" ? "owner" : "member";
-}
-
 async function sendRecoveryEmail(params: {
   admin: any;
   email: string;
@@ -143,7 +138,6 @@ export async function resendContractorInviteFromForm(formData: FormData): Promis
   const returnTo = safeReturnTo(String(formData.get("return_to") ?? ""));
   const contractorId = String(formData.get("contractor_id") ?? "").trim();
   const email = normalizeEmail(formData.get("email"));
-  const role = parseContractorRole(formData.get("role"));
 
   if (!contractorId || !email || !email.includes("@")) {
     redirect(withNotice(returnTo, "invalid_invite_target"));
@@ -152,8 +146,27 @@ export async function resendContractorInviteFromForm(formData: FormData): Promis
   await inviteContractor({
     contractorId,
     email,
-    role,
   });
 
   redirect(withNotice(returnTo, "invite_resent"));
+}
+
+export async function inviteContractorUserFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  await requireInternalRole("admin", { supabase });
+
+  const returnTo = safeReturnTo(String(formData.get("return_to") ?? ""));
+  const contractorId = String(formData.get("contractor_id") ?? "").trim();
+  const email = normalizeEmail(formData.get("email"));
+
+  if (!contractorId || !email || !email.includes("@")) {
+    redirect(withNotice(returnTo, "invalid_invite_target"));
+  }
+
+  await inviteContractor({
+    contractorId,
+    email,
+  });
+
+  redirect(withNotice(returnTo, "invite_sent"));
 }

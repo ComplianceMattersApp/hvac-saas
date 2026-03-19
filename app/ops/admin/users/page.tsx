@@ -175,10 +175,10 @@ export default async function AdminUsersCommandCenterPage({
   }
 
   // Optional pending invite visibility for contractor onboarding.
-  let contractorInvites: Array<{ id: string; contractor_id: string; email: string; role: string; status: string }> = [];
+  let contractorInvites: Array<{ id: string; contractor_id: string; email: string; status: string }> = [];
   const { data: invitesData, error: invitesErr } = await supabase
     .from("contractor_invites")
-    .select("id, contractor_id, email, role, status")
+    .select("id, contractor_id, email, status")
     .eq("owner_user_id", internalUser.account_owner_user_id)
     .in("status", ["pending", "invited"])
     .order("created_at", { ascending: false });
@@ -268,7 +268,7 @@ export default async function AdminUsersCommandCenterPage({
       email,
       name: String(profile?.fullName ?? "").trim() || "Unknown User",
       company: contractor?.name ?? "Contractor",
-      role: toRoleLabel(String(row.role ?? "member")),
+      role: "contractor_user",
       lifecycle: getContractorLifecycle(authConfirmedMap.get(id) ?? null),
       canDeactivateReactivate: false,
       isActiveFlag: null,
@@ -290,7 +290,7 @@ export default async function AdminUsersCommandCenterPage({
       email,
       name: "Pending Invite",
       company: contractorMap.get(contractorId)?.name ?? "Contractor",
-      role: toRoleLabel(String(invite.role ?? "member")),
+      role: "contractor_user",
       lifecycle: "invited",
       canDeactivateReactivate: false,
       isActiveFlag: null,
@@ -579,7 +579,6 @@ export default async function AdminUsersCommandCenterPage({
                         <form action={resendContractorInviteFromForm}>
                           <input type="hidden" name="email" value={record.email} />
                           <input type="hidden" name="contractor_id" value={record.contractorId} />
-                          <input type="hidden" name="role" value={record.role} />
                           <input type="hidden" name="return_to" value={returnTo} />
                           <button
                             type="submit"
