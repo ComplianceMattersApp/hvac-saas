@@ -1,3 +1,15 @@
+// Status formatting utility
+function formatStatus(status?: string | null) {
+  if (!status) return '';
+  const map: Record<string, string> = {
+    scheduled: 'Scheduled',
+    on_my_way: 'On My Way',
+    in_progress: 'In Progress',
+    field_complete: 'Field Complete',
+    closed: 'Closed',
+  };
+  return map[status] || status.split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+}
 import Link from 'next/link';
 import { X } from 'lucide-react';
 
@@ -723,6 +735,14 @@ export async function CalendarView(props: Props) {
           </div>
           <NavLinks view={uiView} date={data.anchorDate} />
         </div>
+        {/* Status Legend */}
+        <div className="flex items-center gap-2 mt-2 text-xs text-slate-500">
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-400" />Scheduled</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />On My Way</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-600" />In Progress</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" />Field Complete</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-600" />Closed</span>
+        </div>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
@@ -797,7 +817,24 @@ export async function CalendarView(props: Props) {
                                   <div className="truncate text-[11px] text-slate-500">{job.job_type || job.title}</div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-xs text-slate-500">{job.status}</span>
+                                  <span className={`text-xs font-semibold flex items-center gap-1 ${
+                                    job.status === 'scheduled' ? 'text-gray-400'
+                                    : job.status === 'on_my_way' ? 'text-blue-500'
+                                    : job.status === 'in_progress' ? 'text-indigo-600'
+                                    : job.status === 'field_complete' ? 'text-amber-500'
+                                    : job.status === 'closed' ? 'text-green-600'
+                                    : 'text-slate-500'
+                                  }`}>
+                                    <span className={`w-2 h-2 rounded-full ${
+                                      job.status === 'scheduled' ? 'bg-gray-400'
+                                      : job.status === 'on_my_way' ? 'bg-blue-500'
+                                      : job.status === 'in_progress' ? 'bg-indigo-600'
+                                      : job.status === 'field_complete' ? 'bg-amber-500'
+                                      : job.status === 'closed' ? 'bg-green-600'
+                                      : 'bg-gray-300'
+                                    }`}></span>
+                                    {formatStatus(job.status)}
+                                  </span>
                                   {needsTech && (
                                     <span className="inline-block rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">Needs Tech</span>
                                   )}

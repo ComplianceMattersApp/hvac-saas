@@ -40,6 +40,26 @@ const statusColors: Record<string, 'default' | 'success' | 'warning' | 'danger' 
   closed: 'info',
 };
 
+function formatStatus(status?: string | null) {
+  if (!status) return "";
+
+  const map: Record<string, string> = {
+    scheduled: "Scheduled",
+    on_my_way: "On My Way",
+    in_progress: "In Progress",
+    field_complete: "Field Complete",
+    closed: "Closed",
+  };
+
+  return (
+    map[status] ||
+    status
+      .split("_")
+      .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+      .join(" ")
+  );
+}
+
 function shortTitle(job: DispatchJob) {
   const title = String(job.title ?? '').trim();
   if (!title) return `Job ${job.id.slice(0, 8)}`;
@@ -111,7 +131,11 @@ export default function CalendarMonthGrid({ monthDate, jobs }: CalendarMonthGrid
                       {job.contractor_name ? (
                         <div className="mb-1 text-slate-600">Contractor: {job.contractor_name}</div>
                       ) : null}
-                      <div className="mb-1 text-slate-600">Status: {job.status || 'unknown'}</div>
+                      <div className="mb-1 text-slate-600 flex items-center gap-1">
+                        <span className={`w-2 h-2 rounded-full ${statusColor}`}></span>
+                        <span>{formatStatus(job.status) || 'Unknown'}</span>
+                      </div>
+                      // Status formatting utility
                       <div className="mb-1 text-slate-600">Type: {job.job_type || 'N/A'}</div>
                       <div className="mb-1 text-slate-600">Scheduled: {job.scheduled_date || 'N/A'}</div>
                       {needsTech && (
