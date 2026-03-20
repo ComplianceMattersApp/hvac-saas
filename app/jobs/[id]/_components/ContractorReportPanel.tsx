@@ -6,6 +6,11 @@ import {
   sendContractorReport,
   type ContractorReportPreview,
 } from "@/lib/actions/job-ops-actions";
+import ActionFeedback from "@/components/ui/ActionFeedback";
+
+function contractorReportErrorMessage(action: "generate" | "send") {
+  return action === "generate" ? "Could not prepare report." : "Could not send report.";
+}
 
 export default function ContractorReportPanel({
   jobId,
@@ -39,9 +44,10 @@ export default function ContractorReportPanel({
         setIsExpanded(true);
         setSent(false);
       } catch (e) {
+        console.error("generateContractorReportPreview failed", e);
         setPreview(null);
         setIsExpanded(false);
-        setError(e instanceof Error ? e.message : "Failed to generate report preview");
+        setError(contractorReportErrorMessage("generate"));
       } finally {
         setLastAction(null);
       }
@@ -57,16 +63,17 @@ export default function ContractorReportPanel({
 
     startTransition(async () => {
       try {
-        await sendContractorReport({
+        const result = await sendContractorReport({
           jobId,
           contractorNote,
         });
 
-        setSuccess("Contractor report published to portal.");
+        setSuccess(result.alreadySent ? "This was already sent." : "Report sent.");
         setIsExpanded(false);
         setSent(true);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to send contractor report");
+        console.error("sendContractorReport failed", e);
+        setError(contractorReportErrorMessage("send"));
       } finally {
         setLastAction(null);
       }
@@ -88,17 +95,8 @@ export default function ContractorReportPanel({
         </div>
       ) : null}
 
-      {error ? (
-        <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </div>
-      ) : null}
-
-      {success ? (
-        <div className="mb-3 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          {success}
-        </div>
-      ) : null}
+      <ActionFeedback type="error" message={error} className="mb-3" />
+      <ActionFeedback type="success" message={success} className="mb-3" />
 
       <div className="mb-3 flex flex-wrap gap-2">
         <button

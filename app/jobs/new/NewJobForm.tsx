@@ -5,6 +5,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { createJobFromForm } from "@/lib/actions";
 import JobCoreFields from "@/components/jobs/JobCoreFields";
+import ActionFeedback from "@/components/ui/ActionFeedback";
 
 type Contractor = { id: string; name: string };
 
@@ -131,11 +132,13 @@ export default function NewJobForm({
   existingCustomer,
   locations = [],
   myContractor,
+  errorCode,
 }: {
   contractors: Contractor[];
   existingCustomer?: ExistingCustomer | null;
   locations?: LocationRow[];
   myContractor?: MyContractor;
+  errorCode?: string | null;
 }) {
 
   const isContractorMode = Boolean(myContractor?.id);
@@ -146,10 +149,6 @@ export default function NewJobForm({
   if (!isExistingCustomer) return "";
   return locations.length ? locations[0].id : "__new__";
 });
-
-  const selectedLoc = isExistingCustomer
-    ? locations.find((l) => l.id === locationId) ?? null
-    : null;
 
   const [windowStart, setWindowStart] = useState("");
   const [windowEnd, setWindowEnd] = useState("");
@@ -190,11 +189,6 @@ const [billingRecipient, setBillingRecipient] = useState<
     if (start) setWindowStart(start);
     if (end) setWindowEnd(end);
   }
-
-  const equipmentHasAnyComponents = useMemo(
-    () => systems.some((s) => s.components.length > 0),
-    [systems]
-  );
 
   const systemsNeedingName = useMemo(() => {
     return systems
@@ -372,6 +366,12 @@ const [billingRecipient, setBillingRecipient] = useState<
   return (
     <div className="p-6 max-w-lg">
       <h1 className="text-xl font-semibold mb-2">New Job</h1>
+
+      <ActionFeedback
+        type="warning"
+        message={errorCode === "missing_address" ? "Could not create job. Service address is required." : null}
+        className="mb-4"
+      />
 
       <div className="text-sm text-gray-600 mb-6">
         <div className="font-medium text-gray-800">How this works</div>

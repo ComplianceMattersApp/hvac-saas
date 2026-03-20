@@ -7,6 +7,7 @@ import { insertInternalNotificationForEvent } from "@/lib/actions/notification-a
 import { createClient } from "@/lib/supabase/server";
 import JobAttachments from "@/components/portal/JobAttachments";
 import SubmitButton from "@/components/SubmitButton";
+import FlashBanner from "@/components/ui/FlashBanner";
 import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import {
   extractFailureReasons,
@@ -167,6 +168,8 @@ export default async function PortalJobDetailPage({
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const noteErrorRaw = sp.note_error;
   const noteError = Array.isArray(noteErrorRaw) ? noteErrorRaw[0] : noteErrorRaw;
+  const bannerRaw = sp.banner;
+  const banner = Array.isArray(bannerRaw) ? bannerRaw[0] : bannerRaw;
 
   const supabase = await createClient();
 
@@ -482,7 +485,7 @@ export default async function PortalJobDetailPage({
     if (dupErr) throw dupErr;
     if (recentDuplicate?.id) {
       revalidatePath(`/portal/jobs/${nextJobId}`);
-      redirect(`/portal/jobs/${nextJobId}`);
+      redirect(`/portal/jobs/${nextJobId}?banner=note_duplicate`);
     }
 
     const { error: insErr } = await nextSupabase.from("job_events").insert({
@@ -502,11 +505,35 @@ export default async function PortalJobDetailPage({
     });
 
     revalidatePath(`/portal/jobs/${nextJobId}`);
-    redirect(`/portal/jobs/${nextJobId}`);
+    redirect(`/portal/jobs/${nextJobId}?banner=note_saved`);
   }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 text-gray-900 dark:text-gray-100">
+      {banner === "job_created" ? (
+        <FlashBanner type="success" message="Job created." />
+      ) : null}
+
+      {banner === "job_already_created" ? (
+        <FlashBanner type="warning" message="Job already created." />
+      ) : null}
+
+      {banner === "note_saved" ? (
+        <FlashBanner type="success" message="Saved." />
+      ) : null}
+
+      {banner === "note_duplicate" ? (
+        <FlashBanner type="warning" message="This submission was already received." />
+      ) : null}
+
+      {banner === "retest_ready_requested" ? (
+        <FlashBanner type="success" message="Submission received." />
+      ) : null}
+
+      {banner === "retest_ready_already_received" ? (
+        <FlashBanner type="warning" message="This submission was already received." />
+      ) : null}
+
       <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
         <div className="flex items-start justify-between gap-4">
           <Link

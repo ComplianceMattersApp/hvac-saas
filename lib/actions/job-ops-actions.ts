@@ -374,7 +374,7 @@ export async function generateContractorReportPreview(input: {
 export async function sendContractorReport(input: {
   jobId: string;
   contractorNote?: string | null;
-}): Promise<{ ok: true }> {
+}): Promise<{ ok: true; alreadySent?: boolean }> {
   const supabase = await createClient();
   const jobId = String(input.jobId ?? "").trim();
   if (!jobId) throw new Error("Missing jobId");

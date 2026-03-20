@@ -7,6 +7,7 @@ import {
   createJobAttachmentUploadToken,
   revalidatePortalJob,
 } from "@/lib/actions/attachment-actions";
+import ActionFeedback from "@/components/ui/ActionFeedback";
 
 type Item = {
   id: string;
@@ -19,6 +20,10 @@ type Item = {
   created_at: string;
   signedUrl: string | null;
 };
+
+function attachmentErrorMessage(intent: "upload" | "review") {
+  return intent === "review" ? "Could not save changes." : "Could not upload files.";
+}
 
 export default function JobAttachments({
   jobId,
@@ -80,8 +85,7 @@ export default function JobAttachments({
 
     if (upErr) throw new Error(upErr.message);
 
-    // If your server action returns attachmentId, use it; otherwise null is fine
-    return (tok as any).attachmentId ?? null;
+    return tok.attachmentId ?? null;
   }
 
   async function uploadOnly() {
@@ -121,9 +125,10 @@ export default function JobAttachments({
         setFiles([]);
         setCaption("");
         setNote("");
-        setOk("Files uploaded successfully.");
-      } catch (e: any) {
-        setError(e?.message ?? "Upload failed");
+        setOk("Upload complete.");
+      } catch (e) {
+        console.error("portal uploadOnly failed", e);
+        setError(attachmentErrorMessage("upload"));
       }
     });
   }
@@ -170,11 +175,10 @@ export default function JobAttachments({
         setFiles([]);
         setCaption("");
         setNote("");
-        setOk(
-          "Submitted for review. Thank you — we’ll review and schedule next steps."
-        );
-      } catch (e: any) {
-        setError(e?.message ?? "Submit failed");
+        setOk("Submission received.");
+      } catch (e) {
+        console.error("portal submitForReview failed", e);
+        setError(attachmentErrorMessage("review"));
       }
     });
   }
@@ -199,15 +203,8 @@ export default function JobAttachments({
           disabled={isPending}
         />
 
-        {error ? (
-          <div className="text-sm text-red-600 dark:text-red-300">{error}</div>
-        ) : null}
-
-        {ok ? (
-          <div className="text-sm text-emerald-700 dark:text-emerald-300">
-            {ok}
-          </div>
-        ) : null}
+        <ActionFeedback type="error" message={error} />
+        <ActionFeedback type="success" message={ok} />
 
         {/* Choose files */}
         <div className="flex flex-wrap items-center gap-2">
@@ -293,7 +290,7 @@ export default function JobAttachments({
 
 {/* Action */}
 <div className="text-xs text-gray-500 dark:text-gray-300">
-If this job failed testing, choose "Correction / Ready for review".
+If this job failed testing, choose &quot;Correction / Ready for review&quot;.
 </div>
 <button
   type="button"
@@ -308,8 +305,8 @@ If this job failed testing, choose "Correction / Ready for review".
 >
   {isPending
     ? intent === "review"
-      ? "Submitting…"
-      : "Uploading…"
+      ? "Submitting..."
+      : "Uploading..."
     : intent === "review"
     ? "Submit for Review"
     : "Upload Files"}

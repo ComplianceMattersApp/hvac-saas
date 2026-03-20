@@ -1,12 +1,17 @@
 "use client";
 
+import { useFormStatus } from "react-dom";
+
 type UnscheduleButtonProps = {
   className?: string;
 };
 
 export default function UnscheduleButton({ className }: UnscheduleButtonProps) {
+  const { pending } = useFormStatus();
+
   return (
     <button
+      disabled={pending}
       className={
         className ??
         "inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-100"
@@ -19,7 +24,7 @@ export default function UnscheduleButton({ className }: UnscheduleButtonProps) {
         if (!ok) e.preventDefault();
       }}
     >
-      Unschedule
+      {pending ? "Updating..." : "Unschedule"}
     </button>
   );
 }

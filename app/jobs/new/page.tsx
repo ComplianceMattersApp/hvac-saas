@@ -26,7 +26,7 @@ function isUuid(v: string) {
 }
 
 export default async function NewJobPage(props: {
-  searchParams?: Promise<{ customer_id?: string }>;
+  searchParams?: Promise<{ customer_id?: string; err?: string }>;
 }) {
   const supabase = await createClient();
 
@@ -69,6 +69,7 @@ export default async function NewJobPage(props: {
 
   const sp = props.searchParams ? await props.searchParams : undefined;
   const customerId = String(sp?.customer_id ?? "").trim();
+  const errorCode = String(sp?.err ?? "").trim() || null;
 
   // Optional: existing customer mode
   let existingCustomer: ExistingCustomerRow | null = null;
@@ -100,6 +101,7 @@ export default async function NewJobPage(props: {
       existingCustomer={existingCustomer}
       locations={customerLocations}
       myContractor={myContractor}
+      errorCode={errorCode}
     />
   );
 }

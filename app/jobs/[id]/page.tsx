@@ -368,6 +368,14 @@ export default async function JobDetailPage({
       ? noticeRaw
       : "";
 
+  const bannerRaw = sp.banner;
+  const banner =
+    Array.isArray(bannerRaw)
+      ? bannerRaw[0]
+      : typeof bannerRaw === "string"
+      ? bannerRaw
+      : "";
+
   const showEccNotice = notice === "ecc_test_required";
 
   const supabase = await createClient();
@@ -1365,70 +1373,133 @@ const renderTimelineItem = (e: any, key: string) => {
         </div>
       )}
 
-      {sp?.banner === "customer_reused" && (
+      {banner === "job_created" && (
+        <FlashBanner
+          type="success"
+          message="Job created."
+        />
+      )}
+
+      {banner === "job_already_created" && (
+        <FlashBanner
+          type="warning"
+          message="Job already created."
+        />
+      )}
+
+      {banner === "schedule_saved" && (
+        <FlashBanner
+          type="success"
+          message="Schedule updated."
+        />
+      )}
+
+      {banner === "schedule_already_saved" && (
+        <FlashBanner
+          type="warning"
+          message="Schedule was already up to date."
+        />
+      )}
+
+      {banner === "status_updated" && (
+        <FlashBanner
+          type="success"
+          message="Saved."
+        />
+      )}
+
+      {banner === "status_already_updated" && (
+        <FlashBanner
+          type="warning"
+          message="This was already processed."
+        />
+      )}
+
+      {banner === "service_closeout_saved" && (
+        <FlashBanner
+          type="success"
+          message="Saved."
+        />
+      )}
+
+      {banner === "service_closeout_already_saved" && (
+        <FlashBanner
+          type="warning"
+          message="This was already processed."
+        />
+      )}
+
+      {banner === "service_closeout_locked" && (
+        <FlashBanner
+          type="warning"
+          message="Could not save changes."
+        />
+      )}
+
+      {banner === "customer_reused" && (
         <FlashBanner
           type="warning"
           message="Existing customer matched by phone — reused (no duplicate created)."
         />
       )}
 
-      {sp?.banner === "customer_created" && (
+      {banner === "customer_created" && (
         <FlashBanner
           type="success"
           message="New customer created and linked to this job."
         />
       )}
 
-      {sp?.banner === "assignment_added" && (
+      {banner === "assignment_added" && (
         <FlashBanner
           type="success"
           message="Team member assigned to this job."
         />
       )}
 
-      {sp?.banner === "assignment_added_primary" && (
+      {banner === "assignment_added_primary" && (
         <FlashBanner
           type="success"
           message="Team member assigned and set as primary."
         />
       )}
 
-      {sp?.banner === "assignment_primary_set" && (
+      {banner === "assignment_primary_set" && (
         <FlashBanner
           type="success"
           message="Primary assignee updated."
         />
       )}
 
-      {sp?.banner === "assignment_removed" && (
+      {banner === "assignment_removed" && (
         <FlashBanner
           type="success"
           message="Assignee removed from this job."
         />
       )}
 
-      {sp?.banner === "contractor_updated" && (
+      {banner === "contractor_updated" && (
         <FlashBanner
           type="success"
           message="Contractor assignment updated."
         />
       )}
 
-      {sp?.banner === "contractor_unchanged" && (
+      {banner === "contractor_unchanged" && (
         <FlashBanner
           type="warning"
           message="Contractor assignment was unchanged."
         />
       )}
 
-      {sp?.banner === "contractor_update_failed" && (
+      {banner === "contractor_update_failed" && (
         <FlashBanner
           type="warning"
           message="Unable to update contractor assignment. Please try again or contact support if it continues."
         />
       )}
 
-      {sp?.banner === "job_cancelled" && (
+      {banner === "job_cancelled" && (
         <FlashBanner
           type="success"
           message="Job cancelled successfully. This job is no longer in active queues."

@@ -1596,7 +1596,7 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
 
   if (childErr) throw childErr;
   if (openRetestChild?.id) {
-    redirect(`/portal/jobs/${jobId}`);
+    redirect(`/portal/jobs/${jobId}?banner=retest_ready_already_received`);
   }
 
   const { data: existingRequest, error: reqErr } = await supabase
@@ -1610,35 +1610,38 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
 
   if (reqErr) throw reqErr;
 
-  if (!existingRequest?.id) {
-    await insertJobEvent({
-      supabase,
-      jobId,
-      event_type: "retest_ready_requested",
-      meta: {
-        source: "contractor_portal",
-        requested_by: "contractor",
-        next_action: "create_retest_job",
-      },
-      userId: user.id,
-    });
-
-    await insertInternalNotificationForEvent({
-      supabase,
-      jobId,
-      eventType: "retest_ready_requested",
-      actorUserId: user.id,
-    });
-
-    await notifyInternalNextActionChanged({
-      supabase,
-      jobId,
-      eventType: "retest_ready_requested",
-      meta: {
-        next_action: "create_retest_job",
-      },
-    });
+  if (existingRequest?.id) {
+    revalidatePath(`/portal/jobs/${jobId}`);
+    redirect(`/portal/jobs/${jobId}?banner=retest_ready_already_received`);
   }
+
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: "retest_ready_requested",
+    meta: {
+      source: "contractor_portal",
+      requested_by: "contractor",
+      next_action: "create_retest_job",
+    },
+    userId: user.id,
+  });
+
+  await insertInternalNotificationForEvent({
+    supabase,
+    jobId,
+    eventType: "retest_ready_requested",
+    actorUserId: user.id,
+  });
+
+  await notifyInternalNextActionChanged({
+    supabase,
+    jobId,
+    eventType: "retest_ready_requested",
+    meta: {
+      next_action: "create_retest_job",
+    },
+  });
 
   revalidatePath("/ops");
   revalidatePath(`/jobs/${jobId}`);
@@ -3404,12 +3407,16 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     contractorId: isContractorUser ? contractorIdFinal : null,
   });
 
-  function redirectToCreatedJob(jobId: string) {
+  function redirectToCreatedJob(jobId: string, banner: string) {
+    const search = new URLSearchParams();
+    search.set("banner", banner);
+    const suffix = `?${search.toString()}`;
+
     if (isContractorUser) {
-      redirect(`/portal/jobs/${jobId}`);
+      redirect(`/portal/jobs/${jobId}${suffix}`);
     }
 
-    redirect(`/jobs/${jobId}`);
+    redirect(`/jobs/${jobId}${suffix}`);
   }
 
   const DUPLICATE_SUBMISSION_WINDOW_MS = 45_000;
@@ -3869,10 +3876,10 @@ await insertEquipmentForJob(createdJobId);
   if (isContractorUser) {
     revalidatePath(`/portal`);
     revalidatePath(`/portal/jobs/${createdJobId}`);
-    redirect(`/portal/jobs/${createdJobId}`);
+    redirect(`/portal/jobs/${createdJobId}?banner=job_created`);
   }
 
-  redirect(`/jobs/${createdJobId}`);
+  redirect(`/jobs/${createdJobId}?banner=job_created`);
 }
 
 const CONTRACTOR_SANDBOX_ALLOWED = new Set([
@@ -3901,7 +3908,7 @@ function canContractorWriteEvent(event_type: string) {
       jobAddress: jobAddressRaw || null,
     });
     if (existingDuplicateId) {
-      redirectToCreatedJob(existingDuplicateId);
+      redirectToCreatedJob(existingDuplicateId, "job_already_created");
     }
 
     const created = await createJob({
@@ -3992,7 +3999,7 @@ if (existingCustomerId && !existingLocationId) {
     jobAddress: jobAddressRaw || null,
   });
   if (existingDuplicateId) {
-    redirectToCreatedJob(existingDuplicateId);
+    redirectToCreatedJob(existingDuplicateId, "job_already_created");
   }
 
   const created = await createJob({
@@ -4082,7 +4089,7 @@ const existingDuplicateId = await findExistingIntakeDuplicate({
   jobAddress: jobAddressRaw || null,
 });
 if (existingDuplicateId) {
-  redirectToCreatedJob(existingDuplicateId);
+  redirectToCreatedJob(existingDuplicateId, "job_already_created");
 }
 
 const created = await createJob({
@@ -4276,7 +4283,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       revalidatePath(`/ops`);
       revalidatePath(`/portal`);
       revalidatePath(`/portal/jobs/${id}`);
-      redirect(`/jobs/${id}`);
+      redirect(`/jobs/${id}?banner=status_already_updated`);
     }
 
     // Keep on_my_way close to user intent in event order.
@@ -4360,7 +4367,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       revalidatePath(`/ops`);
       revalidatePath(`/portal`);
       revalidatePath(`/portal/jobs/${id}`);
-      redirect(`/jobs/${id}`);
+      redirect(`/jobs/${id}?banner=status_already_updated`);
     }
 
     
@@ -4534,7 +4541,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${id}`);
 
-  redirect(`/jobs/${id}`);
+  redirect(`/jobs/${id}?banner=status_updated`);
 }
 
 }
@@ -4564,6 +4571,17 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const permitDateRaw = String(formData.get("permit_date") || "").trim();
   const jurisdictionRaw = String(formData.get("jurisdiction") || "").trim();
   const returnToRaw = String(formData.get("return_to") || "").trim();
+
+  function redirectToScheduleTarget(banner: string) {
+    if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
+      const [pathOnly, searchRaw = ""] = returnToRaw.split("?");
+      const search = new URLSearchParams(searchRaw);
+      search.set("banner", banner);
+      redirect(`${pathOnly}?${search.toString()}`);
+    }
+
+    redirect(`/jobs/${id}?banner=${banner}`);
+  }
 
   // Canonical scheduling + ops_status logic (NO Date parsing)
   const derived = deriveScheduleAndOps(formData);
@@ -4601,6 +4619,22 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const permit_number = isServiceJob ? null : (permitNumberRaw || null);
   const jurisdiction = isServiceJob ? null : (jurisdictionRaw || null);
   const permit_date = isServiceJob ? null : (permitDateRaw || null);
+
+  const didPermitFieldsChange =
+    normalizeScheduleValue(before?.permit_number) !== normalizeScheduleValue(permit_number) ||
+    normalizeScheduleValue(before?.jurisdiction) !== normalizeScheduleValue(jurisdiction) ||
+    normalizeScheduleValue(before?.permit_date) !== normalizeScheduleValue(permit_date);
+
+  const didScheduleFieldsChange =
+    normalizeScheduleValue(before?.scheduled_date) !== normalizeScheduleValue(scheduled_date) ||
+    normalizeScheduleValue(before?.window_start) !== normalizeScheduleValue(window_start) ||
+    normalizeScheduleValue(before?.window_end) !== normalizeScheduleValue(window_end);
+
+  if (!didScheduleFieldsChange && !didPermitFieldsChange) {
+    revalidatePath(`/jobs/${id}`);
+    revalidatePath(`/calendar`);
+    redirectToScheduleTarget("schedule_already_saved");
+  }
 
   const nextLifecycleStatus =
     unscheduleRequested && isUnscheduledAfterSave ? "open" : undefined;
@@ -4653,11 +4687,6 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const wasScheduled =
     !!before?.scheduled_date || !!before?.window_start || !!before?.window_end;
   const isScheduled = !!scheduled_date || !!window_start || !!window_end;
-  const didScheduleFieldsChange =
-    normalizeScheduleValue(before?.scheduled_date) !== normalizeScheduleValue(scheduled_date) ||
-    normalizeScheduleValue(before?.window_start) !== normalizeScheduleValue(window_start) ||
-    normalizeScheduleValue(before?.window_end) !== normalizeScheduleValue(window_end);
-
   const event_type = unscheduleRequested
     ? "unscheduled"
     : !wasScheduled && isScheduled
@@ -4718,14 +4747,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${id}`);
 
-  if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
-    const [pathOnly, searchRaw = ""] = returnToRaw.split("?");
-    const search = new URLSearchParams(searchRaw);
-    search.set("banner", "schedule_saved");
-    redirect(`${pathOnly}?${search.toString()}`);
-  }
-
-  redirect(`/jobs/${id}`);
+  redirectToScheduleTarget("schedule_saved");
 }
 
 

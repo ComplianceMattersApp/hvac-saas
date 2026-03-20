@@ -36,6 +36,7 @@ const TECH_COLOR_PALETTE = [
 function bannerMessage(banner?: string) {
   const map: Record<string, string> = {
     schedule_saved: 'Schedule updated.',
+    schedule_already_saved: 'Schedule was already up to date.',
     assignment_added: 'Assignee added.',
     assignment_added_primary: 'Assignee added and set as primary.',
     assignment_primary_set: 'Primary assignee updated.',

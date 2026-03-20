@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 /**
  * Service jobs:
@@ -34,7 +35,7 @@ export async function markServiceComplete(jobId: string): Promise<void> {
   // Idempotent: already field-complete and at invoice_required
   if (job.field_complete && job.ops_status === "invoice_required") {
     revalidatePath(`/jobs/${jobId}`);
-    return;
+    redirect(`/jobs/${jobId}?banner=service_closeout_already_saved`);
   }
 
   const beforeStatus = job.status ?? "in_progress";
@@ -95,6 +96,7 @@ export async function markServiceComplete(jobId: string): Promise<void> {
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
+  redirect(`/jobs/${jobId}?banner=service_closeout_saved`);
 }
 
 export async function markInvoiceSent(jobId: string): Promise<void> {
@@ -112,5 +114,18 @@ export async function markInvoiceSent(jobId: string): Promise<void> {
     throw new Error("markInvoiceSent can only be used for Service jobs.");
   }
 
-  await setOpsStatusIfNotManual(jobId, "closed");
+  const result = await setOpsStatusIfNotManual(jobId, "closed");
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/ops`);
+
+  if (result.manualLockPrevented) {
+    redirect(`/jobs/${jobId}?banner=service_closeout_locked`);
+  }
+
+  if (!result.updated) {
+    redirect(`/jobs/${jobId}?banner=service_closeout_already_saved`);
+  }
+
+  redirect(`/jobs/${jobId}?banner=service_closeout_saved`);
 }
