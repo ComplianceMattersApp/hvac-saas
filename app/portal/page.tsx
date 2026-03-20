@@ -95,7 +95,7 @@ export default async function PortalPage({
       customer_phone,
       city,
       job_address,
-      locations:location_id ( address_line1, city, state )
+      locations:location_id ( address_line1, city, state, zip )
     `
     )
     .eq("contractor_id", contractorId)
@@ -138,6 +138,7 @@ export default async function PortalPage({
       job.city,
       job.locations?.address_line1,
       job.locations?.city,
+      job.locations?.zip,
       job.permit_number,
       job.id,
     ]
@@ -318,8 +319,13 @@ export default async function PortalPage({
       String(job.job_address ?? "").trim() ||
       "No address";
     const city = String(job.locations?.city ?? "").trim() || String(job.city ?? "").trim();
+    const state = String(job.locations?.state ?? "").trim();
+    const zip = String(job.locations?.zip ?? "").trim();
+    const cityStateZip = [city, [state, zip].filter(Boolean).join(" ")]
+      .filter(Boolean)
+      .join(", ");
 
-    return city ? `${addr}, ${city}` : addr;
+    return cityStateZip ? `${addr}, ${cityStateZip}` : addr;
   }
 
   function retestScheduleLabel(child: any) {

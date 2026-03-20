@@ -51,6 +51,7 @@ export async function createJobFromIntake(formData: FormData) {
 
   const addressLine1 = String(formData.get("address_line1") || "").trim();
   const city = String(formData.get("city") || "").trim();
+  const zip = String(formData.get("zip") || "").trim();
 
   // Notes should always exist + be editable later
   const jobNotes = String(formData.get("job_notes") || "").trim() || null;
@@ -65,8 +66,8 @@ export async function createJobFromIntake(formData: FormData) {
   if (!firstName || !lastName || !phone) {
     throw new Error("Missing required fields: First Name, Last Name, Phone.");
   }
-  if (!addressLine1 || !city) {
-    throw new Error("Missing required fields: Service Address, City.");
+  if (!addressLine1 || !city || !zip) {
+    throw new Error("Missing required fields: Service Address, City, Zip.");
   }
   if (jobType === "service" && !titleRaw) {
     throw new Error("Service jobs require a Job Title.");
@@ -115,6 +116,8 @@ export async function createJobFromIntake(formData: FormData) {
       customer_id: customerId,
       address_line1: addressLine1,
       city,
+      zip,
+      postal_code: zip,
       owner_user_id: canonicalOwnerUserId,
     })
     .select("id")
@@ -145,6 +148,13 @@ export async function createJobFromIntake(formData: FormData) {
 
       city,
       job_address: addressLine1,
+      meta: {
+        service_address_snapshot: {
+          address_line1: addressLine1,
+          city,
+          zip,
+        },
+      },
 
       permit_number: permitNumber,
 

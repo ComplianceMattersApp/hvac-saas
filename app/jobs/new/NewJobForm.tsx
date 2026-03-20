@@ -579,7 +579,10 @@ const [billingRecipient, setBillingRecipient] = useState<
       >
         {locations.map((l) => (
           <option key={l.id} value={l.id}>
-            {(l.nickname ? `${l.nickname} — ` : "") + (l.address_line1 ?? "Address") + ", " + (l.city ?? "")}
+            {(l.nickname ? `${l.nickname} — ` : "") +
+              (l.address_line1 ?? "Address") +
+              ", " +
+              [l.city, l.state, l.zip].filter(Boolean).join(" ")}
           </option>
         ))}
         <option value="__new__">+ Add new location…</option>

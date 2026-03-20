@@ -548,7 +548,10 @@ function customerLine(j: any) {
 
 function addressLine(j: any) {
   const parts = addressParts(j);
-  const out = [parts.address, parts.city].filter(Boolean).join(", ");
+  const cityStateZip = [parts.city, [parts.state, parts.zip].filter(Boolean).join(" ")]
+    .filter(Boolean)
+    .join(", ");
+  const out = [parts.address, cityStateZip].filter(Boolean).join(", ");
   return out || "—";
 }
 
@@ -565,6 +568,8 @@ function addressParts(j: any) {
       String(l?.city ?? "").trim() ||
       String(j.city ?? "").trim() ||
       "",
+    state: String(l?.state ?? "").trim(),
+    zip: String(l?.zip ?? l?.postal_code ?? "").trim(),
   };
 }
 

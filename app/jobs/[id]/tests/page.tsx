@@ -361,6 +361,12 @@ export default async function JobTestsPage({
       customer_last_name,
       customer_phone,
       customer_email,
+      locations:location_id (
+        address_line1,
+        city,
+        state,
+        zip
+      ),
       job_systems (
         id,
         name,
@@ -424,6 +430,21 @@ export default async function JobTestsPage({
       .map((value: unknown) => String(value ?? "").trim())
       .filter(Boolean)
       .join(" ") || "—";
+
+  const locationSnapshot = Array.isArray((job as any)?.locations)
+    ? ((job as any).locations.find((row: any) => row) ?? null)
+    : ((job as any)?.locations ?? null);
+  const reportAddress =
+    String(locationSnapshot?.address_line1 ?? "").trim() ||
+    String(job.job_address ?? "").trim();
+  const reportCityStateZip = [
+    String(locationSnapshot?.city ?? "").trim() || String(job.city ?? "").trim(),
+    [String(locationSnapshot?.state ?? "").trim(), String(locationSnapshot?.zip ?? "").trim()]
+      .filter(Boolean)
+      .join(" "),
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   const projectTypeLabel = String(job.project_type ?? "")
     .trim()
@@ -677,7 +698,7 @@ const defaultSystemTonnage =
             </div>
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Address</div>
-              <div className="text-sm font-medium text-slate-950">{fallbackText(job.job_address)}</div>
+              <div className="text-sm font-medium text-slate-950">{fallbackText(reportAddress)}</div>
             </div>
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Phone</div>
@@ -695,8 +716,8 @@ const defaultSystemTonnage =
               <div className="text-sm font-medium text-slate-950">{contractorName}</div>
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">City</div>
-              <div className="text-sm font-medium text-slate-950">{fallbackText(job.city)}</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">City / State / ZIP</div>
+              <div className="text-sm font-medium text-slate-950">{fallbackText(reportCityStateZip)}</div>
             </div>
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Permit Number</div>

@@ -141,7 +141,7 @@ if (countsData) {
       locationIds.length
         ? supabase
             .from("locations")
-            .select("id, address_line1, city")
+            .select("id, address_line1, city, state, zip")
             .in("id", locationIds)
         : Promise.resolve({ data: [] as any[], error: null }),
     ]);
@@ -218,7 +218,9 @@ const customerName: string | null =
     `${c?.first_name ?? ""} ${c?.last_name ?? ""}`.trim() ||
     `${job.customer_first_name ?? ""} ${job.customer_last_name ?? ""}`.trim()) || null;
 
-const displayCity: string = (l?.city ?? job.city ?? "—") as string;
+const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.zip ?? null].filter(Boolean).join(" ")]
+  .filter(Boolean)
+  .join(", ") || "—";
   const today = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Los_Angeles",
   year: "numeric",

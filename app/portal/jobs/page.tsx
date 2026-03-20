@@ -82,7 +82,7 @@ export default async function PortalAllJobsPage() {
       customer_phone,
       city,
       job_address,
-      locations:location_id ( address_line1, city, state )
+      locations:location_id ( address_line1, city, state, zip )
     `
     )
     .eq("contractor_id", contractorId)
@@ -256,7 +256,12 @@ export default async function PortalAllJobsPage() {
       "No address";
     const city =
       String(job.locations?.city ?? "").trim() || String(job.city ?? "").trim();
-    return city ? `${addr}, ${city}` : addr;
+    const state = String(job.locations?.state ?? "").trim();
+    const zip = String(job.locations?.zip ?? "").trim();
+    const cityStateZip = [city, [state, zip].filter(Boolean).join(" ")]
+      .filter(Boolean)
+      .join(", ");
+    return cityStateZip ? `${addr}, ${cityStateZip}` : addr;
   }
 
   function retestScheduleLabel(child: any) {

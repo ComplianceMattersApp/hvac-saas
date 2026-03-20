@@ -18,6 +18,7 @@ export default function JobCoreFields({
 }: Props) {
   const titleIsRequired = Boolean(titleRequired);
   const showEccPermitFields = jobType !== "service";
+  const showJobTitle = jobType === "service";
 
   return (
     <div className="space-y-4">
@@ -25,16 +26,18 @@ export default function JobCoreFields({
       <div className="rounded-lg border p-3 space-y-3">
         <div className="text-sm font-semibold">Job Details</div>
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium">Job Title</label>
-          <input
-            type="text"
-            name="title"
-            required={titleIsRequired}
-            placeholder={titleIsRequired ? "" : "Optional"}
-            className="w-full border rounded px-3 py-2"
-          />
-        </div>
+        {showJobTitle && (
+          <div className="space-y-1">
+            <label className="block text-sm font-medium">Job Title</label>
+            <input
+              type="text"
+              name="title"
+              required={titleIsRequired}
+              placeholder={titleIsRequired ? "" : "Optional"}
+              className="w-full border rounded px-3 py-2"
+            />
+          </div>
+        )}
 
         {showEccPermitFields && (
           <>
@@ -141,6 +144,16 @@ export default function JobCoreFields({
             <input
               type="text"
               name="city"
+              className="w-full border rounded px-3 py-2"
+              required
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium">ZIP Code</label>
+            <input
+              type="text"
+              name="zip"
               className="w-full border rounded px-3 py-2"
               required
             />

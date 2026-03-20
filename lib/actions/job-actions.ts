@@ -3408,7 +3408,7 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     contractorId: isContractorUser ? contractorIdFinal : null,
   });
 
-  const idempotencyMeta = submissionId ? { submission_id: submissionId } : null;
+  const idempotencyMeta = submissionId ? { submission_id: submissionId } : {};
 
   function redirectToCreatedJob(jobId: string) {
     if (isContractorUser) {
@@ -3525,12 +3525,16 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
   const customerPhoneSnapshot =
     customerPhoneRaw || String(existingCustomerSnapshot?.phone ?? "").trim() || null;
 
-  let existingLocationSnapshot: { address_line1?: string | null; city?: string | null } | null = null;
+  let existingLocationSnapshot: {
+    address_line1?: string | null;
+    city?: string | null;
+    zip?: string | null;
+  } | null = null;
 
   if (existingLocationId) {
     const { data: existingLocation, error: existingLocationErr } = await supabase
       .from("locations")
-      .select("id, address_line1, city")
+      .select("id, address_line1, city, zip")
       .eq("id", existingLocationId)
       .maybeSingle();
 
@@ -3557,7 +3561,23 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
 
   const locationNickname =
     String(formData.get("location_nickname") || "").trim() || null;
-  const zip = String(formData.get("zip") || "").trim() || null;
+  const zip =
+    String(formData.get("zip") || "").trim() ||
+    String(existingLocationSnapshot?.zip ?? "").trim() ||
+    null;
+
+  if (!existingLocationId && !zip) {
+    throw new Error("Zip is required");
+  }
+
+  const addressSnapshotMeta = {
+    service_address_snapshot: {
+      address_line1: address_line1 || null,
+      city: city || null,
+      zip,
+    },
+  };
+  const jobMeta = { ...idempotencyMeta, ...addressSnapshotMeta };
 
     const normalizeAddressPart = (value: string | null | undefined) =>
     String(value || "")
@@ -3574,7 +3594,7 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
 
   const { data: existingLocations, error } = await supabase
     .from("locations")
-    .select("id, address_line1, city, zip")
+    .select("id, address_line1, city, zip, postal_code")
     .eq("customer_id", customerId);
 
   if (error) throw error;
@@ -3582,7 +3602,7 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
   const match = (existingLocations || []).find((loc) => {
     const locAddress = normalizeAddressPart(loc.address_line1);
     const locCity = normalizeAddressPart(loc.city);
-    const locZip = normalizeAddressPart((loc as any).zip);
+    const locZip = normalizeAddressPart((loc as any).zip ?? (loc as any).postal_code);
 
     const sameAddress = locAddress === normalizedAddressLine1;
     const sameCity = locCity === normalizedCity;
@@ -3895,7 +3915,7 @@ function canContractorWriteEvent(event_type: string) {
       billing_city,
       billing_state,
       billing_zip,
-      meta: idempotencyMeta,
+      meta: jobMeta,
     });
 
  await postCreate(created.id, "customer");
@@ -3928,6 +3948,7 @@ if (existingCustomerId && !existingLocationId) {
         address_line1,
         city,
         zip,
+        postal_code: zip,
         owner_user_id: canonicalOwnerUserId,
       })
       .select("id")
@@ -3946,7 +3967,7 @@ if (existingCustomerId && !existingLocationId) {
   }
 
   const created = await createJob({
-    meta: idempotencyMeta,
+    meta: jobMeta,
     job_type: jobType,
     project_type: projectType,
     job_address: jobAddressRaw || null,
@@ -4011,6 +4032,7 @@ if (reusableLocation?.id) {
       address_line1,
       city,
       zip,
+      postal_code: zip,
       owner_user_id: canonicalOwnerUserId,
     })
     .select("id")
@@ -4029,7 +4051,7 @@ if (existingDuplicateId) {
 }
 
 const created = await createJob({
-  meta: idempotencyMeta,
+  meta: jobMeta,
   job_type: jobType,
   project_type: projectType,
   job_address: jobAddressRaw || null,
