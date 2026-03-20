@@ -148,13 +148,6 @@ export async function createJobFromIntake(formData: FormData) {
 
       city,
       job_address: addressLine1,
-      meta: {
-        service_address_snapshot: {
-          address_line1: addressLine1,
-          city,
-          zip,
-        },
-      },
 
       permit_number: permitNumber,
 

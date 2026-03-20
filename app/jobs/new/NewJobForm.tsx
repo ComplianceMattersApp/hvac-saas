@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { createJobFromForm } from "@/lib/actions";
 import JobCoreFields from "@/components/jobs/JobCoreFields";
 
@@ -181,7 +181,6 @@ const [billingRecipient, setBillingRecipient] = useState<
   // Optional equipment
   const [systems, setSystems] = useState<EquipmentSystem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const submissionIdRef = useRef<HTMLInputElement | null>(null);
 
   const isNewLocation = isExistingCustomer && locationId === "__new__";
 
@@ -367,15 +366,6 @@ const [billingRecipient, setBillingRecipient] = useState<
       return;
     }
 
-    const nextSubmissionId =
-      typeof globalThis.crypto?.randomUUID === "function"
-        ? globalThis.crypto.randomUUID()
-        : uid();
-
-    if (submissionIdRef.current) {
-      submissionIdRef.current.value = nextSubmissionId;
-    }
-
     setIsSubmitting(true);
   }
 
@@ -409,7 +399,6 @@ const [billingRecipient, setBillingRecipient] = useState<
       )}
 
       <form action={createJobFromForm} className="space-y-4" onSubmit={handleFormSubmit}>
-        <input ref={submissionIdRef} type="hidden" name="submission_id" defaultValue="" />
         {/* Identity-tied contractor */}
         {myContractor?.id ? (
           <>
