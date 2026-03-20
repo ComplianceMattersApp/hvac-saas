@@ -648,10 +648,29 @@ export async function CalendarView(props: Props) {
   const banner = bannerMessage(props.banner);
   const selectedJobId = String(props.job ?? '').trim();
 
-  const jobsForRange =
-    data.mode === 'day'
-      ? data.day.jobs
-      : data.week.days.flatMap((day) => day.jobs);
+  // Month jobs projection
+  let jobsForRange: DispatchJob[] = [];
+  if (uiView === 'month') {
+    // Collect all jobs scheduled in the visible month
+    const anchor = data.anchorDate;
+    const anchorDate = new Date(anchor);
+    const month = anchorDate.getMonth();
+    const year = anchorDate.getFullYear();
+    // Combine day and week jobs for full coverage
+    const allJobs = [
+      ...data.day.jobs,
+      ...data.week.days.flatMap((d) => d.jobs),
+    ];
+    jobsForRange = allJobs.filter((job) => {
+      if (!job.scheduled_date) return false;
+      const jobDate = new Date(job.scheduled_date);
+      return jobDate.getMonth() === month && jobDate.getFullYear() === year;
+    });
+  } else if (data.mode === 'day') {
+    jobsForRange = data.day.jobs;
+  } else {
+    jobsForRange = data.week.days.flatMap((day) => day.jobs);
+  }
 
   const canonicalDispatchJobsForRange = jobsForRange.filter((job) => isDispatchVisibleForLayout(job));
 
@@ -665,6 +684,23 @@ export async function CalendarView(props: Props) {
     data.unassignedScheduledJobs.find((job) => job.id === selectedJobId) ||
     null;
 
+  // Header label logic
+  let headerLabel = '';
+  if (uiView === 'month') {
+    const anchor = data.anchorDate;
+    const anchorDate = new Date(anchor);
+    const monthName = anchorDate.toLocaleString('default', { month: 'long' });
+    const year = anchorDate.getFullYear();
+    headerLabel = `Month view for ${monthName} ${year}`;
+  } else if (mode === 'day') {
+    headerLabel = `Day view for ${formatBusinessDateUS(data.day.date)}`;
+  } else {
+    headerLabel = `Week view ${formatBusinessDateUS(data.week.startDate)} - ${formatBusinessDateUS(data.week.endDate)}`;
+  }
+
+  // Unscheduled lane source: always show true unscheduled jobs
+  const unscheduledJobs = data.unassignedScheduledJobs;
+
   return (
     <div className="space-y-4 pb-6">
       {banner ? (
@@ -674,11 +710,7 @@ export async function CalendarView(props: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <div>
           <h2 className="text-base font-semibold text-slate-900">Dispatch Workspace</h2>
-          <p className="mt-1 text-xs text-slate-600">
-            {mode === 'day'
-              ? `Day view for ${formatBusinessDateUS(data.day.date)}`
-              : `Week view ${formatBusinessDateUS(data.week.startDate)} - ${formatBusinessDateUS(data.week.endDate)}`}
-          </p>
+          <p className="mt-1 text-xs text-slate-600">{headerLabel}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex items-center rounded bg-slate-100 p-1">
@@ -700,8 +732,8 @@ export async function CalendarView(props: Props) {
         <aside>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unscheduled Jobs</h3>
           <div className="mt-2 max-h-[70vh] space-y-1 overflow-y-auto pr-1">
-              {data.unassignedScheduledJobs.length ? (
-                data.unassignedScheduledJobs.map((job) => (
+              {unscheduledJobs.length ? (
+                unscheduledJobs.map((job) => (
                   <Link
                     key={`unassigned-${job.id}`}
                     href={buildCalendarHref(uiView, data.anchorDate, { job: job.id })}
