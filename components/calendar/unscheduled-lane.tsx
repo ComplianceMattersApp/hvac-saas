@@ -30,44 +30,63 @@ type Props = {
   onSchedule: (payload: SchedulePayload) => Promise<{ ok: boolean; message?: string }>;
 };
 
+type FeedbackState = {
+  type: "success" | "error" | "info";
+  message: string;
+} | null;
+
+type LogCallOutcomeFormProps = {
+  jobId: string;
+  onClose: () => void;
+  feedback: FeedbackState;
+  onSubmit: (formData: FormData, jobId: string) => Promise<void>;
+  isPending: boolean;
+};
+
 export default function UnscheduledLane({ jobs, onSchedule }: Props) {
   const router = useRouter();
-  // Use canonical unscheduled jobs only
+
   const [items, setItems] = useState<UnscheduledJob[]>(jobs);
-  useEffect(() => {
-    setItems(jobs);
-  }, [jobs]);
   const [openJobId, setOpenJobId] = useState<string | null>(null);
   const [scheduledDate, setScheduledDate] = useState("");
   const [windowStart, setWindowStart] = useState("");
   const [windowEnd, setWindowEnd] = useState("");
+
   const [openLogJobId, setOpenLogJobId] = useState<string | null>(null);
-  const [logFeedback, setLogFeedback] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
-    function openLog(jobId: string) {
-      setOpenLogJobId(jobId);
-      setLogFeedback(null);
-    }
+  const [logFeedback, setLogFeedback] = useState<FeedbackState>(null);
+  const [feedback, setFeedback] = useState<FeedbackState>(null);
 
-    function closeLog() {
-      setOpenLogJobId(null);
-      setLogFeedback(null);
-    }
-
-    async function handleLogSubmit(formData: FormData, jobId: string) {
-      setLogFeedback(null);
-      try {
-        await logCustomerContactAttemptFromForm(formData);
-        setLogFeedback({ type: "success", message: "Call outcome logged." });
-        setOpenLogJobId(null);
-        router.refresh();
-      } catch (err: any) {
-        setLogFeedback({ type: "error", message: err?.message || "Could not log outcome." });
-      }
-    }
-  const [feedback, setFeedback] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  useEffect(() => {
+    setItems(jobs);
+  }, [jobs]);
+
   const sortedItems = useMemo(() => items, [items]);
+
+  function openLog(jobId: string) {
+    setOpenLogJobId(jobId);
+    setLogFeedback(null);
+  }
+
+  function closeLog() {
+    setOpenLogJobId(null);
+    setLogFeedback(null);
+  }
+
+  async function handleLogSubmit(formData: FormData, jobId: string) {
+    setLogFeedback(null);
+
+    try {
+      await logCustomerContactAttemptFromForm(formData);
+      setLogFeedback({ type: "success", message: "Call outcome logged." });
+      setOpenLogJobId(null);
+      router.refresh();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not log outcome.";
+      setLogFeedback({ type: "error", message });
+    }
+  }
 
   function openSchedule(jobId: string) {
     setOpenJobId(jobId);
@@ -147,7 +166,8 @@ export default function UnscheduledLane({ jobs, onSchedule }: Props) {
         ) : (
           sortedItems.map((job) => {
             const customerName =
-              [job.customer_first_name, job.customer_last_name].filter(Boolean).join(" ") || "Unnamed customer";
+              [job.customer_first_name, job.customer_last_name].filter(Boolean).join(" ") ||
+              "Unnamed customer";
 
             const address = [job.job_address, job.city].filter(Boolean).join(", ");
             const label = job.title || job.job_type || "Job";
@@ -159,10 +179,11 @@ export default function UnscheduledLane({ jobs, onSchedule }: Props) {
                   <div className="text-xs text-gray-500">{label}</div>
                   {address ? <div className="mt-1 text-xs text-gray-600">{address}</div> : null}
                   {job.contractor_name ? (
-                    <div className="mt-1 text-xs text-gray-500">Contractor: {job.contractor_name}</div>
+                    <div className="mt-1 text-xs text-gray-500">
+                      Contractor: {job.contractor_name}
+                    </div>
                   ) : null}
                 </div>
-
 
                 <div className="flex flex-wrap gap-2">
                   {job.phone ? (
@@ -190,6 +211,7 @@ export default function UnscheduledLane({ jobs, onSchedule }: Props) {
                     Schedule
                   </button>
                 </div>
+
                 {openLogJobId === job.id ? (
                   <LogCallOutcomeForm
                     jobId={job.id}
@@ -200,76 +222,11 @@ export default function UnscheduledLane({ jobs, onSchedule }: Props) {
                   />
                 ) : null}
 
-
-
-
-
-// --- Inline log call outcome form ---
-function LogCallOutcomeForm({ jobId, onClose, feedback, onSubmit, isPending }) {
-  return (
-    <form
-      className="mt-3 space-y-2 border-t pt-3"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.currentTarget);
-        await onSubmit(formData, jobId);
-      }}
-    >
-      <input type="hidden" name="job_id" value={jobId} />
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">Method</label>
-          <select name="method" className="w-full rounded-md border px-3 py-2 text-sm" required defaultValue="call">
-            <option value="call">Call</option>
-            <option value="text">Text</option>
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">Result</label>
-          <select name="result" className="w-full rounded-md border px-3 py-2 text-sm" required defaultValue="no_answer">
-            <option value="no_answer">No Answer</option>
-            <option value="spoke">Spoke</option>
-            <option value="sent">Sent</option>
-          </select>
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <SubmitButton
-          className="rounded-md bg-blue-700 px-3 py-2 text-xs font-medium text-white"
-          loadingText="Logging..."
-          disabled={isPending}
-        >
-          Log Outcome
-        </SubmitButton>
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={isPending}
-          className="rounded-md border px-3 py-2 text-xs font-medium text-gray-700"
-        >
-          Cancel
-        </button>
-      </div>
-      {feedback ? (
-        <div
-          className={`mt-2 rounded-md px-3 py-2 text-xs ${
-            feedback.type === "success"
-              ? "bg-green-50 text-green-800"
-              : feedback.type === "error"
-              ? "bg-red-50 text-red-800"
-              : "bg-gray-50 text-gray-700"
-          }`}
-        >
-          {feedback.message}
-        </div>
-      ) : null}
-    </form>
-  );
-}
-
-
                 {openJobId === job.id ? (
-                  <form className="mt-3 space-y-2 border-t pt-3" onSubmit={(e) => handleScheduleSubmit(e, job.id)}>
+                  <form
+                    className="mt-3 space-y-2 border-t pt-3"
+                    onSubmit={(e) => handleScheduleSubmit(e, job.id)}
+                  >
                     <div>
                       <label className="mb-1 block text-xs font-medium text-gray-700">Date</label>
                       <input
@@ -282,7 +239,9 @@ function LogCallOutcomeForm({ jobId, onClose, feedback, onSubmit, isPending }) {
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-700">Start</label>
+                        <label className="mb-1 block text-xs font-medium text-gray-700">
+                          Start
+                        </label>
                         <input
                           type="time"
                           value={windowStart}
@@ -291,7 +250,9 @@ function LogCallOutcomeForm({ jobId, onClose, feedback, onSubmit, isPending }) {
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-700">End</label>
+                        <label className="mb-1 block text-xs font-medium text-gray-700">
+                          End
+                        </label>
                         <input
                           type="time"
                           value={windowEnd}
@@ -329,8 +290,13 @@ function LogCallOutcomeForm({ jobId, onClose, feedback, onSubmit, isPending }) {
   );
 }
 
-// --- Inline log call outcome form ---
-function LogCallOutcomeForm({ jobId, onClose, feedback, onSubmit, isPending }) {
+function LogCallOutcomeForm({
+  jobId,
+  onClose,
+  feedback,
+  onSubmit,
+  isPending,
+}: LogCallOutcomeFormProps) {
   return (
     <form
       className="mt-3 space-y-2 border-t pt-3"
@@ -341,23 +307,36 @@ function LogCallOutcomeForm({ jobId, onClose, feedback, onSubmit, isPending }) {
       }}
     >
       <input type="hidden" name="job_id" value={jobId} />
+
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-700">Method</label>
-          <select name="method" className="w-full rounded-md border px-3 py-2 text-sm" required defaultValue="call">
+          <select
+            name="method"
+            className="w-full rounded-md border px-3 py-2 text-sm"
+            required
+            defaultValue="call"
+          >
             <option value="call">Call</option>
             <option value="text">Text</option>
           </select>
         </div>
+
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-700">Result</label>
-          <select name="result" className="w-full rounded-md border px-3 py-2 text-sm" required defaultValue="no_answer">
+          <select
+            name="result"
+            className="w-full rounded-md border px-3 py-2 text-sm"
+            required
+            defaultValue="no_answer"
+          >
             <option value="no_answer">No Answer</option>
             <option value="spoke">Spoke</option>
             <option value="sent">Sent</option>
           </select>
         </div>
       </div>
+
       <div className="flex gap-2">
         <SubmitButton
           className="rounded-md bg-blue-700 px-3 py-2 text-xs font-medium text-white"
@@ -366,6 +345,7 @@ function LogCallOutcomeForm({ jobId, onClose, feedback, onSubmit, isPending }) {
         >
           Log Outcome
         </SubmitButton>
+
         <button
           type="button"
           onClick={onClose}
@@ -375,14 +355,15 @@ function LogCallOutcomeForm({ jobId, onClose, feedback, onSubmit, isPending }) {
           Cancel
         </button>
       </div>
+
       {feedback ? (
         <div
           className={`mt-2 rounded-md px-3 py-2 text-xs ${
             feedback.type === "success"
               ? "bg-green-50 text-green-800"
               : feedback.type === "error"
-              ? "bg-red-50 text-red-800"
-              : "bg-gray-50 text-gray-700"
+                ? "bg-red-50 text-red-800"
+                : "bg-gray-50 text-gray-700"
           }`}
         >
           {feedback.message}
