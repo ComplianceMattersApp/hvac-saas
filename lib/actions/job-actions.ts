@@ -233,6 +233,7 @@ function buildCustomerScheduledEmailHtml(args: {
   scheduledDate: string;
   scheduledWindow: string;
   serviceType: string | null;
+  companyName: string | null;
 }) {
   const details: string[] = [
     `<li><strong>Customer:</strong> ${escapeHtml(args.customerName)}</li>`,
@@ -243,6 +244,10 @@ function buildCustomerScheduledEmailHtml(args: {
 
   if (args.serviceType) {
     details.push(`<li><strong>Service Type:</strong> ${escapeHtml(args.serviceType)}</li>`);
+  }
+
+  if (args.companyName) {
+    details.push(`<li><strong>Service Company:</strong> ${escapeHtml(args.companyName)}</li>`);
   }
 
   details.push(`<li><strong>Customer Email:</strong> ${escapeHtml(args.customerEmail)}</li>`);
@@ -272,6 +277,7 @@ function buildContractorScheduledEmailHtml(args: {
   serviceType: string | null;
   permitNumber: string | null;
   portalJobUrl: string | null;
+  companyName: string | null;
 }) {
   const details: string[] = [
     `<li><strong>Customer:</strong> ${escapeHtml(args.customerName)}</li>`,
@@ -292,6 +298,10 @@ function buildContractorScheduledEmailHtml(args: {
     details.push(`<li><strong>Service Type:</strong> ${escapeHtml(args.serviceType)}</li>`);
   }
 
+  if (args.companyName) {
+    details.push(`<li><strong>Company:</strong> ${escapeHtml(args.companyName)}</li>`);
+  }
+
   if (args.permitNumber) {
     details.push(`<li><strong>Permit Number:</strong> ${escapeHtml(args.permitNumber)}</li>`);
   }
@@ -303,13 +313,176 @@ function buildContractorScheduledEmailHtml(args: {
   return renderSystemEmailLayout({
     title: "Compliance Matters Schedule",
     bodyHtml: `
-      <p style="margin: 0 0 12px 0;">A job has been scheduled.</p>
+      <p style="margin: 0 0 12px 0;">A job has been scheduled or updated.</p>
       <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
       <p style="margin: 0 0 12px 0;">Please ensure someone can provide access to the property and equipment if needed.</p>
       ${portalSection}
       <p style="margin: 0;">For questions or changes, please contact us directly.</p>
     `,
   });
+}
+
+type OperationalEmailRecipientType = "customer" | "contractor" | "internal";
+
+type OperationalEmailNotificationType =
+  | "customer_job_scheduled_email"
+  | "contractor_job_scheduled_email"
+  | "internal_contractor_job_intake_email";
+
+type OperationalEmailDeliveryStatus = "queued" | "sent" | "failed";
+
+function normalizeScheduleValue(value: unknown): string | null {
+  const normalized = String(value ?? "").trim();
+  return normalized || null;
+}
+
+function buildScheduleSignature(input: {
+  scheduledDate: unknown;
+  windowStart: unknown;
+  windowEnd: unknown;
+}): string {
+  return [
+    normalizeScheduleValue(input.scheduledDate) ?? "",
+    normalizeScheduleValue(input.windowStart) ?? "",
+    normalizeScheduleValue(input.windowEnd) ?? "",
+  ].join("|");
+}
+
+function buildOperationalEmailDedupeKey(input: {
+  jobId: string;
+  notificationType: OperationalEmailNotificationType;
+  scope: string;
+}): string {
+  return `${input.notificationType}:${input.jobId}:${input.scope}`;
+}
+
+async function findExistingOperationalEmailDelivery(input: {
+  supabase: any;
+  notificationType: OperationalEmailNotificationType;
+  dedupeKey: string;
+}): Promise<{ id: string; status: string | null } | null> {
+  const dedupeKey = String(input.dedupeKey ?? "").trim();
+  if (!dedupeKey) return null;
+
+  const { data, error } = await input.supabase
+    .from("notifications")
+    .select("id, status")
+    .eq("channel", "email")
+    .eq("notification_type", input.notificationType)
+    .contains("payload", { dedupe_key: dedupeKey })
+    .in("status", ["queued", "sent"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.id) return null;
+
+  return {
+    id: String(data.id),
+    status: data.status ?? null,
+  };
+}
+
+async function hasOperationalEmailHistory(input: {
+  supabase: any;
+  jobId: string;
+  notificationType: OperationalEmailNotificationType;
+}): Promise<boolean> {
+  const { data, error } = await input.supabase
+    .from("notifications")
+    .select("id")
+    .eq("job_id", input.jobId)
+    .eq("channel", "email")
+    .eq("notification_type", input.notificationType)
+    .in("status", ["queued", "sent"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data?.id);
+}
+
+async function insertOperationalEmailDeliveryNotification(input: {
+  supabase: any;
+  jobId: string;
+  notificationType: OperationalEmailNotificationType;
+  recipientType: OperationalEmailRecipientType;
+  recipientRef?: string | null;
+  recipientEmail?: string | null;
+  subject: string;
+  body: string;
+  dedupeKey: string;
+  status: OperationalEmailDeliveryStatus;
+  sentAt?: string | null;
+  errorDetail?: string | null;
+}): Promise<{ id: string }> {
+  const payload: Record<string, unknown> = {
+    source: "operational_email",
+    dedupe_key: input.dedupeKey,
+  };
+
+  const recipientEmail = String(input.recipientEmail ?? "").trim().toLowerCase() || null;
+  if (recipientEmail) payload.recipient_email = recipientEmail;
+
+  const errorDetail = String(input.errorDetail ?? "").trim() || null;
+  if (errorDetail) payload.error_detail = errorDetail;
+
+  const { data, error } = await input.supabase
+    .from("notifications")
+    .insert({
+      job_id: input.jobId,
+      recipient_type: input.recipientType,
+      recipient_ref: String(input.recipientRef ?? "").trim() || null,
+      channel: "email",
+      notification_type: input.notificationType,
+      subject: input.subject,
+      body: input.body,
+      payload,
+      status: input.status,
+      sent_at: input.status === "sent" ? input.sentAt ?? new Date().toISOString() : null,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw error;
+  if (!data?.id) throw new Error("Failed to create operational email notification row");
+
+  return { id: String(data.id) };
+}
+
+async function markOperationalEmailDeliveryNotification(input: {
+  supabase: any;
+  notificationId: string;
+  status: "sent" | "failed";
+  sentAt?: string | null;
+  errorDetail?: string | null;
+}): Promise<void> {
+  const notificationId = String(input.notificationId ?? "").trim();
+  if (!notificationId) return;
+
+  const patch: Record<string, unknown> = {
+    status: input.status,
+  };
+
+  if (input.status === "sent") {
+    patch.sent_at = input.sentAt ?? new Date().toISOString();
+  }
+
+  if (input.status === "failed") {
+    const errorDetail = String(input.errorDetail ?? "").trim();
+    if (errorDetail) {
+      patch.body = `Operational email delivery failed: ${errorDetail}`;
+    }
+  }
+
+  const { error } = await input.supabase
+    .from("notifications")
+    .update(patch)
+    .eq("id", notificationId);
+
+  if (error) throw error;
 }
 
 function resolveOpsAlertAppUrl(): string | null {
@@ -390,6 +563,19 @@ async function sendInternalContractorIntakeAlertEmail(params: {
 }): Promise<void> {
   const { jobId, accountOwnerUserId } = params;
   const admin = createAdminClient();
+  const intakeDedupeKey = buildOperationalEmailDedupeKey({
+    jobId,
+    notificationType: "internal_contractor_job_intake_email",
+    scope: "initial_submission",
+  });
+
+  const existingDelivery = await findExistingOperationalEmailDelivery({
+    supabase: admin,
+    notificationType: "internal_contractor_job_intake_email",
+    dedupeKey: intakeDedupeKey,
+  });
+
+  if (existingDelivery) return;
 
   const { data: internalRows, error: internalErr } = await admin
     .from("internal_users")
@@ -477,19 +663,50 @@ async function sendInternalContractorIntakeAlertEmail(params: {
   const jobUrl = appUrl ? `${appUrl}/jobs/${jobId}` : null;
 
   const subject = `New Contractor Job Intake - ${customerName} - ${serviceAddress}`;
-
-  await sendEmail({
-    to: recipientEmails,
-    subject,
-    html: buildContractorIntakeAlertEmailHtml({
-      contractorName,
-      customerName,
-      serviceAddress,
-      serviceType,
-      createdAtText,
-      jobUrl,
-    }),
+  const html = buildContractorIntakeAlertEmailHtml({
+    contractorName,
+    customerName,
+    serviceAddress,
+    serviceType,
+    createdAtText,
+    jobUrl,
   });
+
+  const queuedDelivery = await insertOperationalEmailDeliveryNotification({
+    supabase: admin,
+    jobId,
+    notificationType: "internal_contractor_job_intake_email",
+    recipientType: "internal",
+    subject,
+    body: "Internal ops/admin alert for contractor-submitted job.",
+    dedupeKey: intakeDedupeKey,
+    status: "queued",
+  });
+
+  try {
+    await sendEmail({
+      to: recipientEmails,
+      subject,
+      html,
+    });
+
+    await markOperationalEmailDeliveryNotification({
+      supabase: admin,
+      notificationId: queuedDelivery.id,
+      status: "sent",
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown send error";
+
+    await markOperationalEmailDeliveryNotification({
+      supabase: admin,
+      notificationId: queuedDelivery.id,
+      status: "failed",
+      errorDetail: errorMessage,
+    });
+
+    throw error;
+  }
 }
 
 async function sendCustomerScheduledEmailForJob({
@@ -514,6 +731,8 @@ async function sendCustomerScheduledEmailForJob({
       scheduled_date,
       window_start,
       window_end,
+      contractor_id,
+      contractors:contractor_id ( name ),
       locations:location_id (address_line1, address_line2, city, state, zip)
       `
     )
@@ -547,10 +766,42 @@ async function sendCustomerScheduledEmailForJob({
 
   const serviceTypeRaw = String(scheduledJob?.job_type ?? "").trim();
   const serviceType = serviceTypeRaw ? toTitleCase(serviceTypeRaw) : null;
+  const companyName = String((scheduledJob as any)?.contractors?.name ?? "").trim() || null;
   const subjectDate = scheduledDateText && scheduledDateText !== "Not available"
     ? scheduledDateText
     : "Date TBD";
   const subject = `Job Scheduled \u2013 ${customerName} \u2013 ${subjectDate}`;
+  const scheduleSignature = buildScheduleSignature({
+    scheduledDate: scheduledJob?.scheduled_date,
+    windowStart: scheduledJob?.window_start,
+    windowEnd: scheduledJob?.window_end,
+  });
+  const dedupeKey = buildOperationalEmailDedupeKey({
+    jobId,
+    notificationType: "customer_job_scheduled_email",
+    scope: scheduleSignature,
+  });
+
+  const existingDelivery = await findExistingOperationalEmailDelivery({
+    supabase,
+    notificationType: "customer_job_scheduled_email",
+    dedupeKey,
+  });
+
+  if (existingDelivery) return;
+
+  const queuedDelivery = await insertOperationalEmailDeliveryNotification({
+    supabase,
+    jobId,
+    notificationType: "customer_job_scheduled_email",
+    recipientType: "customer",
+    recipientRef: null,
+    recipientEmail: customerEmail,
+    subject,
+    body: "Customer appointment confirmation email.",
+    dedupeKey,
+    status: "queued",
+  });
 
   try {
     await sendEmail({
@@ -564,13 +815,29 @@ async function sendCustomerScheduledEmailForJob({
         scheduledDate: scheduledDateText,
         scheduledWindow: scheduledWindowText,
         serviceType,
+        companyName,
       }),
     });
+
+    await markOperationalEmailDeliveryNotification({
+      supabase,
+      notificationId: queuedDelivery.id,
+      status: "sent",
+    });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown send error";
+
+    await markOperationalEmailDeliveryNotification({
+      supabase,
+      notificationId: queuedDelivery.id,
+      status: "failed",
+      errorDetail: errorMessage,
+    });
+
     console.error("Customer scheduled email send failed:", {
       jobId,
       customerEmail,
-      error: error instanceof Error ? error.message : "Unknown send error",
+      error: errorMessage,
     });
   }
 }
@@ -599,7 +866,7 @@ async function sendContractorScheduledEmailForJob({
       window_start,
       window_end,
       contractor_id,
-      contractors:contractor_id ( email ),
+      contractors:contractor_id ( email, name ),
       locations:location_id (address_line1, address_line2, city, state, zip)
       `
     )
@@ -644,13 +911,45 @@ async function sendContractorScheduledEmailForJob({
   const serviceTypeRaw = String(scheduledJob?.job_type ?? "").trim();
   const serviceType = serviceTypeRaw ? toTitleCase(serviceTypeRaw) : null;
   const permitNumber = String(scheduledJob?.permit_number ?? "").trim() || null;
+  const companyName = String((scheduledJob as any)?.contractors?.name ?? "").trim() || null;
   const subjectDate = scheduledDateText && scheduledDateText !== "Not available"
     ? scheduledDateText
     : "Date TBD";
   const subject = `Compliance Matters Schedule \u2013 ${customerName} \u2013 ${subjectDate}`;
+  const scheduleSignature = buildScheduleSignature({
+    scheduledDate: scheduledJob?.scheduled_date,
+    windowStart: scheduledJob?.window_start,
+    windowEnd: scheduledJob?.window_end,
+  });
+  const dedupeKey = buildOperationalEmailDedupeKey({
+    jobId,
+    notificationType: "contractor_job_scheduled_email",
+    scope: scheduleSignature,
+  });
+
+  const existingDelivery = await findExistingOperationalEmailDelivery({
+    supabase,
+    notificationType: "contractor_job_scheduled_email",
+    dedupeKey,
+  });
+
+  if (existingDelivery) return;
 
   const appUrl = resolveAppUrl();
   const portalJobUrl = appUrl ? `${appUrl}/portal/jobs/${jobId}` : null;
+
+  const queuedDelivery = await insertOperationalEmailDeliveryNotification({
+    supabase,
+    jobId,
+    notificationType: "contractor_job_scheduled_email",
+    recipientType: "contractor",
+    recipientRef: contractorId,
+    recipientEmail: contractorEmail,
+    subject,
+    body: "Contractor schedule notification email.",
+    dedupeKey,
+    status: "queued",
+  });
 
   try {
     await sendEmail({
@@ -666,13 +965,29 @@ async function sendContractorScheduledEmailForJob({
         serviceType,
         permitNumber,
         portalJobUrl,
+        companyName,
       }),
     });
+
+    await markOperationalEmailDeliveryNotification({
+      supabase,
+      notificationId: queuedDelivery.id,
+      status: "sent",
+    });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown send error";
+
+    await markOperationalEmailDeliveryNotification({
+      supabase,
+      notificationId: queuedDelivery.id,
+      status: "failed",
+      errorDetail: errorMessage,
+    });
+
     console.error("Contractor scheduled email send failed:", {
       jobId,
       contractorEmail,
-      error: error instanceof Error ? error.message : "Unknown send error",
+      error: errorMessage,
     });
   }
 }
@@ -4179,6 +4494,10 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const wasScheduled =
     !!before?.scheduled_date || !!before?.window_start || !!before?.window_end;
   const isScheduled = !!scheduled_date || !!window_start || !!window_end;
+  const didScheduleFieldsChange =
+    normalizeScheduleValue(before?.scheduled_date) !== normalizeScheduleValue(scheduled_date) ||
+    normalizeScheduleValue(before?.window_start) !== normalizeScheduleValue(window_start) ||
+    normalizeScheduleValue(before?.window_end) !== normalizeScheduleValue(window_end);
 
   const event_type = unscheduleRequested
     ? "unscheduled"
@@ -4220,6 +4539,18 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   if (event_type === "scheduled") {
     await sendCustomerScheduledEmailForJob({ supabase, jobId: id });
     await sendContractorScheduledEmailForJob({ supabase, jobId: id });
+  }
+
+  if (event_type === "schedule_updated" && didScheduleFieldsChange && isScheduled) {
+    const hasPriorContractorScheduleEmail = await hasOperationalEmailHistory({
+      supabase,
+      jobId: id,
+      notificationType: "contractor_job_scheduled_email",
+    });
+
+    if (hasPriorContractorScheduleEmail) {
+      await sendContractorScheduledEmailForJob({ supabase, jobId: id });
+    }
   }
 
   revalidatePath(`/jobs/${id}`);
