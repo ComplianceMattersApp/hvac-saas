@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { X } from 'lucide-react';
 
+import CalendarMonthGrid from './CalendarMonthGrid';
 import SubmitButton from '@/components/SubmitButton';
 import {
   assignJobAssigneeFromForm,
@@ -11,7 +12,8 @@ import {
 import { getDispatchCalendarData, type DispatchJob, type DispatchViewMode } from '@/lib/actions/calendar';
 import { displayWindowLA, formatBusinessDateUS } from '@/lib/utils/schedule-la';
 
-type CalendarUIView = 'day' | 'week' | 'list';
+
+type CalendarUIView = 'day' | 'week' | 'list' | 'month';
 
 type Props = {
   view?: string;
@@ -83,6 +85,7 @@ function normalizeView(view?: string): CalendarUIView {
   const raw = String(view ?? '').trim().toLowerCase();
   if (raw === 'day') return 'day';
   if (raw === 'week') return 'week';
+  if (raw === 'month') return 'month';
   return 'list';
 }
 
@@ -679,7 +682,7 @@ export async function CalendarView(props: Props) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex items-center rounded bg-slate-100 p-1">
-            {(['day', 'week', 'list'] as CalendarUIView[]).map((viewValue) => (
+            {(['day', 'week', 'month', 'list'] as CalendarUIView[]).map((viewValue) => (
               <Link
                 key={viewValue}
                 href={buildCalendarHref(viewValue, data.anchorDate)}
@@ -720,6 +723,13 @@ export async function CalendarView(props: Props) {
           {uiView === 'list' ? (
             <section className="px-1">
               <AgendaList jobs={canonicalDispatchJobsForRange} mode={mode} date={data.anchorDate} />
+            </section>
+          ) : uiView === 'month' ? (
+            <section className="overflow-x-auto">
+              <CalendarMonthGrid
+                monthDate={data.anchorDate}
+                jobs={jobsForRange}
+              />
             </section>
           ) : mode === 'day' ? (
             <section className="overflow-x-auto">
