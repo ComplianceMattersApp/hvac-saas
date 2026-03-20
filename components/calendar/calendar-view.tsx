@@ -1,17 +1,6 @@
-// Status formatting utility
-function formatStatus(status?: string | null) {
-  if (!status) return '';
-  const map: Record<string, string> = {
-    scheduled: 'Scheduled',
-    on_my_way: 'On My Way',
-    in_progress: 'In Progress',
-    field_complete: 'Field Complete',
-    closed: 'Closed',
-  };
-  return map[status] || status.split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
-}
 import Link from 'next/link';
 import { X } from 'lucide-react';
+import { eachWeekOfInterval, endOfMonth, format as formatDate, parseISO, startOfMonth } from 'date-fns';
 
 import CalendarMonthGrid from './CalendarMonthGrid';
 import SubmitButton from '@/components/SubmitButton';
@@ -23,7 +12,6 @@ import {
 } from '@/lib/actions/job-actions';
 import { getDispatchCalendarData, type DispatchJob, type DispatchViewMode } from '@/lib/actions/calendar';
 import { displayWindowLA, formatBusinessDateUS } from '@/lib/utils/schedule-la';
-
 
 type CalendarUIView = 'day' | 'week' | 'list' | 'month';
 
@@ -45,6 +33,14 @@ const TECH_COLOR_PALETTE = [
   'bg-sky-500',
   'bg-fuchsia-500',
   'bg-amber-500',
+];
+
+const STATUS_LEGEND = [
+  { key: 'scheduled', label: 'Scheduled', dot: 'bg-gray-400' },
+  { key: 'on_my_way', label: 'On My Way', dot: 'bg-blue-500' },
+  { key: 'in_progress', label: 'In Progress', dot: 'bg-indigo-600' },
+  { key: 'field_complete', label: 'Field Complete', dot: 'bg-amber-500' },
+  { key: 'closed', label: 'Closed', dot: 'bg-green-600' },
 ];
 
 function bannerMessage(banner?: string) {
@@ -106,6 +102,17 @@ function addDaysYmd(ymd: string, days: number): string {
   if (!m) return ymd;
   const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0));
   d.setUTCDate(d.getUTCDate() + days);
+  const y = d.getUTCFullYear();
+  const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${mo}-${day}`;
+}
+
+function addMonthsYmd(ymd: string, months: number): string {
+  const m = String(ymd).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return ymd;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0));
+  d.setUTCMonth(d.getUTCMonth() + months);
   const y = d.getUTCFullYear();
   const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
   const day = String(d.getUTCDate()).padStart(2, '0');
@@ -213,19 +220,72 @@ function initialsFromName(name: string) {
   return (letters || first || 'T').toUpperCase();
 }
 
+function normalizedLifecycleStatus(job: DispatchJob) {
+  const raw = String(job.status ?? job.ops_status ?? '').trim().toLowerCase();
+
+  if (!raw) return 'scheduled';
+  if (raw === 'open') return 'scheduled';
+  if (raw === 'need_to_schedule') return 'scheduled';
+  if (raw === 'pending') return 'scheduled';
+  if (raw === 'pending_information') return 'scheduled';
+
+  if (raw === 'on_my_way') return 'on_my_way';
+  if (raw === 'in_progress') return 'in_progress';
+
+  if (raw === 'field_complete') return 'field_complete';
+  if (raw === 'completed') return 'field_complete';
+  if (raw === 'completed_paperwork_pending') return 'field_complete';
+
+  if (raw === 'closed') return 'closed';
+
+  return raw;
+}
+
+function formatLifecycleStatus(status: string) {
+  const map: Record<string, string> = {
+    scheduled: 'Scheduled',
+    on_my_way: 'On My Way',
+    in_progress: 'In Progress',
+    field_complete: 'Field Complete',
+    closed: 'Closed',
+  };
+  return map[status] || status;
+}
+
+function statusDotClass(status: string) {
+  if (status === 'scheduled') return 'bg-gray-400';
+  if (status === 'on_my_way') return 'bg-blue-500';
+  if (status === 'in_progress') return 'bg-indigo-600';
+  if (status === 'field_complete') return 'bg-amber-500';
+  if (status === 'closed') return 'bg-green-600';
+  return 'bg-gray-300';
+}
+
 function NavLinks(props: { view: CalendarUIView; date: string }) {
   const { view, date } = props;
-  const offset = view === 'week' ? 7 : 1;
-  const prev = addDaysYmd(date, -offset);
-  const next = addDaysYmd(date, offset);
   const today = todayYmdLA();
+
+  const prev =
+    view === 'month' || view === 'list'
+      ? addMonthsYmd(date, -1)
+      : addDaysYmd(date, view === 'week' ? -7 : -1);
+
+  const next =
+    view === 'month' || view === 'list'
+      ? addMonthsYmd(date, 1)
+      : addDaysYmd(date, view === 'week' ? 7 : 1);
+
+  const todayTarget =
+    view === 'month' || view === 'list'
+      ? today.slice(0, 8) + '01'
+      : today;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Link href={buildCalendarHref(view, prev)} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
         Previous
       </Link>
-      <Link href={buildCalendarHref(view, today)} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+      <Link href={buildCalendarHref(view, todayTarget)} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
         Today
       </Link>
       <Link href={buildCalendarHref(view, next)} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
@@ -374,11 +434,12 @@ function DispatchGrid(props: {
         {columns.map((col) => {
           const tech = splitTechnicianLabel(col.display_name, col.user_id);
           return (
-          <div key={col.user_id} className="border-b border-r border-slate-100 bg-slate-50 px-3 py-2.5">
-            <p className="truncate text-sm font-semibold text-slate-900">{tech.name}</p>
-            <p className="truncate text-[11px] text-slate-500">{tech.email}</p>
-          </div>
-        )})}
+            <div key={col.user_id} className="border-b border-r border-slate-100 bg-slate-50 px-3 py-2.5">
+              <p className="truncate text-sm font-semibold text-slate-900">{tech.name}</p>
+              <p className="truncate text-[11px] text-slate-500">{tech.email}</p>
+            </div>
+          );
+        })}
 
         <div className="relative border-r border-slate-100 bg-white" style={{ height: `${totalGridHeight}px` }}>
           {Array.from({ length: endHour - startHour }, (_, i) => (
@@ -423,61 +484,61 @@ function DispatchGrid(props: {
             {showNowLine ? <div className="absolute left-0 right-0 border-t border-rose-400/70" style={{ top: `${nowTop}px` }} /> : null}
 
             {(laneItemsByUser.get(col.user_id) ?? []).map((row) => {
-                const { job } = row;
-                const top = ((row.start - gridStartMinutes) / 60) * hourHeight;
-                const height = Math.max(((row.end - row.start) / 60) * hourHeight, 36);
-                const isSelected = selectedJobId === job.id;
-                const assignees = Array.isArray(job.assignments) ? job.assignments : [];
-                const colorBars = assignees.slice(0, 3);
-                const overflowCount = Math.max(assignees.length - colorBars.length, 0);
-                const initials = assignees.slice(0, 2).map((a) => initialsFromName(a.display_name)).join(' ');
+              const { job } = row;
+              const top = ((row.start - gridStartMinutes) / 60) * hourHeight;
+              const height = Math.max(((row.end - row.start) / 60) * hourHeight, 36);
+              const isSelected = selectedJobId === job.id;
+              const assignees = Array.isArray(job.assignments) ? job.assignments : [];
+              const colorBars = assignees.slice(0, 3);
+              const overflowCount = Math.max(assignees.length - colorBars.length, 0);
+              const initials = assignees.slice(0, 2).map((a) => initialsFromName(a.display_name)).join(' ');
 
-                const laneWidthPct = 100 / Math.max(row.laneCount, 1);
-                const laneLeftPct = row.lane * laneWidthPct;
-                const laneGapPx = 3;
+              const laneWidthPct = 100 / Math.max(row.laneCount, 1);
+              const laneLeftPct = row.lane * laneWidthPct;
+              const laneGapPx = 3;
 
-                return (
-                  <Link
-                    key={row.id}
-                    href={buildCalendarHref(mode, date, { job: job.id })}
-                    scroll={false}
-                    className={`absolute left-1 right-1 rounded-md border py-0.5 pr-1.5 pl-5 shadow-sm transition hover:cursor-pointer hover:shadow-md hover:brightness-[1.03] ${dispatchBlockClass(job.ops_status)} ${isSelected ? 'ring-2 ring-slate-800/45 border-slate-700' : ''}`}
-                    style={{
-                      top: `${top}px`,
-                      height: `${height}px`,
-                      left: `calc(${laneLeftPct}% + ${laneGapPx}px)`,
-                      width: `calc(${laneWidthPct}% - ${laneGapPx * 2}px)`,
-                      right: 'auto',
-                    }}
-                  >
-                    <div className="absolute inset-y-1 left-1 flex items-start gap-0.5">
-                      {colorBars.map((assignment) => (
-                        <span
-                          key={`${job.id}-${assignment.user_id}-bar`}
-                          className={`inline-block rounded-sm ${colorClassForUserId(assignment.user_id)} ${isSelected ? 'w-1.5' : 'w-1'} h-full`}
-                          title={assignment.display_name}
-                        />
-                      ))}
-                      {overflowCount > 0 ? (
-                        <span className="inline-flex h-3 min-w-3 items-center justify-center rounded-sm bg-slate-700/75 px-0.5 text-[9px] font-semibold text-white">
-                          +{overflowCount}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="truncate text-xs font-semibold leading-4">{shortTitle(job)}</p>
-                      {/* Needs Tech badge: scheduled job, no assignments */}
-                      {job.scheduled_date && (!job.assignments || job.assignments.length === 0) ? (
-                        <span className="ml-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">Needs Tech</span>
-                      ) : null}
-                    <p className="truncate text-[11px] leading-4 opacity-90">{job.city || job.contractor_name || 'No city or contractor'}</p>
-                    <div className="mt-0.5 flex items-center justify-between gap-2">
-                      <p className="truncate text-[10px] font-medium uppercase tracking-wide opacity-80">{blockTimeLabel(row.start, row.end)}</p>
-                      {initials ? <p className="truncate text-[9px] font-semibold uppercase tracking-wide opacity-70">{initials}</p> : null}
-                    </div>
-                  </Link>
-                );
-              })}
-
+              return (
+                <Link
+                  key={row.id}
+                  href={buildCalendarHref(mode, date, { job: job.id })}
+                  scroll={false}
+                  className={`absolute left-1 right-1 rounded-md border py-0.5 pr-1.5 pl-5 shadow-sm transition hover:cursor-pointer hover:shadow-md hover:brightness-[1.03] ${dispatchBlockClass(job.ops_status)} ${isSelected ? 'ring-2 ring-slate-800/45 border-slate-700' : ''}`}
+                  style={{
+                    top: `${top}px`,
+                    height: `${height}px`,
+                    left: `calc(${laneLeftPct}% + ${laneGapPx}px)`,
+                    width: `calc(${laneWidthPct}% - ${laneGapPx * 2}px)`,
+                    right: 'auto',
+                  }}
+                >
+                  <div className="absolute inset-y-1 left-1 flex items-start gap-0.5">
+                    {colorBars.map((assignment) => (
+                      <span
+                        key={`${job.id}-${assignment.user_id}-bar`}
+                        className={`inline-block rounded-sm ${colorClassForUserId(assignment.user_id)} ${isSelected ? 'w-1.5' : 'w-1'} h-full`}
+                        title={assignment.display_name}
+                      />
+                    ))}
+                    {overflowCount > 0 ? (
+                      <span className="inline-flex h-3 min-w-3 items-center justify-center rounded-sm bg-slate-700/75 px-0.5 text-[9px] font-semibold text-white">
+                        +{overflowCount}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="truncate text-xs font-semibold leading-4">{shortTitle(job)}</p>
+                  {job.scheduled_date && (!job.assignments || job.assignments.length === 0) ? (
+                    <span className="ml-2 inline-block rounded border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                      Needs Tech
+                    </span>
+                  ) : null}
+                  <p className="truncate text-[11px] leading-4 opacity-90">{job.city || job.contractor_name || 'No city or contractor'}</p>
+                  <div className="mt-0.5 flex items-center justify-between gap-2">
+                    <p className="truncate text-[10px] font-medium uppercase tracking-wide opacity-80">{blockTimeLabel(row.start, row.end)}</p>
+                    {initials ? <p className="truncate text-[9px] font-semibold uppercase tracking-wide opacity-70">{initials}</p> : null}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         ))}
       </div>
@@ -487,44 +548,66 @@ function DispatchGrid(props: {
 
 function AgendaList(props: {
   jobs: DispatchJob[];
-  mode: DispatchViewMode;
   date: string;
 }) {
-  const { jobs, mode, date } = props;
+  const { jobs, date } = props;
 
-  const listJobs = jobs
-    .filter((job) => (mode === 'day' ? String(job.scheduled_date) === date : true))
-    .slice()
-    .sort((a, b) => {
-      const at = parseMinutes(a.window_start) ?? 0;
-      const bt = parseMinutes(b.window_start) ?? 0;
-      return at - bt;
-    });
+  const grouped = new Map<string, DispatchJob[]>();
+  for (const job of jobs) {
+    if (!job.scheduled_date) continue;
+    if (!grouped.has(job.scheduled_date)) grouped.set(job.scheduled_date, []);
+    grouped.get(job.scheduled_date)?.push(job);
+  }
 
-  if (!listJobs.length) {
-    return <div className="py-8 text-sm text-slate-500">No scheduled assigned jobs for this period.</div>;
+  const sortedDates = Array.from(grouped.keys()).sort();
+
+  if (!sortedDates.length) {
+    return <div className="py-8 text-sm text-slate-500">No scheduled jobs for this month.</div>;
   }
 
   return (
-    <div className="space-y-1">
-      {listJobs.map((job) => (
-        <Link
-          key={`list-${job.id}`}
-          href={buildCalendarHref('list', date, { job: job.id })}
-          scroll={false}
-          className="block rounded px-3 py-2 hover:bg-slate-50"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">{shortTitle(job)}</p>
-              <p className="text-xs text-slate-600">{job.city || job.contractor_name || 'No city or contractor'}</p>
-            </div>
-            <div className="text-right text-xs text-slate-500">
-              <p>{displayWindowLA(job.window_start, job.window_end) || 'No window'}</p>
-              <p>{job.assignment_names.join(', ')}</p>
-            </div>
+    <div className="space-y-6">
+      {sortedDates.map((dateKey) => (
+        <div key={dateKey}>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-700">{formatBusinessDateUS(dateKey)}</span>
+            <span className="text-xs text-slate-400">
+              {(grouped.get(dateKey)?.length ?? 0)} job{(grouped.get(dateKey)?.length ?? 0) > 1 ? 's' : ''}
+            </span>
           </div>
-        </Link>
+          <div className="space-y-1">
+            {(grouped.get(dateKey) ?? []).map((job) => {
+              const needsTech = job.scheduled_date && (!job.assignments || job.assignments.length === 0);
+              const lifecycle = normalizedLifecycleStatus(job);
+              const dotClass = statusDotClass(lifecycle);
+
+              return (
+                <Link
+                  key={job.id}
+                  href={buildCalendarHref('list', date, { job: job.id })}
+                  scroll={false}
+                  className={`block rounded border border-slate-200 bg-white px-3 py-2 shadow-sm hover:bg-slate-50 ${lifecycle === 'closed' ? 'opacity-50' : ''}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-slate-900">{job.job_address || shortTitle(job)}</div>
+                      <div className="truncate text-[11px] text-slate-500">{job.job_type || job.title}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">{formatLifecycleStatus(lifecycle)}</span>
+                      {needsTech ? (
+                        <span className="inline-block rounded border border-amber-200 bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800">
+                          Needs Tech
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -542,117 +625,123 @@ function DetailPanel(props: {
 
   return (
     <aside className={`overflow-y-auto bg-white p-4 ${className}`}>
-        <div className="mb-3 flex items-start justify-between gap-2 border-b pb-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Job Details</p>
-            <h3 className="text-base font-semibold text-gray-900">{job.title || `Job ${job.id.slice(0, 8)}`}</h3>
-            <p className="mt-1 text-xs text-gray-600">{customerName(job)} • {job.city || 'No city'}</p>
-          </div>
-          <Link
-            href={buildCalendarHref(view, date)}
-            scroll={false}
-            aria-label="Close details"
-            className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-          >
-            <X className="h-4 w-4" />
-          </Link>
+      <div className="mb-3 flex items-start justify-between gap-2 border-b pb-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Job Details</p>
+          <h3 className="text-base font-semibold text-gray-900">{job.title || `Job ${job.id.slice(0, 8)}`}</h3>
+          <p className="mt-1 text-xs text-gray-600">
+            {customerName(job)} • {job.city || 'No city'}
+          </p>
         </div>
+        <Link
+          href={buildCalendarHref(view, date)}
+          scroll={false}
+          aria-label="Close details"
+          className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+        >
+          <X className="h-4 w-4" />
+        </Link>
+      </div>
 
-        <div className="mb-4 flex flex-wrap gap-2">
-          <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-            Open Job
-          </Link>
-          <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-            Open Customer
-          </Link>
-          <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-            Open Location
-          </Link>
-        </div>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+          Open Job
+        </Link>
+        <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+          Open Customer
+        </Link>
+        <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+          Open Location
+        </Link>
+      </div>
 
-        <div className="space-y-4">
-          <section>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Schedule</p>
-            <form action={updateJobScheduleFromForm} className="grid gap-2">
-              <input type="hidden" name="job_id" value={job.id} />
-              <input type="hidden" name="return_to" value={returnTo} />
-              <input type="date" name="scheduled_date" defaultValue={job.scheduled_date ?? ''} className="rounded border px-2 py-2 text-sm" />
-              <div className="grid grid-cols-2 gap-2">
-                <input type="time" name="window_start" defaultValue={job.window_start ?? ''} className="rounded border px-2 py-2 text-sm" />
-                <input type="time" name="window_end" defaultValue={job.window_end ?? ''} className="rounded border px-2 py-2 text-sm" />
-              </div>
-              <SubmitButton className="rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white" loadingText="Saving...">
-                Save Schedule
-              </SubmitButton>
-            </form>
-          </section>
+      <div className="space-y-4">
+        <section>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Schedule</p>
+          <form action={updateJobScheduleFromForm} className="grid gap-2">
+            <input type="hidden" name="job_id" value={job.id} />
+            <input type="hidden" name="return_to" value={returnTo} />
+            <input type="date" name="scheduled_date" defaultValue={job.scheduled_date ?? ''} className="rounded border px-2 py-2 text-sm" />
+            <div className="grid grid-cols-2 gap-2">
+              <input type="time" name="window_start" defaultValue={job.window_start ?? ''} className="rounded border px-2 py-2 text-sm" />
+              <input type="time" name="window_end" defaultValue={job.window_end ?? ''} className="rounded border px-2 py-2 text-sm" />
+            </div>
+            <SubmitButton className="rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white" loadingText="Saving...">
+              Save Schedule
+            </SubmitButton>
+          </form>
+        </section>
 
-          <section>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Assignment</p>
-            <form action={assignJobAssigneeFromForm} className="grid gap-2">
-              <input type="hidden" name="job_id" value={job.id} />
-              <input type="hidden" name="tab" value="ops" />
-              <input type="hidden" name="return_to" value={returnTo} />
-              <select name="user_id" className="rounded border px-2 py-2 text-sm" defaultValue="">
-                <option value="" disabled>
-                  Select internal user
+        <section>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Assignment</p>
+          <form action={assignJobAssigneeFromForm} className="grid gap-2">
+            <input type="hidden" name="job_id" value={job.id} />
+            <input type="hidden" name="tab" value="ops" />
+            <input type="hidden" name="return_to" value={returnTo} />
+            <select name="user_id" className="rounded border px-2 py-2 text-sm" defaultValue="">
+              <option value="" disabled>
+                Select internal user
+              </option>
+              {assignableUsers.map((user) => (
+                <option key={user.user_id} value={user.user_id}>
+                  {user.display_name}
                 </option>
-                {assignableUsers.map((user) => (
-                  <option key={user.user_id} value={user.user_id}>
-                    {user.display_name}
-                  </option>
-                ))}
-              </select>
-              <label className="inline-flex items-center gap-2 rounded border px-2 py-2 text-xs text-gray-700">
-                <input type="checkbox" name="make_primary" value="1" /> Make primary
-              </label>
-              <SubmitButton className="rounded bg-gray-900 px-3 py-2 text-sm font-semibold text-white" loadingText="Assigning...">
-                Assign Technician
-              </SubmitButton>
-            </form>
+              ))}
+            </select>
+            <label className="inline-flex items-center gap-2 rounded border px-2 py-2 text-xs text-gray-700">
+              <input type="checkbox" name="make_primary" value="1" /> Make primary
+            </label>
+            <SubmitButton className="rounded bg-gray-900 px-3 py-2 text-sm font-semibold text-white" loadingText="Assigning...">
+              Assign Technician
+            </SubmitButton>
+          </form>
 
-            {job.assignments.length ? (
-              <div className="mt-3 space-y-2">
-                {job.assignments.map((assignment) => (
-                  <div key={`${job.id}-${assignment.user_id}`} className="flex items-center justify-between rounded border bg-gray-50 px-2 py-1.5 text-xs">
-                    <span>{assignment.display_name}{assignment.is_primary ? ' (primary)' : ''}</span>
-                    <div className="flex items-center gap-1.5">
-                      {!assignment.is_primary ? (
-                        <form action={setPrimaryJobAssigneeFromForm}>
-                          <input type="hidden" name="job_id" value={job.id} />
-                          <input type="hidden" name="user_id" value={assignment.user_id} />
-                          <input type="hidden" name="tab" value="ops" />
-                          <input type="hidden" name="return_to" value={returnTo} />
-                          <SubmitButton className="rounded border border-blue-200 bg-white px-2 py-1 text-xs text-blue-700" loadingText="...">
-                            Primary
-                          </SubmitButton>
-                        </form>
-                      ) : null}
-                      <form action={removeJobAssigneeFromForm}>
+          {job.assignments.length ? (
+            <div className="mt-3 space-y-2">
+              {job.assignments.map((assignment) => (
+                <div key={`${job.id}-${assignment.user_id}`} className="flex items-center justify-between rounded border bg-gray-50 px-2 py-1.5 text-xs">
+                  <span>
+                    {assignment.display_name}
+                    {assignment.is_primary ? ' (primary)' : ''}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {!assignment.is_primary ? (
+                      <form action={setPrimaryJobAssigneeFromForm}>
                         <input type="hidden" name="job_id" value={job.id} />
                         <input type="hidden" name="user_id" value={assignment.user_id} />
                         <input type="hidden" name="tab" value="ops" />
                         <input type="hidden" name="return_to" value={returnTo} />
-                        <SubmitButton className="rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700" loadingText="...">
-                          Remove
+                        <SubmitButton className="rounded border border-blue-200 bg-white px-2 py-1 text-xs text-blue-700" loadingText="...">
+                          Primary
                         </SubmitButton>
                       </form>
-                    </div>
+                    ) : null}
+                    <form action={removeJobAssigneeFromForm}>
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="user_id" value={assignment.user_id} />
+                      <input type="hidden" name="tab" value="ops" />
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <SubmitButton className="rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700" loadingText="...">
+                        Remove
+                      </SubmitButton>
+                    </form>
                   </div>
-                ))}
-              </div>
-            ) : null}
-          </section>
-        </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      </div>
     </aside>
   );
 }
 
 export async function CalendarView(props: Props) {
   const uiView = normalizeView(props.view);
-  const mode: DispatchViewMode = uiView === 'week' ? 'week' : 'day';
+  const baseMode: DispatchViewMode = uiView === 'week' ? 'week' : 'day';
+
   const data = await getDispatchCalendarData({
-    mode,
+    mode: baseMode,
     anchorDate: props.date,
   });
 
@@ -660,88 +749,116 @@ export async function CalendarView(props: Props) {
   const banner = bannerMessage(props.banner);
   const selectedJobId = String(props.job ?? '').trim();
 
-  // Month jobs projection (from canonical scheduled jobs)
-  let jobsForRange: DispatchJob[] = [];
-  if (uiView === 'month') {
-    // Use all scheduled jobs in the visible month
-    const anchor = data.anchorDate;
-    const anchorDate = new Date(anchor);
-    const month = anchorDate.getMonth();
-    const year = anchorDate.getFullYear();
-    jobsForRange = data.week.days
-      .flatMap((d) => d.jobs)
-      .filter((job) => {
-        if (!job.scheduled_date) return false;
-        const jobDate = new Date(job.scheduled_date);
-        return jobDate.getMonth() === month && jobDate.getFullYear() === year;
-      });
-  } else if (data.mode === 'day') {
-    jobsForRange = data.day.jobs;
-  } else {
-    jobsForRange = data.week.days.flatMap((day) => day.jobs);
-  }
-
-  // No more ad hoc filtering; use canonical scheduled jobs only
-  const canonicalDispatchJobsForRange = jobsForRange;
-  const canonicalDispatchJobsByDay = data.week.days.map((day) => ({
+  let canonicalDispatchJobsByDay = data.week.days.map((day) => ({
     date: day.date,
     jobs: day.jobs,
   }));
+
+  let canonicalDispatchJobsForRange: DispatchJob[] =
+    data.mode === 'day' ? data.day.jobs : data.week.days.flatMap((day) => day.jobs);
+
+  if (uiView === 'month' || uiView === 'list') {
+    const anchor = parseISO(data.anchorDate);
+    const monthStart = startOfMonth(anchor);
+    const monthEnd = endOfMonth(anchor);
+    const weekAnchors = eachWeekOfInterval({ start: monthStart, end: monthEnd });
+
+    const weekResults = await Promise.all(
+      weekAnchors.map((weekDate) =>
+        getDispatchCalendarData({
+          mode: 'week',
+          anchorDate: formatDate(weekDate, 'yyyy-MM-dd'),
+        }),
+      ),
+    );
+
+    const dayMap = new Map<string, DispatchJob[]>();
+
+    for (const result of weekResults) {
+      for (const day of result.week.days) {
+        const existing = dayMap.get(day.date) ?? [];
+        const merged = new Map(existing.map((job) => [job.id, job]));
+        for (const job of day.jobs) merged.set(job.id, job);
+        dayMap.set(day.date, Array.from(merged.values()));
+      }
+    }
+
+    const monthNumber = anchor.getMonth();
+    const yearNumber = anchor.getFullYear();
+
+    canonicalDispatchJobsByDay = Array.from(dayMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, jobs]) => ({
+        date,
+        jobs: jobs.filter((job) => {
+          if (!job.scheduled_date) return false;
+          const jobDate = parseISO(job.scheduled_date);
+          return jobDate.getMonth() === monthNumber && jobDate.getFullYear() === yearNumber;
+        }),
+      }))
+      .filter((day) => day.jobs.length > 0);
+
+    canonicalDispatchJobsForRange = canonicalDispatchJobsByDay.flatMap((day) => day.jobs);
+  }
 
   const selectedJob =
     (selectedJobId ? canonicalDispatchJobsForRange.find((job) => job.id === selectedJobId) : null) ||
     data.unassignedScheduledJobs.find((job) => job.id === selectedJobId) ||
     null;
 
-  // Header label logic
   let headerLabel = '';
   if (uiView === 'month') {
-    const anchor = data.anchorDate;
-    const anchorDate = new Date(anchor);
-    const monthName = anchorDate.toLocaleString('default', { month: 'long' });
-    const year = anchorDate.getFullYear();
-    headerLabel = `Month view for ${monthName} ${year}`;
-  } else if (mode === 'day') {
+    const anchor = parseISO(data.anchorDate);
+    headerLabel = `Month view for ${formatDate(anchor, 'MMMM yyyy')}`;
+  } else if (uiView === 'list') {
+    const anchor = parseISO(data.anchorDate);
+    headerLabel = `List view for ${formatDate(anchor, 'MMMM yyyy')}`;
+  } else if (baseMode === 'day') {
     headerLabel = `Day view for ${formatBusinessDateUS(data.day.date)}`;
   } else {
     headerLabel = `Week view ${formatBusinessDateUS(data.week.startDate)} - ${formatBusinessDateUS(data.week.endDate)}`;
   }
 
-  // Unscheduled lane source: always show canonical unscheduled jobs
   const unscheduledJobs = data.unassignedScheduledJobs;
 
   return (
     <div className="space-y-6 pb-8">
       {banner ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-base text-emerald-900 mb-4">{banner}</div>
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-base text-emerald-900">{banner}</div>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 pb-5">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 pb-5">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Dispatch Workspace</h2>
-          <p className="mt-2 text-sm text-gray-500 font-medium">{headerLabel}</p>
+          <p className="mt-2 text-sm font-medium text-gray-500">{headerLabel}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex items-center rounded-xl bg-gray-100 p-2">
-            {(['day', 'week', 'month', 'list'] as CalendarUIView[]).map((viewValue) => (
-              <Link
-                key={viewValue}
-                href={buildCalendarHref(viewValue, data.anchorDate)}
-                className={`rounded-lg px-4 py-2 text-base font-semibold ${uiView === viewValue ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'}`}
-              >
-                {viewValue.charAt(0).toUpperCase() + viewValue.slice(1)}
-              </Link>
+
+        <div className="flex flex-col items-end gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex items-center rounded-xl bg-gray-100 p-2">
+              {(['day', 'week', 'month', 'list'] as CalendarUIView[]).map((viewValue) => (
+                <Link
+                  key={viewValue}
+                  href={buildCalendarHref(viewValue, data.anchorDate)}
+                  className={`rounded-lg px-4 py-2 text-base font-semibold ${
+                    uiView === viewValue ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {viewValue.charAt(0).toUpperCase() + viewValue.slice(1)}
+                </Link>
+              ))}
+            </div>
+            <NavLinks view={uiView} date={data.anchorDate} />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+            {STATUS_LEGEND.map((item) => (
+              <span key={item.key} className="inline-flex items-center gap-1.5">
+                <span className={`h-2 w-2 rounded-full ${item.dot}`} />
+                <span>{item.label}</span>
+              </span>
             ))}
           </div>
-          <NavLinks view={uiView} date={data.anchorDate} />
-        </div>
-        {/* Status Legend */}
-        <div className="flex items-center gap-2 mt-2 text-xs text-slate-500">
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-400" />Scheduled</span>
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />On My Way</span>
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-600" />In Progress</span>
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" />Field Complete</span>
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-600" />Closed</span>
         </div>
       </div>
 
@@ -749,118 +866,38 @@ export async function CalendarView(props: Props) {
         <aside>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unscheduled Jobs</h3>
           <div className="mt-2 max-h-[70vh] space-y-1 overflow-y-auto pr-1">
-              {unscheduledJobs.length ? (
-                unscheduledJobs.map((job) => (
-                  <Link
-                    key={`unassigned-${job.id}`}
-                    href={buildCalendarHref(uiView, data.anchorDate, { job: job.id })}
-                    scroll={false}
-                    className="block rounded px-2 py-2 hover:bg-slate-50"
-                  >
-                    <p className="truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
-                    <p className="truncate text-[11px] text-slate-600">{job.city || job.contractor_name || 'No city or contractor'}</p>
-                  </Link>
-                ))
-              ) : (
-                <div className="py-2 text-xs text-slate-500">No unscheduled jobs.</div>
-              )}
+            {unscheduledJobs.length ? (
+              unscheduledJobs.map((job) => (
+                <Link
+                  key={`unassigned-${job.id}`}
+                  href={buildCalendarHref(uiView, data.anchorDate, { job: job.id })}
+                  scroll={false}
+                  className="block rounded px-2 py-2 hover:bg-slate-50"
+                >
+                  <p className="truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
+                  <p className="truncate text-[11px] text-slate-600">{job.city || job.contractor_name || 'No city or contractor'}</p>
+                </Link>
+              ))
+            ) : (
+              <div className="py-2 text-xs text-slate-500">No unscheduled jobs.</div>
+            )}
           </div>
-
         </aside>
 
         <main className="min-w-0 space-y-4">
           {uiView === 'list' ? (
-            <section className="px-1">
-              {/* Month-aware List view: group jobs by date for the visible month */}
-              {(() => {
-                // Use jobsForRange logic from above for month
-                let jobsForList: DispatchJob[] = [];
-                if (uiView === 'list') {
-                  // Use the same month filtering as the month view
-                  const anchor = data.anchorDate;
-                  const anchorDate = new Date(anchor);
-                  const month = anchorDate.getMonth();
-                  const year = anchorDate.getFullYear();
-                  jobsForList = data.week.days
-                    .flatMap((d) => d.jobs)
-                    .filter((job) => {
-                      if (!job.scheduled_date) return false;
-                      const jobDate = new Date(job.scheduled_date);
-                      return jobDate.getMonth() === month && jobDate.getFullYear() === year;
-                    });
-                }
-                const jobsByDate = new Map<string, DispatchJob[]>();
-                for (const job of jobsForList) {
-                  if (!job.scheduled_date) continue;
-                  if (!jobsByDate.has(job.scheduled_date)) jobsByDate.set(job.scheduled_date, []);
-                  (jobsByDate.get(job.scheduled_date) ?? []).push(job);
-                }
-                const sortedDates = Array.from(jobsByDate.keys()).sort();
-                if (!sortedDates.length) {
-                  return <div className="py-8 text-sm text-slate-500">No scheduled jobs for this month.</div>;
-                }
-                return (
-                  <div className="space-y-6">
-                    {sortedDates.map(date => (
-                      <div key={date}>
-                        <div className="mb-2 flex items-center gap-2">
-                          <span className="text-xs font-semibold text-slate-700">{formatBusinessDateUS(date)}</span>
-                          <span className="text-xs text-slate-400">{(jobsByDate.get(date)?.length ?? 0)} job{(jobsByDate.get(date)?.length ?? 0) > 1 ? 's' : ''}</span>
-                        </div>
-                        <div className="space-y-1">
-                          {(jobsByDate.get(date) ?? []).map((job: DispatchJob) => {
-                            const needsTech = job.scheduled_date && (!job.assignments || job.assignments.length === 0);
-                            return (
-                              <div key={job.id} className="flex items-center gap-3 rounded border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                                <div className="flex-1 min-w-0">
-                                  <div className="truncate font-medium text-slate-900 text-sm">{job.job_address || shortTitle(job)}</div>
-                                  <div className="truncate text-[11px] text-slate-500">{job.job_type || job.title}</div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className={`text-xs font-semibold flex items-center gap-1 ${
-                                    job.status === 'scheduled' ? 'text-gray-400'
-                                    : job.status === 'on_my_way' ? 'text-blue-500'
-                                    : job.status === 'in_progress' ? 'text-indigo-600'
-                                    : job.status === 'field_complete' ? 'text-amber-500'
-                                    : job.status === 'closed' ? 'text-green-600'
-                                    : 'text-slate-500'
-                                  }`}>
-                                    <span className={`w-2 h-2 rounded-full ${
-                                      job.status === 'scheduled' ? 'bg-gray-400'
-                                      : job.status === 'on_my_way' ? 'bg-blue-500'
-                                      : job.status === 'in_progress' ? 'bg-indigo-600'
-                                      : job.status === 'field_complete' ? 'bg-amber-500'
-                                      : job.status === 'closed' ? 'bg-green-600'
-                                      : 'bg-gray-300'
-                                    }`}></span>
-                                    {formatStatus(job.status)}
-                                  </span>
-                                  {needsTech && (
-                                    <span className="inline-block rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">Needs Tech</span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
+            <section className="overflow-x-auto px-1">
+              <AgendaList jobs={canonicalDispatchJobsForRange} date={data.anchorDate} />
             </section>
           ) : uiView === 'month' ? (
             <section className="overflow-x-auto">
-              <CalendarMonthGrid
-                monthDate={data.anchorDate}
-                jobs={canonicalDispatchJobsByDay.flatMap((day) => day.jobs)}
-              />
+              <CalendarMonthGrid monthDate={data.anchorDate} jobs={canonicalDispatchJobsForRange} />
             </section>
-          ) : mode === 'day' ? (
+          ) : baseMode === 'day' ? (
             <section className="overflow-x-auto">
               <DispatchGrid
                 jobs={data.day.jobs.filter((job) => isDispatchVisibleForLayout(job))}
-                mode={mode}
+                mode={baseMode}
                 date={data.day.date}
                 selectedJobId={selectedJobId}
               />
@@ -875,7 +912,7 @@ export async function CalendarView(props: Props) {
                   </div>
                   <DispatchGrid
                     jobs={day.jobs}
-                    mode={mode}
+                    mode={baseMode}
                     date={day.date}
                     selectedJobId={selectedJobId}
                   />
