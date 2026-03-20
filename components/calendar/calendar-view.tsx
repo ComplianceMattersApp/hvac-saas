@@ -132,10 +132,9 @@ function parseMinutes(value?: string | null): number | null {
 
 function isDispatchVisibleForLayout(job: DispatchJob) {
   const ops = String(job.ops_status ?? '').toLowerCase();
-  // Business rule: scheduled jobs should appear if they have scheduled_date and window_start
   if (!job.scheduled_date || !job.window_start) return false;
+  if (!Array.isArray(job.assignments) || job.assignments.length === 0) return false;
   if (ops === 'on_hold') return false;
-  // Remove assignment requirement for grid inclusion
   return true;
 }
 
@@ -451,6 +450,10 @@ function DispatchGrid(props: {
                       ) : null}
                     </div>
                     <p className="truncate text-xs font-semibold leading-4">{shortTitle(job)}</p>
+                      {/* Needs Tech badge: scheduled job, no assignments */}
+                      {job.scheduled_date && (!job.assignments || job.assignments.length === 0) ? (
+                        <span className="ml-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">Needs Tech</span>
+                      ) : null}
                     <p className="truncate text-[11px] leading-4 opacity-90">{job.city || job.contractor_name || 'No city or contractor'}</p>
                     <div className="mt-0.5 flex items-center justify-between gap-2">
                       <p className="truncate text-[10px] font-medium uppercase tracking-wide opacity-80">{blockTimeLabel(row.start, row.end)}</p>
