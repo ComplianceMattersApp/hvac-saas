@@ -1,93 +1,215 @@
 "use client";
-import React, { useState } from "react";
-import Link from "next/link";
+
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import SubmitButton from "@/components/SubmitButton";
 
-// Accepts jobs, schedule action, and refresh callback
-  const [openJobId, setOpenJobId] = useState(null);
-  const [feedback, setFeedback] = useState({ state: '', jobId: '' });
-  const [pending, setPending] = useState(false);
-  const [localJobs, setLocalJobs] = useState(jobs);
+type UnscheduledJob = {
+  id: string;
+  customer_first_name?: string | null;
+  customer_last_name?: string | null;
+  job_address?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  job_type?: string | null;
+  title?: string | null;
+  contractor_name?: string | null;
+};
+
+type SchedulePayload = {
+  jobId: string;
+  scheduledDate: string;
+  windowStart: string;
+  windowEnd: string;
+};
+
+type Props = {
+  jobs: UnscheduledJob[];
+  onSchedule: (payload: SchedulePayload) => Promise<{ ok: boolean; message?: string }>;
+};
+
+export default function UnscheduledLane({ jobs, onSchedule }: Props) {
   const router = useRouter();
+  const [items, setItems] = useState<UnscheduledJob[]>(jobs);
+  const [openJobId, setOpenJobId] = useState<string | null>(null);
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [windowStart, setWindowStart] = useState("");
+  const [windowEnd, setWindowEnd] = useState("");
+  const [feedback, setFeedback] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  async function handleSchedule(e, jobId) {
-    e.preventDefault();
-    setPending(true);
-    setFeedback({ state: 'pending', jobId });
-    const formData = new FormData(e.target);
-    try {
-      const result = await onSchedule(formData);
-      if (result?.success) {
-        setFeedback({ state: 'success', jobId });
-        setLocalJobs(localJobs.filter(j => j.id !== jobId));
+  const sortedItems = useMemo(() => items, [items]);
+
+  function openSchedule(jobId: string) {
+    setOpenJobId(jobId);
+    setFeedback(null);
+    setScheduledDate("");
+    setWindowStart("");
+    setWindowEnd("");
+  }
+
+  function closeSchedule() {
+    setOpenJobId(null);
+    setFeedback(null);
+  }
+
+  async function handleScheduleSubmit(event: React.FormEvent<HTMLFormElement>, jobId: string) {
+    event.preventDefault();
+    setFeedback(null);
+
+    if (!scheduledDate || !windowStart || !windowEnd) {
+      setFeedback({ type: "error", message: "Could not save changes." });
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const result = await onSchedule({
+          jobId,
+          scheduledDate,
+          windowStart,
+          windowEnd,
+        });
+
+        if (!result.ok) {
+          setFeedback({
+            type: "error",
+            message: result.message || "Could not save changes.",
+          });
+          return;
+        }
+
+        setItems((prev) => prev.filter((j) => j.id !== jobId));
+        setFeedback({ type: "success", message: "Schedule updated." });
         setOpenJobId(null);
         router.refresh();
-      } else if (result?.already) {
-        setFeedback({ state: 'already', jobId });
-      } else {
-        setFeedback({ state: 'error', jobId });
+      } catch {
+        setFeedback({ type: "error", message: "Could not save changes." });
       }
-    } catch {
-      setFeedback({ state: 'error', jobId });
-    }
-    setPending(false);
+    });
   }
 
   return (
-    <div className="w-full max-w-md bg-white rounded shadow p-4 ml-6">
-      <h2 className="text-lg font-semibold mb-3">Unscheduled</h2>
-      <div className="flex flex-col gap-3">
-        {localJobs.map((job) => (
-          <div key={job.id} className="flex items-center justify-between border rounded px-3 py-2 bg-slate-50">
-            <div className="flex flex-col min-w-0">
-              <span className="font-medium text-slate-900 truncate">{`${job.customer_first_name ?? ''} ${job.customer_last_name ?? ''}`.trim() || 'Customer'}</span>
-              <span className="text-xs text-slate-600 truncate">{job.job_address ?? job.city ?? 'Location'}</span>
-              <span className="text-xs text-slate-500 truncate">{job.title ?? job.job_type ?? `Job ${job.id.slice(0, 8)}`}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {job.phone_number && (
-                <a href={`tel:${job.phone_number}`} className="p-1 rounded hover:bg-blue-100" title="Call">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92V21a2 2 0 0 1-2.18 2A19.88 19.88 0 0 1 3 5.18 2 2 0 0 1 5 3h4.09a2 2 0 0 1 2 1.72c.13 1.23.37 2.42.72 3.57a2 2 0 0 1-.45 2.11l-2.2 2.2a16.06 16.06 0 0 0 6.29 6.29l2.2-2.2a2 2 0 0 1 2.11-.45c1.15.35 2.34.59 3.57.72A2 2 0 0 1 21 19.09V21z"></path></svg>
-                </a>
-              )}
-              <button className="p-1 rounded hover:bg-green-100" title="Schedule" onClick={() => setOpenJobId(job.id)}>
-                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M8 17l4-4 4 4M3 6h18" /></svg>
-              </button>
-            </div>
-            {feedback.jobId === job.id && feedback.state && (
-              <span className="ml-2 text-xs font-semibold text-blue-700">{
-                feedback.state === 'pending' ? 'Scheduling...' :
-                feedback.state === 'success' ? 'Schedule updated.' :
-                feedback.state === 'error' ? 'Could not save changes.' :
-                feedback.state === 'already' ? 'Schedule was already up to date.' : ''
-              }</span>
-            )}
-            {openJobId === job.id && (
-              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-                <div className="bg-white rounded shadow p-6 w-full max-w-md">
-                  <h3 className="text-lg font-semibold mb-4">Schedule Job</h3>
-                  <form onSubmit={e => handleSchedule(e, job.id)}>
-                    <label className="block mb-2 text-sm">Date
-                      <input name="scheduled_date" type="date" defaultValue="" className="border rounded px-2 py-1 w-full" required />
-                    </label>
-                    <label className="block mb-2 text-sm">Window Start
-                      <input name="window_start" type="time" defaultValue="" className="border rounded px-2 py-1 w-full" required />
-                    </label>
-                    <label className="block mb-4 text-sm">Window End
-                      <input name="window_end" type="time" defaultValue="" className="border rounded px-2 py-1 w-full" required />
-                    </label>
-                    <input type="hidden" name="job_id" value={job.id} />
+    <aside className="rounded-xl border bg-white p-4 shadow-sm">
+      <div className="mb-3">
+        <h2 className="text-sm font-semibold text-gray-900">Unscheduled Jobs</h2>
+        <p className="text-xs text-gray-500">Call, schedule, and move on.</p>
+      </div>
+
+      {feedback ? (
+        <div
+          className={`mb-3 rounded-md px-3 py-2 text-sm ${
+            feedback.type === "success"
+              ? "bg-green-50 text-green-800"
+              : feedback.type === "error"
+                ? "bg-red-50 text-red-800"
+                : "bg-gray-50 text-gray-700"
+          }`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
+
+      <div className="space-y-3">
+        {sortedItems.length === 0 ? (
+          <div className="rounded-md border border-dashed px-3 py-4 text-sm text-gray-500">
+            No unscheduled jobs.
+          </div>
+        ) : (
+          sortedItems.map((job) => {
+            const customerName =
+              [job.customer_first_name, job.customer_last_name].filter(Boolean).join(" ") || "Unnamed customer";
+
+            const address = [job.job_address, job.city].filter(Boolean).join(", ");
+            const label = job.title || job.job_type || "Job";
+
+            return (
+              <div key={job.id} className="rounded-lg border p-3">
+                <div className="mb-2">
+                  <div className="text-sm font-medium text-gray-900">{customerName}</div>
+                  <div className="text-xs text-gray-500">{label}</div>
+                  {address ? <div className="mt-1 text-xs text-gray-600">{address}</div> : null}
+                  {job.contractor_name ? (
+                    <div className="mt-1 text-xs text-gray-500">Contractor: {job.contractor_name}</div>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {job.phone ? (
+                    <a
+                      href={`tel:${job.phone}`}
+                      className="rounded-md border px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Call
+                    </a>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => openSchedule(job.id)}
+                    className="rounded-md bg-gray-900 px-3 py-2 text-xs font-medium text-white hover:bg-black"
+                  >
+                    Schedule
+                  </button>
+                </div>
+
+                {openJobId === job.id ? (
+                  <form className="mt-3 space-y-2 border-t pt-3" onSubmit={(e) => handleScheduleSubmit(e, job.id)}>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-700">Date</label>
+                      <input
+                        type="date"
+                        value={scheduledDate}
+                        onChange={(e) => setScheduledDate(e.target.value)}
+                        className="w-full rounded-md border px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-gray-700">Start</label>
+                        <input
+                          type="time"
+                          value={windowStart}
+                          onChange={(e) => setWindowStart(e.target.value)}
+                          className="w-full rounded-md border px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-gray-700">End</label>
+                        <input
+                          type="time"
+                          value={windowEnd}
+                          onChange={(e) => setWindowEnd(e.target.value)}
+                          className="w-full rounded-md border px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+
                     <div className="flex gap-2">
-                      <button type="submit" className="px-3 py-1 rounded bg-green-600 text-white" disabled={pending}>Save</button>
-                      <button type="button" className="px-3 py-1 rounded bg-slate-200" onClick={() => setOpenJobId(null)}>Cancel</button>
+                      <SubmitButton
+                        className="rounded-md bg-gray-900 px-3 py-2 text-xs font-medium text-white"
+                        loadingText="Scheduling..."
+                      >
+                        Save Schedule
+                      </SubmitButton>
+
+                      <button
+                        type="button"
+                        onClick={closeSchedule}
+                        disabled={isPending}
+                        className="rounded-md border px-3 py-2 text-xs font-medium text-gray-700"
+                      >
+                        Cancel
+                      </button>
                     </div>
                   </form>
-                </div>
+                ) : null}
               </div>
-            )}
-          </div>
-        ))}
+            );
+          })
+        )}
       </div>
-    </div>
+    </aside>
   );
 }

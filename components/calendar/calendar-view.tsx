@@ -535,18 +535,44 @@ function DetailPanel(props: {
             aria-label="Close details"
             className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
           >
-            <div className="flex">
-              <div className="flex-1">
-                {feedbackMsg && (
-                  <div className="mb-4 px-4 py-2 rounded bg-blue-100 text-blue-800 font-medium text-sm">{feedbackMsg}</div>
-                )}
-                {/* ...existing calendar grid rendering... */}
+            <X className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+            Open Job
+          </Link>
+          <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+            Open Customer
+          </Link>
+          <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+            Open Location
+          </Link>
+        </div>
+
+        <div className="space-y-4">
+          <section>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Schedule</p>
+            <form action={updateJobScheduleFromForm} className="grid gap-2">
+              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="return_to" value={returnTo} />
+              <input type="date" name="scheduled_date" defaultValue={job.scheduled_date ?? ''} className="rounded border px-2 py-2 text-sm" />
+              <div className="grid grid-cols-2 gap-2">
+                <input type="time" name="window_start" defaultValue={job.window_start ?? ''} className="rounded border px-2 py-2 text-sm" />
+                <input type="time" name="window_end" defaultValue={job.window_end ?? ''} className="rounded border px-2 py-2 text-sm" />
               </div>
-              {/* Unscheduled lane as client component */}
-              {unscheduledJobs.length > 0 && (
-                <UnscheduledLane jobs={unscheduledJobs} onSchedule={handleSchedule} onRefresh={handleRefresh} />
-              )}
-            </div>
+              <SubmitButton className="rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white" loadingText="Saving...">
+                Save Schedule
+              </SubmitButton>
+            </form>
+          </section>
+
+          <section>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Assignment</p>
+            <form action={assignJobAssigneeFromForm} className="grid gap-2">
+              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="tab" value="ops" />
               <input type="hidden" name="return_to" value={returnTo} />
               <select name="user_id" className="rounded border px-2 py-2 text-sm" defaultValue="">
                 <option value="" disabled>
@@ -632,14 +658,10 @@ export async function CalendarView(props: Props) {
     data.unassignedScheduledJobs.find((job) => job.id === selectedJobId) ||
     null;
 
-  const calendarData = await getDispatchCalendarData({
-    mode: normalizeView(props.view),
-    anchorDate: props.date,
-  });
-
-  const feedbackMsg = bannerMessage(props.banner);
-  const unscheduledJobs = calendarData.unassignedScheduledJobs;
-
+  return (
+    <div className="space-y-4 pb-6">
+      {banner ? (
+        <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">{banner}</div>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
