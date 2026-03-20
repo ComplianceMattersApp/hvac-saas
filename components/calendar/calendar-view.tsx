@@ -751,7 +751,66 @@ export async function CalendarView(props: Props) {
         <main className="min-w-0 space-y-4">
           {uiView === 'list' ? (
             <section className="px-1">
-              <AgendaList jobs={canonicalDispatchJobsForRange} mode={mode} date={data.anchorDate} />
+              {/* Month-aware List view: group jobs by date for the visible month */}
+              {(() => {
+                // Use jobsForRange logic from above for month
+                let jobsForList: DispatchJob[] = [];
+                if (uiView === 'list') {
+                  // Use the same month filtering as the month view
+                  const anchor = data.anchorDate;
+                  const anchorDate = new Date(anchor);
+                  const month = anchorDate.getMonth();
+                  const year = anchorDate.getFullYear();
+                  jobsForList = data.week.days
+                    .flatMap((d) => d.jobs)
+                    .filter((job) => {
+                      if (!job.scheduled_date) return false;
+                      const jobDate = new Date(job.scheduled_date);
+                      return jobDate.getMonth() === month && jobDate.getFullYear() === year;
+                    });
+                }
+                const jobsByDate = new Map<string, DispatchJob[]>();
+                for (const job of jobsForList) {
+                  if (!job.scheduled_date) continue;
+                  if (!jobsByDate.has(job.scheduled_date)) jobsByDate.set(job.scheduled_date, []);
+                  (jobsByDate.get(job.scheduled_date) ?? []).push(job);
+                }
+                const sortedDates = Array.from(jobsByDate.keys()).sort();
+                if (!sortedDates.length) {
+                  return <div className="py-8 text-sm text-slate-500">No scheduled jobs for this month.</div>;
+                }
+                return (
+                  <div className="space-y-6">
+                    {sortedDates.map(date => (
+                      <div key={date}>
+                        <div className="mb-2 flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-700">{formatBusinessDateUS(date)}</span>
+                          <span className="text-xs text-slate-400">{(jobsByDate.get(date)?.length ?? 0)} job{(jobsByDate.get(date)?.length ?? 0) > 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="space-y-1">
+                          {(jobsByDate.get(date) ?? []).map((job: DispatchJob) => {
+                            const needsTech = job.scheduled_date && (!job.assignments || job.assignments.length === 0);
+                            return (
+                              <div key={job.id} className="flex items-center gap-3 rounded border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                                <div className="flex-1 min-w-0">
+                                  <div className="truncate font-medium text-slate-900 text-sm">{job.job_address || shortTitle(job)}</div>
+                                  <div className="truncate text-[11px] text-slate-500">{job.job_type || job.title}</div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-slate-500">{job.status}</span>
+                                  {needsTech && (
+                                    <span className="inline-block rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">Needs Tech</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </section>
           ) : uiView === 'month' ? (
             <section className="overflow-x-auto">

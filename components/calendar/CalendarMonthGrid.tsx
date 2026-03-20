@@ -71,7 +71,6 @@ export default function CalendarMonthGrid({ monthDate, jobs }: CalendarMonthGrid
             <div className="flex flex-col gap-1">
               {dayJobs.slice(0, maxJobsPerCell).map((job) => {
                 const needsTech = job.scheduled_date && (!job.assignments || job.assignments.length === 0);
-                // Status color mapping
                 const statusColor =
                   job.status === 'scheduled' ? 'bg-gray-400'
                   : job.status === 'on_my_way' ? 'bg-blue-500'
@@ -82,29 +81,46 @@ export default function CalendarMonthGrid({ monthDate, jobs }: CalendarMonthGrid
                 const faded = job.status === 'closed' ? 'opacity-50' : '';
                 const primaryLine = job.job_address || shortTitle(job);
                 return (
-                  <Link
-                    key={job.id}
-                    href={`/calendar?view=month&date=${monthDate}&job=${job.id}`}
-                    className={`
-                      group flex items-start gap-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 px-2 py-1 text-xs shadow-sm min-h-[32px] ${faded}
-                    `}
-                    title={`${job.job_address || ''} — ${job.title || ''}`}
-                  >
-                    <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${statusColor}`} />
-                    <div className="flex flex-col truncate">
-                      <span className="truncate text-slate-900 font-medium">
-                        {primaryLine}
-                      </span>
-                      <span className="truncate text-[10px] text-slate-500">
-                        {job.job_type || job.title}
-                      </span>
+                  <div key={job.id} className="relative group">
+                    <Link
+                      href={`/calendar?view=month&date=${monthDate}&job=${job.id}`}
+                      className={`flex items-start gap-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 px-2 py-1 text-xs shadow-sm min-h-[32px] ${faded}`}
+                      tabIndex={0}
+                    >
+                      <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${statusColor}`} />
+                      <div className="flex flex-col truncate">
+                        <span className="truncate text-slate-900 font-medium">
+                          {primaryLine}
+                        </span>
+                        <span className="truncate text-[10px] text-slate-500">
+                          {job.job_type || job.title}
+                        </span>
+                      </div>
+                      {needsTech && (
+                        <span className="ml-auto shrink-0 inline-block rounded bg-amber-100 px-1 py-0.5 text-[9px] font-semibold text-amber-800 border border-amber-200">
+                          Needs Tech
+                        </span>
+                      )}
+                    </Link>
+                    <div className="absolute z-20 left-0 top-full mt-1 w-64 rounded-lg border border-slate-200 bg-white shadow-lg p-3 text-xs text-slate-900 whitespace-normal pointer-events-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-hover:pointer-events-auto group-focus-within:pointer-events-auto transition-opacity">
+                      <div className="font-semibold mb-1">{job.title || shortTitle(job)}</div>
+                      <div className="mb-1 text-slate-700">{job.job_address || 'No address'}</div>
+                      {job.customer_first_name || job.customer_last_name ? (
+                        <div className="mb-1 text-slate-600">Customer: {[job.customer_first_name, job.customer_last_name].filter(Boolean).join(' ')}</div>
+                      ) : null}
+                      {job.contractor_name ? (
+                        <div className="mb-1 text-slate-600">Contractor: {job.contractor_name}</div>
+                      ) : null}
+                      <div className="mb-1 text-slate-600">Status: {job.status || 'unknown'}</div>
+                      <div className="mb-1 text-slate-600">Type: {job.job_type || 'N/A'}</div>
+                      <div className="mb-1 text-slate-600">Scheduled: {job.scheduled_date || 'N/A'}</div>
+                      {needsTech && (
+                        <div className="inline-block rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200 mt-1">
+                          Needs Tech
+                        </div>
+                      )}
                     </div>
-                    {needsTech && (
-                      <span className="ml-auto shrink-0 inline-block rounded bg-amber-100 px-1 py-0.5 text-[9px] font-semibold text-amber-800 border border-amber-200">
-                        Needs Tech
-                      </span>
-                    )}
-                  </Link>
+                  </div>
                 );
               })}
               {dayJobs.length > maxJobsPerCell && (
