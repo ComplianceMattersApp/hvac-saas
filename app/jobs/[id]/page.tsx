@@ -1436,6 +1436,76 @@ const renderTimelineItem = (e: any, key: string) => {
         />
       )}
 
+      {banner === "note_added" && (
+        <FlashBanner
+          type="success"
+          message="Note added."
+        />
+      )}
+
+      {banner === "follow_up_note_added" && (
+        <FlashBanner
+          type="success"
+          message="Follow-up note added."
+        />
+      )}
+
+      {banner === "note_already_added" && (
+        <FlashBanner
+          type="warning"
+          message="Note already added."
+        />
+      )}
+
+      {banner === "follow_up_note_already_added" && (
+        <FlashBanner
+          type="warning"
+          message="Note already added."
+        />
+      )}
+
+      {banner === "note_add_failed" && (
+        <FlashBanner
+          type="error"
+          message="Could not add note."
+        />
+      )}
+
+      {banner === "ops_details_saved" && (
+        <FlashBanner
+          type="success"
+          message="Saved."
+        />
+      )}
+
+      {banner === "ops_details_already_saved" && (
+        <FlashBanner
+          type="warning"
+          message="This was already processed."
+        />
+      )}
+
+      {banner === "ops_status_saved" && (
+        <FlashBanner
+          type="success"
+          message="Saved."
+        />
+      )}
+
+      {banner === "ops_status_already_saved" && (
+        <FlashBanner
+          type="warning"
+          message="This was already processed."
+        />
+      )}
+
+      {banner === "contact_attempt_logged" && (
+        <FlashBanner
+          type="success"
+          message="Saved."
+        />
+      )}
+
       {banner === "customer_reused" && (
         <FlashBanner
           type="warning"
@@ -2590,12 +2660,12 @@ const renderTimelineItem = (e: any, key: string) => {
         />
 
         <div className="flex justify-end">
-          <button
-            type="submit"
+          <SubmitButton
+            loadingText="Adding note..."
             className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100"
           >
             Save follow-up note
-          </button>
+          </SubmitButton>
         </div>
       </form>
 
@@ -2649,12 +2719,12 @@ const renderTimelineItem = (e: any, key: string) => {
     />
 
     <div className="flex justify-end">
-      <button
-        type="submit"
+      <SubmitButton
+        loadingText="Adding note..."
         className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100"
       >
         Save shared note
-      </button>
+      </SubmitButton>
     </div>
   </form>
 
@@ -2722,12 +2792,12 @@ const renderTimelineItem = (e: any, key: string) => {
     />
 
     <div className="flex justify-end">
-      <button
-        type="submit"
+      <SubmitButton
+        loadingText="Adding note..."
         className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100"
       >
         Save internal note
-      </button>
+      </SubmitButton>
     </div>
   </form>
 

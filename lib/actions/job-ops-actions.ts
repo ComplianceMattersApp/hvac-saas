@@ -879,7 +879,10 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
   };
 
   const changes = buildOpsChanges(before, after);
-  if (changes.length === 0) return;
+  if (changes.length === 0) {
+    revalidatePath(`/jobs/${jobId}`);
+    redirect(`/jobs/${jobId}?tab=ops&banner=ops_details_already_saved`);
+  }
 
   const { error: updateErr } = await supabase
     .from('jobs')
@@ -902,6 +905,10 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
   });
 
   if (eventErr) throw new Error(eventErr.message);
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/ops`);
+  redirect(`/jobs/${jobId}?tab=ops&banner=ops_details_saved`);
 }
 
 export async function releasePendingInfoAndRecompute(jobId: string, source = "manual_release_pending_info"): Promise<string | null> {
@@ -1152,7 +1159,10 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   const after: OpsSnapshot = { ...before, ops_status: nextOpsStatus };
 
   const changes = buildOpsChanges(before, after);
-  if (changes.length === 0) return;
+  if (changes.length === 0) {
+    revalidatePath(`/jobs/${jobId}`);
+    redirect(`/jobs/${jobId}?tab=ops&banner=ops_status_already_saved`);
+  }
 
   // UPDATE
   const { error: updateErr } = await supabase
@@ -1179,7 +1189,7 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${jobId}`);
-  redirect(`/jobs/${jobId}?tab=ops`);
+  redirect(`/jobs/${jobId}?tab=ops&banner=ops_status_saved`);
 }
 
 export async function markJobFieldCompleteFromForm(formData: FormData): Promise<void> {

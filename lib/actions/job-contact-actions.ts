@@ -115,5 +115,5 @@ if (insertErr) throw new Error(insertErr.message);
     if (escErr) throw new Error(escErr.message);
   }
   revalidatePath(`/jobs/${jobId}`);
-  redirect(`/jobs/${jobId}?tab=ops`);
+  redirect(`/jobs/${jobId}?tab=ops&banner=contact_attempt_logged`);
 }

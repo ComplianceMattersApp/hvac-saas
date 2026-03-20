@@ -4798,7 +4798,7 @@ export async function addPublicNoteFromForm(formData: FormData) {
 
   if (!jobId) throw new Error("Job ID is required");
   if (!note) {
-    redirect(`/jobs/${jobId}?tab=${tab}`);
+    redirect(`/jobs/${jobId}?tab=${tab}&banner=note_add_failed`);
   }
 
   const supabase = await createClient();
@@ -4811,6 +4811,23 @@ export async function addPublicNoteFromForm(formData: FormData) {
   if (userErr) throw userErr;
   if (!user) redirect("/login");
 
+  const { data: recentDuplicate, error: duplicateErr } = await supabase
+    .from("job_events")
+    .select("id")
+    .eq("job_id", jobId)
+    .eq("event_type", "public_note")
+    .eq("user_id", user.id)
+    .contains("meta", { note })
+    .gte("created_at", new Date(Date.now() - 15_000).toISOString())
+    .maybeSingle();
+
+  if (duplicateErr) throw duplicateErr;
+  if (recentDuplicate?.id) {
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/ops`);
+    redirect(`/jobs/${jobId}?tab=${tab}&banner=note_already_added`);
+  }
+
   await insertJobEvent({
     supabase,
     jobId,
@@ -4821,7 +4838,7 @@ export async function addPublicNoteFromForm(formData: FormData) {
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  redirect(`/jobs/${jobId}?tab=${tab}`);
+  redirect(`/jobs/${jobId}?tab=${tab}&banner=note_added`);
 }
 
 export async function addInternalNoteFromForm(formData: FormData) {
@@ -4834,7 +4851,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
 
   if (!jobId) throw new Error("Job ID is required");
   if (!note) {
-    redirect(`/jobs/${jobId}?tab=${tab}`);
+    redirect(`/jobs/${jobId}?tab=${tab}&banner=note_add_failed`);
   }
 
   const supabase = await createClient();
@@ -4857,6 +4874,35 @@ export async function addInternalNoteFromForm(formData: FormData) {
       }
     : { note };
 
+  const duplicateMeta: Record<string, unknown> = { note };
+  if (context) duplicateMeta.context = context;
+  if (anchorEventId) duplicateMeta.anchor_event_id = anchorEventId;
+  if (anchorEventType) duplicateMeta.anchor_event_type = anchorEventType;
+
+  const { data: recentDuplicate, error: duplicateErr } = await supabase
+    .from("job_events")
+    .select("id")
+    .eq("job_id", jobId)
+    .eq("event_type", "internal_note")
+    .eq("user_id", user.id)
+    .contains("meta", duplicateMeta)
+    .gte("created_at", new Date(Date.now() - 15_000).toISOString())
+    .maybeSingle();
+
+  if (duplicateErr) throw duplicateErr;
+
+  const isFollowUpContext = context === "contractor_report_review";
+
+  if (recentDuplicate?.id) {
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/ops`);
+    redirect(
+      `/jobs/${jobId}?tab=${tab}&banner=${
+        isFollowUpContext ? "follow_up_note_already_added" : "note_already_added"
+      }`
+    );
+  }
+
   await insertJobEvent({
     supabase,
     jobId,
@@ -4867,7 +4913,9 @@ export async function addInternalNoteFromForm(formData: FormData) {
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  redirect(`/jobs/${jobId}?tab=${tab}`);
+  redirect(
+    `/jobs/${jobId}?tab=${tab}&banner=${isFollowUpContext ? "follow_up_note_added" : "note_added"}`
+  );
 }
 
 export async function completeDataEntryFromForm(formData: FormData) {
