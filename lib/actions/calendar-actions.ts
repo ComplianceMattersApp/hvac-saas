@@ -230,111 +230,59 @@ export async function getDispatchCalendarData(params: {
     'contractor_id',
     'contractors(name)',
     'created_at',
+    'deleted_at',
   ].join(', ');
 
-  const { data: dayRows, error: dayErr } = await supabase
+  // Fetch all jobs in the relevant window
+  const { data: allRows, error: allErr } = await supabase
     .from('jobs')
     .select(baseSelect)
     .is('deleted_at', null)
-    .eq('scheduled_date', anchorDate)
-    .neq('ops_status', 'closed')
-    .order('window_start', { ascending: true })
-    .order('created_at', { ascending: true });
-
-  if (dayErr) throw dayErr;
-
-  const { data: weekRows, error: weekErr } = await supabase
-    .from('jobs')
-    .select(baseSelect)
-    .is('deleted_at', null)
-    .neq('ops_status', 'closed')
-    .gte('scheduled_date', weekStart)
-    .lte('scheduled_date', weekEnd)
     .order('scheduled_date', { ascending: true })
     .order('window_start', { ascending: true })
     .order('created_at', { ascending: true });
+  if (allErr) throw allErr;
 
-  if (weekErr) throw weekErr;
+  // Canonical exclusion logic
+  function isActive(job: JobDispatchRow) {
+    const ops = String(job.ops_status ?? '').toLowerCase();
+    const status = String(job.status ?? '').toLowerCase();
+    if (ops === 'closed' || ops === 'cancelled') return false;
+    if (status === 'closed' || status === 'cancelled') return false;
+    return true;
+  }
 
-  const { data: unassignedRows, error: unassignedErr } = await supabase
-    .from('jobs')
-    .select(baseSelect)
-    .is('deleted_at', null)
-    .eq('status', 'open')
-    .eq('ops_status', 'scheduled')
-    .gte('scheduled_date', anchorDate)
-    .order('scheduled_date', { ascending: true })
-    .order('window_start', { ascending: true })
-    .limit(100);
+  // Type guard for JobDispatchRow
+  function isJobDispatchRow(row: any): row is JobDispatchRow {
+    return row && typeof row.id === 'string' && typeof row.status !== 'undefined' && typeof row.ops_status !== 'undefined';
+  }
 
-  if (unassignedErr) throw unassignedErr;
+  // Filter out any rows that are not valid JobDispatchRow
+  const validRows = (allRows ?? []).filter(isJobDispatchRow) as unknown as JobDispatchRow[];
 
-  const { data: openRetestChildren, error: openRetestErr } = await supabase
-    .from('jobs')
-    .select('parent_job_id')
-    .not('parent_job_id', 'is', null)
-    .is('deleted_at', null)
-    .neq('ops_status', 'closed');
-
-  if (openRetestErr) throw openRetestErr;
-
-  const { data: resolvedRetestChildren, error: resolvedRetestErr } = await supabase
-    .from('jobs')
-    .select('parent_job_id')
-    .not('parent_job_id', 'is', null)
-    .is('deleted_at', null)
-    .in('ops_status', ['paperwork_required', 'invoice_required', 'closed']);
-
-  if (resolvedRetestErr) throw resolvedRetestErr;
-
-  const openRetestParentIds = new Set(
-    ((openRetestChildren ?? []) as ParentIdRow[])
-      .map((row) => String(row?.parent_job_id ?? '').trim())
-      .filter(Boolean),
+  // Canonical scheduled active jobs
+  const scheduledActiveRows = validRows.filter(
+    (row) => isActive(row) && !!row.scheduled_date
   );
 
-  const resolvedFailedParentIds = new Set(
-    ((resolvedRetestChildren ?? []) as ParentIdRow[])
-      .map((row) => String(row?.parent_job_id ?? '').trim())
-      .filter(Boolean),
+  // Canonical unscheduled active jobs
+  const unscheduledActiveRows = validRows.filter(
+    (row) => isActive(row) && !row.scheduled_date
   );
 
-  const filteredDayRows = suppressRetestParentRows(((dayRows ?? []) as unknown) as JobDispatchRow[], {
-    openRetestParentIds,
-    resolvedFailedParentIds,
-  });
-  const filteredWeekRows = suppressRetestParentRows(((weekRows ?? []) as unknown) as JobDispatchRow[], {
-    openRetestParentIds,
-    resolvedFailedParentIds,
-  });
-  const filteredUnassignedRows = suppressRetestParentRows(((unassignedRows ?? []) as unknown) as JobDispatchRow[], {
-    openRetestParentIds,
-    resolvedFailedParentIds,
-  });
-
-  const allJobIds = Array.from(
-    new Set(
-      [...filteredDayRows, ...filteredWeekRows, ...filteredUnassignedRows]
-        .map((row) => String(row?.id ?? '').trim())
-        .filter(Boolean),
-    ),
-  );
-
+  // Assignment and event mapping
+  const allJobIds = [...scheduledActiveRows, ...unscheduledActiveRows].map((row) => String(row?.id ?? '').trim()).filter(Boolean);
   const assignmentMap = await getActiveJobAssignmentDisplayMap({
     supabase,
     jobIds: allJobIds,
   });
-
-  const unassignedJobIds = allJobIds.filter((jobId) => !(assignmentMap[jobId] ?? []).length);
 
   const { data: eventRows, error: eventErr } = await supabase
     .from('job_events')
     .select('job_id, event_type, created_at')
     .in('job_id', allJobIds.length ? allJobIds : ['00000000-0000-0000-0000-000000000000'])
     .order('created_at', { ascending: false });
-
   if (eventErr) throw eventErr;
-
   const latestEventByJob = new Map<string, { event_type: string | null; created_at: string | null }>();
   for (const event of (eventRows ?? []) as JobEventRow[]) {
     const jobId = String(event?.job_id ?? '').trim();
@@ -345,21 +293,21 @@ export async function getDispatchCalendarData(params: {
     });
   }
 
-  const dayJobs = filteredDayRows.map((row) =>
-    mergeJobRow({ row, assignmentMap, latestEventByJob }),
+  // Canonical scheduled jobs (normalized)
+  const scheduledActiveJobs = scheduledActiveRows.map((row) =>
+    mergeJobRow({ row, assignmentMap, latestEventByJob })
   );
 
-  const weekJobs = filteredWeekRows.map((row) =>
-    mergeJobRow({ row, assignmentMap, latestEventByJob }),
+  // Canonical unscheduled jobs (normalized)
+  const unscheduledActiveJobs = unscheduledActiveRows.map((row) =>
+    mergeJobRow({ row, assignmentMap, latestEventByJob })
   );
 
-  const unassignedScheduledJobs = filteredUnassignedRows
-    .filter((row) => unassignedJobIds.includes(String(row?.id ?? '').trim()))
-    .map((row) => mergeJobRow({ row, assignmentMap, latestEventByJob }));
-
+  // Build day/week/month/list from canonical scheduled jobs
+  const dayJobs = scheduledActiveJobs.filter((job) => String(job.scheduled_date) === anchorDate);
   const weekDays = Array.from({ length: 7 }).map((_, index) => {
     const date = addDaysYmd(weekStart, index);
-    const jobs = weekJobs.filter((job) => String(job.scheduled_date ?? '') === date);
+    const jobs = scheduledActiveJobs.filter((job) => String(job.scheduled_date ?? '') === date);
     return { date, jobs };
   });
 
@@ -380,7 +328,8 @@ export async function getDispatchCalendarData(params: {
       endDate: weekEnd,
       days: weekDays,
     },
-    unassignedScheduledJobs,
+    // All calendar consumers must use these canonical collections
+    unassignedScheduledJobs: unscheduledActiveJobs,
     assignableUsers,
   };
 }

@@ -20,6 +20,7 @@ function getMonthDays(monthDate: string) {
 function jobsByDate(jobs: DispatchJob[]) {
   const map = new Map<string, DispatchJob[]>();
   for (const job of jobs) {
+    // All jobs here are canonical scheduled jobs
     if (!job.scheduled_date) continue;
     if (!map.has(job.scheduled_date)) map.set(job.scheduled_date, []);
     map.get(job.scheduled_date)?.push(job);

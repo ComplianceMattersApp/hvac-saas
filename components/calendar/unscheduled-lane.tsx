@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import SubmitButton from "@/components/SubmitButton";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
+import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
+
 type UnscheduledJob = {
   id: string;
   customer_first_name?: string | null;
@@ -30,15 +32,38 @@ type Props = {
 
 export default function UnscheduledLane({ jobs, onSchedule }: Props) {
   const router = useRouter();
-  // Filter jobs to only those truly unscheduled by business rule
+  // Use canonical unscheduled jobs only
   const [items, setItems] = useState<UnscheduledJob[]>(jobs);
   useEffect(() => {
-  setItems(jobs);
-}, [jobs]);
+    setItems(jobs);
+  }, [jobs]);
   const [openJobId, setOpenJobId] = useState<string | null>(null);
   const [scheduledDate, setScheduledDate] = useState("");
   const [windowStart, setWindowStart] = useState("");
   const [windowEnd, setWindowEnd] = useState("");
+  const [openLogJobId, setOpenLogJobId] = useState<string | null>(null);
+  const [logFeedback, setLogFeedback] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+    function openLog(jobId: string) {
+      setOpenLogJobId(jobId);
+      setLogFeedback(null);
+    }
+
+    function closeLog() {
+      setOpenLogJobId(null);
+      setLogFeedback(null);
+    }
+
+    async function handleLogSubmit(formData: FormData, jobId: string) {
+      setLogFeedback(null);
+      try {
+        await logCustomerContactAttemptFromForm(formData);
+        setLogFeedback({ type: "success", message: "Call outcome logged." });
+        setOpenLogJobId(null);
+        router.refresh();
+      } catch (err: any) {
+        setLogFeedback({ type: "error", message: err?.message || "Could not log outcome." });
+      }
+    }
   const [feedback, setFeedback] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -138,6 +163,7 @@ export default function UnscheduledLane({ jobs, onSchedule }: Props) {
                   ) : null}
                 </div>
 
+
                 <div className="flex flex-wrap gap-2">
                   {job.phone ? (
                     <a
@@ -150,12 +176,97 @@ export default function UnscheduledLane({ jobs, onSchedule }: Props) {
 
                   <button
                     type="button"
+                    onClick={() => openLog(job.id)}
+                    className="rounded-md border px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                  >
+                    Log Call Outcome
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => openSchedule(job.id)}
                     className="rounded-md bg-gray-900 px-3 py-2 text-xs font-medium text-white hover:bg-black"
                   >
                     Schedule
                   </button>
                 </div>
+                {openLogJobId === job.id ? (
+                  <LogCallOutcomeForm
+                    jobId={job.id}
+                    onClose={closeLog}
+                    feedback={logFeedback}
+                    onSubmit={handleLogSubmit}
+                    isPending={isPending}
+                  />
+                ) : null}
+
+
+
+
+
+// --- Inline log call outcome form ---
+function LogCallOutcomeForm({ jobId, onClose, feedback, onSubmit, isPending }) {
+  return (
+    <form
+      className="mt-3 space-y-2 border-t pt-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        await onSubmit(formData, jobId);
+      }}
+    >
+      <input type="hidden" name="job_id" value={jobId} />
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-700">Method</label>
+          <select name="method" className="w-full rounded-md border px-3 py-2 text-sm" required defaultValue="call">
+            <option value="call">Call</option>
+            <option value="text">Text</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-700">Result</label>
+          <select name="result" className="w-full rounded-md border px-3 py-2 text-sm" required defaultValue="no_answer">
+            <option value="no_answer">No Answer</option>
+            <option value="spoke">Spoke</option>
+            <option value="sent">Sent</option>
+          </select>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <SubmitButton
+          className="rounded-md bg-blue-700 px-3 py-2 text-xs font-medium text-white"
+          loadingText="Logging..."
+          disabled={isPending}
+        >
+          Log Outcome
+        </SubmitButton>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={isPending}
+          className="rounded-md border px-3 py-2 text-xs font-medium text-gray-700"
+        >
+          Cancel
+        </button>
+      </div>
+      {feedback ? (
+        <div
+          className={`mt-2 rounded-md px-3 py-2 text-xs ${
+            feedback.type === "success"
+              ? "bg-green-50 text-green-800"
+              : feedback.type === "error"
+              ? "bg-red-50 text-red-800"
+              : "bg-gray-50 text-gray-700"
+          }`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
+    </form>
+  );
+}
+
 
                 {openJobId === job.id ? (
                   <form className="mt-3 space-y-2 border-t pt-3" onSubmit={(e) => handleScheduleSubmit(e, job.id)}>
@@ -215,5 +326,68 @@ export default function UnscheduledLane({ jobs, onSchedule }: Props) {
         )}
       </div>
     </aside>
+  );
+}
+
+// --- Inline log call outcome form ---
+function LogCallOutcomeForm({ jobId, onClose, feedback, onSubmit, isPending }) {
+  return (
+    <form
+      className="mt-3 space-y-2 border-t pt-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        await onSubmit(formData, jobId);
+      }}
+    >
+      <input type="hidden" name="job_id" value={jobId} />
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-700">Method</label>
+          <select name="method" className="w-full rounded-md border px-3 py-2 text-sm" required defaultValue="call">
+            <option value="call">Call</option>
+            <option value="text">Text</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-700">Result</label>
+          <select name="result" className="w-full rounded-md border px-3 py-2 text-sm" required defaultValue="no_answer">
+            <option value="no_answer">No Answer</option>
+            <option value="spoke">Spoke</option>
+            <option value="sent">Sent</option>
+          </select>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <SubmitButton
+          className="rounded-md bg-blue-700 px-3 py-2 text-xs font-medium text-white"
+          loadingText="Logging..."
+          disabled={isPending}
+        >
+          Log Outcome
+        </SubmitButton>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={isPending}
+          className="rounded-md border px-3 py-2 text-xs font-medium text-gray-700"
+        >
+          Cancel
+        </button>
+      </div>
+      {feedback ? (
+        <div
+          className={`mt-2 rounded-md px-3 py-2 text-xs ${
+            feedback.type === "success"
+              ? "bg-green-50 text-green-800"
+              : feedback.type === "error"
+              ? "bg-red-50 text-red-800"
+              : "bg-gray-50 text-gray-700"
+          }`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
+    </form>
   );
 }

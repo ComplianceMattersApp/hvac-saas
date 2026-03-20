@@ -648,35 +648,32 @@ export async function CalendarView(props: Props) {
   const banner = bannerMessage(props.banner);
   const selectedJobId = String(props.job ?? '').trim();
 
-  // Month jobs projection
+  // Month jobs projection (from canonical scheduled jobs)
   let jobsForRange: DispatchJob[] = [];
   if (uiView === 'month') {
-    // Collect all jobs scheduled in the visible month
+    // Use all scheduled jobs in the visible month
     const anchor = data.anchorDate;
     const anchorDate = new Date(anchor);
     const month = anchorDate.getMonth();
     const year = anchorDate.getFullYear();
-    // Combine day and week jobs for full coverage
-    const allJobs = [
-      ...data.day.jobs,
-      ...data.week.days.flatMap((d) => d.jobs),
-    ];
-    jobsForRange = allJobs.filter((job) => {
-      if (!job.scheduled_date) return false;
-      const jobDate = new Date(job.scheduled_date);
-      return jobDate.getMonth() === month && jobDate.getFullYear() === year;
-    });
+    jobsForRange = data.week.days
+      .flatMap((d) => d.jobs)
+      .filter((job) => {
+        if (!job.scheduled_date) return false;
+        const jobDate = new Date(job.scheduled_date);
+        return jobDate.getMonth() === month && jobDate.getFullYear() === year;
+      });
   } else if (data.mode === 'day') {
     jobsForRange = data.day.jobs;
   } else {
     jobsForRange = data.week.days.flatMap((day) => day.jobs);
   }
 
-  const canonicalDispatchJobsForRange = jobsForRange.filter((job) => isDispatchVisibleForLayout(job));
-
+  // No more ad hoc filtering; use canonical scheduled jobs only
+  const canonicalDispatchJobsForRange = jobsForRange;
   const canonicalDispatchJobsByDay = data.week.days.map((day) => ({
     date: day.date,
-    jobs: day.jobs.filter((job) => isDispatchVisibleForLayout(job)),
+    jobs: day.jobs,
   }));
 
   const selectedJob =
@@ -698,7 +695,7 @@ export async function CalendarView(props: Props) {
     headerLabel = `Week view ${formatBusinessDateUS(data.week.startDate)} - ${formatBusinessDateUS(data.week.endDate)}`;
   }
 
-  // Unscheduled lane source: always show true unscheduled jobs
+  // Unscheduled lane source: always show canonical unscheduled jobs
   const unscheduledJobs = data.unassignedScheduledJobs;
 
   return (
