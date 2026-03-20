@@ -132,9 +132,10 @@ function parseMinutes(value?: string | null): number | null {
 
 function isDispatchVisibleForLayout(job: DispatchJob) {
   const ops = String(job.ops_status ?? '').toLowerCase();
+  // Business rule: scheduled jobs should appear if they have scheduled_date and window_start
   if (!job.scheduled_date || !job.window_start) return false;
-  if (!Array.isArray(job.assignments) || job.assignments.length === 0) return false;
   if (ops === 'on_hold') return false;
+  // Remove assignment requirement for grid inclusion
   return true;
 }
 

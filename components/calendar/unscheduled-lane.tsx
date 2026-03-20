@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import SubmitButton from "@/components/SubmitButton";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 type UnscheduledJob = {
   id: string;
@@ -30,7 +30,11 @@ type Props = {
 
 export default function UnscheduledLane({ jobs, onSchedule }: Props) {
   const router = useRouter();
+  // Filter jobs to only those truly unscheduled by business rule
   const [items, setItems] = useState<UnscheduledJob[]>(jobs);
+  useEffect(() => {
+  setItems(jobs);
+}, [jobs]);
   const [openJobId, setOpenJobId] = useState<string | null>(null);
   const [scheduledDate, setScheduledDate] = useState("");
   const [windowStart, setWindowStart] = useState("");
