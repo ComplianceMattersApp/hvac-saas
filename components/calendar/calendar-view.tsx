@@ -699,23 +699,23 @@ export async function CalendarView(props: Props) {
   const unscheduledJobs = data.unassignedScheduledJobs;
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="space-y-6 pb-8">
       {banner ? (
-        <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">{banner}</div>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-base text-emerald-900 mb-4">{banner}</div>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 pb-5">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Dispatch Workspace</h2>
-          <p className="mt-1 text-xs text-slate-600">{headerLabel}</p>
+          <h2 className="text-2xl font-bold text-gray-900">Dispatch Workspace</h2>
+          <p className="mt-2 text-sm text-gray-500 font-medium">{headerLabel}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center rounded bg-slate-100 p-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex items-center rounded-xl bg-gray-100 p-2">
             {(['day', 'week', 'month', 'list'] as CalendarUIView[]).map((viewValue) => (
               <Link
                 key={viewValue}
                 href={buildCalendarHref(viewValue, data.anchorDate)}
-                className={`rounded px-3 py-1.5 text-sm font-medium ${uiView === viewValue ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-200'}`}
+                className={`rounded-lg px-4 py-2 text-base font-semibold ${uiView === viewValue ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'}`}
               >
                 {viewValue.charAt(0).toUpperCase() + viewValue.slice(1)}
               </Link>
@@ -757,7 +757,7 @@ export async function CalendarView(props: Props) {
             <section className="overflow-x-auto">
               <CalendarMonthGrid
                 monthDate={data.anchorDate}
-                jobs={jobsForRange}
+                jobs={canonicalDispatchJobsByDay.flatMap((day) => day.jobs)}
               />
             </section>
           ) : mode === 'day' ? (
