@@ -54,6 +54,7 @@ type CreateJobInput = {
   billing_city?: string | null;
   billing_state?: string | null;
   billing_zip?: string | null;
+  meta?: Record<string, any> | null;
   
   };
 
@@ -3263,6 +3264,7 @@ export async function createJob(input: CreateJobInput): Promise<{ id: string; se
     billing_city: input.billing_city ?? null,
     billing_state: input.billing_state ?? null,
     billing_zip: input.billing_zip ?? null,
+    meta: input.meta ?? {},
   };
 
   const { data, error } = await supabase
@@ -3366,6 +3368,8 @@ const permit_date = jobType === "service" ? null : (permitDateRaw || null);
 const permit_number = jobType === "service" ? null : (permitNumberRaw || null);
 
 const status = String(formData.get("status") || "open").trim() as JobStatus;
+const submissionIdRaw = String(formData.get("submission_id") || "").trim();
+const submissionId = submissionIdRaw ? submissionIdRaw.slice(0, 120) : null;
 
 // ----- supabase + identity -----
 const supabase = await createClient();
@@ -3403,6 +3407,78 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     defaultWriteClient: supabase,
     contractorId: isContractorUser ? contractorIdFinal : null,
   });
+
+  const idempotencyMeta = submissionId ? { submission_id: submissionId } : null;
+
+  function redirectToCreatedJob(jobId: string) {
+    if (isContractorUser) {
+      redirect(`/portal/jobs/${jobId}`);
+    }
+
+    redirect(`/jobs/${jobId}`);
+  }
+
+  async function findExistingJobBySubmissionId() {
+    if (!submissionId) return null;
+
+    let query = canonicalWriteClient
+      .from("jobs")
+      .select("id")
+      .contains("meta", { submission_id: submissionId })
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (contractorIdFinal) {
+      query = query.eq("contractor_id", contractorIdFinal);
+    } else {
+      query = query.is("contractor_id", null);
+    }
+
+    const { data, error } = await query.maybeSingle();
+    if (error) throw error;
+    return data?.id ? String(data.id) : null;
+  }
+
+  async function findRecentDuplicateJob(params: {
+    customerId: string;
+    locationId: string;
+  }) {
+    let query = canonicalWriteClient
+      .from("jobs")
+      .select("id")
+      .eq("customer_id", params.customerId)
+      .eq("location_id", params.locationId)
+      .eq("job_type", jobType)
+      .gte("created_at", new Date(Date.now() - 10_000).toISOString())
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (contractorIdFinal) {
+      query = query.eq("contractor_id", contractorIdFinal);
+    } else {
+      query = query.is("contractor_id", null);
+    }
+
+    const { data, error } = await query.maybeSingle();
+    if (error) throw error;
+    return data?.id ? String(data.id) : null;
+  }
+
+  async function findExistingIntakeDuplicate(params: {
+    customerId: string;
+    locationId: string;
+  }) {
+    const bySubmissionId = await findExistingJobBySubmissionId();
+    if (bySubmissionId) return bySubmissionId;
+    return findRecentDuplicateJob(params);
+  }
+
+  const earlyDuplicateId = await findExistingJobBySubmissionId();
+  if (earlyDuplicateId) {
+    redirectToCreatedJob(earlyDuplicateId);
+  }
 
 
   // ----- billing defaults based on FINAL contractor id -----
@@ -3777,6 +3853,14 @@ function canContractorWriteEvent(event_type: string) {
 }
   // ---- Branch 1: existing customer + existing location ----
   if (existingCustomerId && existingLocationId) {
+    const existingDuplicateId = await findExistingIntakeDuplicate({
+      customerId: existingCustomerId,
+      locationId: existingLocationId,
+    });
+    if (existingDuplicateId) {
+      redirectToCreatedJob(existingDuplicateId);
+    }
+
     const created = await createJob({
       job_type: jobType,
       project_type: projectType,
@@ -3811,6 +3895,7 @@ function canContractorWriteEvent(event_type: string) {
       billing_city,
       billing_state,
       billing_zip,
+      meta: idempotencyMeta,
     });
 
  await postCreate(created.id, "customer");
@@ -3852,7 +3937,16 @@ if (existingCustomerId && !existingLocationId) {
     locationIdToUse = location.id;
   }
 
+  const existingDuplicateId = await findExistingIntakeDuplicate({
+    customerId: existingCustomerId,
+    locationId: locationIdToUse,
+  });
+  if (existingDuplicateId) {
+    redirectToCreatedJob(existingDuplicateId);
+  }
+
   const created = await createJob({
+    meta: idempotencyMeta,
     job_type: jobType,
     project_type: projectType,
     job_address: jobAddressRaw || null,
@@ -3926,7 +4020,16 @@ if (reusableLocation?.id) {
   locationIdToUse = location.id;
 }
 
+const existingDuplicateId = await findExistingIntakeDuplicate({
+  customerId,
+  locationId: locationIdToUse,
+});
+if (existingDuplicateId) {
+  redirectToCreatedJob(existingDuplicateId);
+}
+
 const created = await createJob({
+  meta: idempotencyMeta,
   job_type: jobType,
   project_type: projectType,
   job_address: jobAddressRaw || null,

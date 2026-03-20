@@ -9,6 +9,7 @@ import {
   type ContractorIssue,
 } from "@/lib/portal/resolveContractorIssues";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { isPortalVisibleJob } from "@/lib/visibility/portal";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -63,6 +64,7 @@ export default async function PortalAllJobsPage() {
       id,
       title,
       status,
+      lifecycle_state,
       ops_status,
       permit_number,
       pending_info_reason,
@@ -89,7 +91,7 @@ export default async function PortalAllJobsPage() {
 
   if (baseJobsErr) throw baseJobsErr;
 
-  const jobs = (baseJobs ?? []) as any[];
+  const jobs = ((baseJobs ?? []) as any[]).filter(isPortalVisibleJob);
   const openRetestChildByParentId = new Map<string, any>();
   for (const candidate of jobs) {
     const parentId = String(candidate.parent_job_id ?? "").trim();

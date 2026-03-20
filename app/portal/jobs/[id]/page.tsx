@@ -14,6 +14,7 @@ import {
   resolveContractorIssues,
 } from "@/lib/portal/resolveContractorIssues";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { isPortalVisibleJob } from "@/lib/visibility/portal";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -188,7 +189,7 @@ export default async function PortalJobDetailPage({
     .from("jobs")
     .select(
       `
-      id, title, status, ops_status, city, job_address, location_id,
+      id, title, status, lifecycle_state, ops_status, city, job_address, location_id,
       customer_id, customer_first_name, customer_last_name, customer_phone,
       created_at, follow_up_date, scheduled_date, window_start, window_end,
       permit_number, jurisdiction, permit_date, pending_info_reason, next_action_note,
@@ -203,6 +204,9 @@ export default async function PortalJobDetailPage({
 
   if (jobErr) throw jobErr;
   if (!job) notFound();
+  if (!isPortalVisibleJob(job as any)) {
+    redirect("/portal/jobs?banner=job_no_longer_active");
+  }
 
   const rootJobId = (job as any)?.parent_job_id ?? jobId;
 

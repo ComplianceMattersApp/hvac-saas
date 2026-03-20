@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { createJobFromForm } from "@/lib/actions";
 import JobCoreFields from "@/components/jobs/JobCoreFields";
 
@@ -180,6 +180,8 @@ const [billingRecipient, setBillingRecipient] = useState<
 
   // Optional equipment
   const [systems, setSystems] = useState<EquipmentSystem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submissionIdRef = useRef<HTMLInputElement | null>(null);
 
   const isNewLocation = isExistingCustomer && locationId === "__new__";
 
@@ -359,6 +361,24 @@ const [billingRecipient, setBillingRecipient] = useState<
     );
   }
 
+  function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    if (isSubmitting) {
+      event.preventDefault();
+      return;
+    }
+
+    const nextSubmissionId =
+      typeof globalThis.crypto?.randomUUID === "function"
+        ? globalThis.crypto.randomUUID()
+        : uid();
+
+    if (submissionIdRef.current) {
+      submissionIdRef.current.value = nextSubmissionId;
+    }
+
+    setIsSubmitting(true);
+  }
+
   return (
     <div className="p-6 max-w-lg">
       <h1 className="text-xl font-semibold mb-2">New Job</h1>
@@ -388,7 +408,8 @@ const [billingRecipient, setBillingRecipient] = useState<
         </div>
       )}
 
-      <form action={createJobFromForm} className="space-y-4">
+      <form action={createJobFromForm} className="space-y-4" onSubmit={handleFormSubmit}>
+        <input ref={submissionIdRef} type="hidden" name="submission_id" defaultValue="" />
         {/* Identity-tied contractor */}
         {myContractor?.id ? (
           <>
@@ -902,6 +923,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             type="button"
             className="border rounded px-3 py-2 text-sm"
             onClick={saveDraft}
+            disabled={isSubmitting}
           >
             Save Draft
           </button>
@@ -909,7 +931,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           <button
             type="submit"
             className={`rounded px-3 py-2 text-sm text-white ${canSubmit ? "bg-black" : "bg-gray-400 cursor-not-allowed"}`}
-            disabled={!canSubmit}
+            disabled={!canSubmit || isSubmitting}
             onClick={() => {
               // If submit succeeds, server will redirect away. We can safely clear draft on click.
               try {
@@ -917,7 +939,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               } catch {}
             }}
           >
-            Create Job
+            {isSubmitting ? "Creating Job..." : "Create Job"}
           </button>
         </div>
       </form>
