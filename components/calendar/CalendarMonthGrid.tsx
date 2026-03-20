@@ -71,19 +71,38 @@ export default function CalendarMonthGrid({ monthDate, jobs }: CalendarMonthGrid
             <div className="flex flex-col gap-1">
               {dayJobs.slice(0, maxJobsPerCell).map((job) => {
                 const needsTech = job.scheduled_date && (!job.assignments || job.assignments.length === 0);
+                // Status color mapping
+                const statusColor =
+                  job.status === 'scheduled' ? 'bg-gray-400'
+                  : job.status === 'on_my_way' ? 'bg-blue-500'
+                  : job.status === 'in_progress' ? 'bg-indigo-600'
+                  : job.status === 'field_complete' ? 'bg-amber-500'
+                  : job.status === 'closed' ? 'bg-green-600'
+                  : 'bg-gray-300';
+                const faded = job.status === 'closed' ? 'opacity-50' : '';
+                const primaryLine = job.job_address || shortTitle(job);
                 return (
                   <Link
                     key={job.id}
                     href={`/calendar?view=month&date=${monthDate}&job=${job.id}`}
-                    className="group flex items-center gap-2 truncate rounded-md bg-gray-100 px-2 py-1 text-xs font-medium hover:bg-gray-200 border border-gray-200 min-h-[32px]"
-                    title={job.title || job.id}
+                    className={`
+                      group flex items-start gap-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 px-2 py-1 text-xs shadow-sm min-h-[32px] ${faded}
+                    `}
+                    title={`${job.job_address || ''} — ${job.title || ''}`}
                   >
-                    <Badge variant={statusColors[job.status ?? 'pending'] || 'default'} className="mr-1 text-[10px] px-1 py-0.5">
-                      {job.status ? job.status.replace(/_/g, ' ') : 'pending'}
-                    </Badge>
-                    <span className="truncate text-gray-900">{shortTitle(job)}</span>
+                    <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${statusColor}`} />
+                    <div className="flex flex-col truncate">
+                      <span className="truncate text-slate-900 font-medium">
+                        {primaryLine}
+                      </span>
+                      <span className="truncate text-[10px] text-slate-500">
+                        {job.job_type || job.title}
+                      </span>
+                    </div>
                     {needsTech && (
-                      <span className="ml-1 inline-block rounded bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200 opacity-80">Needs Tech</span>
+                      <span className="ml-auto shrink-0 inline-block rounded bg-amber-100 px-1 py-0.5 text-[9px] font-semibold text-amber-800 border border-amber-200">
+                        Needs Tech
+                      </span>
                     )}
                   </Link>
                 );
