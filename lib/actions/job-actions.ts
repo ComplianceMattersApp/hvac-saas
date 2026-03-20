@@ -3412,20 +3412,47 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     redirect(`/jobs/${jobId}`);
   }
 
+  const DUPLICATE_SUBMISSION_WINDOW_MS = 45_000;
+
+  function normalizeDuplicateField(value: string | null | undefined) {
+    return String(value ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+  }
+
+  function sameDuplicateField(left: string | null | undefined, right: string | null | undefined) {
+    return normalizeDuplicateField(left) === normalizeDuplicateField(right);
+  }
+
   async function findRecentDuplicateJob(params: {
     customerId: string;
     locationId: string;
+    city?: string | null;
+    title?: string | null;
+    scheduledDate?: string | null;
+    windowStart?: string | null;
+    windowEnd?: string | null;
+    permitNumber?: string | null;
+    jobAddress?: string | null;
   }) {
+    const compareServiceTitle =
+      jobType === "service" || normalizeDuplicateField(params.title).length > 0;
+    const comparePermitNumber = normalizeDuplicateField(params.permitNumber).length > 0;
+    const compareJobAddress = normalizeDuplicateField(params.jobAddress).length > 0;
+
     let query = canonicalWriteClient
       .from("jobs")
-      .select("id")
+      .select(
+        "id, title, city, scheduled_date, window_start, window_end, permit_number, job_address"
+      )
       .eq("customer_id", params.customerId)
       .eq("location_id", params.locationId)
       .eq("job_type", jobType)
-      .gte("created_at", new Date(Date.now() - 10_000).toISOString())
+      .gte("created_at", new Date(Date.now() - DUPLICATE_SUBMISSION_WINDOW_MS).toISOString())
       .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1);
+      .order("created_at", { ascending: true })
+      .limit(5);
 
     if (contractorIdFinal) {
       query = query.eq("contractor_id", contractorIdFinal);
@@ -3433,14 +3460,47 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
       query = query.is("contractor_id", null);
     }
 
-    const { data, error } = await query.maybeSingle();
+    const { data, error } = await query;
     if (error) throw error;
-    return data?.id ? String(data.id) : null;
+
+    const match = (data ?? []).find((candidate: {
+      id?: string | null;
+      title?: string | null;
+      city?: string | null;
+      scheduled_date?: string | null;
+      window_start?: string | null;
+      window_end?: string | null;
+      permit_number?: string | null;
+      job_address?: string | null;
+    }) => {
+      if (!sameDuplicateField(candidate.city, params.city)) return false;
+      if (!sameDuplicateField(candidate.scheduled_date, params.scheduledDate)) return false;
+      if (!sameDuplicateField(candidate.window_start, params.windowStart)) return false;
+      if (!sameDuplicateField(candidate.window_end, params.windowEnd)) return false;
+      if (compareServiceTitle && !sameDuplicateField(candidate.title, params.title)) return false;
+      if (comparePermitNumber && !sameDuplicateField(candidate.permit_number, params.permitNumber)) {
+        return false;
+      }
+      if (compareJobAddress && !sameDuplicateField(candidate.job_address, params.jobAddress)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return match?.id ? String(match.id) : null;
   }
 
   async function findExistingIntakeDuplicate(params: {
     customerId: string;
     locationId: string;
+    city?: string | null;
+    title?: string | null;
+    scheduledDate?: string | null;
+    windowStart?: string | null;
+    windowEnd?: string | null;
+    permitNumber?: string | null;
+    jobAddress?: string | null;
   }) {
     return findRecentDuplicateJob(params);
   }
@@ -3832,6 +3892,13 @@ function canContractorWriteEvent(event_type: string) {
     const existingDuplicateId = await findExistingIntakeDuplicate({
       customerId: existingCustomerId,
       locationId: existingLocationId,
+      city,
+      title: titleFinal,
+      scheduledDate: scheduled_date,
+      windowStart: window_start,
+      windowEnd: window_end,
+      permitNumber: permit_number,
+      jobAddress: jobAddressRaw || null,
     });
     if (existingDuplicateId) {
       redirectToCreatedJob(existingDuplicateId);
@@ -3916,6 +3983,13 @@ if (existingCustomerId && !existingLocationId) {
   const existingDuplicateId = await findExistingIntakeDuplicate({
     customerId: existingCustomerId,
     locationId: locationIdToUse,
+    city,
+    title: titleFinal,
+    scheduledDate: scheduled_date,
+    windowStart: window_start,
+    windowEnd: window_end,
+    permitNumber: permit_number,
+    jobAddress: jobAddressRaw || null,
   });
   if (existingDuplicateId) {
     redirectToCreatedJob(existingDuplicateId);
@@ -3999,6 +4073,13 @@ if (reusableLocation?.id) {
 const existingDuplicateId = await findExistingIntakeDuplicate({
   customerId,
   locationId: locationIdToUse,
+  city,
+  title: titleFinal,
+  scheduledDate: scheduled_date,
+  windowStart: window_start,
+  windowEnd: window_end,
+  permitNumber: permit_number,
+  jobAddress: jobAddressRaw || null,
 });
 if (existingDuplicateId) {
   redirectToCreatedJob(existingDuplicateId);

@@ -398,7 +398,7 @@ const [billingRecipient, setBillingRecipient] = useState<
         </div>
       )}
 
-      <form action={createJobFromForm} className="space-y-4" onSubmit={handleFormSubmit}>
+      <form action={createJobFromForm} className="space-y-4" onSubmit={handleFormSubmit} aria-busy={isSubmitting}>
         {/* Identity-tied contractor */}
         {myContractor?.id ? (
           <>
@@ -910,12 +910,17 @@ const [billingRecipient, setBillingRecipient] = useState<
           </div>
         )}
 
+        <div className="sr-only" aria-live="polite">
+          {isSubmitting ? "Creating job. Please wait." : ""}
+        </div>
+
         <div className="flex gap-2">
           <button
             type="button"
             className="border rounded px-3 py-2 text-sm"
             onClick={saveDraft}
             disabled={isSubmitting}
+            aria-disabled={isSubmitting}
           >
             Save Draft
           </button>
@@ -924,6 +929,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             type="submit"
             className={`rounded px-3 py-2 text-sm text-white ${canSubmit ? "bg-black" : "bg-gray-400 cursor-not-allowed"}`}
             disabled={!canSubmit || isSubmitting}
+            aria-disabled={!canSubmit || isSubmitting}
             onClick={() => {
               // If submit succeeds, server will redirect away. We can safely clear draft on click.
               try {
