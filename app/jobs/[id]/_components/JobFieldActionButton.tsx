@@ -51,7 +51,7 @@ export function JobFieldActionButton({
 
   return (
     <form
-      className="w-full sm:w-auto"
+      className="min-w-[9.5rem] flex-1 sm:w-auto sm:min-w-0 sm:flex-none"
       action={advanceJobStatusFromForm}
       onSubmit={(e) => {
         const needsScheduleConfirm = currentStatus === "open" && !hasFullSchedule;

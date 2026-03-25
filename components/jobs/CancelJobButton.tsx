@@ -6,7 +6,7 @@ export default function CancelJobButton({ jobId }: { jobId: string }) {
   return (
     <form
       action={cancelJobFromForm}
-      className="w-full sm:w-auto"
+      className="min-w-[9.5rem] flex-1 sm:w-auto sm:min-w-0 sm:flex-none"
       onSubmit={(e) => {
         if (!window.confirm("Cancel this job? This action cannot be undone.")) {
           e.preventDefault();

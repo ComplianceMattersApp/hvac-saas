@@ -1655,7 +1655,7 @@ const renderTimelineItem = (e: any, key: string) => {
       <div className="mt-4 mb-6 flex flex-col gap-0 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
 
         {/* Tabs */}
-        <div className="flex flex-wrap gap-2 pb-3 lg:pb-0">
+        <div className="flex w-full flex-wrap gap-2 pb-3 lg:w-auto lg:pb-0">
           <Link
             href={`/jobs/${job.id}?tab=info`}
             className={`inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium transition ${
@@ -1691,7 +1691,7 @@ const renderTimelineItem = (e: any, key: string) => {
         </div>
 
         {/* Field Workflow */}
-        <div className="flex w-full flex-col gap-2 border-t border-gray-200 pt-3 sm:flex-row sm:items-center lg:w-auto lg:border-t-0 lg:pt-0">
+        <div className="flex w-full flex-wrap items-stretch gap-2 border-t border-gray-200 pt-3 lg:w-auto lg:border-t-0 lg:pt-0">
           {!isFieldComplete ? (
             <JobFieldActionButton
               jobId={job.id}
