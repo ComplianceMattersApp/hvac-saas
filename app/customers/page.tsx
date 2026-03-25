@@ -91,17 +91,18 @@ export default async function CustomersPage(props: {
         <div className="text-sm">No matches for “{q}”.</div>
       ) : (
         <div className="grid gap-3">
-          {results.map((r) => (
-            <Link
-              key={r.customer_id}
-              href={`/customers/${r.customer_id}`}
-              className="block rounded-lg border p-4 hover:bg-muted/50"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="font-medium">
-                    {r.full_name ?? "Unnamed Customer"}
-                  </div>
+          {results.map((r) => {
+            const displayName = String(r.full_name ?? "").trim() || "Unnamed Customer";
+
+            return (
+              <Link
+                key={r.customer_id}
+                href={`/customers/${r.customer_id}`}
+                className="block rounded-lg border p-4 hover:bg-muted/50"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="font-medium">{displayName}</div>
                   <div className="text-sm text-muted-foreground">
                     {r.phone ?? "No phone"} {r.email ? `• ${r.email}` : ""}
                   </div>
@@ -124,8 +125,9 @@ export default async function CustomersPage(props: {
                   {r.locations_count === 1 ? "" : "s"}
                 </div>
               </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

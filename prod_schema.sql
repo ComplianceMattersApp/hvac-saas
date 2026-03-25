@@ -834,7 +834,10 @@ CREATE FUNCTION public.search_customers(search_text text, result_limit integer D
   matches as (
     select
       c.id as customer_id,
-      c.full_name,
+            coalesce(
+                nullif(trim(coalesce(c.full_name, '')), ''),
+                nullif(trim(concat_ws(' ', nullif(trim(coalesce(c.first_name, '')), ''), nullif(trim(coalesce(c.last_name, '')), ''))), '')
+            ) as full_name,
       c.phone,
       c.email,
       l.id as location_id,
@@ -847,7 +850,10 @@ CREATE FUNCTION public.search_customers(search_text text, result_limit integer D
     where
       q.s <> ''
       and (
-        c.full_name ilike '%' || q.s || '%'
+                coalesce(
+                    nullif(trim(coalesce(c.full_name, '')), ''),
+                    nullif(trim(concat_ws(' ', nullif(trim(coalesce(c.first_name, '')), ''), nullif(trim(coalesce(c.last_name, '')), ''))), '')
+                ) ilike '%' || q.s || '%'
         or (q.digits <> '' and regexp_replace(coalesce(c.phone,''), '\D', '', 'g') like '%' || q.digits || '%')
         or l.address_line1 ilike '%' || q.s || '%'
         or l.city ilike '%' || q.s || '%'
