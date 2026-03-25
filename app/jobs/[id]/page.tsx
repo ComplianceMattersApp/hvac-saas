@@ -1652,10 +1652,10 @@ const renderTimelineItem = (e: any, key: string) => {
     })() : null}
 
       {/* Control Bar: Tabs + Field Workflow */}
-      <div className="mt-4 mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mt-4 mb-6 flex flex-col gap-0 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
 
         {/* Tabs */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 pb-3 lg:pb-0">
           <Link
             href={`/jobs/${job.id}?tab=info`}
             className={`inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium transition ${
@@ -1691,7 +1691,7 @@ const renderTimelineItem = (e: any, key: string) => {
         </div>
 
         {/* Field Workflow */}
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:w-auto">
+        <div className="flex w-full flex-col gap-2 border-t border-gray-200 pt-3 sm:flex-row sm:items-center lg:w-auto lg:border-t-0 lg:pt-0">
           {!isFieldComplete ? (
             <JobFieldActionButton
               jobId={job.id}
@@ -1700,7 +1700,7 @@ const renderTimelineItem = (e: any, key: string) => {
               hasFullSchedule={hasFullSchedule}
             />
           ) : (
-            <span className="w-full min-h-10 inline-flex items-center justify-center rounded-md border border-green-600 bg-green-600 px-4 text-sm font-semibold text-white shadow-sm sm:w-auto">
+            <span className="w-full min-h-10 inline-flex items-center justify-center whitespace-nowrap rounded-md border border-green-600 bg-green-600 px-4 text-sm font-semibold text-white shadow-sm sm:w-auto">
               ✓ Field Complete
             </span>
           )}

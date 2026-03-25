@@ -17,6 +17,7 @@ export default function CancelJobButton({ jobId }: { jobId: string }) {
       <button
         type="submit"
         className="w-full min-h-10 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 px-4 text-sm font-medium text-red-600 hover:bg-red-100 sm:w-auto"
+          className="w-full min-h-10 inline-flex items-center justify-center whitespace-nowrap rounded-md border border-red-200 bg-red-50 px-4 text-sm font-medium text-red-600 hover:bg-red-100 sm:w-auto"
       >
         📋 Cancel Job
       </button>
