@@ -66,7 +66,7 @@ export default async function RootLayout({
           {user ? (
             <>
               {/* Top Bar */}
-              <header className="sticky top-0 z-50 border-b bg-white px-4 py-3 sm:px-6 print:hidden">
+              <header className="fixed top-0 inset-x-0 z-50 border-b bg-white px-4 py-3 sm:px-6 print:hidden">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-center gap-2.5">
                     <Link
@@ -112,7 +112,7 @@ export default async function RootLayout({
           ) : null}
 
           {/* Main Content */}
-          <main className="flex-1 p-6 print:p-0">
+          <main className="flex-1 p-6 pt-28 lg:pt-16 print:p-0">
             {children}
           </main>
 

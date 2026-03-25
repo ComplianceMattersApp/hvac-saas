@@ -25,18 +25,9 @@ export default async function ContractorsPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Contractors</h1>
-          <p className="text-sm text-gray-600">Manage contractor accounts (Phase 1: basics).</p>
-        </div>
-
-        <Link
-          href="/contractors/new"
-          className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-900"
-        >
-          + New Contractor
-        </Link>
+      <div>
+        <h1 className="text-xl font-semibold">Contractors</h1>
+        <p className="text-sm text-gray-600">Manage contractor accounts (Phase 1: basics).</p>
       </div>
 
       <div className="rounded-lg border bg-white">
