@@ -40,6 +40,15 @@ function getEffectiveResultLabel(t: any) {
   return "Not computed";
 }
 
+function getEffectiveResultState(run: any): "pass" | "fail" | "unknown" {
+  if (!run) return "unknown";
+  if (run.override_pass === true) return "pass";
+  if (run.override_pass === false) return "fail";
+  if (run.computed_pass === true) return "pass";
+  if (run.computed_pass === false) return "fail";
+  return "unknown";
+}
+
 function getPrimaryEquipment(systemEquipment: any[]) {
   return (
     systemEquipment.find((eq) => eq.component_type?.startsWith("package")) ??
@@ -352,6 +361,7 @@ export default async function JobTestsPage({
       `
       id,
       title,
+      parent_job_id,
       job_address,
       city,
       job_type,
@@ -477,6 +487,70 @@ export default async function JobTestsPage({
       ? String(systems[0].id)
       : "";
 
+  const selectedSystemMeta = systems.find(
+    (sys: any) => String(sys.id) === String(selectedSystemId)
+  );
+  const selectedSystemName = selectedSystemMeta?.name ?? "Selected system";
+
+  const parentJobId = String((job as any)?.parent_job_id ?? "").trim();
+  const isRetestChild = Boolean(parentJobId);
+
+  const parentJob = isRetestChild
+    ? (
+        await supabase
+          .from("jobs")
+          .select(
+            `
+            id,
+            title,
+            job_systems (
+              id,
+              name,
+              created_at
+            ),
+            ecc_test_runs (
+              id,
+              test_type,
+              system_id,
+              equipment_id,
+              system_key,
+              data,
+              computed,
+              computed_pass,
+              override_pass,
+              override_reason,
+              created_at,
+              updated_at,
+              is_completed,
+              visit_id
+            )
+          `
+          )
+          .eq("id", parentJobId)
+          .maybeSingle()
+      ).data
+    : null;
+
+  const parentSystems = (parentJob?.job_systems ?? []) as any[];
+  const parentSystemIdByName = new Map<string, string>();
+  for (const parentSystem of parentSystems) {
+    const key = canonicalId(parentSystem?.name);
+    const value = String(parentSystem?.id ?? "").trim();
+    if (!key || !value || parentSystemIdByName.has(key)) continue;
+    parentSystemIdByName.set(key, value);
+  }
+
+  const matchedParentSystemId = parentSystemIdByName.get(canonicalId(selectedSystemName)) ?? "";
+
+  const pickParentRunForSelectedSystem = (testType: EccTestType) => {
+    if (!parentJob || !matchedParentSystemId) return null;
+    return pickLatestRunForSystem(parentJob, testType, matchedParentSystemId);
+  };
+
+  const parentRunDL = pickParentRunForSelectedSystem("duct_leakage");
+  const parentRunAF = pickParentRunForSelectedSystem("airflow");
+  const parentRunRC = pickParentRunForSelectedSystem("refrigerant_charge");
+
   const runDL = selectedSystemId ? pickRunForSystem(job, "duct_leakage", selectedSystemId) : null;
   const runAF = selectedSystemId ? pickRunForSystem(job, "airflow", selectedSystemId) : null;
   const runRC = selectedSystemId ? pickRunForSystem(job, "refrigerant_charge", selectedSystemId) : null;
@@ -510,9 +584,27 @@ export default async function JobTestsPage({
   const scenarioNotes = scenarioResult.notes;
   const isPlanDrivenNewConstruction = scenarioCode === "new_construction_plan_driven";
 
-     const requiredTests = suggestedTests
-   .filter((t) => t.required)
+  const baselineRequiredTests = suggestedTests
+    .filter((t) => t.required)
     .map((t) => t.testType);
+
+  const parentRequiredOutcomes = new Map<EccTestType, "pass" | "fail" | "unknown">();
+  for (const testType of baselineRequiredTests) {
+    const parentRun = pickParentRunForSelectedSystem(testType as EccTestType);
+    parentRequiredOutcomes.set(testType as EccTestType, getEffectiveResultState(parentRun));
+  }
+
+  const carriedForwardPassedTypes = isRetestChild
+    ? baselineRequiredTests.filter(
+        (testType) => parentRequiredOutcomes.get(testType as EccTestType) === "pass"
+      )
+    : [];
+
+  const requiredTests = isRetestChild
+    ? baselineRequiredTests.filter(
+        (testType) => parentRequiredOutcomes.get(testType as EccTestType) !== "pass"
+      )
+    : baselineRequiredTests;
 
   const systemRunTestTypes = selectedSystemId
     ? Array.from(
@@ -526,7 +618,7 @@ export default async function JobTestsPage({
     : [];
 
   const visibleTestTypes = Array.from(
-    new Set([...(requiredTests as string[]), ...systemRunTestTypes])
+    new Set([...(requiredTests as string[]), ...systemRunTestTypes, ...carriedForwardPassedTypes])
   ) as EccTestType[];
 
   const focusedCustomTestType =
@@ -563,8 +655,16 @@ const defaultSystemTonnage =
     ? fallbackTonnageEquipment.tonnage
     : "";
 
-  const selectedSystemName =
-    systems.find((sys: any) => String(sys.id) === String(selectedSystemId))?.name ?? "Selected system";
+  const carriedForwardDL = !runDL && carriedForwardPassedTypes.includes("duct_leakage");
+  const carriedForwardAF = !runAF && carriedForwardPassedTypes.includes("airflow");
+  const carriedForwardRC = !runRC && carriedForwardPassedTypes.includes("refrigerant_charge");
+
+  const parentFailedComparisonRows = (baselineRequiredTests as EccTestType[])
+    .map((testType) => ({
+      testType,
+      run: pickParentRunForSelectedSystem(testType),
+    }))
+    .filter((row) => getEffectiveResultState(row.run) === "fail");
 
   const equipmentReferenceItems = selectedSystemEquipment
     .slice()
@@ -1038,6 +1138,9 @@ const defaultSystemTonnage =
               <div className="grid gap-2">
                 {visibleTestTypes.map((testType: EccTestType) => {
   const status = getRequiredTestStatusForSystem(job, selectedSystemId, testType);
+  const parentRun = pickParentRunForSelectedSystem(testType);
+  const parentOutcome = getEffectiveResultState(parentRun);
+  const carriedForward = isRetestChild && !status.run && parentOutcome === "pass";
   const testHref = `/jobs/${job.id}/tests?s=${selectedSystemId}&t=${testType}`;
   const isRequired = requiredTests.includes(testType);
 
@@ -1049,7 +1152,11 @@ const defaultSystemTonnage =
       <div className="min-w-0">
         <div className="font-medium">
           {getTestDisplayLabel(testType, packageSystem)}
-          {isRequired ? (
+          {carriedForward ? (
+            <span className="ml-2 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+              Carried Forward
+            </span>
+          ) : isRequired ? (
             <span className="ml-2 rounded-full border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-600">
               Required
             </span>
@@ -1060,7 +1167,9 @@ const defaultSystemTonnage =
           )}
         </div>
         <div className="text-xs text-muted-foreground">
-          {status.state === "required"
+          {carriedForward
+            ? "Passed on parent visit; no retest entry required"
+            : status.state === "required"
             ? "Required test is not started yet"
             : status.state === "open"
             ? "Run opened and ready for readings"
@@ -1079,14 +1188,18 @@ const defaultSystemTonnage =
       </div>
 
       <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-        {status.state === "required" ? (
-            <form action={addEccTestRunFromForm}>
+        {carriedForward ? (
+          <span className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+            No retest needed
+          </span>
+        ) : status.state === "required" ? (
+          <form action={addEccTestRunFromForm}>
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="system_id" value={selectedSystemId} />
             <input type="hidden" name="test_type" value={testType} />
-              <SubmitButton loadingText="Starting..." className="rounded-md border px-3 py-1.5 text-xs font-medium bg-white hover:bg-gray-50">
+            <SubmitButton loadingText="Starting..." className="rounded-md border px-3 py-1.5 text-xs font-medium bg-white hover:bg-gray-50">
               Start Test
-              </SubmitButton>
+            </SubmitButton>
           </form>
         ) : (
           <Link
@@ -1098,9 +1211,11 @@ const defaultSystemTonnage =
         )}
 
         <div
-          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status.tone}`}
+          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+            carriedForward ? "border-emerald-200 bg-emerald-50 text-emerald-700" : status.tone
+          }`}
         >
-          {status.label}
+          {carriedForward ? "Pass (parent)" : status.label}
         </div>
       </div>
     </div>
@@ -1108,6 +1223,24 @@ const defaultSystemTonnage =
 })}
               </div>
             )}
+
+            {isRetestChild && parentFailedComparisonRows.length > 0 ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-3 space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-red-800">Parent Failed Results (Read-only)</div>
+                {parentFailedComparisonRows.map((row) => (
+                  <div key={`parent-failed-${row.testType}`} className="rounded-md border border-red-200 bg-white px-3 py-2 text-xs text-slate-700">
+                    <div className="font-medium text-slate-900">{getTestDisplayLabel(row.testType, packageSystem)}</div>
+                    <div>Result on parent: {getEffectiveResultLabel(row.run)}</div>
+                    <div>
+                      Updated: {row.run?.updated_at ? new Date(row.run.updated_at).toLocaleString() : "—"}
+                    </div>
+                    {row.run?.data?.notes ? (
+                      <div className="break-words">Notes: {String(row.run.data.notes)}</div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             {scenarioNotes.length > 0 ? (
               <div className="grid gap-2 pt-1">
@@ -1305,7 +1438,12 @@ const defaultSystemTonnage =
               <div>
                 <div className="font-medium">Duct Leakage</div>
                 <div className="mt-1 text-sm">
-                  <span className="font-medium">Result:</span> {runDL ? getEffectiveResultLabel(runDL) : "Not started"}
+                  <span className="font-medium">Result:</span>{" "}
+                  {runDL
+                    ? getEffectiveResultLabel(runDL)
+                    : carriedForwardDL
+                    ? `PASS (carried from parent${parentRunDL ? ` · ${getEffectiveResultLabel(parentRunDL)}` : ""})`
+                    : "Not started"}
                 </div>
               </div>
               <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
@@ -1320,15 +1458,25 @@ const defaultSystemTonnage =
             </div>
 
             {!runDL ? (
-              <form action={addEccTestRunFromForm} className="flex items-center gap-2">
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="system_id" value={selectedSystemId} />
-                <input type="hidden" name="test_type" value="duct_leakage" />
-                                
-                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
-                  Create Duct Leakage Run
-                </SubmitButton>
-              </form>
+              carriedForwardDL ? (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
+                  <div className="font-medium">Passed on parent visit; carried forward.</div>
+                  <div className="mt-1 text-xs text-emerald-700">
+                    Parent result: {getEffectiveResultLabel(parentRunDL)}
+                    {parentRunDL?.updated_at ? ` · Updated ${new Date(parentRunDL.updated_at).toLocaleString()}` : ""}
+                  </div>
+                </div>
+              ) : (
+                <form action={addEccTestRunFromForm} className="flex items-center gap-2">
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+                  <input type="hidden" name="test_type" value="duct_leakage" />
+
+                  <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                    Create Duct Leakage Run
+                  </SubmitButton>
+                </form>
+              )
             ) : (
               <>
                 <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
@@ -1518,7 +1666,12 @@ const defaultSystemTonnage =
               <div>
                 <div className="font-medium">Airflow</div>
                 <div className="mt-1 text-sm">
-                  <span className="font-medium">Result:</span> {runAF ? getEffectiveResultLabel(runAF) : "Not started"}
+                  <span className="font-medium">Result:</span>{" "}
+                  {runAF
+                    ? getEffectiveResultLabel(runAF)
+                    : carriedForwardAF
+                    ? `PASS (carried from parent${parentRunAF ? ` · ${getEffectiveResultLabel(parentRunAF)}` : ""})`
+                    : "Not started"}
                 </div>
               </div>
               <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
@@ -1533,14 +1686,24 @@ const defaultSystemTonnage =
             </div>
 
             {!runAF ? (
-              <form action={addEccTestRunFromForm} className="flex items-center gap-2">
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="system_id" value={selectedSystemId} />
-                <input type="hidden" name="test_type" value="airflow" />
-                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
-                  Create Airflow Run
-                </SubmitButton>
-              </form>
+              carriedForwardAF ? (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
+                  <div className="font-medium">Passed on parent visit; carried forward.</div>
+                  <div className="mt-1 text-xs text-emerald-700">
+                    Parent result: {getEffectiveResultLabel(parentRunAF)}
+                    {parentRunAF?.updated_at ? ` · Updated ${new Date(parentRunAF.updated_at).toLocaleString()}` : ""}
+                  </div>
+                </div>
+              ) : (
+                <form action={addEccTestRunFromForm} className="flex items-center gap-2">
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+                  <input type="hidden" name="test_type" value="airflow" />
+                  <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                    Create Airflow Run
+                  </SubmitButton>
+                </form>
+              )
             ) : (
               <>
               <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
@@ -1675,7 +1838,12 @@ const defaultSystemTonnage =
               <div>
                 <div className="font-medium">Refrigerant Charge</div>
                 <div className="mt-1 text-sm">
-                  <span className="font-medium">Result:</span> {runRC ? getEffectiveResultLabel(runRC) : "Not started"}
+                  <span className="font-medium">Result:</span>{" "}
+                  {runRC
+                    ? getEffectiveResultLabel(runRC)
+                    : carriedForwardRC
+                    ? `PASS (carried from parent${parentRunRC ? ` · ${getEffectiveResultLabel(parentRunRC)}` : ""})`
+                    : "Not started"}
                 </div>
               </div>
               <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
@@ -1690,14 +1858,24 @@ const defaultSystemTonnage =
             </div>
 
             {!runRC ? (
-              <form action={addEccTestRunFromForm} className="flex items-center gap-2">
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="system_id" value={selectedSystemId} />
-                <input type="hidden" name="test_type" value="refrigerant_charge" />
-                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
-                  Create Refrigerant Charge Run
-                </SubmitButton>
-              </form>
+              carriedForwardRC ? (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
+                  <div className="font-medium">Passed on parent visit; carried forward.</div>
+                  <div className="mt-1 text-xs text-emerald-700">
+                    Parent result: {getEffectiveResultLabel(parentRunRC)}
+                    {parentRunRC?.updated_at ? ` · Updated ${new Date(parentRunRC.updated_at).toLocaleString()}` : ""}
+                  </div>
+                </div>
+              ) : (
+                <form action={addEccTestRunFromForm} className="flex items-center gap-2">
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+                  <input type="hidden" name="test_type" value="refrigerant_charge" />
+                  <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                    Create Refrigerant Charge Run
+                  </SubmitButton>
+                </form>
+              )
             ) : (
               <>
                 <div className="text-sm font-semibold text-slate-900">Required Inputs</div>

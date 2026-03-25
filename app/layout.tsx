@@ -66,7 +66,7 @@ export default async function RootLayout({
           {user ? (
             <>
               {/* Top Bar */}
-              <header className="border-b bg-white px-4 py-3 sm:px-6 print:hidden">
+              <header className="sticky top-0 z-50 border-b bg-white px-4 py-3 sm:px-6 print:hidden">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-center gap-2.5">
                     <Link
@@ -90,14 +90,6 @@ export default async function RootLayout({
                     >
                       + New Job
                     </Link>
-                    {!isContractor && (
-                      <Link
-                        href="/contractors/new"
-                        className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
-                      >
-                        + New Contractor
-                      </Link>
-                    )}
                     <Link
                       href="/calendar"
                       className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
@@ -110,7 +102,7 @@ export default async function RootLayout({
                     >
                       Search Customers
                     </Link>
-                    <div className="ml-1 sm:ml-2">
+                    <div className="ml-1 flex items-center border-l border-slate-200 pl-3 sm:ml-2">
                       <LogoutButton />
                     </div>
                   </div>
