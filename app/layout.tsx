@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import LogoutButton from "@/components/auth/LogoutButton";
 import { getInternalUser } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
 
@@ -82,7 +83,7 @@ export default async function RootLayout({
                     </Link>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">
                     <Link
                       href="/jobs/new"
                       className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 sm:px-4 sm:py-2 sm:text-sm"
@@ -101,6 +102,21 @@ export default async function RootLayout({
                     >
                       Search Customers
                     </Link>
+
+                    <details className="relative ml-auto">
+                      <summary className="list-none rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-slate-50 text-[10px] font-semibold text-slate-700">
+                            A
+                          </span>
+                          Account
+                        </span>
+                      </summary>
+
+                      <div className="absolute right-0 z-50 mt-2 min-w-36 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                        <LogoutButton />
+                      </div>
+                    </details>
                   </div>
                 </div>
               </header>
