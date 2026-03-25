@@ -56,6 +56,18 @@ export default async function RootLayout({
     }
   }
 
+  const userMetadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
+  const preferredName = [
+    userMetadata.first_name,
+    userMetadata.given_name,
+    userMetadata.name,
+    userMetadata.full_name,
+  ]
+    .map((v) => String(v ?? "").trim())
+    .find(Boolean);
+  const accountFirstName = preferredName ? preferredName.split(/\s+/)[0] : "";
+  const accountLabel = accountFirstName || "Account";
+
   return (
     <html lang="en">
       <body
@@ -67,8 +79,8 @@ export default async function RootLayout({
             <>
               {/* Top Bar */}
               <header className="fixed top-0 inset-x-0 z-50 border-b bg-white px-4 py-3 sm:px-6 print:hidden">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex items-center gap-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex items-center gap-2.5">
                     <Link
                       href={homeHref}
                       className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
@@ -77,13 +89,36 @@ export default async function RootLayout({
                     </Link>
                     <Link
                       href={homeHref}
-                      className="text-sm font-semibold text-slate-900 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                      className="truncate text-sm font-semibold text-slate-900 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                     >
                       Compliance Matters
                     </Link>
                   </div>
 
-                  <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">
+                  <details className="relative shrink-0">
+                    <summary className="list-none rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-slate-300 bg-slate-50 px-1 text-[10px] font-semibold text-slate-700">
+                          {accountFirstName ? accountFirstName.slice(0, 1).toUpperCase() : "A"}
+                        </span>
+                        {accountLabel}
+                      </span>
+                    </summary>
+
+                    <div className="absolute right-0 z-50 mt-2 min-w-44 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                      <Link
+                        href="/account"
+                        className="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                      >
+                        Profile
+                      </Link>
+                      <div className="my-1 border-t border-slate-100" />
+                      <LogoutButton className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900" />
+                    </div>
+                  </details>
+                </div>
+
+                <div className="mt-3 hidden flex-wrap items-center gap-2 sm:flex">
                     <Link
                       href="/jobs/new"
                       className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 sm:px-4 sm:py-2 sm:text-sm"
@@ -102,22 +137,6 @@ export default async function RootLayout({
                     >
                       Search Customers
                     </Link>
-
-                    <details className="relative ml-auto">
-                      <summary className="list-none rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-slate-50 text-[10px] font-semibold text-slate-700">
-                            A
-                          </span>
-                          Account
-                        </span>
-                      </summary>
-
-                      <div className="absolute right-0 z-50 mt-2 min-w-36 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
-                        <LogoutButton />
-                      </div>
-                    </details>
-                  </div>
                 </div>
               </header>
             </>
