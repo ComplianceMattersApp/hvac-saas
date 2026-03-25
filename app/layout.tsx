@@ -120,10 +120,19 @@ export default async function RootLayout({
                         >
                           Search Customers
                         </Link>
+                        <div className="my-1 border-t border-slate-100" />
+                        <Link
+                          href="/account"
+                          className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                        >
+                          Profile
+                        </Link>
+                        <LogoutButton className="w-full rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900" />
                       </div>
                     </details>
 
-                    <details className="relative shrink-0">
+                    {/* Desktop-only account dropdown */}
+                    <details className="relative shrink-0 hidden sm:block">
                       <summary className="list-none rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm">
                         <span className="inline-flex items-center gap-1.5">
                           <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-slate-300 bg-slate-50 px-1 text-[10px] font-semibold text-slate-700">
