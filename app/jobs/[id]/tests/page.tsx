@@ -653,7 +653,7 @@ const defaultSystemTonnage =
   });
 
     return (
-      <div className="p-6 max-w-3xl space-y-4 print:max-w-none print:p-0">
+      <div className="w-full min-w-0 overflow-x-hidden p-6 max-w-3xl space-y-4 print:max-w-none print:p-0">
           {notice === "rc_exempt_reason_required" && (
       <div className="mb-4 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         Select <span className="font-semibold">Package unit</span> or{" "}
@@ -661,14 +661,14 @@ const defaultSystemTonnage =
         refrigerant charge exempt.
       </div>
     )}
-      <div className="flex items-center justify-between gap-3 print:hidden">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between print:hidden">
+        <div className="min-w-0">
           <div className="text-sm text-slate-700">Job Tests</div>
           <h1 className="text-xl font-semibold">{job.title}</h1>
           <div className="text-sm text-slate-700">{job.city ?? "—"}</div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <label htmlFor="completion-report-toggle" className="cursor-pointer px-3 py-2 rounded border text-sm font-medium bg-white hover:bg-gray-50">
             View Completion Report
           </label>
@@ -904,7 +904,7 @@ const defaultSystemTonnage =
 
       </div>
 
-      <section className="rounded-lg border p-4 space-y-4 print:hidden">
+      <section className="min-w-0 rounded-lg border p-4 space-y-4 print:hidden">
         <div>
           <h2 className="text-lg font-semibold">ECC Tests</h2>
           <p className="text-sm text-muted-foreground">
@@ -1044,7 +1044,7 @@ const defaultSystemTonnage =
   return (
     <div
       key={testType}
-      className="flex items-center justify-between rounded-md border px-3 py-2 gap-3"
+      className="flex min-w-0 flex-col gap-3 rounded-md border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="min-w-0">
         <div className="font-medium">
@@ -1078,7 +1078,7 @@ const defaultSystemTonnage =
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
         {status.state === "required" ? (
             <form action={addEccTestRunFromForm}>
             <input type="hidden" name="job_id" value={job.id} />
@@ -1300,15 +1300,15 @@ const defaultSystemTonnage =
             DUCT LEAKAGE
             ========================= */}
         {focusedType === "duct_leakage" ? (
-          <div className="rounded-lg border bg-white p-4 space-y-4">
-            <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium">Duct Leakage</div>
                 <div className="mt-1 text-sm">
                   <span className="font-medium">Result:</span> {runDL ? getEffectiveResultLabel(runDL) : "Not started"}
                 </div>
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
                 {runDL?.updated_at ? new Date(runDL.updated_at).toLocaleString() : null}
               </div>
             </div>
@@ -1456,7 +1456,7 @@ const defaultSystemTonnage =
                   <input type="hidden" name="test_run_id" value={runDL.id} />
                 </form>
 
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 space-y-3">
+                <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 space-y-3">
                   <div className="text-sm font-semibold text-slate-900">Action Sequence</div>
                   <div className="text-xs text-slate-700">
                     1. Save readings, 2. Save override (optional), 3. Complete test.
@@ -1513,15 +1513,15 @@ const defaultSystemTonnage =
             AIRFLOW
             ========================= */}
         {focusedType === "airflow" ? (
-          <div className="rounded-lg border bg-white p-4 space-y-4">
-            <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium">Airflow</div>
                 <div className="mt-1 text-sm">
                   <span className="font-medium">Result:</span> {runAF ? getEffectiveResultLabel(runAF) : "Not started"}
                 </div>
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
                 {runAF?.updated_at ? new Date(runAF.updated_at).toLocaleString() : null}
               </div>
             </div>
@@ -1670,15 +1670,15 @@ const defaultSystemTonnage =
             REFRIGERANT CHARGE
             ========================= */}
         {focusedType === "refrigerant_charge" ? (
-          <div className="rounded-lg border bg-white p-4 space-y-4">
-            <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium">Refrigerant Charge</div>
                 <div className="mt-1 text-sm">
                   <span className="font-medium">Result:</span> {runRC ? getEffectiveResultLabel(runRC) : "Not started"}
                 </div>
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
                 {runRC?.updated_at ? new Date(runRC.updated_at).toLocaleString() : null}
               </div>
             </div>

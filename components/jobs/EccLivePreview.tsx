@@ -88,10 +88,10 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
         }
 
         setContent(
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          <div className="min-h-[96px] rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
             <div className="flex items-center justify-between gap-2">
               <div className="font-semibold text-slate-900">Live Preview (unsaved)</div>
-              <div className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusClasses(tone)}`}>
+              <div className={`min-w-[120px] rounded-full border px-2 py-0.5 text-center text-xs font-medium ${statusClasses(tone)}`}>
                 {label}
               </div>
             </div>
@@ -127,10 +127,10 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
         }
 
         setContent(
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          <div className="min-h-[96px] rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
             <div className="flex items-center justify-between gap-2">
               <div className="font-semibold text-slate-900">Live Preview (unsaved)</div>
-              <div className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusClasses(tone)}`}>
+              <div className={`min-w-[120px] rounded-full border px-2 py-0.5 text-center text-xs font-medium ${statusClasses(tone)}`}>
                 {label}
               </div>
             </div>
@@ -202,10 +202,10 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
         measuredSuperheat == null ? "pending" : measuredSuperheat < 25 ? "pass" : "fail";
 
       setContent(
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        <div className="min-h-[168px] rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
           <div className="flex items-center justify-between gap-2">
             <div className="font-semibold text-slate-900">Live Preview (unsaved)</div>
-            <div className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusClasses(overallTone)}`}>
+            <div className={`min-w-[120px] rounded-full border px-2 py-0.5 text-center text-xs font-medium ${statusClasses(overallTone)}`}>
               {overallLabel}
             </div>
           </div>

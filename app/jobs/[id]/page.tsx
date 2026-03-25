@@ -1167,7 +1167,7 @@ const renderTimelineItem = (e: any, key: string) => {
 };
 
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="w-full min-w-0 overflow-x-hidden p-6 max-w-3xl">
 
 <div className="mb-4 space-y-2">
   <div>
@@ -1214,16 +1214,16 @@ const renderTimelineItem = (e: any, key: string) => {
       {contractorName && contractorName !== "—" ? ` • Contractor: ${contractorName}` : ""}
     </p>
 
-    <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+    <div className="min-w-0 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
       <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Assigned Team</div>
       {assignedTeam.length > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-2 flex min-w-0 flex-wrap gap-2">
           {assignedTeam.map((assignee) => (
             <div
               key={`${assignee.job_id}-${assignee.user_id}`}
-              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-800"
+              className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-800"
             >
-              <span>{assignee.display_name}</span>
+              <span className="max-w-full break-words">{assignee.display_name}</span>
               {assignee.is_primary ? (
                 <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
                   Primary
@@ -1231,7 +1231,7 @@ const renderTimelineItem = (e: any, key: string) => {
               ) : null}
 
               {isInternalUser && !assignee.is_primary ? (
-                <form action={setPrimaryJobAssigneeFromForm}>
+                <form action={setPrimaryJobAssigneeFromForm} className="shrink-0">
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="user_id" value={assignee.user_id} />
                   <input type="hidden" name="tab" value={tab} />
@@ -1245,7 +1245,7 @@ const renderTimelineItem = (e: any, key: string) => {
               ) : null}
 
               {isInternalUser ? (
-                <form action={removeJobAssigneeFromForm}>
+                <form action={removeJobAssigneeFromForm} className="shrink-0">
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="user_id" value={assignee.user_id} />
                   <input type="hidden" name="tab" value={tab} />
@@ -1265,12 +1265,12 @@ const renderTimelineItem = (e: any, key: string) => {
       )}
 
       {isInternalUser ? (
-        <form action={assignJobAssigneeFromForm} className="mt-3 flex flex-wrap items-center gap-2">
+        <form action={assignJobAssigneeFromForm} className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <input type="hidden" name="job_id" value={job.id} />
           <input type="hidden" name="tab" value={tab} />
           <select
             name="user_id"
-            className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+            className="w-full min-w-0 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 sm:w-auto"
             required
             defaultValue=""
             disabled={assignmentCandidates.length === 0}
@@ -1293,7 +1293,7 @@ const renderTimelineItem = (e: any, key: string) => {
           <button
             type="submit"
             disabled={assignmentCandidates.length === 0}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             Assign
           </button>
@@ -1320,11 +1320,11 @@ const renderTimelineItem = (e: any, key: string) => {
 
       {/* Closeout Actions (Internal Only) */}
     {showCloseoutRow && (
-  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 shadow-sm">
-    <div className="flex items-center justify-between">
+  <div className="mt-3 min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 shadow-sm">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div className="text-sm font-medium text-gray-700">Closeout</div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {/* ECC only: Certs */}
           {canShowCertsButton && (
             <form action={markCertsCompleteFromForm}>
