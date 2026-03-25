@@ -1312,6 +1312,28 @@ const renderTimelineItem = (e: any, key: string) => {
         {formatOpsStatusLabel(job.ops_status)}
       </div>
     </div>
+
+    <section className="mt-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+      <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Field Actions</div>
+      <div className="mt-2 flex w-full flex-wrap items-stretch gap-2">
+        {!isFieldComplete ? (
+          <JobFieldActionButton
+            jobId={job.id}
+            currentStatus={job.status}
+            tab={tab}
+            hasFullSchedule={hasFullSchedule}
+          />
+        ) : (
+          <span className="w-full min-h-10 inline-flex items-center justify-center whitespace-nowrap rounded-md border border-green-600 bg-green-600 px-4 text-sm font-semibold text-white shadow-sm sm:w-auto">
+            ✓ Field Complete
+          </span>
+        )}
+
+        {!["completed", "failed", "cancelled"].includes(job.status) && (
+          <CancelJobButton jobId={job.id} />
+        )}
+      </div>
+    </section>
   </div>
 </div>
       {/* Header */}
@@ -1651,11 +1673,10 @@ const renderTimelineItem = (e: any, key: string) => {
       );
     })() : null}
 
-      {/* Control Bar: Tabs + Field Workflow */}
-      <div className="mt-4 mb-6 flex flex-col gap-0 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
+      {/* Control Bar: Tabs */}
+      <div className="mt-4 mb-6">
 
-        {/* Tabs */}
-        <div className="flex w-full flex-wrap gap-2 pb-3 lg:w-auto lg:pb-0">
+        <div className="flex w-full flex-wrap gap-2">
           <Link
             href={`/jobs/${job.id}?tab=info`}
             className={`inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium transition ${
@@ -1688,26 +1709,6 @@ const renderTimelineItem = (e: any, key: string) => {
           >
             Tests
           </Link>
-        </div>
-
-        {/* Field Workflow */}
-        <div className="flex w-full flex-wrap items-stretch gap-2 border-t border-gray-200 pt-3 lg:w-auto lg:border-t-0 lg:pt-0">
-          {!isFieldComplete ? (
-            <JobFieldActionButton
-              jobId={job.id}
-              currentStatus={job.status}
-              tab={tab}
-              hasFullSchedule={hasFullSchedule}
-            />
-          ) : (
-            <span className="w-full min-h-10 inline-flex items-center justify-center whitespace-nowrap rounded-md border border-green-600 bg-green-600 px-4 text-sm font-semibold text-white shadow-sm sm:w-auto">
-              ✓ Field Complete
-            </span>
-          )}
-          
-          {!["completed", "failed", "cancelled"].includes(job.status) && (
-            <CancelJobButton jobId={job.id} />
-          )}
         </div>
 
       </div>
