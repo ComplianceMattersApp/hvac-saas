@@ -4124,6 +4124,71 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
   return match ?? null;
 }
 
+  async function loadCanonicalJobSnapshot(params: {
+    customerId: string;
+    locationId: string;
+    fallback: {
+      customer_first_name?: string | null;
+      customer_last_name?: string | null;
+      customer_email?: string | null;
+      customer_phone?: string | null;
+      job_address?: string | null;
+      city?: string | null;
+    };
+  }) {
+    const [{ data: customerRow, error: customerErr }, { data: locationRow, error: locationErr }] = await Promise.all([
+      canonicalWriteClient
+        .from("customers")
+        .select("first_name, last_name, email, phone")
+        .eq("id", params.customerId)
+        .maybeSingle(),
+      canonicalWriteClient
+        .from("locations")
+        .select("address_line1, city")
+        .eq("id", params.locationId)
+        .maybeSingle(),
+    ]);
+
+    if (customerErr) throw customerErr;
+    if (locationErr) throw locationErr;
+
+    const customer_first_name =
+      String(customerRow?.first_name ?? "").trim() ||
+      String(params.fallback.customer_first_name ?? "").trim() ||
+      null;
+    const customer_last_name =
+      String(customerRow?.last_name ?? "").trim() ||
+      String(params.fallback.customer_last_name ?? "").trim() ||
+      null;
+    const customer_email =
+      String(customerRow?.email ?? "").trim() ||
+      String(params.fallback.customer_email ?? "").trim() ||
+      null;
+    const customer_phone =
+      String(customerRow?.phone ?? "").trim() ||
+      String(params.fallback.customer_phone ?? "").trim() ||
+      null;
+    const job_address =
+      String(locationRow?.address_line1 ?? "").trim() ||
+      String(params.fallback.job_address ?? "").trim() ||
+      null;
+    const city =
+      String(locationRow?.city ?? "").trim() ||
+      String(params.fallback.city ?? "").trim() ||
+      null;
+
+    if (!city) throw new Error("City is required");
+
+    return {
+      customer_first_name,
+      customer_last_name,
+      customer_email,
+      customer_phone,
+      job_address,
+      city,
+    };
+  }
+
   // ----- equipment payload (optional) + server validation -----
   const equipmentJsonRaw = String(formData.get("equipment_json") || "").trim();
   let equipmentPayload: any = null;
@@ -4396,20 +4461,33 @@ function canContractorWriteEvent(event_type: string) {
       redirectToCreatedJob(existingDuplicateId, "job_already_created");
     }
 
+    const canonicalSnapshot = await loadCanonicalJobSnapshot({
+      customerId: existingCustomerId,
+      locationId: existingLocationId,
+      fallback: {
+        customer_first_name: customerFirstNameSnapshot,
+        customer_last_name: customerLastNameSnapshot,
+        customer_email: customerEmailSnapshot,
+        customer_phone: customerPhoneSnapshot,
+        job_address: jobAddressRaw || null,
+        city,
+      },
+    });
+
     const created = await createJob({
       job_type: jobType,
       project_type: projectType,
-      job_address: jobAddressRaw || null,
+      job_address: canonicalSnapshot.job_address,
       customer_id: existingCustomerId,
       location_id: existingLocationId,
 
-      customer_first_name: customerFirstNameSnapshot,
-      customer_last_name: customerLastNameSnapshot,
-      customer_email: customerEmailSnapshot,
+      customer_first_name: canonicalSnapshot.customer_first_name,
+      customer_last_name: canonicalSnapshot.customer_last_name,
+      customer_email: canonicalSnapshot.customer_email,
       job_notes: jobNotesRaw || null,
 
       title: titleFinal,
-      city,
+      city: canonicalSnapshot.city,
       scheduled_date,
       status,
       contractor_id: contractorIdFinal,
@@ -4418,7 +4496,7 @@ function canContractorWriteEvent(event_type: string) {
       permit_date,
       window_start,
       window_end,
-      customer_phone: customerPhoneSnapshot,
+      customer_phone: canonicalSnapshot.customer_phone,
       ops_status,
 
       billing_recipient: billingRecipientFinal,
@@ -4487,20 +4565,33 @@ if (existingCustomerId && !existingLocationId) {
     redirectToCreatedJob(existingDuplicateId, "job_already_created");
   }
 
+  const canonicalSnapshot = await loadCanonicalJobSnapshot({
+    customerId: existingCustomerId,
+    locationId: locationIdToUse,
+    fallback: {
+      customer_first_name: customerFirstNameSnapshot,
+      customer_last_name: customerLastNameSnapshot,
+      customer_email: customerEmailSnapshot,
+      customer_phone: customerPhoneSnapshot,
+      job_address: jobAddressRaw || null,
+      city,
+    },
+  });
+
   const created = await createJob({
     job_type: jobType,
     project_type: projectType,
-    job_address: jobAddressRaw || null,
+    job_address: canonicalSnapshot.job_address,
     customer_id: existingCustomerId,
     location_id: locationIdToUse,
 
-    customer_first_name: customerFirstNameSnapshot,
-    customer_last_name: customerLastNameSnapshot,
-    customer_email: customerEmailSnapshot,
+    customer_first_name: canonicalSnapshot.customer_first_name,
+    customer_last_name: canonicalSnapshot.customer_last_name,
+    customer_email: canonicalSnapshot.customer_email,
     job_notes: jobNotesRaw || null,
 
     title: titleFinal,
-    city,
+    city: canonicalSnapshot.city,
     scheduled_date,
     status,
     contractor_id: contractorIdFinal,
@@ -4509,7 +4600,7 @@ if (existingCustomerId && !existingLocationId) {
     permit_date,
     window_start,
     window_end,
-    customer_phone: customerPhoneSnapshot,
+    customer_phone: canonicalSnapshot.customer_phone,
     ops_status,
 
     billing_recipient: billingRecipientFinal,
@@ -4577,20 +4668,33 @@ if (existingDuplicateId) {
   redirectToCreatedJob(existingDuplicateId, "job_already_created");
 }
 
+const canonicalSnapshot = await loadCanonicalJobSnapshot({
+  customerId,
+  locationId: locationIdToUse,
+  fallback: {
+    customer_first_name: customerFirstNameRaw || null,
+    customer_last_name: customerLastNameRaw || null,
+    customer_email: customerEmailRaw || null,
+    customer_phone: customerPhoneRaw || null,
+    job_address: jobAddressRaw || null,
+    city,
+  },
+});
+
 const created = await createJob({
   job_type: jobType,
   project_type: projectType,
-  job_address: jobAddressRaw || null,
+  job_address: canonicalSnapshot.job_address,
   customer_id: customerId,
   location_id: locationIdToUse,
 
-  customer_first_name: customerFirstNameRaw || null,
-  customer_last_name: customerLastNameRaw || null,
-  customer_email: customerEmailRaw || null,
+  customer_first_name: canonicalSnapshot.customer_first_name,
+  customer_last_name: canonicalSnapshot.customer_last_name,
+  customer_email: canonicalSnapshot.customer_email,
   job_notes: jobNotesRaw || null,
 
   title: titleFinal,
-  city,
+  city: canonicalSnapshot.city,
   scheduled_date,
   status,
   contractor_id: contractorIdFinal,
@@ -4599,7 +4703,7 @@ const created = await createJob({
   permit_date,
   window_start,
   window_end,
-  customer_phone: customerPhoneRaw ? customerPhoneRaw : null,
+  customer_phone: canonicalSnapshot.customer_phone,
   ops_status,
 
   billing_recipient: billingRecipientFinal,

@@ -16,6 +16,7 @@ export async function findOrCreateCustomer(params: {
 
   const inputFullName = normalizeFullName(firstName ?? "", lastName ?? "");
   const inputPhone10 = normalizePhone10(phone ?? "");
+  const hasInputFullName = Boolean(inputFullName);
   let userId = ownerUserId ?? null;
   if (!userId) {
     const { data: auth } = await supabase.auth.getUser();
@@ -45,10 +46,25 @@ const { data: candidates, error } = await query;
 
     if (error) throw error;
 
-const match = (candidates ?? []).find((c: any) => {
+const normalizedCandidates = (candidates ?? []).filter((c: any) => {
   const cPhone10 = normalizePhone10(c.phone);
   return cPhone10 === inputPhone10;
 });
+
+let match: any = null;
+
+if (hasInputFullName) {
+  match = normalizedCandidates.find((c: any) =>
+    isSameCustomerByNamePhone({
+      inputFullName,
+      inputPhone10,
+      candidate: c,
+    })
+  );
+} else if (normalizedCandidates.length === 1) {
+  // If name is not provided, only reuse when there is a single unambiguous phone match.
+  match = normalizedCandidates[0];
+}
 
     if (match?.id) {
       return { customerId: match.id as string, reused: true };
@@ -61,6 +77,7 @@ const match = (candidates ?? []).find((c: any) => {
     .insert({
       first_name: firstName || null,
       last_name: lastName || null,
+      full_name: inputFullName || null,
       email: email || null,
       phone: phone || null,
       owner_user_id: userId,
