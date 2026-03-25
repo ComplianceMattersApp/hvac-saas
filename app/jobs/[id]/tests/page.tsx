@@ -6,6 +6,7 @@ import { resolveEccScenario } from "@/lib/ecc/scenario-resolver";
 import Link from "next/link";
 import PrintButton from "@/components/ui/PrintButton";
 import SubmitButton from "@/components/SubmitButton";
+import EccLivePreview from "@/components/jobs/EccLivePreview";
 
 import {
   completeEccTestRunFromForm,
@@ -479,6 +480,12 @@ export default async function JobTestsPage({
   const runDL = selectedSystemId ? pickRunForSystem(job, "duct_leakage", selectedSystemId) : null;
   const runAF = selectedSystemId ? pickRunForSystem(job, "airflow", selectedSystemId) : null;
   const runRC = selectedSystemId ? pickRunForSystem(job, "refrigerant_charge", selectedSystemId) : null;
+  const ductSaveFormId = runDL ? `duct-save-${runDL.id}` : "";
+  const ductOverrideFormId = runDL ? `duct-override-${runDL.id}` : "";
+  const ductCompleteFormId = runDL ? `duct-complete-${runDL.id}` : "";
+  const ductDeleteFormId = runDL ? `duct-delete-${runDL.id}` : "";
+  const airflowSaveFormId = runAF ? `airflow-save-${runAF.id}` : "";
+  const rcSaveFormId = runRC ? `rc-save-${runRC.id}` : "";
 
   const normalizedProfile = normalizeProjectTypeToRuleProfile(job.project_type);
   const manualAddTests = getActiveManualAddTests();
@@ -1325,7 +1332,11 @@ const defaultSystemTonnage =
             ) : (
               <>
                 <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
-                <form action={saveDuctLeakageDataFromForm} className="grid gap-3 border-t pt-3">
+                <form
+                  id={ductSaveFormId}
+                  action={saveDuctLeakageDataFromForm}
+                  className="grid gap-3 border-t pt-3"
+                >
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runDL.id} />
@@ -1372,21 +1383,9 @@ const defaultSystemTonnage =
                       />
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <SubmitButton loadingText="Saving..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
-                      Save Duct Leakage
-                    </SubmitButton>
-
-                    <button
-                      type="submit"
-                      formAction={completeEccTestRunFromForm}
-                      className="inline-flex min-h-11 items-center px-3 py-2 rounded border text-sm bg-white hover:bg-gray-50"
-                      disabled={!!runDL.is_completed}
-                    >
-                      {runDL.is_completed ? "Completed ✅" : "Complete Duct Leakage Test"}
-                    </button>
-                  </div>
                 </form>
+
+                <EccLivePreview mode="duct_leakage" formId={ductSaveFormId} projectType={job.project_type} />
 
                 <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
                 <div className="text-sm text-muted-foreground rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
@@ -1401,7 +1400,11 @@ const defaultSystemTonnage =
                 </div>
 
                 <div className="text-sm font-semibold text-slate-900">Override (Optional)</div>
-                <form action={saveEccTestOverrideFromForm} className="grid gap-3 border-t pt-3">
+                <form
+                  id={ductOverrideFormId}
+                  action={saveEccTestOverrideFromForm}
+                  className="grid gap-3 border-t pt-3"
+                >
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runDL.id} />
                     <input type="hidden" name="system_id" value={selectedSystemId} />
@@ -1440,20 +1443,66 @@ const defaultSystemTonnage =
                       />
                     </div>
                   </div>
-
-                  <SubmitButton loadingText="Saving..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
-                    Save Override
-                  </SubmitButton>
                 </form>
 
-{/* DELETE stays separate */}
-<form action={deleteEccTestRunFromForm}>
-  <input type="hidden" name="job_id" value={job.id} />
-  <input type="hidden" name="test_run_id" value={runDL.id} />
-  <button type="submit" className="inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50">
-    Delete
-  </button>
-</form>
+                <form id={ductCompleteFormId} action={completeEccTestRunFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runDL.id} />
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+                </form>
+
+                <form id={ductDeleteFormId} action={deleteEccTestRunFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runDL.id} />
+                </form>
+
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 space-y-3">
+                  <div className="text-sm font-semibold text-slate-900">Action Sequence</div>
+                  <div className="text-xs text-slate-700">
+                    1. Save readings, 2. Save override (optional), 3. Complete test.
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <button
+                      type="submit"
+                      form={ductSaveFormId}
+                      className="inline-flex min-h-11 items-center justify-center rounded-md bg-black px-4 py-2 text-sm text-white hover:brightness-95"
+                    >
+                      1. Save Readings
+                    </button>
+
+                    <button
+                      type="submit"
+                      form={ductOverrideFormId}
+                      className="inline-flex min-h-11 items-center justify-center rounded-md border px-4 py-2 text-sm bg-white hover:bg-gray-50"
+                    >
+                      2. Save Override
+                    </button>
+
+                    <button
+                      type="submit"
+                      form={ductCompleteFormId}
+                      className="inline-flex min-h-11 items-center justify-center rounded-md border px-4 py-2 text-sm bg-white hover:bg-gray-50"
+                      disabled={!!runDL.is_completed}
+                    >
+                      {runDL.is_completed ? "Completed ✅" : "3. Complete Test"}
+                    </button>
+                  </div>
+
+                  <div className="text-xs text-slate-600">
+                    Override save updates only override fields. Saved readings and computed results remain intact until readings are saved again.
+                  </div>
+
+                  <div>
+                    <button
+                      type="submit"
+                      form={ductDeleteFormId}
+                      className="inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
 
               </>
             )}
@@ -1495,7 +1544,11 @@ const defaultSystemTonnage =
             ) : (
               <>
               <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
-              <form action={saveAirflowDataFromForm} className="grid gap-3 border-t pt-3">
+              <form
+                id={airflowSaveFormId}
+                action={saveAirflowDataFromForm}
+                className="grid gap-3 border-t pt-3"
+              >
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="test_run_id" value={runAF.id} />
@@ -1582,6 +1635,8 @@ const defaultSystemTonnage =
                 </SubmitButton>
               </form>
 
+                <EccLivePreview mode="airflow" formId={airflowSaveFormId} projectType={job.project_type} />
+
                 <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
                 <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   <div>Required Total Airflow: {fmtValue(runAF.computed?.required_total_cfm, "CFM")}</div>
@@ -1646,7 +1701,11 @@ const defaultSystemTonnage =
             ) : (
               <>
                 <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
-                <form action={saveRefrigerantChargeDataFromForm} className="grid gap-3 border-t pt-3">
+                <form
+                  id={rcSaveFormId}
+                  action={saveRefrigerantChargeDataFromForm}
+                  className="grid gap-3 border-t pt-3"
+                >
                   {/* ✅ critical: system_id must be included or server redirect can produce &s= */}
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
@@ -1830,6 +1889,8 @@ const defaultSystemTonnage =
                     Save Refrigerant Charge Readings
                   </SubmitButton>
                 </form>
+
+                <EccLivePreview mode="refrigerant_charge" formId={rcSaveFormId} projectType={job.project_type} />
 
                 <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
                 <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">

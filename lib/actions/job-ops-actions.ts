@@ -1,3 +1,7 @@
+// Utility: After On My Way or ops status change, always revalidate job detail page for immediate UI update
+export async function revalidateJobDetail(jobId: string) {
+  revalidatePath(`/jobs/${jobId}`);
+}
 // lib/actions/job-ops-actions
 'use server';
 

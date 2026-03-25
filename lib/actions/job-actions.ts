@@ -1907,26 +1907,25 @@ if (override_pass !== null) {
 
   const supabase = await createClient();
 
+  // Only update override fields, never touch data/computed
   const { data: updated, error } = await supabase
-  .from("ecc_test_runs")
-  .update({
-    override_pass,
-    override_reason,
-    updated_at: new Date().toISOString(),
-  })
-  .eq("id", testRunId)
-  .eq("job_id", jobId)
-  .select("id, job_id, test_type, override_pass, override_reason")
-  .maybeSingle();
+    .from("ecc_test_runs")
+    .update({
+      override_pass,
+      override_reason,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId)
+    .select("id, job_id, test_type, override_pass, override_reason")
+    .maybeSingle();
 
-if (error) throw error;
-
-// 🔎 Force visibility if nothing matched
-if (!updated?.id) {
-  throw new Error(
-    `Override update matched 0 rows. job_id=${jobId} test_run_id=${testRunId}`
-  );
-}
+  if (error) throw error;
+  if (!updated?.id) {
+    throw new Error(
+      `Override update matched 0 rows. job_id=${jobId} test_run_id=${testRunId}`
+    );
+  }
 
     await evaluateEccOpsStatus(jobId);
     revalidatePath(`/jobs/${jobId}`);
@@ -4253,8 +4252,12 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       actorUserId: actingUserId,
     });
 
+    // Patch: Also set ops_status to 'on_the_way' for immediate UI update
+    // This is safe because: 'on_the_way' is a transient, field-driven state, not set by other workflows, and is not ECC-specific.
+    // Only applies to this transition; does not affect ECC completion or other status flows.
     const updatePayload: Record<string, any> = {
       status: "on_the_way",
+      ops_status: "on_the_way",
       on_the_way_at: now.toISOString(),
     };
 
@@ -5198,11 +5201,9 @@ export async function createRetestJobFromForm(formData: FormData) {
  */
 export async function cancelJobFromForm(formData: FormData) {
   "use server";
-  const id =
-    String(formData.get("id") || "").trim() ||
-    String(formData.get("job_id") || "").trim();
-
-  if (!id) throw new Error("Job ID is required");
+  // Only accept job_id for safety
+  const id = String(formData.get("job_id") || "").trim();
+  if (!id) throw new Error("Job ID is required (job_id missing)");
 
   const supabase = await createClient();
   const { data: { user }, error: userErr } = await supabase.auth.getUser();
