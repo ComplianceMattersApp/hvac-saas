@@ -16,6 +16,9 @@ import {
   saveAirflowDataFromForm,
   saveRefrigerantChargeDataFromForm,
   saveEccTestOverrideFromForm,
+  saveAndCompleteDuctLeakageFromForm,
+  saveAndCompleteAirflowFromForm,
+  saveAndCompleteRefrigerantChargeFromForm,
 } from "@/lib/actions/job-actions";
 
 import {
@@ -556,7 +559,6 @@ export default async function JobTestsPage({
   const runRC = selectedSystemId ? pickRunForSystem(job, "refrigerant_charge", selectedSystemId) : null;
   const ductSaveFormId = runDL ? `duct-save-${runDL.id}` : "";
   const ductOverrideFormId = runDL ? `duct-override-${runDL.id}` : "";
-  const ductCompleteFormId = runDL ? `duct-complete-${runDL.id}` : "";
   const ductDeleteFormId = runDL ? `duct-delete-${runDL.id}` : "";
   const airflowSaveFormId = runAF ? `airflow-save-${runAF.id}` : "";
   const rcSaveFormId = runRC ? `rc-save-${runRC.id}` : "";
@@ -1482,7 +1484,7 @@ const defaultSystemTonnage =
                 <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
                 <form
                   id={ductSaveFormId}
-                  action={saveDuctLeakageDataFromForm}
+                  action={saveAndCompleteDuctLeakageFromForm}
                   className="grid gap-3 border-t pt-3"
                 >
                   <input type="hidden" name="system_id" value={selectedSystemId} />
@@ -1593,63 +1595,22 @@ const defaultSystemTonnage =
                   </div>
                 </form>
 
-                <form id={ductCompleteFormId} action={completeEccTestRunFromForm}>
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <input type="hidden" name="test_run_id" value={runDL.id} />
-                  <input type="hidden" name="system_id" value={selectedSystemId} />
-                </form>
-
                 <form id={ductDeleteFormId} action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runDL.id} />
                 </form>
 
-                <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 space-y-3">
-                  <div className="text-sm font-semibold text-slate-900">Action Sequence</div>
-                  <div className="text-xs text-slate-700">
-                    1. Save readings, 2. Save override (optional), 3. Complete test.
-                  </div>
-
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <button
-                      type="submit"
-                      form={ductSaveFormId}
-                      className="inline-flex min-h-11 items-center justify-center rounded-md bg-black px-4 py-2 text-sm text-white hover:brightness-95"
-                    >
-                      1. Save Readings
-                    </button>
-
-                    <button
-                      type="submit"
-                      form={ductOverrideFormId}
-                      className="inline-flex min-h-11 items-center justify-center rounded-md border px-4 py-2 text-sm bg-white hover:bg-gray-50"
-                    >
-                      2. Save Override
-                    </button>
-
-                    <button
-                      type="submit"
-                      form={ductCompleteFormId}
-                      className="inline-flex min-h-11 items-center justify-center rounded-md border px-4 py-2 text-sm bg-white hover:bg-gray-50"
-                      disabled={!!runDL.is_completed}
-                    >
-                      {runDL.is_completed ? "Completed ✅" : "3. Complete Test"}
-                    </button>
-                  </div>
-
-                  <div className="text-xs text-slate-600">
-                    Override save updates only override fields. Saved readings and computed results remain intact until readings are saved again.
-                  </div>
-
-                  <div>
-                    <button
-                      type="submit"
-                      form={ductDeleteFormId}
-                      className="inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
-                    >
-                      Delete
-                    </button>
-                  </div>
+                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                  <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
+                    {runDL.is_completed && "✅ Test completed"}
+                  </span>
+                  <button
+                    type="submit"
+                    form={ductDeleteFormId}
+                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                  >
+                    Delete
+                  </button>
                 </div>
 
               </>
@@ -1709,7 +1670,7 @@ const defaultSystemTonnage =
               <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
               <form
                 id={airflowSaveFormId}
-                action={saveAirflowDataFromForm}
+                action={saveAndCompleteAirflowFromForm}
                 className="grid gap-3 border-t pt-3"
               >
                 <input type="hidden" name="system_id" value={selectedSystemId} />
@@ -1793,8 +1754,8 @@ const defaultSystemTonnage =
                   </div>
                 </div>
 
-                <SubmitButton loadingText="Saving..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
-                  Save Airflow
+                <SubmitButton loadingText="Saving & completing..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
+                  Save & Complete Test
                 </SubmitButton>
               </form>
 
@@ -1806,20 +1767,14 @@ const defaultSystemTonnage =
                   <div>Measured Total Airflow: {fmtValue(runAF.data?.measured_total_cfm, "CFM")}</div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 items-center">
-                  <form action={completeEccTestRunFromForm}>
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <input type="hidden" name="test_run_id" value={runAF.id} />
-                    <input type="hidden" name="system_id" value={selectedSystemId} />
-                    <button type="submit" className="inline-flex min-h-11 items-center px-3 py-2 rounded border text-sm bg-white hover:bg-gray-50" disabled={!!runAF.is_completed}>
-                      {runAF.is_completed ? "Completed ✅" : "Complete Airflow Test"}
-                    </button>
-                  </form>
-
+                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                  <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
+                    {runAF.is_completed && "✅ Test completed"}
+                  </span>
                   <form action={deleteEccTestRunFromForm}>
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runAF.id} />
-                    <button type="submit" className="inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50">
+                    <button type="submit" className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50">
                       Delete
                     </button>
                   </form>
@@ -1881,7 +1836,7 @@ const defaultSystemTonnage =
                 <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
                 <form
                   id={rcSaveFormId}
-                  action={saveRefrigerantChargeDataFromForm}
+                  action={saveAndCompleteRefrigerantChargeFromForm}
                   className="grid gap-3 border-t pt-3"
                 >
                   {/* ✅ critical: system_id must be included or server redirect can produce &s= */}
@@ -2063,8 +2018,8 @@ const defaultSystemTonnage =
                     </div>
                   </div>
 
-                  <SubmitButton loadingText="Saving..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
-                    Save Refrigerant Charge Readings
+                  <SubmitButton loadingText="Saving & completing..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
+                    Save & Complete Test
                   </SubmitButton>
                 </form>
 
@@ -2120,20 +2075,14 @@ const defaultSystemTonnage =
   </div>
 </form>
 
-                <div className="flex flex-wrap gap-2 items-center">
-                  <form action={completeEccTestRunFromForm}>
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <input type="hidden" name="test_run_id" value={runRC.id} />
-                    <input type="hidden" name="system_id" value={selectedSystemId} />
-                    <button type="submit" className="inline-flex min-h-11 items-center px-3 py-2 rounded border text-sm bg-white hover:bg-gray-50" disabled={!!runRC.is_completed}>
-                      {runRC.is_completed ? "Completed ✅" : "Complete Refrigerant Charge Test"}
-                    </button>
-                  </form>
-
+                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                  <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
+                    {runRC.is_completed && "✅ Test completed"}
+                  </span>
                   <form action={deleteEccTestRunFromForm}>
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runRC.id} />
-                    <button type="submit" className="inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50">
+                    <button type="submit" className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50">
                       Delete
                     </button>
                   </form>

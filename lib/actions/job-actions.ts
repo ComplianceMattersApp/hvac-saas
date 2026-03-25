@@ -3125,6 +3125,492 @@ if (parentJobId) {
   redirectToTests({ jobId, testType: run.test_type, systemId });
 }
 
+/** =========================
+ * SAVE & COMPLETE: DUCT LEAKAGE (Combined)
+ * - saves readings + completes in one action
+ * - sets is_completed = true
+ * ========================= */
+export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+  const projectType = String(formData.get("project_type") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  const num = (key: string) => {
+    const raw = String(formData.get(key) || "").trim();
+    if (!raw) return null;
+    const val = Number(raw);
+    return Number.isFinite(val) ? val : null;
+  };
+
+  const measuredLeakageCfm = num("measured_duct_leakage_cfm");
+  const tonnage = num("tonnage");
+
+  const normalizedProjectType = projectType.toLowerCase();
+  const leakagePercentAllowed =
+    normalizedProjectType === "all_new" ||
+    normalizedProjectType === "allnew" ||
+    normalizedProjectType === "new" ||
+    normalizedProjectType === "new_construction" ||
+    normalizedProjectType === "new_prescriptive"
+      ? 0.05
+      : normalizedProjectType === "alteration"
+      ? 0.10
+      : null;
+
+  const baseAirflowCfm = tonnage != null ? tonnage * 400 : null;
+  const maxLeakageCfm =
+    baseAirflowCfm != null && leakagePercentAllowed != null
+      ? baseAirflowCfm * leakagePercentAllowed
+      : null;
+
+  const failures: string[] = [];
+  const warnings: string[] = [];
+
+  if (tonnage == null) warnings.push("Missing tonnage");
+  if (measuredLeakageCfm == null) warnings.push("Missing measured duct leakage");
+  if (leakagePercentAllowed == null) warnings.push("No leakage rule profile found for project type");
+
+  let computedPass: boolean | null = null;
+
+  if (measuredLeakageCfm != null && maxLeakageCfm != null) {
+    computedPass = measuredLeakageCfm <= maxLeakageCfm;
+    if (computedPass === false) {
+      failures.push(`Duct leakage above max (${maxLeakageCfm} CFM)`);
+    }
+  } else {
+    computedPass = null;
+  }
+
+  const data = {
+    measured_duct_leakage_cfm: measuredLeakageCfm,
+    tonnage,
+    notes: String(formData.get("notes") || "").trim() || null,
+  };
+
+  const computed = {
+    base_airflow_cfm: baseAirflowCfm,
+    leakage_percent_allowed: leakagePercentAllowed,
+    leakage_percent_allowed_display:
+      leakagePercentAllowed != null ? leakagePercentAllowed * 100 : null,
+    max_leakage_cfm: maxLeakageCfm,
+    measured_duct_leakage_cfm: measuredLeakageCfm,
+    failures,
+    warnings,
+  };
+
+  const supabase = await createClient();
+
+  // Get system_id and visit_id
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  let visitId: string | null = null;
+  const { data: run } = await supabase
+    .from("ecc_test_runs")
+    .select("visit_id")
+    .eq("id", testRunId)
+    .eq("job_id", jobId)
+    .single();
+
+  if (run?.visit_id) {
+    visitId = run.visit_id;
+  } else {
+    const { data: v } = await supabase
+      .from("job_visits")
+      .select("id")
+      .eq("job_id", jobId)
+      .order("visit_number", { ascending: true })
+      .limit(1)
+      .single();
+    visitId = v?.id ?? null;
+  }
+
+  // Save data + mark completed
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data,
+      computed,
+      computed_pass: computedPass,
+      updated_at: new Date().toISOString(),
+      is_completed: true,
+      visit_id: visitId,
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  await evaluateEccOpsStatus(jobId);
+  revalidatePath(`/jobs/${jobId}/tests`);
+  revalidatePath(`/jobs/${jobId}`);
+  redirectToTests({ jobId, testType: "duct_leakage", systemId });
+}
+
+/** =========================
+ * SAVE & COMPLETE: AIRFLOW (Combined)
+ * - saves readings + completes in one action
+ * - sets is_completed = true
+ * ========================= */
+export async function saveAndCompleteAirflowFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+  const projectType = String(formData.get("project_type") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  const num = (key: string) => {
+    const raw = String(formData.get(key) || "").trim();
+    if (!raw) return null;
+    const val = Number(raw);
+    return Number.isFinite(val) ? val : null;
+  };
+
+  const measuredTotalCfm = num("measured_total_cfm");
+  const tonnage = num("tonnage");
+
+  const cfmPerTon = projectType === "all_new" ? 350 : 300;
+  const requiredTotalCfm = tonnage != null ? tonnage * cfmPerTon : null;
+
+  const failures: string[] = [];
+  const warnings: string[] = [];
+
+  if (tonnage == null) warnings.push("Missing tonnage");
+  if (measuredTotalCfm == null) warnings.push("Missing measured total airflow");
+
+  let computedPass: boolean | null = null;
+
+  if (measuredTotalCfm != null && requiredTotalCfm != null) {
+    computedPass = measuredTotalCfm < requiredTotalCfm ? false : true;
+    if (computedPass === false) {
+      failures.push(`Airflow below required (${requiredTotalCfm} CFM)`);
+    }
+  } else {
+    computedPass = null;
+  }
+
+  const airflowOverridePass = String(formData.get("airflow_override_pass") || "").trim() === "true";
+  const airflowOverrideReason = String(formData.get("airflow_override_reason") || "").trim();
+
+  if (airflowOverridePass && !airflowOverrideReason) {
+    throw new Error("Airflow override reason is required when override is enabled.");
+  }
+
+  const data = {
+    measured_total_cfm: measuredTotalCfm,
+    tonnage,
+    cfm_per_ton_required: cfmPerTon,
+    notes: String(formData.get("notes") || "").trim() || null,
+    airflow_override_applied: airflowOverridePass || undefined,
+    airflow_override_reason: airflowOverridePass ? airflowOverrideReason : undefined,
+  };
+
+  const computed = {
+    cfm_per_ton_required: cfmPerTon,
+    required_total_cfm: requiredTotalCfm,
+    measured_total_cfm: measuredTotalCfm,
+    failures,
+    warnings,
+    override_mode: airflowOverridePass ? "pass_override" : null,
+  };
+
+  const supabase = await createClient();
+
+  // Get system_id and visit_id
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  let visitId: string | null = null;
+  const { data: run } = await supabase
+    .from("ecc_test_runs")
+    .select("visit_id")
+    .eq("id", testRunId)
+    .eq("job_id", jobId)
+    .single();
+
+  if (run?.visit_id) {
+    visitId = run.visit_id;
+  } else {
+    const { data: v } = await supabase
+      .from("job_visits")
+      .select("id")
+      .eq("job_id", jobId)
+      .order("visit_number", { ascending: true })
+      .limit(1)
+      .single();
+    visitId = v?.id ?? null;
+  }
+
+  // Save data + mark completed
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data,
+      computed,
+      computed_pass: computedPass,
+      override_pass: airflowOverridePass ? true : null,
+      override_reason: airflowOverridePass ? airflowOverrideReason : null,
+      updated_at: new Date().toISOString(),
+      is_completed: true,
+      visit_id: visitId,
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  await evaluateEccOpsStatus(jobId);
+  revalidatePath(`/jobs/${jobId}/tests`);
+  revalidatePath(`/jobs/${jobId}`);
+  redirectToTests({ jobId, testType: "airflow", systemId });
+}
+
+/** =========================
+ * SAVE & COMPLETE: REFRIGERANT CHARGE (Combined)
+ * - saves readings + completes in one action
+ * - sets is_completed = true
+ * ========================= */
+export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  const num = (key: string) => {
+    const raw = String(formData.get(key) || "").trim();
+    if (!raw) return null;
+    const val = Number(raw);
+    return Number.isFinite(val) ? val : null;
+  };
+
+  const exemptPackageUnit = formData.get("rc_exempt_package_unit") === "on";
+  const exemptConditions = formData.get("rc_exempt_conditions") === "on";
+  const overrideDetails = String(formData.get("rc_override_details") || "").trim() || null;
+
+  const isChargeExempt = exemptPackageUnit || exemptConditions;
+
+  const chargeExemptReason = exemptPackageUnit
+    ? "package_unit"
+    : exemptConditions
+      ? "conditions_not_met"
+      : null;
+
+  const chargeOverrideReasonText = exemptPackageUnit
+    ? "Package unit — charge verification not required"
+    : exemptConditions
+      ? "Conditions not met / weather — charge verification override"
+      : null;
+
+  const fullOverrideReason =
+    isChargeExempt
+      ? (overrideDetails
+          ? `${chargeOverrideReasonText}: ${overrideDetails}`
+          : chargeOverrideReasonText)
+      : null;
+
+  const data = {
+    lowest_return_air_db_f: num("lowest_return_air_db_f"),
+    condenser_air_entering_db_f: num("condenser_air_entering_db_f"),
+    liquid_line_temp_f: num("liquid_line_temp_f"),
+    liquid_line_pressure_psig: num("liquid_line_pressure_psig"),
+    condenser_sat_temp_f: num("condenser_sat_temp_f"),
+    target_subcool_f: num("target_subcool_f"),
+    suction_line_temp_f: num("suction_line_temp_f"),
+    suction_line_pressure_psig: num("suction_line_pressure_psig"),
+    evaporator_sat_temp_f: num("evaporator_sat_temp_f"),
+    outdoor_temp_f: num("outdoor_temp_f"),
+    refrigerant_type: String(formData.get("refrigerant_type") || "").trim() || null,
+    filter_drier_installed: formData.get("filter_drier_installed") === "on",
+    notes: String(formData.get("notes") || "").trim() || null,
+  };
+
+  const measuredSubcool =
+    data.condenser_sat_temp_f != null && data.liquid_line_temp_f != null
+      ? data.condenser_sat_temp_f - data.liquid_line_temp_f
+      : null;
+
+  const measuredSuperheat =
+    data.suction_line_temp_f != null && data.evaporator_sat_temp_f != null
+      ? data.suction_line_temp_f - data.evaporator_sat_temp_f
+      : null;
+
+  const subcoolDelta =
+    measuredSubcool != null && data.target_subcool_f != null
+      ? measuredSubcool - data.target_subcool_f
+      : null;
+
+  const rules = {
+    indoor_min_f: 70,
+    outdoor_min_f: 55,
+    subcool_tolerance_f: 2,
+    superheat_max_f: 25,
+    filter_drier_required: true,
+  };
+
+  const failures: string[] = [];
+  const warnings: string[] = [];
+  const blocked: string[] = [];
+
+  if (data.lowest_return_air_db_f != null && data.lowest_return_air_db_f < rules.indoor_min_f) {
+    blocked.push(`Indoor temp below ${rules.indoor_min_f}F`);
+  } else if (data.lowest_return_air_db_f == null) {
+    warnings.push("Missing lowest return air dry bulb");
+  }
+
+  if (data.outdoor_temp_f != null && data.outdoor_temp_f < rules.outdoor_min_f) {
+    blocked.push(`Outdoor temp below ${rules.outdoor_min_f}F`);
+  } else if (data.outdoor_temp_f == null) {
+    warnings.push("Missing outdoor temp");
+  }
+
+  if (rules.filter_drier_required && !data.filter_drier_installed) {
+    failures.push("Filter drier not confirmed");
+  }
+
+  if (measuredSuperheat != null) {
+    if (measuredSuperheat >= rules.superheat_max_f) {
+      failures.push(`Superheat >= ${rules.superheat_max_f}F`);
+    }
+  } else {
+    warnings.push("Missing superheat inputs");
+  }
+
+  if (data.target_subcool_f == null) {
+    warnings.push("Missing target subcool");
+  }
+  if (measuredSubcool != null && data.target_subcool_f != null) {
+    if (Math.abs(measuredSubcool - data.target_subcool_f) > rules.subcool_tolerance_f) {
+      failures.push(`Subcool not within ±${rules.subcool_tolerance_f}F of target`);
+    }
+  } else {
+    warnings.push("Missing subcool inputs");
+  }
+
+  const hasCoreCompute =
+    measuredSubcool != null &&
+    measuredSuperheat != null &&
+    data.target_subcool_f != null;
+
+  const isBlocked = blocked.length > 0;
+
+  const computedPass = isChargeExempt
+    ? true
+    : isBlocked
+      ? null
+      : hasCoreCompute
+        ? failures.length === 0
+        : null;
+
+  if (isChargeExempt) {
+    warnings.push(
+      exemptPackageUnit
+        ? "Charge verification exempt: package unit"
+        : "Charge verification override: conditions not met"
+    );
+    if (overrideDetails) warnings.push(`Override details: ${overrideDetails}`);
+  }
+
+  const computed = {
+    status: isChargeExempt ? "exempt" : isBlocked ? "blocked" : "computed",
+    blocked: isChargeExempt ? [] : blocked,
+    measured_subcool_f: measuredSubcool,
+    measured_superheat_f: measuredSuperheat,
+    subcool_delta_f: subcoolDelta,
+    rules,
+    failures: isChargeExempt ? [] : failures,
+    warnings,
+  };
+
+  const supabase = await createClient();
+
+  // Get system_id and visit_id
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  let visitId: string | null = null;
+  const { data: run } = await supabase
+    .from("ecc_test_runs")
+    .select("visit_id")
+    .eq("id", testRunId)
+    .eq("job_id", jobId)
+    .single();
+
+  if (run?.visit_id) {
+    visitId = run.visit_id;
+  } else {
+    const { data: v } = await supabase
+      .from("job_visits")
+      .select("id")
+      .eq("job_id", jobId)
+      .order("visit_number", { ascending: true })
+      .limit(1)
+      .single();
+    visitId = v?.id ?? null;
+  }
+
+  // Load existing data so we don't wipe fields
+  const { data: existingRun } = await supabase
+    .from("ecc_test_runs")
+    .select("data")
+    .eq("id", testRunId)
+    .eq("job_id", jobId)
+    .single();
+
+  const existingData = (existingRun?.data ?? {}) as Record<string, any>;
+  const mergedData = { ...existingData, ...data };
+
+  // Save data + mark completed
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data: {
+        ...mergedData,
+        charge_exempt: isChargeExempt || undefined,
+        charge_exempt_reason: chargeExemptReason || undefined,
+        charge_exempt_details: overrideDetails || undefined,
+      },
+      computed,
+      computed_pass: computedPass,
+      override_pass: isChargeExempt ? true : null,
+      override_reason: isChargeExempt ? fullOverrideReason : null,
+      updated_at: new Date().toISOString(),
+      is_completed: true,
+      visit_id: visitId,
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  await evaluateEccOpsStatus(jobId);
+  revalidatePath(`/jobs/${jobId}/tests`);
+  revalidatePath(`/jobs/${jobId}`);
+  redirectToTests({ jobId, testType: "refrigerant_charge", systemId });
+}
+
 
 export async function addAlterationCoreTestsFromForm(formData: FormData) {
   "use server";
