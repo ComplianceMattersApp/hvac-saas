@@ -1328,10 +1328,6 @@ const renderTimelineItem = (e: any, key: string) => {
             ✓ Field Complete
           </span>
         )}
-
-        {!["completed", "failed", "cancelled"].includes(job.status) && (
-          <CancelJobButton jobId={job.id} />
-        )}
       </div>
     </section>
   </div>
@@ -1933,20 +1929,26 @@ const renderTimelineItem = (e: any, key: string) => {
                 Admin archive controls
               </summary>
 
-              <div className="mt-3 space-y-2">
+              <div className="mt-3 space-y-3">
                 <div className="text-sm text-gray-600">
                   Archive hides this job across Ops, portal, and searches. This can be undone later (by clearing deleted_at).
                 </div>
 
-                <form action={archiveJobFromForm}>
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <SubmitButton
-                    loadingText="Archiving..."
-                    className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
-                  >
-                    Archive Job
-                  </SubmitButton>
-                </form>
+                <div className="flex flex-wrap gap-2">
+                  <form action={archiveJobFromForm}>
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <SubmitButton
+                      loadingText="Archiving..."
+                      className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+                    >
+                      Archive Job
+                    </SubmitButton>
+                  </form>
+
+                  {!["completed", "failed", "cancelled"].includes(job.status) && (
+                    <CancelJobButton jobId={job.id} />
+                  )}
+                </div>
               </div>
             </details>
           </div>

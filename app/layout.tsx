@@ -3,7 +3,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import LogoutButton from "@/components/auth/LogoutButton";
 import { getInternalUser } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
 
@@ -102,9 +101,6 @@ export default async function RootLayout({
                     >
                       Search Customers
                     </Link>
-                    <div className="ml-1 flex items-center border-l border-slate-200 pl-3 sm:ml-2">
-                      <LogoutButton />
-                    </div>
                   </div>
                 </div>
               </header>
