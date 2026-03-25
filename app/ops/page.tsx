@@ -261,14 +261,6 @@ for (const row of countRows ?? []) {
   counts.set(key, (counts.get(key) ?? 0) + 1);
 }
 
-const { count: recentClosedCount, error: recentClosedErr } = await supabase
-  .from("jobs")
-  .select("id", { count: "exact", head: true })
-  .eq("ops_status", "closed")
-  .is("deleted_at", null);
-
-if (recentClosedErr) throw recentClosedErr;
-
 // Parents with at least one successfully resolved retest child should leave active unresolved queues.
 // The parent remains historically failed, but should not stay in active Failed / Attention views.
 const { data: resolvedRetestChildren, error: resolvedRetestErr } = await supabase
@@ -1281,11 +1273,6 @@ const workflowCards = [
     label: "Closeout Work Queue",
     count: closeoutJobs.length,
   },
-  {
-    key: "recent_closed",
-    label: "Closed",
-    count: recentClosedCount ?? 0,
-  },
 ].filter((c) => c.count > 0 || c.key === bucket);
 
 const signalCards = [
@@ -1537,7 +1524,10 @@ return (
         </div>
       </div>
       <div className="mt-3 grid gap-1">
-        <label className="text-xs font-medium uppercase tracking-wide text-gray-600">Quick search</label>
+        <div>
+          <label className="text-xs font-medium uppercase tracking-wide text-gray-600">Filter Jobs</label>
+          <p className="mt-0.5 text-xs text-gray-500">Searches visible jobs on this page only</p>
+        </div>
         <form action="/ops" method="get" className="flex flex-col gap-2 sm:flex-row">
           <input type="hidden" name="bucket" value={bucket} />
           <input type="hidden" name="contractor" value={contractor ?? ""} />

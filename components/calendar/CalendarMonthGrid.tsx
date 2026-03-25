@@ -27,24 +27,23 @@ function jobsByDate(jobs: DispatchJob[]) {
 }
 
 function normalizedLifecycleStatus(job: DispatchJob) {
-  const raw = String(job.status ?? job.ops_status ?? '').trim().toLowerCase();
+  const status = String(job.status ?? '').trim().toLowerCase();
+  const opsStatus = String(job.ops_status ?? '').trim().toLowerCase();
+  const values = [status, opsStatus].filter(Boolean);
 
-  if (!raw) return 'scheduled';
-  if (raw === 'open') return 'scheduled';
-  if (raw === 'need_to_schedule') return 'scheduled';
-  if (raw === 'pending') return 'scheduled';
-  if (raw === 'pending_information') return 'scheduled';
+  if (!values.length) return 'scheduled';
+  if (values.includes('cancelled')) return 'cancelled';
+  if (values.includes('closed')) return 'closed';
+  if (values.includes('field_complete') || values.includes('completed') || values.includes('completed_paperwork_pending')) {
+    return 'field_complete';
+  }
+  if (values.includes('in_progress')) return 'in_progress';
+  if (values.includes('on_my_way')) return 'on_my_way';
+  if (values.includes('open') || values.includes('need_to_schedule') || values.includes('pending') || values.includes('pending_information')) {
+    return 'scheduled';
+  }
 
-  if (raw === 'on_my_way') return 'on_my_way';
-  if (raw === 'in_progress') return 'in_progress';
-
-  if (raw === 'field_complete') return 'field_complete';
-  if (raw === 'completed') return 'field_complete';
-  if (raw === 'completed_paperwork_pending') return 'field_complete';
-
-  if (raw === 'closed') return 'closed';
-
-  return raw;
+  return values[0];
 }
 
 function statusDotClass(status: string) {
@@ -53,6 +52,7 @@ function statusDotClass(status: string) {
   if (status === 'in_progress') return 'bg-indigo-600';
   if (status === 'field_complete') return 'bg-amber-500';
   if (status === 'closed') return 'bg-green-600';
+  if (status === 'cancelled') return 'bg-slate-400';
   return 'bg-gray-300';
 }
 
@@ -63,6 +63,7 @@ function formatStatus(status: string) {
     in_progress: 'In Progress',
     field_complete: 'Field Complete',
     closed: 'Closed',
+    cancelled: 'Cancelled',
   };
 
   return map[status] || status;
@@ -113,7 +114,7 @@ export default function CalendarMonthGrid({ monthDate, jobs }: CalendarMonthGrid
                 const needsTech = !!job.scheduled_date && (!job.assignments || job.assignments.length === 0);
                 const lifecycle = normalizedLifecycleStatus(job);
                 const dotClass = statusDotClass(lifecycle);
-                const faded = lifecycle === 'closed' ? 'opacity-50' : '';
+                const faded = lifecycle === 'closed' || lifecycle === 'cancelled' ? 'opacity-50' : '';
                 const primaryLine = job.job_address || shortTitle(job);
                 const secondaryLine = job.job_type || job.title || 'Job';
 
@@ -128,6 +129,9 @@ export default function CalendarMonthGrid({ monthDate, jobs }: CalendarMonthGrid
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium text-slate-900">{primaryLine}</div>
                         <div className="truncate text-[10px] text-slate-500">{secondaryLine}</div>
+                        {lifecycle === 'cancelled' ? (
+                          <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Cancelled</div>
+                        ) : null}
                       </div>
                       {needsTech ? (
                         <span className="ml-auto shrink-0 rounded border border-amber-200 bg-amber-100 px-1 py-0.5 text-[9px] font-semibold text-amber-800">

@@ -243,13 +243,17 @@ export async function getDispatchCalendarData(params: {
     .order('created_at', { ascending: true });
   if (allErr) throw allErr;
 
-  // Canonical exclusion logic
+  // Calendar is a scheduling record surface, so scheduled jobs stay visible even after completion/cancellation.
   function isActive(job: JobDispatchRow) {
     const ops = String(job.ops_status ?? '').toLowerCase();
     const status = String(job.status ?? '').toLowerCase();
     if (ops === 'closed' || ops === 'cancelled') return false;
     if (status === 'closed' || status === 'cancelled') return false;
     return true;
+  }
+
+  function isCalendarScheduled(job: JobDispatchRow) {
+    return !!job.scheduled_date;
   }
 
   // Type guard for JobDispatchRow
@@ -260,10 +264,8 @@ export async function getDispatchCalendarData(params: {
   // Filter out any rows that are not valid JobDispatchRow
   const validRows = (allRows ?? []).filter(isJobDispatchRow) as unknown as JobDispatchRow[];
 
-  // Canonical scheduled active jobs
-  const scheduledActiveRows = validRows.filter(
-    (row) => isActive(row) && !!row.scheduled_date
-  );
+  // Canonical scheduled calendar jobs retain historical visibility regardless of actionability.
+  const scheduledCalendarRows = validRows.filter((row) => isCalendarScheduled(row));
 
   // Canonical unscheduled active jobs
   const unscheduledActiveRows = validRows.filter(
@@ -271,7 +273,7 @@ export async function getDispatchCalendarData(params: {
   );
 
   // Assignment and event mapping
-  const allJobIds = [...scheduledActiveRows, ...unscheduledActiveRows].map((row) => String(row?.id ?? '').trim()).filter(Boolean);
+  const allJobIds = [...scheduledCalendarRows, ...unscheduledActiveRows].map((row) => String(row?.id ?? '').trim()).filter(Boolean);
   const assignmentMap = await getActiveJobAssignmentDisplayMap({
     supabase,
     jobIds: allJobIds,
@@ -294,7 +296,7 @@ export async function getDispatchCalendarData(params: {
   }
 
   // Canonical scheduled jobs (normalized)
-  const scheduledActiveJobs = scheduledActiveRows.map((row) =>
+  const scheduledCalendarJobs = scheduledCalendarRows.map((row) =>
     mergeJobRow({ row, assignmentMap, latestEventByJob })
   );
 
@@ -304,10 +306,10 @@ export async function getDispatchCalendarData(params: {
   );
 
   // Build day/week/month/list from canonical scheduled jobs
-  const dayJobs = scheduledActiveJobs.filter((job) => String(job.scheduled_date) === anchorDate);
+  const dayJobs = scheduledCalendarJobs.filter((job) => String(job.scheduled_date) === anchorDate);
   const weekDays = Array.from({ length: 7 }).map((_, index) => {
     const date = addDaysYmd(weekStart, index);
-    const jobs = scheduledActiveJobs.filter((job) => String(job.scheduled_date ?? '') === date);
+    const jobs = scheduledCalendarJobs.filter((job) => String(job.scheduled_date ?? '') === date);
     return { date, jobs };
   });
 

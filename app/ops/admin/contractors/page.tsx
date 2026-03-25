@@ -21,6 +21,9 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   invite_sent: { tone: "success", message: "Contractor user invite sent." },
   invite_resent: { tone: "success", message: "Contractor user invite resent." },
   password_reset_sent: { tone: "success", message: "Password reset email sent." },
+  contractor_created_invite_sent: { tone: "success", message: "Contractor created and invite sent." },
+  contractor_created_no_email: { tone: "warn", message: "Contractor created. No invite sent because no email was provided." },
+  contractor_created_invite_failed: { tone: "warn", message: "Contractor created, but invite could not be sent." },
   invalid_invite_target: { tone: "error", message: "Missing or invalid contractor invite details." },
   invalid_email: { tone: "error", message: "Please enter a valid email address." },
 };

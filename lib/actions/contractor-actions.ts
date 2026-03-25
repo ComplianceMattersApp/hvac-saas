@@ -2,8 +2,46 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { requireInternalRole } from "@/lib/auth/internal-user";
+import { inviteContractor } from "@/lib/actions/contractor-invite-actions";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+
+type ContractorCreateNotice =
+  | "contractor_created_invite_sent"
+  | "contractor_created_no_email"
+  | "contractor_created_invite_failed";
+
+function withNotice(path: string, notice: ContractorCreateNotice) {
+  const url = new URL(`http://local${path}`);
+  url.searchParams.set("notice", notice);
+  return `${url.pathname}${url.search}`;
+}
+
+function normalizeInviteEmail(raw: string | null) {
+  const value = String(raw ?? "").trim().toLowerCase();
+  return value || null;
+}
+
+async function getCreateNotice(params: {
+  contractorId: string;
+  email: string | null;
+}): Promise<ContractorCreateNotice> {
+  const email = normalizeInviteEmail(params.email);
+
+  if (!email || !email.includes("@")) {
+    return "contractor_created_no_email";
+  }
+
+  try {
+    await inviteContractor({
+      contractorId: params.contractorId,
+      email,
+    });
+    return "contractor_created_invite_sent";
+  } catch {
+    return "contractor_created_invite_failed";
+  }
+}
 
 export async function createContractorFromForm(formData: FormData) {
   const supabase = await createClient();
@@ -50,10 +88,15 @@ export async function createContractorFromForm(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  const notice = await getCreateNotice({
+    contractorId: String(data.id),
+    email,
+  });
+
   revalidatePath("/contractors");
   revalidatePath("/ops");
 
-  redirect(`/contractors/${data.id}/edit`);
+  redirect(withNotice(`/contractors/${data.id}/edit`, notice));
 }
 
 // keep your existing updateContractorFromForm here (unchanged)
@@ -189,5 +232,11 @@ export async function createQuickContractorFromForm(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  const notice = await getCreateNotice({
+    contractorId: String(data.id),
+    email,
+  });
+
   revalidatePath("/ops/admin/contractors");
+  redirect(withNotice("/ops/admin/contractors", notice));
 }

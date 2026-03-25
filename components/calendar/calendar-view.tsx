@@ -41,6 +41,7 @@ const STATUS_LEGEND = [
   { key: 'in_progress', label: 'In Progress', dot: 'bg-indigo-600' },
   { key: 'field_complete', label: 'Field Complete', dot: 'bg-amber-500' },
   { key: 'closed', label: 'Closed', dot: 'bg-green-600' },
+  { key: 'cancelled', label: 'Cancelled', dot: 'bg-slate-400' },
 ];
 
 function bannerMessage(banner?: string) {
@@ -63,6 +64,7 @@ function dispatchBlockClass(status?: string | null) {
   if (value === 'failed') return 'border-red-200 bg-red-100 text-red-900';
   if (value === 'pending_info') return 'border-amber-200 bg-amber-100 text-amber-900';
   if (value === 'on_hold') return 'border-slate-300 bg-slate-100 text-slate-900';
+  if (value === 'cancelled') return 'border-slate-300 border-dashed bg-slate-100 text-slate-500';
   if (value === 'closed') return 'border-slate-300 border-dashed bg-slate-100 text-slate-500';
   if (value === 'scheduled') return 'border-blue-200 bg-blue-100 text-blue-900';
   return 'border-indigo-200 bg-indigo-50 text-indigo-900';
@@ -221,24 +223,23 @@ function initialsFromName(name: string) {
 }
 
 function normalizedLifecycleStatus(job: DispatchJob) {
-  const raw = String(job.status ?? job.ops_status ?? '').trim().toLowerCase();
+  const status = String(job.status ?? '').trim().toLowerCase();
+  const opsStatus = String(job.ops_status ?? '').trim().toLowerCase();
+  const values = [status, opsStatus].filter(Boolean);
 
-  if (!raw) return 'scheduled';
-  if (raw === 'open') return 'scheduled';
-  if (raw === 'need_to_schedule') return 'scheduled';
-  if (raw === 'pending') return 'scheduled';
-  if (raw === 'pending_information') return 'scheduled';
+  if (!values.length) return 'scheduled';
+  if (values.includes('cancelled')) return 'cancelled';
+  if (values.includes('closed')) return 'closed';
+  if (values.includes('field_complete') || values.includes('completed') || values.includes('completed_paperwork_pending')) {
+    return 'field_complete';
+  }
+  if (values.includes('in_progress')) return 'in_progress';
+  if (values.includes('on_my_way')) return 'on_my_way';
+  if (values.includes('open') || values.includes('need_to_schedule') || values.includes('pending') || values.includes('pending_information')) {
+    return 'scheduled';
+  }
 
-  if (raw === 'on_my_way') return 'on_my_way';
-  if (raw === 'in_progress') return 'in_progress';
-
-  if (raw === 'field_complete') return 'field_complete';
-  if (raw === 'completed') return 'field_complete';
-  if (raw === 'completed_paperwork_pending') return 'field_complete';
-
-  if (raw === 'closed') return 'closed';
-
-  return raw;
+  return values[0];
 }
 
 function formatLifecycleStatus(status: string) {
@@ -248,6 +249,7 @@ function formatLifecycleStatus(status: string) {
     in_progress: 'In Progress',
     field_complete: 'Field Complete',
     closed: 'Closed',
+    cancelled: 'Cancelled',
   };
   return map[status] || status;
 }
@@ -258,6 +260,7 @@ function statusDotClass(status: string) {
   if (status === 'in_progress') return 'bg-indigo-600';
   if (status === 'field_complete') return 'bg-amber-500';
   if (status === 'closed') return 'bg-green-600';
+  if (status === 'cancelled') return 'bg-slate-400';
   return 'bg-gray-300';
 }
 
@@ -492,6 +495,8 @@ function DispatchGrid(props: {
               const colorBars = assignees.slice(0, 3);
               const overflowCount = Math.max(assignees.length - colorBars.length, 0);
               const initials = assignees.slice(0, 2).map((a) => initialsFromName(a.display_name)).join(' ');
+              const lifecycle = normalizedLifecycleStatus(job);
+              const isCancelled = lifecycle === 'cancelled';
 
               const laneWidthPct = 100 / Math.max(row.laneCount, 1);
               const laneLeftPct = row.lane * laneWidthPct;
@@ -526,6 +531,11 @@ function DispatchGrid(props: {
                     ) : null}
                   </div>
                   <p className="truncate text-xs font-semibold leading-4">{shortTitle(job)}</p>
+                  {isCancelled ? (
+                    <span className="ml-1 inline-block rounded border border-slate-300 bg-slate-200 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-600">
+                      Cancelled
+                    </span>
+                  ) : null}
                   {job.scheduled_date && (!job.assignments || job.assignments.length === 0) ? (
                     <span className="ml-2 inline-block rounded border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
                       Needs Tech
@@ -580,18 +590,20 @@ function AgendaList(props: {
               const needsTech = job.scheduled_date && (!job.assignments || job.assignments.length === 0);
               const lifecycle = normalizedLifecycleStatus(job);
               const dotClass = statusDotClass(lifecycle);
+              const faded = lifecycle === 'closed' || lifecycle === 'cancelled' ? 'opacity-50' : '';
 
               return (
                 <Link
                   key={job.id}
                   href={buildCalendarHref('list', date, { job: job.id })}
                   scroll={false}
-                  className={`block rounded border border-slate-200 bg-white px-3 py-2 shadow-sm hover:bg-slate-50 ${lifecycle === 'closed' ? 'opacity-50' : ''}`}
+                  className={`block rounded border border-slate-200 bg-white px-3 py-2 shadow-sm hover:bg-slate-50 ${faded}`}
                 >
                   <div className="flex items-center gap-3">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium text-slate-900">{job.job_address || shortTitle(job)}</div>
+                      <div className="truncate text-[11px] text-slate-600">{job.city || 'No city'}</div>
                       <div className="truncate text-[11px] text-slate-500">{job.job_type || job.title}</div>
                     </div>
                     <div className="flex items-center gap-2">
