@@ -17,7 +17,7 @@ function FieldActionSubmitButton({ label }: { label: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex min-h-11 items-center justify-center rounded-md border border-blue-600 bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+      className="w-full min-h-11 inline-flex items-center justify-center rounded-md border border-blue-600 bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
     >
       {pending ? "Updating..." : label}
     </button>
@@ -43,7 +43,7 @@ export function JobFieldActionButton({
 
   if (isDone) {
     return (
-      <span className="inline-flex h-10 items-center rounded-md border border-green-600 bg-green-600 px-4 text-sm font-semibold text-white shadow-sm">
+      <span className="w-full min-h-10 inline-flex items-center justify-center rounded-md border border-green-600 bg-green-600 px-4 text-sm font-semibold text-white shadow-sm sm:w-auto">
         ✓ Field visit complete
       </span>
     );
@@ -51,6 +51,7 @@ export function JobFieldActionButton({
 
   return (
     <form
+      className="w-full sm:w-auto"
       action={advanceJobStatusFromForm}
       onSubmit={(e) => {
         const needsScheduleConfirm = currentStatus === "open" && !hasFullSchedule;

@@ -6,7 +6,7 @@ export default function CancelJobButton({ jobId }: { jobId: string }) {
   return (
     <form
       action={cancelJobFromForm}
-      style={{ display: "inline" }}
+      className="w-full sm:w-auto"
       onSubmit={(e) => {
         if (!window.confirm("Cancel this job? This action cannot be undone.")) {
           e.preventDefault();
@@ -16,7 +16,7 @@ export default function CancelJobButton({ jobId }: { jobId: string }) {
       <input type="hidden" name="job_id" value={jobId} />
       <button
         type="submit"
-        className="inline-flex h-10 items-center rounded-md border border-red-200 bg-red-50 px-4 text-sm font-medium text-red-600 hover:bg-red-100"
+        className="w-full min-h-10 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 px-4 text-sm font-medium text-red-600 hover:bg-red-100 sm:w-auto"
       >
         📋 Cancel Job
       </button>

@@ -1700,7 +1700,7 @@ const renderTimelineItem = (e: any, key: string) => {
               hasFullSchedule={hasFullSchedule}
             />
           ) : (
-            <span className="inline-flex h-10 items-center rounded-md border border-green-600 bg-green-600 px-4 text-sm font-semibold text-white shadow-sm">
+            <span className="w-full min-h-10 inline-flex items-center justify-center rounded-md border border-green-600 bg-green-600 px-4 text-sm font-semibold text-white shadow-sm sm:w-auto">
               ✓ Field Complete
             </span>
           )}
@@ -1976,7 +1976,7 @@ const renderTimelineItem = (e: any, key: string) => {
     
       <SubmitButton
         loadingText="Saving..."
-        className="px-3 py-2 rounded border text-sm bg-black text-white"
+        className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded border text-sm bg-black text-white"
       >
         Mark Data Entry Complete
       </SubmitButton>
@@ -2047,7 +2047,7 @@ const renderTimelineItem = (e: any, key: string) => {
 <div className="rounded-lg border bg-white p-4 text-gray-900 mb-6">
   <div className="text-sm font-semibold mb-3">Job Status</div>
 
-  <form action={updateJobOpsFromForm} className="flex gap-2 items-end">
+  <form action={updateJobOpsFromForm} className="flex flex-col gap-2 sm:flex-row sm:items-end">
     <input type="hidden" name="job_id" value={job.id} />
 
     <div className="flex-1">
@@ -2087,7 +2087,7 @@ const renderTimelineItem = (e: any, key: string) => {
       </p>
           </div>
 
-          <SubmitButton loadingText="Saving..." className="px-3 py-2 rounded bg-black text-white text-sm">
+          <SubmitButton loadingText="Saving..." className="w-full inline-flex items-center justify-center min-h-10 px-3 py-2 rounded bg-black text-white text-sm sm:w-auto sm:shrink-0">
             Save
           </SubmitButton>
         </form>
@@ -2095,7 +2095,7 @@ const renderTimelineItem = (e: any, key: string) => {
         {canShowReleaseAndReevaluate ? (
           <form action={releaseAndReevaluateFromForm} className="mt-2">
             <input type="hidden" name="job_id" value={job.id} />
-            <SubmitButton loadingText="Updating..." className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
+            <SubmitButton loadingText="Updating..." className="w-full inline-flex items-center justify-center min-h-10 px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100 sm:w-auto">
               {String(job.ops_status ?? "").toLowerCase() === "pending_info"
                 ? "Release Pending Info & Re-evaluate"
                 : "Release & Re-evaluate"}
@@ -2171,7 +2171,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="method" value="call" />
                 <input type="hidden" name="result" value="no_answer" />
-                <SubmitButton loadingText="Logging..." className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
+                <SubmitButton loadingText="Logging..." className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
                   Log Call (No Answer)
                 </SubmitButton>
               </form>
@@ -2180,7 +2180,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="method" value="text" />
                 <input type="hidden" name="result" value="sent" />
-                <SubmitButton loadingText="Logging..." className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
+                <SubmitButton loadingText="Logging..." className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
                   Log Text (Sent)
                 </SubmitButton>
               </form>
@@ -2189,7 +2189,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="method" value="call" />
                 <input type="hidden" name="result" value="spoke" />
-                <SubmitButton loadingText="Logging..." className="px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
+                <SubmitButton loadingText="Logging..." className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100">
                   Log Call (Spoke)
                 </SubmitButton>
               </form>
@@ -2362,7 +2362,7 @@ const renderTimelineItem = (e: any, key: string) => {
               />
             </div>
 
-            <SubmitButton loadingText="Saving..." className="px-3 py-2 rounded bg-black text-white text-sm w-fit">
+            <SubmitButton loadingText="Saving..." className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded bg-black text-white text-sm w-fit">
               Save Follow Up
             </SubmitButton>
           </form>
@@ -2544,7 +2544,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
       <button
         type="submit"
-        className="px-3 py-2 rounded bg-black text-white text-sm"
+        className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded bg-black text-white text-sm"
       >
         Create Retest Job
       </button>
@@ -2619,7 +2619,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
       <button
         type="submit"
-        className="px-3 py-2 rounded bg-black text-white text-sm"
+        className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded bg-black text-white text-sm"
       >
         Resolve Failure by Correction Review
       </button>
