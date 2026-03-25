@@ -95,27 +95,56 @@ export default async function RootLayout({
                     </Link>
                   </div>
 
-                  <details className="relative shrink-0">
-                    <summary className="list-none rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-slate-300 bg-slate-50 px-1 text-[10px] font-semibold text-slate-700">
-                          {accountFirstName ? accountFirstName.slice(0, 1).toUpperCase() : "A"}
-                        </span>
-                        {accountLabel}
-                      </span>
-                    </summary>
+                  <div className="flex items-center gap-2">
+                    {/* Mobile-only action menu */}
+                    <details className="relative shrink-0 sm:hidden">
+                      <summary className="list-none rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+                        ⋮ Menu
+                      </summary>
+                      <div className="absolute right-12 z-50 mt-2 w-48 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                        <Link
+                          href="/jobs/new"
+                          className="block rounded-md px-3 py-2 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50"
+                        >
+                          + New Job
+                        </Link>
+                        <Link
+                          href="/calendar"
+                          className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                        >
+                          View Calendar
+                        </Link>
+                        <Link
+                          href="/customers"
+                          className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                        >
+                          Search Customers
+                        </Link>
+                      </div>
+                    </details>
 
-                    <div className="absolute right-0 z-50 mt-2 min-w-44 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
-                      <Link
-                        href="/account"
-                        className="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                      >
-                        Profile
-                      </Link>
-                      <div className="my-1 border-t border-slate-100" />
-                      <LogoutButton className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900" />
-                    </div>
-                  </details>
+                    <details className="relative shrink-0">
+                      <summary className="list-none rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-slate-300 bg-slate-50 px-1 text-[10px] font-semibold text-slate-700">
+                            {accountFirstName ? accountFirstName.slice(0, 1).toUpperCase() : "A"}
+                          </span>
+                          {accountLabel}
+                        </span>
+                      </summary>
+
+                      <div className="absolute right-0 z-50 mt-2 min-w-44 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                        <Link
+                          href="/account"
+                          className="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                        >
+                          Profile
+                        </Link>
+                        <div className="my-1 border-t border-slate-100" />
+                        <LogoutButton className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900" />
+                      </div>
+                    </details>
+                  </div>
                 </div>
 
                 <div className="mt-3 hidden flex-wrap items-center gap-2 sm:flex">
@@ -143,7 +172,7 @@ export default async function RootLayout({
           ) : null}
 
           {/* Main Content */}
-          <main className="flex-1 p-6 pt-28 lg:pt-16 print:p-0">
+          <main className="flex-1 p-6 pt-16 sm:pt-28 print:p-0">
             {children}
           </main>
 
