@@ -3836,7 +3836,7 @@ const billing_city = String(formData.get("billing_city") || "").trim() || null;
 const billing_state = String(formData.get("billing_state") || "").trim() || null;
 const billing_zip = String(formData.get("billing_zip") || "").trim() || null;
 
-const { scheduled_date, window_start, window_end, ops_status } =
+const { scheduled_date: derived_scheduled_date, window_start: derived_window_start, window_end: derived_window_end, ops_status } =
   deriveScheduleAndOps(formData);
 
 const permitNumberRaw = String(formData.get("permit_number") || "").trim();
@@ -3884,6 +3884,12 @@ if (userId) {
   }
   
 }
+
+// Contractor/customer intake: scheduling is set by ops after submission, not during intake.
+// Internal staff submissions (isContractorUser = false) keep scheduling fields as-is.
+const scheduled_date = isContractorUser ? null : derived_scheduled_date;
+const window_start = isContractorUser ? null : derived_window_start;
+const window_end = isContractorUser ? null : derived_window_end;
 
 const { canonicalOwnerUserId, canonicalWriteClient } =
   await resolveCanonicalOwner({
