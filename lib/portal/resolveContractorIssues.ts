@@ -1,4 +1,5 @@
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 
 export type ContractorIssueGroup = "needs_info" | "failed" | "in_progress" | "passed";
 
@@ -23,6 +24,7 @@ export type ResolveContractorIssuesInput = {
     id: string;
     ops_status?: string | null;
     pending_info_reason?: string | null;
+    follow_up_date?: string | null;
     next_action_note?: string | null;
     action_required_by?: string | null;
     scheduled_date?: string | null;
@@ -221,6 +223,12 @@ export function resolveContractorIssues(
   const opsStatus = normalize(input.job.ops_status);
   const pendingInfoReason = String(input.job.pending_info_reason ?? "").trim();
   const nextActionNote = String(input.job.next_action_note ?? "").trim();
+  const pendingInfoSignal = getPendingInfoSignal({
+    pending_info_reason: input.job.pending_info_reason,
+    follow_up_date: input.job.follow_up_date,
+    next_action_note: input.job.next_action_note,
+    action_required_by: input.job.action_required_by,
+  });
   const failureReasons = (input.failureReasons ?? []).map(String).map((s) => s.trim()).filter(Boolean);
   const events = input.events ?? [];
 
@@ -238,7 +246,7 @@ export function resolveContractorIssues(
 
   const issues: ContractorIssue[] = [];
 
-  if (opsStatus === "pending_info") {
+  if (pendingInfoSignal) {
     issues.push({
       group: "needs_info",
       headline: pendingInfoReason || "Details requested",

@@ -46,6 +46,7 @@ import { displayDateLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
 import UnscheduleButton from "./_components/UnscheduleButton";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
+import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import ContractorReportPanel from "./_components/ContractorReportPanel";
 import { resolveContractorResponseTracking } from "@/lib/portal/resolveContractorIssues";
 import {
@@ -974,6 +975,14 @@ const canShowReleaseAndReevaluate = [
   "invoice_required",
 ].includes(String(job.ops_status ?? "").toLowerCase());
 
+const pendingInfoSignal = getPendingInfoSignal({
+  ops_status: job.ops_status,
+  pending_info_reason: (job as any).pending_info_reason,
+  follow_up_date: (job as any).follow_up_date,
+  next_action_note: (job as any).next_action_note,
+  action_required_by: (job as any).action_required_by,
+});
+
 const locationId = serviceLocation?.id ?? null;
 
 const digitsOnly = (v?: string | null) => String(v ?? "").replace(/\D/g, "");
@@ -1311,6 +1320,12 @@ const renderTimelineItem = (e: any, key: string) => {
         <span className="font-medium">Ops:</span>{" "}
         {formatOpsStatusLabel(job.ops_status)}
       </div>
+
+      {pendingInfoSignal ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-800">
+          Pending Info
+        </div>
+      ) : null}
     </div>
 
     <section className="mt-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">

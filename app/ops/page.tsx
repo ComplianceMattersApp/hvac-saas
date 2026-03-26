@@ -15,6 +15,7 @@ import {
   startOfTodayUtcIsoLA,
   startOfTomorrowUtcIsoLA,
 } from "@/lib/utils/schedule-la";
+import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
@@ -278,6 +279,43 @@ const resolvedFailedParentIds = new Set(
     .filter(Boolean)
 );
 
+const { data: activeRetestChildren, error: activeRetestErr } = await supabase
+  .from("jobs")
+  .select("parent_job_id, service_case_id, ops_status, status")
+  .not("parent_job_id", "is", null)
+  .is("deleted_at", null)
+  .neq("status", "cancelled")
+  .neq("ops_status", "closed");
+
+if (activeRetestErr) throw activeRetestErr;
+
+const failedParentIdsWithRetestChild = new Set(
+  (activeRetestChildren ?? [])
+    .map((r: any) => String(r.parent_job_id ?? "").trim())
+    .filter(Boolean)
+);
+
+const activeRetestServiceCaseIds = new Set(
+  (activeRetestChildren ?? [])
+    .map((r: any) => String(r.service_case_id ?? "").trim())
+    .filter(Boolean)
+);
+
+function shouldHideFailedParentJob(j: any) {
+  const opsStatus = String(j?.ops_status ?? "").toLowerCase();
+  const parentJobId = String(j?.parent_job_id ?? "").trim();
+  const jobId = String(j?.id ?? "").trim();
+  const serviceCaseId = String(j?.service_case_id ?? "").trim();
+
+  if (opsStatus !== "failed") return false;
+  if (parentJobId) return false;
+
+  return (
+    failedParentIdsWithRetestChild.has(jobId) ||
+    (!!serviceCaseId && activeRetestServiceCaseIds.has(serviceCaseId))
+  );
+}
+
 
   // Contractors for filter dropdown
   const { data: contractors } = await supabase
@@ -287,7 +325,7 @@ const resolvedFailedParentIds = new Set(
 
   // Common job select (keep lightweight)
  const baseSelect =
-   "id, title, status, parent_job_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, permit_number, pending_info_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at";
+   "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, permit_number, pending_info_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -342,8 +380,9 @@ let fieldWorkQ = supabase
 
 fieldWorkQ = applyCommonFilters(fieldWorkQ);
 
-const { data: fieldWorkJobs, error: fieldWorkErr } = await fieldWorkQ;
+const { data: fieldWorkJobsRaw, error: fieldWorkErr } = await fieldWorkQ;
 if (fieldWorkErr) throw fieldWorkErr;
+const fieldWorkJobs = (fieldWorkJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
 
 // 2) UPCOMING (scheduled jobs on/after LA tomorrow)
 let upcomingQ = supabase
@@ -360,8 +399,9 @@ let upcomingQ = supabase
 
 upcomingQ = applyCommonFilters(upcomingQ);
 
-const { data: upcomingJobs, error: upcomingErr } = await upcomingQ;
+const { data: upcomingJobsRaw, error: upcomingErr } = await upcomingQ;
 if (upcomingErr) throw upcomingErr;
+const upcomingJobs = (upcomingJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
 
 
   // 3) CALL LIST preview (need_to_schedule)
@@ -377,8 +417,9 @@ if (upcomingErr) throw upcomingErr;
 
   callListQ = applyCommonFilters(callListQ);
 
-  const { data: callListJobs, error: callListErr } = await callListQ;
+  const { data: callListJobsRaw, error: callListErr } = await callListQ;
   if (callListErr) throw callListErr;
+  const callListJobs = (callListJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
 
     // 4) CLOSEOUT COMMAND BOARD (derived from field_complete + remaining office obligations)
     let closeoutQ = supabase
@@ -393,8 +434,9 @@ if (upcomingErr) throw upcomingErr;
 
     closeoutQ = applyCommonFilters(closeoutQ);
 
-    const { data: closeoutSourceJobs, error: closeoutErr } = await closeoutQ;
+    const { data: closeoutSourceJobsRaw, error: closeoutErr } = await closeoutQ;
     if (closeoutErr) throw closeoutErr;
+    const closeoutSourceJobs = (closeoutSourceJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
 
     // 5) EXCEPTIONS: Still Open (scheduled before today in LA and not field-complete)
     let stillOpenQ = supabase
@@ -411,8 +453,9 @@ if (upcomingErr) throw upcomingErr;
 
     stillOpenQ = applyCommonFilters(stillOpenQ);
 
-    const { data: stillOpenJobs, error: stillOpenErr } = await stillOpenQ;
+    const { data: stillOpenJobsRaw, error: stillOpenErr } = await stillOpenQ;
     if (stillOpenErr) throw stillOpenErr;
+    const stillOpenJobs = (stillOpenJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
 
     // 6) NEEDS ATTENTION preview (aging-based escalation queue)
     let attentionQ = supabase
@@ -436,9 +479,10 @@ if (upcomingErr) throw upcomingErr;
 
     attentionQ = applyCommonFilters(attentionQ);
 
-    const { data: attentionJobs, error: attentionErr } = await attentionQ;
-    const attentionCount = attentionJobs?.length ?? 0;
+    const { data: attentionJobsRaw, error: attentionErr } = await attentionQ;
     if (attentionErr) throw attentionErr;
+    const attentionJobs = (attentionJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
+    const attentionCount = attentionJobs.length;
 
   // 7) BUCKET list (tabs)
     let bucketQ = supabase
@@ -474,8 +518,9 @@ if (upcomingErr) throw upcomingErr;
 
     bucketQ = applyCommonFilters(bucketQ);
 
-    const { data: bucketJobs, error: bucketErr } = await bucketQ;
+    const { data: bucketJobsRaw, error: bucketErr } = await bucketQ;
   if (bucketErr) throw bucketErr;
+  const bucketJobs = (bucketJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
   const baseFilteredBucketJobs =
   bucket === "failed" || bucket === "attention"
     ? (bucketJobs ?? []).filter(
@@ -1205,7 +1250,12 @@ const closeoutJobs = sortJobs(
 const activeFailedCount = (countRows ?? []).filter((row: any) => {
   const status = String((row as any)?.ops_status ?? "").toLowerCase();
   const jobId = String((row as any)?.id ?? "");
-  return status === "failed" && !resolvedFailedParentIds.has(jobId) && !hasScheduledRetestForJob(jobId);
+  return (
+    status === "failed" &&
+    !resolvedFailedParentIds.has(jobId) &&
+    !failedParentIdsWithRetestChild.has(jobId) &&
+    !hasScheduledRetestForJob(jobId)
+  );
 }).length;
 
 const adjustedAttentionCount = (attentionJobs ?? []).filter((j: any) => {
@@ -1311,30 +1361,106 @@ const PREVIEW_LIMIT = 4;
 const EXCEPTION_PREVIEW_LIMIT = 5;
 const isPanelExpanded = (key: string) => panel === key;
 
+const prioritizedCallListJobs = prioritizeActionableJobs(sortedCallListJobs);
+const prioritizedFieldWorkJobs = prioritizeActionableJobs(sortedFieldWorkJobs);
+const prioritizedCloseoutJobs = prioritizeActionableJobs(closeoutJobs);
+
 const callListVisibleJobs = isPanelExpanded("call_list")
-  ? sortedCallListJobs
-  : sortedCallListJobs.slice(0, PREVIEW_LIMIT);
+  ? prioritizedCallListJobs
+  : prioritizedCallListJobs.slice(0, PREVIEW_LIMIT);
 
 const fieldWorkVisibleJobs = isPanelExpanded("field_work")
-  ? sortedFieldWorkJobs
-  : sortedFieldWorkJobs.slice(0, PREVIEW_LIMIT);
+  ? prioritizedFieldWorkJobs
+  : prioritizedFieldWorkJobs.slice(0, PREVIEW_LIMIT);
 
 const closeoutVisibleJobs = isPanelExpanded("closeout")
-  ? closeoutJobs
-  : closeoutJobs.slice(0, PREVIEW_LIMIT);
+  ? prioritizedCloseoutJobs
+  : prioritizedCloseoutJobs.slice(0, PREVIEW_LIMIT);
 
 const exceptionVisibleJobs = isPanelExpanded("exceptions")
   ? sortedExceptionJobs
   : sortedExceptionJobs.slice(0, EXCEPTION_PREVIEW_LIMIT);
 
-function compactRow(j: any, showDate = false, note?: string) {
+function isNeedsAttentionJob(j: any) {
+  const status = String(j?.ops_status ?? "").toLowerCase();
+  const lifecycle = String(j?.status ?? "").toLowerCase();
+  const createdMs = safeDateValue(j?.created_at);
+  const jobId = String(j?.id ?? "");
+
+  if (!createdMs) return false;
+
+  if (
+    status === "need_to_schedule" &&
+    lifecycle === "open" &&
+    createdMs <= safeDateValue(attentionBusinessCutoffIso)
+  ) {
+    return true;
+  }
+
+  const pendingInfoSignal = getPendingInfoSignal({
+    ops_status: j?.ops_status,
+    pending_info_reason: j?.pending_info_reason,
+    follow_up_date: j?.follow_up_date,
+    next_action_note: j?.next_action_note,
+    action_required_by: j?.action_required_by,
+  });
+
+  if (pendingInfoSignal && createdMs <= safeDateValue(attentionBusinessCutoffIso)) {
+    return true;
+  }
+
+  if (
+    status === "failed" &&
+    createdMs <= safeDateValue(failedCutoffIso) &&
+    !resolvedFailedParentIds.has(jobId) &&
+    !hasScheduledRetestForJob(jobId)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function actionablePriorityRank(j: any) {
+  const opsStatus = String(j?.ops_status ?? "").toLowerCase();
+  const pendingInfoSignal = getPendingInfoSignal({
+    ops_status: j?.ops_status,
+    pending_info_reason: j?.pending_info_reason,
+    follow_up_date: j?.follow_up_date,
+    next_action_note: j?.next_action_note,
+    action_required_by: j?.action_required_by,
+  });
+
+  if (isNeedsAttentionJob(j)) return 0;
+  if (pendingInfoSignal || opsStatus === "pending_info") return 1;
+  if (opsStatus === "on_hold") return 2;
+  return 3;
+}
+
+function prioritizeActionableJobs<T>(jobs: T[]) {
+  return jobs
+    .map((job, index) => ({ job, index }))
+    .sort((a, b) => {
+      const rankA = actionablePriorityRank(a.job);
+      const rankB = actionablePriorityRank(b.job);
+      if (rankA !== rankB) return rankA - rankB;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.job);
+}
+
+function compactRow(j: any, showDate = false, note?: string, emphasize = false) {
   const jobId = String(j?.id ?? "");
   const assignmentSummary = assignmentSummaryForJob(jobId);
   const retestState = retestStateForJob(jobId);
   const scheduledRetestLabel = retestScheduleLabelForJob(jobId);
   const lifecycleStatus = String(j?.status ?? "").toLowerCase();
   const opsStatus = String(j?.ops_status ?? "").toLowerCase();
-  const statusMeta = retestState === "pending_scheduling"
+  const isFailed = opsStatus === "failed";
+  const isRetestChild = Boolean(String(j?.parent_job_id ?? "").trim());
+  const statusMeta = isFailed
+    ? { label: "FAILED", tone: "border-rose-200 bg-rose-50 text-rose-800" }
+    : retestState === "pending_scheduling"
     ? { label: "Retest Pending Scheduling", tone: "border-amber-200 bg-amber-50 text-amber-800" }
     : scheduledRetestLabel
     ? { label: "Retest Scheduled", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" }
@@ -1342,11 +1468,29 @@ function compactRow(j: any, showDate = false, note?: string) {
     ? { label: "On the Way", tone: "border-sky-200 bg-sky-50 text-sky-800" }
     : lifecycleStatus === "in_progress"
     ? { label: "In Progress", tone: "border-blue-200 bg-blue-50 text-blue-800" }
-    : opsStatus === "failed"
-    ? { label: "Failed", tone: "border-rose-200 bg-rose-50 text-rose-800" }
     : opsStatus === "scheduled"
     ? { label: "Scheduled", tone: "border-slate-200 bg-slate-50 text-slate-800" }
     : { label: "Open", tone: "border-slate-200 bg-slate-50 text-slate-800" };
+  const pendingInfoSignal = getPendingInfoSignal({
+    ops_status: j?.ops_status,
+    pending_info_reason: j?.pending_info_reason,
+    follow_up_date: j?.follow_up_date,
+    next_action_note: j?.next_action_note,
+    action_required_by: j?.action_required_by,
+  });
+  const onHoldSignal = opsStatus === "on_hold";
+  const needsAttention = isNeedsAttentionJob(j);
+  const pendingInfoReason = String(j?.pending_info_reason ?? "").trim();
+  const pendingInfoContext = pendingInfoReason
+    ? pendingInfoReason
+    : String(j?.next_action_note ?? "").trim() || "Awaiting requested details";
+  const onHoldContext =
+    String(j?.next_action_note ?? "").trim() ||
+    String(j?.action_required_by ?? "").trim() ||
+    pendingInfoReason;
+  const scheduleText = j?.scheduled_date
+    ? `${formatBusinessDateUS(String(j.scheduled_date))} ${displayWindowLA(j.window_start, j.window_end) || ""}`.trim()
+    : "Not scheduled";
   const nextStep = nextActionLabel(j, {
         retestReady: hasSignalEventForJob(latestRetestReadyByJob, jobId),
         newContractorJob:
@@ -1356,14 +1500,30 @@ function compactRow(j: any, showDate = false, note?: string) {
       });
   const noteText = String(note ?? "").trim();
   const nextStepNorm = nextStep.toLowerCase();
-  const detailLine = scheduledRetestLabel
-    ? `Retest scheduled for ${scheduledRetestLabel}`
-    : noteText && noteText.toLowerCase() !== nextStepNorm
-    ? noteText
+  const detailLine = !isFailed
+    ? scheduledRetestLabel
+      ? `Retest scheduled for ${scheduledRetestLabel}`
+      : noteText && noteText.toLowerCase() !== nextStepNorm
+      ? noteText
+      : ""
     : "";
+  const rawFailureReason = String(primaryFailureReasonByJob.get(jobId) ?? "").trim();
+  const normalizedFailureReason = rawFailureReason.replace(/^failed\s*[-:]\s*/i, "").trim();
+  const fallbackFailureReason = String(note ?? "").replace(/^failed\s*[-:]\s*/i, "").trim();
+  const failedReasonText = isRetestChild
+    ? fallbackFailureReason || "Retest follow-up for prior failed inspection"
+    : normalizedFailureReason || fallbackFailureReason || "Test requirement not met";
 
   return (
-    <div key={j.id} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
+    <div
+      key={j.id}
+      className={[
+        "relative rounded-lg border bg-white p-3 shadow-sm transition-shadow hover:shadow-md",
+        emphasize && needsAttention
+          ? "border-amber-300 bg-amber-50/40"
+          : "border-gray-200",
+      ].join(" ")}
+    >
       <div className="flex items-start justify-between gap-2">
         <div>
           <Link
@@ -1372,26 +1532,69 @@ function compactRow(j: any, showDate = false, note?: string) {
           >
             {j.title}
           </Link>
+          {emphasize && (pendingInfoSignal || onHoldSignal) ? (
+            <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-gray-700">
+              {pendingInfoSignal ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
+                  <span aria-hidden>⚠</span>
+                  <span>Pending Info: {pendingInfoContext}</span>
+                </span>
+              ) : null}
+              {onHoldSignal ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 font-medium text-slate-800">
+                  <span aria-hidden>⏸</span>
+                  <span>On Hold{onHoldContext ? `: ${onHoldContext}` : ""}</span>
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <div className="mt-0.5 text-xs font-medium text-gray-700">{customerNameOnly(j)} • {customerPhoneOnly(j) || "-"}</div>
+          <div className="text-xs text-gray-600">{addressLine(j)}</div>
           <div className="text-xs text-gray-600">Contractor: {contractorNameOnly(j)}</div>
+          <div className="text-xs text-gray-600">Schedule: {scheduleText}</div>
           <div className="text-xs text-gray-600">Assigned: {assignmentSummary}</div>
-          <div className="text-xs text-gray-500">{addressLine(j)}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-            <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
-              {statusMeta.label}
-            </span>
+            {!isFailed ? (
+              <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
+                {statusMeta.label}
+              </span>
+            ) : null}
+            {pendingInfoSignal ? (
+              <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
+                Pending Info
+              </span>
+            ) : null}
+            {onHoldSignal ? (
+              <span className="inline-flex rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 font-medium text-slate-800">
+                On Hold
+              </span>
+            ) : null}
           </div>
-          <div className="mt-1 text-xs font-medium text-gray-700">
-            {`Next step: ${nextStep}`}
-          </div>
+          {isFailed ? (
+            <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-sm text-blue-900">
+              <div className="font-semibold">{`Next Step: ${nextStep}`}</div>
+              <div className="mt-0.5 text-xs font-medium text-blue-900/90">
+                {`Reason: ${failedReasonText}`}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-sm font-semibold text-blue-900">
+              {`Next Step: ${nextStep}`}
+            </div>
+          )}
           {detailLine ? (
             <div className="mt-1 text-xs text-gray-600">
               {detailLine}
             </div>
           ) : null}
         </div>
-        {showDate ? (
+        {isFailed || showDate ? (
           <div className="text-right text-[11px] text-gray-500">
+            {isFailed ? (
+              <div className="mb-1 inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-800">
+                FAILED
+              </div>
+            ) : null}
             <div className="font-medium text-gray-700">{j.scheduled_date ? formatBusinessDateUS(String(j.scheduled_date)) : "-"}</div>
             <div>{displayWindowLA(j.window_start, j.window_end) || "-"}</div>
           </div>
@@ -1549,13 +1752,43 @@ return (
       </div>
     </div>
 
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-2 text-sm font-semibold text-gray-900">System Alerts</div>
+      <div className="flex flex-wrap gap-2">
+        {signalCards.map((card) => {
+          const isActive = signal === card.key;
+          return (
+            <Link
+              key={card.key}
+              href={`/ops${buildQueryString({
+                bucket: card.bucket,
+                contractor: contractor ?? "",
+                q: q ?? "",
+                sort: sort ?? "",
+                signal: card.key,
+              })}#ops-queues`}
+              className={[
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                isActive
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : `${signalToneClass(card.key)} hover:bg-white`,
+              ].join(" ")}
+            >
+              <span>{card.label}</span>
+              <span className={isActive ? "text-slate-200" : "text-current/80"}>{card.count}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-semibold text-gray-900">Call List</div>
           <div className="flex items-center gap-3">
-            <div className="text-xs text-gray-500">{sortedCallListJobs.length}</div>
-            {sortedCallListJobs.length > PREVIEW_LIMIT ? (
+            <div className="text-xs text-gray-500">{prioritizedCallListJobs.length}</div>
+            {prioritizedCallListJobs.length > PREVIEW_LIMIT ? (
               <Link
                 href={`/ops${buildQueryString({
                   bucket,
@@ -1572,15 +1805,15 @@ return (
             ) : null}
           </div>
         </div>
-        <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j))}</div>
+        <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j, false, undefined, true))}</div>
       </div>
 
      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <div className="text-sm font-semibold text-gray-900">Field Work</div>
         <div className="flex items-center gap-3">
-          <div className="text-xs text-gray-500">{sortedFieldWorkJobs.length}</div>
-          {sortedFieldWorkJobs.length > PREVIEW_LIMIT ? (
+          <div className="text-xs text-gray-500">{prioritizedFieldWorkJobs.length}</div>
+          {prioritizedFieldWorkJobs.length > PREVIEW_LIMIT ? (
             <Link
               href={`/ops${buildQueryString({
                 bucket,
@@ -1598,13 +1831,13 @@ return (
         </div>
       </div>
 
-  {sortedFieldWorkJobs.length === 0 ? (
+  {prioritizedFieldWorkJobs.length === 0 ? (
     <div className="flex h-32 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-sm font-medium text-emerald-800">
       <span className="mr-1.5 text-emerald-700">✓</span> Field work complete for today
     </div>
   ) : (
     <div className="space-y-2">
-      {fieldWorkVisibleJobs.map((j: any) => compactRow(j, true))}
+      {fieldWorkVisibleJobs.map((j: any) => compactRow(j, true, undefined, true))}
     </div>
   )}
 </div>
@@ -1613,8 +1846,8 @@ return (
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-semibold text-gray-900">Closeout Work Queue</div>
           <div className="flex items-center gap-3">
-            <div className="text-xs text-gray-500">{closeoutJobs.length}</div>
-            {closeoutJobs.length > PREVIEW_LIMIT ? (
+            <div className="text-xs text-gray-500">{prioritizedCloseoutJobs.length}</div>
+            {prioritizedCloseoutJobs.length > PREVIEW_LIMIT ? (
               <Link
                 href={`/ops${buildQueryString({
                   bucket,
@@ -1632,7 +1865,7 @@ return (
           </div>
         </div>
         <div className="space-y-2">
-          {closeoutVisibleJobs.map((j: any) => compactRow(j, false, closeoutLabel(j)))}
+          {closeoutVisibleJobs.map((j: any) => compactRow(j, false, closeoutLabel(j), true))}
         </div>
       </div>
     </div>
@@ -1671,7 +1904,7 @@ return (
     <div id="ops-queues" className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-sm font-semibold text-gray-900">Queues</div>
+          <div className="text-sm font-semibold text-gray-900">System / Contractor Work</div>
           <div className="text-xs text-gray-600">Closeout is the working bucket. Paperwork and invoice cards show raw projected status buckets.</div>
         </div>
         <div className="w-full sm:w-72">
@@ -1679,7 +1912,7 @@ return (
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-1">
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div className="mb-3 text-sm font-semibold text-gray-900">Workflow Queues</div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -1700,38 +1933,6 @@ return (
                     isActive
                       ? "border-slate-900 bg-slate-900 text-white"
                       : `${workflowToneClass(card.key)} hover:bg-white`,
-                  ].join(" ")}
-                >
-                  <div className={`text-[11px] font-medium ${isActive ? "text-slate-200" : "text-current/80"}`}>
-                    {card.label}
-                  </div>
-                  <div className="text-lg font-semibold">{card.count}</div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 text-sm font-semibold text-gray-900">Signals</div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {signalCards.map((card) => {
-              const isActive = signal === card.key;
-              return (
-                <Link
-                  key={card.key}
-                  href={`/ops${buildQueryString({
-                    bucket: card.bucket,
-                    contractor: contractor ?? "",
-                    q: q ?? "",
-                    sort: sort ?? "",
-                    signal: card.key,
-                  })}#ops-queues`}
-                  className={[
-                    "rounded-md border p-2.5 shadow-sm transition-all hover:-translate-y-[1px] hover:shadow",
-                    isActive
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : `${signalToneClass(card.key)} hover:bg-white`,
                   ].join(" ")}
                 >
                   <div className={`text-[11px] font-medium ${isActive ? "text-slate-200" : "text-current/80"}`}>

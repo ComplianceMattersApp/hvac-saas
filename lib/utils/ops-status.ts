@@ -51,3 +51,28 @@ export function resolveOpsStatus(job: ResolveOpsStatusInput): string {
   // Fallback
   return job.current_ops_status ?? "need_to_schedule";
 }
+
+export type PendingInfoSignalInput = {
+  ops_status?: string | null;
+  pending_info_reason?: string | null;
+  follow_up_date?: string | null;
+  next_action_note?: string | null;
+  action_required_by?: string | null;
+};
+
+function hasSignalValue(value: unknown): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+export function getPendingInfoSignal(input: PendingInfoSignalInput): boolean {
+  const legacyPendingInfo =
+    String(input.ops_status ?? "").trim().toLowerCase() === "pending_info";
+
+  const derivedPendingInfo =
+    hasSignalValue(input.pending_info_reason) ||
+    hasSignalValue(input.follow_up_date) ||
+    hasSignalValue(input.next_action_note) ||
+    hasSignalValue(input.action_required_by);
+
+  return legacyPendingInfo || derivedPendingInfo;
+}
