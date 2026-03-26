@@ -1541,10 +1541,6 @@ const defaultSystemTonnage =
                 <div className="text-sm text-muted-foreground rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
                   <div>
                     Max Allowed: {runDL.computed?.max_leakage_cfm ?? "—"} CFM
-                    {runDL.computed?.leakage_percent_allowed_display != null &&
-                    runDL.computed?.base_airflow_cfm != null
-                      ? ` (at ${runDL.computed.leakage_percent_allowed_display}% of ${runDL.computed.base_airflow_cfm} CFM base airflow)`
-                      : ""}
                   </div>
                   <div>Measured: {runDL.data?.measured_duct_leakage_cfm ?? "—"} CFM</div>
                 </div>
@@ -1604,6 +1600,20 @@ const defaultSystemTonnage =
                   <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
                     {runDL.is_completed && "✅ Test completed"}
                   </span>
+                  <SubmitButton
+                    form={ductSaveFormId}
+                    loadingText="Saving..."
+                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                  >
+                    Save
+                  </SubmitButton>
+                  <SubmitButton
+                    form={ductSaveFormId}
+                    loadingText="Saving & completing..."
+                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  >
+                    {runDL.is_completed ? "Save Changes" : "Save & Complete Test"}
+                  </SubmitButton>
                   <button
                     type="submit"
                     form={ductDeleteFormId}

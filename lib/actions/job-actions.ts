@@ -2728,8 +2728,8 @@ export async function saveAirflowDataFromForm(formData: FormData) {
     notes: String(formData.get("notes") || "").trim() || null,
 
     // breadcrumb for reporting/audit
-    airflow_override_applied: airflowOverridePass || undefined,
-    airflow_override_reason: airflowOverridePass ? airflowOverrideReason : undefined,
+    airflow_override_applied: airflowOverridePass,
+    airflow_override_reason: airflowOverridePass ? airflowOverrideReason : null,
   };
 
   const computed = {
