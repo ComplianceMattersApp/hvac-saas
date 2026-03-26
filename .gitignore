@@ -44,3 +44,14 @@ next-env.d.ts
 
 /public/sw.js
 /public/workbox-*.js
+
+# Supabase temp files
+supabase/.temp/
+
+# Local env
+.env
+.env.local
+
+# OS / editor
+.DS_Store
+node_modules/
