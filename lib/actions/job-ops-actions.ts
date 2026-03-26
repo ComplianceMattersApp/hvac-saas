@@ -1424,7 +1424,8 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
     });
   }
 
-  nextOps = await recomputeOpsAfterCloseoutMutation(supabase, jobId);
+  nextOps =
+    (await recomputeOpsAfterCloseoutMutation(supabase, jobId)) ?? nextOps;
 
   const {
     data: { user },
