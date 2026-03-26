@@ -37,6 +37,7 @@ export default async function RootLayout({
 
   let homeHref = "/ops";
   let isContractor = false;
+  let isInternalUser = false;
 
   if (user) {
     const [{ data: cu }, internalUser] = await Promise.all([
@@ -53,6 +54,7 @@ export default async function RootLayout({
       isContractor = true;
     } else if (internalUser?.is_active) {
       homeHref = "/ops";
+      isInternalUser = true;
     }
   }
 
@@ -120,6 +122,14 @@ export default async function RootLayout({
                         >
                           Search Customers
                         </Link>
+                        {isInternalUser && (
+                          <Link
+                            href="/notes"
+                            className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                          >
+                            Notes
+                          </Link>
+                        )}
                         <div className="my-1 border-t border-slate-100" />
                         <Link
                           href="/account"
@@ -175,6 +185,14 @@ export default async function RootLayout({
                     >
                       Search Customers
                     </Link>
+                    {isInternalUser && (
+                      <Link
+                        href="/notes"
+                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
+                      >
+                        Notes
+                      </Link>
+                    )}
                 </div>
               </header>
             </>

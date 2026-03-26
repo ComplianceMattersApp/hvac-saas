@@ -164,6 +164,11 @@ export default function JobCoreFields({
       {/* Notes */}
       <div className="rounded-lg border p-3 space-y-2">
         <div className="text-sm font-semibold">Additional Comments/Notes</div>
+        {mode === "external" && (
+          <p className="text-xs text-gray-600">
+            Need to share timing, availability, or scheduling details? Add them in the notes section and our team will review.
+          </p>
+        )}
         <textarea
           name="job_notes"
           rows={4}
