@@ -334,6 +334,7 @@ let fieldWorkQ = supabase
   .select(baseSelect)
   .is("deleted_at", null)
   .neq("status", "cancelled")
+  .neq("ops_status", "closed")
   .eq("field_complete", false)
   .gte("scheduled_date", startTodayUtc)
   .lt("scheduled_date", startTomorrowUtc)
