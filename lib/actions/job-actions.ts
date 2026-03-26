@@ -9,7 +9,7 @@ import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
-import { evaluateJobOpsStatus } from "@/lib/actions/job-evaluator";
+import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from "@/lib/actions/job-evaluator";
 import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
 import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions/job-event-meta";
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
@@ -5575,6 +5575,9 @@ if (jobType !== "ecc") {
 
   if (error) throw error;
 
+  await evaluateJobOpsStatus(id);
+  await healStalePaperworkOpsStatus(id);
+
   redirect(`/jobs/${id}`);
 }
 
@@ -5589,6 +5592,9 @@ if (jobType !== "ecc") {
     .eq("id", id);
 
   if (error) throw error;
+
+  await evaluateJobOpsStatus(id);
+  await healStalePaperworkOpsStatus(id);
 
   redirect(`/jobs/${id}`);
 }

@@ -4,7 +4,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { resolveOpsStatus } from "@/lib/utils/ops-status";
-import { setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
+import { forceSetOpsStatus, setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
 import type { OpsStatus } from "@/lib/actions/ops-status";
 
 /**
@@ -60,4 +60,46 @@ export async function evaluateJobOpsStatus(jobId: string): Promise<void> {
   });
 
   await setOpsStatusIfNotManual(jobId, nextOps as OpsStatus);
+}
+
+export async function healStalePaperworkOpsStatus(jobId: string): Promise<boolean> {
+  const supabase = await createClient();
+
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select(
+      "id, job_type, status, scheduled_date, window_start, window_end, field_complete, certs_complete, invoice_complete, ops_status"
+    )
+    .eq("id", jobId)
+    .single();
+
+  if (jobErr) throw new Error(jobErr.message);
+  if (!job?.id) throw new Error("Job not found");
+
+  const currentOps = String(job.ops_status ?? "").toLowerCase();
+  const isPaperworkRequired = currentOps === "paperwork_required";
+  const isFullyComplete = Boolean(job.field_complete) && Boolean(job.certs_complete) && Boolean(job.invoice_complete);
+
+  if (!isPaperworkRequired || !isFullyComplete) {
+    return false;
+  }
+
+  const nextOps = resolveOpsStatus({
+    status: job.status,
+    job_type: job.job_type,
+    scheduled_date: job.scheduled_date,
+    window_start: job.window_start,
+    window_end: job.window_end,
+    field_complete: job.field_complete,
+    certs_complete: job.certs_complete,
+    invoice_complete: job.invoice_complete,
+    current_ops_status: job.ops_status,
+  });
+
+  if (String(nextOps ?? "").toLowerCase() === currentOps) {
+    return false;
+  }
+
+  await forceSetOpsStatus(jobId, nextOps as OpsStatus);
+  return true;
 }

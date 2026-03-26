@@ -8,7 +8,7 @@ import { resolveOpsStatus } from "@/lib/utils/ops-status";
 import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { forceSetOpsStatus } from "@/lib/actions/ops-status";
-import { evaluateJobOpsStatus } from "@/lib/actions/job-evaluator";
+import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from "@/lib/actions/job-evaluator";
 import {
   isInternalAccessError,
   requireInternalUser,
@@ -85,6 +85,20 @@ function buildOpsChanges(before: OpsSnapshot, after: OpsSnapshot) {
   }
 
   return changes;
+}
+
+async function recomputeOpsAfterCloseoutMutation(supabase: any, jobId: string): Promise<string | null> {
+  await evaluateJobOpsStatus(jobId);
+  await healStalePaperworkOpsStatus(jobId);
+
+  const { data: refreshed, error: refreshedErr } = await supabase
+    .from("jobs")
+    .select("ops_status")
+    .eq("id", jobId)
+    .single();
+
+  if (refreshedErr) throw new Error(refreshedErr.message);
+  return refreshed?.ops_status ?? null;
 }
 
 type ContractorReportKind = "failed" | "pending_info";
@@ -692,7 +706,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
     }
     
   // Recompute ops_status using shared resolver
-  const nextOps = resolveOpsStatus({
+  let nextOps = resolveOpsStatus({
     status: job.status,
     job_type: job.job_type,
     scheduled_date: job.scheduled_date,
@@ -710,6 +724,8 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
     .eq("id", jobId);
 
   if (opsErr) throw opsErr;
+
+  nextOps = await recomputeOpsAfterCloseoutMutation(supabase, jobId);
 
   const { error: eventErr } = await supabase.from("job_events").insert({
     job_id: jobId,
@@ -817,6 +833,8 @@ if (!updatedInvoiceRow?.id || updatedInvoiceRow.invoice_complete !== true) {
     .eq("id", jobId);
 
   if (opsErr) throw opsErr;
+
+  nextOps = await recomputeOpsAfterCloseoutMutation(supabase, jobId);
 
   const { error: eventErr } = await supabase.from("job_events").insert({
     job_id: jobId,
@@ -1403,6 +1421,8 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
       final_ops_status: nextOps,
     });
   }
+
+  nextOps = await recomputeOpsAfterCloseoutMutation(supabase, jobId);
 
   const {
     data: { user },

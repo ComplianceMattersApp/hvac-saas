@@ -56,6 +56,7 @@ import {
 } from "@/lib/staffing/human-layer";
 
 import JobAttachmentsInternal from "./_components/JobAttachmentsInternal";
+import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from "@/lib/actions/job-evaluator";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -495,6 +496,27 @@ export default async function JobDetailPage({
     .single();
 
   if (jobError || !job) return notFound();
+
+  const looksStalePaperworkStatus =
+    String(job.ops_status ?? "").toLowerCase() === "paperwork_required" &&
+    Boolean(job.field_complete) &&
+    Boolean(job.certs_complete) &&
+    Boolean(job.invoice_complete);
+
+  if (looksStalePaperworkStatus) {
+    await evaluateJobOpsStatus(jobId);
+    await healStalePaperworkOpsStatus(jobId);
+
+    const { data: healedRow, error: healedErr } = await supabase
+      .from("jobs")
+      .select("ops_status")
+      .eq("id", jobId)
+      .single();
+
+    if (!healedErr && healedRow?.ops_status != null) {
+      job.ops_status = healedRow.ops_status;
+    }
+  }
 
   const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
     supabase,
