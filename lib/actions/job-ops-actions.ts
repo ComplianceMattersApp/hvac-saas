@@ -725,7 +725,8 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
 
   if (opsErr) throw opsErr;
 
-  nextOps = await recomputeOpsAfterCloseoutMutation(supabase, jobId);
+  nextOps =
+    (await recomputeOpsAfterCloseoutMutation(supabase, jobId)) ?? nextOps;
 
   const { error: eventErr } = await supabase.from("job_events").insert({
     job_id: jobId,
@@ -834,7 +835,8 @@ if (!updatedInvoiceRow?.id || updatedInvoiceRow.invoice_complete !== true) {
 
   if (opsErr) throw opsErr;
 
-  nextOps = await recomputeOpsAfterCloseoutMutation(supabase, jobId);
+  nextOps =
+    (await recomputeOpsAfterCloseoutMutation(supabase, jobId)) ?? nextOps;
 
   const { error: eventErr } = await supabase.from("job_events").insert({
     job_id: jobId,
