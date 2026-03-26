@@ -1959,7 +1959,7 @@ const renderTimelineItem = (e: any, key: string) => {
       {tab === "info" && (
         <>
     
-{job.ops_status === "data_entry" ? (
+{["data_entry", "invoice_required"].includes(String(job.ops_status ?? "").toLowerCase()) ? (
   <div className="rounded-lg border bg-yellow-50 p-4 mt-6">
     <div className="font-semibold mb-2">
       Data Entry Required
