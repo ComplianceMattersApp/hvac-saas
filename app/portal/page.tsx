@@ -9,6 +9,7 @@ import {
   type ContractorIssue,
 } from "@/lib/portal/resolveContractorIssues";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import { isPortalVisibleJob } from "@/lib/visibility/portal";
 
 function formatDateLA(iso: string) {
@@ -217,6 +218,7 @@ export default async function PortalPage({
         id: String(job.id ?? ""),
         ops_status: job.ops_status,
         pending_info_reason: job.pending_info_reason,
+        follow_up_date: job.follow_up_date,
         next_action_note: job.next_action_note,
         action_required_by: job.action_required_by,
         scheduled_date: job.scheduled_date,
@@ -355,7 +357,7 @@ export default async function PortalPage({
     const lifecycle = String(row.job.status ?? "").trim().toLowerCase();
     const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
     if (row.resolved?.retestState === "scheduled" || row.resolved?.bucket === "passed") return "Next step: No Immediate Action";
-    if (ops === "pending_info" || row.resolved?.primaryIssue?.group === "needs_info") return "Next step: Provide Requested Information";
+    if (row.resolved?.primaryIssue?.group === "needs_info") return "Next step: Provide Requested Information";
     if (ops === "failed" || ops === "retest_needed" || row.resolved?.primaryIssue?.group === "failed") return "Next step: Await Contractor Correction";
     if (["paperwork_required", "invoice_required"].includes(ops)) return "Next step: Finish Closeout";
     if (row.resolved?.retestState === "pending_scheduling" || lifecycle === "on_the_way" || lifecycle === "in_progress" || ops === "scheduled") {
@@ -430,6 +432,13 @@ export default async function PortalPage({
             const openRetestChild = openRetestChildByParentId.get(String(j.id));
             const detailLine = cardDetailLine(resolved);
             const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
+            const pendingInfoSignal = getPendingInfoSignal({
+              ops_status: j?.ops_status,
+              pending_info_reason: j?.pending_info_reason,
+              follow_up_date: j?.follow_up_date,
+              next_action_note: j?.next_action_note,
+              action_required_by: j?.action_required_by,
+            });
 
             return (
               <Link
@@ -460,6 +469,11 @@ export default async function PortalPage({
                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
                         {statusMeta.label}
                       </span>
+                      {pendingInfoSignal ? (
+                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
+                          Pending Info
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -510,6 +524,13 @@ export default async function PortalPage({
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = cardDetailLine(resolved);
               const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
+              const pendingInfoSignal = getPendingInfoSignal({
+                ops_status: j?.ops_status,
+                pending_info_reason: j?.pending_info_reason,
+                follow_up_date: j?.follow_up_date,
+                next_action_note: j?.next_action_note,
+                action_required_by: j?.action_required_by,
+              });
               return (
                 <Link
                   key={j.id}
@@ -534,6 +555,11 @@ export default async function PortalPage({
                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
                           {statusMeta.label}
                         </span>
+                        {pendingInfoSignal ? (
+                          <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
+                            Pending Info
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -584,6 +610,13 @@ export default async function PortalPage({
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = cardDetailLine(resolved);
               const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
+              const pendingInfoSignal = getPendingInfoSignal({
+                ops_status: j?.ops_status,
+                pending_info_reason: j?.pending_info_reason,
+                follow_up_date: j?.follow_up_date,
+                next_action_note: j?.next_action_note,
+                action_required_by: j?.action_required_by,
+              });
               return (
                 <Link
                   key={j.id}
@@ -608,6 +641,11 @@ export default async function PortalPage({
                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
                           {statusMeta.label}
                         </span>
+                        {pendingInfoSignal ? (
+                          <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
+                            Pending Info
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">

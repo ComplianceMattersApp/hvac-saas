@@ -5,8 +5,10 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { resolveOpsStatus } from "@/lib/utils/ops-status";
+import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { forceSetOpsStatus } from "@/lib/actions/ops-status";
+import { evaluateJobOpsStatus } from "@/lib/actions/job-evaluator";
 import {
   isInternalAccessError,
   requireInternalUser,
@@ -242,6 +244,9 @@ async function resolveContractorReportForJob(params: {
       ops_status,
       contractor_id,
       pending_info_reason,
+      follow_up_date,
+      next_action_note,
+      action_required_by,
       scheduled_date,
       window_start,
       window_end,
@@ -260,7 +265,14 @@ async function resolveContractorReportForJob(params: {
   if (!job?.id) throw new Error("Job not found");
 
   const opsStatus = String(job.ops_status ?? "").trim().toLowerCase();
-  if (opsStatus !== "failed" && opsStatus !== "pending_info") {
+  const pendingInfoSignal = getPendingInfoSignal({
+    pending_info_reason: (job as any)?.pending_info_reason,
+    follow_up_date: (job as any)?.follow_up_date,
+    next_action_note: (job as any)?.next_action_note,
+    action_required_by: (job as any)?.action_required_by,
+  });
+
+  if (opsStatus !== "failed" && !pendingInfoSignal) {
     throw new Error("Contractor report is only available for failed or pending_info jobs");
   }
 
@@ -846,7 +858,23 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
     action_required_by: beforeJob.action_required_by ?? null,
   };
   const opsStatusRaw = formData.get("ops_status");
-  const ops_status = isOpsStatus(opsStatusRaw) ? opsStatusRaw : before.ops_status;
+  const allowedSignalOpsStatuses = ["pending_info", "on_hold"] as const;
+  const isAllowedSignalOpsStatus = (
+    value: unknown
+  ): value is (typeof allowedSignalOpsStatuses)[number] =>
+    typeof value === "string" &&
+    allowedSignalOpsStatuses.includes(
+      value as (typeof allowedSignalOpsStatuses)[number]
+    );
+
+  let ops_status = before.ops_status;
+  if (opsStatusRaw != null) {
+    if (!isAllowedSignalOpsStatus(opsStatusRaw)) {
+      throw new Error("Invalid ops_status");
+    }
+    // pending_info is a signal-only state: keep lifecycle ops_status unchanged.
+    ops_status = opsStatusRaw === "pending_info" ? before.ops_status : opsStatusRaw;
+  }
   const pendingInfoReasonRaw = formData.get('pending_info_reason');
   const followUpDateRaw = formData.get('follow_up_date');
   const nextActionNoteRaw = formData.get('next_action_note');
@@ -917,7 +945,7 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
   const { data: before, error: beforeErr } = await supabase
     .from("jobs")
     .select(
-      "id, status, job_type, ops_status, field_complete, certs_complete, invoice_complete, scheduled_date, window_start, window_end"
+      "id, status, job_type, ops_status, field_complete, certs_complete, invoice_complete, scheduled_date, window_start, window_end, pending_info_reason, follow_up_date, next_action_note, action_required_by"
     )
     .eq("id", jobId)
     .single();
@@ -925,8 +953,75 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
   if (beforeErr) throw new Error(beforeErr.message);
   if (!before?.id) throw new Error("Job not found");
 
+  const hasPendingInfoSignal = getPendingInfoSignal({
+    pending_info_reason: before.pending_info_reason,
+    follow_up_date: before.follow_up_date,
+    next_action_note: before.next_action_note,
+    action_required_by: before.action_required_by,
+  });
+
+  if (!hasPendingInfoSignal) return before.ops_status ?? null;
+
   const currentOps = String(before.ops_status ?? "").trim().toLowerCase();
-  if (currentOps !== "pending_info") return before.ops_status ?? null;
+  const releasable = new Set([
+    "pending_info",
+    "on_hold",
+    "failed",
+    "retest_needed",
+    "paperwork_required",
+    "invoice_required",
+  ]);
+
+  if (!releasable.has(currentOps)) {
+    const beforeSnapshot: OpsSnapshot = {
+      ops_status: before.ops_status ?? null,
+      pending_info_reason: before.pending_info_reason ?? null,
+      follow_up_date: before.follow_up_date ?? null,
+      next_action_note: before.next_action_note ?? null,
+      action_required_by: before.action_required_by ?? null,
+    };
+
+    const afterSnapshot: OpsSnapshot = {
+      ...beforeSnapshot,
+      pending_info_reason: null,
+      follow_up_date: null,
+      next_action_note: null,
+      action_required_by: null,
+    };
+
+    const changes = buildOpsChanges(beforeSnapshot, afterSnapshot);
+
+    const { error: clearErr } = await supabase
+      .from("jobs")
+      .update({
+        pending_info_reason: null,
+        follow_up_date: null,
+        next_action_note: null,
+        action_required_by: null,
+      })
+      .eq("id", jobId);
+
+    if (clearErr) throw new Error(clearErr.message);
+
+    if (changes.length > 0) {
+      const { error: eventErr } = await supabase.from("job_events").insert({
+        job_id: jobId,
+        event_type: "ops_update",
+        message: "Pending info signal cleared",
+        meta: {
+          changes,
+          source,
+          release_from: before.ops_status ?? null,
+          release_to: before.ops_status ?? null,
+          signal_only_clear: true,
+        },
+      });
+
+      if (eventErr) throw new Error(eventErr.message);
+    }
+
+    return before.ops_status ?? null;
+  }
 
   return releaseAndReevaluate(jobId, source);
 }
@@ -1118,9 +1213,6 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   }
 
   const allowedManualOpsStatuses = [
-    "need_to_schedule",
-    "scheduled",
-    "pending_info",
     "on_hold",
   ] as const;
 
@@ -1132,7 +1224,8 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
     );
 
   if (!isAllowedManualOpsStatus(opsStatusRaw)) {
-    throw new Error("Invalid manual ops_status");
+    const banner = encodeURIComponent("Use Ops Details to set Pending Info");
+    redirect(`/jobs/${jobId}?tab=ops&banner=${banner}`);
   }
 
   // BEFORE

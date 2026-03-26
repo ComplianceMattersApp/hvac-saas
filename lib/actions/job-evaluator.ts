@@ -1,0 +1,63 @@
+// lib/actions/job-evaluator.ts
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
+import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
+import { resolveOpsStatus } from "@/lib/utils/ops-status";
+import { setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
+import type { OpsStatus } from "@/lib/actions/ops-status";
+
+/**
+ * Job-type-aware ops_status resolver entry point.
+ *
+ * This is the intended single authority entry point for writing jobs.ops_status.
+ * Actions should call this instead of writing ops_status directly.
+ *
+ * ECC jobs:
+ *   Delegates entirely to evaluateEccOpsStatus, which is test-run-aware,
+ *   scenario-driven, and handles its own DB write with appropriate hard-lock
+ *   guards (pending_info, on_hold are never cleared by ECC evaluation).
+ *
+ * Service jobs (and unknown/fallback job types):
+ *   Computes next status via resolveOpsStatus (pure lifecycle utility), then
+ *   writes via setOpsStatusIfNotManual, which respects the manual-lock list
+ *   (pending_info, on_hold, retest_needed, paperwork_required, invoice_required
+ *   are not overwritten by automated resolution).
+ */
+export async function evaluateJobOpsStatus(jobId: string): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select(
+      "id, job_type, status, scheduled_date, window_start, window_end, field_complete, certs_complete, invoice_complete, ops_status"
+    )
+    .eq("id", jobId)
+    .single();
+
+  if (jobErr) throw new Error(jobErr.message);
+  if (!job?.id) throw new Error("Job not found");
+
+  const jobType = String(job.job_type ?? "").trim().toLowerCase();
+
+  // ECC path: delegate entirely — evaluateEccOpsStatus owns its own write
+  if (jobType === "ecc") {
+    await evaluateEccOpsStatus(jobId);
+    return;
+  }
+
+  // Service / fallback path: compute via shared lifecycle resolver, write safely
+  const nextOps = resolveOpsStatus({
+    status: job.status,
+    job_type: job.job_type,
+    scheduled_date: job.scheduled_date,
+    window_start: job.window_start,
+    window_end: job.window_end,
+    field_complete: job.field_complete,
+    certs_complete: job.certs_complete,
+    invoice_complete: job.invoice_complete,
+    current_ops_status: job.ops_status,
+  });
+
+  await setOpsStatusIfNotManual(jobId, nextOps as OpsStatus);
+}

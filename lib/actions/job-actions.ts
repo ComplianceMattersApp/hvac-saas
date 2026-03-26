@@ -6,8 +6,10 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath, refresh } from "next/cache";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
+import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
+import { evaluateJobOpsStatus } from "@/lib/actions/job-evaluator";
 import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
 import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions/job-event-meta";
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
@@ -5159,7 +5161,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const { data: before, error: beforeErr } = await supabase
     .from("jobs")
     .select(
-      "scheduled_date, window_start, window_end, ops_status, job_type, status, field_complete, permit_number, jurisdiction, permit_date"
+      "scheduled_date, window_start, window_end, ops_status, job_type, status, field_complete, permit_number, jurisdiction, permit_date, pending_info_reason, follow_up_date, next_action_note, action_required_by"
     )
     .eq("id", id)
     .single();
@@ -5245,7 +5247,6 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     scheduled_date,
     window_start,
     window_end,
-    ops_status: next_ops_status,
     status: nextLifecycleStatus,
     on_the_way_at: nextOnTheWayAt,
     permit_number,
@@ -5253,10 +5254,21 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     permit_date,
   });
 
-  const wasPendingInfo = String(before?.ops_status ?? "").trim().toLowerCase() === "pending_info";
+  try {
+    await evaluateJobOpsStatus(id);
+  } catch {
+    redirectToScheduleTarget("schedule_saved_ops_eval_failed");
+  }
+
+  const hadPendingInfoSignal = getPendingInfoSignal({
+    pending_info_reason: before?.pending_info_reason,
+    follow_up_date: before?.follow_up_date,
+    next_action_note: before?.next_action_note,
+    action_required_by: before?.action_required_by,
+  });
   const hasPermitNumber = String(permit_number ?? "").trim().length > 0;
 
-  if (wasPendingInfo && hasPermitNumber) {
+  if (hadPendingInfoSignal && hasPermitNumber) {
     await releasePendingInfoAndRecompute(id, "auto_release_on_permit_save");
   }
 
@@ -5286,6 +5298,10 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const wasScheduled =
     !!before?.scheduled_date || !!before?.window_start || !!before?.window_end;
   const isScheduled = !!scheduled_date || !!window_start || !!window_end;
+  const shouldAutoReleaseHold =
+    String(before?.ops_status ?? "").trim().toLowerCase() === "on_hold" &&
+    isScheduled &&
+    !unscheduleRequested;
   const event_type = unscheduleRequested
     ? "unscheduled"
     : !wasScheduled && isScheduled
@@ -5322,6 +5338,11 @@ export async function updateJobScheduleFromForm(formData: FormData) {
       },
     },
   });
+
+  if (shouldAutoReleaseHold) {
+    const { releaseAndReevaluate } = await import("@/lib/actions/job-ops-actions");
+    await releaseAndReevaluate(id, "auto_release_on_schedule_save");
+  }
 
   if (event_type === "scheduled") {
     await sendCustomerScheduledEmailForJob({ supabase, jobId: id });

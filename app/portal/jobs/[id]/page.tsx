@@ -15,6 +15,7 @@ import {
   resolveContractorIssues,
 } from "@/lib/portal/resolveContractorIssues";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import { isPortalVisibleJob } from "@/lib/visibility/portal";
 
 function formatDateLA(iso: string) {
@@ -374,6 +375,7 @@ export default async function PortalJobDetailPage({
       id: String((job as any)?.id ?? ""),
       ops_status: (job as any)?.ops_status,
       pending_info_reason: (job as any)?.pending_info_reason,
+      follow_up_date: (job as any)?.follow_up_date,
       next_action_note: (job as any)?.next_action_note,
       action_required_by: (job as any)?.action_required_by,
       scheduled_date: (job as any)?.scheduled_date,
@@ -419,6 +421,14 @@ export default async function PortalJobDetailPage({
 
   const customerPhone =
     String((job as any)?.customers?.phone ?? "").trim() || String((job as any)?.customer_phone ?? "").trim() || "-";
+
+  const pendingInfoSignal = getPendingInfoSignal({
+    ops_status: (job as any)?.ops_status ?? null,
+    pending_info_reason: (job as any)?.pending_info_reason ?? null,
+    follow_up_date: (job as any)?.follow_up_date ?? null,
+    next_action_note: (job as any)?.next_action_note ?? null,
+    action_required_by: (job as any)?.action_required_by ?? null,
+  });
 
   const pendingInfoReasonText = String((job as any)?.pending_info_reason ?? "").trim();
   const showPermitField =
@@ -583,7 +593,14 @@ export default async function PortalJobDetailPage({
 
           <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 h-full">
             <div className="text-xs text-gray-500 dark:text-gray-300">Current Status</div>
-            <div className="mt-1 font-medium">{titleCaseFromSnake((job as any).status)} / {titleCaseFromSnake((job as any).ops_status)}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="font-medium">{titleCaseFromSnake((job as any).status)} / {titleCaseFromSnake((job as any).ops_status)}</span>
+              {pendingInfoSignal ? (
+                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  Pending Info
+                </span>
+              ) : null}
+            </div>
           </div>
 
           <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 h-full">
