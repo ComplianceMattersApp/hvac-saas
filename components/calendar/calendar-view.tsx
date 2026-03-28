@@ -19,6 +19,7 @@ type Props = {
   date?: string;
   banner?: string;
   job?: string;
+  tech?: string;
 };
 
 const TECH_COLOR_PALETTE = [
@@ -107,19 +108,21 @@ function phoneHrefValue(rawPhone: string) {
   return rawPhone.replace(/[^\d+]/g, '');
 }
 
-function buildReturnTo(view: CalendarUIView, date: string) {
+function buildReturnTo(view: CalendarUIView, date: string, tech?: string | null) {
   const q = new URLSearchParams();
   q.set('view', view);
   q.set('date', date);
+  if (tech) q.set('tech', tech);
   return `/calendar?${q.toString()}`;
 }
 
-function buildCalendarHref(view: CalendarUIView, date: string, params?: { banner?: string; job?: string | null }) {
+function buildCalendarHref(view: CalendarUIView, date: string, params?: { banner?: string; job?: string | null; tech?: string | null }) {
   const q = new URLSearchParams();
   q.set('view', view);
   q.set('date', date);
   if (params?.banner) q.set('banner', params.banner);
   if (params?.job) q.set('job', params.job);
+  if (params?.tech) q.set('tech', params.tech);
   return `/calendar?${q.toString()}`;
 }
 
@@ -307,8 +310,8 @@ function statusDotClass(status: string) {
   return 'bg-gray-300';
 }
 
-function NavLinks(props: { view: CalendarUIView; date: string }) {
-  const { view, date } = props;
+function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | null }) {
+  const { view, date, tech } = props;
   const today = todayYmdLA();
 
   const prev =
@@ -328,13 +331,13 @@ function NavLinks(props: { view: CalendarUIView; date: string }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Link href={buildCalendarHref(view, prev)} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+      <Link href={buildCalendarHref(view, prev, { tech })} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
         Previous
       </Link>
-      <Link href={buildCalendarHref(view, todayTarget)} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+      <Link href={buildCalendarHref(view, todayTarget, { tech })} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
         Today
       </Link>
-      <Link href={buildCalendarHref(view, next)} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+      <Link href={buildCalendarHref(view, next, { tech })} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
         Next
       </Link>
     </div>
@@ -602,8 +605,9 @@ function DispatchGrid(props: {
 function AgendaList(props: {
   jobs: DispatchJob[];
   date: string;
+  tech?: string | null;
 }) {
-  const { jobs, date } = props;
+  const { jobs, date, tech } = props;
 
   const grouped = new Map<string, DispatchJob[]>();
   for (const job of jobs) {
@@ -638,7 +642,7 @@ function AgendaList(props: {
               return (
                 <Link
                   key={job.id}
-                  href={buildCalendarHref('list', date, { job: job.id })}
+                  href={buildCalendarHref('list', date, { job: job.id, tech })}
                   scroll={false}
                   className={`block rounded border border-slate-200 bg-white px-3 py-2 shadow-sm hover:bg-slate-50 ${faded}`}
                 >
@@ -675,9 +679,10 @@ function DetailPanel(props: {
   assignableUsers: Array<{ user_id: string; display_name: string }>;
   view: CalendarUIView;
   date: string;
+  tech?: string | null;
   className?: string;
 }) {
-  const { job, returnTo, assignableUsers, view, date, className = '' } = props;
+  const { job, returnTo, assignableUsers, view, date, tech, className = '' } = props;
   const phone = customerPhone(job);
   const phoneHref = phoneHrefValue(phone);
   const hasPhone = Boolean(phoneHref);
@@ -714,14 +719,14 @@ function DetailPanel(props: {
               )}
 
               <Link
-                href={buildCalendarHref(view, date, { job: job.id, banner: 'called' })}
+                href={buildCalendarHref(view, date, { job: job.id, banner: 'called', tech })}
                 scroll={false}
                 className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50"
               >
                 Called
               </Link>
               <Link
-                href={buildCalendarHref(view, date, { job: job.id, banner: 'text_sent' })}
+                href={buildCalendarHref(view, date, { job: job.id, banner: 'text_sent', tech })}
                 scroll={false}
                 className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50"
               >
@@ -731,7 +736,7 @@ function DetailPanel(props: {
           </div>
         </div>
         <Link
-          href={buildCalendarHref(view, date)}
+          href={buildCalendarHref(view, date, { tech })}
           scroll={false}
           aria-label="Close details"
           className="mr-1 mt-1 shrink-0 rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
@@ -755,6 +760,14 @@ function DetailPanel(props: {
       <div className="space-y-5">
         <section>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Schedule</p>
+          {job.scheduled_date ? (
+            <p className="mb-3 rounded bg-sky-50 px-2 py-1.5 text-xs text-sky-800">
+              {formatBusinessDateUS(job.scheduled_date)}
+              {job.window_start ? ` · ${displayWindowLA(job.window_start, job.window_end) ?? ''}` : ''}
+            </p>
+          ) : (
+            <p className="mb-3 text-xs text-slate-400">Not yet scheduled</p>
+          )}
           <form action={updateJobScheduleFromForm} className="grid gap-3">
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="return_to" value={returnTo} />
@@ -767,6 +780,16 @@ function DetailPanel(props: {
               Save Schedule
             </SubmitButton>
           </form>
+          {job.scheduled_date ? (
+            <form action={updateJobScheduleFromForm} className="mt-3">
+              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="return_to" value={returnTo} />
+              <input type="hidden" name="unschedule" value="1" />
+              <SubmitButton className="w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-500 hover:border-red-200 hover:text-red-700" loadingText="Removing...">
+                Unschedule
+              </SubmitButton>
+            </form>
+          ) : null}
         </section>
 
         <section>
@@ -828,7 +851,8 @@ export async function CalendarView(props: Props) {
     anchorDate: props.date,
   });
 
-  const returnTo = buildReturnTo(uiView, data.anchorDate);
+  const activeTech = String(props.tech ?? '').trim() || null;
+  const returnTo = buildReturnTo(uiView, data.anchorDate, activeTech);
   const banner = bannerMessage(props.banner);
   const selectedJobId = String(props.job ?? '').trim();
 
@@ -889,6 +913,22 @@ export async function CalendarView(props: Props) {
     data.unassignedScheduledJobs.find((job) => job.id === selectedJobId) ||
     null;
 
+  // Tech filter — applied at the presentation layer only, no backend change
+  const filteredDayJobs = activeTech
+    ? data.day.jobs.filter((job) => isDispatchVisibleForLayout(job) && job.assignments.some((a) => a.user_id === activeTech))
+    : data.day.jobs.filter((job) => isDispatchVisibleForLayout(job));
+
+  const filteredJobsByDay = activeTech
+    ? canonicalDispatchJobsByDay.map((day) => ({
+        ...day,
+        jobs: day.jobs.filter((job) => job.assignments.some((a) => a.user_id === activeTech)),
+      }))
+    : canonicalDispatchJobsByDay;
+
+  const filteredJobsForRange = activeTech
+    ? canonicalDispatchJobsForRange.filter((job) => job.assignments.some((a) => a.user_id === activeTech))
+    : canonicalDispatchJobsForRange;
+
   let headerLabel = '';
   if (uiView === 'month') {
     const anchor = parseISO(data.anchorDate);
@@ -922,7 +962,7 @@ export async function CalendarView(props: Props) {
               {(['day', 'week', 'month', 'list'] as CalendarUIView[]).map((viewValue) => (
                 <Link
                   key={viewValue}
-                  href={buildCalendarHref(viewValue, data.anchorDate)}
+                  href={buildCalendarHref(viewValue, data.anchorDate, { tech: activeTech })}
                   className={`rounded-lg px-4 py-2 text-base font-semibold ${
                     uiView === viewValue ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'
                   }`}
@@ -931,8 +971,32 @@ export async function CalendarView(props: Props) {
                 </Link>
               ))}
             </div>
-            <NavLinks view={uiView} date={data.anchorDate} />
+            <NavLinks view={uiView} date={data.anchorDate} tech={activeTech} />
           </div>
+
+          {data.assignableUsers.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href={buildCalendarHref(uiView, data.anchorDate)}
+                className={`rounded px-2.5 py-1 text-xs font-medium ${
+                  !activeTech ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                All technicians
+              </Link>
+              {data.assignableUsers.map((user) => (
+                <Link
+                  key={user.user_id}
+                  href={buildCalendarHref(uiView, data.anchorDate, { tech: user.user_id })}
+                  className={`rounded px-2.5 py-1 text-xs font-medium ${
+                    activeTech === user.user_id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {user.display_name}
+                </Link>
+              ))}
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
             {STATUS_LEGEND.map((item) => (
@@ -970,16 +1034,16 @@ export async function CalendarView(props: Props) {
         <main className="min-w-0 space-y-4">
           {uiView === 'list' ? (
             <section className="overflow-x-auto px-1">
-              <AgendaList jobs={canonicalDispatchJobsForRange} date={data.anchorDate} />
+              <AgendaList jobs={filteredJobsForRange} date={data.anchorDate} tech={activeTech} />
             </section>
           ) : uiView === 'month' ? (
             <section className="overflow-x-auto">
-              <CalendarMonthGrid monthDate={data.anchorDate} jobs={canonicalDispatchJobsForRange} />
+              <CalendarMonthGrid monthDate={data.anchorDate} jobs={filteredJobsForRange} />
             </section>
           ) : baseMode === 'day' ? (
             <section className="overflow-x-auto">
               <DispatchGrid
-                jobs={data.day.jobs.filter((job) => isDispatchVisibleForLayout(job))}
+                jobs={filteredDayJobs}
                 mode={baseMode}
                 date={data.day.date}
                 selectedJobId={selectedJobId}
@@ -987,7 +1051,7 @@ export async function CalendarView(props: Props) {
             </section>
           ) : (
             <section className="space-y-6 overflow-x-auto">
-              {canonicalDispatchJobsByDay.map((day) => (
+              {filteredJobsByDay.map((day) => (
                 <div key={day.date}>
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-900">{formatDayDateHeader(day.date)}</h3>
@@ -1014,6 +1078,7 @@ export async function CalendarView(props: Props) {
             assignableUsers={data.assignableUsers}
             view={uiView}
             date={data.anchorDate}
+            tech={activeTech}
             className="max-h-[calc(100vh-120px)] rounded-md border border-slate-200 bg-white shadow-xl"
           />
         </div>
@@ -1027,6 +1092,7 @@ export async function CalendarView(props: Props) {
             assignableUsers={data.assignableUsers}
             view={uiView}
             date={data.anchorDate}
+            tech={activeTech}
             className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-xl border border-slate-200 shadow-xl"
           />
         </div>

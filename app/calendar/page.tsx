@@ -17,6 +17,7 @@ export default async function CalendarPage({
     date?: string;
     banner?: string;
     job?: string;
+    tech?: string;
   }>;
 }) {
   const sp = (searchParams ? await searchParams : {}) ?? {};
@@ -24,7 +25,7 @@ export default async function CalendarPage({
 
   return (
     <div className="min-h-screen w-full bg-gray-50 px-6 py-5">
-      <CalendarView view={sp.view} date={date} banner={sp.banner} job={sp.job} />
+      <CalendarView view={sp.view} date={date} banner={sp.banner} job={sp.job} tech={sp.tech} />
     </div>
   );
 }
