@@ -93,10 +93,15 @@ export default async function PortalAllJobsPage() {
 
   const jobs = ((baseJobs ?? []) as any[]).filter(isPortalVisibleJob);
   const openRetestChildByParentId = new Map<string, any>();
+  const resolvedRetestParentIds = new Set<string>();
   for (const candidate of jobs) {
     const parentId = String(candidate.parent_job_id ?? "").trim();
     if (!parentId) continue;
-    if (String(candidate.ops_status ?? "").toLowerCase() === "closed") continue;
+    const childStatus = String(candidate.ops_status ?? "").toLowerCase();
+    if (["paperwork_required", "invoice_required", "closed"].includes(childStatus)) {
+      resolvedRetestParentIds.add(parentId);
+      continue;
+    }
 
     const current = openRetestChildByParentId.get(parentId);
     if (!current || toDateMs(candidate.created_at) > toDateMs(current.created_at)) {
@@ -182,9 +187,12 @@ export default async function PortalAllJobsPage() {
   });
 
   // Exclude parent jobs that have an active (non-closed) retest child.
-  // The retest child is the actionable job; the parent should not appear in active portal views.
+  // Exclude parent jobs that have any retest child — active or resolved.
+  // The retest child is the actionable/outcome unit; the parent must not appear in active portal views.
   const activeResolvedJobs = resolvedJobs.filter(
-    ({ job }) => !openRetestChildByParentId.has(String(job.id))
+    ({ job }) =>
+      !openRetestChildByParentId.has(String(job.id)) &&
+      !resolvedRetestParentIds.has(String(job.id))
   );
 
   const actionRequiredJobs = activeResolvedJobs
