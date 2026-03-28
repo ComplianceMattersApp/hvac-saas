@@ -109,11 +109,26 @@ if (jobsSnapErr) throw jobsSnapErr;
         .from("jobs")
         .update({
           job_address: address_line1,
+          address_line2,
           city,
         })
         .eq("location_id", existingLoc.id);
 
       if (jobsAddrErr) throw jobsAddrErr;
+
+      // Fetch affected job IDs for explicit revalidation of detail routes
+      const { data: affectedJobsExisting } = await supabase
+        .from("jobs")
+        .select("id")
+        .eq("location_id", existingLoc.id);
+
+      if (affectedJobsExisting) {
+        affectedJobsExisting.forEach(job => {
+          revalidatePath(`/jobs/${job.id}`);
+          revalidatePath(`/jobs/${job.id}/info`);
+          revalidatePath(`/jobs/${job.id}/tests`);
+        });
+      }
 
     } else {
       const { data: newLoc, error: locInsErr } = await supabase
@@ -140,12 +155,27 @@ if (jobsSnapErr) throw jobsSnapErr;
         .from("jobs")
         .update({
           job_address: address_line1,
+          address_line2,
           city,
           updated_at: new Date().toISOString(),
         })
         .eq("location_id", newLoc.id);
 
       if (jobsAddrErr) throw jobsAddrErr;
+
+      // Fetch affected job IDs for explicit revalidation of detail routes
+      const { data: affectedJobsNew } = await supabase
+        .from("jobs")
+        .select("id")
+        .eq("location_id", newLoc.id);
+
+      if (affectedJobsNew) {
+        affectedJobsNew.forEach(job => {
+          revalidatePath(`/jobs/${job.id}`);
+          revalidatePath(`/jobs/${job.id}/info`);
+          revalidatePath(`/jobs/${job.id}/tests`);
+        });
+      }
     }
   }
 
