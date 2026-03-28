@@ -19,6 +19,10 @@ import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
+import {
+  getInternalUnreadNotificationCount,
+  listInternalNotifications,
+} from "@/lib/actions/notification-read-actions";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -190,6 +194,10 @@ export default async function OpsPage({
 
     throw error;
   }
+
+  const unreadNotificationCount = await getInternalUnreadNotificationCount();
+  const recentNotifications = await listInternalNotifications({ limit: 3 });
+
   function digitsOnly(v?: string | null) {
   return String(v ?? "").replace(/\D/g, "");
 }
@@ -1678,6 +1686,17 @@ return (
         {isAdmin ? (
           <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/80 p-2 shadow-sm">
             <Link
+              href="/ops/notifications"
+              className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            >
+              Notifications
+              {unreadNotificationCount > 0 ? (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-1.5 text-[11px] font-semibold text-blue-700">
+                  {unreadNotificationCount}
+                </span>
+              ) : null}
+            </Link>
+            <Link
               href="/ops/field"
               className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
             >
@@ -1693,6 +1712,17 @@ return (
         ) : (
           <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/80 p-2 shadow-sm">
             <Link
+              href="/ops/notifications"
+              className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            >
+              Notifications
+              {unreadNotificationCount > 0 ? (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-1.5 text-[11px] font-semibold text-blue-700">
+                  {unreadNotificationCount}
+                </span>
+              ) : null}
+            </Link>
+            <Link
               href="/ops/field"
               className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
             >
@@ -1701,6 +1731,56 @@ return (
           </div>
         )}
       </div>
+    </section>
+
+    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Recent Notifications</h2>
+          <p className="text-xs text-slate-500">Latest internal signals for Ops.</p>
+        </div>
+        <Link
+          href="/ops/notifications"
+          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+        >
+          View all
+        </Link>
+      </div>
+
+      {recentNotifications.length === 0 ? (
+        <p className="text-sm text-slate-500">No notifications yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {recentNotifications.map((n) => (
+            <div
+              key={n.id}
+              className="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-slate-50/60 px-3 py-2"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-sm font-medium text-slate-800">
+                    {n.subject || n.notification_type}
+                  </p>
+                  {n.is_unread ? (
+                    <span className="inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true" />
+                  ) : null}
+                </div>
+                <p className="mt-0.5 line-clamp-1 text-xs text-slate-600">
+                  {n.body || "No additional details."}
+                </p>
+              </div>
+              {n.job_id ? (
+                <Link
+                  href={`/jobs/${n.job_id}`}
+                  className="inline-flex shrink-0 items-center rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                >
+                  Job
+                </Link>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
     </section>
 
     <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">

@@ -87,3 +87,19 @@ export async function markAllNotificationsAsRead(): Promise<void> {
 
   if (error) throw error;
 }
+
+export async function getInternalUnreadNotificationCount(): Promise<number> {
+  // Ensure internal user access
+  await requireInternalUser();
+
+  const supabase = await createClient();
+
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("recipient_type", "internal")
+    .is("read_at", null);
+
+  if (error) throw error;
+  return count ?? 0;
+}
