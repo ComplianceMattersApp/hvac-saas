@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { NotificationRowForUI } from "@/lib/actions/notification-read-actions";
-import { NotificationList } from "./NotificationList";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 
@@ -17,13 +16,12 @@ export function NotificationListClient({
 }: NotificationListClientProps) {
   const [notifications, setNotifications] =
     useState<NotificationRowForUI[]>(initialNotifications);
-  const [isLoading, setIsLoading] = useState(false);
+  const [pendingReadId, setPendingReadId] = useState<string | null>(null);
 
   const handleMarkAsRead = async (notificationId: string) => {
-    setIsLoading(true);
+    setPendingReadId(notificationId);
     try {
       await onMarkAsRead({ notificationId: notificationId });
-      // Update local state
       setNotifications(prevNotifs =>
         prevNotifs.map(n =>
           n.id === notificationId
@@ -34,80 +32,83 @@ export function NotificationListClient({
     } catch (error) {
       console.error("Failed to mark notification as read:", error);
     } finally {
-      setIsLoading(false);
+      setPendingReadId(null);
     }
   };
 
   if (notifications.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <div className="text-gray-400 mb-2 text-4xl">📭</div>
-        <p className="text-gray-600 font-medium">No notifications</p>
-        <p className="text-gray-500 text-sm mt-1">You're all caught up!</p>
+      <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+        <p className="text-base font-semibold text-slate-800">No notifications</p>
+        <p className="mt-1 text-sm text-slate-500">You're all caught up right now.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {notifications.map(notif => (
         <div
           key={notif.id}
-          className={`p-4 rounded border transition ${
-            notif.is_unread
-              ? "bg-blue-50 border-blue-200 hover:bg-blue-100"
-              : "bg-white border-gray-200 hover:bg-gray-50"
+          className={`relative overflow-hidden rounded-lg border bg-white p-4 transition ${
+            notif.is_unread ? "border-blue-200 shadow-sm" : "border-slate-200"
           }`}
         >
+          {notif.is_unread && (
+            <div className="absolute left-0 top-0 h-full w-1 bg-blue-500" aria-hidden="true" />
+          )}
+
           <div className="flex items-start justify-between gap-4">
-            {/* Left: notification info */}
-            <div className="flex-1 min-w-0">
-              {/* Header: subject + unread badge */}
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold text-gray-900 truncate">
+            <div className="min-w-0 flex-1">
+              <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                <h3 className="truncate text-sm font-semibold text-slate-900 md:text-base">
                   {notif.subject || notif.notification_type}
                 </h3>
                 {notif.is_unread && (
                   <span
-                    className="inline-block w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"
+                    className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700"
                     title="Unread"
-                  />
+                  >
+                    Unread
+                  </span>
                 )}
               </div>
 
-              {/* Body + timestamp */}
-              <p className="text-gray-700 text-sm mb-2 line-clamp-2">
-                {notif.body}
+              <p className="mb-2 line-clamp-2 text-sm text-slate-700">
+                {notif.body || "No additional details."}
               </p>
-              <p className="text-gray-500 text-xs">
-                {formatDistanceToNow(new Date(notif.created_at), {
-                  addSuffix: true,
-                })}
-              </p>
+
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium uppercase tracking-wide text-slate-600">
+                  {notif.notification_type.replace(/_/g, " ")}
+                </span>
+                <span>
+                  {formatDistanceToNow(new Date(notif.created_at), {
+                    addSuffix: true,
+                  })}
+                </span>
+              </div>
             </div>
 
-            {/* Right: actions */}
-            <div className="flex gap-2 flex-shrink-0">
-              {/* Mark as read button */}
+            <div className="flex flex-shrink-0 items-center gap-2">
               {notif.is_unread && (
                 <button
                   onClick={() => handleMarkAsRead(notif.id)}
-                  disabled={isLoading}
-                  className="px-3 py-1 text-xs font-medium text-gray-700 hover:text-gray-900 bg-gray-200 hover:bg-gray-300 rounded transition disabled:opacity-50"
+                  disabled={pendingReadId === notif.id}
+                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
                   title="Mark as read"
                 >
-                  ✓
+                  {pendingReadId === notif.id ? "Saving..." : "Mark read"}
                 </button>
               )}
 
-              {/* Navigate to job (if notification has job_id) */}
               {notif.job_id && (
                 <Link
                   href={`/jobs/${notif.job_id}`}
-                  className="px-3 py-1 text-xs font-medium text-blue-700 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 rounded transition"
+                  className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
                   title="View job"
                 >
-                  Job
+                  View job
                 </Link>
               )}
             </div>
