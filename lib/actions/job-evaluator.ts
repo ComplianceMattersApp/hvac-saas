@@ -39,8 +39,35 @@ export async function evaluateJobOpsStatus(jobId: string): Promise<void> {
   if (!job?.id) throw new Error("Job not found");
 
   const jobType = String(job.job_type ?? "").trim().toLowerCase();
+  const currentOps = String(job.ops_status ?? "").trim().toLowerCase();
+  const isFieldComplete = Boolean(job.field_complete) || String(job.status ?? "").trim().toLowerCase() === "completed";
 
-  // ECC path: delegate entirely — evaluateEccOpsStatus owns its own write
+  // Pre-field lifecycle is universal and schedule-driven.
+  // Guard: never auto-overwrite true ECC failure/retest states with scheduling-derived statuses.
+  if (!isFieldComplete) {
+    const isProtectedEccFailureState =
+      jobType === "ecc" && (currentOps === "failed" || currentOps === "retest_needed");
+
+    if (!isProtectedEccFailureState) {
+      const preFieldOps = resolveOpsStatus({
+        status: job.status,
+        job_type: job.job_type,
+        scheduled_date: job.scheduled_date,
+        window_start: job.window_start,
+        window_end: job.window_end,
+        field_complete: job.field_complete,
+        certs_complete: job.certs_complete,
+        invoice_complete: job.invoice_complete,
+        current_ops_status: job.ops_status,
+      });
+
+      await setOpsStatusIfNotManual(jobId, preFieldOps as OpsStatus);
+    }
+
+    return;
+  }
+
+  // Post-field ECC path: delegate to ECC outcome resolver.
   if (jobType === "ecc") {
     await evaluateEccOpsStatus(jobId);
     return;
