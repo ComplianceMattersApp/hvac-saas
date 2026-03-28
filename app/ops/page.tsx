@@ -196,7 +196,10 @@ export default async function OpsPage({
   }
 
   const unreadNotificationCount = await getInternalUnreadNotificationCount();
-  const recentNotifications = await listInternalNotifications({ limit: 3 });
+  const recentNotifications = await listInternalNotifications({
+    limit: 3,
+    onlyUnread: true,
+  });
 
   function digitsOnly(v?: string | null) {
   return String(v ?? "").replace(/\D/g, "");
@@ -1748,7 +1751,7 @@ return (
       </div>
 
       {recentNotifications.length === 0 ? (
-        <p className="text-sm text-slate-500">No notifications yet.</p>
+        <p className="text-sm text-slate-500">You're all caught up.</p>
       ) : (
         <div className="space-y-2">
           {recentNotifications.map((n) => (
