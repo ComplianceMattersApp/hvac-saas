@@ -16,7 +16,8 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/workbox-") ||
     pathname === "/icon.png" ||
     pathname === "/icon-192.png" ||
-    pathname === "/apple-icon.png";
+    pathname === "/apple-icon.png" ||
+    /\.(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|otf)$/i.test(pathname);
 
   if (isPublicAsset) return NextResponse.next();
 

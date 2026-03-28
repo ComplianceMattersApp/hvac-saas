@@ -1,3 +1,4 @@
+// Legacy component — currently not used in calendar
 export function CalendarLegend() {
   return (
     <div className="mb-6 rounded-lg border bg-white p-4">

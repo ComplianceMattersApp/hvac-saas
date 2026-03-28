@@ -1647,9 +1647,14 @@ function signalToneClass(key: string) {
 }
 
 return (
-  <div className="mx-auto max-w-6xl space-y-4 p-4 text-gray-900 lg:space-y-5">
-    <div className="rounded-xl border border-gray-200 bg-gradient-to-b from-white to-slate-50/70 p-4 shadow-sm sm:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <div className="mx-auto max-w-6xl space-y-6 p-4 text-gray-900 lg:space-y-7">
+    <section className="rounded-xl border border-gray-200 bg-gradient-to-b from-white to-slate-50/70 p-4 shadow-sm sm:p-6">
+      <div className="mb-4 border-b border-slate-200/80 pb-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Command Surface</div>
+        <div className="mt-1 text-sm text-slate-600">Page-specific operations and queue controls for dispatch workflow.</div>
+      </div>
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm">
@@ -1669,11 +1674,12 @@ return (
             {selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
           </p>
         </div>
+
         {isAdmin ? (
-          <div className="flex items-center">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/80 p-2 shadow-sm">
             <Link
               href="/ops/field"
-              className="mr-2 inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
             >
               My Work
             </Link>
@@ -1685,7 +1691,7 @@ return (
             </Link>
           </div>
         ) : (
-          <div className="flex items-center">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/80 p-2 shadow-sm">
             <Link
               href="/ops/field"
               className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
@@ -1695,9 +1701,9 @@ return (
           </div>
         )}
       </div>
-    </div>
+    </section>
 
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
         <div className="grid gap-1">
@@ -1750,9 +1756,9 @@ return (
           </button>
         </form>
       </div>
-    </div>
+    </section>
 
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div className="mb-2 text-sm font-semibold text-gray-900">System Alerts</div>
       <div className="flex flex-wrap gap-2">
         {signalCards.map((card) => {
@@ -1780,9 +1786,9 @@ return (
           );
         })}
       </div>
-    </div>
+    </section>
 
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-semibold text-gray-900">Call List</div>
@@ -1868,9 +1874,9 @@ return (
           {closeoutVisibleJobs.map((j: any) => compactRow(j, false, closeoutLabel(j), true))}
         </div>
       </div>
-    </div>
+    </section>
 
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <div className="text-sm font-semibold text-gray-900">Exceptions (Still Open Past Scheduled Date)</div>
         <div className="flex items-center gap-3">
@@ -1899,16 +1905,13 @@ return (
           return compactRow(j, true, note);
         })}
       </div>
-    </div>
+    </section>
 
-    <div id="ops-queues" className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <section id="ops-queues" className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-sm font-semibold text-gray-900">System / Contractor Work</div>
           <div className="text-xs text-gray-600">Closeout is the working bucket. Paperwork and invoice cards show raw projected status buckets.</div>
-        </div>
-        <div className="w-full sm:w-72">
-          <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
         </div>
       </div>
 
@@ -1983,7 +1986,7 @@ return (
           </div>
         )}
       </div>
-    </div>
+    </section>
   </div>
 );
 }

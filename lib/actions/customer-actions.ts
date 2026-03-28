@@ -196,6 +196,32 @@ export async function archiveCustomerFromForm(formData: FormData) {
   redirect(`/customers?saved=archived`);
 }
 
+export async function updateCustomerNotesFromForm(formData: FormData) {
+  const supabase = await createClient();
+
+  const customer_id = String(formData.get("customer_id") ?? "").trim();
+  if (!customer_id) throw new Error("Missing customer_id");
+
+  const notesRaw = String(formData.get("notes") ?? "");
+  const notes = notesRaw.trim();
+
+  const { error } = await supabase
+    .from("customers")
+    .update({
+      notes: notes ? notes : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", customer_id);
+
+  if (error) throw error;
+
+  revalidatePath(`/customers/${customer_id}`);
+  revalidatePath(`/customers/${customer_id}/edit`);
+  revalidatePath("/customers");
+
+  redirect(`/customers/${customer_id}#customer-notes`);
+}
+
 /**
  * Assigns owner_user_id on a customer row that currently has owner_user_id = NULL.
  * Only internal (non-contractor) authenticated users may call this.

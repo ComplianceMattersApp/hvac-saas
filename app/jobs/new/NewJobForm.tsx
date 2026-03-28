@@ -3,6 +3,7 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { createJobFromForm } from "@/lib/actions";
 import JobCoreFields from "@/components/jobs/JobCoreFields";
 import ActionFeedback from "@/components/ui/ActionFeedback";
@@ -142,6 +143,7 @@ export default function NewJobForm({
 }) {
 
   const isContractorMode = Boolean(myContractor?.id);
+  const router = useRouter();
   
   const isExistingCustomer = Boolean(existingCustomer?.id);
 
@@ -363,57 +365,59 @@ const [billingRecipient, setBillingRecipient] = useState<
     setIsSubmitting(true);
   }
 
+  const secondaryButtonClass =
+    "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition-all duration-150 hover:bg-slate-100 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60";
+  const secondaryCompactButtonClass =
+    "rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 transition-all duration-150 hover:bg-slate-100 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60";
+  const dangerTextButtonClass =
+    "text-sm text-red-600 transition-colors duration-150 hover:text-red-700 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200";
+  const primaryButtonClass =
+    `rounded-md px-4 py-2 text-sm font-semibold text-white transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-70 ${
+      canSubmit ? "bg-slate-900 hover:bg-slate-800 active:scale-[0.99]" : "bg-slate-400"
+    }`;
+
   return (
-    <div className="p-6 max-w-lg">
-      <h1 className="text-xl font-semibold mb-2">New Job</h1>
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <h1 className="text-2xl font-semibold text-slate-900 mb-1">New Job</h1>
+      <p className="mb-4 text-sm text-slate-600">Create a new job in a few quick steps.</p>
 
       <ActionFeedback
         type="warning"
         message={errorCode === "missing_address" ? "Could not create job. Service address is required." : null}
-        className="mb-4"
+        className="mb-5"
       />
 
-      <div className="text-sm text-gray-600 mb-6">
-        <div className="font-medium text-gray-800">How this works</div>
-        <ul className="list-disc pl-5 space-y-1 mt-1">
-          <li>Fill out the core job + customer info.</li>
-          <li>
-            (Optional) Add equipment if you have it — even a single component (furnace-only, condenser-only, etc.).
-          </li>
-          <li>Submit and the job will appear in the Ops queue.</li>
-        </ul>
-      </div>
-
       {draftFound && (
-        <div className="rounded-lg border p-3 mb-4 bg-gray-50">
-          <div className="text-sm font-medium mb-2">Draft found on this device</div>
-          <div className="flex gap-2">
-            <button type="button" className="border rounded px-3 py-1 text-sm" onClick={restoreDraft}>
+        <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-2 text-sm font-medium text-slate-900">Draft found on this device</div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={secondaryCompactButtonClass} onClick={restoreDraft}>
               Restore
             </button>
-            <button type="button" className="border rounded px-3 py-1 text-sm" onClick={discardDraft}>
+            <button type="button" className={secondaryCompactButtonClass} onClick={discardDraft}>
               Discard
             </button>
           </div>
         </div>
       )}
 
-      <form action={createJobFromForm} className="space-y-4" onSubmit={handleFormSubmit} aria-busy={isSubmitting}>
+      <form action={createJobFromForm} className="space-y-8" onSubmit={handleFormSubmit} aria-busy={isSubmitting}>
         {/* Identity-tied contractor */}
         {myContractor?.id ? (
           <>
-            <div className="rounded-lg border p-3">
-              <div className="text-sm font-medium">Submitting as</div>
-              <div className="text-sm text-gray-700 mt-1">{myContractor.name}</div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="text-sm font-medium text-slate-900">Submitting as</div>
+              <div className="mt-1 text-sm text-slate-700">{myContractor.name}</div>
             </div>
             <input type="hidden" name="contractor_id" value={myContractor.id} />
           </>
         ) : (
-          <div className="rounded-lg border p-3 space-y-2">
-            <label className="block text-sm font-medium">Contractor (optional)</label>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+            <label className="block text-sm font-medium text-slate-900">Contractor (optional)</label>
             <select
               name="contractor_id"
-              className="border rounded w-full p-2"
+              className="w-full rounded-md border border-slate-300 bg-white p-2"
               value={contractorId}
               onChange={(e) => {
                 const v = e.target.value;
@@ -433,331 +437,367 @@ const [billingRecipient, setBillingRecipient] = useState<
           </div>
         )}
 
-        {/* Job Type */}
-        <div className="rounded-lg border p-3 space-y-2">
-          <label className="block text-sm font-medium">Job Type</label>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="_jobTypeUi"
-                value="ecc"
-                checked={jobType === "ecc"}
-                onChange={() => setJobType("ecc")}
-              />
-              ECC
-            </label>
+        <div className="space-y-8">
 
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="_jobTypeUi"
-                value="service"
-                checked={jobType === "service"}
-                onChange={() => setJobType("service")}
-              />
-              Service
-            </label>
-          </div>
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-900">Job Setup</h2>
 
-          {/* real submitted value */}
-          <input type="hidden" name="job_type" value={jobType} />
-        </div>
-
-        {/* Project Type */}
-{jobType !== "service" && (
-  <div className="rounded-lg border p-3 space-y-2">
-    <label className="block text-sm font-medium">Project Type (ECC)</label>
-    <select
-      name="project_type"
-      className="border rounded w-full p-2"
-      value={projectType}
-      onChange={(e) => setProjectType(e.target.value as "alteration" | "all_new" | "new_construction")}
-    >
-      <option value="alteration">Alteration</option>
-      <option value="all_new">All New</option>
-      <option value="new_construction">New Construction</option>
-    </select>
-  </div>
-)}
-
-{/* Scheduling — internal/staff only; hidden for contractor and customer intake */}
-{!isContractorMode && (
-  <>
-    <div>
-      <label className="text-xs text-gray-600">Scheduled Date</label>
-      <input
-        type="date"
-        name="scheduled_date"
-        className="border rounded w-full p-2"
-        value={scheduledDate}
-        onChange={(e) => setScheduledDate(e.target.value)}
-      />
-    </div>
-
-    <div className="rounded-lg border p-3 space-y-2">
-      <div className="text-sm font-medium">Scheduling (wall-clock)</div>
-      <div className="text-xs text-gray-600">
-        Enter times exactly as you want them shown (ex: 08:00). No timezone conversion.
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="text-xs text-gray-600">Window Start</label>
-          <input
-            type="time"
-            name="window_start"
-            className="border rounded w-full p-2"
-            value={windowStart}
-            onChange={(e) => setWindowStart(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="text-xs text-gray-600">Window End</label>
-          <input
-            type="time"
-            name="window_end"
-            className="border rounded w-full p-2"
-            value={windowEnd}
-            onChange={(e) => setWindowEnd(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="text-xs text-gray-600">Quick Window</label>
-        <select
-          className="border rounded w-full p-2"
-          onChange={(e) => onQuickWindowChange(e.target.value)}
-        >
-          <option value="">— Select —</option>
-          <option value="08:00-10:00">08:00-10:00</option>
-          <option value="10:00-12:00">10:00-12:00</option>
-          <option value="12:00-14:00">12:00-14:00</option>
-          <option value="14:00-16:00">14:00-16:00</option>
-        </select>
-      </div>
-    </div>
-  </>
-)}
-
-{/* Existing Customer / Location Mode */}
-{isExistingCustomer && existingCustomer?.id ? (
-  <>
-    <div className="rounded-lg border p-3 space-y-1">
-      <div className="text-sm font-semibold">Customer (Existing)</div>
-      <div className="text-sm text-gray-700">
-        {(existingCustomer.first_name ?? "") + " " + (existingCustomer.last_name ?? "")}
-      </div>
-      {existingCustomer.phone ? (
-        <div className="text-xs text-gray-600">Phone: {existingCustomer.phone}</div>
-      ) : null}
-      {existingCustomer.email ? (
-        <div className="text-xs text-gray-600">Email: {existingCustomer.email}</div>
-      ) : null}
-
-      <input type="hidden" name="customer_id" value={existingCustomer.id} />
-    </div>
-
-    <div className="rounded-lg border p-3 space-y-2">
-      <div className="text-sm font-semibold">Service Location</div>
-
-      <label className="block text-sm font-medium">Pick a location</label>
-      <select
-        className="border rounded w-full p-2"
-        value={locationId}
-        onChange={(e) => setLocationId(e.target.value)}
-      >
-        {locations.map((l) => (
-          <option key={l.id} value={l.id}>
-            {(l.nickname ? `${l.nickname} — ` : "") +
-              (l.address_line1 ?? "Address") +
-              ", " +
-              [l.city, l.state, l.zip].filter(Boolean).join(" ")}
-          </option>
-        ))}
-        <option value="__new__">+ Add new location…</option>
-      </select>
-
-      {!isNewLocation ? (
-        <input type="hidden" name="location_id" value={locationId} />
-      ) : (
-        <div className="space-y-2 mt-2">
-          <div className="text-xs text-gray-600">
-            New location details (required for new location)
-          </div>
-
-          <input
-            className="border rounded w-full p-2"
-            name="location_nickname"
-            placeholder="Nickname (optional) e.g., Main House, ADU"
-          />
-
-          <input
-            className="border rounded w-full p-2"
-            name="address_line1"
-            placeholder="Address"
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              className="border rounded w-full p-2"
-              name="city"
-              placeholder="City"
-              required
-            />
-            <input
-              className="border rounded w-full p-2"
-              name="zip"
-              placeholder="ZIP"
-              required
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  </>
-) : null}
-
-  <JobCoreFields
-  mode={myContractor?.id ? "external" : "internal"}
-  titleRequired={jobType === "service"}
-  hideCustomer={isExistingCustomer}
-  hideServiceLocation={isExistingCustomer}
-  jobType={jobType}
-/>
-        {/* Billing Recipient */}
-        <div className="rounded-lg border p-3 space-y-2">
-          <label className="block text-sm font-medium">Billing Recipient</label>
-
-          <div className="flex flex-col gap-2">
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="_billingRecipientUi"
-                value="contractor"
-                checked={billingRecipient === "contractor"}
-                onChange={() => setBillingRecipient("contractor")}
-                disabled={Boolean(!myContractor?.id && !contractorId)}
-              />
-              Contractor (company)
-              {!myContractor?.id && !contractorId && (
-                <span className="text-xs text-gray-500">(select contractor first)</span>
-              )}
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="_billingRecipientUi"
-                value="customer"
-                checked={billingRecipient === "customer"}
-                onChange={() => setBillingRecipient("customer")}
-              />
-              Customer / Homeowner
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="_billingRecipientUi"
-                value="other"
-                checked={billingRecipient === "other"}
-                onChange={() => setBillingRecipient("other")}
-              />
-              Other (custom)
-            </label>
-          </div>
-
-          <input type="hidden" name="billing_recipient" value={billingRecipient} />
-
-          {billingRecipient === "other" && (
-            <div className="mt-2 space-y-2">
-              <div className="text-xs text-gray-600">
-                If billing is “Other”, please enter billing name + address.
-              </div>
-
-              <input
-                className="border rounded w-full p-2"
-                name="billing_name"
-                placeholder="Billing name"
-                value={billingName}
-                onChange={(e) => setBillingName(e.target.value)}
-              />
-              <input
-                className="border rounded w-full p-2"
-                name="billing_email"
-                placeholder="Billing email (optional)"
-                value={billingEmail}
-                onChange={(e) => setBillingEmail(e.target.value)}
-              />
-              <input
-                className="border rounded w-full p-2"
-                name="billing_phone"
-                placeholder="Billing phone (optional)"
-                value={billingPhone}
-                onChange={(e) => setBillingPhone(e.target.value)}
-              />
-              <input
-                className="border rounded w-full p-2"
-                name="billing_address_line1"
-                placeholder="Address line 1"
-                value={billingAddr1}
-                onChange={(e) => setBillingAddr1(e.target.value)}
-              />
-              <input
-                className="border rounded w-full p-2"
-                name="billing_address_line2"
-                placeholder="Address line 2 (optional)"
-                value={billingAddr2}
-                onChange={(e) => setBillingAddr2(e.target.value)}
-              />
-              <div className="grid grid-cols-3 gap-2">
+          {/* Job Type */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+            <label className="block text-sm font-medium text-slate-900">Job Type</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2">
                 <input
-                  className="border rounded w-full p-2 col-span-2"
-                  name="billing_city"
-                  placeholder="City"
-                  value={billingCity}
-                  onChange={(e) => setBillingCity(e.target.value)}
+                  type="radio"
+                  name="_jobTypeUi"
+                  value="ecc"
+                  checked={jobType === "ecc"}
+                  onChange={() => setJobType("ecc")}
                 />
+                ECC
+              </label>
+
+              <label className="flex items-center gap-2">
                 <input
-                  className="border rounded w-full p-2"
-                  name="billing_state"
-                  placeholder="State"
-                  value={billingState}
-                  onChange={(e) => setBillingState(e.target.value)}
+                  type="radio"
+                  name="_jobTypeUi"
+                  value="service"
+                  checked={jobType === "service"}
+                  onChange={() => setJobType("service")}
                 />
-              </div>
-              <input
-                className="border rounded w-full p-2"
-                name="billing_zip"
-                placeholder="ZIP"
-                value={billingZip}
-                onChange={(e) => setBillingZip(e.target.value)}
-              />
+                Service
+              </label>
+            </div>
+
+            {/* real submitted value */}
+            <input type="hidden" name="job_type" value={jobType} />
+          </div>
+
+          {/* Project Type */}
+          {jobType !== "service" && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+              <label className="block text-sm font-medium text-slate-900">Project Type (ECC)</label>
+              <select
+                name="project_type"
+                className="w-full rounded-md border border-slate-300 bg-white p-2"
+                value={projectType}
+                onChange={(e) => setProjectType(e.target.value as "alteration" | "all_new" | "new_construction")}
+              >
+                <option value="alteration">Alteration</option>
+                <option value="all_new">All New</option>
+                <option value="new_construction">New Construction</option>
+              </select>
             </div>
           )}
-        </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-900">Customer &amp; Location</h2>
+
+          {/* Existing Customer / Location Mode */}
+          {isExistingCustomer && existingCustomer?.id ? (
+            <>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-1">
+                <div className="text-sm font-semibold text-slate-900">Customer (Existing)</div>
+                <div className="text-sm text-slate-700">
+                  {(existingCustomer.first_name ?? "") + " " + (existingCustomer.last_name ?? "")}
+                </div>
+                {existingCustomer.phone ? (
+                  <div className="text-xs text-slate-600">Phone: {existingCustomer.phone}</div>
+                ) : null}
+                {existingCustomer.email ? (
+                  <div className="text-xs text-slate-600">Email: {existingCustomer.email}</div>
+                ) : null}
+
+                <input type="hidden" name="customer_id" value={existingCustomer.id} />
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+                <div className="text-sm font-semibold text-slate-900">Service Location</div>
+
+                <label className="block text-sm font-medium text-slate-900">Pick a location</label>
+                <select
+                  className="w-full rounded-md border border-slate-300 bg-white p-2"
+                  value={locationId}
+                  onChange={(e) => setLocationId(e.target.value)}
+                >
+                  {locations.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {(l.nickname ? `${l.nickname} — ` : "") +
+                        (l.address_line1 ?? "Address") +
+                        ", " +
+                        [l.city, l.state, l.zip].filter(Boolean).join(" ")}
+                    </option>
+                  ))}
+                  <option value="__new__">+ Add new location…</option>
+                </select>
+
+                {!isNewLocation ? (
+                  <input type="hidden" name="location_id" value={locationId} />
+                ) : (
+                  <div className="space-y-2 mt-2">
+                    <div className="text-xs text-slate-600">
+                      New location details (required for new location)
+                    </div>
+
+                    <input
+                      className="w-full rounded-md border border-slate-300 bg-white p-2"
+                      name="location_nickname"
+                      placeholder="Nickname (optional) e.g., Main House, ADU"
+                    />
+
+                    <input
+                      className="w-full rounded-md border border-slate-300 bg-white p-2"
+                      name="address_line1"
+                      placeholder="Address"
+                      required
+                    />
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        className="w-full rounded-md border border-slate-300 bg-white p-2"
+                        name="city"
+                        placeholder="City"
+                        required
+                      />
+                      <input
+                        className="w-full rounded-md border border-slate-300 bg-white p-2"
+                        name="zip"
+                        placeholder="ZIP"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <JobCoreFields
+              mode={myContractor?.id ? "external" : "internal"}
+              titleRequired={jobType === "service"}
+              hideCustomer={false}
+              hideServiceLocation={false}
+              jobType={jobType}
+              showJobDetails={false}
+              showNotesSection={false}
+            />
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-900">Job Details</h2>
+          <JobCoreFields
+            mode={myContractor?.id ? "external" : "internal"}
+            titleRequired={jobType === "service"}
+            hideCustomer
+            hideServiceLocation
+            jobType={jobType}
+            showCustomerSection={false}
+            showServiceLocationSection={false}
+          />
+        </section>
+
+        {/* Scheduling — internal/staff only; hidden for contractor and customer intake */}
+        {!isContractorMode && (
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold text-slate-900">Scheduling</h2>
+
+            <div>
+              <label className="text-xs text-slate-600">Scheduled Date</label>
+              <input
+                type="date"
+                name="scheduled_date"
+                className="w-full rounded-md border border-slate-300 bg-white p-2"
+                value={scheduledDate}
+                onChange={(e) => setScheduledDate(e.target.value)}
+              />
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+              <div className="text-sm font-medium text-slate-900">Schedule (optional)</div>
+              <div className="text-xs text-slate-600">
+                Set a date and time now, or leave it for later.
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-slate-600">Window Start</label>
+                  <input
+                    type="time"
+                    name="window_start"
+                    className="w-full rounded-md border border-slate-300 bg-white p-2"
+                    value={windowStart}
+                    onChange={(e) => setWindowStart(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-600">Window End</label>
+                  <input
+                    type="time"
+                    name="window_end"
+                    className="w-full rounded-md border border-slate-300 bg-white p-2"
+                    value={windowEnd}
+                    onChange={(e) => setWindowEnd(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-600">Quick Window</label>
+                <select
+                  className="w-full rounded-md border border-slate-300 bg-white p-2"
+                  onChange={(e) => onQuickWindowChange(e.target.value)}
+                >
+                  <option value="">— Select —</option>
+                  <option value="08:00-10:00">08:00-10:00</option>
+                  <option value="10:00-12:00">10:00-12:00</option>
+                  <option value="12:00-14:00">12:00-14:00</option>
+                  <option value="14:00-16:00">14:00-16:00</option>
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Billing Recipient */}
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-800">Billing</h2>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+            <label className="block text-sm font-medium text-slate-900">Billing Recipient</label>
+
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="_billingRecipientUi"
+                  value="contractor"
+                  checked={billingRecipient === "contractor"}
+                  onChange={() => setBillingRecipient("contractor")}
+                  disabled={Boolean(!myContractor?.id && !contractorId)}
+                />
+                Contractor (company)
+                {!myContractor?.id && !contractorId && (
+                  <span className="text-xs text-slate-500">(select contractor first)</span>
+                )}
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="_billingRecipientUi"
+                  value="customer"
+                  checked={billingRecipient === "customer"}
+                  onChange={() => setBillingRecipient("customer")}
+                />
+                Customer / Homeowner
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="_billingRecipientUi"
+                  value="other"
+                  checked={billingRecipient === "other"}
+                  onChange={() => setBillingRecipient("other")}
+                />
+                Other (custom)
+              </label>
+            </div>
+
+            <input type="hidden" name="billing_recipient" value={billingRecipient} />
+
+            {billingRecipient === "other" && (
+              <div className="mt-2 space-y-2">
+                <div className="text-xs text-slate-600">
+                  If billing is “Other”, please enter billing name + address.
+                </div>
+
+                <input
+                  className="w-full rounded-md border border-slate-300 bg-white p-2"
+                  name="billing_name"
+                  placeholder="Billing name"
+                  value={billingName}
+                  onChange={(e) => setBillingName(e.target.value)}
+                />
+                <input
+                  className="w-full rounded-md border border-slate-300 bg-white p-2"
+                  name="billing_email"
+                  placeholder="Billing email (optional)"
+                  value={billingEmail}
+                  onChange={(e) => setBillingEmail(e.target.value)}
+                />
+                <input
+                  className="w-full rounded-md border border-slate-300 bg-white p-2"
+                  name="billing_phone"
+                  placeholder="Billing phone (optional)"
+                  value={billingPhone}
+                  onChange={(e) => setBillingPhone(e.target.value)}
+                />
+                <input
+                  className="w-full rounded-md border border-slate-300 bg-white p-2"
+                  name="billing_address_line1"
+                  placeholder="Address line 1"
+                  value={billingAddr1}
+                  onChange={(e) => setBillingAddr1(e.target.value)}
+                />
+                <input
+                  className="w-full rounded-md border border-slate-300 bg-white p-2"
+                  name="billing_address_line2"
+                  placeholder="Address line 2 (optional)"
+                  value={billingAddr2}
+                  onChange={(e) => setBillingAddr2(e.target.value)}
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    className="col-span-2 w-full rounded-md border border-slate-300 bg-white p-2"
+                    name="billing_city"
+                    placeholder="City"
+                    value={billingCity}
+                    onChange={(e) => setBillingCity(e.target.value)}
+                  />
+                  <input
+                    className="w-full rounded-md border border-slate-300 bg-white p-2"
+                    name="billing_state"
+                    placeholder="State"
+                    value={billingState}
+                    onChange={(e) => setBillingState(e.target.value)}
+                  />
+                </div>
+                <input
+                  className="w-full rounded-md border border-slate-300 bg-white p-2"
+                  name="billing_zip"
+                  placeholder="ZIP"
+                  value={billingZip}
+                  onChange={(e) => setBillingZip(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-800">Photos (optional)</h2>
+          <input
+            type="file"
+            name="photos"
+            multiple
+            className="w-full rounded-md border border-slate-300 bg-white p-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700"
+          />
+        </section>
 
         {/* Optional Equipment */}
-        <div className="rounded-lg border p-3 space-y-3">
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-800">Equipment (optional)</h2>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium">Optional Equipment</div>
-              <div className="text-xs text-gray-600 mt-1">
-                Add what you know — all equipment fields are optional.
-                <br />
-                <span className="font-medium">
-                  Rule:
-                </span>{" "}
-                If you add a component, you must name the system (Upstairs/Downstairs/ADU) so tests map correctly.
-              </div>
+              <div className="text-sm font-medium text-slate-900">Optional Equipment</div>
+              <div className="mt-1 text-xs text-slate-600">If you add a component, name the system (for example: Upstairs, Downstairs, ADU).</div>
             </div>
 
             <button
               type="button"
-              className="border rounded px-3 py-1 text-sm"
+              className={secondaryCompactButtonClass}
               onClick={addSystem}
             >
               Add System
@@ -765,7 +805,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           </div>
 
           {systems.length === 0 && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-slate-600">
               No systems added. (That’s fine.)
             </div>
           )}
@@ -775,12 +815,12 @@ const [billingRecipient, setBillingRecipient] = useState<
             const showNameError = nameRequired && !sys.name.trim();
 
             return (
-              <div key={sys.id} className="rounded-lg border p-3 space-y-3">
+              <div key={sys.id} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium">System {idx + 1}</div>
+                  <div className="text-sm font-medium text-slate-900">System {idx + 1}</div>
                   <button
                     type="button"
-                    className="text-sm text-red-600"
+                    className={dangerTextButtonClass}
                     onClick={() => removeSystem(sys.id)}
                   >
                     Remove
@@ -788,7 +828,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </div>
 
                 <div>
-                  <label className="block text-xs text-gray-600">
+                  <label className="block text-xs text-slate-600">
                     System Location/Name {nameRequired ? "(required)" : "(optional)"}
                   </label>
                   <input
@@ -806,9 +846,9 @@ const [billingRecipient, setBillingRecipient] = useState<
 
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
-                    <label className="block text-xs text-gray-600">Add Component</label>
+                    <label className="block text-xs text-slate-600">Add Component</label>
                     <select
-                      className="border rounded w-full p-2"
+                      className="w-full rounded-md border border-slate-300 bg-white p-2"
                       defaultValue=""
                       onChange={(e) => {
                         const v = e.target.value as ComponentType;
@@ -832,16 +872,16 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </div>
 
                 {sys.components.length === 0 ? (
-                  <div className="text-sm text-gray-600">No components added yet.</div>
+                  <div className="text-sm text-slate-600">No components added yet.</div>
                 ) : (
                   <div className="space-y-3">
                     {sys.components.map((c) => (
-                      <div key={c.id} className="rounded border p-2 space-y-2">
+                      <div key={c.id} className="rounded border border-slate-200 bg-white p-2 space-y-2">
                         <div className="flex items-center justify-between">
-                          <div className="text-sm font-medium">{componentLabel(c.type)}</div>
+                          <div className="text-sm font-medium text-slate-900">{componentLabel(c.type)}</div>
                           <button
                             type="button"
-                            className="text-sm text-red-600"
+                            className={dangerTextButtonClass}
                             onClick={() => removeComponent(sys.id, c.id)}
                           >
                             Remove
@@ -850,25 +890,25 @@ const [billingRecipient, setBillingRecipient] = useState<
 
                         <div className="grid grid-cols-2 gap-2">
                           <input
-                            className="border rounded p-2"
+                            className="rounded-md border border-slate-300 p-2"
                             placeholder="Manufacturer (optional)"
                             value={c.manufacturer}
                             onChange={(e) => patchComponent(sys.id, c.id, { manufacturer: e.target.value })}
                           />
                           <input
-                            className="border rounded p-2"
+                            className="rounded-md border border-slate-300 p-2"
                             placeholder="Model (optional)"
                             value={c.model}
                             onChange={(e) => patchComponent(sys.id, c.id, { model: e.target.value })}
                           />
                           <input
-                            className="border rounded p-2"
+                            className="rounded-md border border-slate-300 p-2"
                             placeholder="Serial (optional)"
                             value={c.serial}
                             onChange={(e) => patchComponent(sys.id, c.id, { serial: e.target.value })}
                           />
                           <input
-                            className="border rounded p-2"
+                            className="rounded-md border border-slate-300 p-2"
                             placeholder="Tonnage (optional)"
                             value={c.tonnage}
                             onChange={(e) => patchComponent(sys.id, c.id, { tonnage: e.target.value })}
@@ -881,7 +921,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                           c.type === "package_heat_pump" ||
                           c.type === "mini_split_outdoor") && (
                           <input
-                            className="border rounded w-full p-2"
+                            className="w-full rounded-md border border-slate-300 p-2"
                             placeholder="Refrigerant type (optional)"
                             value={c.refrigerant_type}
                             onChange={(e) => patchComponent(sys.id, c.id, { refrigerant_type: e.target.value })}
@@ -889,7 +929,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                         )}
 
                         <textarea
-                          className="border rounded w-full p-2"
+                          className="w-full rounded-md border border-slate-300 p-2"
                           placeholder="Notes (optional)"
                           value={c.notes}
                           onChange={(e) => patchComponent(sys.id, c.id, { notes: e.target.value })}
@@ -904,6 +944,8 @@ const [billingRecipient, setBillingRecipient] = useState<
 
           {/* equipment_json payload */}
           <input type="hidden" name="equipment_json" value={equipmentJson} />
+          </div>
+        </section>
         </div>
 
         {!canSubmit && (
@@ -916,10 +958,26 @@ const [billingRecipient, setBillingRecipient] = useState<
           {isSubmitting ? "Creating job. Please wait." : ""}
         </div>
 
-        <div className="flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-200 pt-5 sm:justify-end">
           <button
             type="button"
-            className="border rounded px-3 py-2 text-sm"
+            className={secondaryButtonClass}
+            onClick={() => {
+              if (window.history.length > 1) {
+                router.back();
+                return;
+              }
+              router.push("/ops");
+            }}
+            disabled={isSubmitting}
+            aria-disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            className={secondaryButtonClass}
             onClick={saveDraft}
             disabled={isSubmitting}
             aria-disabled={isSubmitting}
@@ -929,7 +987,7 @@ const [billingRecipient, setBillingRecipient] = useState<
 
           <button
             type="submit"
-            className={`rounded px-3 py-2 text-sm text-white ${canSubmit ? "bg-black" : "bg-gray-400 cursor-not-allowed"}`}
+            className={primaryButtonClass}
             disabled={!canSubmit || isSubmitting}
             aria-disabled={!canSubmit || isSubmitting}
             onClick={() => {
@@ -943,6 +1001,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           </button>
         </div>
       </form>
+      </div>
     </div>
   );
 }

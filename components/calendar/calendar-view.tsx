@@ -7,7 +7,6 @@ import SubmitButton from '@/components/SubmitButton';
 import {
   assignJobAssigneeFromForm,
   removeJobAssigneeFromForm,
-  setPrimaryJobAssigneeFromForm,
   updateJobScheduleFromForm,
 } from '@/lib/actions/job-actions';
 import { getDispatchCalendarData, type DispatchJob, type DispatchViewMode } from '@/lib/actions/calendar';
@@ -36,7 +35,7 @@ const TECH_COLOR_PALETTE = [
 ];
 
 const STATUS_LEGEND = [
-  { key: 'scheduled', label: 'Scheduled', dot: 'bg-gray-400' },
+  { key: 'scheduled', label: 'Scheduled', dot: 'bg-sky-500' },
   { key: 'on_my_way', label: 'On My Way', dot: 'bg-blue-500' },
   { key: 'in_progress', label: 'In Progress', dot: 'bg-indigo-600' },
   { key: 'field_complete', label: 'Field Complete', dot: 'bg-amber-500' },
@@ -52,6 +51,8 @@ function bannerMessage(banner?: string) {
     assignment_added_primary: 'Assignee added and set as primary.',
     assignment_primary_set: 'Primary assignee updated.',
     assignment_removed: 'Assignee removed.',
+    called: 'Customer marked as called.',
+    text_sent: 'Customer marked as text sent.',
   };
 
   const key = String(banner ?? '').trim();
@@ -73,6 +74,37 @@ function dispatchBlockClass(status?: string | null) {
 function customerName(job: DispatchJob) {
   const name = `${String(job.customer_first_name ?? '').trim()} ${String(job.customer_last_name ?? '').trim()}`.trim();
   return name || 'Customer not set';
+}
+
+function customerAddressLine1(job: DispatchJob) {
+  return String(job.job_address ?? '').trim() || 'Address not available';
+}
+
+function customerAddressLine2(job: DispatchJob) {
+  const extended = job as DispatchJob & {
+    state?: string | null;
+    zip?: string | null;
+    customer_state?: string | null;
+    customer_zip?: string | null;
+  };
+  const city = String(job.city ?? '').trim();
+  const state = String(extended.customer_state ?? extended.state ?? '').trim();
+  const zip = String(extended.customer_zip ?? extended.zip ?? '').trim();
+  const stateZip = [state, zip].filter(Boolean).join(' ');
+  return [city, stateZip].filter(Boolean).join(', ') || 'City/state/zip not available';
+}
+
+function customerPhone(job: DispatchJob) {
+  const extended = job as DispatchJob & {
+    phone?: string | null;
+    customer_phone?: string | null;
+    customer_phone_number?: string | null;
+  };
+  return String(extended.customer_phone ?? extended.customer_phone_number ?? extended.phone ?? '').trim();
+}
+
+function phoneHrefValue(rawPhone: string) {
+  return rawPhone.replace(/[^\d+]/g, '');
 }
 
 function buildReturnTo(view: CalendarUIView, date: string) {
@@ -173,6 +205,17 @@ function blockTimeLabel(startMinutes: number, endMinutes: number) {
   return `${toLabel(startMinutes)} - ${toLabel(endMinutes)}`;
 }
 
+function listTimeWindowLabel(windowStart?: string | null, windowEnd?: string | null) {
+  const rendered = displayWindowLA(windowStart, windowEnd);
+  if (!rendered) return 'Time not set';
+  return rendered.replace(/\s-\s/g, ' – ');
+}
+
+function formatDayDateHeader(ymd: string) {
+  const parsed = parseISO(ymd);
+  return `${formatDate(parsed, 'EEEE')} — ${formatBusinessDateUS(ymd)}`;
+}
+
 function shortTitle(job: DispatchJob) {
   const title = String(job.title ?? '').trim();
   if (!title) return `Job ${job.id.slice(0, 8)}`;
@@ -255,7 +298,7 @@ function formatLifecycleStatus(status: string) {
 }
 
 function statusDotClass(status: string) {
-  if (status === 'scheduled') return 'bg-gray-400';
+  if (status === 'scheduled') return 'bg-sky-500';
   if (status === 'on_my_way') return 'bg-blue-500';
   if (status === 'in_progress') return 'bg-indigo-600';
   if (status === 'field_complete') return 'bg-amber-500';
@@ -580,7 +623,7 @@ function AgendaList(props: {
       {sortedDates.map((dateKey) => (
         <div key={dateKey}>
           <div className="mb-2 flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-700">{formatBusinessDateUS(dateKey)}</span>
+            <span className="text-xs font-semibold text-slate-700">{formatDayDateHeader(dateKey)}</span>
             <span className="text-xs text-slate-400">
               {(grouped.get(dateKey)?.length ?? 0)} job{(grouped.get(dateKey)?.length ?? 0) > 1 ? 's' : ''}
             </span>
@@ -604,6 +647,7 @@ function AgendaList(props: {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium text-slate-900">{job.job_address || shortTitle(job)}</div>
                       <div className="truncate text-[11px] text-slate-600">{job.city || 'No city'}</div>
+                      <div className="truncate text-[11px] text-slate-600">{listTimeWindowLabel(job.window_start, job.window_end)}</div>
                       <div className="truncate text-[11px] text-slate-500">{job.job_type || job.title}</div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -634,43 +678,84 @@ function DetailPanel(props: {
   className?: string;
 }) {
   const { job, returnTo, assignableUsers, view, date, className = '' } = props;
+  const phone = customerPhone(job);
+  const phoneHref = phoneHrefValue(phone);
+  const hasPhone = Boolean(phoneHref);
 
   return (
-    <aside className={`overflow-y-auto bg-white p-4 ${className}`}>
-      <div className="mb-3 flex items-start justify-between gap-2 border-b pb-3">
-        <div>
+    <aside className={`overflow-y-auto bg-white p-4 pt-5 pr-5 sm:p-5 sm:pt-6 sm:pr-6 ${className}`}>
+      <div className="mb-4 flex items-start justify-between gap-2 border-b pb-4">
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Job Details</p>
           <h3 className="text-base font-semibold text-gray-900">{job.title || `Job ${job.id.slice(0, 8)}`}</h3>
           <p className="mt-1 text-xs text-gray-600">
             {customerName(job)} • {job.city || 'No city'}
           </p>
+          <p className="mt-2 truncate text-xs text-gray-600">{customerAddressLine1(job)}</p>
+          <p className="mt-0.5 truncate text-xs text-gray-500">{customerAddressLine2(job)}</p>
+          <p className="mt-1.5 text-xs text-gray-700">{phone || 'Phone not available'}</p>
+          <div className="mt-2.5">
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Contact Actions</p>
+            <div className="grid grid-cols-2 gap-2">
+              {hasPhone ? (
+                <a href={`tel:${phoneHref}`} className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50">
+                  Call Customer
+                </a>
+              ) : (
+                <span className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-400">Call Customer</span>
+              )}
+
+              {hasPhone ? (
+                <a href={`sms:${phoneHref}`} className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50">
+                  Send Text
+                </a>
+              ) : (
+                <span className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-400">Send Text</span>
+              )}
+
+              <Link
+                href={buildCalendarHref(view, date, { job: job.id, banner: 'called' })}
+                scroll={false}
+                className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Called
+              </Link>
+              <Link
+                href={buildCalendarHref(view, date, { job: job.id, banner: 'text_sent' })}
+                scroll={false}
+                className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Text Sent
+              </Link>
+            </div>
+          </div>
         </div>
         <Link
           href={buildCalendarHref(view, date)}
           scroll={false}
           aria-label="Close details"
-          className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+          className="mr-1 mt-1 shrink-0 rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
         >
           <X className="h-4 w-4" />
         </Link>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-5 flex flex-wrap gap-2.5">
         <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
           Open Job
         </Link>
-        <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+        <Link href={`/customers/${(job as DispatchJob & { customer_id: string }).customer_id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
           Open Customer
         </Link>
-        <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+        <Link href={`/locations/${(job as DispatchJob & { location_id: string }).location_id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
           Open Location
         </Link>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         <section>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Schedule</p>
-          <form action={updateJobScheduleFromForm} className="grid gap-2">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Schedule</p>
+          <form action={updateJobScheduleFromForm} className="grid gap-3">
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="return_to" value={returnTo} />
             <input type="date" name="scheduled_date" defaultValue={job.scheduled_date ?? ''} className="rounded border px-2 py-2 text-sm" />
@@ -685,8 +770,8 @@ function DetailPanel(props: {
         </section>
 
         <section>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Assignment</p>
-          <form action={assignJobAssigneeFromForm} className="grid gap-2">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Assignment</p>
+          <form action={assignJobAssigneeFromForm} className="grid gap-3">
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="tab" value="ops" />
             <input type="hidden" name="return_to" value={returnTo} />
@@ -700,34 +785,20 @@ function DetailPanel(props: {
                 </option>
               ))}
             </select>
-            <label className="inline-flex items-center gap-2 rounded border px-2 py-2 text-xs text-gray-700">
-              <input type="checkbox" name="make_primary" value="1" /> Make primary
-            </label>
             <SubmitButton className="rounded bg-gray-900 px-3 py-2 text-sm font-semibold text-white" loadingText="Assigning...">
               Assign Technician
             </SubmitButton>
           </form>
 
           {job.assignments.length ? (
-            <div className="mt-3 space-y-2">
+            <div className="mt-4 space-y-2.5">
               {job.assignments.map((assignment) => (
-                <div key={`${job.id}-${assignment.user_id}`} className="flex items-center justify-between rounded border bg-gray-50 px-2 py-1.5 text-xs">
+                <div key={`${job.id}-${assignment.user_id}`} className="flex items-center justify-between gap-2 rounded border bg-gray-50 px-2.5 py-2 text-xs">
                   <span>
                     {assignment.display_name}
                     {assignment.is_primary ? ' (primary)' : ''}
                   </span>
-                  <div className="flex items-center gap-1.5">
-                    {!assignment.is_primary ? (
-                      <form action={setPrimaryJobAssigneeFromForm}>
-                        <input type="hidden" name="job_id" value={job.id} />
-                        <input type="hidden" name="user_id" value={assignment.user_id} />
-                        <input type="hidden" name="tab" value="ops" />
-                        <input type="hidden" name="return_to" value={returnTo} />
-                        <SubmitButton className="rounded border border-blue-200 bg-white px-2 py-1 text-xs text-blue-700" loadingText="...">
-                          Primary
-                        </SubmitButton>
-                      </form>
-                    ) : null}
+                  <div className="flex items-center gap-2">
                     <form action={removeJobAssigneeFromForm}>
                       <input type="hidden" name="job_id" value={job.id} />
                       <input type="hidden" name="user_id" value={assignment.user_id} />
@@ -841,7 +912,7 @@ export async function CalendarView(props: Props) {
 
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 pb-5">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Dispatch Workspace</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Dispatch Calendar</h2>
           <p className="mt-2 text-sm font-medium text-gray-500">{headerLabel}</p>
         </div>
 
@@ -919,7 +990,7 @@ export async function CalendarView(props: Props) {
               {canonicalDispatchJobsByDay.map((day) => (
                 <div key={day.date}>
                   <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-slate-900">{formatBusinessDateUS(day.date)}</h3>
+                    <h3 className="text-sm font-semibold text-slate-900">{formatDayDateHeader(day.date)}</h3>
                     <p className="text-xs text-slate-500">{day.jobs.length} jobs</p>
                   </div>
                   <DispatchGrid
@@ -936,27 +1007,27 @@ export async function CalendarView(props: Props) {
       </div>
 
       {selectedJob ? (
-        <div className="fixed inset-y-4 right-3 z-30 hidden w-[380px] xl:block">
+        <div className="fixed right-3 top-28 z-50 hidden w-[380px] xl:block">
           <DetailPanel
             job={selectedJob}
             returnTo={returnTo}
             assignableUsers={data.assignableUsers}
             view={uiView}
             date={data.anchorDate}
-            className="h-full rounded-md border border-slate-200 bg-white shadow-xl"
+            className="max-h-[calc(100vh-120px)] rounded-md border border-slate-200 bg-white shadow-xl"
           />
         </div>
       ) : null}
 
       {selectedJob ? (
-        <div className="fixed inset-0 z-40 bg-black/30 p-3 xl:hidden">
+        <div className="fixed inset-0 z-50 bg-black/30 px-3 pb-4 pt-24 sm:px-4 sm:pb-5 sm:pt-28 xl:hidden">
           <DetailPanel
             job={selectedJob}
             returnTo={returnTo}
             assignableUsers={data.assignableUsers}
             view={uiView}
             date={data.anchorDate}
-            className="ml-auto h-full max-w-md border-l border-slate-200"
+            className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-xl border border-slate-200 shadow-xl"
           />
         </div>
       ) : null}
