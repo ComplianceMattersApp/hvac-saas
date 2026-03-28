@@ -54,6 +54,7 @@ type JobRow = {
   ops_status: string | null;
   contractor_id: string | null;
   service_case_id: string | null;
+  parent_job_id: string | null;
   location_id: string | null;
   deleted_at: string | null;
   contractors?: {
@@ -308,6 +309,7 @@ const { data: jobsData, error: jobsErr } = await supabase
     ops_status,
     contractor_id,
     service_case_id,
+    parent_job_id,
     location_id,
     deleted_at
     `
@@ -342,6 +344,28 @@ const { data: jobsData, error: jobsErr } = await supabase
       const key = String((row as { service_case_id?: string | null }).service_case_id ?? "").trim();
       if (!key) continue;
       serviceCaseVisitCounts.set(key, (serviceCaseVisitCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  // Retest resolution awareness: identify parent failed jobs whose retest child has resolved
+  const failedJobIds = activeJobs
+    .filter((j) => normalizeOpsStatus(j.ops_status) === "failed")
+    .map((j) => j.id);
+
+  const resolvedRetestParentIds = new Set<string>();
+  if (failedJobIds.length > 0) {
+    const { data: retestChildren, error: retestErr } = await supabase
+      .from("jobs")
+      .select("parent_job_id")
+      .in("parent_job_id", failedJobIds)
+      .in("ops_status", ["paperwork_required", "invoice_required", "closed"])
+      .is("deleted_at", null);
+
+    if (retestErr) throw retestErr;
+
+    for (const row of retestChildren ?? []) {
+      const pid = String((row as { parent_job_id?: string | null }).parent_job_id ?? "").trim();
+      if (pid) resolvedRetestParentIds.add(pid);
     }
   }
 
@@ -687,6 +711,9 @@ const { data: jobsData, error: jobsErr } = await supabase
                   ? serviceCaseVisitCounts.get(job.service_case_id) ?? 1
                   : null;
                 const isArchived = Boolean(job.deleted_at);
+                const isResolvedParent =
+                  normalizeOpsStatus(job.ops_status) === "failed" &&
+                  resolvedRetestParentIds.has(job.id);
 
                 const address = [job.job_address, job.city]
                   .map((v) => String(v ?? "").trim())
@@ -714,12 +741,21 @@ const { data: jobsData, error: jobsErr } = await supabase
                           </Link>
 
                           <span
-                            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${opsBadgeClass(
-                              job.ops_status
-                            )}`}
+                            className={[
+                              "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+                              isResolvedParent
+                                ? "border-slate-200 bg-slate-100 text-slate-400 line-through"
+                                : opsBadgeClass(job.ops_status),
+                            ].join(" ")}
                           >
                             {opsStatusLabel(job.ops_status)}
                           </span>
+
+                          {isResolvedParent && (
+                            <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                              Retest Resolved ✓
+                            </span>
+                          )}
 
                           {isArchived ? (
                             <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
