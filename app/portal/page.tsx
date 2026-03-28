@@ -9,7 +9,6 @@ import {
   type ContractorIssue,
 } from "@/lib/portal/resolveContractorIssues";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
-import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import { isPortalVisibleJob } from "@/lib/visibility/portal";
 
 function formatDateLA(iso: string) {
@@ -447,13 +446,7 @@ export default async function PortalPage({
             const openRetestChild = openRetestChildByParentId.get(String(j.id));
             const detailLine = cardDetailLine(resolved);
             const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
-            const pendingInfoSignal = getPendingInfoSignal({
-              ops_status: j?.ops_status,
-              pending_info_reason: j?.pending_info_reason,
-              follow_up_date: j?.follow_up_date,
-              next_action_note: j?.next_action_note,
-              action_required_by: j?.action_required_by,
-            });
+            const isPendingInfoOps = String(j?.ops_status ?? "").trim().toLowerCase() === "pending_info";
 
             return (
               <Link
@@ -484,7 +477,7 @@ export default async function PortalPage({
                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
                         {statusMeta.label}
                       </span>
-                      {pendingInfoSignal ? (
+                      {isPendingInfoOps ? (
                         <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
                           Pending Info
                         </span>
@@ -544,13 +537,7 @@ export default async function PortalPage({
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = cardDetailLine(resolved);
               const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
-              const pendingInfoSignal = getPendingInfoSignal({
-                ops_status: j?.ops_status,
-                pending_info_reason: j?.pending_info_reason,
-                follow_up_date: j?.follow_up_date,
-                next_action_note: j?.next_action_note,
-                action_required_by: j?.action_required_by,
-              });
+              const isPendingInfoOps = String(j?.ops_status ?? "").trim().toLowerCase() === "pending_info";
               return (
                 <Link
                   key={j.id}
@@ -575,7 +562,7 @@ export default async function PortalPage({
                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
                           {statusMeta.label}
                         </span>
-                        {pendingInfoSignal ? (
+                        {isPendingInfoOps ? (
                           <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
                             Pending Info
                           </span>
@@ -635,13 +622,7 @@ export default async function PortalPage({
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = cardDetailLine(resolved);
               const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
-              const pendingInfoSignal = getPendingInfoSignal({
-                ops_status: j?.ops_status,
-                pending_info_reason: j?.pending_info_reason,
-                follow_up_date: j?.follow_up_date,
-                next_action_note: j?.next_action_note,
-                action_required_by: j?.action_required_by,
-              });
+              const isPendingInfoOps = String(j?.ops_status ?? "").trim().toLowerCase() === "pending_info";
               return (
                 <Link
                   key={j.id}
@@ -666,7 +647,7 @@ export default async function PortalPage({
                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
                           {statusMeta.label}
                         </span>
-                        {pendingInfoSignal ? (
+                        {isPendingInfoOps ? (
                           <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
                             Pending Info
                           </span>

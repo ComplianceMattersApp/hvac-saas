@@ -15,7 +15,6 @@ import {
   resolveContractorIssues,
 } from "@/lib/portal/resolveContractorIssues";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
-import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import { isPortalVisibleJob } from "@/lib/visibility/portal";
 
 function formatDateLA(iso: string) {
@@ -422,13 +421,7 @@ export default async function PortalJobDetailPage({
   const customerPhone =
     String((job as any)?.customers?.phone ?? "").trim() || String((job as any)?.customer_phone ?? "").trim() || "-";
 
-  const pendingInfoSignal = getPendingInfoSignal({
-    ops_status: (job as any)?.ops_status ?? null,
-    pending_info_reason: (job as any)?.pending_info_reason ?? null,
-    follow_up_date: (job as any)?.follow_up_date ?? null,
-    next_action_note: (job as any)?.next_action_note ?? null,
-    action_required_by: (job as any)?.action_required_by ?? null,
-  });
+  const isPendingInfoOps = opsStatus === "pending_info";
 
   const pendingInfoReasonText = String((job as any)?.pending_info_reason ?? "").trim();
   const showPermitField =
@@ -611,7 +604,7 @@ export default async function PortalJobDetailPage({
             }`}>Current Status</div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="font-medium">{primaryIssue.headline}</span>
-              {pendingInfoSignal ? (
+              {isPendingInfoOps ? (
                 <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
                   More info needed
                 </span>

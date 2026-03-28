@@ -1,5 +1,4 @@
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
-import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 
 export type ContractorIssueGroup = "needs_info" | "failed" | "in_progress" | "passed";
 
@@ -61,13 +60,6 @@ export type ContractorResponseTracking = {
   awaitingInternalReview: boolean;
   lastResponseType: ContractorResponseType | null;
   lastResponseAt: string | null;
-};
-
-const PRIORITY: Record<ContractorIssueGroup, number> = {
-  needs_info: 1,
-  failed: 2,
-  in_progress: 3,
-  passed: 4,
 };
 
 function formatRetestSchedule(chain?: ResolveContractorIssuesInput["chain"]): string {
@@ -223,12 +215,6 @@ export function resolveContractorIssues(
   const opsStatus = normalize(input.job.ops_status);
   const pendingInfoReason = String(input.job.pending_info_reason ?? "").trim();
   const nextActionNote = String(input.job.next_action_note ?? "").trim();
-  const pendingInfoSignal = getPendingInfoSignal({
-    pending_info_reason: input.job.pending_info_reason,
-    follow_up_date: input.job.follow_up_date,
-    next_action_note: input.job.next_action_note,
-    action_required_by: input.job.action_required_by,
-  });
   const failureReasons = (input.failureReasons ?? []).map(String).map((s) => s.trim()).filter(Boolean);
   const events = input.events ?? [];
 
@@ -244,38 +230,36 @@ export function resolveContractorIssues(
         : "pending_scheduling"
       : "none";
 
-  const issues: ContractorIssue[] = [];
+  let primaryIssue: ContractorIssue;
 
-  if (pendingInfoSignal) {
-    issues.push({
+  if (opsStatus === "pending_info") {
+    primaryIssue = {
       group: "needs_info",
       headline: pendingInfoReason || "Details requested",
       explanation:
         nextActionNote || "Please provide the requested information so work can continue.",
       detailLines: pendingInfoReason ? [pendingInfoReason] : undefined,
       stage: "needs_info",
-    });
-  }
-
-  if (opsStatus === "failed" || opsStatus === "retest_needed") {
+    };
+  } else if (opsStatus === "failed" || opsStatus === "retest_needed") {
     if (retestState === "scheduled") {
-      issues.push({
+      primaryIssue = {
         group: "in_progress",
         headline: `Retest scheduled for ${retestSchedule}`,
         explanation: "Retest scheduled for visit. No Immediate Action is required.",
         stage: "retest_scheduled",
-      });
+      };
     } else if (retestState === "pending_scheduling") {
-      issues.push({
+      primaryIssue = {
         group: "failed",
         headline: "Retest Pending Scheduling",
         explanation: "Retest child exists but still needs a scheduled date/time.",
         stage: "retest_pending_scheduling",
-      });
+      };
     } else {
       const stage = hasCorrectionSubmission ? "awaiting_review" : "action_needed";
 
-      issues.push({
+      primaryIssue = {
         group: "failed",
         headline:
           stage === "awaiting_review"
@@ -287,21 +271,17 @@ export function resolveContractorIssues(
             : "Please correct the failed items and submit for review.",
         detailLines: failureReasons.length > 0 ? failureReasons : undefined,
         stage,
-      });
+      };
     }
-  }
-
-  if (["need_to_schedule", "scheduled", "on_hold"].includes(opsStatus)) {
-    issues.push({
+  } else if (["need_to_schedule", "scheduled", "on_hold"].includes(opsStatus)) {
+    primaryIssue = {
       group: "in_progress",
       headline: inProgressHeadline(opsStatus),
       explanation: "Work is in progress.",
       stage: opsStatus,
-    });
-  }
-
-  if (["paperwork_required", "invoice_required", "closed"].includes(opsStatus)) {
-    issues.push({
+    };
+  } else if (["paperwork_required", "invoice_required", "closed"].includes(opsStatus)) {
+    primaryIssue = {
       group: "passed",
       headline: "Passed",
       explanation:
@@ -309,47 +289,33 @@ export function resolveContractorIssues(
           ? "This job is complete."
           : "This job has passed and is in final processing.",
       stage: opsStatus,
-    });
-  }
-
-  if (issues.length === 0) {
-    issues.push({
+    };
+  } else {
+    primaryIssue = {
       group: "in_progress",
       headline: "In progress",
       explanation: "Work is in progress.",
       stage: "unknown",
-    });
+    };
   }
 
-  issues.sort((a, b) => PRIORITY[a.group] - PRIORITY[b.group]);
+  const bucket: ContractorBucket =
+    primaryIssue.group === "needs_info" || primaryIssue.group === "failed"
+      ? "action_required"
+      : primaryIssue.group === "passed"
+      ? "passed"
+      : "in_progress";
 
-  const primaryIssue = issues[0];
-  const hasBlockingPrimary = primaryIssue.group === "needs_info" || primaryIssue.group === "failed";
+  const secondaryIssues: ContractorIssue[] = [];
 
-  const secondaryIssues = issues
-    .slice(1)
-    .filter((issue) => {
-      if (!hasBlockingPrimary) return true;
-      return issue.group === "needs_info" || issue.group === "failed";
-    });
-
-  const hasBlockingIssue = issues.some(
-    (issue) => issue.group === "needs_info" || issue.group === "failed"
-  );
-
-  const bucket: ContractorBucket = hasBlockingIssue
-    ? "action_required"
-    : issues.some((issue) => issue.group === "in_progress")
-    ? "in_progress"
-    : "passed";
-
-  let statusLabel = primaryIssue.group === "failed"
-    ? "Failed"
-    : primaryIssue.group === "needs_info"
-    ? "Needs Info"
-    : primaryIssue.group === "passed"
-    ? "Passed"
-    : "In Progress";
+  let statusLabel =
+    primaryIssue.group === "failed"
+      ? "Failed"
+      : primaryIssue.group === "needs_info"
+      ? "Needs Info"
+      : primaryIssue.group === "passed"
+      ? "Passed"
+      : "In Progress";
 
   let nextStep = primaryIssue.explanation ?? primaryIssue.headline;
 
