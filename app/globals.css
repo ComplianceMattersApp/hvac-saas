@@ -46,3 +46,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover,
 input[type="time"]::-webkit-calendar-picker-indicator:hover {
   background: rgba(0,0,0,0.06);
 }
+
+/* Ensure disclosure triangles rotate reliably across all <details> cards. */
+details summary .disclosure-icon {
+  transform-origin: center;
+}
+
+details[open] summary .disclosure-icon {
+  transform: rotate(90deg);
+}

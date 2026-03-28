@@ -323,6 +323,31 @@ function nextStatusLabel(status?: string | null) {
   return nextMap[s] ?? "—";
 }
 
+function CollapsibleHeader(props: {
+  title: string;
+  subtitle?: string;
+  meta?: string;
+}) {
+  const { title, subtitle, meta } = props;
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start gap-2">
+        <span
+          aria-hidden
+          className="disclosure-icon mt-[2px] inline-block text-[11px] text-slate-500 transition-transform duration-150 group-open:rotate-90"
+        >
+          ▶
+        </span>
+        <div>
+          <div className="text-base font-semibold">{title}</div>
+          {subtitle ? <div className="text-xs text-gray-500">{subtitle}</div> : null}
+        </div>
+      </div>
+      {meta ? <div className="text-xs text-gray-500">{meta}</div> : null}
+    </div>
+  );
+}
+
 
 type JobSearchParams = {
   tab?: "info" | "ops" | "tests";
@@ -1219,12 +1244,14 @@ const renderTimelineItem = (e: any, key: string) => {
           </Link>
         ) : null}
 
-        <Link
-          href={`/jobs/${job.id}/tests`}
-          className="inline-flex h-10 items-center rounded-md bg-slate-900 px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-px hover:bg-black"
-        >
-          Open Tests Workspace
-        </Link>
+        {job.job_type === "ecc" ? (
+          <Link
+            href={`/jobs/${job.id}/tests`}
+            className="inline-flex h-10 items-center rounded-md bg-slate-900 px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-px hover:bg-black"
+          >
+            Open Tests Workspace
+          </Link>
+        ) : null}
       </div>
 
       <div className="w-full lg:ml-auto lg:w-auto lg:shrink-0">
@@ -1807,16 +1834,12 @@ const renderTimelineItem = (e: any, key: string) => {
 
       {/* Single-workspace context (tab query preserved for compatibility) */}
      
-          <details className="mb-6 rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6">
+          <details className="group mb-6 rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90">
             <summary className="cursor-pointer list-none">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-base font-semibold">Edit Job</div>
-                  <div className="text-xs text-gray-500">
-                    All editable controls for this job.
-                  </div>
-                </div>
-              </div>
+              <CollapsibleHeader
+                title="Edit Job"
+                subtitle="All editable controls for this job."
+              />
             </summary>
 
             <div className="mt-3 border-t border-slate-200 pt-4">
@@ -1892,10 +1915,15 @@ const renderTimelineItem = (e: any, key: string) => {
               </div>
 
               {job.job_type === "ecc" ? (
-                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <details open className="w-full">
-                    <summary className="cursor-pointer font-semibold text-slate-900">
-                      Permit &amp; Compliance
+                <details
+                  open
+                  className="group mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm [&[open]_.disclosure-icon]:rotate-90"
+                >
+                    <summary className="cursor-pointer list-none">
+                      <CollapsibleHeader
+                        title="Permit & Compliance"
+                        subtitle="ECC permit fields and jurisdiction details."
+                      />
                     </summary>
                     <form action={updateJobScheduleFromForm} className="mt-3 space-y-3">
                       <input type="hidden" name="job_id" value={job.id} />
@@ -1942,14 +1970,16 @@ const renderTimelineItem = (e: any, key: string) => {
                         Save Permit Info
                       </SubmitButton>
                     </form>
-                  </details>
-                </div>
+                </details>
               ) : null}
 
               <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <details className="w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
-                  <summary className="cursor-pointer font-semibold text-slate-900">
-                    Change job type
+                <details className="group w-full rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm [&[open]_.disclosure-icon]:rotate-90">
+                  <summary className="cursor-pointer list-none">
+                    <CollapsibleHeader
+                      title="Change Job Type"
+                      subtitle="Switch between service and ECC workflows."
+                    />
                   </summary>
 
                   <form
@@ -1979,9 +2009,12 @@ const renderTimelineItem = (e: any, key: string) => {
                   </form>
                 </details>
 
-                <details className="w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
-                  <summary className="cursor-pointer font-semibold text-slate-900">
-                    Change contractor
+                <details className="group w-full rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm [&[open]_.disclosure-icon]:rotate-90">
+                  <summary className="cursor-pointer list-none">
+                    <CollapsibleHeader
+                      title="Change Contractor"
+                      subtitle="Reassign job ownership to a different contractor."
+                    />
                   </summary>
 
                   <div className="mt-3">
@@ -2019,9 +2052,12 @@ const renderTimelineItem = (e: any, key: string) => {
                 </details>
               </div>
 
-              <details className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <summary className="cursor-pointer text-sm font-semibold text-slate-900">
-                  Admin archive controls
+              <details className="group mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm [&[open]_.disclosure-icon]:rotate-90">
+                <summary className="cursor-pointer list-none">
+                  <CollapsibleHeader
+                    title="Admin Archive Controls"
+                    subtitle="Archive or cancel this job with admin-only actions."
+                  />
                 </summary>
 
                 <div className="mt-3 space-y-3">
@@ -2085,16 +2121,12 @@ const renderTimelineItem = (e: any, key: string) => {
   <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.92fr)] xl:items-start">
   <div className="order-2 flex flex-col gap-5 xl:order-2">
     {/* Equipment */}
-  <details open={equipmentCount === 0} className="rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm xl:order-2 sm:p-6">
+  <details open={equipmentCount === 0} className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm xl:order-2 sm:p-6 [&[open]_.disclosure-icon]:rotate-90">
       <summary className="cursor-pointer list-none">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-base font-semibold">Equipment</div>
-            <div className="text-xs text-gray-500">
-              Location-based equipment context for this job.
-            </div>
-          </div>
-        </div>
+        <CollapsibleHeader
+          title="Equipment"
+          subtitle="Location-based equipment context for this job."
+        />
       </summary>
 
       <div className="mt-3 border-t border-slate-200 pt-4">
@@ -2142,15 +2174,50 @@ const renderTimelineItem = (e: any, key: string) => {
     </details>
 
     {/* Attachments - moved up from bottom */}
-    <details className="rounded-xl border border-slate-200 bg-white text-gray-900 shadow-sm sm:p-6">
-      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">
-        Attachments ({attachmentItems.length})
+    <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90">
+      <summary className="cursor-pointer list-none">
+        <div className="flex items-center gap-2 text-slate-900">
+          <span aria-hidden className="disclosure-icon inline-block text-[11px] text-slate-500 transition-transform duration-150 group-open:rotate-90">▶</span>
+          <span className="text-base font-semibold">Attachments ({attachmentItems.length})</span>
+        </div>
       </summary>
       <div className="px-4 pb-4">
         <JobAttachmentsInternal
           jobId={job.id}
           initialItems={attachmentItems}
         />
+      </div>
+    </details>
+
+    <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90">
+      <summary className="cursor-pointer list-none">
+        <CollapsibleHeader
+          title="Follow-Up History"
+          subtitle="Customer contact attempts and activity."
+        />
+      </summary>
+
+      <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
+        {!attemptItems.length ? (
+          <div className="text-sm text-gray-600">No contact attempts logged yet.</div>
+        ) : (
+          <div className="space-y-2">
+            {contactPreviewItems.map((a: any, idx: number) => renderAttemptItem(a, `attempt-preview-${idx}`))}
+
+            {contactOverflowItems.length > 0 ? (
+              <details className="pt-1">
+                <summary className="cursor-pointer text-sm text-gray-700 underline">
+                  Show all attempts ({attemptItems.length})
+                </summary>
+                <div className="mt-2 space-y-2">
+                  {contactOverflowItems.map((a: any, idx: number) =>
+                    renderAttemptItem(a, `attempt-overflow-${idx}`)
+                  )}
+                </div>
+              </details>
+            ) : null}
+          </div>
+        )}
       </div>
     </details>
 
@@ -2373,17 +2440,26 @@ const renderTimelineItem = (e: any, key: string) => {
         ) : null}
       </div>
 
-      {/* Section A: Follow Up (Active Edit Area) */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6">
-        <div className="mb-4">
-          <div className="text-base font-semibold">Follow Up</div>
-          <div className="text-xs text-gray-500">
-            Edit pending info, next actions, and follow-up schedule.
+      {job.job_notes ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-gray-900 shadow-sm">
+          <div className="text-sm font-semibold mb-2">Job Notes</div>
+          <div className="whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
+            {job.job_notes}
           </div>
         </div>
+      ) : null}
 
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
-          <div className="text-sm font-semibold mb-3">Follow Up</div>
+      {/* Section A: Follow Up (Active Edit Area) */}
+      <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90">
+        <summary className="cursor-pointer list-none">
+          <CollapsibleHeader
+            title="Follow Up"
+            subtitle="Edit pending info, next actions, and follow-up schedule."
+          />
+        </summary>
+
+        <div className="mt-3 border-t border-slate-200 pt-4">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
 
           <form action={updateJobOpsDetailsFromForm} className="grid gap-3">
             <input type="hidden" name="job_id" value={job.id} />
@@ -2439,53 +2515,9 @@ const renderTimelineItem = (e: any, key: string) => {
           </form>
         </div>
       </div>
-
-      {/* Section B: Follow-Up History (Collapsible) */}
-      <details className="rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6">
-        <summary className="cursor-pointer list-none">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-base font-semibold">Follow-Up History</div>
-              <div className="text-xs text-gray-500">
-                Customer contact attempts and activity.
-              </div>
-            </div>
-          </div>
-        </summary>
-
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
-          {!attemptItems.length ? (
-            <div className="text-sm text-gray-600">No contact attempts logged yet.</div>
-          ) : (
-            <div className="space-y-2">
-              {contactPreviewItems.map((a: any, idx: number) => renderAttemptItem(a, `attempt-preview-${idx}`))}
-
-              {contactOverflowItems.length > 0 ? (
-                <details className="pt-1">
-                  <summary className="cursor-pointer text-sm text-gray-700 underline">
-                    Show all attempts ({attemptItems.length})
-                  </summary>
-                  <div className="mt-2 space-y-2">
-                    {contactOverflowItems.map((a: any, idx: number) =>
-                      renderAttemptItem(a, `attempt-overflow-${idx}`)
-                    )}
-                  </div>
-                </details>
-              ) : null}
-            </div>
-          )}
-        </div>
       </details>
-</div>
 
-      {job.job_notes ? (
-        <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 text-gray-900 shadow-sm">
-          <div className="text-sm font-semibold mb-2">Job Notes</div>
-          <div className="whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
-            {job.job_notes}
-          </div>
-        </div>
-      ) : null}
+ </div>
 
           {/* Retest + Linked Jobs */}
 {showRetestSection ? (
@@ -2664,18 +2696,15 @@ const renderTimelineItem = (e: any, key: string) => {
 
 
         </>
-    </div>
-  </div>
-
-    <section className="mt-4 rounded-xl border border-slate-200 bg-white">
-      <div className="space-y-0">
+    <section className="mt-2 space-y-4">
+      <div className="space-y-4">
         {/* Shared Notes */}
-        <details className="rounded-t-xl border-b border-slate-200 p-4 text-gray-900 sm:p-5" open>
+        <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90" open>
           <summary className="cursor-pointer list-none">
-            <div className="text-sm font-semibold">Shared Notes</div>
+            <CollapsibleHeader title="Shared Notes" subtitle="Notes visible to contractor and team." />
           </summary>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 border-t border-slate-200 pt-4 space-y-2">
 
   <form action={addPublicNoteFromForm} className="mb-4 space-y-3">
     <input type="hidden" name="job_id" value={job.id} />
@@ -2748,12 +2777,12 @@ const renderTimelineItem = (e: any, key: string) => {
         </details>
 
         {/* Internal Notes */}
-        <details className="border-b border-slate-200 p-4 text-gray-900 sm:p-5" open>
+        <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90" open>
           <summary className="cursor-pointer list-none">
-            <div className="text-sm font-semibold">Internal Notes</div>
+            <CollapsibleHeader title="Internal Notes" subtitle="Internal-only notes for your team." />
           </summary>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 border-t border-slate-200 pt-4 space-y-2">
 
   <form action={addInternalNoteFromForm} className="mb-4 space-y-3">
     <input type="hidden" name="job_id" value={job.id} />
@@ -2807,17 +2836,16 @@ const renderTimelineItem = (e: any, key: string) => {
         </details>
 
         {/* Timeline - Activity/History */}
-        <details className="rounded-b-xl border-t border-slate-200 p-4 text-gray-900 sm:p-5">
+        <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90">
           <summary className="cursor-pointer list-none">
-            <div>
-              <div className="text-sm font-semibold">Timeline</div>
-              <div className="text-xs text-gray-500">
-                {timelineItems.length} event(s)
-              </div>
-            </div>
+            <CollapsibleHeader
+              title="Timeline"
+              subtitle="Activity history for this job."
+              meta={`${timelineItems.length} event(s)`}
+            />
           </summary>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 border-t border-slate-200 pt-4 space-y-2">
     {timelineItems.length ? (
       <>
         {timelinePreviewItems.map((e: any, idx: number) =>
@@ -2845,6 +2873,8 @@ const renderTimelineItem = (e: any, key: string) => {
       </div>
     </section>
     </div>
+  </div>
+  </div>
   );
   
 }
