@@ -519,7 +519,7 @@ export default async function PortalJobDetailPage({
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 text-gray-900 dark:text-gray-100">
+    <div className="max-w-4xl mx-auto space-y-8 text-gray-900 dark:text-gray-100">
       {banner === "job_created" ? (
         <FlashBanner type="success" message="Job created." />
       ) : null}
@@ -544,24 +544,24 @@ export default async function PortalJobDetailPage({
         <FlashBanner type="warning" message="This submission was already received." />
       ) : null}
 
-      <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
+      <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-white via-gray-50 to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950 p-6 shadow-md space-y-5">
         <div className="flex items-start justify-between gap-4">
           <Link
             href="/portal"
-            className="inline-flex px-3 py-2 rounded-lg border bg-white dark:bg-gray-900 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+            className="inline-flex px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition"
           >
             Back
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-3 md:items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 md:items-stretch">
           <div className="space-y-2">
-            <div className="text-xs text-gray-500 dark:text-gray-300">Contractor Portal - {contractorName}</div>
+            <div className="text-xs font-medium tracking-wide text-gray-400 dark:text-gray-500">{contractorName}</div>
 
-            <div className="text-2xl font-semibold tracking-tight">{customerName}</div>
-            <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">{String((job as any).title ?? "Job")}</div>
+            <div className="text-3xl font-extrabold tracking-tight leading-tight">{customerName}</div>
+            <div className="text-base font-semibold text-gray-700 dark:text-gray-300">{String((job as any).title ?? "Job")}</div>
 
-            <div className="space-y-0.5">
+            <div className="space-y-1.5">
               {addressDisplay.line1 ? (
                 <div className="text-sm font-medium text-gray-700 dark:text-gray-200">{addressDisplay.line1}</div>
               ) : null}
@@ -586,24 +586,40 @@ export default async function PortalJobDetailPage({
         </div>
 
         <div className={`grid grid-cols-1 ${showPermitField ? "md:grid-cols-4" : "md:grid-cols-3"} gap-3 text-sm`}>
-          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 h-full">
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3 h-full hover:shadow-sm transition-shadow">
             <div className="text-xs text-gray-500 dark:text-gray-300">Customer Phone</div>
             <div className="mt-1 font-medium">{customerPhone}</div>
           </div>
 
-          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 h-full">
-            <div className="text-xs text-gray-500 dark:text-gray-300">Current Status</div>
+          <div className={`rounded-lg border border-gray-200 dark:border-gray-700 p-3 h-full transition-all ${
+            primaryIssue.group === "failed"
+              ? "bg-red-50 dark:bg-red-950/20"
+              : primaryIssue.group === "needs_info"
+              ? "bg-amber-50 dark:bg-amber-950/20"
+              : primaryIssue.group === "in_progress"
+              ? "bg-blue-50 dark:bg-blue-950/20"
+              : "bg-emerald-50 dark:bg-emerald-950/20"
+          }`}>
+            <div className={`text-xs font-semibold ${
+              primaryIssue.group === "failed"
+                ? "text-red-600 dark:text-red-300"
+                : primaryIssue.group === "needs_info"
+                ? "text-amber-600 dark:text-amber-300"
+                : primaryIssue.group === "in_progress"
+                ? "text-blue-600 dark:text-blue-300"
+                : "text-emerald-600 dark:text-emerald-300"
+            }`}>Current Status</div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="font-medium">{titleCaseFromSnake((job as any).status)} / {titleCaseFromSnake((job as any).ops_status)}</span>
+              <span className="font-medium">{primaryIssue.headline}</span>
               {pendingInfoSignal ? (
                 <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
-                  Pending Info
+                  More info needed
                 </span>
               ) : null}
             </div>
           </div>
 
-          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 h-full">
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3 h-full hover:shadow-sm transition-shadow">
             <div className="text-xs text-gray-500 dark:text-gray-300">Service Date</div>
             <div className="mt-1 font-medium">
               {(job as any).scheduled_date ? formatBusinessDateUS(String((job as any).scheduled_date)) : "Not scheduled"}
@@ -614,52 +630,74 @@ export default async function PortalJobDetailPage({
           </div>
 
           {showPermitField ? (
-            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 h-full">
-              <div className="text-xs text-gray-500 dark:text-gray-300">Permit #</div>
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3 h-full hover:shadow-sm transition-shadow">
               <div className="mt-1 font-medium">{String((job as any).permit_number ?? "").trim() || "-"}</div>
             </div>
           ) : null}
         </div>
       </section>
 
-      <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
-        <div className="text-sm font-semibold">Status</div>
-        <div className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-300">
+      <section className={`rounded-xl border-l-4 border-r border-t border-b border-gray-200 dark:border-gray-800 p-6 shadow-sm space-y-5 ${
+        primaryIssue.group === "failed"
+          ? "border-l-red-500 bg-gradient-to-br from-white to-red-50 dark:from-gray-900 dark:to-red-950/10"
+          : primaryIssue.group === "needs_info"
+          ? "border-l-amber-500 bg-gradient-to-br from-white to-amber-50 dark:from-gray-900 dark:to-amber-950/10"
+          : primaryIssue.group === "in_progress"
+          ? "border-l-blue-500 bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-blue-950/10"
+          : "border-l-emerald-500 bg-gradient-to-br from-white to-emerald-50 dark:from-gray-900 dark:to-emerald-950/10"
+      }`}>
+        <div className="text-base font-semibold">Status</div>
+        <div className={`text-xs font-semibold uppercase tracking-widest ${
+          primaryIssue.group === "failed"
+            ? "text-red-600 dark:text-red-300"
+            : primaryIssue.group === "needs_info"
+            ? "text-amber-600 dark:text-amber-300"
+            : primaryIssue.group === "in_progress"
+            ? "text-blue-600 dark:text-blue-300"
+            : "text-emerald-600 dark:text-emerald-300"
+        }`}>
           {primaryIssue.group === "needs_info"
             ? "Need information from you"
             : primaryIssue.group === "failed"
-            ? "Failed"
+            ? "Needs correction"
             : primaryIssue.group === "in_progress"
             ? "In progress"
             : "Passed"}
         </div>
-        <div className="text-lg font-semibold">{primaryIssue.headline}</div>
+        <div className="text-xl font-bold">{primaryIssue.headline}</div>
         {primaryIssue.explanation ? (
-          <div className="text-sm text-gray-700 dark:text-gray-200">{primaryIssue.explanation}</div>
+          <div className="text-sm leading-relaxed text-gray-700 dark:text-gray-200">{primaryIssue.explanation}</div>
         ) : null}
 
         {(primaryIssue.detailLines ?? []).slice(0, 4).length > 0 ? (
-          <div className="space-y-1 text-sm text-gray-700 dark:text-gray-200">
+          <div className="space-y-1.5 text-sm text-gray-700 dark:text-gray-200 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
             {(primaryIssue.detailLines ?? []).slice(0, 4).map((reason, idx) => (
-              <div key={`${reason}-${idx}`}>Failed - {reason}</div>
+              <div key={`${reason}-${idx}`}>{reason}</div>
             ))}
           </div>
         ) : null}
 
+        {hasRetestReadyRequest ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-700 p-3 text-sm text-emerald-800 dark:text-emerald-300">
+            Retest request received — we&apos;ll schedule it shortly.
+          </div>
+        ) : null}
+
         {latestRaterNote ? (
-          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3">
             <div className="text-xs text-gray-500 dark:text-gray-300">Rater / Inspector Note</div>
             <div className="mt-1 text-sm whitespace-pre-wrap">{latestRaterNote}</div>
           </div>
         ) : null}
       </section>
 
-      {latestSentReportMeta ? (
-        <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
-          <div className="text-sm font-semibold">Latest Contractor Report</div>
 
-          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 text-sm space-y-1">
-            <div><span className="font-medium">Type:</span> {String(latestSentReportMeta.report_kind ?? "").trim() === "pending_info" ? "INFORMATION NEEDED" : "FAILED TEST"}</div>
+      {latestSentReportMeta ? (
+        <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm space-y-3">
+          <div className="text-base font-semibold">Latest Contractor Report</div>
+
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3 text-sm space-y-1">
+            <div><span className="font-medium">Type:</span> {String(latestSentReportMeta.report_kind ?? "").trim() === "pending_info" ? "More information needed" : "Needs correction"}</div>
             <div><span className="font-medium">Customer:</span> {String(latestSentReportMeta.customer_name ?? "-")}</div>
             <div><span className="font-medium">Location:</span> {String(latestSentReportMeta.location_text ?? "-")}</div>
             <div><span className="font-medium">Contractor:</span> {String(latestSentReportMeta.contractor_name ?? "").trim() || "Not assigned"}</div>
@@ -684,17 +722,17 @@ export default async function PortalJobDetailPage({
             ) : null}
 
             <div className="pt-1"><span className="font-medium">Next Step:</span> {String(latestSentReportMeta.next_step ?? "-")}</div>
-            {false && <div>{latestSentReportMeta.body_text}</div>}
+
           </div>
         </section>
       ) : null}
 
       {secondaryIssues.length > 0 ? (
-        <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
-          <div className="text-sm font-semibold">Additional Blockers</div>
+        <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm space-y-4">
+          <div className="text-base font-semibold">Additional Blockers</div>
           <div className="space-y-2">
             {secondaryIssues.map((issue, idx) => (
-              <div key={`${issue.group}-${idx}`} className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+              <div key={`${issue.group}-${idx}`} className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3">
                 <div className="text-sm font-medium">{issue.headline}</div>
                 {issue.explanation ? (
                   <div className="mt-1 text-sm text-gray-700 dark:text-gray-200">{issue.explanation}</div>
@@ -705,12 +743,12 @@ export default async function PortalJobDetailPage({
         </section>
       ) : null}
 
-      <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-4">
-        <div className="text-sm font-semibold">Contractor Actions</div>
+      <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm space-y-5">
+        <div className="text-base font-semibold">Contractor Actions</div>
 
         {isPortalFailed && !hasOpenRetestChild ? (
-          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3 space-y-2">
-            <div className="text-sm font-medium">Retest readiness</div>
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-4 space-y-3 hover:shadow-sm transition-shadow">
+            <div className="text-sm font-semibold">Request retest</div>
             {hasRetestReadyRequest ? (
               <div className="text-sm text-emerald-700 dark:text-emerald-300">
                 Retest Ready has already been submitted.
@@ -729,8 +767,8 @@ export default async function PortalJobDetailPage({
           </div>
         ) : null}
 
-        <div className="space-y-2">
-          <div className="text-sm font-medium">Add contractor note</div>
+        <div className="space-y-3">
+          <div className="text-sm font-semibold">Add contractor note</div>
           {noteError === "empty_note" ? (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Please enter a note before sending.
@@ -742,7 +780,7 @@ export default async function PortalJobDetailPage({
               name="note"
               rows={3}
               placeholder="Type your note here..."
-              className="w-full border rounded-md px-3 py-2 bg-white dark:bg-gray-900"
+              className="w-full border border-gray-200 dark:border-gray-700 rounded-md px-3 py-2.5 text-sm bg-white dark:bg-gray-900 resize-none focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-gray-300 dark:focus:ring-gray-600 transition-all"
             />
             <SubmitButton className="px-4 py-2 rounded-lg border bg-gray-900 text-white text-sm font-medium hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed">
               Save Note
@@ -751,10 +789,10 @@ export default async function PortalJobDetailPage({
         </div>
       </section>
 
-      <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-4">
-        <div className="text-sm font-semibold">Notes</div>
+      <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm space-y-5">
+        <div className="text-base font-semibold">Notes</div>
 
-        <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3">
           <div className="text-sm font-medium">Rater / Inspector Notes</div>
           {raterNotes.length === 0 ? (
             <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">No notes yet.</div>
@@ -772,7 +810,7 @@ export default async function PortalJobDetailPage({
           )}
         </div>
 
-        <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3">
           <div className="text-sm font-medium">Contractor Notes</div>
           {contractorNotes.length === 0 ? (
             <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">No notes yet.</div>
@@ -795,13 +833,16 @@ export default async function PortalJobDetailPage({
         </div>
       </section>
 
-      <section className="space-y-3">
-        <div className="text-sm font-semibold">Shared Files</div>
+      <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm space-y-4">
+        <div className="space-y-1">
+          <div className="text-base font-semibold">Photos &amp; Files</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Add photos or documents related to this job.</div>
+        </div>
         <JobAttachments jobId={jobId} initialItems={sharedAttachmentItems} />
       </section>
 
-      <section className="rounded-xl border bg-white dark:bg-gray-900 p-5 shadow-sm space-y-3">
-        <div className="text-sm font-semibold">Timeline</div>
+      <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm space-y-4">
+        <div className="text-base font-semibold">Timeline</div>
 
         {timelineEvents.length === 0 ? (
           <div className="text-sm text-gray-600 dark:text-gray-300">No timeline events yet.</div>
@@ -816,7 +857,7 @@ export default async function PortalJobDetailPage({
               const detail = formatPortalTimelineDetail(type, meta);
 
               return (
-                <div key={`${String(e.created_at)}-${idx}`} className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 p-3">
+                <div key={`${String(e.created_at)}-${idx}`} className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-xs font-medium text-gray-500 dark:text-gray-300">
                       {e.created_at ? formatDateTimeLA(String(e.created_at)) : "-"}
@@ -841,8 +882,8 @@ export default async function PortalJobDetailPage({
         )}
       </section>
 
-      <div className="rounded-xl border bg-white dark:bg-gray-900 p-4 text-sm text-gray-700 dark:text-gray-200 shadow-sm">
-        If you need help, contact Compliance Matters: <b className="whitespace-nowrap">(209) 518-2383</b>
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-6 py-4 text-sm text-gray-600 dark:text-gray-300 shadow-sm text-center">
+        If you need help, contact Compliance Matters: <b className="whitespace-nowrap text-gray-900 dark:text-gray-100">(209) 518-2383</b>
       </div>
     </div>
   );

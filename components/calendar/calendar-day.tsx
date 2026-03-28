@@ -1,3 +1,4 @@
+// Legacy component — currently not used in calendar
 'use client';
 
 import { format } from 'date-fns';

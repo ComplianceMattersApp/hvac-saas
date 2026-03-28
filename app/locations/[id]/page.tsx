@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { updateLocationNotesFromForm } from "./notes-actions";
 
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -169,6 +170,12 @@ export default async function LocationDetailPage(props: {
     const s = String(j?.status ?? "").toLowerCase();
     return !!s && !["completed", "closed", "cancelled"].includes(s);
   }).length;
+  const failedJobs = jobRows.filter((j) =>
+    String(j?.ops_status ?? "").toLowerCase() === "failed"
+  ).length;
+  const pendingInfoJobs = jobRows.filter((j) =>
+    String(j?.ops_status ?? "").toLowerCase() === "pending_info"
+  ).length;
 
   const serviceCaseCounts = new Map<string, number>();
   for (const row of jobRows) {
@@ -190,10 +197,6 @@ export default async function LocationDetailPage(props: {
     <div className="p-6 space-y-6">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-          <Link href="/ops" className="underline">
-            Back to Ops
-          </Link>
-          <span>•</span>
           <Link href={`/customers/${location.customer_id}`} className="underline">
             Back to Customer
           </Link>
@@ -322,16 +325,29 @@ export default async function LocationDetailPage(props: {
           </div>
         </div>
 
-        {"notes" in (location ?? {}) && (location as any).notes ? (
-          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Notes
-            </div>
-            <div className="mt-1 whitespace-pre-wrap text-sm text-gray-900">
-              {String((location as any).notes)}
-            </div>
+      </section>
+
+      <section className="rounded-lg border border-gray-200 bg-white p-4">
+        <h2 className="text-lg font-semibold text-gray-900">Location Notes</h2>
+        <p className="mt-1 text-sm text-gray-600">Internal notes for this property.</p>
+        <form action={updateLocationNotesFromForm} className="mt-4 space-y-3">
+          <input type="hidden" name="location_id" value={locationId} />
+          <textarea
+            name="notes"
+            defaultValue={(location as any).notes ?? ""}
+            rows={5}
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+            placeholder="Add notes for this location..."
+          />
+          <div>
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            >
+              Save
+            </button>
           </div>
-        ) : null}
+        </form>
       </section>
 
       <section className="rounded-lg border border-gray-200 bg-white p-4">
@@ -345,6 +361,27 @@ export default async function LocationDetailPage(props: {
       </p>
     </div>
   </div>
+
+  {jobRows.length > 0 && (
+    <div className="mt-4 flex flex-wrap gap-3">
+      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm">
+        <span className="font-medium text-gray-900">{openJobs}</span>
+        <span className="ml-1 text-gray-500">Open</span>
+      </div>
+      {failedJobs > 0 && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm">
+          <span className="font-medium text-red-700">{failedJobs}</span>
+          <span className="ml-1 text-red-600">Failed</span>
+        </div>
+      )}
+      {pendingInfoJobs > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm">
+          <span className="font-medium text-amber-700">{pendingInfoJobs}</span>
+          <span className="ml-1 text-amber-600">Pending Info</span>
+        </div>
+      )}
+    </div>
+  )}
 
   {jobRows.length === 0 ? (
     <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
@@ -421,32 +458,7 @@ export default async function LocationDetailPage(props: {
   )}
 </section>
 
-      <section className="rounded-lg border border-gray-200 bg-white p-4">
-        <h2 className="text-lg font-semibold text-gray-900">Quick Links</h2>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            href={`/customers/${location.customer_id}`}
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
-          >
-            Open Customer
-          </Link>
-
-          <a
-            href={mapsHref({
-              address_line1: location.address_line1,
-              city: location.city,
-              state: location.state,
-              zip: (location as any).zip,
-            })}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
-          >
-            Open in Maps
-          </a>
-        </div>
-      </section>
     </div>
   );
 }

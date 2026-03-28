@@ -2,7 +2,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { archiveCustomerFromForm } from "@/lib/actions/customer-actions";
+import {
+  archiveCustomerFromForm,
+  updateCustomerNotesFromForm,
+} from "@/lib/actions/customer-actions";
+
 
 type CustomerRow = {
   id?: string;
@@ -365,14 +369,14 @@ const { data: jobsData, error: jobsErr } = await supabase
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-7xl p-4 md:p-6 space-y-6">
+      <div className="mx-auto max-w-7xl space-y-7 p-4 md:space-y-8 md:p-6">
         {hasJobsError && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             This customer has active jobs and cannot be archived. Remove all jobs first.
           </div>
         )}
         {/* Header */}
-        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50/40 p-5 shadow-sm md:flex-row md:items-start md:justify-between md:p-6">
           <div className="space-y-2">
             <Link
               href="/customers"
@@ -382,7 +386,8 @@ const { data: jobsData, error: jobsErr } = await supabase
             </Link>
 
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Entity Workspace</div>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
                 {customerDisplayName(customer)}
               </h1>
               <p className="mt-1 text-sm text-slate-600">
@@ -390,7 +395,7 @@ const { data: jobsData, error: jobsErr } = await supabase
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+            <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200/80 bg-white/70 p-2 text-xs text-slate-600">
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
                 {locations.length} location{locations.length === 1 ? "" : "s"}
               </span>
@@ -407,7 +412,7 @@ const { data: jobsData, error: jobsErr } = await supabase
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-col items-stretch gap-3 rounded-xl border border-slate-200 bg-white/85 p-3 md:items-end">
             <div className="flex flex-wrap gap-2">
               <Link
                 href={`/customers/${customerId}/edit`}
@@ -420,24 +425,16 @@ const { data: jobsData, error: jobsErr } = await supabase
                 href={`/jobs/new?customer_id=${customerId}`}
                 className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
               >
-                New Job
+                New Job for Customer
               </Link>
             </div>
-
-            <form action={archiveCustomerFromForm}>
-              <input type="hidden" name="customer_id" value={customerId} />
-              <button
-                type="submit"
-                className="inline-flex items-center rounded-lg border border-red-200 px-4 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-              >
-                Archive Customer
-              </button>
-            </form>
           </div>
         </div>
 
+        <div className="space-y-6 md:space-y-7">
+
         {/* Open status summary */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
               Open Jobs Summary
@@ -486,15 +483,6 @@ const { data: jobsData, error: jobsErr } = await supabase
                 </div>
                 <div className="text-sm text-slate-900 break-all">
                   {customer.email ?? "—"}
-                </div>
-              </div>
-
-              <div className="space-y-1 md:col-span-2">
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Notes
-                </div>
-                <div className="min-h-[44px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
-                  {customer.notes?.trim() || "No notes on file."}
                 </div>
               </div>
 
@@ -575,6 +563,33 @@ const { data: jobsData, error: jobsErr } = await supabase
               </div>
             </div>
           </div>
+        </section>
+
+        <section id="customer-notes" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-3">
+            <h2 className="text-lg font-semibold text-slate-900">Customer Notes</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Internal notes and context for this customer.
+            </p>
+          </div>
+          <form action={updateCustomerNotesFromForm} className="space-y-3">
+            <input type="hidden" name="customer_id" value={customerId} />
+            <textarea
+              name="notes"
+              defaultValue={customer.notes ?? ""}
+              rows={6}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+              placeholder="Add customer notes..."
+            />
+            <div>
+              <button
+                type="submit"
+                className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                Save
+              </button>
+            </div>
+          </form>
         </section>
 
         {/* Locations */}
@@ -751,6 +766,26 @@ const { data: jobsData, error: jobsErr } = await supabase
             </div>
           )}
         </section>
+
+        <section className="rounded-2xl border border-red-200 bg-red-50/40 p-5 shadow-sm">
+          <div className="mb-3">
+            <h2 className="text-lg font-semibold text-red-900">Danger Zone</h2>
+            <p className="text-sm text-red-800/90">
+              Archive this customer record when it is no longer active.
+            </p>
+          </div>
+
+          <form action={archiveCustomerFromForm}>
+            <input type="hidden" name="customer_id" value={customerId} />
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+            >
+              Archive Customer
+            </button>
+          </form>
+        </section>
+      </div>
       </div>
     </div>
   );

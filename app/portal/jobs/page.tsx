@@ -279,32 +279,33 @@ export default async function PortalAllJobsPage() {
     const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
     const resolvedLabel = String(row.resolved?.statusLabel ?? "").trim();
 
-    if (resolvedLabel === "Retest Scheduled") return { label: resolvedLabel, tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
-    if (resolvedLabel === "Retest Pending Scheduling") return { label: resolvedLabel, tone: "border-amber-200 bg-amber-50 text-amber-800" };
-    if (resolvedLabel === "Failed") return { label: resolvedLabel, tone: "border-rose-200 bg-rose-50 text-rose-800" };
-    if (lifecycle === "on_the_way") return { label: "On the Way", tone: "border-sky-200 bg-sky-50 text-sky-800" };
-    if (lifecycle === "in_progress") return { label: "In Progress", tone: "border-blue-200 bg-blue-50 text-blue-800" };
+    if (resolvedLabel === "Retest Scheduled") return { label: "Retest Scheduled", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
+    if (resolvedLabel === "Retest Pending Scheduling") return { label: "Needs to be scheduled", tone: "border-amber-200 bg-amber-50 text-amber-800" };
+    if (resolvedLabel === "Failed") return { label: "Needs correction", tone: "border-rose-200 bg-rose-50 text-rose-800" };
+    if (lifecycle === "on_the_way") return { label: "On the way", tone: "border-sky-200 bg-sky-50 text-sky-800" };
+    if (lifecycle === "in_progress") return { label: "Work in progress", tone: "border-blue-200 bg-blue-50 text-blue-800" };
     if (ops === "scheduled") return { label: "Scheduled", tone: "border-slate-200 bg-slate-50 text-slate-800" };
     if (row.resolved.bucket === "passed") return { label: "Passed", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
-    return { label: "In Progress", tone: "border-slate-200 bg-slate-50 text-slate-800" };
+    return { label: "In progress", tone: "border-slate-200 bg-slate-50 text-slate-800" };
   }
 
   function nextStepText(row: { job: any; resolved: any; openRetestChild?: any }) {
     const lifecycle = String(row.job.status ?? "").trim().toLowerCase();
     const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
-    if (row.resolved?.retestState === "scheduled" || row.resolved?.bucket === "passed") return "Next step: No Immediate Action";
-    if (row.resolved?.primaryIssue?.group === "needs_info") return "Next step: Provide Requested Information";
-    if (ops === "failed" || ops === "retest_needed" || row.resolved?.primaryIssue?.group === "failed") return "Next step: Await Contractor Correction";
-    if (["paperwork_required", "invoice_required"].includes(ops)) return "Next step: Finish Closeout";
-    if (row.resolved?.retestState === "pending_scheduling" || lifecycle === "on_the_way" || lifecycle === "in_progress" || ops === "scheduled") {
-      return "Next step: Await Scheduled Visit";
+    if (row.resolved?.retestState === "scheduled" || row.resolved?.bucket === "passed") return "Open the job to review details.";
+    if (row.resolved?.primaryIssue?.group === "needs_info") return "Open this job to provide the requested information.";
+    if (ops === "failed" || ops === "retest_needed" || row.resolved?.primaryIssue?.group === "failed") return "Open this job to view what needs to be corrected.";
+    if (["paperwork_required", "invoice_required"].includes(ops)) return "Open this job to finish the paperwork.";
+    if (row.resolved?.retestState === "pending_scheduling") return "Open this job to schedule a retest.";
+    if (lifecycle === "on_the_way" || lifecycle === "in_progress" || ops === "scheduled") {
+      return "Your technician is on the way or work is scheduled.";
     }
-    return "Next step: No Immediate Action";
+    return "Open this job for details.";
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 text-gray-900 dark:text-gray-100">
-      <div className="rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800 p-6 shadow-sm">
+    <div className="max-w-6xl mx-auto space-y-8 text-gray-900 dark:text-gray-100">
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-white via-gray-50 to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950 p-6 shadow-md">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -326,7 +327,7 @@ export default async function PortalAllJobsPage() {
       </div>
 
       {/* Needs Attention */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <div className="flex items-baseline justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {labelWithCount("Needs Attention", actionRequiredJobs.length)}
@@ -413,7 +414,7 @@ export default async function PortalAllJobsPage() {
       </section>
 
       {/* In Progress */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <div className="flex items-baseline justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {labelWithCount("In Progress", inProgressJobs.length)}
@@ -495,7 +496,7 @@ export default async function PortalAllJobsPage() {
       </section>
 
       {/* Passed */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <div className="flex items-baseline justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {labelWithCount("Passed", passedJobs.length)}

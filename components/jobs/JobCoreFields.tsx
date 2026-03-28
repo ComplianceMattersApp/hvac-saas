@@ -7,6 +7,10 @@ type Props = {
   hideCustomer?: boolean;
   hideServiceLocation?: boolean;
   jobType?: "ecc" | "service";
+  showJobDetails?: boolean;
+  showCustomerSection?: boolean;
+  showServiceLocationSection?: boolean;
+  showNotesSection?: boolean;
 };
 
 export default function JobCoreFields({
@@ -15,6 +19,10 @@ export default function JobCoreFields({
   hideCustomer,
   hideServiceLocation,
   jobType = "ecc",
+  showJobDetails = true,
+  showCustomerSection = true,
+  showServiceLocationSection = true,
+  showNotesSection = true,
 }: Props) {
   const titleIsRequired = Boolean(titleRequired);
   const showEccPermitFields = jobType !== "service";
@@ -23,18 +31,19 @@ export default function JobCoreFields({
   return (
     <div className="space-y-4">
       {/* Job Details */}
-      <div className="rounded-lg border p-3 space-y-3">
-        <div className="text-sm font-semibold">Job Details</div>
+      {showJobDetails && (
+      <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <div className="text-sm font-semibold text-slate-900">Job Details</div>
 
         {showJobTitle && (
           <div className="space-y-1">
-            <label className="block text-sm font-medium">Job Title</label>
+            <label className="block text-sm font-medium text-slate-900">Job Title</label>
             <input
               type="text"
               name="title"
               required={titleIsRequired}
               placeholder={titleIsRequired ? "" : "Optional"}
-              className="w-full border rounded px-3 py-2"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
             />
           </div>
         )}
@@ -48,7 +57,7 @@ export default function JobCoreFields({
               <input
                 type="text"
                 name="permit_number"
-                className="w-full border rounded px-3 py-2"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
               />
             </div>
 
@@ -61,7 +70,7 @@ export default function JobCoreFields({
                   type="text"
                   name="jurisdiction"
                   placeholder="City or county permit office"
-                  className="w-full border rounded px-3 py-2"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
                 />
               </div>
 
@@ -72,53 +81,54 @@ export default function JobCoreFields({
                 <input
                   type="date"
                   name="permit_date"
-                  className="w-full border rounded px-3 py-2"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
                 />
               </div>
             </div>
           </>
         )}
       </div>
+      )}
 
       {/* Customer */}
-      {!hideCustomer && (
-        <div className="rounded-lg border p-3 space-y-3">
-          <div className="text-sm font-semibold">Customer</div>
+      {showCustomerSection && !hideCustomer && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          <div className="text-sm font-semibold text-slate-900">Customer</div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="block text-sm font-medium">First Name</label>
+              <label className="block text-sm font-medium text-slate-900">First Name</label>
               <input
                 type="text"
                 name="customer_first_name"
-                className="w-full border rounded px-3 py-2"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="block text-sm font-medium">Last Name</label>
+              <label className="block text-sm font-medium text-slate-900">Last Name</label>
               <input
                 type="text"
                 name="customer_last_name"
-                className="w-full border rounded px-3 py-2"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="block text-sm font-medium">Phone</label>
+              <label className="block text-sm font-medium text-slate-900">Phone</label>
               <input
                 type="tel"
                 name="customer_phone"
-                className="w-full border rounded px-3 py-2"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="block text-sm font-medium">Email (optional)</label>
+              <label className="block text-sm font-medium text-slate-900">Email (optional)</label>
               <input
                 type="email"
                 name="customer_email"
-                className="w-full border rounded px-3 py-2"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
               />
             </div>
           </div>
@@ -126,35 +136,35 @@ export default function JobCoreFields({
       )}
 
       {/* Service Location */}
-      {!hideServiceLocation && (
-        <div className="rounded-lg border p-3 space-y-3">
-          <div className="text-sm font-semibold">Service Location</div>
+      {showServiceLocationSection && !hideServiceLocation && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          <div className="text-sm font-semibold text-slate-900">Service Location</div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium">Address</label>
+            <label className="block text-sm font-medium text-slate-900">Address</label>
             <input
               type="text"
               name="address_line1"
-              className="w-full border rounded px-3 py-2"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium">City</label>
+            <label className="block text-sm font-medium text-slate-900">City</label>
             <input
               type="text"
               name="city"
-              className="w-full border rounded px-3 py-2"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
               required
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-medium">ZIP Code</label>
+            <label className="block text-sm font-medium text-slate-900">ZIP Code</label>
             <input
               type="text"
               name="zip"
-              className="w-full border rounded px-3 py-2"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
               required
             />
           </div>
@@ -162,19 +172,21 @@ export default function JobCoreFields({
       )}
 
       {/* Notes */}
-      <div className="rounded-lg border p-3 space-y-2">
-        <div className="text-sm font-semibold">Additional Comments/Notes</div>
+      {showNotesSection && (
+      <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+        <div className="text-sm font-semibold text-slate-900">Additional Comments/Notes</div>
         {mode === "external" && (
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-slate-600">
             Need to share timing, availability, or scheduling details? Add them in the notes section and our team will review.
           </p>
         )}
         <textarea
           name="job_notes"
           rows={4}
-          className="w-full border rounded px-3 py-2"
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
         />
       </div>
+      )}
 
       {mode === "external" ? null : null}
     </div>
