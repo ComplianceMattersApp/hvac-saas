@@ -1583,7 +1583,6 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
           </div>
           {isFailed ? (
             <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-sm text-blue-900">
-              <div className="font-semibold">{`Next Step: ${nextStep}`}</div>
               <div className="mt-0.5 text-xs font-medium text-blue-900/90">
                 {`Reason: ${failedReasonText}`}
               </div>
