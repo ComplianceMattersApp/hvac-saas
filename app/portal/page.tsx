@@ -284,8 +284,16 @@ export default async function PortalPage({
       return toDateMs(b.job.created_at) - toDateMs(a.job.created_at);
     });
 
+  function isInProgressPortalWork(row: { job: any }) {
+    const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
+    const lifecycle = String(row.job.lifecycle_state ?? row.job.status ?? "").trim().toLowerCase();
+
+    return ["scheduled", "on_the_way", "in_process", "paperwork_required", "invoice_required"].includes(ops)
+      || ["on_the_way", "in_process"].includes(lifecycle);
+  }
+
   const inProgressJobs = activeResolvedJobs
-    .filter((row) => row.resolved.bucket === "in_progress")
+    .filter((row) => isInProgressPortalWork(row))
     .sort((a, b) => toDateMs(b.job.created_at) - toDateMs(a.job.created_at));
 
   const passedJobs = activeResolvedJobs
@@ -367,8 +375,10 @@ export default async function PortalPage({
     if (resolvedLabel === "Retest Scheduled") return { label: "Retest Scheduled", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
     if (resolvedLabel === "Retest Pending Scheduling") return { label: "Needs to be scheduled", tone: "border-amber-200 bg-amber-50 text-amber-800" };
     if (resolvedLabel === "Failed") return { label: "Needs correction", tone: "border-rose-200 bg-rose-50 text-rose-800" };
+    if (ops === "paperwork_required") return { label: "Paperwork in Progress", tone: "border-violet-200 bg-violet-50 text-violet-800" };
+    if (ops === "invoice_required") return { label: "Final Processing", tone: "border-indigo-200 bg-indigo-50 text-indigo-800" };
     if (lifecycle === "on_the_way") return { label: "On the way", tone: "border-sky-200 bg-sky-50 text-sky-800" };
-    if (lifecycle === "in_progress") return { label: "Work in progress", tone: "border-blue-200 bg-blue-50 text-blue-800" };
+    if (lifecycle === "in_progress" || lifecycle === "in_process" || ops === "in_process") return { label: "Work in progress", tone: "border-blue-200 bg-blue-50 text-blue-800" };
     if (ops === "scheduled") return { label: "Scheduled", tone: "border-slate-200 bg-slate-50 text-slate-800" };
     if (row.resolved.bucket === "passed") return { label: "Passed", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
     return { label: "In progress", tone: "border-slate-200 bg-slate-50 text-slate-800" };
@@ -380,9 +390,10 @@ export default async function PortalPage({
     if (row.resolved?.retestState === "scheduled" || row.resolved?.bucket === "passed") return "Open the job to review details.";
     if (row.resolved?.primaryIssue?.group === "needs_info") return "Open this job to provide the requested information.";
     if (ops === "failed" || ops === "retest_needed" || row.resolved?.primaryIssue?.group === "failed") return "Open this job to view what needs to be corrected.";
-    if (["paperwork_required", "invoice_required"].includes(ops)) return "Open this job to finish the paperwork.";
+    if (ops === "paperwork_required") return "Field work is complete. We're finishing the paperwork.";
+    if (ops === "invoice_required") return "Field work is complete. We're completing final processing.";
     if (row.resolved?.retestState === "pending_scheduling") return "Open this job to schedule a retest.";
-    if (lifecycle === "on_the_way" || lifecycle === "in_progress" || ops === "scheduled") {
+    if (lifecycle === "on_the_way" || lifecycle === "in_progress" || lifecycle === "in_process" || ops === "scheduled" || ops === "in_process") {
       return "Your technician is on the way or work is scheduled.";
     }
     return "Open this job for details.";
@@ -535,7 +546,7 @@ export default async function PortalPage({
             {labelWithCount("In Progress", inProgressJobs.length)}
           </h2>
           <div className="text-sm text-gray-600 dark:text-gray-300">
-            Scheduled or active jobs.
+            Field work and office follow-through in progress.
           </div>
         </div>
 
@@ -605,7 +616,7 @@ export default async function PortalPage({
                   No jobs in progress.
                 </div>
                 <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Scheduled and active jobs will appear here.
+                  Scheduled jobs and office follow-through will appear here.
                 </div>
               </div>
             )}
