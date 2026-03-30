@@ -10,6 +10,22 @@ type NotificationListClientProps = {
   onMarkAsRead: (input: { notificationId: string }) => Promise<void>;
 };
 
+function notificationTypeLabel(value?: string | null) {
+  const key = String(value ?? "").trim().toLowerCase();
+  const labels: Record<string, string> = {
+    contractor_report_sent: "Contractor Report Sent",
+    retest_ready_requested: "Retest Ready Requested",
+    contractor_note: "Contractor Note",
+    contractor_schedule_updated: "Contractor Schedule Updated",
+    contractor_report_email: "Contractor Report Email",
+    customer_job_scheduled_email: "Customer Scheduled Email",
+    contractor_job_scheduled_email: "Contractor Scheduled Email",
+    internal_contractor_job_intake_email: "Internal Intake Email",
+  };
+
+  return labels[key] ?? "Notification";
+}
+
 export function NotificationListClient({
   initialNotifications,
   onMarkAsRead,
@@ -40,7 +56,7 @@ export function NotificationListClient({
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
         <p className="text-base font-semibold text-slate-800">No notifications</p>
-        <p className="mt-1 text-sm text-slate-500">You're all caught up right now.</p>
+        <p className="mt-1 text-sm text-slate-500">You are all caught up right now.</p>
       </div>
     );
   }
@@ -80,7 +96,7 @@ export function NotificationListClient({
 
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium uppercase tracking-wide text-slate-600">
-                  {notif.notification_type.replace(/_/g, " ")}
+                  {notificationTypeLabel(notif.notification_type)}
                 </span>
                 <span>
                   {formatDistanceToNow(new Date(notif.created_at), {

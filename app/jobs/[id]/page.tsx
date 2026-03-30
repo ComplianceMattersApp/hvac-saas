@@ -868,6 +868,23 @@ function formatOpsStatusLabel(value?: string | null) {
   const v = String(value ?? "").trim();
   if (!v) return "—";
 
+  const labelMap: Record<string, string> = {
+    need_to_schedule: "Need to Schedule",
+    scheduled: "Scheduled",
+    on_the_way: "On the Way",
+    in_process: "In Progress",
+    pending_info: "Pending Info",
+    on_hold: "On Hold",
+    failed: "Failed",
+    retest_needed: "Retest Needed",
+    paperwork_required: "Paperwork Required",
+    invoice_required: "Invoice Required",
+    closed: "Closed",
+  };
+
+  const mapped = labelMap[v.toLowerCase()];
+  if (mapped) return mapped;
+
   return v
     .split("_")
     .filter(Boolean)
@@ -1026,6 +1043,9 @@ const pendingInfoSignal = getPendingInfoSignal({
   next_action_note: (job as any).next_action_note,
   action_required_by: (job as any).action_required_by,
 });
+const actionablePendingInfo =
+  pendingInfoSignal &&
+  ["pending_info", "on_hold"].includes(String(job.ops_status ?? "").toLowerCase());
 
 const locationId = serviceLocation?.id ?? null;
 
@@ -1404,7 +1424,7 @@ const renderTimelineItem = (e: any, key: string) => {
     <div className="flex gap-2 mb-2 text-xs flex-wrap font-medium">
       <span className={`rounded-md px-2 py-1 ${isFieldComplete ? "bg-green-100 text-green-800" : "bg-blue-50 text-blue-700"}`}>Field: {formatStatus(job.status)}</span>
       <span className="rounded-md bg-blue-50 px-2 py-1 text-blue-700">Ops: {formatOpsStatusLabel(job.ops_status)}</span>
-      {pendingInfoSignal ? <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800">Pending Info</span> : null}
+      {actionablePendingInfo ? <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800">Pending Info</span> : null}
     </div>
 
     <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
@@ -1798,7 +1818,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 title: "Job completed — paperwork still required",
                 body: "Upload/attach required documents (invoice/cert) to fully close out the job.",
               }
-          : ops === "pending_info"
+          : actionablePendingInfo
             ? {
                 title: "Job completed — pending information",
                 body: "Some required info is still missing (ex: permit number, required fields, or notes). Add it to close out.",
@@ -1826,7 +1846,7 @@ const renderTimelineItem = (e: any, key: string) => {
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 mt-3">
           <div className="text-sm font-semibold">{meta.title}</div>
           <div className="mt-1 text-sm">
-            Current Ops Status: <span className="font-medium">{ops}</span>. {meta.body}
+            Current Ops Status: <span className="font-medium">{formatOpsStatusLabel(ops)}</span>. {meta.body}
           </div>
         </div>
       );
@@ -2103,6 +2123,7 @@ const renderTimelineItem = (e: any, key: string) => {
         <label className="text-sm">Invoice # (optional)</label>
         <input
           name="invoice_number"
+          defaultValue={String(job.invoice_number ?? "")}
           className="rounded border px-3 py-2 text-sm"
         />
       </div>

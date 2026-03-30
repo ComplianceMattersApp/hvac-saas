@@ -280,14 +280,18 @@ export function resolveContractorIssues(
       explanation: "Work is in progress.",
       stage: opsStatus,
     };
-  } else if (["paperwork_required", "invoice_required", "closed"].includes(opsStatus)) {
+  } else if (["paperwork_required", "invoice_required"].includes(opsStatus)) {
+    primaryIssue = {
+      group: "in_progress",
+      headline: "Final processing",
+      explanation: "This job has passed inspection and is in final processing.",
+      stage: opsStatus,
+    };
+  } else if (opsStatus === "closed") {
     primaryIssue = {
       group: "passed",
       headline: "Passed",
-      explanation:
-        opsStatus === "closed"
-          ? "This job is complete."
-          : "This job has passed and is in final processing.",
+      explanation: "This job is complete.",
       stage: opsStatus,
     };
   } else {

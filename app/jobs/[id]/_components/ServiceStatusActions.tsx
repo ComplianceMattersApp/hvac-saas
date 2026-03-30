@@ -4,6 +4,23 @@ import { markServiceComplete, markInvoiceSent } from "@/lib/actions/service-acti
 import { createClient } from "@/lib/supabase/server";
 import SubmitButton from "@/components/SubmitButton";
 
+function formatOpsStatusLabel(value?: string | null) {
+  const key = String(value ?? "").trim().toLowerCase();
+  const labels: Record<string, string> = {
+    need_to_schedule: "Need to Schedule",
+    scheduled: "Scheduled",
+    pending_info: "Pending Info",
+    on_hold: "On Hold",
+    failed: "Failed",
+    retest_needed: "Retest Needed",
+    paperwork_required: "Paperwork Required",
+    invoice_required: "Invoice Required",
+    closed: "Closed",
+  };
+
+  return labels[key] ?? "In Progress";
+}
+
 export default async function ServiceStatusActions({ jobId }: { jobId: string }) {
   const supabase = await createClient();
 
@@ -38,7 +55,7 @@ export default async function ServiceStatusActions({ jobId }: { jobId: string })
             These update <b>ops_status</b> and do not affect the Tests page.
           </p>
           <div className="mt-2 text-xs">
-            Current ops_status: <b>{job.ops_status}</b>
+            Current status: <b>{formatOpsStatusLabel(job.ops_status)}</b>
           </div>
         </div>
       </div>

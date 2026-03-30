@@ -811,11 +811,10 @@ function signalReason(j: any, opts?: { retestReady?: boolean; newContractorJob?:
   if (opts?.retestReady) return "Contractor says correction is complete and job is ready for retest review";
   if (opts?.newContractorJob) return "New job submitted by contractor and waiting for internal review";
   if (signal === "contractor_updates") {
-    const updateType = String(latestContractorUpdateByJob.get(String(j?.id ?? ""))?.event_type ?? "").toLowerCase();
-    if (updateType === "permit_info_updated") return "Contractor updated permit information";
+    const updateType = String(
+      latestUnreadContractorUpdateNotificationByJob.get(String(j?.id ?? ""))?.notification_type ?? ""
+    ).toLowerCase();
     if (updateType === "contractor_schedule_updated") return "Contractor updated schedule details";
-    if (updateType === "contractor_correction_submission") return "Contractor submitted correction details";
-    if (updateType === "attachment_added") return "Contractor uploaded attachments";
     if (updateType === "contractor_note") return "Contractor added a note";
   }
   return queueReason(j, bucket);
@@ -969,6 +968,27 @@ const { data: signalEvents, error: signalErr } = await supabase
 
 if (signalErr) throw signalErr;
 
+const CONTRACTOR_UPDATE_NOTIFICATION_TYPES = [
+  "contractor_note",
+  "contractor_schedule_updated",
+] as const;
+
+const { data: unreadContractorUpdateNotifications, error: unreadContractorUpdateNotificationsErr } = await supabase
+  .from("notifications")
+  .select("job_id, notification_type, created_at")
+  .eq("recipient_type", "internal")
+  .is("read_at", null)
+  .in(
+    "job_id",
+    allOpenOpsJobIds.length
+      ? allOpenOpsJobIds
+      : ["00000000-0000-0000-0000-000000000000"]
+  )
+  .in("notification_type", [...CONTRACTOR_UPDATE_NOTIFICATION_TYPES])
+  .order("created_at", { ascending: false });
+
+if (unreadContractorUpdateNotificationsErr) throw unreadContractorUpdateNotificationsErr;
+
 const { data: failedRuns, error: failedRunsErr } = await supabase
   .from("ecc_test_runs")
   .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, updated_at, created_at")
@@ -1018,7 +1038,7 @@ for (const [jobId, run] of latestFailedRunByJob.entries()) {
 
 const latestRetestReadyByJob = new Map<string, any>();
 const latestContractorCreatedByJob = new Map<string, any>();
-const latestContractorUpdateByJob = new Map<string, any>();
+const latestUnreadContractorUpdateNotificationByJob = new Map<string, any>();
 
 for (const ev of signalEvents ?? []) {
   const jobId = String((ev as any).job_id ?? "");
@@ -1032,18 +1052,12 @@ for (const ev of signalEvents ?? []) {
     latestContractorCreatedByJob.set(jobId, ev);
   }
 
-  if (
-    [
-      "contractor_note",
-      "contractor_correction_submission",
-      "contractor_schedule_updated",
-      "attachment_added",
-      "permit_info_updated",
-    ].includes(type) &&
-    !latestContractorUpdateByJob.has(jobId)
-  ) {
-    latestContractorUpdateByJob.set(jobId, ev);
-  }
+}
+
+for (const notif of unreadContractorUpdateNotifications ?? []) {
+  const jobId = String((notif as any).job_id ?? "").trim();
+  if (!jobId || latestUnreadContractorUpdateNotificationByJob.has(jobId)) continue;
+  latestUnreadContractorUpdateNotificationByJob.set(jobId, notif);
 }
 
 function hasSignalEventForJob(map: unknown, jobId: string) {
@@ -1069,15 +1083,7 @@ const contractorCreatedCount = uniqueAllOpenOpsJobs.filter((j: any) => {
 
 const contractorUpdatesCount = (filteredBucketJobs ?? []).filter((j: any) => {
   const jobId = String(j?.id ?? "");
-  const isRetestReadyJob =
-    String(j?.ops_status ?? "").toLowerCase() === "failed" &&
-    hasSignalEventForJob(latestRetestReadyByJob, jobId);
-  return (
-    hasSignalEventForJob(latestContractorUpdateByJob, jobId) &&
-    !isRetestReadyJob &&
-    !(String(j?.ops_status ?? "").toLowerCase() === "need_to_schedule" &&
-      hasSignalEventForJob(latestContractorCreatedByJob, jobId))
-  );
+  return hasSignalEventForJob(latestUnreadContractorUpdateNotificationByJob, jobId);
 }).length;
 
 let signalFilteredBucketJobs = [...(filteredBucketJobs ?? [])];
@@ -1106,14 +1112,7 @@ if (signal === "contractor_updates") {
   // Keep contractor updates within the active queue's scope.
   signalFilteredBucketJobs = signalFilteredBucketJobs.filter((j: any) => {
     const jobId = String(j.id ?? "");
-    const isRetestReadyJob =
-      String(j?.ops_status ?? "").toLowerCase() === "failed" &&
-      hasSignalEventForJob(latestRetestReadyByJob, jobId);
-    const isNewContractorJob =
-      String(j?.ops_status ?? "").toLowerCase() === "need_to_schedule" &&
-      hasSignalEventForJob(latestContractorCreatedByJob, jobId);
-
-    return hasSignalEventForJob(latestContractorUpdateByJob, jobId) && !isRetestReadyJob && !isNewContractorJob;
+    return hasSignalEventForJob(latestUnreadContractorUpdateNotificationByJob, jobId);
   });
 }
 

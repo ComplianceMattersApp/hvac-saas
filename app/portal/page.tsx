@@ -284,16 +284,8 @@ export default async function PortalPage({
       return toDateMs(b.job.created_at) - toDateMs(a.job.created_at);
     });
 
-  function isInProgressPortalWork(row: { job: any }) {
-    const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
-    const lifecycle = String(row.job.lifecycle_state ?? row.job.status ?? "").trim().toLowerCase();
-
-    return ["scheduled", "on_the_way", "in_process", "paperwork_required", "invoice_required"].includes(ops)
-      || ["on_the_way", "in_process"].includes(lifecycle);
-  }
-
   const inProgressJobs = activeResolvedJobs
-    .filter((row) => isInProgressPortalWork(row))
+    .filter((row) => row.resolved.bucket === "in_progress")
     .sort((a, b) => toDateMs(b.job.created_at) - toDateMs(a.job.created_at));
 
   const passedJobs = activeResolvedJobs

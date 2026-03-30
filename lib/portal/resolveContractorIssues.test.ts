@@ -49,6 +49,30 @@ describe("resolveContractorIssues", () => {
     expect(result.bucket).toBe("passed");
   });
 
+  it("keeps paperwork_required in in_progress bucket", () => {
+    const result = resolveContractorIssues({
+      job: {
+        id: "job-5",
+        ops_status: "paperwork_required",
+      },
+    });
+
+    expect(result.primaryIssue.group).toBe("in_progress");
+    expect(result.bucket).toBe("in_progress");
+  });
+
+  it("keeps invoice_required in in_progress bucket", () => {
+    const result = resolveContractorIssues({
+      job: {
+        id: "job-6",
+        ops_status: "invoice_required",
+      },
+    });
+
+    expect(result.primaryIssue.group).toBe("in_progress");
+    expect(result.bucket).toBe("in_progress");
+  });
+
   it("uses retest scheduled override only for failed and retest_needed states", () => {
     const result = resolveContractorIssues({
       job: {

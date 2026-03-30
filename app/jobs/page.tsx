@@ -43,6 +43,25 @@ function queueLabel(q: Queue) {
   return map[q];
 }
 
+function formatOpsStatusLabel(value?: string | null) {
+  const v = String(value ?? "").trim().toLowerCase();
+  if (!v) return "—";
+
+  const labelMap: Record<string, string> = {
+    need_to_schedule: "Need to Schedule",
+    scheduled: "Scheduled",
+    pending_info: "Pending Info",
+    on_hold: "On Hold",
+    retest_needed: "Retest Needed",
+    failed: "Failed",
+    paperwork_required: "Paperwork Required",
+    invoice_required: "Invoice Required",
+    closed: "Closed",
+  };
+
+  return labelMap[v] ?? "In Progress";
+}
+
 
 
 export default async function JobsPage({
@@ -251,7 +270,7 @@ const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.
 
                   <div className="text-sm text-gray-600">
                     {displayCity} • {job.status ?? "—"} •{" "}
-                    <span className="font-medium">{job.ops_status ?? "—"}</span>
+                    <span className="font-medium">{formatOpsStatusLabel(job.ops_status)}</span>
                     {job.follow_up_date ? <> • Follow-up: {job.follow_up_date}</> : null}
                   </div>
 

@@ -5561,14 +5561,14 @@ export async function completeDataEntryFromForm(formData: FormData) {
   // Service: data entry completion = invoice sent/recorded -> closed
   const jobType = String(job?.job_type ?? "").trim().toLowerCase();
 
-// Any non-ECC job closes here after invoice/data entry.
+// Any non-ECC job resolves through projection after invoice/data entry.
 // Only ECC stays in paperwork flow.
 if (jobType !== "ecc") {
   const { error } = await supabase
     .from("jobs")
     .update({
-      ops_status: "closed",
       invoice_number: invoice,
+      invoice_complete: true,
       data_entry_completed_at: new Date().toISOString(),
     })
     .eq("id", id);
