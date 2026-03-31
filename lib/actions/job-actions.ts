@@ -1747,6 +1747,12 @@ export async function addJobEquipmentFromForm(formData: FormData) {
   const heatingCapacityRaw = String(formData.get("heating_capacity_kbtu") || "").trim();
   const heatingCapacityKbtu = heatingCapacityRaw ? Number(heatingCapacityRaw) : null;
 
+  const heatingOutputRaw = String(formData.get("heating_output_btu") || "").trim();
+  const heatingOutputBtu = heatingOutputRaw ? Number(heatingOutputRaw) : null;
+
+  const heatingEfficiencyRaw = String(formData.get("heating_efficiency_percent") || "").trim();
+  const heatingEfficiencyPercent = heatingEfficiencyRaw ? Number(heatingEfficiencyRaw) : null;
+
   const refrigerantType =
     String(formData.get("refrigerant_type") || "").trim() || null;
 
@@ -1790,6 +1796,8 @@ export async function addJobEquipmentFromForm(formData: FormData) {
     serial,
     tonnage,
     heating_capacity_kbtu: heatingCapacityKbtu,
+    heating_output_btu: heatingOutputBtu,
+    heating_efficiency_percent: heatingEfficiencyPercent,
     refrigerant_type: refrigerantType,
     notes,
   });
@@ -1826,6 +1834,12 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
   const heatingCapacityRaw = String(formData.get("heating_capacity_kbtu") || "").trim();
   const heatingCapacityKbtu = heatingCapacityRaw ? Number(heatingCapacityRaw) : null;
 
+  const heatingOutputRaw = String(formData.get("heating_output_btu") || "").trim();
+  const heatingOutputBtu = heatingOutputRaw ? Number(heatingOutputRaw) : null;
+
+  const heatingEfficiencyRaw = String(formData.get("heating_efficiency_percent") || "").trim();
+  const heatingEfficiencyPercent = heatingEfficiencyRaw ? Number(heatingEfficiencyRaw) : null;
+
   const refrigerantType =
     String(formData.get("refrigerant_type") || "").trim() || null;
 
@@ -1843,6 +1857,8 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
       serial,
       tonnage,
       heating_capacity_kbtu: heatingCapacityKbtu,
+      heating_output_btu: heatingOutputBtu,
+      heating_efficiency_percent: heatingEfficiencyPercent,
       refrigerant_type: refrigerantType,
       notes,
     })
@@ -4272,6 +4288,18 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
         ? (heatingCapacityRaw || tonnageRaw ? Number(heatingCapacityRaw || tonnageRaw) : null)
         : null;
 
+      const heatingEffRaw = c?.heating_efficiency_percent
+        ? String(c.heating_efficiency_percent).trim()
+        : "";
+      const heating_efficiency_percent =
+        isFurnaceLike && heatingEffRaw ? Number(heatingEffRaw) : null;
+
+      const heatingOutRaw = c?.heating_output_btu
+        ? String(c.heating_output_btu).trim()
+        : "";
+      const heating_output_btu =
+        isFurnaceLike && heatingOutRaw ? Number(heatingOutRaw) : null;
+
       const { error: eqErr } = await supabase.from("job_equipment").insert({
         job_id: jobId,
         system_id: systemId,
@@ -4282,6 +4310,8 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
         serial,
         tonnage,
         heating_capacity_kbtu,
+        heating_output_btu,
+        heating_efficiency_percent,
         refrigerant_type,
         notes,
       });

@@ -72,6 +72,16 @@ function getTestDisplayLabel(testType: string, packageSystem: boolean) {
   return baseLabel;
 }
 
+function isTestExcludedForHeatOnly(testType: string) {
+  const normalized = String(testType ?? "").trim().toLowerCase();
+  return normalized === "airflow" || normalized === "refrigerant_charge";
+}
+
+function isTestApplicableToSystem(testType: string, heatOnlySystem: boolean) {
+  if (!heatOnlySystem) return true;
+  return !isTestExcludedForHeatOnly(testType);
+}
+
 function getRequiredTestStatusForSystem(job: any, systemId: string, testType: EccTestType) {
   const run = pickRunForSystem(job, testType, systemId);
   const runDataKeys = run?.data && typeof run.data === "object" ? Object.keys(run.data).length : 0;
@@ -260,6 +270,22 @@ function isIndoorEquipment(eq: any) {
   );
 }
 
+function hasCoolingEquipmentForSystem(systemEquipment: any[]) {
+  return systemEquipment.some((eq: any) => {
+    if (isPackageEquipment(eq) || isOutdoorEquipment(eq)) return true;
+    const role = normalizeToken(eq?.equipment_role);
+    return role.includes("condenser") || role.includes("heat_pump") || role.includes("heat pump");
+  });
+}
+
+function isHeatOnlySystemEquipment(systemEquipment: any[]) {
+  const hasHeatingOnlyEquipment = systemEquipment.some((eq: any) =>
+    isHeatingOnlyEquipment(String(eq?.equipment_role ?? ""))
+  );
+  const hasCoolingEquipment = hasCoolingEquipmentForSystem(systemEquipment);
+  return hasHeatingOnlyEquipment && !hasCoolingEquipment;
+}
+
 function exceptionReasonLabel(run: any) {
   const reason = String(run?.data?.charge_exempt_reason ?? "").trim().toLowerCase();
   if (reason === "package_unit") return "Package Unit";
@@ -393,6 +419,8 @@ export default async function JobTestsPage({
         serial,
         tonnage,
         heating_capacity_kbtu,
+        heating_output_btu,
+        heating_efficiency_percent,
         refrigerant_type,
         notes,
         created_at,
@@ -565,12 +593,21 @@ export default async function JobTestsPage({
     ...manualAddTests.map((t) => String(t.code)),
     "custom",
   ]);
-  const focusedType = allowedFocusedTypes.has(focused)
+  const focusedTypeRaw = allowedFocusedTypes.has(focused)
     ? (focused as EccTestType | "custom")
     : "";
 
   const selectedSystemEquipment =
     equipmentBySystemId.get(canonicalId(selectedSystemId)) ?? [];
+  const selectedSystemIsHeatOnly = isHeatOnlySystemEquipment(selectedSystemEquipment);
+  const manualAddTestsForSystem = manualAddTests.filter((test) =>
+    isTestApplicableToSystem(String(test.code), selectedSystemIsHeatOnly)
+  );
+
+  const focusedType =
+    focusedTypeRaw && !isTestApplicableToSystem(focusedTypeRaw, selectedSystemIsHeatOnly)
+      ? ""
+      : focusedTypeRaw;
 
   const scenarioResult = resolveEccScenario({
   projectType: job.project_type,
@@ -584,7 +621,8 @@ export default async function JobTestsPage({
 
   const baselineRequiredTests = suggestedTests
     .filter((t) => t.required)
-    .map((t) => t.testType);
+    .map((t) => t.testType)
+    .filter((testType) => isTestApplicableToSystem(testType, selectedSystemIsHeatOnly));
 
   const parentRequiredOutcomes = new Map<EccTestType, "pass" | "fail" | "unknown">();
   for (const testType of baselineRequiredTests) {
@@ -615,8 +653,12 @@ export default async function JobTestsPage({
       )
     : [];
 
+  const applicableSystemRunTestTypes = systemRunTestTypes.filter((testType) =>
+    isTestApplicableToSystem(testType, selectedSystemIsHeatOnly)
+  );
+
   const visibleTestTypes = Array.from(
-    new Set([...(requiredTests as string[]), ...systemRunTestTypes, ...carriedForwardPassedTypes])
+    new Set([...(requiredTests as string[]), ...applicableSystemRunTestTypes, ...carriedForwardPassedTypes])
   ) as EccTestType[];
 
   const focusedCustomTestType =
@@ -659,6 +701,32 @@ const fallbackHeatingCapacityFromTonnageEquipment =
       String(eq.tonnage).trim() !== ""
   ) ?? null;
 
+const fallbackHeatingEfficiencyEquipment =
+  selectedSystemEquipment.find(
+    (eq: any) =>
+      eq?.heating_efficiency_percent != null &&
+      String(eq.heating_efficiency_percent).trim() !== ""
+  ) ?? null;
+
+const defaultHeatingEfficiencyFromEquipment =
+  primaryEquipment?.heating_efficiency_percent != null &&
+  String(primaryEquipment.heating_efficiency_percent).trim() !== ""
+    ? primaryEquipment.heating_efficiency_percent
+    : fallbackHeatingEfficiencyEquipment?.heating_efficiency_percent ?? "";
+
+const fallbackHeatingOutputEquipment =
+  selectedSystemEquipment.find(
+    (eq: any) =>
+      eq?.heating_output_btu != null &&
+      String(eq.heating_output_btu).trim() !== ""
+  ) ?? null;
+
+const defaultHeatingOutputBtuFromEquipment =
+  primaryEquipment?.heating_output_btu != null &&
+  String(primaryEquipment.heating_output_btu).trim() !== ""
+    ? primaryEquipment.heating_output_btu
+    : fallbackHeatingOutputEquipment?.heating_output_btu ?? "";
+
 const defaultSystemTonnage =
   primaryEquipment?.tonnage != null && primaryEquipment?.tonnage !== ""
     ? primaryEquipment.tonnage
@@ -677,31 +745,22 @@ const defaultHeatingCapacityKbtu =
     ? fallbackHeatingCapacityFromTonnageEquipment.tonnage
     : "";
 
-const hasHeatingOnlyEquipment = selectedSystemEquipment.some((eq: any) =>
-  isHeatingOnlyEquipment(String(eq?.equipment_role ?? ""))
-);
-
-const hasCoolingEquipment = selectedSystemEquipment.some((eq: any) => {
-  if (isPackageEquipment(eq) || isOutdoorEquipment(eq)) return true;
-  const role = normalizeToken(eq?.equipment_role);
-  return role.includes("condenser") || role.includes("heat_pump") || role.includes("heat pump");
-});
-
-const isHeatOnlySystem = hasHeatingOnlyEquipment && !hasCoolingEquipment;
+const isHeatOnlySystem = selectedSystemIsHeatOnly;
 
 const savedDuctMethodRaw = String(runDL?.data?.airflow_method ?? "").trim().toLowerCase();
 const defaultDuctAirflowMethod =
-  savedDuctMethodRaw === "heating" || savedDuctMethodRaw === "cooling"
-    ? savedDuctMethodRaw
-    : isHeatOnlySystem
+  isHeatOnlySystem
     ? "heating"
+    : savedDuctMethodRaw === "heating" || savedDuctMethodRaw === "cooling"
+    ? savedDuctMethodRaw
     : "cooling";
 
 const defaultHeatingOutputBtu =
   runDL?.data?.heating_output_btu ??
+  (defaultHeatingOutputBtuFromEquipment !== "" ? defaultHeatingOutputBtuFromEquipment :
   (isHeatOnlySystem && defaultHeatingCapacityKbtu !== ""
     ? Number(defaultHeatingCapacityKbtu) * 1000
-    : "");
+    : ""));
 
   const carriedForwardDL = !runDL && carriedForwardPassedTypes.includes("duct_leakage");
   const carriedForwardAF = !runAF && carriedForwardPassedTypes.includes("airflow");
@@ -763,9 +822,11 @@ const defaultHeatingOutputBtu =
         return String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
       });
 
-    const runAirflow = pickLatestRunForSystem(job, "airflow", systemId);
+    const systemIsHeatOnly = isHeatOnlySystemEquipment(systemEquipment);
+
+    const runAirflow = systemIsHeatOnly ? null : pickLatestRunForSystem(job, "airflow", systemId);
     const runDuct = pickLatestRunForSystem(job, "duct_leakage", systemId);
-    const runRefrigerant = pickLatestRunForSystem(job, "refrigerant_charge", systemId);
+    const runRefrigerant = systemIsHeatOnly ? null : pickLatestRunForSystem(job, "refrigerant_charge", systemId);
 
     const packageSystem = isPackageSystem(systemEquipment);
     const packageEquipment = systemEquipment.filter((eq: any) => isPackageEquipment(eq));
@@ -790,6 +851,7 @@ const defaultHeatingOutputBtu =
       runAirflow,
       runDuct,
       runRefrigerant,
+      systemIsHeatOnly,
       packageSystem,
       packageEquipment,
       indoorEquipment,
@@ -987,8 +1049,14 @@ const defaultHeatingOutputBtu =
                     <div>
                       <span className="font-semibold text-slate-950">Airflow Summary:</span>
                       <div className="mt-1 space-y-1 text-slate-800">
-                        <div>Measured Airflow: {fmtValue(sys.runAirflow?.data?.measured_total_cfm, "CFM")}</div>
-                        <div>Result: {sys.runAirflow ? getEffectiveResultLabel(sys.runAirflow) : "No run"}</div>
+                        {sys.systemIsHeatOnly ? (
+                          <div>Not applicable for heat-only system (no cooling equipment).</div>
+                        ) : (
+                          <>
+                            <div>Measured Airflow: {fmtValue(sys.runAirflow?.data?.measured_total_cfm, "CFM")}</div>
+                            <div>Result: {sys.runAirflow ? getEffectiveResultLabel(sys.runAirflow) : "No run"}</div>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -1004,7 +1072,11 @@ const defaultHeatingOutputBtu =
                   <div className="rounded-md border border-slate-300 bg-slate-100 p-3 space-y-3 print:rounded-none print:border-slate-400 print:bg-white print:p-2.5 print:space-y-2">
                     <div className="text-sm font-bold text-slate-950 print:text-[13px]">Refrigerant Charge — Full Detailed Result</div>
 
-                    {!sys.runRefrigerant ? (
+                    {sys.systemIsHeatOnly ? (
+                      <div className="text-sm text-slate-700 print:text-[12px]">
+                        Not applicable for heat-only system (no cooling equipment).
+                      </div>
+                    ) : !sys.runRefrigerant ? (
                       <div className="text-sm text-slate-700 print:text-[12px]">No refrigerant charge run found for this system.</div>
                     ) : isRefrigerantException ? (
                       <div className="text-sm text-slate-800 space-y-1 print:text-[12px]">
@@ -1392,12 +1464,17 @@ const defaultHeatingOutputBtu =
                     Select a test
                   </option>
 
-                  {manualAddTests.map((test) => (
+                  {manualAddTestsForSystem.map((test) => (
                     <option key={test.code} value={test.code}>
                       {test.label}
                     </option>
                   ))}
                 </select>
+                {manualAddTestsForSystem.length === 0 ? (
+                  <div className="text-xs text-muted-foreground">
+                    No additional test types apply to this heat-only system.
+                  </div>
+                ) : null}
               </div>
 
               <SubmitButton loadingText="Adding..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
@@ -1559,9 +1636,10 @@ const defaultHeatingOutputBtu =
                     <DuctLeakageMethodFields
                       runId={runDL.id}
                       defaultMethod={defaultDuctAirflowMethod === "heating" ? "heating" : "cooling"}
+                      forceHeatOnly={isHeatOnlySystem}
                       defaultHeatingOutputBtu={defaultHeatingOutputBtu}
                       defaultHeatingInputBtu={runDL.data?.heating_input_btu ?? ""}
-                      defaultHeatingEfficiencyPercent={runDL.data?.heating_efficiency_percent ?? ""}
+                      defaultHeatingEfficiencyPercent={runDL.data?.heating_efficiency_percent ?? defaultHeatingEfficiencyFromEquipment}
                       defaultTonnage={runDL.data?.tonnage ?? defaultSystemTonnage}
                     />
 

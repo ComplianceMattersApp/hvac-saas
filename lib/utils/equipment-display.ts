@@ -20,8 +20,13 @@ export const EQUIPMENT_ROLE_OPTIONS = [
   { value: "other", label: "Other" },
 ] as const;
 
-const NO_REFRIGERANT_ROLES = new Set(["furnace", "air_handler"]);
-const HEATING_ONLY_ROLES = new Set(["furnace"]);
+const NO_REFRIGERANT_ROLES = new Set([
+  "furnace",
+  "furnace_gas",
+  "air_handler",
+  "air_handler_electric",
+]);
+const HEATING_ONLY_ROLES = new Set(["furnace", "furnace_gas"]);
 
 export function equipmentUsesRefrigerant(role: string | null | undefined) {
   return !NO_REFRIGERANT_ROLES.has(String(role ?? "").trim().toLowerCase());

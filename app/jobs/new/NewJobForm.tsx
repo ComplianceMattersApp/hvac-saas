@@ -49,6 +49,8 @@ type EquipmentComponent = {
   serial: string;
   refrigerant_type: string;
   tonnage: string; // keep string in UI; server can coerce
+  heating_output_btu: string; // furnace only
+  heating_efficiency_percent: string; // furnace only
   notes: string;
 };
 
@@ -220,6 +222,12 @@ const [billingRecipient, setBillingRecipient] = useState<
           heating_capacity_kbtu: componentUsesHeatingCapacity(c.type)
             ? c.tonnage.trim() || null
             : null,
+          heating_output_btu: componentUsesHeatingCapacity(c.type)
+            ? c.heating_output_btu.trim() || null
+            : null,
+          heating_efficiency_percent: componentUsesHeatingCapacity(c.type)
+            ? c.heating_efficiency_percent.trim() || null
+            : null,
           notes: c.notes.trim() || null,
         })),
       }))
@@ -334,6 +342,8 @@ const [billingRecipient, setBillingRecipient] = useState<
           serial: "",
           refrigerant_type: "",
           tonnage: "",
+          heating_output_btu: "",
+          heating_efficiency_percent: "",
           notes: "",
         };
         return { ...s, components: [...s.components, next] };
@@ -924,6 +934,29 @@ const [billingRecipient, setBillingRecipient] = useState<
                             value={c.tonnage}
                             onChange={(e) => patchComponent(sys.id, c.id, { tonnage: e.target.value })}
                           />
+                          {componentUsesHeatingCapacity(c.type) && (
+                            <input
+                              className="rounded-md border border-slate-300 p-2"
+                              placeholder="Heating Output (BTU/h) (optional)"
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={c.heating_output_btu}
+                              onChange={(e) => patchComponent(sys.id, c.id, { heating_output_btu: e.target.value })}
+                            />
+                          )}
+                          {componentUsesHeatingCapacity(c.type) && (
+                            <input
+                              className="rounded-md border border-slate-300 p-2"
+                              placeholder="Efficiency % (e.g. 80 for AFUE 80) (optional)"
+                              type="number"
+                              min="1"
+                              max="100"
+                              step="1"
+                              value={c.heating_efficiency_percent}
+                              onChange={(e) => patchComponent(sys.id, c.id, { heating_efficiency_percent: e.target.value })}
+                            />
+                          )}
                         </div>
 
                         {(c.type === "condenser_ac" ||

@@ -34,6 +34,8 @@ const { data: job, error } = await supabase
       serial,
       tonnage,
       heating_capacity_kbtu,
+      heating_output_btu,
+      heating_efficiency_percent,
       refrigerant_type,
       notes,
       created_at,

@@ -21,6 +21,8 @@ type EquipmentRow = {
   serial: string | null;
   tonnage: string | null;
   heating_capacity_kbtu: string | null;
+  heating_output_btu: string | null;
+  heating_efficiency_percent: string | null;
   refrigerant_type: string | null;
   notes: string | null;
 };
@@ -69,8 +71,13 @@ export default function EquipmentEditCard({
             </div>
             <div className="text-xs text-gray-500">
               {eq.serial ? `S/N: ${eq.serial}` : null}
-              {eq.serial && (eq.tonnage || eq.heating_capacity_kbtu || (showRefrigerant && eq.refrigerant_type)) ? " • " : null}
-              {showHeatingCapacity && eq.heating_capacity_kbtu ? `${eq.heating_capacity_kbtu} KBTU/h` : null}
+              {eq.serial && (eq.tonnage || eq.heating_capacity_kbtu || eq.heating_output_btu || (showRefrigerant && eq.refrigerant_type)) ? " • " : null}
+              {showHeatingCapacity && (eq.heating_output_btu
+                ? `${Number(eq.heating_output_btu).toLocaleString()} BTU/h`
+                : eq.heating_capacity_kbtu
+                ? `${eq.heating_capacity_kbtu} KBTU/h (rated)`
+                : null)}
+              {showHeatingCapacity && eq.heating_efficiency_percent ? ` · ${eq.heating_efficiency_percent}% eff` : null}
               {!showHeatingCapacity && eq.tonnage ? `${eq.tonnage} ton` : null}
               {(eq.tonnage || eq.heating_capacity_kbtu) && showRefrigerant && eq.refrigerant_type ? " • " : null}
               {showRefrigerant ? eq.refrigerant_type ?? null : null}
@@ -252,6 +259,47 @@ export default function EquipmentEditCard({
               />
             )}
           </div>
+
+          {showHeatingCapacity ? (
+            <div className="grid gap-1">
+              <label className="text-sm font-medium text-gray-900" htmlFor={`out-${eq.id}`}>
+                Heating Output (BTU/h) (optional)
+              </label>
+              <input
+                id={`out-${eq.id}`}
+                name="heating_output_btu"
+                type="number"
+                step="1"
+                min="0"
+                className="w-full rounded-md border px-3 py-2 text-gray-900 bg-white"
+                defaultValue={eq.heating_output_btu ?? ""}
+                placeholder="66000"
+              />
+            </div>
+          ) : (
+            <input type="hidden" name="heating_output_btu" value="" />
+          )}
+
+          {showHeatingCapacity ? (
+            <div className="grid gap-1">
+              <label className="text-sm font-medium text-gray-900" htmlFor={`eff-${eq.id}`}>
+                Efficiency % (optional)
+              </label>
+              <input
+                id={`eff-${eq.id}`}
+                name="heating_efficiency_percent"
+                type="number"
+                step="1"
+                min="1"
+                max="100"
+                className="w-full rounded-md border px-3 py-2 text-gray-900 bg-white"
+                defaultValue={eq.heating_efficiency_percent ?? ""}
+                placeholder="80"
+              />
+            </div>
+          ) : (
+            <input type="hidden" name="heating_efficiency_percent" value="" />
+          )}
 
           {/* Refrigerant — hidden for furnace / air_handler */}
           {showRefrigerant ? (

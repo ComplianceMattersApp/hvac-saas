@@ -103,6 +103,41 @@ export default function EquipmentCreateForm({
           />
         </div>
 
+        {showHeatingCapacity && (
+          <div className="grid gap-1">
+            <label className="text-sm font-medium text-gray-900" htmlFor="heating_output_btu">
+              Heating Output (BTU/h) (optional)
+            </label>
+            <input
+              id="heating_output_btu"
+              name="heating_output_btu"
+              type="number"
+              step="1"
+              min="0"
+              className="w-full rounded-md border px-3 py-2 text-gray-900"
+              placeholder="66000"
+            />
+          </div>
+        )}
+
+        {showHeatingCapacity && (
+          <div className="grid gap-1">
+            <label className="text-sm font-medium text-gray-900" htmlFor="heating_efficiency_percent">
+              Efficiency % (optional)
+            </label>
+            <input
+              id="heating_efficiency_percent"
+              name="heating_efficiency_percent"
+              type="number"
+              step="1"
+              min="1"
+              max="100"
+              className="w-full rounded-md border px-3 py-2 text-gray-900"
+              placeholder="80"
+            />
+          </div>
+        )}
+
         {showRefrigerant ? (
           <div className="grid gap-1 sm:col-span-2">
             <label className="text-sm font-medium text-gray-900" htmlFor="refrigerant_type">
