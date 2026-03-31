@@ -493,6 +493,7 @@ export default async function JobDetailPage({
         model,
         serial,
         tonnage,
+        heating_capacity_kbtu,
         refrigerant_type,
         notes,
         created_at,
@@ -514,7 +515,8 @@ export default async function JobDetailPage({
 
     .single();
 
-  if (jobError || !job) return notFound();
+  if (jobError) throw jobError;
+  if (!job) return notFound();
 
   const looksStalePaperworkStatus =
     String(job.ops_status ?? "").toLowerCase() === "paperwork_required" &&

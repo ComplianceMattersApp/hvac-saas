@@ -7,6 +7,7 @@ import {
   EQUIPMENT_ROLE_OPTIONS,
   equipmentRoleLabel,
   equipmentUsesRefrigerant,
+  isHeatingOnlyEquipment,
 } from "@/lib/utils/equipment-display";
 
 type SystemRow = { id: string; name: string | null };
@@ -19,6 +20,7 @@ type EquipmentRow = {
   model: string | null;
   serial: string | null;
   tonnage: string | null;
+  heating_capacity_kbtu: string | null;
   refrigerant_type: string | null;
   notes: string | null;
 };
@@ -50,6 +52,7 @@ export default function EquipmentEditCard({
   const isCustomSys = sysChoice === "__custom__";
 
   const showRefrigerant = equipmentUsesRefrigerant(role);
+  const showHeatingCapacity = isHeatingOnlyEquipment(role);
 
   // ── VIEW MODE ──────────────────────────────────────────────────────────────
   if (!editing) {
@@ -66,9 +69,10 @@ export default function EquipmentEditCard({
             </div>
             <div className="text-xs text-gray-500">
               {eq.serial ? `S/N: ${eq.serial}` : null}
-              {eq.serial && (eq.tonnage || (showRefrigerant && eq.refrigerant_type)) ? " • " : null}
-              {eq.tonnage ? `${eq.tonnage} ton` : null}
-              {eq.tonnage && showRefrigerant && eq.refrigerant_type ? " • " : null}
+              {eq.serial && (eq.tonnage || eq.heating_capacity_kbtu || (showRefrigerant && eq.refrigerant_type)) ? " • " : null}
+              {showHeatingCapacity && eq.heating_capacity_kbtu ? `${eq.heating_capacity_kbtu} KBTU/h` : null}
+              {!showHeatingCapacity && eq.tonnage ? `${eq.tonnage} ton` : null}
+              {(eq.tonnage || eq.heating_capacity_kbtu) && showRefrigerant && eq.refrigerant_type ? " • " : null}
               {showRefrigerant ? eq.refrigerant_type ?? null : null}
             </div>
             {eq.notes ? (
@@ -221,19 +225,32 @@ export default function EquipmentEditCard({
           </div>
 
           <div className="grid gap-1">
-            <label className="text-sm font-medium text-gray-900" htmlFor={`ton-${eq.id}`}>
-              Tonnage
+            <label className="text-sm font-medium text-gray-900" htmlFor={showHeatingCapacity ? `hc-${eq.id}` : `ton-${eq.id}`}>
+              {showHeatingCapacity ? "Heating Capacity (KBTU/h)" : "Tonnage"}
             </label>
-            <input
-              id={`ton-${eq.id}`}
-              name="tonnage"
-              type="number"
-              step="0.5"
-              min="0"
-              className="w-full rounded-md border px-3 py-2 text-gray-900 bg-white"
-              defaultValue={eq.tonnage ?? ""}
-              placeholder="5"
-            />
+            {showHeatingCapacity ? (
+              <input
+                id={`hc-${eq.id}`}
+                name="heating_capacity_kbtu"
+                type="number"
+                step="1"
+                min="0"
+                className="w-full rounded-md border px-3 py-2 text-gray-900 bg-white"
+                defaultValue={eq.heating_capacity_kbtu ?? ""}
+                placeholder="120"
+              />
+            ) : (
+              <input
+                id={`ton-${eq.id}`}
+                name="tonnage"
+                type="number"
+                step="0.5"
+                min="0"
+                className="w-full rounded-md border px-3 py-2 text-gray-900 bg-white"
+                defaultValue={eq.tonnage ?? ""}
+                placeholder="5"
+              />
+            )}
           </div>
 
           {/* Refrigerant — hidden for furnace / air_handler */}

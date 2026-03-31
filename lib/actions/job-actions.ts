@@ -18,6 +18,7 @@ import { requireInternalUser } from "@/lib/auth/internal-user";
 import { renderSystemEmailLayout, escapeHtml, resolveAppUrl } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { assertAssignableInternalUser } from "@/lib/staffing/human-layer";
+import { getThresholdRuleForTest } from "@/lib/ecc/rule-profiles";
 import type { JobStatus } from "@/lib/types/job";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
@@ -1743,6 +1744,9 @@ export async function addJobEquipmentFromForm(formData: FormData) {
   const tonnageRaw = String(formData.get("tonnage") || "").trim();
   const tonnage = tonnageRaw ? Number(tonnageRaw) : null;
 
+  const heatingCapacityRaw = String(formData.get("heating_capacity_kbtu") || "").trim();
+  const heatingCapacityKbtu = heatingCapacityRaw ? Number(heatingCapacityRaw) : null;
+
   const refrigerantType =
     String(formData.get("refrigerant_type") || "").trim() || null;
 
@@ -1785,6 +1789,7 @@ export async function addJobEquipmentFromForm(formData: FormData) {
     model,
     serial,
     tonnage,
+    heating_capacity_kbtu: heatingCapacityKbtu,
     refrigerant_type: refrigerantType,
     notes,
   });
@@ -1818,6 +1823,9 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
   const tonnageRaw = String(formData.get("tonnage") || "").trim();
   const tonnage = tonnageRaw ? Number(tonnageRaw) : null;
 
+  const heatingCapacityRaw = String(formData.get("heating_capacity_kbtu") || "").trim();
+  const heatingCapacityKbtu = heatingCapacityRaw ? Number(heatingCapacityRaw) : null;
+
   const refrigerantType =
     String(formData.get("refrigerant_type") || "").trim() || null;
 
@@ -1834,6 +1842,7 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
       model,
       serial,
       tonnage,
+      heating_capacity_kbtu: heatingCapacityKbtu,
       refrigerant_type: refrigerantType,
       notes,
     })
@@ -1883,25 +1892,10 @@ export async function saveEccTestOverrideFromForm(formData: FormData) {
   const systemIdRaw = String(formData.get("system_id") || "").trim();
   const testTypeRaw = String(formData.get("test_type") || "").trim();
 
-  const override = String(formData.get("override") || "none").trim(); // "pass" | "fail" | "none"
-  const reasonRaw = String(formData.get("override_reason") || "").trim();
-
   if (!jobId) throw new Error("Missing job_id");
   if (!testRunId) throw new Error("Missing test_run_id");
 
-  let override_pass: boolean | null = null;
-  let override_reason: string | null = null;
-
-  if (override === "pass") override_pass = true;
-  else if (override === "fail") override_pass = false;
-  else override_pass = null;
-
- // Smoke Test only: reason is optional
-if (override_pass !== null) {
-  override_reason = reasonRaw || "Smoke Test";
-} else {
-  override_reason = null;
-}
+  const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
 
   // ✅ validate testType against allowed pills
   const allowed = new Set(["duct_leakage", "airflow", "refrigerant_charge", "custom"]);
@@ -1913,8 +1907,8 @@ if (override_pass !== null) {
   const { data: updated, error } = await supabase
     .from("ecc_test_runs")
     .update({
-      override_pass,
-      override_reason,
+      override_pass: overridePass,
+      override_reason: overrideReason,
       updated_at: new Date().toISOString(),
     })
     .eq("id", testRunId)
@@ -1969,10 +1963,133 @@ const systemId =
   }
 
   redirectToTests({ jobId, testType, systemId });
-  
-  
 }
 
+function getDuctLeakagePercentAllowed(projectType: string) {
+  const normalizedProjectType = String(projectType ?? "").trim().toLowerCase();
+
+  if (
+    normalizedProjectType === "all_new" ||
+    normalizedProjectType === "allnew" ||
+    normalizedProjectType === "new" ||
+    normalizedProjectType === "new_construction" ||
+    normalizedProjectType === "new_prescriptive"
+  ) {
+    return 0.05;
+  }
+
+  if (normalizedProjectType === "alteration") {
+    return 0.1;
+  }
+
+  return null;
+}
+
+function computeDuctLeakagePayload(formData: FormData, projectType: string) {
+  const num = (key: string) => {
+    const raw = String(formData.get(key) || "").trim();
+    if (!raw) return null;
+    const val = Number(raw);
+    return Number.isFinite(val) ? val : null;
+  };
+
+  const measuredLeakageCfm = num("measured_duct_leakage_cfm");
+  const tonnage = num("tonnage");
+  const heatingOutputBtu = num("heating_output_btu");
+  const heatingInputBtu = num("heating_input_btu");
+  const heatingEfficiencyPercent = num("heating_efficiency_percent");
+
+  const airflowMethodRaw = String(formData.get("airflow_method") || "").trim().toLowerCase();
+  const airflowMethod = airflowMethodRaw === "heating" ? "heating" : "cooling";
+
+  const leakagePercentAllowed = getDuctLeakagePercentAllowed(projectType);
+
+  const derivedHeatingOutputBtu =
+    heatingOutputBtu != null
+      ? heatingOutputBtu
+      : heatingInputBtu != null &&
+        heatingEfficiencyPercent != null &&
+        heatingEfficiencyPercent > 0 &&
+        heatingEfficiencyPercent <= 100
+      ? heatingInputBtu * (heatingEfficiencyPercent / 100)
+      : null;
+
+  const heatingOutputKbtu =
+    airflowMethod === "heating" && derivedHeatingOutputBtu != null
+      ? derivedHeatingOutputBtu / 1000
+      : null;
+
+  const nominalAirflowCfm =
+    airflowMethod === "heating"
+      ? heatingOutputKbtu != null
+        ? heatingOutputKbtu * 21.7
+        : null
+      : tonnage != null
+      ? tonnage * 400
+      : null;
+
+  const maxLeakageCfm =
+    nominalAirflowCfm != null && leakagePercentAllowed != null
+      ? nominalAirflowCfm * leakagePercentAllowed
+      : null;
+
+  const failures: string[] = [];
+  const warnings: string[] = [];
+
+  if (airflowMethod === "cooling" && tonnage == null) {
+    warnings.push("Missing tonnage");
+  }
+
+  if (airflowMethod === "heating") {
+    if (derivedHeatingOutputBtu == null) {
+      warnings.push("Missing heating output BTU or input BTU with efficiency");
+    }
+    if (
+      heatingInputBtu != null &&
+      (heatingEfficiencyPercent == null || heatingEfficiencyPercent <= 0 || heatingEfficiencyPercent > 100)
+    ) {
+      warnings.push("Heating efficiency must be between 0 and 100 when using input BTU");
+    }
+  }
+
+  if (measuredLeakageCfm == null) warnings.push("Missing measured duct leakage");
+  if (leakagePercentAllowed == null) warnings.push("No leakage rule profile found for project type");
+
+  let computedPass: boolean | null = null;
+
+  if (measuredLeakageCfm != null && maxLeakageCfm != null) {
+    computedPass = measuredLeakageCfm <= maxLeakageCfm;
+    if (computedPass === false) {
+      failures.push(`Duct leakage above max (${maxLeakageCfm} CFM)`);
+    }
+  }
+
+  const data = {
+    measured_duct_leakage_cfm: measuredLeakageCfm,
+    tonnage,
+    airflow_method: airflowMethod,
+    heating_output_btu: heatingOutputBtu,
+    heating_input_btu: heatingInputBtu,
+    heating_efficiency_percent: heatingEfficiencyPercent,
+    derived_nominal_airflow_cfm: nominalAirflowCfm,
+    notes: String(formData.get("notes") || "").trim() || null,
+  };
+
+  const computed = {
+    airflow_method: airflowMethod,
+    base_airflow_cfm: nominalAirflowCfm,
+    leakage_percent_allowed: leakagePercentAllowed,
+    leakage_percent_allowed_display:
+      leakagePercentAllowed != null ? leakagePercentAllowed * 100 : null,
+    max_leakage_cfm: maxLeakageCfm,
+    measured_duct_leakage_cfm: measuredLeakageCfm,
+    heating_output_kbtu: heatingOutputKbtu,
+    failures,
+    warnings,
+  };
+
+  return { data, computed, computedPass };
+}
 
 export async function addEccTestRunFromForm(formData: FormData) {
   "use server";
@@ -2694,8 +2811,7 @@ export async function saveAirflowDataFromForm(formData: FormData) {
   const measuredTotalCfm = num("measured_total_cfm");
   const tonnage = num("tonnage");
 
-  // Existing simple rule for now; later we can swap this to rule-profiles helper
-  const cfmPerTon = projectType === "all_new" ? 350 : 300;
+  const cfmPerTon = resolveAirflowCfmPerTon(projectType);
   const requiredTotalCfm = tonnage != null ? tonnage * cfmPerTon : null;
 
   const failures: string[] = [];
@@ -2776,6 +2892,31 @@ export async function saveAirflowDataFromForm(formData: FormData) {
   redirectToTests({ jobId, testType: "airflow", systemId });
 }
 
+function parseOverrideSelectionFromForm(formData: FormData) {
+  const override = String(formData.get("override") || "none").trim().toLowerCase();
+  const reasonRaw = String(formData.get("override_reason") || "").trim();
+
+  let overridePass: boolean | null = null;
+  if (override === "pass") overridePass = true;
+  else if (override === "fail") overridePass = false;
+
+  if (overridePass !== null && !reasonRaw) {
+    throw new Error("Override reason is required when manual override is selected.");
+  }
+
+  return {
+    overridePass,
+    overrideReason: overridePass !== null ? reasonRaw : null,
+  };
+}
+
+function resolveAirflowCfmPerTon(projectType: string): number {
+  const threshold = getThresholdRuleForTest(projectType, "airflow");
+  const rawValue = threshold?.unit === "cfm_per_ton" ? threshold.targetValue : null;
+  const parsed = typeof rawValue === "number" ? rawValue : Number(rawValue);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 300;
+}
+
 /** =========================
  * SAVE: DUCT LEAKAGE
  * - revalidates /tests
@@ -2789,73 +2930,8 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
   if (!jobId) throw new Error("Missing job_id");
   if (!testRunId) throw new Error("Missing test_run_id");
 
-  const num = (key: string) => {
-    const raw = String(formData.get(key) || "").trim();
-    if (!raw) return null;
-    const val = Number(raw);
-    return Number.isFinite(val) ? val : null;
-  };
-
-  const measuredLeakageCfm = num("measured_duct_leakage_cfm");
-  const tonnage = num("tonnage");
-
-  // Locked duct leakage basis:
-  // base airflow = tonnage * 400
-  // alteration = 10%
-  // new/all_new = 5%
-  const normalizedProjectType = projectType.toLowerCase();
-
-  const leakagePercentAllowed =
-    normalizedProjectType === "all_new" ||
-    normalizedProjectType === "allnew" ||
-    normalizedProjectType === "new" ||
-    normalizedProjectType === "new_construction" ||
-    normalizedProjectType === "new_prescriptive"
-      ? 0.05
-      : normalizedProjectType === "alteration"
-      ? 0.10
-      : null;
-
-  const baseAirflowCfm = tonnage != null ? tonnage * 400 : null;
-  const maxLeakageCfm =
-    baseAirflowCfm != null && leakagePercentAllowed != null
-      ? baseAirflowCfm * leakagePercentAllowed
-      : null;
-
-  const failures: string[] = [];
-  const warnings: string[] = [];
-
-  if (tonnage == null) warnings.push("Missing tonnage");
-  if (measuredLeakageCfm == null) warnings.push("Missing measured duct leakage");
-  if (leakagePercentAllowed == null) warnings.push("No leakage rule profile found for project type");
-
-  let computedPass: boolean | null = null;
-
-  if (measuredLeakageCfm != null && maxLeakageCfm != null) {
-    computedPass = measuredLeakageCfm <= maxLeakageCfm;
-    if (computedPass === false) {
-      failures.push(`Duct leakage above max (${maxLeakageCfm} CFM)`);
-    }
-  } else {
-    computedPass = null;
-  }
-
-  const data = {
-    measured_duct_leakage_cfm: measuredLeakageCfm,
-    tonnage,
-    notes: String(formData.get("notes") || "").trim() || null,
-  };
-
-  const computed = {
-    base_airflow_cfm: baseAirflowCfm,
-    leakage_percent_allowed: leakagePercentAllowed,
-    leakage_percent_allowed_display:
-      leakagePercentAllowed != null ? leakagePercentAllowed * 100 : null,
-    max_leakage_cfm: maxLeakageCfm,
-    measured_duct_leakage_cfm: measuredLeakageCfm,
-    failures,
-    warnings,
-  };
+  const { data, computed, computedPass } = computeDuctLeakagePayload(formData, projectType);
+  const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
 
   const supabase = await createClient();
 
@@ -2865,6 +2941,8 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
       data,
       computed,
       computed_pass: computedPass,
+      override_pass: overridePass,
+      override_reason: overrideReason,
       updated_at: new Date().toISOString(),
     })
     .eq("id", testRunId)
@@ -2950,47 +3028,7 @@ const hasAnyData =
 
 if (!hasPassFail && !hasAnyData && run.test_type === "duct_leakage") {
   const projectType = String(formData.get("project_type") || "").trim(); // "alteration" | "all_new"
-
-  const num = (key: string) => {
-    const raw = String(formData.get(key) || "").trim();
-    if (!raw) return null;
-    const val = Number(raw);
-    return Number.isFinite(val) ? val : null;
-  };
-
-  const measuredLeakageCfm = num("measured_duct_leakage_cfm");
-  const tonnage = num("tonnage");
-
-  const leakagePerTonMax = projectType === "all_new" ? 20 : 40;
-  const maxLeakageCfm = tonnage != null ? tonnage * leakagePerTonMax : null;
-
-  const failures: string[] = [];
-  const warnings: string[] = [];
-
-  if (tonnage == null) warnings.push("Missing tonnage");
-  if (measuredLeakageCfm == null) warnings.push("Missing measured duct leakage");
-
-  let computedPass: boolean | null = null;
-
-  if (measuredLeakageCfm != null && maxLeakageCfm != null) {
-    computedPass = measuredLeakageCfm > maxLeakageCfm ? false : true;
-    if (computedPass === false) failures.push(`Duct leakage above max (${maxLeakageCfm} CFM)`);
-  }
-
-  const data = {
-    measured_duct_leakage_cfm: measuredLeakageCfm,
-    tonnage,
-    max_cfm_per_ton: leakagePerTonMax,
-    notes: String(formData.get("notes") || "").trim() || null,
-  };
-
-  const computed = {
-    max_cfm_per_ton: leakagePerTonMax,
-    max_leakage_cfm: maxLeakageCfm,
-    measured_duct_leakage_cfm: measuredLeakageCfm,
-    failures,
-    warnings,
-  };
+  const { data, computed, computedPass } = computeDuctLeakagePayload(formData, projectType);
 
   // Persist compute before allowing completion
   const { error: saveErr } = await supabase
@@ -3000,15 +3038,15 @@ if (!hasPassFail && !hasAnyData && run.test_type === "duct_leakage") {
       computed,
       computed_pass: computedPass,
       updated_at: new Date().toISOString(),
-      visit_id: visitId,        // also ensure visit_id is stamped
-      system_id: systemId,      // ensure system_id is stamped
+      visit_id: visitId, // also ensure visit_id is stamped
+      system_id: systemId, // ensure system_id is stamped
     })
     .eq("id", run.id)
     .eq("job_id", jobId);
 
   if (saveErr) throw saveErr;
 
-  // refresh our local run values for later logic (optional but helps)
+  // refresh local run values for later logic
   run.computed_pass = computedPass as any;
   run.data = data as any;
 }
@@ -3142,68 +3180,8 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
   if (!jobId) throw new Error("Missing job_id");
   if (!testRunId) throw new Error("Missing test_run_id");
 
-  const num = (key: string) => {
-    const raw = String(formData.get(key) || "").trim();
-    if (!raw) return null;
-    const val = Number(raw);
-    return Number.isFinite(val) ? val : null;
-  };
-
-  const measuredLeakageCfm = num("measured_duct_leakage_cfm");
-  const tonnage = num("tonnage");
-
-  const normalizedProjectType = projectType.toLowerCase();
-  const leakagePercentAllowed =
-    normalizedProjectType === "all_new" ||
-    normalizedProjectType === "allnew" ||
-    normalizedProjectType === "new" ||
-    normalizedProjectType === "new_construction" ||
-    normalizedProjectType === "new_prescriptive"
-      ? 0.05
-      : normalizedProjectType === "alteration"
-      ? 0.10
-      : null;
-
-  const baseAirflowCfm = tonnage != null ? tonnage * 400 : null;
-  const maxLeakageCfm =
-    baseAirflowCfm != null && leakagePercentAllowed != null
-      ? baseAirflowCfm * leakagePercentAllowed
-      : null;
-
-  const failures: string[] = [];
-  const warnings: string[] = [];
-
-  if (tonnage == null) warnings.push("Missing tonnage");
-  if (measuredLeakageCfm == null) warnings.push("Missing measured duct leakage");
-  if (leakagePercentAllowed == null) warnings.push("No leakage rule profile found for project type");
-
-  let computedPass: boolean | null = null;
-
-  if (measuredLeakageCfm != null && maxLeakageCfm != null) {
-    computedPass = measuredLeakageCfm <= maxLeakageCfm;
-    if (computedPass === false) {
-      failures.push(`Duct leakage above max (${maxLeakageCfm} CFM)`);
-    }
-  } else {
-    computedPass = null;
-  }
-
-  const data = {
-    measured_duct_leakage_cfm: measuredLeakageCfm,
-    tonnage,
-    notes: String(formData.get("notes") || "").trim() || null,
-  };
-
-  const computed = {
-    base_airflow_cfm: baseAirflowCfm,
-    leakage_percent_allowed: leakagePercentAllowed,
-    leakage_percent_allowed_display:
-      leakagePercentAllowed != null ? leakagePercentAllowed * 100 : null,
-    max_leakage_cfm: maxLeakageCfm,
-    measured_duct_leakage_cfm: measuredLeakageCfm,
-    failures,
-    warnings,
-  };
+  const { data, computed, computedPass } = computeDuctLeakagePayload(formData, projectType);
+  const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
 
   const supabase = await createClient();
 
@@ -3243,6 +3221,8 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
       data,
       computed,
       computed_pass: computedPass,
+      override_pass: overridePass,
+      override_reason: overrideReason,
       updated_at: new Date().toISOString(),
       is_completed: true,
       visit_id: visitId,
@@ -3283,7 +3263,7 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
   const measuredTotalCfm = num("measured_total_cfm");
   const tonnage = num("tonnage");
 
-  const cfmPerTon = projectType === "all_new" ? 350 : 300;
+  const cfmPerTon = resolveAirflowCfmPerTon(projectType);
   const requiredTotalCfm = tonnage != null ? tonnage * cfmPerTon : null;
 
   const failures: string[] = [];
@@ -3315,8 +3295,8 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
     tonnage,
     cfm_per_ton_required: cfmPerTon,
     notes: String(formData.get("notes") || "").trim() || null,
-    airflow_override_applied: airflowOverridePass || undefined,
-    airflow_override_reason: airflowOverridePass ? airflowOverrideReason : undefined,
+    airflow_override_applied: airflowOverridePass,
+    airflow_override_reason: airflowOverridePass ? airflowOverrideReason : null,
   };
 
   const computed = {
@@ -3574,12 +3554,14 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
   }
 
   // Load existing data so we don't wipe fields
-  const { data: existingRun } = await supabase
+  const { data: existingRun, error: loadErr } = await supabase
     .from("ecc_test_runs")
     .select("data")
     .eq("id", testRunId)
     .eq("job_id", jobId)
     .single();
+
+  if (loadErr) throw loadErr;
 
   const existingData = (existingRun?.data ?? {}) as Record<string, any>;
   const mergedData = { ...existingData, ...data };
@@ -4272,6 +4254,8 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
       const equipment_role = String(c?.type || "").trim();
       if (!equipment_role) continue;
 
+      const isFurnaceLike = equipment_role.toLowerCase().includes("furnace");
+
       const manufacturer = c?.manufacturer ? String(c.manufacturer).trim() : null;
       const model = c?.model ? String(c.model).trim() : null;
       const serial = c?.serial ? String(c.serial).trim() : null;
@@ -4279,7 +4263,14 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
       const notes = c?.notes ? String(c.notes).trim() : null;
 
       const tonnageRaw = c?.tonnage ? String(c.tonnage).trim() : "";
-      const tonnage = tonnageRaw ? Number(tonnageRaw) : null;
+      const heatingCapacityRaw = c?.heating_capacity_kbtu
+        ? String(c.heating_capacity_kbtu).trim()
+        : "";
+
+      const tonnage = !isFurnaceLike && tonnageRaw ? Number(tonnageRaw) : null;
+      const heating_capacity_kbtu = isFurnaceLike
+        ? (heatingCapacityRaw || tonnageRaw ? Number(heatingCapacityRaw || tonnageRaw) : null)
+        : null;
 
       const { error: eqErr } = await supabase.from("job_equipment").insert({
         job_id: jobId,
@@ -4290,6 +4281,7 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
         model,
         serial,
         tonnage,
+        heating_capacity_kbtu,
         refrigerant_type,
         notes,
       });

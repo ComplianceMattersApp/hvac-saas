@@ -24,7 +24,7 @@ export default async function CalendarPage({
   const date = String(sp.date ?? '').trim() || todayYmdLA();
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 px-6 py-5">
+    <div className="min-h-screen w-full bg-gray-50 px-3 py-4 sm:px-6 sm:py-5">
       <CalendarView view={sp.view} date={date} banner={sp.banner} job={sp.job} tech={sp.tech} />
     </div>
   );

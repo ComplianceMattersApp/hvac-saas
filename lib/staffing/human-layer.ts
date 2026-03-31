@@ -1,5 +1,6 @@
 import { requireInternalUser } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
+import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 export type AssignableInternalUser = {
   user_id: string;
@@ -11,13 +12,11 @@ export type AssignableInternalUser = {
 };
 
 function toDisplayName(input: { full_name?: unknown; email?: unknown }) {
-  const fullName = String(input.full_name ?? "").trim();
-  if (fullName) return fullName;
-
-  const email = String(input.email ?? "").trim();
-  if (email) return email;
-
-  return "User";
+  return resolveHumanDisplayName({
+    profileFullName: input.full_name,
+    email: input.email,
+    fallback: "User",
+  });
 }
 
 async function resolveAccountOwnerScope(params: {

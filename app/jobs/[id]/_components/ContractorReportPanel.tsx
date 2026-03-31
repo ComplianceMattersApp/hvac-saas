@@ -23,6 +23,7 @@ export default function ContractorReportPanel({
 }) {
   const [preview, setPreview] = useState<ContractorReportPreview | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [contractorSummary, setContractorSummary] = useState("");
   const [contractorNote, setContractorNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -65,6 +66,7 @@ export default function ContractorReportPanel({
       try {
         const result = await sendContractorReport({
           jobId,
+          contractorSummary,
           contractorNote,
         });
 
@@ -170,6 +172,29 @@ export default function ContractorReportPanel({
                 </div>
 
                 <div className="mt-2"><span className="font-medium">Next Step:</span> {preview.next_step}</div>
+
+                <div className="mt-3 rounded border border-gray-200 bg-white px-3 py-2">
+                  <div className="text-xs text-gray-600 mb-1">Canonical Contractor Failure Summary (saved with report)</div>
+                  <div><span className="font-medium">What Failed:</span> {preview.contractor_failure_summary_v1.what_failed}</div>
+                  <div className="mt-1 font-medium">What Needs Correction</div>
+                  <ul className="list-disc pl-5">
+                    {preview.contractor_failure_summary_v1.what_needs_correction.map((line, idx) => (
+                      <li key={`${line}-${idx}`}>{line}</li>
+                    ))}
+                  </ul>
+                  <div className="mt-1"><span className="font-medium">Next Step:</span> {preview.contractor_failure_summary_v1.next_step}</div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Contractor-Safe Summary (optional)</label>
+                <textarea
+                  value={contractorSummary}
+                  onChange={(e) => setContractorSummary(e.target.value)}
+                  rows={3}
+                  placeholder="Optional concise summary shown to the contractor"
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
               </div>
 
               <div>

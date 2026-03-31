@@ -70,8 +70,36 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
       if (mode === "duct_leakage") {
         const tonnage = toNumber(fd.get("tonnage"));
         const measured = toNumber(fd.get("measured_duct_leakage_cfm"));
+        const method = String(fd.get("airflow_method") ?? "").trim().toLowerCase() === "heating" ? "heating" : "cooling";
+        const heatingOutputBtu = toNumber(fd.get("heating_output_btu"));
+        const heatingInputBtu = toNumber(fd.get("heating_input_btu"));
+        const heatingEfficiencyPercent = toNumber(fd.get("heating_efficiency_percent"));
         const percent = leakPercentAllowed(projectType);
-        const baseAirflow = tonnage != null ? tonnage * 400 : null;
+
+        const derivedHeatingOutputBtu =
+          heatingOutputBtu != null
+            ? heatingOutputBtu
+            : heatingInputBtu != null &&
+              heatingEfficiencyPercent != null &&
+              heatingEfficiencyPercent > 0 &&
+              heatingEfficiencyPercent <= 100
+            ? heatingInputBtu * (heatingEfficiencyPercent / 100)
+            : null;
+
+        const heatingOutputKbtu =
+          method === "heating" && derivedHeatingOutputBtu != null
+            ? derivedHeatingOutputBtu / 1000
+            : null;
+
+        const baseAirflow =
+          method === "heating"
+            ? heatingOutputKbtu != null
+              ? heatingOutputKbtu * 21.7
+              : null
+            : tonnage != null
+            ? tonnage * 400
+            : null;
+
         const maxLeakage = baseAirflow != null && percent != null ? baseAirflow * percent : null;
 
         let tone: Tone = "pending";
@@ -95,10 +123,11 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
                 {label}
               </div>
             </div>
-            <div>Base Airflow: {formatNum(baseAirflow, "CFM")}</div>
+            <div>Method: {method === "heating" ? "Heat-only" : "Cooling"}</div>
+            <div>Nominal Airflow: {formatNum(baseAirflow, "CFM")}</div>
             <div>
               Max Allowed: {formatNum(maxLeakage, "CFM")}
-              {percent != null && baseAirflow != null ? ` (${(percent * 100).toFixed(0)}% of base airflow)` : ""}
+              {percent != null && baseAirflow != null ? ` (${(percent * 100).toFixed(0)}% of nominal airflow)` : ""}
             </div>
             <div>Measured: {formatNum(measured, "CFM")}</div>
           </div>
@@ -154,6 +183,16 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
       const suctionPressure = toNumber(fd.get("suction_line_pressure_psig"));
       const evapSat = toNumber(fd.get("evaporator_sat_temp_f"));
       const filterDrierInstalled = fd.get("filter_drier_installed") === "on";
+      const exemptPackageUnit = fd.get("rc_exempt_package_unit") === "on";
+      const exemptConditions = fd.get("rc_exempt_conditions") === "on";
+      const overrideDetails = String(fd.get("rc_override_details") ?? "").trim();
+
+      const isChargeExempt = exemptPackageUnit || exemptConditions;
+      const exemptionReason = exemptPackageUnit
+        ? "Charge verification exempt: package unit"
+        : exemptConditions
+        ? "Charge verification override: conditions not met"
+        : "";
 
       const measuredSubcool = condenserSat != null && liquidTemp != null ? condenserSat - liquidTemp : null;
       const measuredSuperheat = suctionTemp != null && evapSat != null ? suctionTemp - evapSat : null;
@@ -181,7 +220,10 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
       let overallTone: Tone = "pending";
       let overallLabel = "Pending inputs";
 
-      if (blocked.length > 0) {
+      if (isChargeExempt) {
+        overallTone = "pass";
+        overallLabel = "Preview EXEMPT PASS";
+      } else if (blocked.length > 0) {
         overallTone = "blocked";
         overallLabel = "Preview BLOCKED";
       } else if (failures.length > 0) {
@@ -193,13 +235,21 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
       }
 
       const subcoolTone: Tone =
-        measuredSubcool == null || targetSubcool == null
+        isChargeExempt
+          ? "pass"
+          : measuredSubcool == null || targetSubcool == null
           ? "pending"
           : Math.abs(measuredSubcool - targetSubcool) <= 2
           ? "pass"
           : "fail";
       const superheatTone: Tone =
-        measuredSuperheat == null ? "pending" : measuredSuperheat < 25 ? "pass" : "fail";
+        isChargeExempt
+          ? "pass"
+          : measuredSuperheat == null
+          ? "pending"
+          : measuredSuperheat < 25
+          ? "pass"
+          : "fail";
 
       setContent(
         <div className="min-h-[168px] rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
@@ -215,7 +265,9 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
               <div>Target Subcool: {formatNum(targetSubcool, "F")}</div>
               <div>Subcool Delta: {formatNum(subcoolDelta, "F")}</div>
               <div className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${statusClasses(subcoolTone)}`}>
-                {subcoolTone === "pending"
+                {isChargeExempt
+                  ? "Subcool bypassed (exempt)"
+                  : subcoolTone === "pending"
                   ? "Subcool pending"
                   : subcoolTone === "pass"
                   ? "Subcool PASS"
@@ -227,7 +279,9 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
               <div>Liquid Line Pressure: {formatNum(liquidPressure, "psig")}</div>
               <div>Suction Line Pressure: {formatNum(suctionPressure, "psig")}</div>
               <div className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${statusClasses(superheatTone)}`}>
-                {superheatTone === "pending"
+                {isChargeExempt
+                  ? "Superheat bypassed (exempt)"
+                  : superheatTone === "pending"
                   ? "Superheat pending"
                   : superheatTone === "pass"
                   ? "Superheat PASS"
@@ -235,7 +289,13 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
               </div>
             </div>
           </div>
-          {blocked.length > 0 ? (
+          {isChargeExempt ? (
+            <div className="mt-1 text-xs text-emerald-700">
+              {exemptionReason}
+              {overrideDetails ? ` (${overrideDetails})` : ""}
+            </div>
+          ) : null}
+          {!isChargeExempt && blocked.length > 0 ? (
             <div className="mt-1 text-xs text-amber-700">{blocked.join("; ")}</div>
           ) : null}
         </div>

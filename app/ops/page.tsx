@@ -19,6 +19,7 @@ import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
+import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/search-normalization";
 import {
   getInternalUnreadNotificationCount,
   listInternalNotifications,
@@ -343,25 +344,49 @@ function shouldHideFailedParentJob(j: any) {
     if (contractor) qb = qb.eq("contractor_id", contractor);
 
     if (q) {
-      // Use * as wildcard in .or() strings — % is for direct .ilike() only;
-      // commas/parens must be stripped to avoid breaking the OR clause parser.
-      const safe = q.replace(/[,()\\]/g, "").trim();
-      qb = qb.or(
-        [
-          `title.ilike.*${safe}*`,
-          `customer_first_name.ilike.*${safe}*`,
-          `customer_last_name.ilike.*${safe}*`,
-          `customer_email.ilike.*${safe}*`,
-          `customer_phone.ilike.*${safe}*`,
-          `job_address.ilike.*${safe}*`,
-          `city.ilike.*${safe}*`,
-          `permit_number.ilike.*${safe}*`,
-        ].join(",")
-      );
+      const terms = buildIlikeSearchTerms(q)
+        .map((term) => term.replace(/[,()\\]/g, "").trim())
+        .filter(Boolean);
+
+      if (terms.length > 0) {
+        const fields = [
+          "title",
+          "customer_first_name",
+          "customer_last_name",
+          "customer_email",
+          "customer_phone",
+          "job_address",
+          "city",
+          "permit_number",
+        ];
+
+        const clauses: string[] = [];
+        for (const term of terms) {
+          for (const field of fields) {
+            clauses.push(`${field}.ilike.*${term}*`);
+          }
+        }
+
+        qb = qb.or(clauses.join(","));
+      }
     }
 
     return qb;
   };
+
+  const matchesOpsSearch = (job: any) =>
+    matchesNormalizedSearch({
+      query: q,
+      values: [
+        job?.title,
+        job?.customer_first_name,
+        job?.customer_last_name,
+        job?.customer_phone,
+        job?.job_address,
+        job?.city,
+        job?.permit_number,
+      ],
+    });
 
 // ✅ Today in LA as "YYYY-MM-DD" (matches jobs.scheduled_date type = DATE)
 // Canonical LA day boundaries, expressed as UTC ISO instants for timestamptz comparisons
@@ -393,7 +418,9 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
 
 const { data: fieldWorkJobsRaw, error: fieldWorkErr } = await fieldWorkQ;
 if (fieldWorkErr) throw fieldWorkErr;
-const fieldWorkJobs = (fieldWorkJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
+const fieldWorkJobs = (fieldWorkJobsRaw ?? []).filter(
+  (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+);
 
 // 2) UPCOMING (scheduled jobs on/after LA tomorrow)
 let upcomingQ = supabase
@@ -412,7 +439,9 @@ upcomingQ = applyCommonFilters(upcomingQ);
 
 const { data: upcomingJobsRaw, error: upcomingErr } = await upcomingQ;
 if (upcomingErr) throw upcomingErr;
-const upcomingJobs = (upcomingJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
+const upcomingJobs = (upcomingJobsRaw ?? []).filter(
+  (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+);
 
 
   // 3) CALL LIST preview (need_to_schedule)
@@ -430,7 +459,9 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter((j: any) => !shouldHideFaile
 
   const { data: callListJobsRaw, error: callListErr } = await callListQ;
   if (callListErr) throw callListErr;
-  const callListJobs = (callListJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
+  const callListJobs = (callListJobsRaw ?? []).filter(
+    (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+  );
 
     // 4) CLOSEOUT COMMAND BOARD (derived from field_complete + remaining office obligations)
     let closeoutQ = supabase
@@ -447,7 +478,9 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter((j: any) => !shouldHideFaile
 
     const { data: closeoutSourceJobsRaw, error: closeoutErr } = await closeoutQ;
     if (closeoutErr) throw closeoutErr;
-    const closeoutSourceJobs = (closeoutSourceJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
+    const closeoutSourceJobs = (closeoutSourceJobsRaw ?? []).filter(
+      (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+    );
 
     // 5) EXCEPTIONS: Still Open (scheduled before today in LA and not field-complete)
     let stillOpenQ = supabase
@@ -466,7 +499,9 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter((j: any) => !shouldHideFaile
 
     const { data: stillOpenJobsRaw, error: stillOpenErr } = await stillOpenQ;
     if (stillOpenErr) throw stillOpenErr;
-    const stillOpenJobs = (stillOpenJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
+    const stillOpenJobs = (stillOpenJobsRaw ?? []).filter(
+      (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+    );
 
     // 6) NEEDS ATTENTION preview (aging-based escalation queue)
     let attentionQ = supabase
@@ -492,7 +527,9 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter((j: any) => !shouldHideFaile
 
     const { data: attentionJobsRaw, error: attentionErr } = await attentionQ;
     if (attentionErr) throw attentionErr;
-    const attentionJobs = (attentionJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
+    const attentionJobs = (attentionJobsRaw ?? []).filter(
+      (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+    );
     const attentionCount = attentionJobs.length;
 
   // 7) BUCKET list (tabs)
@@ -531,7 +568,9 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter((j: any) => !shouldHideFaile
 
     const { data: bucketJobsRaw, error: bucketErr } = await bucketQ;
   if (bucketErr) throw bucketErr;
-  const bucketJobs = (bucketJobsRaw ?? []).filter((j: any) => !shouldHideFailedParentJob(j));
+  const bucketJobs = (bucketJobsRaw ?? []).filter(
+    (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+  );
   const baseFilteredBucketJobs =
   bucket === "failed" || bucket === "attention"
     ? (bucketJobs ?? []).filter(

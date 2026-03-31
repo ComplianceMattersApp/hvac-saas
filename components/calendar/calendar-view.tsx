@@ -325,7 +325,7 @@ function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | n
       : addDaysYmd(date, view === 'week' ? 7 : 1);
 
   const todayTarget =
-    view === 'month' || view === 'list'
+    view === 'month'
       ? today.slice(0, 8) + '01'
       : today;
 
@@ -844,6 +844,7 @@ function DetailPanel(props: {
 
 export async function CalendarView(props: Props) {
   const uiView = normalizeView(props.view);
+  const todayDate = todayYmdLA();
   const baseMode: DispatchViewMode = uiView === 'week' ? 'week' : 'day';
 
   const data = await getDispatchCalendarData({
@@ -962,7 +963,7 @@ export async function CalendarView(props: Props) {
               {(['day', 'week', 'month', 'list'] as CalendarUIView[]).map((viewValue) => (
                 <Link
                   key={viewValue}
-                  href={buildCalendarHref(viewValue, data.anchorDate, { tech: activeTech })}
+                  href={buildCalendarHref(viewValue, viewValue === 'month' ? data.anchorDate : todayDate, { tech: activeTech })}
                   className={`rounded-lg px-4 py-2 text-base font-semibold ${
                     uiView === viewValue ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'
                   }`}
@@ -1010,7 +1011,7 @@ export async function CalendarView(props: Props) {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <aside>
+        <aside className="order-2 xl:order-1">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unscheduled Jobs</h3>
           <div className="mt-2 max-h-[70vh] space-y-1 overflow-y-auto pr-1">
             {unscheduledJobs.length ? (
@@ -1031,14 +1032,19 @@ export async function CalendarView(props: Props) {
           </div>
         </aside>
 
-        <main className="min-w-0 space-y-4">
+        <main className="order-1 min-w-0 space-y-4 xl:order-2">
           {uiView === 'list' ? (
             <section className="overflow-x-auto px-1">
               <AgendaList jobs={filteredJobsForRange} date={data.anchorDate} tech={activeTech} />
             </section>
           ) : uiView === 'month' ? (
-            <section className="overflow-x-auto">
-              <CalendarMonthGrid monthDate={data.anchorDate} jobs={filteredJobsForRange} />
+            <section>
+              <div className="lg:hidden px-1">
+                <AgendaList jobs={filteredJobsForRange} date={data.anchorDate} tech={activeTech} />
+              </div>
+              <div className="hidden overflow-x-auto lg:block">
+                <CalendarMonthGrid monthDate={data.anchorDate} jobs={filteredJobsForRange} />
+              </div>
             </section>
           ) : baseMode === 'day' ? (
             <section className="overflow-x-auto">

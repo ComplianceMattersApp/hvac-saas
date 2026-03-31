@@ -227,6 +227,9 @@ export async function createJobFromIntake(formData: FormData) {
         throw new Error("If you add equipment, each system must have a Location Label.");
       }
 
+      // For furnace equipment, tonnage may actually be heating capacity in KBTU/h
+      // For now, intake only supports tonnage input, so we store it as tonnage
+      // Future: add separate heating capacity input to intake form
       return {
         system_location,
         equipment_role: role || "equipment", // keep safe default for NOT NULL
@@ -234,6 +237,7 @@ export async function createJobFromIntake(formData: FormData) {
         model: model || null,
         serial: serial || null,
         tonnage: tonnage || null,
+        heating_capacity_kbtu: null, // intake form doesn't yet collect this
         refrigerant_type: refrigerant_type || null,
         notes: notes || null,
       };
@@ -244,6 +248,7 @@ export async function createJobFromIntake(formData: FormData) {
       model: string | null;
       serial: string | null;
       tonnage: string | null;
+      heating_capacity_kbtu: null;
       refrigerant_type: string | null;
       notes: string | null;
     }>;
@@ -274,6 +279,7 @@ export async function createJobFromIntake(formData: FormData) {
         model: r.model,
         serial: r.serial,
         tonnage: r.tonnage,
+        heating_capacity_kbtu: r.heating_capacity_kbtu,
         refrigerant_type: r.refrigerant_type, // optional
         notes: r.notes,
       }));

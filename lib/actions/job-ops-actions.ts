@@ -22,6 +22,7 @@ import {
 import { resolveAppUrl, renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
+import { extractFailureReasons, finalRunPass } from "@/lib/portal/resolveContractorIssues";
 
 const OPS_STATUSES = [
   "need_to_schedule",
@@ -112,6 +113,7 @@ export type ContractorReportPreview = {
   reasons: string[];
   next_step: string;
   body_text: string;
+  contractor_failure_summary_v1: ContractorFailureSummaryV1;
 };
 
 type ContractorReportResolved = ContractorReportPreview & {
@@ -119,22 +121,14 @@ type ContractorReportResolved = ContractorReportPreview & {
   ops_status: string;
 };
 
-function finalRunPass(run: any): boolean | null {
-  if (!run) return null;
-  return run.override_pass != null ? Boolean(run.override_pass) : Boolean(run.computed_pass);
-}
-
-function extractFailureReasons(run: any): string[] {
-  const computed = run?.computed ?? null;
-  if (!computed) return [];
-
-  const failures = Array.isArray(computed.failures)
-    ? computed.failures.map(String).map((s: string) => s.trim()).filter(Boolean)
-    : [];
-
-  if (failures.length > 0) return Array.from(new Set(failures));
-  return [];
-}
+export type ContractorFailureSummaryV1 = {
+  version: 1;
+  report_kind: ContractorReportKind;
+  what_failed: string;
+  what_needs_correction: string[];
+  next_step: string;
+  contractor_safe_summary: string | null;
+};
 
 function formatServiceDateText(job: any, failedRunCreatedAt?: string | null) {
   const scheduledDate = String(job?.scheduled_date ?? "").trim();
@@ -190,10 +184,12 @@ function buildReportBody(args: {
   locationText: string;
   reasons: string[];
   nextStep: string;
+  contractorSummary?: string | null;
   contractorNote?: string | null;
 }) {
   const reasonLabel = args.reasons.length === 1 ? "Reason" : "Reasons";
   const reasonsBlock = args.reasons.map((r) => `- ${r}`).join("\n");
+  const summary = String(args.contractorSummary ?? "").trim();
   const note = String(args.contractorNote ?? "").trim();
 
   const sections = [
@@ -203,9 +199,38 @@ function buildReportBody(args: {
     `Next Step:\n${args.nextStep}`,
   ];
 
+  if (summary) sections.push(`Summary:\n${summary}`);
   if (note) sections.push(`Contractor Note:\n${note}`);
 
   return sections.join("\n\n");
+}
+
+function sanitizeContractorSummary(raw: unknown) {
+  if (typeof raw !== "string") return null;
+  const sanitized = raw.replace(/\u0000/g, "").trim();
+  if (!sanitized) return null;
+  return sanitized.slice(0, 2000);
+}
+
+function buildContractorFailureSummaryV1(args: {
+  reportKind: ContractorReportKind;
+  reasons: string[];
+  nextStep: string;
+  contractorSummary?: string | null;
+}): ContractorFailureSummaryV1 {
+  const whatFailed =
+    args.reportKind === "failed"
+      ? "One or more test checks did not pass."
+      : "Additional information is required before the job can continue.";
+
+  return {
+    version: 1,
+    report_kind: args.reportKind,
+    what_failed: whatFailed,
+    what_needs_correction: args.reasons,
+    next_step: args.nextStep,
+    contractor_safe_summary: sanitizeContractorSummary(args.contractorSummary),
+  };
 }
 
 function buildContractorReportEmailHtml(args: { bodyText: string; portalJobUrl?: string | null }) {
@@ -320,6 +345,12 @@ async function resolveContractorReportForJob(params: {
 
     const nextStep = "Correct the issue and submit your response in the contractor portal.";
     const title = "FAILED TEST";
+    const summary = buildContractorFailureSummaryV1({
+      reportKind: "failed",
+      reasons,
+      nextStep,
+      contractorSummary: null,
+    });
 
     return {
       report_kind: "failed",
@@ -331,11 +362,13 @@ async function resolveContractorReportForJob(params: {
       service_date_text: formatServiceDateText(job, failedRun?.created_at ?? null),
       reasons,
       next_step: nextStep,
+      contractor_failure_summary_v1: summary,
       body_text: buildReportBody({
         title,
         locationText,
         reasons,
         nextStep,
+        contractorSummary: summary.contractor_safe_summary,
       }),
     };
   }
@@ -348,6 +381,12 @@ async function resolveContractorReportForJob(params: {
 
   const nextStep = "Provide the requested information in the contractor portal.";
   const title = "INFORMATION NEEDED";
+  const summary = buildContractorFailureSummaryV1({
+    reportKind: "pending_info",
+    reasons,
+    nextStep,
+    contractorSummary: null,
+  });
 
   return {
     report_kind: "pending_info",
@@ -359,11 +398,13 @@ async function resolveContractorReportForJob(params: {
     service_date_text: formatServiceDateText(job),
     reasons,
     next_step: nextStep,
+    contractor_failure_summary_v1: summary,
     body_text: buildReportBody({
       title,
       locationText,
       reasons,
       nextStep,
+      contractorSummary: summary.contractor_safe_summary,
     }),
   };
 }
@@ -393,12 +434,14 @@ export async function generateContractorReportPreview(input: {
     service_date_text: report.service_date_text,
     reasons: report.reasons,
     next_step: report.next_step,
+    contractor_failure_summary_v1: report.contractor_failure_summary_v1,
     body_text: report.body_text,
   };
 }
 
 export async function sendContractorReport(input: {
   jobId: string;
+  contractorSummary?: string | null;
   contractorNote?: string | null;
 }): Promise<{ ok: true; alreadySent?: boolean }> {
   const supabase = await createClient();
@@ -421,14 +464,22 @@ export async function sendContractorReport(input: {
     throw new Error("Cannot send contractor report: no contractor is assigned to this job.");
   }
 
+  const contractorSummary = sanitizeContractorSummary(input.contractorSummary);
   const contractorNote = sanitizeContractorNote(input.contractorNote);
   const sentAtIso = new Date().toISOString();
+  const contractorFailureSummary = buildContractorFailureSummaryV1({
+    reportKind: report.report_kind,
+    reasons: report.reasons,
+    nextStep: report.next_step,
+    contractorSummary,
+  });
 
   const bodyText = buildReportBody({
     title: report.title,
     locationText: report.location_text,
     reasons: report.reasons,
     nextStep: report.next_step,
+    contractorSummary: contractorFailureSummary.contractor_safe_summary,
     contractorNote,
   });
 
@@ -450,6 +501,7 @@ export async function sendContractorReport(input: {
         contractor_name: report.contractor_name,
         service_date_text: report.service_date_text,
         reasons: report.reasons,
+        contractor_failure_summary_v1: contractorFailureSummary,
         contractor_note: contractorNote,
         next_step: report.next_step,
         body_text: bodyText,

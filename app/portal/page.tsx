@@ -10,6 +10,7 @@ import {
 } from "@/lib/portal/resolveContractorIssues";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isPortalVisibleJob } from "@/lib/visibility/portal";
+import { matchesNormalizedSearch } from "@/lib/utils/search-normalization";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -123,35 +124,23 @@ export default async function PortalPage({
     }
   }
 
-  const normalizedQuery = q.toLowerCase();
-
   function matchesSearch(job: any) {
-    if (!normalizedQuery) return true;
-
-    const fullName = [
-      String(job.customer_first_name ?? "").trim(),
-      String(job.customer_last_name ?? "").trim(),
-    ]
-      .filter(Boolean)
-      .join(" ");
-
-    const haystack = [
-      job.title,
-      fullName,
-      job.customer_phone,
-      job.job_address,
-      job.city,
-      job.locations?.address_line1,
-      job.locations?.city,
-      job.locations?.zip,
-      job.permit_number,
-      job.id,
-    ]
-      .map((v) => String(v ?? "").trim().toLowerCase())
-      .filter(Boolean)
-      .join(" ");
-
-    return haystack.includes(normalizedQuery);
+    return matchesNormalizedSearch({
+      query: q,
+      values: [
+        job?.title,
+        job?.customer_first_name,
+        job?.customer_last_name,
+        job?.customer_phone,
+        job?.job_address,
+        job?.city,
+        job?.locations?.address_line1,
+        job?.locations?.city,
+        job?.locations?.zip,
+        job?.permit_number,
+        job?.id,
+      ],
+    });
   }
 
   function portalHref() {
@@ -381,7 +370,7 @@ export default async function PortalPage({
     const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
     if (row.resolved?.retestState === "scheduled" || row.resolved?.bucket === "passed") return "Open the job to review details.";
     if (row.resolved?.primaryIssue?.group === "needs_info") return "Open this job to provide the requested information.";
-    if (ops === "failed" || ops === "retest_needed" || row.resolved?.primaryIssue?.group === "failed") return "Open this job to view what needs to be corrected.";
+    if (ops === "failed" || ops === "retest_needed" || row.resolved?.primaryIssue?.group === "failed") return "Open this job to review the issue details and next step.";
     if (ops === "paperwork_required") return "Field work is complete. We're finishing the paperwork.";
     if (ops === "invoice_required") return "Field work is complete. We're completing final processing.";
     if (row.resolved?.retestState === "pending_scheduling") return "Open this job to schedule a retest.";

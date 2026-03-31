@@ -3517,6 +3517,7 @@ CREATE TABLE public.job_equipment (
     model text,
     serial text,
     tonnage numeric,
+    heating_capacity_kbtu numeric,
     refrigerant_type text,
     notes text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,

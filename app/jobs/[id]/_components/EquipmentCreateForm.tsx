@@ -7,6 +7,7 @@ import { addJobEquipmentFromForm } from "@/lib/actions/job-actions";
 import {
   EQUIPMENT_ROLE_OPTIONS,
   equipmentUsesRefrigerant,
+  isHeatingOnlyEquipment,
 } from "@/lib/utils/equipment-display";
 
 type SystemRow = { id: string; name: string | null };
@@ -20,6 +21,7 @@ export default function EquipmentCreateForm({
 }) {
   const [role, setRole] = useState("outdoor_unit");
   const showRefrigerant = equipmentUsesRefrigerant(role);
+  const showHeatingCapacity = isHeatingOnlyEquipment(role);
 
   return (
     <form action={addJobEquipmentFromForm} className="mt-4 grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -87,17 +89,17 @@ export default function EquipmentCreateForm({
         </div>
 
         <div className="grid gap-1">
-          <label className="text-sm font-medium text-gray-900" htmlFor="tonnage">
-            Tonnage (optional)
+          <label className="text-sm font-medium text-gray-900" htmlFor={showHeatingCapacity ? "heating_capacity_kbtu" : "tonnage"}>
+            {showHeatingCapacity ? "Heating Capacity (KBTU/h)" : "Tonnage"} (optional)
           </label>
           <input
-            id="tonnage"
-            name="tonnage"
+            id={showHeatingCapacity ? "heating_capacity_kbtu" : "tonnage"}
+            name={showHeatingCapacity ? "heating_capacity_kbtu" : "tonnage"}
             type="number"
-            step="0.5"
+            step={showHeatingCapacity ? "1" : "0.5"}
             min="0"
             className="w-full rounded-md border px-3 py-2 text-gray-900"
-            placeholder="5"
+            placeholder={showHeatingCapacity ? "120" : "5"}
           />
         </div>
 

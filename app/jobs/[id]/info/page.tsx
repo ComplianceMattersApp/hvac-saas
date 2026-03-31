@@ -33,6 +33,7 @@ const { data: job, error } = await supabase
       model,
       serial,
       tonnage,
+      heating_capacity_kbtu,
       refrigerant_type,
       notes,
       created_at,
@@ -43,7 +44,8 @@ const { data: job, error } = await supabase
   .eq("id", id)
   .single();
 
-if (error || !job) return notFound();
+if (error) throw error;
+if (!job) return notFound();
 
 
   const { data: systems, error: systemsErr } = await supabase

@@ -21,9 +21,14 @@ export const EQUIPMENT_ROLE_OPTIONS = [
 ] as const;
 
 const NO_REFRIGERANT_ROLES = new Set(["furnace", "air_handler"]);
+const HEATING_ONLY_ROLES = new Set(["furnace"]);
 
 export function equipmentUsesRefrigerant(role: string | null | undefined) {
   return !NO_REFRIGERANT_ROLES.has(String(role ?? "").trim().toLowerCase());
+}
+
+export function isHeatingOnlyEquipment(role: string | null | undefined) {
+  return HEATING_ONLY_ROLES.has(String(role ?? "").trim().toLowerCase());
 }
 
 export function equipmentRoleLabel(role: string | null | undefined) {

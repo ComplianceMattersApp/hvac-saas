@@ -303,7 +303,7 @@ export default async function PortalAllJobsPage() {
     const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
     if (row.resolved?.retestState === "scheduled" || row.resolved?.bucket === "passed") return "Open the job to review details.";
     if (row.resolved?.primaryIssue?.group === "needs_info") return "Open this job to provide the requested information.";
-    if (ops === "failed" || ops === "retest_needed" || row.resolved?.primaryIssue?.group === "failed") return "Open this job to view what needs to be corrected.";
+    if (ops === "failed" || ops === "retest_needed" || row.resolved?.primaryIssue?.group === "failed") return "Open this job to review the issue details and next step.";
     if (ops === "paperwork_required") return "Field work is complete. We're finishing the paperwork.";
     if (ops === "invoice_required") return "Field work is complete. We're completing final processing.";
     if (row.resolved?.retestState === "pending_scheduling") return "Open this job to schedule a retest.";

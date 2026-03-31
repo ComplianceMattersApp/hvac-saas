@@ -90,6 +90,27 @@ function summarizePlainText(value?: string | null, maxLength = 140) {
   return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
+function readContractorFailureSummaryV1(meta: any) {
+  const raw = meta?.contractor_failure_summary_v1;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+
+  const whatFailed = String(raw.what_failed ?? "").trim();
+  const nextStep = String(raw.next_step ?? "").trim();
+  const safeSummary = String(raw.contractor_safe_summary ?? "").trim();
+  const correctionLines = Array.isArray(raw.what_needs_correction)
+    ? raw.what_needs_correction.map((x: any) => String(x ?? "").trim()).filter(Boolean)
+    : [];
+
+  if (!whatFailed && correctionLines.length === 0 && !nextStep && !safeSummary) return null;
+
+  return {
+    what_failed: whatFailed,
+    what_needs_correction: correctionLines,
+    next_step: nextStep,
+    contractor_safe_summary: safeSummary || null,
+  };
+}
+
 function formatPortalTimelineLabel(type?: string | null, meta?: any) {
   if (type === "contractor_note") {
     return getEventAttachmentCount(meta) > 0 ? "Contractor response received" : "Contractor note received";
@@ -439,6 +460,18 @@ export default async function PortalJobDetailPage({
     latestSentReportEvent && typeof latestSentReportEvent.meta !== "string"
       ? latestSentReportEvent.meta
       : null;
+  const latestSentFailureSummary = readContractorFailureSummaryV1(latestSentReportMeta);
+  const latestSentReportAt = latestSentReportEvent?.created_at
+    ? formatDateTimeLA(String(latestSentReportEvent.created_at))
+    : "";
+  const latestSentContractorNote = String(latestSentReportMeta?.contractor_note ?? "").trim();
+  const statusHeadline = latestSentFailureSummary?.what_failed || primaryIssue.headline;
+  const statusExplanation = latestSentFailureSummary?.contractor_safe_summary || primaryIssue.explanation;
+  const statusDetailLines =
+    (latestSentFailureSummary?.what_needs_correction?.length ?? 0) > 0
+      ? latestSentFailureSummary?.what_needs_correction
+      : primaryIssue.detailLines;
+  const statusNextStep = latestSentFailureSummary?.next_step || resolvedIssues.nextStep;
 
   const timelineEvents = contractorSafeEvents.filter((e: any) => {
     const type = String(e?.event_type ?? "");
@@ -657,16 +690,22 @@ export default async function PortalJobDetailPage({
             ? "In progress"
             : "Passed"}
         </div>
-        <div className="text-xl font-bold">{primaryIssue.headline}</div>
-        {primaryIssue.explanation ? (
-          <div className="text-sm leading-relaxed text-gray-700 dark:text-gray-200">{primaryIssue.explanation}</div>
+        <div className="text-xl font-bold">{statusHeadline}</div>
+        {statusExplanation ? (
+          <div className="text-sm leading-relaxed text-gray-700 dark:text-gray-200">{statusExplanation}</div>
         ) : null}
 
-        {(primaryIssue.detailLines ?? []).slice(0, 4).length > 0 ? (
+        {(statusDetailLines ?? []).slice(0, 4).length > 0 ? (
           <div className="space-y-1.5 text-sm text-gray-700 dark:text-gray-200 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
-            {(primaryIssue.detailLines ?? []).slice(0, 4).map((reason, idx) => (
+            {(statusDetailLines ?? []).slice(0, 4).map((reason: string, idx: number) => (
               <div key={`${reason}-${idx}`}>{reason}</div>
             ))}
+          </div>
+        ) : null}
+
+        {statusNextStep ? (
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3 text-sm">
+            <span className="font-medium">Next Step:</span> {statusNextStep}
           </div>
         ) : null}
 
@@ -678,7 +717,10 @@ export default async function PortalJobDetailPage({
 
         {latestRaterNote ? (
           <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3">
-            <div className="text-xs text-gray-500 dark:text-gray-300">Rater / Inspector Note</div>
+            <div className="text-xs text-gray-500 dark:text-gray-300">Additional Note</div>
+            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              This note is separate from the issue summary above.
+            </div>
             <div className="mt-1 text-sm whitespace-pre-wrap">{latestRaterNote}</div>
           </div>
         ) : null}
@@ -689,33 +731,23 @@ export default async function PortalJobDetailPage({
         <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm space-y-3">
           <div className="text-base font-semibold">Latest Contractor Report</div>
 
-          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3 text-sm space-y-1">
-            <div><span className="font-medium">Type:</span> {String(latestSentReportMeta.report_kind ?? "").trim() === "pending_info" ? "More information needed" : "Needs correction"}</div>
-            <div><span className="font-medium">Customer:</span> {String(latestSentReportMeta.customer_name ?? "-")}</div>
-            <div><span className="font-medium">Location:</span> {String(latestSentReportMeta.location_text ?? "-")}</div>
-            <div><span className="font-medium">Contractor:</span> {String(latestSentReportMeta.contractor_name ?? "").trim() || "Not assigned"}</div>
-            <div><span className="font-medium">Service/Test Date:</span> {String(latestSentReportMeta.service_date_text ?? "-")}</div>
-
-            <div className="pt-1">
-              <div className="font-medium">Reasons</div>
-              <ul className="list-disc pl-5">
-                {(Array.isArray(latestSentReportMeta.reasons) ? latestSentReportMeta.reasons : []).map(
-                  (reason: any, idx: number) => (
-                    <li key={`${String(reason)}-${idx}`}>{String(reason)}</li>
-                  )
-                )}
-              </ul>
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3 text-sm space-y-2">
+            <div>
+              {latestSentReportAt
+                ? `The latest contractor report was shared on ${latestSentReportAt}.`
+                : "A contractor report was previously shared for this job."}
             </div>
-
-            {String(latestSentReportMeta.contractor_note ?? "").trim() ? (
-              <div className="pt-1">
-                <div className="font-medium">Contractor Note</div>
-                <div className="whitespace-pre-wrap">{String(latestSentReportMeta.contractor_note)}</div>
+            {latestSentFailureSummary ? (
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                Status summary above is sourced from the latest contractor report.
               </div>
             ) : null}
-
-            <div className="pt-1"><span className="font-medium">Next Step:</span> {String(latestSentReportMeta.next_step ?? "-")}</div>
-
+            {latestSentContractorNote ? (
+              <div>
+                <div className="font-medium">Included Note</div>
+                <div className="mt-1 whitespace-pre-wrap">{latestSentContractorNote}</div>
+              </div>
+            ) : null}
           </div>
         </section>
       ) : null}

@@ -107,6 +107,10 @@ function componentLabel(t: ComponentType) {
   }
 }
 
+function componentUsesHeatingCapacity(t: ComponentType) {
+  return t === "furnace_gas";
+}
+
 function readValidDraft(): NewJobDraft | null {
   if (typeof window === "undefined") return null;
   try {
@@ -212,7 +216,10 @@ const [billingRecipient, setBillingRecipient] = useState<
           model: c.model.trim() || null,
           serial: c.serial.trim() || null,
           refrigerant_type: c.refrigerant_type.trim() || null,
-          tonnage: c.tonnage.trim() || null,
+          tonnage: componentUsesHeatingCapacity(c.type) ? null : c.tonnage.trim() || null,
+          heating_capacity_kbtu: componentUsesHeatingCapacity(c.type)
+            ? c.tonnage.trim() || null
+            : null,
           notes: c.notes.trim() || null,
         })),
       }))
@@ -909,7 +916,11 @@ const [billingRecipient, setBillingRecipient] = useState<
                           />
                           <input
                             className="rounded-md border border-slate-300 p-2"
-                            placeholder="Tonnage (optional)"
+                            placeholder={
+                              componentUsesHeatingCapacity(c.type)
+                                ? "Heating Capacity (KBTU/h) (optional)"
+                                : "Tonnage (optional)"
+                            }
                             value={c.tonnage}
                             onChange={(e) => patchComponent(sys.id, c.id, { tonnage: e.target.value })}
                           />

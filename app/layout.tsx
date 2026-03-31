@@ -6,6 +6,7 @@ import "./globals.css";
 import LogoutButton from "@/components/auth/LogoutButton";
 import { getInternalUser } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
+import { firstNameFromDisplayName, resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,6 +36,18 @@ export default async function RootLayout({
   const { data: userData } = await supabase.auth.getUser();
   const user = userData?.user;
 
+  let profileFullName: string | null = null;
+
+  if (user?.id) {
+    const { data: profileRow } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    profileFullName = profileRow?.full_name ? String(profileRow.full_name).trim() : null;
+  }
+
   let homeHref = "/ops";
   let isContractor = false;
   let isInternalUser = false;
@@ -59,16 +72,18 @@ export default async function RootLayout({
   }
 
   const userMetadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
-  const preferredName = [
-    userMetadata.first_name,
-    userMetadata.given_name,
-    userMetadata.name,
-    userMetadata.full_name,
-  ]
-    .map((v) => String(v ?? "").trim())
-    .find(Boolean);
-  const accountFirstName = preferredName ? preferredName.split(/\s+/)[0] : "";
-  const accountLabel = accountFirstName || "Account";
+  const accountDisplayName = resolveHumanDisplayName({
+    profileFullName,
+    metadataName: userMetadata.name,
+    metadataFullName: userMetadata.full_name,
+    metadataFirstName: userMetadata.first_name,
+    metadataLastName: userMetadata.last_name,
+    metadataGivenName: userMetadata.given_name,
+    email: user?.email,
+    fallback: "Account",
+  });
+  const accountFirstName = firstNameFromDisplayName(accountDisplayName, "Account");
+  const accountLabel = accountFirstName;
 
   return (
     <html lang="en">
