@@ -5,7 +5,7 @@ import {
   requireInternalRole,
   type InternalRole,
 } from "@/lib/auth/internal-user";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import {
   activateInternalUserFromForm,
@@ -48,6 +48,20 @@ function roleBadgeTone(role: InternalRole) {
   if (role === "admin") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (role === "office") return "border-blue-200 bg-blue-50 text-blue-800";
   return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function lifecycleBadgeTone(lifecycle: "active" | "invited" | "inactive" | "unknown") {
+  if (lifecycle === "active") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (lifecycle === "invited") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (lifecycle === "unknown") return "border-slate-300 bg-slate-50 text-slate-700";
+  return "border-gray-300 bg-gray-50 text-gray-700";
+}
+
+function resolveInternalLifecycleState(isActive: boolean, emailConfirmed: boolean | null) {
+  if (!isActive) return "inactive" as const;
+  if (emailConfirmed === false) return "invited" as const;
+  if (emailConfirmed === true) return "active" as const;
+  return "unknown" as const;
 }
 
 type SearchParams = Promise<{ invite_status?: string }>;
@@ -119,6 +133,23 @@ export default async function AdminInternalUsersPage({
       .map((row: any) => String(row?.user_id ?? "").trim())
       .filter(Boolean),
   });
+
+  const admin = createAdminClient();
+  const emailConfirmedMap = new Map<string, boolean | null>();
+  await Promise.all(
+    (internalUsers ?? []).map(async (row: any) => {
+      const targetUserId = String(row?.user_id ?? "").trim();
+      if (!targetUserId) return;
+
+      const { data, error: authErr } = await admin.auth.admin.getUserById(targetUserId);
+      if (authErr || !data?.user) {
+        emailConfirmedMap.set(targetUserId, null);
+        return;
+      }
+
+      emailConfirmedMap.set(targetUserId, Boolean((data.user as any).email_confirmed_at));
+    }),
+  );
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 text-gray-900 sm:p-6">
@@ -224,6 +255,11 @@ export default async function AdminInternalUsersPage({
           {(internalUsers ?? []).map((row: any) => {
             const role = row.role as InternalRole;
             const isSelf = row.user_id === userId;
+            const targetUserId = String(row.user_id ?? "").trim();
+            const lifecycle = resolveInternalLifecycleState(
+              Boolean(row.is_active),
+              emailConfirmedMap.get(targetUserId) ?? null,
+            );
             const displayName = (() => {
               const resolved = String(userDisplayMap[String(row.user_id ?? "").trim()] ?? "").trim();
               return resolved && resolved !== "User" ? resolved : "Unknown User";
@@ -243,13 +279,11 @@ export default async function AdminInternalUsersPage({
                         {role}
                       </span>
                       <span
-                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
-                          row.is_active
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                            : "border-gray-300 bg-gray-50 text-gray-700"
-                        }`}
+                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${lifecycleBadgeTone(
+                          lifecycle,
+                        )}`}
                       >
-                        {row.is_active ? "active" : "inactive"}
+                        {lifecycle}
                       </span>
                       {isSelf ? (
                         <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">

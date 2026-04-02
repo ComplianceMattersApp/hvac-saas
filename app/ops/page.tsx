@@ -21,7 +21,6 @@ import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/search-normalization";
 import {
-  getInternalUnreadNotificationCount,
   listInternalNotifications,
 } from "@/lib/actions/notification-read-actions";
 
@@ -168,14 +167,11 @@ export default async function OpsPage({
 
   if (!user) redirect("/login");
 
-  let isAdmin = false;
-
   try {
-    const { internalUser } = await requireInternalUser({
+    await requireInternalUser({
       supabase,
       userId: user.id,
     });
-    isAdmin = internalUser.role === "admin";
   } catch (error) {
     if (isInternalAccessError(error)) {
       const { data: cu, error: cuErr } = await supabase
@@ -196,7 +192,6 @@ export default async function OpsPage({
     throw error;
   }
 
-  const unreadNotificationCount = await getInternalUnreadNotificationCount();
   const recentNotifications = await listInternalNotifications({
     limit: 3,
     onlyUnread: true,
@@ -254,11 +249,12 @@ function subtractBusinessDays(date: Date, days: number) {
 }
 
   // ✅ Counts per ops_status (exclude "closed", respect contractor filter)
-let countsQ = supabase
-  .from("jobs")
-  .select("id, ops_status, status")
-  .neq("ops_status", "closed")
-  .is("deleted_at", null);
+  let countsQ = supabase
+    .from("jobs")
+    .select("id, ops_status, status")
+    .neq("ops_status", "closed")
+    .neq("status", "cancelled")
+    .is("deleted_at", null);
 
 if (contractor) countsQ = countsQ.eq("contractor_id", contractor);
 
@@ -518,6 +514,7 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
 
           // Failed older than 14 calendar days
           `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
+          `and(ops_status.eq.pending_office_review,created_at.lte.${failedCutoffIso})`,
         ].join(",")
       )
       .order("created_at", { ascending: true })
@@ -537,6 +534,7 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
       .from("jobs")
       .select(baseSelect)
       .is("deleted_at", null)
+      .neq("status", "cancelled")
       .order("created_at", { ascending: false })
       .limit(100);
 
@@ -546,8 +544,11 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
           `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
           `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
           `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
+          `and(ops_status.eq.pending_office_review,created_at.lte.${failedCutoffIso})`,
         ].join(",")
       );
+    } else if (bucket === "failed") {
+      bucketQ = bucketQ.in("ops_status", ["failed", "pending_office_review"]);
     } else if (bucket === "closeout") {
       bucketQ = bucketQ
         .eq("field_complete", true)
@@ -764,6 +765,10 @@ function queueReason(j: any, activeBucket: string) {
     return pendingInfoReason ? `Pending info — ${pendingInfoReason}` : "Pending info — waiting for required information";
   }
 
+  if (status === "pending_office_review") {
+    return "Under review — contractor corrections submitted and pending internal review";
+  }
+
   if (activeBucket === "failed" || status === "failed") {
     return primaryFailureReasonByJob.get(jobId) ?? "Failed — awaiting correction or retest";
   }
@@ -823,6 +828,7 @@ function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJo
 
   if (opts?.scheduledRetest) return "No Immediate Action";
   if (status === "pending_info" || status === "on_hold") return "Provide Requested Information";
+  if (status === "pending_office_review") return "Review Contractor Submission";
   if (status === "failed" || status === "retest_needed") return "Await Contractor Correction";
   if (status === "need_to_schedule") return "Need to Schedule Visit";
   if (
@@ -1207,7 +1213,12 @@ function closeoutNeedsForException(j: any) {
     };
   }
 
-  const isEccFailed = !needs.isService && (ops === "failed" || ops === "pending_info" || ops === "retest_needed");
+  const isEccFailed =
+    !needs.isService &&
+    (ops === "failed" ||
+      ops === "pending_info" ||
+      ops === "retest_needed" ||
+      ops === "pending_office_review");
 
   return {
     needsInvoice: needs.needsInvoice,
@@ -1300,7 +1311,7 @@ const activeFailedCount = (countRows ?? []).filter((row: any) => {
   const status = String((row as any)?.ops_status ?? "").toLowerCase();
   const jobId = String((row as any)?.id ?? "");
   return (
-    status === "failed" &&
+    (status === "failed" || status === "pending_office_review") &&
     !resolvedFailedParentIds.has(jobId) &&
     !failedParentIdsWithRetestChild.has(jobId) &&
     !hasScheduledRetestForJob(jobId)
@@ -1337,16 +1348,6 @@ const workflowCards = [
     key: "on_hold",
     label: "On Hold",
     count: counts.get("on_hold") ?? 0,
-  },
-  {
-    key: "in_progress",
-    label: "In Progress",
-    count: counts.get("in_progress") ?? 0,
-  },
-  {
-    key: "passed",
-    label: "Passed",
-    count: counts.get("passed") ?? 0,
   },
   {
     key: "failed",
@@ -1506,9 +1507,12 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   const lifecycleStatus = String(j?.status ?? "").toLowerCase();
   const opsStatus = String(j?.ops_status ?? "").toLowerCase();
   const isFailed = opsStatus === "failed";
+  const isPendingOfficeReview = opsStatus === "pending_office_review";
   const isRetestChild = Boolean(String(j?.parent_job_id ?? "").trim());
   const statusMeta = isFailed
     ? { label: "FAILED", tone: "border-rose-200 bg-rose-50 text-rose-800" }
+    : isPendingOfficeReview
+    ? { label: "UNDER REVIEW", tone: "border-cyan-200 bg-cyan-50 text-cyan-800" }
     : retestState === "pending_scheduling"
     ? { label: "Retest Pending Scheduling", tone: "border-amber-200 bg-amber-50 text-amber-800" }
     : scheduledRetestLabel
@@ -1698,7 +1702,7 @@ return (
   <div className="mx-auto max-w-6xl space-y-6 p-4 text-gray-900 lg:space-y-7">
     <section className="rounded-xl border border-gray-200 bg-gradient-to-b from-white to-slate-50/70 p-4 shadow-sm sm:p-6">
       <div className="mb-4 border-b border-slate-200/80 pb-4">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Command Surface</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Command Center</div>
         <div className="mt-1 text-sm text-slate-600">Page-specific operations and queue controls for dispatch workflow.</div>
       </div>
 
@@ -1714,62 +1718,11 @@ return (
           </div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Ops Dashboard</h1>
-            <span className="inline-flex h-6 items-center rounded-full border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 shadow-sm">
-              {OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}
-            </span>
           </div>
           <p className="text-sm text-slate-600">
             {selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
           </p>
         </div>
-
-        {isAdmin ? (
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/80 p-2 shadow-sm">
-            <Link
-              href="/ops/notifications"
-              className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-            >
-              Notifications
-              {unreadNotificationCount > 0 ? (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-1.5 text-[11px] font-semibold text-blue-700">
-                  {unreadNotificationCount}
-                </span>
-              ) : null}
-            </Link>
-            <Link
-              href="/ops/field"
-              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-            >
-              My Work
-            </Link>
-            <Link
-              href="/ops/admin"
-              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-            >
-              Admin
-            </Link>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/80 p-2 shadow-sm">
-            <Link
-              href="/ops/notifications"
-              className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-            >
-              Notifications
-              {unreadNotificationCount > 0 ? (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-1.5 text-[11px] font-semibold text-blue-700">
-                  {unreadNotificationCount}
-                </span>
-              ) : null}
-            </Link>
-            <Link
-              href="/ops/field"
-              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-            >
-              My Work
-            </Link>
-          </div>
-        )}
       </div>
     </section>
 
@@ -1824,6 +1777,12 @@ return (
     </section>
 
     <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-end">
+        <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs">
+          <span className="font-semibold uppercase tracking-wide text-slate-500">Queue Focus</span>
+          <span className="font-medium text-slate-800">{OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}</span>
+        </div>
+      </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
         <div className="grid gap-1">

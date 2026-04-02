@@ -9,7 +9,6 @@ const QUEUES = [
   "pending_info",
   "on_hold",
   "retest_needed",
-  "ready",
 ] as const;
 
 
@@ -38,7 +37,6 @@ function queueLabel(q: Queue) {
     pending_info: "Pending Info",
     on_hold: "On Hold",
     retest_needed: "Retest Needed",
-    ready: "Ready",
   };
   return map[q];
 }
@@ -88,14 +86,21 @@ const { count: attentionTodayCount } = await supabase
   .from("jobs")
   .select("id", { count: "exact", head: true })
   .is("deleted_at", null)
+  .neq("status", "cancelled")
   .not("follow_up_date", "is", null)
   .lte("follow_up_date", today)
   .in("ops_status", ["need_to_schedule", "pending_info", "retest_needed"]);
 
+const { count: allCount } = await supabase
+  .from("jobs")
+  .select("id", { count: "exact", head: true })
+  .is("deleted_at", null);
+
   const { data: countsData } = await supabase
   .from("jobs")
   .select("ops_status", { count: "exact" })
-  .is("deleted_at", null);
+  .is("deleted_at", null)
+  .neq("status", "cancelled");
 
 const counts: Record<string, number> = {};
 
@@ -116,11 +121,14 @@ if (countsData) {
 
   if (queue === "attention_today") {
   query = query
+      .neq("status", "cancelled")
     .not("follow_up_date", "is", null)
     .lte("follow_up_date", today)
     .in("ops_status", ["need_to_schedule", "pending_info", "retest_needed"]);
 } else if (queue !== "all") {
-  query = query.eq("ops_status", queue);
+    query = query
+      .neq("status", "cancelled")
+      .eq("ops_status", queue);
 }
 
 
@@ -201,7 +209,7 @@ if (countsData) {
   q === "attention_today"
     ? (attentionTodayCount ?? 0)
     : q === "all"
-      ? Object.values(counts).reduce((a, b) => a + b, 0)
+      ? (allCount ?? 0)
       : counts[q] ?? 0;
 
     return (

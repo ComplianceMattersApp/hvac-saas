@@ -98,6 +98,27 @@ export default async function AdminContractorsPage({
     memberships = membershipRows ?? [];
   }
 
+  let pendingInvites: Array<{
+    id: string;
+    contractor_id: string;
+    email: string;
+    status: string;
+    created_at: string | null;
+  }> = [];
+
+  if (contractorIds.length > 0) {
+    const { data: inviteRows, error: inviteErr } = await supabase
+      .from("contractor_invites")
+      .select("id, contractor_id, email, status, created_at")
+      .eq("owner_user_id", internalUser.account_owner_user_id)
+      .in("contractor_id", contractorIds)
+      .in("status", ["pending", "invited"])
+      .order("created_at", { ascending: false });
+
+    if (inviteErr) throw inviteErr;
+    pendingInvites = inviteRows ?? [];
+  }
+
   const userIds = Array.from(new Set(memberships.map((row) => String(row.user_id).trim()).filter(Boolean)));
   const profileMap = new Map<string, { email: string; fullName: string }>();
 
@@ -131,7 +152,11 @@ export default async function AdminContractorsPage({
 
   const membershipByContractor = new Map<
     string,
-    Array<{ userId: string; email: string; fullName: string; status: "active" | "invited" }>
+    Array<{ userId: string; email: string; fullName: string; status: "active" | "invited" | "unknown" }>
+  >();
+  const pendingInvitesByContractor = new Map<
+    string,
+    Array<{ id: string; email: string; status: string; createdAt: string | null }>
   >();
 
   for (const membership of memberships) {
@@ -143,11 +168,30 @@ export default async function AdminContractorsPage({
     const email = String(profile?.email ?? "").trim().toLowerCase();
     const fullName = String(profile?.fullName ?? "").trim() || "Unknown User";
     const confirmed = emailConfirmedMap.get(userId);
-    const status: "active" | "invited" = confirmed === false ? "invited" : "active";
+    const status: "active" | "invited" | "unknown" =
+      confirmed === true ? "active" : confirmed === false ? "invited" : "unknown";
 
     const list = membershipByContractor.get(contractorId) ?? [];
     list.push({ userId, email, fullName, status });
     membershipByContractor.set(contractorId, list);
+  }
+
+  for (const invite of pendingInvites) {
+    const contractorId = String(invite.contractor_id ?? "").trim();
+    const inviteId = String(invite.id ?? "").trim();
+    const email = String(invite.email ?? "").trim().toLowerCase();
+    const status = String(invite.status ?? "").trim().toLowerCase() || "pending";
+
+    if (!contractorId || !inviteId || !email) continue;
+
+    const list = pendingInvitesByContractor.get(contractorId) ?? [];
+    list.push({
+      id: inviteId,
+      email,
+      status,
+      createdAt: invite.created_at ?? null,
+    });
+    pendingInvitesByContractor.set(contractorId, list);
   }
 
   return (
@@ -225,6 +269,7 @@ export default async function AdminContractorsPage({
             const createdDate = new Date(row.created_at).toLocaleDateString();
             const contractorId = String(row.id ?? "").trim();
             const members = membershipByContractor.get(contractorId) ?? [];
+            const invites = pendingInvitesByContractor.get(contractorId) ?? [];
 
             return (
               <div key={row.id} className="px-4 py-4 sm:px-5">
@@ -303,6 +348,42 @@ export default async function AdminContractorsPage({
 
                   <div className="rounded-lg border border-gray-200 bg-white">
                     <div className="border-b border-gray-200 px-3 py-2">
+                      <h3 className="text-sm font-semibold text-gray-900">Pending Invites</h3>
+                    </div>
+
+                    {invites.length === 0 ? (
+                      <div className="px-3 py-4 text-sm text-gray-600">
+                        No pending invites.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-200">
+                        {invites.map((invite) => {
+                          const sentDate = invite.createdAt
+                            ? new Date(invite.createdAt).toLocaleDateString()
+                            : null;
+
+                          return (
+                            <div key={`${contractorId}:invite:${invite.id}`} className="flex flex-col gap-1 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-sm font-medium text-gray-900">{invite.email}</span>
+                                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
+                                    {invite.status}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-600">
+                                  {sentDate ? `Sent ${sentDate}` : "Invite pending"}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border border-gray-200 bg-white">
+                    <div className="border-b border-gray-200 px-3 py-2">
                       <h3 className="text-sm font-semibold text-gray-900">Linked Users</h3>
                     </div>
 
@@ -321,7 +402,9 @@ export default async function AdminContractorsPage({
                                   className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
                                     member.status === "active"
                                       ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                                      : "border-amber-200 bg-amber-50 text-amber-900"
+                                      : member.status === "invited"
+                                        ? "border-amber-200 bg-amber-50 text-amber-900"
+                                        : "border-slate-300 bg-slate-50 text-slate-700"
                                   }`}
                                 >
                                   {member.status}

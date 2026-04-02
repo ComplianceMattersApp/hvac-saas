@@ -355,6 +355,7 @@ export default async function PortalPage({
 
     if (resolvedLabel === "Retest Scheduled") return { label: "Retest Scheduled", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
     if (resolvedLabel === "Retest Pending Scheduling") return { label: "Needs to be scheduled", tone: "border-amber-200 bg-amber-50 text-amber-800" };
+    if (resolvedLabel === "Under Review") return { label: "Under review", tone: "border-cyan-200 bg-cyan-50 text-cyan-800" };
     if (resolvedLabel === "Failed") return { label: "Needs correction", tone: "border-rose-200 bg-rose-50 text-rose-800" };
     if (ops === "paperwork_required") return { label: "Paperwork in Progress", tone: "border-violet-200 bg-violet-50 text-violet-800" };
     if (ops === "invoice_required") return { label: "Final Processing", tone: "border-indigo-200 bg-indigo-50 text-indigo-800" };
@@ -369,6 +370,7 @@ export default async function PortalPage({
     const lifecycle = String(row.job.status ?? "").trim().toLowerCase();
     const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
     if (row.resolved?.retestState === "scheduled" || row.resolved?.bucket === "passed") return "Open the job to review details.";
+    if (ops === "pending_office_review") return "Corrections were submitted and are currently under internal review.";
     if (row.resolved?.primaryIssue?.group === "needs_info") return "Open this job to provide the requested information.";
     if (ops === "failed" || ops === "retest_needed" || row.resolved?.primaryIssue?.group === "failed") return "Open this job to review the issue details and next step.";
     if (ops === "paperwork_required") return "Field work is complete. We're finishing the paperwork.";

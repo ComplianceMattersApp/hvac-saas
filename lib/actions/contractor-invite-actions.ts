@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { sendInviteEmail } from "@/lib/email/smtp";
 import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
+import { requireInternalRole } from "@/lib/auth/internal-user";
 
 // Mirrors the isAlreadyExistsAuthError helper used in internal-user-actions.ts
 function isAlreadyExistsError(err: any): boolean {
@@ -47,7 +48,12 @@ export async function inviteContractor(args: {
   if (userErr) throw new Error(userErr.message);
   if (!user) throw new Error("Not authenticated");
 
-  const ownerUserId = user.id;
+  const { internalUser } = await requireInternalRole(["admin", "office"], {
+    supabase,
+    userId: user.id,
+  });
+
+  const ownerUserId = internalUser.account_owner_user_id;
   const invitedBy = user.id;
 
   // 1) Resolve contractor (create if missing)

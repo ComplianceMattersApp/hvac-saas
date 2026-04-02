@@ -241,6 +241,14 @@ export function resolveContractorIssues(
       detailLines: pendingInfoReason ? [pendingInfoReason] : undefined,
       stage: "needs_info",
     };
+  } else if (opsStatus === "pending_office_review") {
+    primaryIssue = {
+      group: "in_progress",
+      headline: "Under review",
+      explanation: "Corrections submitted. Our team is reviewing your submission.",
+      detailLines: failureReasons.length > 0 ? failureReasons : undefined,
+      stage: "pending_office_review",
+    };
   } else if (opsStatus === "failed" || opsStatus === "retest_needed") {
     if (retestState === "scheduled") {
       primaryIssue = {
@@ -334,6 +342,9 @@ export function resolveContractorIssues(
       statusLabel = "Failed";
       nextStep = "Retest decision needed.";
     }
+  } else if (opsStatus === "pending_office_review") {
+    statusLabel = "Under Review";
+    nextStep = "Corrections submitted. Our team is reviewing your submission.";
   }
 
   const actionRequired = bucket === "action_required";

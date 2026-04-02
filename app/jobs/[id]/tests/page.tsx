@@ -1628,8 +1628,8 @@ const defaultHeatingOutputBtu =
                   <input type="hidden" name="project_type" value={job.project_type} />
 
                   <div className="rounded-md border border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] text-slate-500">
-                    Heat-only: enter Heating Output, or enter Heating Input + Efficiency to derive output. Enter
-                    measured leakage to calculate result.
+                    Cooling Method uses tonnage-based airflow. Heating Method uses Heating Output, or Heating Input +
+                    Efficiency. Enter measured leakage to calculate result.
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1706,9 +1706,8 @@ const defaultHeatingOutputBtu =
 
                 <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
                 <div className="text-sm text-muted-foreground rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                  <div>Method: {savedDuctMethodRaw === "heating" || savedDuctMethodRaw === "cooling" ? savedDuctMethodRaw : defaultDuctAirflowMethod}</div>
                   <div>
-                    Nominal Airflow: {runDL.computed?.base_airflow_cfm ?? runDL.data?.derived_nominal_airflow_cfm ?? "—"} CFM
+                    Method: {(savedDuctMethodRaw === "heating" || savedDuctMethodRaw === "cooling" ? savedDuctMethodRaw : defaultDuctAirflowMethod) === "heating" ? "Heating Method" : "Cooling Method"}
                   </div>
                   <div>
                     Max Allowed: {runDL.computed?.max_leakage_cfm ?? "—"} CFM

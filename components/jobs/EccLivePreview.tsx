@@ -124,7 +124,6 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
               </div>
             </div>
             <div>Method: {method === "heating" ? "Heat-only" : "Cooling"}</div>
-            <div>Nominal Airflow: {formatNum(baseAirflow, "CFM")}</div>
             <div>
               Max Allowed: {formatNum(maxLeakage, "CFM")}
               {percent != null && baseAirflow != null ? ` (${(percent * 100).toFixed(0)}% of nominal airflow)` : ""}

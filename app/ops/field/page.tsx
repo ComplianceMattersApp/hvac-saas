@@ -72,6 +72,11 @@ function sortBySchedule(a: any, b: any) {
   });
 }
 
+function isLifecycleComplete(job: any) {
+  const status = String(job?.status ?? "").toLowerCase();
+  return ["completed", "closed", "cancelled"].includes(status);
+}
+
 function renderJobCard(job: any) {
   const phone = String(job?.customer_phone ?? "").trim();
   const navigateHref = mapsHref({
@@ -197,12 +202,17 @@ export default async function OpsFieldPage() {
         ? assignedJobIds
         : ["00000000-0000-0000-0000-000000000000"],
     )
+    .neq("status", "cancelled")
     .is("deleted_at", null);
 
   if (jobsErr) throw jobsErr;
 
   const today = todayBusinessDateLA();
-  const activeJobs = (jobs ?? []).filter((job: any) => !job?.field_complete);
+  const activeJobs = (jobs ?? []).filter((job: any) => {
+    if (isLifecycleComplete(job)) return false;
+    if (Boolean(job?.field_complete)) return false;
+    return true;
+  });
 
   const inProgressJobs = activeJobs
     .filter((job: any) => {
@@ -217,6 +227,16 @@ export default async function OpsFieldPage() {
     .filter((job: any) => {
       const jobId = String(job?.id ?? "");
       return !inProgressIds.has(jobId) && String(job?.scheduled_date ?? "") === today;
+    })
+    .sort(sortBySchedule);
+
+  const overdueJobs = activeJobs
+    .filter((job: any) => {
+      const jobId = String(job?.id ?? "");
+      if (inProgressIds.has(jobId)) return false;
+
+      const scheduledDate = String(job?.scheduled_date ?? "").trim();
+      return !!scheduledDate && scheduledDate < today;
     })
     .sort(sortBySchedule);
 
@@ -240,6 +260,11 @@ export default async function OpsFieldPage() {
       title: "In Progress",
       subtitle: "Assigned jobs already underway.",
       jobs: inProgressJobs,
+    },
+    {
+      title: "Overdue",
+      subtitle: "Assigned visits scheduled before today and not yet in progress.",
+      jobs: overdueJobs,
     },
     {
       title: "Upcoming",

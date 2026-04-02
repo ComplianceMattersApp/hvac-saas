@@ -32,7 +32,12 @@ export function resolveOpsStatus(job: ResolveOpsStatusInput): string {
   // Preserve unresolved ECC failure states.
   // Failed originals and retest-needed jobs should not be auto-resolved
   // by generic closeout actions.
-  if (jobType === "ecc" && (currentOps === "failed" || currentOps === "retest_needed")) {
+  if (
+    jobType === "ecc" &&
+    (currentOps === "failed" ||
+      currentOps === "retest_needed" ||
+      currentOps === "pending_office_review")
+  ) {
     return currentOps;
   }
 

@@ -24,6 +24,12 @@ import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
 export type { JobStatus } from "@/lib/types/job";
 
+type OnTheWayUndoEligibility = {
+  eligible: boolean;
+  reason: string | null;
+  onMyWayEventId: string | null;
+};
+
 type CreateJobInput = {
   ops_status?: string | null;
   parent_job_id?: string | null;
@@ -203,6 +209,127 @@ async function insertJobEvent(params: {
   });
 
   if (error) throw error;
+}
+
+async function getOnTheWayUndoEligibilityInternal(params: {
+  supabase: any;
+  jobId: string;
+}): Promise<OnTheWayUndoEligibility> {
+  const jobId = String(params.jobId ?? "").trim();
+
+  if (!jobId) {
+    return {
+      eligible: false,
+      reason: "missing_job_id",
+      onMyWayEventId: null,
+    };
+  }
+
+  const { supabase } = params;
+
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select("status, on_the_way_at")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+
+  if (!job) {
+    return {
+      eligible: false,
+      reason: "job_not_found",
+      onMyWayEventId: null,
+    };
+  }
+
+  if (String(job.status ?? "").trim().toLowerCase() !== "on_the_way") {
+    return {
+      eligible: false,
+      reason: "status_not_on_the_way",
+      onMyWayEventId: null,
+    };
+  }
+
+  if (!job.on_the_way_at) {
+    return {
+      eligible: false,
+      reason: "missing_on_the_way_at",
+      onMyWayEventId: null,
+    };
+  }
+
+  const { data: latestEvent, error: latestEventErr } = await supabase
+    .from("job_events")
+    .select("id, event_type, meta")
+    .eq("job_id", jobId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestEventErr) throw latestEventErr;
+
+  if (!latestEvent?.id) {
+    return {
+      eligible: false,
+      reason: "missing_on_my_way_event",
+      onMyWayEventId: null,
+    };
+  }
+
+  if (String(latestEvent.event_type ?? "").trim() !== "on_my_way") {
+    return {
+      eligible: false,
+      reason: "later_event_exists",
+      onMyWayEventId: null,
+    };
+  }
+
+  const meta =
+    latestEvent.meta && typeof latestEvent.meta === "object" && !Array.isArray(latestEvent.meta)
+      ? latestEvent.meta
+      : null;
+
+  const movementTo = String(meta?.movement_context?.to_status ?? meta?.to ?? "")
+    .trim()
+    .toLowerCase();
+  const sourceAction = String(meta?.source_action ?? "").trim().toLowerCase();
+  const autoScheduleApplied = meta?.auto_schedule_applied === true;
+
+  if (movementTo && movementTo !== "on_the_way") {
+    return {
+      eligible: false,
+      reason: "latest_event_not_on_the_way_transition",
+      onMyWayEventId: null,
+    };
+  }
+
+  if (sourceAction && sourceAction !== "advance_job_status_from_form") {
+    return {
+      eligible: false,
+      reason: "unsupported_source_action",
+      onMyWayEventId: null,
+    };
+  }
+
+  if (autoScheduleApplied) {
+    return {
+      eligible: false,
+      reason: "auto_schedule_applied",
+      onMyWayEventId: null,
+    };
+  }
+
+  return {
+    eligible: true,
+    reason: null,
+    onMyWayEventId: String(latestEvent.id),
+  };
+}
+
+export async function getOnTheWayUndoEligibility(jobId: string): Promise<OnTheWayUndoEligibility> {
+  const supabase = await createClient();
+  return getOnTheWayUndoEligibilityInternal({ supabase, jobId });
 }
 
 function toTitleCase(value: string) {
@@ -4762,6 +4889,8 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
   if (!id) throw new Error("Job ID is required");
 
+  console.log("[ADVANCE_STATUS_ENTRY]", { jobId: id, ts: new Date().toISOString() });
+
   const supabase = await createClient();
 
   // ✅ Read true current status from DB (source of truth)
@@ -4774,6 +4903,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   if (jobErr) throw jobErr;
 
   const current = (job?.status || "open") as JobStatus;
+  console.log("[ADVANCE_STATUS_DB_READ]", { jobId: id, current, on_the_way_at: job?.on_the_way_at ?? null });
 
   const nextMap: Record<JobStatus, JobStatus> = {
     open: "on_the_way",
@@ -4785,6 +4915,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   };
 
   const next = nextMap[current];
+  console.log("[ADVANCE_STATUS_COMPUTED]", { jobId: id, current, next });
 
   // ECC guard:
   // do not allow status flow to move into completed unless at least one
@@ -4815,6 +4946,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       });
 
       if (!hasMeaningfulCompletedRun) {
+        console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "ecc_test_required", current, next });
         redirect(`/jobs/${id}?notice=ecc_test_required`);
       }
     }
@@ -4822,6 +4954,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     // ✅ stamp only first time entering on_the_way
   if (next === "on_the_way" && !job?.on_the_way_at) {
+    console.log("[ADVANCE_STATUS_BRANCH]", { jobId: id, branch: "on_the_way_stamp", current, next });
     const autoScheduleConfirmed =
       String(formData.get("auto_schedule_confirmed") || "").trim() === "1";
 
@@ -4856,6 +4989,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     const plusTwoHours = new Date(now.getTime() + 2 * 60 * 60 * 1000);
 
     if (!hasFullSchedule && !autoScheduleConfirmed) {
+      console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "schedule_required", current, next, hasFullSchedule });
       redirect(`/jobs/${id}?tab=${String(formData.get("tab") || "info")}&schedule_required=1`);
     }
 
@@ -4872,12 +5006,8 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       actorUserId: actingUserId,
     });
 
-    // Patch: Also set ops_status to 'on_the_way' for immediate UI update
-    // This is safe because: 'on_the_way' is a transient, field-driven state, not set by other workflows, and is not ECC-specific.
-    // Only applies to this transition; does not affect ECC completion or other status flows.
     const updatePayload: Record<string, any> = {
       status: "on_the_way",
-      ops_status: "on_the_way",
       on_the_way_at: now.toISOString(),
     };
 
@@ -4898,9 +5028,12 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     if (updErr) throw updErr;
 
+    console.log("[ADVANCE_STATUS_UPDATED]", { jobId: id, branch: "on_the_way_stamp", applied: !!onTheWayApplied?.id, returnedId: onTheWayApplied?.id ?? null });
+
     // Concurrency hardening: if another request already advanced this job,
     // do not emit duplicate transition events on this stale request.
     if (!onTheWayApplied?.id) {
+      console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_already_updated", branch: "on_the_way_stamp", current, next });
       revalidatePath(`/jobs/${id}`);
       revalidatePath(`/jobs`);
       revalidatePath(`/ops`);
@@ -4909,46 +5042,64 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       redirect(`/jobs/${id}?banner=status_already_updated`);
     }
 
-    // Keep on_my_way close to user intent in event order.
-    // assignment_added (if any) -> on_my_way -> schedule_updated (if any)
-    await insertJobEvent({
-      supabase,
-      jobId: id,
-      event_type: "on_my_way",
-      meta: {
-        ...buildMovementEventMeta({
-          from: current,
-          to: next,
-          trigger: "field_action",
-          sourceAction: "advance_job_status_from_form",
-        }),
-        actor_user_id: actingUserId,
-        assignment_id: actingAssignment.id,
-      },
-      userId: actingUserId,
-    });
+    // Diagnostic re-read: confirm DB write persisted before event inserts.
+    const { data: rereadOtw } = await supabase.from("jobs").select("status").eq("id", id).single();
+    console.log("[ADVANCE_STATUS_REREAD]", { jobId: id, branch: "on_the_way_stamp", status_after_update: rereadOtw?.status ?? null });
 
-    if (!hasFullSchedule && autoScheduleConfirmed) {
+    try {
+      // Keep on_my_way close to user intent in event order.
+      // assignment_added (if any) -> on_my_way -> schedule_updated (if any)
       await insertJobEvent({
         supabase,
         jobId: id,
-        event_type: "schedule_updated",
+        event_type: "on_my_way",
         meta: {
-          before: {
-            scheduled_date: scheduleSnapshot?.scheduled_date ?? null,
-            window_start: scheduleSnapshot?.window_start ?? null,
-            window_end: scheduleSnapshot?.window_end ?? null,
-          },
-          after: {
-            scheduled_date: updatePayload.scheduled_date,
-            window_start: updatePayload.window_start,
-            window_end: updatePayload.window_end,
-          },
-          source: "auto_schedule_on_the_way",
+          ...buildMovementEventMeta({
+            from: current,
+            to: next,
+            trigger: "field_action",
+            sourceAction: "advance_job_status_from_form",
+          }),
+          auto_schedule_applied: !hasFullSchedule && autoScheduleConfirmed,
+          actor_user_id: actingUserId,
+          assignment_id: actingAssignment.id,
         },
+        userId: actingUserId,
+      });
+
+      if (!hasFullSchedule && autoScheduleConfirmed) {
+        await insertJobEvent({
+          supabase,
+          jobId: id,
+          event_type: "schedule_updated",
+          meta: {
+            before: {
+              scheduled_date: scheduleSnapshot?.scheduled_date ?? null,
+              window_start: scheduleSnapshot?.window_start ?? null,
+              window_end: scheduleSnapshot?.window_end ?? null,
+            },
+            after: {
+              scheduled_date: updatePayload.scheduled_date,
+              window_start: updatePayload.window_start,
+              window_end: updatePayload.window_end,
+            },
+            source: "auto_schedule_on_the_way",
+          },
+        });
+      }
+    } catch (ancillaryError) {
+      console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
+        jobId: id,
+        fromStatus: current,
+        toStatus: next,
+        stage: "on_the_way_post_update",
+        error: ancillaryError instanceof Error ? ancillaryError.message : String(ancillaryError),
+        stack: ancillaryError instanceof Error ? ancillaryError.stack : undefined,
       });
     }
+    console.log("[ADVANCE_STATUS_OTW_BRANCH_END]", { jobId: id, note: "on_the_way branch completed — no redirect issued from this code path" });
   } else {
+    console.log("[ADVANCE_STATUS_BRANCH]", { jobId: id, branch: "else", current, next });
     const updatePayload: Record<string, any> = { status: next };
 
     // ✅ When field marks completed, push into Data Entry queue
@@ -4982,9 +5133,12 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     if (updErr) throw updErr;
 
+    console.log("[ADVANCE_STATUS_UPDATED]", { jobId: id, branch: "else", applied: !!transitionApplied?.id, returnedId: transitionApplied?.id ?? null });
+
     // Concurrency/no-op hardening: stale retries should not emit duplicate
     // lifecycle events when a parallel request already moved status forward.
     if (!transitionApplied?.id) {
+      console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_already_updated", branch: "else", current, next });
       revalidatePath(`/jobs/${id}`);
       revalidatePath(`/jobs`);
       revalidatePath(`/ops`);
@@ -4993,180 +5147,302 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       redirect(`/jobs/${id}?banner=status_already_updated`);
     }
 
-    
+    // Diagnostic re-read: confirm DB write persisted before post-update work.
+    const { data: rereadElse } = await supabase.from("jobs").select("status").eq("id", id).single();
+    console.log("[ADVANCE_STATUS_REREAD]", { jobId: id, branch: "else", status_after_update: rereadElse?.status ?? null });
 
-  // ECC canonical resolution:
-  // once the field lifecycle is marked complete, derive ops_status from ecc_test_runs
-  if (next === "completed") {
-    const { data: jt2, error: jt2Err } = await supabase
-      .from("jobs")
-      .select("job_type")
-      .eq("id", id)
-      .single();
+    // ECC canonical resolution:
+    // once the field lifecycle is marked complete, derive ops_status from ecc_test_runs
+    if (next === "completed") {
+      const { data: jt2, error: jt2Err } = await supabase
+        .from("jobs")
+        .select("job_type")
+        .eq("id", id)
+        .single();
 
-    if (jt2Err) throw jt2Err;
+      if (jt2Err) throw jt2Err;
 
-    if ((jt2?.job_type ?? "").toLowerCase() === "ecc") {
-      await evaluateEccOpsStatus(id);
+      if ((jt2?.job_type ?? "").toLowerCase() === "ecc") {
+        await evaluateEccOpsStatus(id);
+      }
     }
-  }
+
     const lifecycleEventMap: Partial<Record<JobStatus, string>> = {
-    on_the_way: "on_my_way",
-    completed: "job_completed",
-  };
-
-  if (next === "in_process") {
-    // PH2-E: person-level arrival event, additive to legacy visit-level start.
-    // Order is intentional for downstream consumers: tech_arrived -> job_started.
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser();
-
-    if (userErr) throw userErr;
-
-    const actingUserId = user?.id ?? null;
-
-    let assignmentId: string | null = null;
-    if (actingUserId) {
-      const { data: activeAssignment, error: assignmentErr } = await supabase
-        .from("job_assignments")
-        .select("id")
-        .eq("job_id", id)
-        .eq("user_id", actingUserId)
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (assignmentErr) throw assignmentErr;
-      assignmentId = String(activeAssignment?.id ?? "").trim() || null;
-    }
-
-    const movementMeta = buildMovementEventMeta({
-      from: current,
-      to: next,
-      trigger: "field_action",
-      sourceAction: "advance_job_status_from_form",
-    });
-
-    const transitionMeta = {
-      ...movementMeta,
-      actor_user_id: actingUserId,
-      ...(assignmentId ? { assignment_id: assignmentId } : {}),
+      on_the_way: "on_my_way",
+      completed: "job_completed",
     };
 
-    await insertJobEvent({
-      supabase,
-      jobId: id,
-      event_type: "tech_arrived",
-      meta: transitionMeta,
-      userId: actingUserId,
-    });
+    if (next === "in_process") {
+      // PH2-E: person-level arrival event, additive to legacy visit-level start.
+      // Order is intentional for downstream consumers: tech_arrived -> job_started.
+      const {
+        data: { user },
+        error: userErr,
+      } = await supabase.auth.getUser();
 
-    await insertJobEvent({
-      supabase,
-      jobId: id,
-      event_type: "job_started",
-      meta: transitionMeta,
-      userId: actingUserId,
-    });
-  } else {
-    const lifecycleEventType = lifecycleEventMap[next];
+      if (userErr) throw userErr;
 
-    if (lifecycleEventType) {
-      if (lifecycleEventType === "job_completed") {
-        const {
-          data: { user },
-          error: userErr,
-        } = await supabase.auth.getUser();
+      const actingUserId = user?.id ?? null;
 
-        if (userErr) throw userErr;
+      let assignmentId: string | null = null;
+      if (actingUserId) {
+        const { data: activeAssignment, error: assignmentErr } = await supabase
+          .from("job_assignments")
+          .select("id")
+          .eq("job_id", id)
+          .eq("user_id", actingUserId)
+          .eq("is_active", true)
+          .maybeSingle();
 
-        const actingUserId = user?.id ?? null;
+        if (assignmentErr) throw assignmentErr;
+        assignmentId = String(activeAssignment?.id ?? "").trim() || null;
+      }
 
-        let assignmentId: string | null = null;
-        if (actingUserId) {
-          const { data: activeAssignment, error: assignmentErr } = await supabase
-            .from("job_assignments")
-            .select("id")
-            .eq("job_id", id)
-            .eq("user_id", actingUserId)
-            .eq("is_active", true)
-            .maybeSingle();
+      const movementMeta = buildMovementEventMeta({
+        from: current,
+        to: next,
+        trigger: "field_action",
+        sourceAction: "advance_job_status_from_form",
+      });
 
-          if (assignmentErr) throw assignmentErr;
-          assignmentId = String(activeAssignment?.id ?? "").trim() || null;
-        }
+      const transitionMeta = {
+        ...movementMeta,
+        actor_user_id: actingUserId,
+        ...(assignmentId ? { assignment_id: assignmentId } : {}),
+      };
 
+      try {
         await insertJobEvent({
           supabase,
           jobId: id,
-          event_type: lifecycleEventType,
-          meta: {
-            ...buildMovementEventMeta({
-              from: current,
-              to: next,
-              trigger: "field_action",
-              sourceAction: "advance_job_status_from_form",
-            }),
-            actor_user_id: actingUserId,
-            ...(assignmentId ? { assignment_id: assignmentId } : {}),
-          },
+          event_type: "tech_arrived",
+          meta: transitionMeta,
           userId: actingUserId,
         });
-      } else {
+
         await insertJobEvent({
           supabase,
           jobId: id,
-          event_type: lifecycleEventType,
-          meta: buildMovementEventMeta({
-            from: current,
-            to: next,
-            trigger: "field_action",
-            sourceAction: "advance_job_status_from_form",
-          }),
+          event_type: "job_started",
+          meta: transitionMeta,
+          userId: actingUserId,
+        });
+      } catch (ancillaryError) {
+        console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
+          jobId: id,
+          fromStatus: current,
+          toStatus: next,
+          stage: "in_process_event_insert",
+          error: ancillaryError instanceof Error ? ancillaryError.message : String(ancillaryError),
+          stack: ancillaryError instanceof Error ? ancillaryError.stack : undefined,
+        });
+      }
+    } else {
+      const lifecycleEventType = lifecycleEventMap[next];
+
+      if (lifecycleEventType) {
+        if (lifecycleEventType === "job_completed") {
+          const {
+            data: { user },
+            error: userErr,
+          } = await supabase.auth.getUser();
+
+          if (userErr) throw userErr;
+
+          const actingUserId = user?.id ?? null;
+
+          let assignmentId: string | null = null;
+          if (actingUserId) {
+            const { data: activeAssignment, error: assignmentErr } = await supabase
+              .from("job_assignments")
+              .select("id")
+              .eq("job_id", id)
+              .eq("user_id", actingUserId)
+              .eq("is_active", true)
+              .maybeSingle();
+
+            if (assignmentErr) throw assignmentErr;
+            assignmentId = String(activeAssignment?.id ?? "").trim() || null;
+          }
+
+          try {
+            await insertJobEvent({
+              supabase,
+              jobId: id,
+              event_type: lifecycleEventType,
+              meta: {
+                ...buildMovementEventMeta({
+                  from: current,
+                  to: next,
+                  trigger: "field_action",
+                  sourceAction: "advance_job_status_from_form",
+                }),
+                actor_user_id: actingUserId,
+                ...(assignmentId ? { assignment_id: assignmentId } : {}),
+              },
+              userId: actingUserId,
+            });
+          } catch (ancillaryError) {
+            console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
+              jobId: id,
+              fromStatus: current,
+              toStatus: next,
+              stage: "job_completed_event_insert",
+              error: ancillaryError instanceof Error ? ancillaryError.message : String(ancillaryError),
+              stack: ancillaryError instanceof Error ? ancillaryError.stack : undefined,
+            });
+          }
+        } else {
+          try {
+            await insertJobEvent({
+              supabase,
+              jobId: id,
+              event_type: lifecycleEventType,
+              meta: buildMovementEventMeta({
+                from: current,
+                to: next,
+                trigger: "field_action",
+                sourceAction: "advance_job_status_from_form",
+              }),
+            });
+          } catch (ancillaryError) {
+            console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
+              jobId: id,
+              fromStatus: current,
+              toStatus: next,
+              stage: "lifecycle_event_insert",
+              error: ancillaryError instanceof Error ? ancillaryError.message : String(ancillaryError),
+              stack: ancillaryError instanceof Error ? ancillaryError.stack : undefined,
+            });
+          }
+        }
+      }
+    }
+
+    // Retest-specific lifecycle breadcrumb:
+    // if this job is a linked retest child and it enters in_process,
+    // log retest_started on BOTH the child and the parent.
+    const { data: linkedJob, error: linkedErr } = await supabase
+      .from("jobs")
+      .select("parent_job_id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (linkedErr) throw linkedErr;
+
+    const parentJobId = String(linkedJob?.parent_job_id ?? "").trim();
+
+    if (parentJobId && next === "in_process") {
+      try {
+        await insertJobEvent({
+          supabase,
+          jobId: id,
+          event_type: "retest_started",
+          meta: { parent_job_id: parentJobId },
+        });
+
+        await insertJobEvent({
+          supabase,
+          jobId: parentJobId,
+          event_type: "retest_started",
+          meta: { child_job_id: id },
+        });
+      } catch (ancillaryError) {
+        console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
+          jobId: id,
+          fromStatus: current,
+          toStatus: next,
+          stage: "retest_started_event_insert",
+          error: ancillaryError instanceof Error ? ancillaryError.message : String(ancillaryError),
+          stack: ancillaryError instanceof Error ? ancillaryError.stack : undefined,
         });
       }
     }
   }
 
-    // Retest-specific lifecycle breadcrumb:
-  // if this job is a linked retest child and it enters in_process,
-  // log retest_started on BOTH the child and the parent.
-  const { data: linkedJob, error: linkedErr } = await supabase
-    .from("jobs")
-    .select("parent_job_id")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (linkedErr) throw linkedErr;
-
-  const parentJobId = String(linkedJob?.parent_job_id ?? "").trim();
-
-  if (parentJobId && next === "in_process") {
-    await insertJobEvent({
-      supabase,
-      jobId: id,
-      event_type: "retest_started",
-      meta: { parent_job_id: parentJobId },
-    });
-
-    await insertJobEvent({
-      supabase,
-      jobId: parentJobId,
-      event_type: "retest_started",
-      meta: { child_job_id: id },
-    });
-  }
-
+  console.log("[ADVANCE_STATUS_PREREVALIDATE]", { jobId: id, current, next });
   revalidatePath(`/jobs/${id}`);
   revalidatePath(`/jobs`);
   revalidatePath(`/ops`);
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${id}`);
 
-  redirect(`/jobs/${id}?banner=status_updated`);
+  console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_updated", current, next });
+  redirect(`/jobs/${id}?banner=status_updated&refresh=${Date.now()}`);
 }
 
+export async function revertOnTheWayFromForm(formData: FormData) {
+  const id =
+    String(formData.get("id") || "").trim() ||
+    String(formData.get("job_id") || "").trim();
+  const tab = String(formData.get("tab") || "info").trim() || "info";
+
+  if (!id) throw new Error("Job ID is required");
+
+  const supabase = await createClient();
+  const { userId: actingUserId } = await requireInternalUser({ supabase });
+
+  const redirectToJob = (banner: string) => {
+    const params = new URLSearchParams();
+    params.set("tab", tab);
+    params.set("banner", banner);
+    redirect(`/jobs/${id}?${params.toString()}`);
+  };
+
+  const eligibility = await getOnTheWayUndoEligibilityInternal({
+    supabase,
+    jobId: id,
+  });
+
+  if (!eligibility.eligible || !eligibility.onMyWayEventId) {
+    revalidatePath(`/jobs/${id}`);
+    redirectToJob("on_the_way_revert_unavailable");
+  }
+
+  const { data: revertedJob, error: revertErr } = await supabase
+    .from("jobs")
+    .update({
+      status: "open",
+      on_the_way_at: null,
+    })
+    .eq("id", id)
+    .eq("status", "on_the_way")
+    .not("on_the_way_at", "is", null)
+    .select("id")
+    .maybeSingle();
+
+  if (revertErr) throw revertErr;
+
+  if (!revertedJob?.id) {
+    revalidatePath(`/jobs/${id}`);
+    redirectToJob("on_the_way_revert_unavailable");
+  }
+
+  await insertJobEvent({
+    supabase,
+    jobId: id,
+    event_type: "on_the_way_reverted",
+    meta: {
+      ...buildMovementEventMeta({
+        from: "on_the_way",
+        to: "open",
+        trigger: "undo_action",
+        sourceAction: "revert_on_the_way_from_form",
+      }),
+      actor_user_id: actingUserId,
+      reverted_event_id: eligibility.onMyWayEventId,
+    },
+    userId: actingUserId,
+  });
+
+  revalidatePath(`/jobs/${id}`);
+  revalidatePath(`/jobs`);
+  revalidatePath(`/ops`);
+  revalidatePath(`/calendar`);
+  revalidatePath(`/portal`);
+  revalidatePath(`/portal/jobs/${id}`);
+
+  redirectToJob("on_the_way_reverted");
 }
 
 
@@ -5206,19 +5482,30 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     redirect(`/jobs/${id}?banner=${banner}`);
   }
 
-  // Canonical scheduling + ops_status logic (NO Date parsing)
-  const derived = deriveScheduleAndOps(formData);
+  // Check for explicit unschedule BEFORE validation to avoid crash on invalid form values
   const unscheduleRequested = String(formData.get("unschedule") || "").trim() === "1";
 
-  let scheduled_date = derived.scheduled_date;
-  let window_start = derived.window_start;
-  let window_end = derived.window_end;
-  const ops_status = derived.ops_status;
+  // Canonical scheduling + ops_status logic (NO Date parsing)
+  // SAFETY: Skip validation if unschedule is explicit; nulling is safe regardless of form values
+  let derived;
+  let scheduled_date: string | null;
+  let window_start: string | null;
+  let window_end: string | null;
+  let ops_status: string;
 
   if (unscheduleRequested) {
+    // Unschedule path: bypass validation, set all to null directly
     scheduled_date = null;
     window_start = null;
     window_end = null;
+    ops_status = "need_to_schedule";
+  } else {
+    // Schedule path: validate form values
+    derived = deriveScheduleAndOps(formData);
+    scheduled_date = derived.scheduled_date;
+    window_start = derived.window_start;
+    window_end = derived.window_end;
+    ops_status = derived.ops_status;
   }
 
   let next_ops_status = ops_status;
@@ -5568,12 +5855,13 @@ export async function completeDataEntryFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required");
 
   const invoice = String(formData.get("invoice_number") || "").trim() || null;
+  const completedAt = new Date().toISOString();
 
   const supabase = await createClient();
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
-    .select("id, job_type, ops_status")
+    .select("id, job_type, ops_status, invoice_number, invoice_complete, data_entry_completed_at")
     .eq("id", id)
     .single();
 
@@ -5591,11 +5879,26 @@ if (jobType !== "ecc") {
     .update({
       invoice_number: invoice,
       invoice_complete: true,
-      data_entry_completed_at: new Date().toISOString(),
+      data_entry_completed_at: completedAt,
     })
     .eq("id", id);
 
   if (error) throw error;
+
+  await insertJobEvent({
+    supabase,
+    jobId: id,
+    event_type: "ops_update",
+    meta: {
+      source: "job_detail_data_entry",
+      changes: [
+        { field: "invoice_number", from: job?.invoice_number ?? null, to: invoice },
+        { field: "invoice_complete", from: !!job?.invoice_complete, to: true },
+        { field: "data_entry_completed_at", from: job?.data_entry_completed_at ?? null, to: completedAt },
+      ],
+    },
+    userId: null,
+  });
 
   await evaluateJobOpsStatus(id);
   await healStalePaperworkOpsStatus(id);
@@ -5609,11 +5912,25 @@ if (jobType !== "ecc") {
     .from("jobs")
     .update({
       invoice_number: invoice,
-      data_entry_completed_at: new Date().toISOString(),
+      data_entry_completed_at: completedAt,
     })
     .eq("id", id);
 
   if (error) throw error;
+
+  await insertJobEvent({
+    supabase,
+    jobId: id,
+    event_type: "ops_update",
+    meta: {
+      source: "job_detail_data_entry",
+      changes: [
+        { field: "invoice_number", from: job?.invoice_number ?? null, to: invoice },
+        { field: "data_entry_completed_at", from: job?.data_entry_completed_at ?? null, to: completedAt },
+      ],
+    },
+    userId: null,
+  });
 
   await evaluateJobOpsStatus(id);
   await healStalePaperworkOpsStatus(id);
@@ -5898,7 +6215,10 @@ export async function cancelJobFromForm(formData: FormData) {
   revalidatePath(`/jobs/${id}`);
   revalidatePath(`/jobs`);
   revalidatePath(`/ops`);
+  revalidatePath(`/ops/field`);
+  revalidatePath(`/calendar`);
   revalidatePath(`/portal`);
+  revalidatePath(`/portal/jobs/${id}`);
 
   redirect(`/jobs/${id}?banner=job_cancelled`);
 }

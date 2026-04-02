@@ -104,7 +104,7 @@ export async function resendInternalInviteFromForm(formData: FormData): Promise<
     body: "Use the link below to finish account setup and set your password.",
   });
 
-  redirect(withNotice(returnTo, "invite_resent"));
+  redirect(withNotice(returnTo, "recovery_sent"));
 }
 
 export async function sendPasswordResetFromForm(formData: FormData): Promise<void> {

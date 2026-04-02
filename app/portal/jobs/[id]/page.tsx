@@ -281,7 +281,7 @@ export default async function PortalJobDetailPage({
 
     if (type === "status_changed") {
       const to = String(meta?.to ?? "").toLowerCase();
-      return ["failed", "retest_needed", "paperwork_required", "closed"].includes(to);
+      return ["failed", "pending_office_review", "retest_needed", "paperwork_required", "closed"].includes(to);
     }
 
     return true;
@@ -385,7 +385,8 @@ export default async function PortalJobDetailPage({
     (testRuns ?? []).find((r: any) => r.is_completed && finalRunPass(r) === false) ?? null;
 
   const opsStatus = String((job as any)?.ops_status ?? "").toLowerCase();
-  const isPortalFailed = ["failed", "retest_needed"].includes(opsStatus);
+  const isPortalFailed = ["failed", "pending_office_review", "retest_needed"].includes(opsStatus);
+  const canRequestRetestReady = opsStatus === "failed";
 
   const statusRun = isPortalFailed ? (latestFailedRun ?? latestCompletedRun) : latestCompletedRun;
   const topReasons = statusRun ? extractFailureReasons(statusRun) : [];
@@ -495,7 +496,9 @@ export default async function PortalJobDetailPage({
     const nextJobId = String(formData.get("job_id") || "").trim();
     const note = String(formData.get("note") || "").trim();
 
-    if (!nextJobId) throw new Error("Missing job_id");
+    if (!nextJobId) {
+      redirect("/portal/jobs?banner=invalid_request");
+    }
     if (!note) {
       redirect(`/portal/jobs/${nextJobId}?note_error=empty_note`);
     }
@@ -503,8 +506,39 @@ export default async function PortalJobDetailPage({
     const nextSupabase = await createClient();
 
     const { data: nextUserData, error: userErr } = await nextSupabase.auth.getUser();
-    if (userErr) throw userErr;
+    if (userErr) {
+      redirect(`/portal/jobs/${nextJobId}?note_error=save_failed`);
+    }
     if (!nextUserData?.user) redirect("/login");
+
+    // Ownership check: verify the submitted job belongs to the authenticated user's contractor.
+    // Page-level fetch only protects the render path; this action is callable directly.
+    const { data: nextCu, error: cuCheckErr } = await nextSupabase
+      .from("contractor_users")
+      .select("contractor_id")
+      .eq("user_id", nextUserData.user.id)
+      .maybeSingle();
+
+    if (cuCheckErr) {
+      redirect(`/portal/jobs/${nextJobId}?note_error=save_failed`);
+    }
+    if (!nextCu?.contractor_id) {
+      redirect(`/portal/jobs/${nextJobId}?note_error=not_allowed`);
+    }
+
+    const { data: ownedJob, error: jobCheckErr } = await nextSupabase
+      .from("jobs")
+      .select("id")
+      .eq("id", nextJobId)
+      .eq("contractor_id", nextCu.contractor_id)
+      .maybeSingle();
+
+    if (jobCheckErr) {
+      redirect(`/portal/jobs/${nextJobId}?note_error=save_failed`);
+    }
+    if (!ownedJob?.id) {
+      redirect(`/portal/jobs/${nextJobId}?note_error=not_allowed`);
+    }
 
     // Idempotency guard: if the same actor submits the same note back-to-back,
     // keep only one canonical contractor_note event.
@@ -518,7 +552,9 @@ export default async function PortalJobDetailPage({
       .gte("created_at", new Date(Date.now() - 15_000).toISOString())
       .maybeSingle();
 
-    if (dupErr) throw dupErr;
+    if (dupErr) {
+      redirect(`/portal/jobs/${nextJobId}?note_error=save_failed`);
+    }
     if (recentDuplicate?.id) {
       revalidatePath(`/portal/jobs/${nextJobId}`);
       redirect(`/portal/jobs/${nextJobId}?banner=note_duplicate`);
@@ -531,7 +567,9 @@ export default async function PortalJobDetailPage({
       meta: { note },
     });
 
-    if (insErr) throw insErr;
+    if (insErr) {
+      redirect(`/portal/jobs/${nextJobId}?note_error=save_failed`);
+    }
 
     await insertInternalNotificationForEvent({
       supabase: nextSupabase,
@@ -568,6 +606,10 @@ export default async function PortalJobDetailPage({
 
       {banner === "retest_ready_already_received" ? (
         <FlashBanner type="warning" message="This submission was already received." />
+      ) : null}
+
+      {banner === "invalid_request" ? (
+        <FlashBanner type="warning" message="That action could not be completed. Please open the job again and try once more." />
       ) : null}
 
       <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-white via-gray-50 to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950 p-6 shadow-md space-y-5">
@@ -771,7 +813,7 @@ export default async function PortalJobDetailPage({
       <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm space-y-5">
         <div className="text-base font-semibold">Contractor Actions</div>
 
-        {isPortalFailed && !hasOpenRetestChild ? (
+        {canRequestRetestReady && !hasOpenRetestChild ? (
           <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-4 space-y-3 hover:shadow-sm transition-shadow">
             <div className="text-sm font-semibold">Request retest</div>
             {hasRetestReadyRequest ? (
@@ -797,6 +839,16 @@ export default async function PortalJobDetailPage({
           {noteError === "empty_note" ? (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Please enter a note before sending.
+            </div>
+          ) : null}
+          {noteError === "not_allowed" ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              You do not have access to update this job.
+            </div>
+          ) : null}
+          {noteError === "save_failed" ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              We could not save your note. Please try again.
             </div>
           ) : null}
           <form action={addContractorNote} className="space-y-3">

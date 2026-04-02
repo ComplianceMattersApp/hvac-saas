@@ -3,12 +3,14 @@ import { X } from 'lucide-react';
 import { eachWeekOfInterval, endOfMonth, format as formatDate, parseISO, startOfMonth } from 'date-fns';
 
 import CalendarMonthGrid from './CalendarMonthGrid';
+import { calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
 import SubmitButton from '@/components/SubmitButton';
 import {
   assignJobAssigneeFromForm,
   removeJobAssigneeFromForm,
   updateJobScheduleFromForm,
 } from '@/lib/actions/job-actions';
+import { logCustomerContactAttemptFromForm } from '@/lib/actions/job-contact-actions';
 import { getDispatchCalendarData, type DispatchJob, type DispatchViewMode } from '@/lib/actions/calendar';
 import { displayWindowLA, formatBusinessDateUS } from '@/lib/utils/schedule-la';
 
@@ -20,6 +22,7 @@ type Props = {
   banner?: string;
   job?: string;
   tech?: string;
+  prefillDate?: string;
 };
 
 const TECH_COLOR_PALETTE = [
@@ -52,8 +55,8 @@ function bannerMessage(banner?: string) {
     assignment_added_primary: 'Assignee added and set as primary.',
     assignment_primary_set: 'Primary assignee updated.',
     assignment_removed: 'Assignee removed.',
-    called: 'Customer marked as called.',
-    text_sent: 'Customer marked as text sent.',
+    contact_attempt_logged_call: 'Call attempt logged.',
+    contact_attempt_logged_text: 'Text attempt logged.',
   };
 
   const key = String(banner ?? '').trim();
@@ -116,14 +119,24 @@ function buildReturnTo(view: CalendarUIView, date: string, tech?: string | null)
   return `/calendar?${q.toString()}`;
 }
 
-function buildCalendarHref(view: CalendarUIView, date: string, params?: { banner?: string; job?: string | null; tech?: string | null }) {
+function buildCalendarHref(
+  view: CalendarUIView,
+  date: string,
+  params?: { banner?: string; job?: string | null; tech?: string | null; prefillDate?: string | null },
+) {
   const q = new URLSearchParams();
   q.set('view', view);
   q.set('date', date);
   if (params?.banner) q.set('banner', params.banner);
   if (params?.job) q.set('job', params.job);
   if (params?.tech) q.set('tech', params.tech);
+  if (params?.prefillDate) q.set('prefill_date', params.prefillDate);
   return `/calendar?${q.toString()}`;
+}
+
+function normalizeYmd(value?: string | null) {
+  const raw = String(value ?? '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
 }
 
 function normalizeView(view?: string): CalendarUIView {
@@ -150,6 +163,19 @@ function addMonthsYmd(ymd: string, months: number): string {
   if (!m) return ymd;
   const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0));
   d.setUTCMonth(d.getUTCMonth() + months);
+  const y = d.getUTCFullYear();
+  const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${mo}-${day}`;
+}
+
+function startOfWeekMondayYmd(ymd: string): string {
+  const m = String(ymd).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return ymd;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0));
+  const dayOfWeek = d.getUTCDay();
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  d.setUTCDate(d.getUTCDate() + diffToMonday);
   const y = d.getUTCFullYear();
   const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
   const day = String(d.getUTCDate()).padStart(2, '0');
@@ -268,46 +294,12 @@ function initialsFromName(name: string) {
   return (letters || first || 'T').toUpperCase();
 }
 
-function normalizedLifecycleStatus(job: DispatchJob) {
-  const status = String(job.status ?? '').trim().toLowerCase();
-  const opsStatus = String(job.ops_status ?? '').trim().toLowerCase();
-  const values = [status, opsStatus].filter(Boolean);
-
-  if (!values.length) return 'scheduled';
-  if (values.includes('cancelled')) return 'cancelled';
-  if (values.includes('closed')) return 'closed';
-  if (values.includes('field_complete') || values.includes('completed') || values.includes('completed_paperwork_pending')) {
-    return 'field_complete';
-  }
-  if (values.includes('in_progress')) return 'in_progress';
-  if (values.includes('on_my_way')) return 'on_my_way';
-  if (values.includes('open') || values.includes('need_to_schedule') || values.includes('pending') || values.includes('pending_information')) {
-    return 'scheduled';
-  }
-
-  return values[0];
-}
-
-function formatLifecycleStatus(status: string) {
-  const map: Record<string, string> = {
-    scheduled: 'Scheduled',
-    on_my_way: 'On My Way',
-    in_progress: 'In Progress',
-    field_complete: 'Field Complete',
-    closed: 'Closed',
-    cancelled: 'Cancelled',
-  };
-  return map[status] || status;
-}
-
-function statusDotClass(status: string) {
-  if (status === 'scheduled') return 'bg-sky-500';
-  if (status === 'on_my_way') return 'bg-blue-500';
-  if (status === 'in_progress') return 'bg-indigo-600';
-  if (status === 'field_complete') return 'bg-amber-500';
-  if (status === 'closed') return 'bg-green-600';
-  if (status === 'cancelled') return 'bg-slate-400';
-  return 'bg-gray-300';
+function dispatchVisibilityIssueLabels(job: DispatchJob) {
+  const labels: string[] = [];
+  if (String(job.ops_status ?? '').trim().toLowerCase() === 'on_hold') labels.push('On hold');
+  if (!job.window_start) labels.push('Time not set');
+  if (!Array.isArray(job.assignments) || job.assignments.length === 0) labels.push('Needs tech');
+  return labels;
 }
 
 function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | null }) {
@@ -635,8 +627,8 @@ function AgendaList(props: {
           <div className="space-y-1">
             {(grouped.get(dateKey) ?? []).map((job) => {
               const needsTech = job.scheduled_date && (!job.assignments || job.assignments.length === 0);
-              const lifecycle = normalizedLifecycleStatus(job);
-              const dotClass = statusDotClass(lifecycle);
+              const lifecycle = getCalendarDisplayStatus(job);
+              const dotClass = calendarStatusDotClass(lifecycle);
               const faded = lifecycle === 'closed' || lifecycle === 'cancelled' ? 'opacity-50' : '';
 
               return (
@@ -655,7 +647,7 @@ function AgendaList(props: {
                       <div className="truncate text-[11px] text-slate-500">{job.job_type || job.title}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">{formatLifecycleStatus(lifecycle)}</span>
+                      <span className="text-xs text-slate-500">{formatCalendarDisplayStatus(lifecycle)}</span>
                       {needsTech ? (
                         <span className="inline-block rounded border border-amber-200 bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800">
                           Needs Tech
@@ -680,12 +672,15 @@ function DetailPanel(props: {
   view: CalendarUIView;
   date: string;
   tech?: string | null;
+  prefillDate?: string | null;
   className?: string;
 }) {
-  const { job, returnTo, assignableUsers, view, date, tech, className = '' } = props;
+  const { job, returnTo, assignableUsers, view, date, tech, prefillDate, className = '' } = props;
   const phone = customerPhone(job);
   const phoneHref = phoneHrefValue(phone);
   const hasPhone = Boolean(phoneHref);
+  const customerId = String(job.customer_id ?? '').trim() || null;
+  const locationId = String(job.location_id ?? '').trim() || null;
 
   return (
     <aside className={`overflow-y-auto bg-white p-4 pt-5 pr-5 sm:p-5 sm:pt-6 sm:pr-6 ${className}`}>
@@ -718,20 +713,26 @@ function DetailPanel(props: {
                 <span className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-400">Send Text</span>
               )}
 
-              <Link
-                href={buildCalendarHref(view, date, { job: job.id, banner: 'called', tech })}
-                scroll={false}
-                className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Called
-              </Link>
-              <Link
-                href={buildCalendarHref(view, date, { job: job.id, banner: 'text_sent', tech })}
-                scroll={false}
-                className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Text Sent
-              </Link>
+              <form action={logCustomerContactAttemptFromForm}>
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="method" value="call" />
+                <input type="hidden" name="result" value="spoke" />
+                <input type="hidden" name="return_to" value={buildCalendarHref(view, date, { job: job.id, tech })} />
+                <input type="hidden" name="success_banner" value="contact_attempt_logged_call" />
+                <SubmitButton className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50" loadingText="...">
+                  Called
+                </SubmitButton>
+              </form>
+              <form action={logCustomerContactAttemptFromForm}>
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="method" value="text" />
+                <input type="hidden" name="result" value="sent" />
+                <input type="hidden" name="return_to" value={buildCalendarHref(view, date, { job: job.id, tech })} />
+                <input type="hidden" name="success_banner" value="contact_attempt_logged_text" />
+                <SubmitButton className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50" loadingText="...">
+                  Text Sent
+                </SubmitButton>
+              </form>
             </div>
           </div>
         </div>
@@ -749,12 +750,16 @@ function DetailPanel(props: {
         <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
           Open Job
         </Link>
-        <Link href={`/customers/${(job as DispatchJob & { customer_id: string }).customer_id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-          Open Customer
-        </Link>
-        <Link href={`/locations/${(job as DispatchJob & { location_id: string }).location_id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-          Open Location
-        </Link>
+        {customerId ? (
+          <Link href={`/customers/${customerId}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+            Open Customer
+          </Link>
+        ) : null}
+        {locationId ? (
+          <Link href={`/locations/${locationId}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+            Open Location
+          </Link>
+        ) : null}
       </div>
 
       <div className="space-y-5">
@@ -771,7 +776,7 @@ function DetailPanel(props: {
           <form action={updateJobScheduleFromForm} className="grid gap-3">
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="return_to" value={returnTo} />
-            <input type="date" name="scheduled_date" defaultValue={job.scheduled_date ?? ''} className="rounded border px-2 py-2 text-sm" />
+            <input type="date" name="scheduled_date" defaultValue={prefillDate ?? job.scheduled_date ?? ''} className="rounded border px-2 py-2 text-sm" />
             <div className="grid grid-cols-2 gap-2">
               <input type="time" name="window_start" defaultValue={job.window_start ?? ''} className="rounded border px-2 py-2 text-sm" />
               <input type="time" name="window_end" defaultValue={job.window_end ?? ''} className="rounded border px-2 py-2 text-sm" />
@@ -856,6 +861,7 @@ export async function CalendarView(props: Props) {
   const returnTo = buildReturnTo(uiView, data.anchorDate, activeTech);
   const banner = bannerMessage(props.banner);
   const selectedJobId = String(props.job ?? '').trim();
+  const prefillDate = normalizeYmd(props.prefillDate);
 
   let canonicalDispatchJobsByDay = data.week.days.map((day) => ({
     date: day.date,
@@ -914,21 +920,40 @@ export async function CalendarView(props: Props) {
     data.unassignedScheduledJobs.find((job) => job.id === selectedJobId) ||
     null;
 
-  // Tech filter — applied at the presentation layer only, no backend change
-  const filteredDayJobs = activeTech
-    ? data.day.jobs.filter((job) => isDispatchVisibleForLayout(job) && job.assignments.some((a) => a.user_id === activeTech))
-    : data.day.jobs.filter((job) => isDispatchVisibleForLayout(job));
-
-  const filteredJobsByDay = activeTech
+  const techFilteredScheduledJobsByDay = activeTech
     ? canonicalDispatchJobsByDay.map((day) => ({
         ...day,
         jobs: day.jobs.filter((job) => job.assignments.some((a) => a.user_id === activeTech)),
       }))
     : canonicalDispatchJobsByDay;
 
-  const filteredJobsForRange = activeTech
-    ? canonicalDispatchJobsForRange.filter((job) => job.assignments.some((a) => a.user_id === activeTech))
-    : canonicalDispatchJobsForRange;
+  const consistentlyVisibleJobsByDay = techFilteredScheduledJobsByDay.map((day) => ({
+    ...day,
+    jobs: day.jobs.filter((job) => isDispatchVisibleForLayout(job)),
+  }));
+
+  const hiddenScheduledJobs = techFilteredScheduledJobsByDay
+    .flatMap((day) => day.jobs.filter((job) => !isDispatchVisibleForLayout(job)))
+    .sort((a, b) => {
+      const dateA = String(a.scheduled_date ?? '');
+      const dateB = String(b.scheduled_date ?? '');
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return String(a.window_start ?? '').localeCompare(String(b.window_start ?? ''));
+    });
+
+  // Tech filter — applied at the presentation layer only, no backend change.
+  const filteredJobsByDay = consistentlyVisibleJobsByDay;
+
+  const filteredJobsForRange = filteredJobsByDay.flatMap((day) => day.jobs);
+  const filteredDayJobs = filteredJobsByDay.find((day) => day.date === data.day.date)?.jobs ?? [];
+  const selectedDayJobs = techFilteredScheduledJobsByDay.find((day) => day.date === data.anchorDate)?.jobs ?? [];
+  const mondayAnchorDate = startOfWeekMondayYmd(data.anchorDate);
+  const showDesktopInspectorColumn = uiView === 'month' || Boolean(selectedJob);
+
+  const targetDateForView = (viewValue: CalendarUIView) => {
+    if (viewValue === 'week' || viewValue === 'list') return mondayAnchorDate;
+    return data.anchorDate;
+  };
 
   let headerLabel = '';
   if (uiView === 'month') {
@@ -963,7 +988,7 @@ export async function CalendarView(props: Props) {
               {(['day', 'week', 'month', 'list'] as CalendarUIView[]).map((viewValue) => (
                 <Link
                   key={viewValue}
-                  href={buildCalendarHref(viewValue, viewValue === 'month' ? data.anchorDate : todayDate, { tech: activeTech })}
+                  href={buildCalendarHref(viewValue, targetDateForView(viewValue), { tech: activeTech, job: selectedJobId || null })}
                   className={`rounded-lg px-4 py-2 text-base font-semibold ${
                     uiView === viewValue ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'
                   }`}
@@ -1010,20 +1035,48 @@ export async function CalendarView(props: Props) {
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
+      <div className={`grid gap-5 ${showDesktopInspectorColumn ? 'xl:grid-cols-[260px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[260px_minmax(0,1fr)]'}`}>
         <aside className="order-2 xl:order-1">
+          {hiddenScheduledJobs.length ? (
+            <>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Scheduled Jobs Needing Attention</h3>
+              <div className="mt-2 max-h-[32vh] space-y-1 overflow-y-auto pr-1">
+                {hiddenScheduledJobs.map((job) => {
+                  const issueSummary = dispatchVisibilityIssueLabels(job).join(' · ') || 'Needs review';
+
+                  return (
+                    <Link
+                      key={`hidden-scheduled-${job.id}`}
+                      href={buildCalendarHref(uiView, job.scheduled_date ?? data.anchorDate, { job: job.id, tech: activeTech })}
+                      draggable
+                      scroll={false}
+                      className="group block cursor-grab rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 shadow-sm transition hover:-translate-y-px hover:border-amber-300 hover:bg-amber-100 hover:shadow active:cursor-grabbing active:opacity-85"
+                    >
+                      <p className="truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
+                      <p className="truncate text-[11px] text-slate-600">{formatBusinessDateUS(job.scheduled_date ?? data.anchorDate)}</p>
+                      <p className="truncate text-[11px] text-amber-800">{issueSummary}</p>
+                      <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-amber-700/90 group-hover:text-amber-800">Drag to a day</p>
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
+
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unscheduled Jobs</h3>
           <div className="mt-2 max-h-[70vh] space-y-1 overflow-y-auto pr-1">
             {unscheduledJobs.length ? (
               unscheduledJobs.map((job) => (
                 <Link
                   key={`unassigned-${job.id}`}
-                  href={buildCalendarHref(uiView, data.anchorDate, { job: job.id })}
+                  href={buildCalendarHref(uiView, data.anchorDate, { job: job.id, tech: activeTech })}
+                  draggable
                   scroll={false}
-                  className="block rounded px-2 py-2 hover:bg-slate-50"
+                  className="group block cursor-grab rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow active:cursor-grabbing active:opacity-85"
                 >
                   <p className="truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
                   <p className="truncate text-[11px] text-slate-600">{job.city || job.contractor_name || 'No city or contractor'}</p>
+                  <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-500 group-hover:text-slate-700">Drag to a day</p>
                 </Link>
               ))
             ) : (
@@ -1043,7 +1096,13 @@ export async function CalendarView(props: Props) {
                 <AgendaList jobs={filteredJobsForRange} date={data.anchorDate} tech={activeTech} />
               </div>
               <div className="hidden overflow-x-auto lg:block">
-                <CalendarMonthGrid monthDate={data.anchorDate} jobs={filteredJobsForRange} />
+                <CalendarMonthGrid
+                  monthDate={data.anchorDate}
+                  jobs={filteredJobsForRange}
+                  tech={activeTech}
+                  selectedDate={data.anchorDate}
+                  selectedJobId={selectedJobId}
+                />
               </div>
             </section>
           ) : baseMode === 'day' ? (
@@ -1074,21 +1133,33 @@ export async function CalendarView(props: Props) {
             </section>
           )}
         </main>
-      </div>
 
-      {selectedJob ? (
-        <div className="fixed right-3 top-28 z-50 hidden w-[380px] xl:block">
-          <DetailPanel
-            job={selectedJob}
-            returnTo={returnTo}
-            assignableUsers={data.assignableUsers}
-            view={uiView}
-            date={data.anchorDate}
-            tech={activeTech}
-            className="max-h-[calc(100vh-120px)] rounded-md border border-slate-200 bg-white shadow-xl"
-          />
-        </div>
-      ) : null}
+        {showDesktopInspectorColumn ? (
+          <aside className="order-3 hidden xl:block">
+            {selectedJob ? (
+              <DetailPanel
+                job={selectedJob}
+                returnTo={returnTo}
+                assignableUsers={data.assignableUsers}
+                view={uiView}
+                date={data.anchorDate}
+                tech={activeTech}
+                prefillDate={prefillDate}
+                className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-md border border-slate-200 bg-white shadow-lg"
+              />
+            ) : uiView === 'month' ? (
+              <div className="sticky top-24 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Inspector</p>
+                <h3 className="mt-1 text-sm font-semibold text-slate-900">{formatDayDateHeader(data.anchorDate)}</h3>
+                <p className="mt-2 text-xs text-slate-600">
+                  {selectedDayJobs.length} scheduled job{selectedDayJobs.length === 1 ? '' : 's'} in this day context.
+                </p>
+                <p className="mt-3 text-xs text-slate-500">Select a job chip to open schedule and assignment controls.</p>
+              </div>
+            ) : null}
+          </aside>
+        ) : null}
+      </div>
 
       {selectedJob ? (
         <div className="fixed inset-0 z-50 bg-black/30 px-3 pb-4 pt-24 sm:px-4 sm:pb-5 sm:pt-28 xl:hidden">
@@ -1099,6 +1170,7 @@ export async function CalendarView(props: Props) {
             view={uiView}
             date={data.anchorDate}
             tech={activeTech}
+            prefillDate={prefillDate}
             className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-xl border border-slate-200 shadow-xl"
           />
         </div>

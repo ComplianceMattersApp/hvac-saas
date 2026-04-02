@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { requireInternalUser } from "@/lib/auth/internal-user";
+import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 
 function safeFileName(name: string) {
   return name.replace(/[^\w.\- ()]/g, "_");
@@ -19,6 +20,27 @@ export async function createJobAttachmentUploadToken(input: {
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) throw new Error("Not authenticated");
+
+  const { data: contractorUser, error: contractorUserErr } = await supabase
+    .from("contractor_users")
+    .select("contractor_id")
+    .eq("user_id", userData.user.id)
+    .maybeSingle();
+
+  if (contractorUserErr) throw contractorUserErr;
+
+  if (contractorUser?.contractor_id) {
+    const { data: ownedJob, error: ownedJobErr } = await supabase
+      .from("jobs")
+      .select("id")
+      .eq("id", input.jobId)
+      .eq("contractor_id", contractorUser.contractor_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (ownedJobErr) throw ownedJobErr;
+    if (!ownedJob?.id) throw new Error("Not authorized to upload attachment for this job");
+  }
 
   const cleanName = safeFileName(input.fileName);
 
@@ -41,8 +63,10 @@ export async function createJobAttachmentUploadToken(input: {
 
   if (insErr) throw new Error(insErr.message);
 
-  // 2) Create signed upload token/url for client upload
-  const { data, error: upErr } = await supabase.storage
+  // 2) Create signed upload token/url for client upload using admin client
+  // Ownership already verified above; use service-role to bypass storage RLS
+  const adminClient = createAdminClient();
+  const { data, error: upErr } = await adminClient.storage
     .from("attachments")
     .createSignedUploadUrl(storagePath);
 
@@ -59,6 +83,128 @@ export async function createJobAttachmentUploadToken(input: {
 
 export async function revalidatePortalJob(jobId: string) {
   revalidatePath(`/portal/jobs/${jobId}`);
+}
+
+export async function finalizePortalAttachmentSubmission(input: {
+  jobId: string;
+  intent: "upload" | "review";
+  note?: string;
+  caption?: string;
+  fileNames?: string[];
+  attachmentIds?: string[];
+}) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr) throw userErr;
+  if (!user) throw new Error("Not authenticated");
+
+  const { data: contractorUser, error: contractorUserErr } = await supabase
+    .from("contractor_users")
+    .select("contractor_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (contractorUserErr) throw contractorUserErr;
+
+  const contractorId = String(contractorUser?.contractor_id ?? "").trim();
+  if (!contractorId) {
+    throw new Error("Only contractor users can submit portal updates.");
+  }
+
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select("id, contractor_id, job_type, ops_status")
+    .eq("id", input.jobId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+  if (!job?.id) throw new Error("Job not found.");
+
+  if (String(job.contractor_id ?? "") !== contractorId) {
+    throw new Error("You do not have access to this job.");
+  }
+
+  const note = String(input.note ?? "").trim();
+  const caption = String(input.caption ?? "").trim();
+  const fileNames = Array.isArray(input.fileNames)
+    ? input.fileNames.map((v) => String(v ?? "").trim()).filter(Boolean)
+    : [];
+  const attachmentIds = Array.isArray(input.attachmentIds)
+    ? input.attachmentIds.map((v) => String(v ?? "").trim()).filter(Boolean)
+    : [];
+
+  if (!note && attachmentIds.length === 0) {
+    return;
+  }
+
+  if (input.intent === "review") {
+    const jobType = String(job.job_type ?? "").trim().toLowerCase();
+    const opsStatus = String(job.ops_status ?? "").trim().toLowerCase();
+
+    if (jobType !== "ecc" || opsStatus !== "failed") {
+      throw new Error("Correction review submission is only available for failed ECC jobs.");
+    }
+
+    const { error: evErr } = await supabase.from("job_events").insert({
+      job_id: input.jobId,
+      event_type: "contractor_correction_submission",
+      user_id: user.id,
+      meta: {
+        note: note || null,
+        attachment_ids: attachmentIds,
+        caption: caption || null,
+        file_names: fileNames,
+      },
+    });
+
+    if (evErr) throw evErr;
+
+    const { data: reviewMarked, error: rpcErr } = await supabase.rpc(
+      "mark_job_needs_internal_review",
+      { p_job_id: input.jobId }
+    );
+
+    if (rpcErr) throw rpcErr;
+    if (!reviewMarked) {
+      throw new Error("Could not submit correction review for this job.");
+    }
+
+    await insertInternalNotificationForEvent({
+      supabase,
+      jobId: input.jobId,
+      eventType: "contractor_note",
+      actorUserId: user.id,
+    });
+
+    return;
+  }
+
+  const { error: noteErr } = await supabase.from("job_events").insert({
+    job_id: input.jobId,
+    event_type: "contractor_note",
+    user_id: user.id,
+    meta: {
+      note: note || null,
+      attachment_ids: attachmentIds,
+      caption: caption || null,
+      file_names: fileNames,
+    },
+  });
+
+  if (noteErr) throw noteErr;
+
+  await insertInternalNotificationForEvent({
+    supabase,
+    jobId: input.jobId,
+    eventType: "contractor_note",
+    actorUserId: user.id,
+  });
 }
 
 export async function shareJobAttachmentToContractor(input: {

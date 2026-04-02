@@ -26,6 +26,8 @@ import {
   createRetestJobFromForm,
   addPublicNoteFromForm,
   addInternalNoteFromForm,
+  getOnTheWayUndoEligibility,
+  revertOnTheWayFromForm,
 } from "@/lib/actions/job-actions";
 import CancelJobButton from "@/components/jobs/CancelJobButton";
 
@@ -262,6 +264,7 @@ function formatTimelineEvent(type?: string | null, meta?: any, message?: string 
       : "Schedule updated",
 
   on_my_way: "Technician marked On the Way",
+  on_the_way_reverted: "On the Way was reverted",
   job_started: "Technician started work",
   job_completed: "Technician completed the visit",
 
@@ -696,6 +699,8 @@ const contractorResponseSubLabel =
     ? "Awaiting internal review"
     : null;
 
+const onTheWayUndoEligibility = await getOnTheWayUndoEligibility(jobId);
+
 const { data: attachmentRows, error: attachmentErr } = await supabase
   .from("attachments")
   .select("id, bucket, storage_path, file_name, content_type, file_size, caption, created_at")
@@ -876,6 +881,7 @@ function formatOpsStatusLabel(value?: string | null) {
     on_the_way: "On the Way",
     in_process: "In Progress",
     pending_info: "Pending Info",
+    pending_office_review: "Pending Office Review",
     on_hold: "On Hold",
     failed: "Failed",
     retest_needed: "Retest Needed",
@@ -901,7 +907,7 @@ function serviceChainBadgeClass(opsStatus?: string | null, isCurrent?: boolean) 
     return "bg-black text-white";
   }
 
-  if (v === "failed" || v === "retest_needed") {
+  if (v === "failed" || v === "retest_needed" || v === "pending_office_review") {
     return "bg-red-100 text-red-800";
   }
 
@@ -1001,7 +1007,7 @@ if (recipient === "contractor") {
 const isFieldComplete = !!job.field_complete;
 
 const isFailedUnresolved =
-  ["failed", "retest_needed"].includes(String(job.ops_status ?? ""));
+  ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
 
 const isAdminComplete =
   (job.job_type === "service" && job.invoice_complete) ||
@@ -1088,7 +1094,7 @@ const contactPreviewItems = attemptItems.slice(0, 3);
 const contactOverflowItems = attemptItems.slice(3);
 
 const showRetestSection =
-  ["failed", "retest_needed"].includes(String(job.ops_status ?? "")) ||
+  ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? "")) ||
   !!parentJob ||
   (childJobs?.length ?? 0) > 0;
 
@@ -1145,6 +1151,7 @@ const renderTimelineItem = (e: any, key: string) => {
     type === "customer_attempt" ? "📞" :
     type === "status_changed" ? "🔄" :
     type === "on_my_way" ? "🚗" :
+    type === "on_the_way_reverted" ? "↩️" :
     type === "job_started" ? "🛠️" :
     type === "job_completed" ? "🏁" :
     type === "job_failed" ? "❌" :
@@ -1278,13 +1285,34 @@ const renderTimelineItem = (e: any, key: string) => {
 
       <div className="w-full lg:ml-auto lg:w-auto lg:shrink-0">
         {!isFieldComplete ? (
-          <div className="flex w-full justify-start lg:justify-end [&_button]:h-10 [&_button]:rounded-md [&_button]:bg-blue-600 [&_button]:px-4 [&_button]:text-sm [&_button]:font-semibold [&_button]:text-white [&_button]:shadow-sm hover:[&_button]:bg-blue-700">
-            <JobFieldActionButton
-              jobId={job.id}
-              currentStatus={job.status}
-              tab={tab}
-              hasFullSchedule={hasFullSchedule}
-            />
+          <div className="flex w-full flex-col items-start gap-2 lg:items-end">
+            <div className="flex w-full flex-wrap justify-start gap-2 lg:justify-end [&_button]:h-10 [&_button]:rounded-md [&_button]:px-4 [&_button]:text-sm [&_button]:font-semibold [&_button]:shadow-sm">
+              <JobFieldActionButton
+                jobId={job.id}
+                currentStatus={job.status}
+                tab={tab}
+                hasFullSchedule={hasFullSchedule}
+              />
+
+              {onTheWayUndoEligibility.eligible ? (
+                <form action={revertOnTheWayFromForm} className="w-full sm:w-auto">
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="tab" value={tab} />
+                  <SubmitButton
+                    loadingText="Undoing..."
+                    className="w-full rounded-md border border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:w-auto"
+                  >
+                    Undo On the Way
+                  </SubmitButton>
+                </form>
+              ) : null}
+            </div>
+
+            {onTheWayUndoEligibility.eligible ? (
+              <div className="text-xs text-slate-500 lg:text-right">
+                Available only until any later job activity occurs.
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="flex w-full justify-start lg:justify-end">
@@ -1608,6 +1636,20 @@ const renderTimelineItem = (e: any, key: string) => {
         <FlashBanner
           type="success"
           message="Saved."
+        />
+      )}
+
+      {banner === "on_the_way_reverted" && (
+        <FlashBanner
+          type="success"
+          message="On the Way was reverted."
+        />
+      )}
+
+      {banner === "on_the_way_revert_unavailable" && (
+        <FlashBanner
+          type="warning"
+          message="Undo On the Way is no longer available for this job."
         />
       )}
 
@@ -2425,24 +2467,15 @@ const renderTimelineItem = (e: any, key: string) => {
 
       <select
         name="ops_status"
-        defaultValue={
-          ["need_to_schedule", "scheduled", "pending_info", "on_hold"].includes(
-            String(job.ops_status ?? "")
-          )
-            ? String(job.ops_status)
-            : "need_to_schedule"
-        }
+        defaultValue="on_hold"
         className="w-full rounded border px-2 py-2 text-sm border-gray-300"
       >
-        <option value="need_to_schedule">Need to Schedule</option>
-        <option value="scheduled">Scheduled</option>
-        <option value="pending_info">Pending Info</option>
         <option value="on_hold">On Hold</option>
       </select>
 
       <p className="mt-2 text-xs text-gray-600">
-        Manual ops updates are limited to scheduling and follow-up states.
-        Failed, retest, closeout, and closed states are set by workflow actions.
+        Manual ops updates here support only On Hold.
+        Use Follow Up fields for pending info signals; lifecycle and closeout states are workflow-driven.
       </p>
     </div>
 
@@ -2547,7 +2580,7 @@ const renderTimelineItem = (e: any, key: string) => {
 <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 text-gray-900 shadow-sm">
   <div className="text-sm font-semibold mb-3">Retest</div>
 
-  {["failed", "retest_needed"].includes(String(job.ops_status ?? "")) ? (
+  {["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? "")) ? (
     <form action={createRetestJobFromForm} className="mb-4">
       <input type="hidden" name="parent_job_id" value={job.id} />
 
@@ -2566,7 +2599,7 @@ const renderTimelineItem = (e: any, key: string) => {
   ) : (
     <div className="text-sm text-gray-600 mb-4">
       Retest button appears when Ops Status is <span className="font-medium">Failed</span> or{" "}
-      <span className="font-medium">Retest Needed</span>.
+      <span className="font-medium">Retest Needed</span> or <span className="font-medium">Pending Office Review</span>.
     </div>
   )}
 
@@ -2607,7 +2640,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
 {isInternalUser &&
  job.job_type === "ecc" &&
- ["failed", "retest_needed"].includes(String(job.ops_status ?? "")) && (
+ ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? "")) && (
   <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 text-gray-900 shadow-sm">
     <div className="text-sm font-semibold mb-3">Correction Review Resolution</div>
 
@@ -2724,7 +2757,7 @@ const renderTimelineItem = (e: any, key: string) => {
         {/* Shared Notes */}
         <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90" open>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title="Shared Notes" subtitle="Notes visible to contractor and team." />
+            <CollapsibleHeader title="Shared Notes" subtitle="Notes across this direct job chain, visible to contractor and team." />
           </summary>
 
           <div className="mt-3 border-t border-slate-200 pt-4 space-y-2">
@@ -2802,7 +2835,7 @@ const renderTimelineItem = (e: any, key: string) => {
         {/* Internal Notes */}
         <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90" open>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title="Internal Notes" subtitle="Internal-only notes for your team." />
+            <CollapsibleHeader title="Internal Notes" subtitle="Internal-only notes across this direct job chain for your team." />
           </summary>
 
           <div className="mt-3 border-t border-slate-200 pt-4 space-y-2">
@@ -2863,7 +2896,7 @@ const renderTimelineItem = (e: any, key: string) => {
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title="Timeline"
-              subtitle="Activity history for this job."
+              subtitle="Activity history across this direct job chain."
               meta={`${timelineItems.length} event(s)`}
             />
           </summary>

@@ -61,6 +61,9 @@ function opsBadgeClasses(value?: string | null) {
   if (v === "retest_needed") {
     return "border-orange-200 bg-orange-50 text-orange-700";
   }
+  if (v === "pending_office_review") {
+    return "border-cyan-200 bg-cyan-50 text-cyan-700";
+  }
   if (v === "pending_info") {
     return "border-amber-200 bg-amber-50 text-amber-700";
   }
@@ -154,7 +157,8 @@ export default async function LocationDetailPage(props: {
       ops_status,
       created_at,
       scheduled_date,
-      service_case_id
+      service_case_id,
+      deleted_at
       `
     )
     .eq("location_id", locationId)
@@ -164,17 +168,22 @@ export default async function LocationDetailPage(props: {
   if (jobsErr) throw jobsErr;
 
   const jobRows = (jobs ?? []) as any[];
-
-  const totalJobs = jobRows.length;
-  const openJobs = jobRows.filter((j) => {
+  const activeSummaryRows = jobRows.filter((j) => !j?.deleted_at);
+  const lifecycleOpenRows = activeSummaryRows.filter((j) => {
     const s = String(j?.status ?? "").toLowerCase();
     return !!s && !["completed", "closed", "cancelled"].includes(s);
-  }).length;
-  const failedJobs = jobRows.filter((j) =>
+  });
+
+  const totalJobs = jobRows.length;
+  const openJobs = lifecycleOpenRows.length;
+  const failedJobs = lifecycleOpenRows.filter((j) =>
     String(j?.ops_status ?? "").toLowerCase() === "failed"
   ).length;
-  const pendingInfoJobs = jobRows.filter((j) =>
+  const pendingInfoJobs = lifecycleOpenRows.filter((j) =>
     String(j?.ops_status ?? "").toLowerCase() === "pending_info"
+  ).length;
+  const pendingOfficeReviewJobs = lifecycleOpenRows.filter((j) =>
+    String(j?.ops_status ?? "").toLowerCase() === "pending_office_review"
   ).length;
 
   const serviceCaseCounts = new Map<string, number>();
@@ -192,14 +201,21 @@ export default async function LocationDetailPage(props: {
       .at(-1) ?? null;
 
   const customerName = customerDisplayName(customer);
+  const customerId = String(location?.customer_id ?? "").trim() || null;
 
   return (
     <div className="p-6 space-y-6">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-          <Link href={`/customers/${location.customer_id}`} className="underline">
-            Back to Customer
-          </Link>
+          {customerId ? (
+            <Link href={`/customers/${customerId}`} className="underline">
+              Back to Customer
+            </Link>
+          ) : (
+            <Link href="/customers" className="underline">
+              Back to Customers
+            </Link>
+          )}
         </div>
 
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -220,12 +236,14 @@ export default async function LocationDetailPage(props: {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/customers/${location.customer_id}`}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
-            >
-              Open Customer
-            </Link>
+            {customerId ? (
+              <Link
+                href={`/customers/${customerId}`}
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
+              >
+                Open Customer
+              </Link>
+            ) : null}
 
             <a
               href={mapsHref({
@@ -300,9 +318,13 @@ export default async function LocationDetailPage(props: {
               Customer
             </div>
             <div className="mt-1 text-sm font-semibold text-gray-900">
-              <Link href={`/customers/${location.customer_id}`} className="underline">
-                {customerName}
-              </Link>
+              {customerId ? (
+                <Link href={`/customers/${customerId}`} className="underline">
+                  {customerName}
+                </Link>
+              ) : (
+                customerName
+              )}
             </div>
           </div>
 
@@ -378,6 +400,12 @@ export default async function LocationDetailPage(props: {
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm">
           <span className="font-medium text-amber-700">{pendingInfoJobs}</span>
           <span className="ml-1 text-amber-600">Pending Info</span>
+        </div>
+      )}
+      {pendingOfficeReviewJobs > 0 && (
+        <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm">
+          <span className="font-medium text-cyan-700">{pendingOfficeReviewJobs}</span>
+          <span className="ml-1 text-cyan-600">Pending Office Review</span>
         </div>
       )}
     </div>

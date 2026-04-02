@@ -24,7 +24,7 @@ type SearchParams = Promise<{
   notice?: string;
 }>;
 
-type Lifecycle = "active" | "invited" | "inactive";
+type Lifecycle = "active" | "invited" | "inactive" | "unknown";
 
 type UserRecord = {
   key: string;
@@ -43,6 +43,7 @@ type UserRecord = {
 
 const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
   invite_resent: { tone: "success", message: "Invite link resent successfully." },
+  recovery_sent: { tone: "success", message: "Account setup recovery email sent successfully." },
   password_reset_sent: { tone: "success", message: "Password reset email sent successfully." },
   invalid_email: { tone: "error", message: "Please provide a valid email address." },
   invalid_invite_target: { tone: "error", message: "Invite target is missing required information." },
@@ -81,12 +82,14 @@ function toRoleLabel(role: string): string {
 function getInternalLifecycle(isActive: boolean, emailConfirmed: boolean | null): Lifecycle {
   if (!isActive) return "inactive";
   if (emailConfirmed === false) return "invited";
-  return "active";
+  if (emailConfirmed === true) return "active";
+  return "unknown";
 }
 
 function getContractorLifecycle(emailConfirmed: boolean | null): Lifecycle {
   if (emailConfirmed === false) return "invited";
-  return "active";
+  if (emailConfirmed === true) return "active";
+  return "unknown";
 }
 
 function matchesQuery(record: UserRecord, query: string) {
@@ -548,7 +551,7 @@ export default async function AdminUsersCommandCenterPage({
                         )
                       ) : null}
 
-                      {record.email ? (
+                      {record.email && record.userId ? (
                         <form action={sendPasswordResetFromForm}>
                           <input type="hidden" name="email" value={record.email} />
                           <input type="hidden" name="return_to" value={returnTo} />

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import FlashBanner from "@/components/ui/FlashBanner";
 import {
   extractFailureReasons,
   finalRunPass,
@@ -30,8 +31,20 @@ function toDateMs(value: string | null | undefined) {
   return Number.isFinite(t) ? t : 0;
 }
 
-export default async function PortalAllJobsPage() {
+type SP = Record<string, string | string[] | undefined>;
+
+function sp1(v: string | string[] | undefined) {
+  return Array.isArray(v) ? v[0] : v;
+}
+
+export default async function PortalAllJobsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<SP>;
+}) {
   const supabase = await createClient();
+  const sp: SP = (searchParams ? await searchParams : {}) ?? {};
+  const banner = (sp1(sp.banner) ?? "").toString().trim();
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
@@ -288,6 +301,7 @@ export default async function PortalAllJobsPage() {
 
     if (resolvedLabel === "Retest Scheduled") return { label: "Retest Scheduled", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
     if (resolvedLabel === "Retest Pending Scheduling") return { label: "Needs to be scheduled", tone: "border-amber-200 bg-amber-50 text-amber-800" };
+    if (resolvedLabel === "Under Review") return { label: "Under review", tone: "border-cyan-200 bg-cyan-50 text-cyan-800" };
     if (resolvedLabel === "Failed") return { label: "Needs correction", tone: "border-rose-200 bg-rose-50 text-rose-800" };
     if (ops === "paperwork_required") return { label: "Paperwork in Progress", tone: "border-violet-200 bg-violet-50 text-violet-800" };
     if (ops === "invoice_required") return { label: "Final Processing", tone: "border-indigo-200 bg-indigo-50 text-indigo-800" };
@@ -302,6 +316,7 @@ export default async function PortalAllJobsPage() {
     const lifecycle = String(row.job.status ?? "").trim().toLowerCase();
     const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
     if (row.resolved?.retestState === "scheduled" || row.resolved?.bucket === "passed") return "Open the job to review details.";
+    if (ops === "pending_office_review") return "Corrections were submitted and are currently under internal review.";
     if (row.resolved?.primaryIssue?.group === "needs_info") return "Open this job to provide the requested information.";
     if (ops === "failed" || ops === "retest_needed" || row.resolved?.primaryIssue?.group === "failed") return "Open this job to review the issue details and next step.";
     if (ops === "paperwork_required") return "Field work is complete. We're finishing the paperwork.";
@@ -315,6 +330,13 @@ export default async function PortalAllJobsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 text-gray-900 dark:text-gray-100">
+      {banner === "invalid_request" ? (
+        <FlashBanner
+          type="warning"
+          message="That action could not be completed. Please open the job and try again."
+        />
+      ) : null}
+
       <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-white via-gray-50 to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950 p-6 shadow-md">
         <div className="flex items-start justify-between gap-4">
           <div>

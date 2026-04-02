@@ -455,7 +455,7 @@ export async function deleteInternalUserFromForm(formData: FormData): Promise<vo
   }
 
   // Check for active assignments
-  const { data: activeAssignments, error: assignmentError } = await admin
+  const { count: activeAssignmentCount, error: assignmentError } = await admin
     .from("job_assignments")
     .select("id", { count: "exact", head: true })
     .eq("user_id", targetUserId)
@@ -463,7 +463,7 @@ export async function deleteInternalUserFromForm(formData: FormData): Promise<vo
 
   if (assignmentError) throw assignmentError;
 
-  if ((activeAssignments?.length ?? 0) > 0) {
+  if ((activeAssignmentCount ?? 0) > 0) {
     throw new Error(
       "CANNOT_DELETE_USER_WITH_ACTIVE_ASSIGNMENTS",
     );

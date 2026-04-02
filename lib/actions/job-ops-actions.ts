@@ -28,6 +28,7 @@ const OPS_STATUSES = [
   "need_to_schedule",
   "scheduled",
   "pending_info",
+  "pending_office_review",
   "on_hold",
   "failed",
   "retest_needed",
@@ -641,7 +642,7 @@ export async function resolveFailureByCorrectionReviewFromForm(formData: FormDat
     redirect(`/jobs/${jobId}?tab=ops`);
   }
 
-  if (!["failed", "retest_needed"].includes(String(job.ops_status ?? ""))) {
+  if (!["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""))) {
   redirect(`/jobs/${jobId}?tab=ops`);
   }
   const beforeOps = job.ops_status ?? null;

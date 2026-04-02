@@ -7,6 +7,7 @@ export type OpsStatus =
   | "need_to_schedule"
   | "scheduled"
   | "pending_info"
+  | "pending_office_review"
   | "on_hold"
   | "failed"
   | "retest_needed"
@@ -14,7 +15,14 @@ export type OpsStatus =
   | "invoice_required"
   | "closed";
 
-const MANUAL_STATUSES: OpsStatus[] = ["pending_info", "on_hold", "retest_needed", "paperwork_required", "invoice_required"];
+const MANUAL_STATUSES: OpsStatus[] = [
+  "pending_info",
+  "pending_office_review",
+  "on_hold",
+  "retest_needed",
+  "paperwork_required",
+  "invoice_required",
+];
 
 export type SetOpsStatusResult = {
   jobId: string;

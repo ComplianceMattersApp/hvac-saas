@@ -1,12 +1,51 @@
-import React from 'react';
+"use client";
+
+import React, { useState } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO } from 'date-fns';
-import { DispatchJob } from '@/lib/actions/calendar';
+import type { DispatchJob } from '@/lib/actions/calendar';
 import Link from 'next/link';
 import { displayWindowLA } from '@/lib/utils/schedule-la';
+import { calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
+import { useRouter } from 'next/navigation';
 
 interface CalendarMonthGridProps {
   monthDate: string; // YYYY-MM-DD (first day of month)
   jobs: DispatchJob[];
+  tech?: string | null;
+  selectedDate?: string;
+  selectedJobId?: string;
+}
+
+function buildCalendarHref(
+  view: 'day' | 'week' | 'list' | 'month',
+  date: string,
+  params?: { job?: string | null; tech?: string | null; prefillDate?: string | null },
+) {
+  const q = new URLSearchParams();
+  q.set('view', view);
+  q.set('date', date);
+  if (params?.job) q.set('job', params.job);
+  if (params?.tech) q.set('tech', params.tech);
+  if (params?.prefillDate) q.set('prefill_date', params.prefillDate);
+  return `/calendar?${q.toString()}`;
+}
+
+function extractDraggedJobId(event: React.DragEvent<HTMLElement>) {
+  const transfer = event.dataTransfer;
+
+  const explicit = String(transfer.getData('application/x-cm-job-id') || '').trim();
+  if (explicit) return explicit;
+
+  const uriLike = String(transfer.getData('text/uri-list') || transfer.getData('text/plain') || '').trim();
+  if (!uriLike) return null;
+
+  try {
+    const parsed = new URL(uriLike, window.location.origin);
+    const job = String(parsed.searchParams.get('job') || '').trim();
+    return job || null;
+  } catch {
+    return null;
+  }
 }
 
 function getMonthDays(monthDate: string) {
@@ -26,56 +65,15 @@ function jobsByDate(jobs: DispatchJob[]) {
   return map;
 }
 
-function normalizedLifecycleStatus(job: DispatchJob) {
-  const status = String(job.status ?? '').trim().toLowerCase();
-  const opsStatus = String(job.ops_status ?? '').trim().toLowerCase();
-  const values = [status, opsStatus].filter(Boolean);
-
-  if (!values.length) return 'scheduled';
-  if (values.includes('cancelled')) return 'cancelled';
-  if (values.includes('closed')) return 'closed';
-  if (values.includes('field_complete') || values.includes('completed') || values.includes('completed_paperwork_pending')) {
-    return 'field_complete';
-  }
-  if (values.includes('in_progress')) return 'in_progress';
-  if (values.includes('on_my_way')) return 'on_my_way';
-  if (values.includes('open') || values.includes('need_to_schedule') || values.includes('pending') || values.includes('pending_information')) {
-    return 'scheduled';
-  }
-
-  return values[0];
-}
-
-function statusDotClass(status: string) {
-  if (status === 'scheduled') return 'bg-sky-500';
-  if (status === 'on_my_way') return 'bg-blue-500';
-  if (status === 'in_progress') return 'bg-indigo-600';
-  if (status === 'field_complete') return 'bg-amber-500';
-  if (status === 'closed') return 'bg-green-600';
-  if (status === 'cancelled') return 'bg-slate-400';
-  return 'bg-gray-300';
-}
-
-function formatStatus(status: string) {
-  const map: Record<string, string> = {
-    scheduled: 'Scheduled',
-    on_my_way: 'On My Way',
-    in_progress: 'In Progress',
-    field_complete: 'Field Complete',
-    closed: 'Closed',
-    cancelled: 'Cancelled',
-  };
-
-  return map[status] || status;
-}
-
 function shortTitle(job: DispatchJob) {
   const title = String(job.title ?? '').trim();
   if (!title) return `Job ${job.id.slice(0, 8)}`;
   return title.length > 32 ? `${title.slice(0, 29)}...` : title;
 }
 
-export default function CalendarMonthGrid({ monthDate, jobs }: CalendarMonthGridProps) {
+export default function CalendarMonthGrid({ monthDate, jobs, tech, selectedDate, selectedJobId }: CalendarMonthGridProps) {
+  const router = useRouter();
+  const [dropTargetDate, setDropTargetDate] = useState<string | null>(null);
   const days = getMonthDays(monthDate);
   const jobMap = jobsByDate(jobs);
   const month = parseISO(monthDate);
@@ -96,22 +94,48 @@ export default function CalendarMonthGrid({ monthDate, jobs }: CalendarMonthGrid
         {days.map((day) => {
           const ymd = format(day, 'yyyy-MM-dd');
           const dayJobs = jobMap.get(ymd) || [];
+          const isSelectedDate = ymd === selectedDate;
 
           return (
             <div
               key={ymd}
+              onDragOver={(event) => {
+                if (!event.dataTransfer) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                setDropTargetDate(ymd);
+              }}
+              onDragLeave={() => {
+                setDropTargetDate((current) => (current === ymd ? null : current));
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const droppedJobId = extractDraggedJobId(event);
+                setDropTargetDate(null);
+                if (!droppedJobId) return;
+
+                router.push(
+                  buildCalendarHref('month', ymd, {
+                    job: droppedJobId,
+                    tech,
+                    prefillDate: ymd,
+                  }),
+                  { scroll: false },
+                );
+              }}
               className={`min-h-24 rounded-xl border border-gray-200 p-3 transition-colors ${
                 isToday(day) ? 'bg-blue-50' : isSameMonth(day, month) ? 'bg-white' : 'bg-gray-50'
-              } hover:bg-gray-50`}
+              } hover:bg-gray-50 ${isSelectedDate ? 'ring-2 ring-slate-800/45 border-slate-500' : ''} ${dropTargetDate === ymd ? 'ring-2 ring-blue-400 border-blue-500 bg-blue-50/80' : ''}`}
             >
               <div className="mb-2 flex items-center justify-between">
-                <span
-                  className={`text-lg font-bold ${
+                <Link
+                  href={buildCalendarHref('month', ymd, { tech })}
+                  className={`rounded-sm text-lg font-bold hover:underline ${
                     isToday(day) ? 'rounded-full bg-blue-600 px-2 text-white' : 'text-gray-900'
-                  }`}
+                  } ${isSelectedDate && !isToday(day) ? 'rounded bg-slate-100 px-2' : ''}`}
                 >
                   {format(day, 'd')}
-                </span>
+                </Link>
                 {dayJobs.length > 0 ? (
                   <span className="text-xs font-semibold text-emerald-700">
                     {dayJobs.length} job{dayJobs.length > 1 ? 's' : ''}
@@ -122,8 +146,8 @@ export default function CalendarMonthGrid({ monthDate, jobs }: CalendarMonthGrid
               <div className="flex flex-col gap-1">
                 {dayJobs.slice(0, maxJobsPerCell).map((job) => {
                   const needsTech = !!job.scheduled_date && (!job.assignments || job.assignments.length === 0);
-                  const lifecycle = normalizedLifecycleStatus(job);
-                  const dotClass = statusDotClass(lifecycle);
+                  const lifecycle = getCalendarDisplayStatus(job);
+                  const dotClass = calendarStatusDotClass(lifecycle);
                   const faded = lifecycle === 'closed' || lifecycle === 'cancelled' ? 'opacity-50' : '';
                   const primaryLine = job.job_address || shortTitle(job);
                   const secondaryLine = job.job_type || job.title || 'Job';
@@ -131,8 +155,13 @@ export default function CalendarMonthGrid({ monthDate, jobs }: CalendarMonthGrid
                   return (
                     <div key={job.id} className="group relative">
                       <Link
-                        href={`/calendar?view=month&date=${monthDate}&job=${job.id}`}
-                        className={`flex min-h-[32px] items-start gap-2 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm hover:bg-slate-50 ${faded}`}
+                        href={buildCalendarHref('month', ymd, { job: job.id, tech })}
+                        draggable
+                        onDragStart={(event) => {
+                          event.dataTransfer.setData('application/x-cm-job-id', job.id);
+                          event.dataTransfer.effectAllowed = 'move';
+                        }}
+                        className={`flex min-h-[32px] items-start gap-2 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm hover:bg-slate-50 ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700' : ''}`}
                         scroll={false}
                       >
                         <div className={`mt-[5px] h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
@@ -166,7 +195,7 @@ export default function CalendarMonthGrid({ monthDate, jobs }: CalendarMonthGrid
 
                         <div className="mb-1 flex items-center gap-1 text-slate-600">
                           <span className={`h-2 w-2 rounded-full ${dotClass}`} />
-                          <span>{formatStatus(lifecycle)}</span>
+                          <span>{formatCalendarDisplayStatus(lifecycle)}</span>
                         </div>
 
                         <div className="mb-1 text-slate-600">Type: {job.job_type || 'N/A'}</div>

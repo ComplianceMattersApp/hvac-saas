@@ -44,6 +44,8 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
   const jobId = String(formData.get("job_id") || "").trim();
   const method = String(formData.get("method") || "").trim() as AttemptMethod;
   const result = String(formData.get("result") || "").trim() || "no_answer";
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+  const successBannerRaw = String(formData.get("success_banner") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
   if (method !== "call" && method !== "text") throw new Error("Invalid method");
@@ -114,6 +116,17 @@ if (insertErr) throw new Error(insertErr.message);
 
     if (escErr) throw new Error(escErr.message);
   }
+
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/calendar`);
+
+  if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
+    const [pathOnly, searchRaw = ""] = returnToRaw.split("?");
+    const search = new URLSearchParams(searchRaw);
+    if (successBannerRaw) search.set("banner", successBannerRaw);
+    if (pathOnly) revalidatePath(pathOnly);
+    redirect(`${pathOnly}?${search.toString()}`);
+  }
+
   redirect(`/jobs/${jobId}?tab=ops&banner=contact_attempt_logged`);
 }

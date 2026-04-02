@@ -101,7 +101,16 @@ export default function SetPasswordPage() {
 
     // Ensure contractor membership exists (creates it from pending invite if
     // needed) and determine whether to route to /portal or /ops.
-    const { isContractor } = await ensureContractorMembershipFromInvite();
+    const { isContractor, error: membershipError } = await ensureContractorMembershipFromInvite();
+
+    if (membershipError) {
+      setLoading(false);
+      setSuccessMsg(null);
+      setErrorMsg(
+        "Password updated, but we could not finish contractor access setup. Please try again in a moment or contact support.",
+      );
+      return;
+    }
 
     const target = isContractor ? "/portal" : "/ops";
     await handoffRedirectAfterPasswordSet(supabase, target);

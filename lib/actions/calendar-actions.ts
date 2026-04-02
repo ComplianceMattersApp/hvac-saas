@@ -7,6 +7,8 @@ export type DispatchViewMode = 'day' | 'week';
 
 export type DispatchJob = {
   id: string;
+  customer_id: string | null;
+  location_id: string | null;
   title: string;
   job_type: string | null;
   status: string | null;
@@ -53,6 +55,8 @@ export type DispatchCalendarData = {
 
 type JobDispatchRow = {
   id: string;
+  customer_id: string | null;
+  location_id: string | null;
   title: string | null;
   job_type: string | null;
   status: string | null;
@@ -161,6 +165,8 @@ function mergeJobRow(params: {
 
   return {
     id: jobId,
+    customer_id: row?.customer_id ? String(row.customer_id) : null,
+    location_id: row?.location_id ? String(row.location_id) : null,
     title: String(row?.title ?? ''),
     job_type: row?.job_type ? String(row.job_type) : null,
     status: row?.status ? String(row.status) : null,
@@ -215,6 +221,8 @@ export async function getDispatchCalendarData(params: {
 
   const baseSelect = [
     'id',
+    'customer_id',
+    'location_id',
     'title',
     'job_type',
     'status',

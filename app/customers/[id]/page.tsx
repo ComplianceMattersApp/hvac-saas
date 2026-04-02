@@ -47,6 +47,7 @@ type LocationRow = {
 type JobRow = {
   id: string;
   title: string | null;
+  status: string | null;
   job_address: string | null;
   city: string | null;
   scheduled_date: string | null;
@@ -149,6 +150,15 @@ function normalizeOpsStatus(v?: string | null) {
   return String(v ?? "").trim().toLowerCase();
 }
 
+function normalizeLifecycleStatus(v?: string | null) {
+  return String(v ?? "").trim().toLowerCase();
+}
+
+function isLifecycleComplete(v?: string | null) {
+  const status = normalizeLifecycleStatus(v);
+  return ["completed", "closed", "cancelled"].includes(status);
+}
+
 function opsStatusLabel(v?: string | null) {
   const s = normalizeOpsStatus(v);
   if (s === "need_to_schedule") return "Need to Schedule";
@@ -156,6 +166,7 @@ function opsStatusLabel(v?: string | null) {
   if (s === "pending_info") return "Pending Info";
   if (s === "on_hold") return "On Hold";
   if (s === "failed") return "Failed";
+  if (s === "pending_office_review") return "Pending Office Review";
   if (s === "retest_needed") return "Retest Needed";
   if (s === "paperwork_required") return "Paperwork Required";
   if (s === "invoice_required") return "Invoice Required";
@@ -182,6 +193,9 @@ function opsBadgeClass(v?: string | null) {
   if (s === "failed") {
     return "border-red-200 bg-red-50 text-red-800";
   }
+  if (s === "pending_office_review") {
+    return "border-cyan-200 bg-cyan-50 text-cyan-800";
+  }
   if (s === "retest_needed") {
     return "border-rose-200 bg-rose-50 text-rose-800";
   }
@@ -207,6 +221,7 @@ function summaryOrder() {
     "scheduled",
     "pending_info",
     "failed",
+    "pending_office_review",
     "retest_needed",
     "on_hold",
   ] as const;
@@ -302,6 +317,7 @@ const { data: jobsData, error: jobsErr } = await supabase
     `
     id,
     title,
+    status,
     job_address,
     city,
     scheduled_date,
@@ -320,7 +336,9 @@ const { data: jobsData, error: jobsErr } = await supabase
   if (jobsErr) throw jobsErr;
 
   const jobs = (jobsData ?? []) as JobRow[];
-  const activeJobs = jobs.filter((job) => !job.deleted_at);
+  const activeJobs = jobs.filter(
+    (job) => !job.deleted_at && !isLifecycleComplete(job.status)
+  );
 
   // Lightweight service-case awareness
   const serviceCaseIds = Array.from(
@@ -396,7 +414,7 @@ const { data: jobsData, error: jobsErr } = await supabase
       <div className="mx-auto max-w-7xl space-y-7 p-4 md:space-y-8 md:p-6">
         {hasJobsError && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            This customer has active jobs and cannot be archived. Remove all jobs first.
+            This customer has non-archived jobs and cannot be archived. Remove or archive all jobs first.
           </div>
         )}
         {/* Header */}
@@ -565,15 +583,18 @@ const { data: jobsData, error: jobsErr } = await supabase
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-xs uppercase tracking-wide text-slate-500">
-                  Active Work
+                  Active Work (Incl. Closeout)
                 </div>
                 <div className="mt-2 text-2xl font-semibold text-slate-900">
                   {(opsCounts["need_to_schedule"] ?? 0) +
                     (opsCounts["scheduled"] ?? 0) +
                     (opsCounts["pending_info"] ?? 0) +
                     (opsCounts["failed"] ?? 0) +
+                    (opsCounts["pending_office_review"] ?? 0) +
                     (opsCounts["retest_needed"] ?? 0) +
-                    (opsCounts["on_hold"] ?? 0)}
+                    (opsCounts["on_hold"] ?? 0) +
+                    (opsCounts["paperwork_required"] ?? 0) +
+                    (opsCounts["invoice_required"] ?? 0)}
                 </div>
               </div>
 
@@ -711,6 +732,7 @@ const { data: jobsData, error: jobsErr } = await supabase
                   ? serviceCaseVisitCounts.get(job.service_case_id) ?? 1
                   : null;
                 const isArchived = Boolean(job.deleted_at);
+                const isCancelled = normalizeLifecycleStatus(job.status) === "cancelled";
                 const isResolvedParent =
                   normalizeOpsStatus(job.ops_status) === "failed" &&
                   resolvedRetestParentIds.has(job.id);
@@ -725,7 +747,7 @@ const { data: jobsData, error: jobsErr } = await supabase
                     key={job.id}
                     className={[
                       "rounded-xl border p-4",
-                      isArchived
+                      isArchived || isCancelled
                         ? "border-slate-200 bg-slate-100/70"
                         : "border-slate-200 bg-slate-50",
                     ].join(" ")}
@@ -756,6 +778,12 @@ const { data: jobsData, error: jobsErr } = await supabase
                               Retest Resolved ✓
                             </span>
                           )}
+
+                          {isCancelled && !isArchived ? (
+                            <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                              Cancelled
+                            </span>
+                          ) : null}
 
                           {isArchived ? (
                             <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
@@ -807,7 +835,7 @@ const { data: jobsData, error: jobsErr } = await supabase
           <div className="mb-3">
             <h2 className="text-lg font-semibold text-red-900">Danger Zone</h2>
             <p className="text-sm text-red-800/90">
-              Archive this customer record when it is no longer active.
+              Archive this customer record after all related jobs have been removed or archived.
             </p>
           </div>
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   createJobAttachmentUploadToken,
+  finalizePortalAttachmentSubmission,
   revalidatePortalJob,
 } from "@/lib/actions/attachment-actions";
 import ActionFeedback from "@/components/ui/ActionFeedback";
@@ -23,6 +24,20 @@ type Item = {
 
 function attachmentErrorMessage(intent: "upload" | "review") {
   return intent === "review" ? "Could not save changes." : "Could not upload files.";
+}
+
+function getActionErrorMessage(intent: "upload" | "review", error: unknown) {
+  const fallback = attachmentErrorMessage(intent);
+  if (!error || typeof error !== "object") return fallback;
+
+  const message = "message" in error ? String((error as { message?: unknown }).message ?? "").trim() : "";
+  if (!message) return fallback;
+
+  if (message === "Correction review submission is only available for failed ECC jobs.") {
+    return message;
+  }
+
+  return fallback;
 }
 
 export default function JobAttachments({
@@ -103,21 +118,14 @@ export default function JobAttachments({
 
         const trimmed = note.trim();
 
-        // Multi-purpose: log a contractor_note only if there is content
-        if (trimmed || uploadedIds.length > 0) {
-          const { error: evErr } = await supabase.from("job_events").insert({
-            job_id: jobId,
-            event_type: "contractor_note",
-            meta: {
-              note: trimmed || null,
-              attachment_ids: uploadedIds,
-              caption: caption.trim() || null,
-              file_names: files.map((f) => f.name),
-            },
-          });
-
-          if (evErr) throw new Error(evErr.message);
-        }
+        await finalizePortalAttachmentSubmission({
+          jobId,
+          intent: "upload",
+          note: trimmed,
+          caption: caption.trim(),
+          attachmentIds: uploadedIds,
+          fileNames: files.map((f) => f.name),
+        });
 
         await revalidatePortalJob(jobId);
         router.refresh();
@@ -128,7 +136,7 @@ export default function JobAttachments({
         setOk("Upload complete.");
       } catch (e) {
         console.error("portal uploadOnly failed", e);
-        setError(attachmentErrorMessage("upload"));
+        setError(getActionErrorMessage("upload", e));
       }
     });
   }
@@ -148,26 +156,14 @@ export default function JobAttachments({
 
         const trimmed = note.trim();
 
-        // Correction submission event (allowed by your RLS allow-list)
-        const { error: evErr } = await supabase.from("job_events").insert({
-          job_id: jobId,
-          event_type: "contractor_correction_submission",
-          meta: {
-            note: trimmed || null,
-            attachment_ids: uploadedIds,
-            caption: caption.trim() || null,
-            file_names: files.map((f) => f.name),
-          },
+        await finalizePortalAttachmentSubmission({
+          jobId,
+          intent: "review",
+          note: trimmed,
+          caption: caption.trim(),
+          attachmentIds: uploadedIds,
+          fileNames: files.map((f) => f.name),
         });
-
-        if (evErr) throw new Error(evErr.message);
-
-        // Mark job as "needs internal review"
-        const { error: rpcErr } = await supabase.rpc(
-          "mark_job_needs_internal_review",
-          { p_job_id: jobId }
-        );
-        if (rpcErr) throw new Error(rpcErr.message);
 
         await revalidatePortalJob(jobId);
         router.refresh();
@@ -178,7 +174,7 @@ export default function JobAttachments({
         setOk("Submission received.");
       } catch (e) {
         console.error("portal submitForReview failed", e);
-        setError(attachmentErrorMessage("review"));
+        setError(getActionErrorMessage("review", e));
       }
     });
   }

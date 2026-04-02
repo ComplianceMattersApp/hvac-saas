@@ -34,11 +34,11 @@ export function JobFieldActionButton({
 
   const label =
     currentStatus === "open"
-      ? "On the way"
+      ? "Mark On the Way"
       : currentStatus === "on_the_way"
-      ? "In progress"
+      ? "Mark In Progress"
       : currentStatus === "in_process"
-      ? "Job completed"
+      ? "Mark Job Complete"
       : "—";
 
   if (isDone) {

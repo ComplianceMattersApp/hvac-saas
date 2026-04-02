@@ -73,6 +73,21 @@ describe("resolveContractorIssues", () => {
     expect(result.bucket).toBe("in_progress");
   });
 
+  it("maps pending_office_review to under review in_progress state", () => {
+    const result = resolveContractorIssues({
+      job: {
+        id: "job-7",
+        ops_status: "pending_office_review",
+      },
+      failureReasons: ["Failed - airflow below target"],
+    });
+
+    expect(result.primaryIssue.group).toBe("in_progress");
+    expect(result.primaryIssue.headline).toBe("Under review");
+    expect(result.statusLabel).toBe("Under Review");
+    expect(result.bucket).toBe("in_progress");
+  });
+
   it("uses retest scheduled override only for failed and retest_needed states", () => {
     const result = resolveContractorIssues({
       job: {

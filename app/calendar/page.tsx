@@ -18,6 +18,7 @@ export default async function CalendarPage({
     banner?: string;
     job?: string;
     tech?: string;
+    prefill_date?: string;
   }>;
 }) {
   const sp = (searchParams ? await searchParams : {}) ?? {};
@@ -25,7 +26,7 @@ export default async function CalendarPage({
 
   return (
     <div className="min-h-screen w-full bg-gray-50 px-3 py-4 sm:px-6 sm:py-5">
-      <CalendarView view={sp.view} date={date} banner={sp.banner} job={sp.job} tech={sp.tech} />
+      <CalendarView view={sp.view} date={date} banner={sp.banner} job={sp.job} tech={sp.tech} prefillDate={sp.prefill_date} />
     </div>
   );
 }
