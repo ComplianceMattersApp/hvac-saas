@@ -533,7 +533,7 @@ function DispatchGrid(props: {
               const colorBars = assignees.slice(0, 3);
               const overflowCount = Math.max(assignees.length - colorBars.length, 0);
               const initials = assignees.slice(0, 2).map((a) => initialsFromName(a.display_name)).join(' ');
-              const lifecycle = normalizedLifecycleStatus(job);
+              const lifecycle = getCalendarDisplayStatus(job);
               const isCancelled = lifecycle === 'cancelled';
 
               const laneWidthPct = 100 / Math.max(row.laneCount, 1);
