@@ -2516,6 +2516,7 @@ export async function assignJobAssigneeFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/ops");
   revalidatePath("/ops/field");
+  revalidatePath(`/calendar`);
 
   redirectToJobWithBanner({
     jobId,
@@ -2556,6 +2557,7 @@ export async function setPrimaryJobAssigneeFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/ops");
   revalidatePath("/ops/field");
+  revalidatePath(`/calendar`);
 
   redirectToJobWithBanner({
     jobId,
@@ -2596,6 +2598,7 @@ export async function removeJobAssigneeFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/ops");
   revalidatePath("/ops/field");
+  revalidatePath(`/calendar`);
 
   redirectToJobWithBanner({
     jobId,
