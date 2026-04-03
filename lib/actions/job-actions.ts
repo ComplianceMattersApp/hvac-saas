@@ -2483,7 +2483,14 @@ export async function assignJobAssigneeFromForm(formData: FormData) {
   const returnToRaw = String(formData.get("return_to") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
-  if (!userId) throw new Error("Missing user_id");
+  if (!userId) {
+    redirectToJobWithBanner({
+      jobId,
+      banner: "assignment_user_required",
+      tabRaw,
+      returnToRaw,
+    });
+  }
 
   const supabase = await createClient();
   const { userId: actorUserId } = await requireInternalUser({ supabase });

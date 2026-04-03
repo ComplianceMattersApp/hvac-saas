@@ -55,6 +55,7 @@ function bannerMessage(banner?: string) {
     assignment_added_primary: 'Assignee added and set as primary.',
     assignment_primary_set: 'Primary assignee updated.',
     assignment_removed: 'Assignee removed.',
+    assignment_user_required: 'Select a technician before assigning.',
     contact_attempt_logged_call: 'Call attempt logged.',
     contact_attempt_logged_text: 'Text attempt logged.',
   };
@@ -803,7 +804,7 @@ function DetailPanel(props: {
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="tab" value="ops" />
             <input type="hidden" name="return_to" value={returnTo} />
-            <select name="user_id" className="rounded border px-2 py-2 text-sm" defaultValue="">
+            <select name="user_id" className="rounded border px-2 py-2 text-sm" defaultValue="" required>
               <option value="" disabled>
                 Select internal user
               </option>
