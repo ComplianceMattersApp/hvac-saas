@@ -55,6 +55,10 @@ function getMonthDays(monthDate: string) {
   return eachDayOfInterval({ start, end });
 }
 
+function getLeadingEmptyCellCount(monthDate: string) {
+  return startOfMonth(parseISO(monthDate)).getDay();
+}
+
 function jobsByDate(jobs: DispatchJob[]) {
   const map = new Map<string, DispatchJob[]>();
   for (const job of jobs) {
@@ -75,6 +79,8 @@ export default function CalendarMonthGrid({ monthDate, jobs, tech, selectedDate,
   const router = useRouter();
   const [dropTargetDate, setDropTargetDate] = useState<string | null>(null);
   const days = getMonthDays(monthDate);
+  const leadingEmptyCellCount = getLeadingEmptyCellCount(monthDate);
+  const trailingEmptyCellCount = (7 - ((leadingEmptyCellCount + days.length) % 7)) % 7;
   const jobMap = jobsByDate(jobs);
   const month = parseISO(monthDate);
   const maxJobsPerCell = 3;
@@ -91,6 +97,13 @@ export default function CalendarMonthGrid({ monthDate, jobs, tech, selectedDate,
       </div>
 
       <div className="grid grid-cols-7 gap-2">
+        {Array.from({ length: leadingEmptyCellCount }, (_, index) => (
+          <div
+            key={`leading-empty-${index}`}
+            aria-hidden="true"
+            className="min-h-24 rounded-xl border border-transparent bg-transparent p-3"
+          />
+        ))}
         {days.map((day) => {
           const ymd = format(day, 'yyyy-MM-dd');
           const dayJobs = jobMap.get(ymd) || [];
@@ -221,6 +234,13 @@ export default function CalendarMonthGrid({ monthDate, jobs, tech, selectedDate,
             </div>
           );
         })}
+        {Array.from({ length: trailingEmptyCellCount }, (_, index) => (
+          <div
+            key={`trailing-empty-${index}`}
+            aria-hidden="true"
+            className="min-h-24 rounded-xl border border-transparent bg-transparent p-3"
+          />
+        ))}
       </div>
     </div>
   );
