@@ -735,7 +735,21 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
       return r?.computed_pass === false;
     });
 
+    let hasCorrectionReviewResolution = false;
     if (hasFailedCompletedRun) {
+      const { data: correctionResolutionEvent, error: correctionResolutionErr } = await supabase
+        .from("job_events")
+        .select("id")
+        .eq("job_id", jobId)
+        .eq("event_type", "failure_resolved_by_correction_review")
+        .limit(1)
+        .maybeSingle();
+
+      if (correctionResolutionErr) throw new Error(correctionResolutionErr.message);
+      hasCorrectionReviewResolution = Boolean(correctionResolutionEvent?.id);
+    }
+
+    if (hasFailedCompletedRun && !hasCorrectionReviewResolution) {
       redirect(`/jobs/${jobId}?notice=failed_requires_retest`);
     }
   }
