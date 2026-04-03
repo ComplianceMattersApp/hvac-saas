@@ -47,11 +47,11 @@ export async function middleware(req: NextRequest) {
   );
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
   // If not logged in, force to /login
-  if (!session && !isAuthRoute) {
+  if (!user && !isAuthRoute) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);

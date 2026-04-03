@@ -32,7 +32,7 @@ export async function ensureContractorMembershipFromInvite(): Promise<{
 
   // Find the oldest pending invite linked to this auth user.
   // .limit(1) ensures maybeSingle() never errors on multiple rows.
-  const { data: invites, error: inviteErr } = await admin
+  const { data: invitesByUserId, error: inviteErr } = await admin
     .from("contractor_invites")
     .select("id, contractor_id, status")
     .eq("auth_user_id", user.id)
@@ -42,7 +42,25 @@ export async function ensureContractorMembershipFromInvite(): Promise<{
 
   if (inviteErr) return { isContractor: false, error: inviteErr.message };
 
-  const invite = invites?.[0];
+  let invite = invitesByUserId?.[0] ?? null;
+
+  // Fallback for older/fragile invite rows where auth_user_id was not set.
+  if (!invite) {
+    const email = String(user.email ?? "").trim().toLowerCase();
+
+    if (email) {
+      const { data: invitesByEmail, error: byEmailErr } = await admin
+        .from("contractor_invites")
+        .select("id, contractor_id, status")
+        .eq("status", "pending")
+        .ilike("email", email)
+        .order("created_at", { ascending: true })
+        .limit(1);
+
+      if (byEmailErr) return { isContractor: false, error: byEmailErr.message };
+      invite = invitesByEmail?.[0] ?? null;
+    }
+  }
 
   if (!invite) {
     // No pending invite — check if this user already has a membership row.

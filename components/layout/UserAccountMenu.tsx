@@ -65,7 +65,6 @@ export default function UserAccountMenu({ accountFirstName, accountLabel, isAdmi
       {open ? (
         <div
           className="absolute right-0 z-50 mt-2 min-w-44 rounded-md border border-slate-200 bg-white p-1 shadow-lg"
-          onClickCapture={() => setOpen(false)}
         >
           {isAdmin ? (
             <Link

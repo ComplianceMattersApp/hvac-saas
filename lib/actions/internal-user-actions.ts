@@ -106,7 +106,34 @@ async function getAuthUserIdByEmail(admin: any, email: string): Promise<string |
     .maybeSingle();
 
   if (error) throw error;
-  return data?.id ? String(data.id) : null;
+  if (data?.id) return String(data.id);
+
+  // Fallback to auth-admin user lookup so invite flows are not dependent
+  // solely on profile row presence/timing.
+  let page = 1;
+
+  while (page <= 5) {
+    const { data: listed, error: listErr } = await admin.auth.admin.listUsers({
+      page,
+      perPage: 200,
+    });
+
+    if (listErr) throw listErr;
+
+    const users = Array.isArray((listed as any)?.users)
+      ? (listed as any).users
+      : [];
+
+    const match = users.find((u: any) =>
+      String(u?.email ?? "").trim().toLowerCase() === normalized,
+    );
+
+    if (match?.id) return String(match.id);
+    if (users.length < 200) break;
+    page += 1;
+  }
+
+  return null;
 }
 
 async function requireScopedTarget(

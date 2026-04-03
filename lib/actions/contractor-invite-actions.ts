@@ -21,14 +21,43 @@ function normalizeEmail(email: string) {
 }
 
 async function getAuthUserIdByEmail(admin: any, email: string): Promise<string | null> {
+  const normalized = String(email ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+
   const { data, error } = await admin
     .from("profiles")
     .select("id, email")
-    .ilike("email", email)
+    .ilike("email", normalized)
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  return data?.id ? String(data.id) : null;
+  if (data?.id) return String(data.id);
+
+  // Fallback to auth-admin lookup to avoid relying only on profiles.
+  let page = 1;
+
+  while (page <= 5) {
+    const { data: listed, error: listErr } = await admin.auth.admin.listUsers({
+      page,
+      perPage: 200,
+    });
+
+    if (listErr) throw listErr;
+
+    const users = Array.isArray((listed as any)?.users)
+      ? (listed as any).users
+      : [];
+
+    const match = users.find((u: any) =>
+      String(u?.email ?? "").trim().toLowerCase() === normalized,
+    );
+
+    if (match?.id) return String(match.id);
+    if (users.length < 200) break;
+    page += 1;
+  }
+
+  return null;
 }
 
 export async function inviteContractor(args: {
