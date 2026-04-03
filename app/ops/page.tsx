@@ -92,6 +92,7 @@ function windowToDisplay(start?: string | null, end?: string | null) {
 
 
 type BucketKey =
+  | "workflow_all"
   | "attention"
   | "need_to_schedule"
   | "scheduled"
@@ -105,6 +106,7 @@ type BucketKey =
   | "recent_closed";
 
 const OPS_TABS: { key: BucketKey; label: string }[] = [
+  { key: "workflow_all", label: "Workflow View All" },
   { key: "attention", label: "Needs Attention" },
   { key: "need_to_schedule", label: "Need to Schedule" },
   { key: "scheduled", label: "Scheduled" },
@@ -549,6 +551,14 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
       );
     } else if (bucket === "failed") {
       bucketQ = bucketQ.in("ops_status", ["failed", "pending_office_review"]);
+    } else if (bucket === "workflow_all") {
+      bucketQ = bucketQ.in("ops_status", [
+        "need_to_schedule",
+        "pending_info",
+        "on_hold",
+        "failed",
+        "pending_office_review",
+      ]);
     } else if (bucket === "closeout") {
       bucketQ = bucketQ
         .eq("field_complete", true)
@@ -573,9 +583,22 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
     (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
   );
   const baseFilteredBucketJobs =
-  bucket === "failed" || bucket === "attention"
+  bucket === "failed" || bucket === "attention" || bucket === "workflow_all"
     ? (bucketJobs ?? []).filter(
-        (j: any) => !resolvedFailedParentIds.has(String(j.id ?? ""))
+        (j: any) => {
+          const id = String(j.id ?? "");
+          const ops = String(j.ops_status ?? "").toLowerCase();
+
+          if (ops === "failed" || ops === "pending_office_review") {
+            if (resolvedFailedParentIds.has(id) || hasScheduledRetestForJob(id)) return false;
+          }
+
+          if (bucket === "workflow_all" && ops === "need_to_schedule") {
+            return String(j.status ?? "").toLowerCase() === "open";
+          }
+
+          return true;
+        }
       )
     : bucket === "closeout"
       ? (bucketJobs ?? []).filter((j: any) => isInCloseoutQueue(j))
@@ -1318,26 +1341,11 @@ const activeFailedCount = (countRows ?? []).filter((row: any) => {
   );
 }).length;
 
-const adjustedAttentionCount = (attentionJobs ?? []).filter((j: any) => {
-  const jobId = String(j?.id ?? "");
-  return !hasScheduledRetestForJob(jobId);
-}).length;
-
 const workflowCards = [
-  {
-    key: "attention",
-    label: "Needs Attention",
-    count: adjustedAttentionCount,
-  },
   {
     key: "need_to_schedule",
     label: "Need to Schedule",
     count: counts.get("need_to_schedule") ?? 0,
-  },
-  {
-    key: "scheduled",
-    label: "Scheduled",
-    count: counts.get("scheduled") ?? 0,
   },
   {
     key: "pending_info",
@@ -1353,26 +1361,6 @@ const workflowCards = [
     key: "failed",
     label: "Failed",
     count: activeFailedCount,
-  },
-  {
-    key: "retest_needed",
-    label: "Retest Needed",
-    count: counts.get("retest_needed") ?? 0,
-  },
-  {
-    key: "paperwork_required",
-    label: "Status: Paperwork Required",
-    count: counts.get("paperwork_required") ?? 0,
-  },
-  {
-    key: "invoice_required",
-    label: "Status: Invoice Required",
-    count: counts.get("invoice_required") ?? 0,
-  },
-  {
-    key: "closeout",
-    label: "Closeout Work Queue",
-    count: closeoutJobs.length,
   },
 ].filter((c) => c.count > 0 || c.key === bucket);
 
@@ -1990,13 +1978,27 @@ return (
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-sm font-semibold text-gray-900">System / Contractor Work</div>
-          <div className="text-xs text-gray-600">Closeout is the working bucket. Paperwork and invoice cards show raw projected status buckets.</div>
+          <div className="text-xs text-gray-600">Workflow signal queues for active operational coordination.</div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-1">
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 text-sm font-semibold text-gray-900">Workflow Queues</div>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="text-sm font-semibold text-gray-900">Workflow Queues</div>
+            <Link
+              href={`/ops${buildQueryString({
+                bucket: "workflow_all",
+                contractor: contractor ?? "",
+                q: q ?? "",
+                sort: sort ?? "",
+                signal: "",
+              })}#ops-queues`}
+              className="text-xs font-medium text-blue-700 hover:text-blue-800 hover:underline"
+            >
+              View All
+            </Link>
+          </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {workflowCards.map((card) => {
               const isActive = bucket === card.key && !signal;
