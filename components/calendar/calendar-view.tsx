@@ -5,7 +5,7 @@ import { eachWeekOfInterval, endOfMonth, format as formatDate, parseISO, startOf
 import CalendarMonthGrid from './CalendarMonthGrid';
 import { CALENDAR_STATUS_LEGEND, calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
 import SubmitButton from '@/components/SubmitButton';
-import { createCalendarBlockEventFromForm, deleteCalendarBlockEventFromForm } from '@/lib/actions/calendar-event-actions';
+import { createCalendarBlockEventFromForm, deleteCalendarBlockEventFromForm, updateCalendarBlockEventFromForm } from '@/lib/actions/calendar-event-actions';
 import {
   assignJobAssigneeFromForm,
   removeJobAssigneeFromForm,
@@ -23,6 +23,7 @@ type Props = {
   date?: string;
   banner?: string;
   job?: string;
+  block?: string;
   tech?: string;
   prefillDate?: string;
 };
@@ -52,9 +53,11 @@ function bannerMessage(banner?: string) {
     contact_attempt_logged_call: 'Call attempt logged.',
     contact_attempt_logged_text: 'Text attempt logged.',
     calendar_block_created: 'Calendar block added.',
+    calendar_block_updated: 'Calendar block updated.',
     calendar_block_deleted: 'Calendar block removed.',
     calendar_block_delete_invalid: 'Select a valid calendar block to remove.',
     calendar_block_delete_missing: 'That calendar block no longer exists.',
+    calendar_block_update_missing: 'That calendar block no longer exists.',
     calendar_block_invalid: 'Enter a title, date, and valid start/end times.',
     calendar_block_invalid_range: 'End time must be after start time.',
     calendar_block_user_required: 'Select an internal user for the block.',
@@ -126,13 +129,14 @@ function buildReturnTo(view: CalendarUIView, date: string, tech?: string | null)
 function buildCalendarHref(
   view: CalendarUIView,
   date: string,
-  params?: { banner?: string; job?: string | null; tech?: string | null; prefillDate?: string | null },
+  params?: { banner?: string; job?: string | null; block?: string | null; tech?: string | null; prefillDate?: string | null },
 ) {
   const q = new URLSearchParams();
   q.set('view', view);
   q.set('date', date);
   if (params?.banner) q.set('banner', params.banner);
   if (params?.job) q.set('job', params.job);
+  if (params?.block) q.set('block', params.block);
   if (params?.tech) q.set('tech', params.tech);
   if (params?.prefillDate) q.set('prefill_date', params.prefillDate);
   return `/calendar?${q.toString()}`;
@@ -611,11 +615,20 @@ function DispatchGrid(props: {
                         ) : null}
                       </div>
                       <form action={deleteCalendarBlockEventFromForm} className="ml-2 shrink-0 self-center">
+                        <div className="flex items-center gap-1.5">
+                          <Link
+                            href={buildCalendarHref(mode, date, { block: blockEvent.id, tech })}
+                            scroll={false}
+                            className="inline-flex h-6 w-14 items-center justify-center rounded-md border border-emerald-300 bg-white/95 px-1.5 py-1 text-[9px] font-semibold uppercase leading-none tracking-wide text-emerald-800 transition hover:bg-emerald-100"
+                          >
+                            Edit
+                          </Link>
                           <input type="hidden" name="event_id" value={blockEvent.id} />
                           <input type="hidden" name="return_to" value={buildCalendarHref(mode, date, { tech })} />
-                          <SubmitButton className="rounded-md border border-emerald-300 bg-white/95 px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-800 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700" loadingText="...">
+                          <SubmitButton className="appearance-none !inline-flex !h-6 !min-h-0 !w-14 items-center justify-center rounded-md border border-emerald-300 bg-white/95 px-1.5 py-1 text-[9px] font-semibold uppercase leading-none tracking-wide text-emerald-800 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700" loadingText="...">
                             Remove
                           </SubmitButton>
+                        </div>
                       </form>
                     </div>
                   </div>
@@ -699,8 +712,9 @@ function AgendaList(props: {
   blockEvents: DispatchCalendarBlockEvent[];
   date: string;
   tech?: string | null;
+  selectedBlockId?: string;
 }) {
-  const { jobs, blockEvents, date, tech } = props;
+  const { jobs, blockEvents, date, tech, selectedBlockId } = props;
 
   const grouped = new Map<string, DispatchJob[]>();
   for (const job of jobs) {
@@ -778,7 +792,7 @@ function AgendaList(props: {
             {(groupedBlocks.get(dateKey) ?? []).map((event) => (
               <div
                 key={event.id}
-                className="flex items-center gap-3 rounded border border-emerald-200 border-dashed bg-emerald-50/70 px-3 py-2 text-[13px] text-emerald-950 shadow-sm"
+                className={`flex items-center gap-3 rounded border border-emerald-200 border-dashed bg-emerald-50/70 px-3 py-2 text-[13px] text-emerald-950 shadow-sm ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}
               >
                 <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                   Block
@@ -790,6 +804,13 @@ function AgendaList(props: {
                     {event.description ? ` · ${event.description}` : ''}
                   </div>
                 </div>
+                <Link
+                  href={buildCalendarHref('list', date, { block: event.id, tech })}
+                  scroll={false}
+                  className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700 underline-offset-2 hover:underline"
+                >
+                  Edit
+                </Link>
               </div>
             ))}
           </div>
@@ -1090,6 +1111,7 @@ export async function CalendarView(props: Props) {
   const returnTo = buildReturnTo(uiView, data.anchorDate, activeTech);
   const banner = bannerMessage(props.banner);
   const selectedJobId = String(props.job ?? '').trim();
+  const selectedBlockId = String(props.block ?? '').trim();
   const prefillDate = normalizeYmd(props.prefillDate);
   let canonicalBlockEventsForRange = data.calendarBlockEvents;
 
@@ -1159,6 +1181,7 @@ export async function CalendarView(props: Props) {
   const techFilteredBlockEvents = activeTech
     ? canonicalBlockEventsForRange.filter((event) => event.internal_user_id === activeTech)
     : canonicalBlockEventsForRange;
+  const selectedBlock = canonicalBlockEventsForRange.find((event) => event.id === selectedBlockId) ?? null;
 
   const selectedJob =
     (selectedJobId ? canonicalDispatchJobsForRange.find((job) => job.id === selectedJobId) : null) ||
@@ -1302,81 +1325,157 @@ export async function CalendarView(props: Props) {
 
       <div className={`grid gap-5 ${showDesktopInspectorColumn ? 'xl:grid-cols-[260px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[260px_minmax(0,1fr)]'}`}>
         <aside className="order-2 xl:order-1">
-          {(uiView === 'day' || uiView === 'week') && data.assignableUsers.length ? (
-            <details className="group mb-4 rounded-lg border border-emerald-100 bg-white/90">
-              <summary className="flex cursor-pointer list-none items-start justify-between gap-2 rounded-lg px-2.5 py-2 text-left transition hover:bg-emerald-50/40 [&::-webkit-details-marker]:hidden">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Add Block</p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">Create an internal time block only when needed.</p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
-                    Internal only
-                  </span>
-                  <span aria-hidden="true" className="inline-block text-xs font-semibold text-slate-400 transition-transform group-open:rotate-90">
-                    {'>'}
-                  </span>
-                </div>
-              </summary>
-              <div className="border-t border-emerald-100 px-2.5 pb-2.5 pt-2">
-                <form action={createCalendarBlockEventFromForm} className="grid gap-2">
-                  <input type="hidden" name="return_to" value={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })} />
-                  <input
-                    name="title"
-                    className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400"
-                    placeholder="Event name"
-                    required
-                  />
-                  <select
-                    name="internal_user_id"
-                    defaultValue={activeTech ?? ''}
-                    className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
-                    required
-                  >
-                    <option value="" disabled>
-                      Select technician
-                    </option>
-                    {data.assignableUsers.map((user) => (
-                      <option key={`block-user-${user.user_id}`} value={user.user_id}>
-                        {user.display_name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="grid gap-1.5 sm:grid-cols-2">
-                    <input
-                      type="date"
-                      name="date"
-                      defaultValue={data.anchorDate}
-                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 sm:col-span-2"
-                      required
-                    />
-                    <input
-                      type="time"
-                      name="start_time"
-                      defaultValue="08:00"
-                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
-                      required
-                    />
-                    <input
-                      type="time"
-                      name="end_time"
-                      defaultValue="09:00"
-                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
-                      required
-                    />
+          {data.assignableUsers.length ? (
+            selectedBlock ? (
+              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/70 p-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Edit Block</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">Update the existing internal block and save your corrections.</p>
                   </div>
-                  <textarea
-                    name="description"
-                    rows={2}
-                    className="rounded-md border border-slate-200 bg-slate-50/70 px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400"
-                    placeholder="Optional details"
-                  />
-                  <SubmitButton className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-emerald-700" loadingText="Creating...">
-                    Add Block
-                  </SubmitButton>
-                </form>
+                  <Link
+                    href={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })}
+                    scroll={false}
+                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 transition hover:bg-slate-50"
+                  >
+                    Close
+                  </Link>
+                </div>
+                <div className="mt-2 border-t border-emerald-100 pt-2">
+                  <form action={updateCalendarBlockEventFromForm} className="grid gap-2">
+                    <input type="hidden" name="event_id" value={selectedBlock.id} />
+                    <input type="hidden" name="return_to" value={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })} />
+                    <input
+                      name="title"
+                      defaultValue={selectedBlock.title}
+                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400"
+                      placeholder="Event name"
+                      required
+                    />
+                    <select
+                      name="internal_user_id"
+                      defaultValue={selectedBlock.internal_user_id}
+                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                      required
+                    >
+                      {data.assignableUsers.map((user) => (
+                        <option key={`edit-block-user-${user.user_id}`} value={user.user_id}>
+                          {user.display_name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="grid gap-1.5 sm:grid-cols-2">
+                      <input
+                        type="date"
+                        name="date"
+                        defaultValue={selectedBlock.calendar_date}
+                        className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 sm:col-span-2"
+                        required
+                      />
+                      <input
+                        type="time"
+                        name="start_time"
+                        defaultValue={selectedBlock.start_time}
+                        className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                        required
+                      />
+                      <input
+                        type="time"
+                        name="end_time"
+                        defaultValue={selectedBlock.end_time}
+                        className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                        required
+                      />
+                    </div>
+                    <textarea
+                      name="description"
+                      rows={2}
+                      defaultValue={selectedBlock.description ?? ''}
+                      className="rounded-md border border-slate-200 bg-slate-50/70 px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400"
+                      placeholder="Optional details"
+                    />
+                    <SubmitButton className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-emerald-700" loadingText="Saving...">
+                      Save Block
+                    </SubmitButton>
+                  </form>
+                </div>
               </div>
-            </details>
+            ) : (uiView === 'day' || uiView === 'week') ? (
+              <details className="group mb-4 rounded-lg border border-emerald-100 bg-white/90">
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-2 rounded-lg px-2.5 py-2 text-left transition hover:bg-emerald-50/40 [&::-webkit-details-marker]:hidden">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Add Block</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">Create an internal time block only when needed.</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                      Internal only
+                    </span>
+                    <span aria-hidden="true" className="inline-block text-xs font-semibold text-slate-400 transition-transform group-open:rotate-90">
+                      {'>'}
+                    </span>
+                  </div>
+                </summary>
+                <div className="border-t border-emerald-100 px-2.5 pb-2.5 pt-2">
+                  <form action={createCalendarBlockEventFromForm} className="grid gap-2">
+                    <input type="hidden" name="return_to" value={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })} />
+                    <input
+                      name="title"
+                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400"
+                      placeholder="Event name"
+                      required
+                    />
+                    <select
+                      name="internal_user_id"
+                      defaultValue={activeTech ?? ''}
+                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                      required
+                    >
+                      <option value="" disabled>
+                        Select technician
+                      </option>
+                      {data.assignableUsers.map((user) => (
+                        <option key={`block-user-${user.user_id}`} value={user.user_id}>
+                          {user.display_name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="grid gap-1.5 sm:grid-cols-2">
+                      <input
+                        type="date"
+                        name="date"
+                        defaultValue={data.anchorDate}
+                        className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 sm:col-span-2"
+                        required
+                      />
+                      <input
+                        type="time"
+                        name="start_time"
+                        defaultValue="08:00"
+                        className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                        required
+                      />
+                      <input
+                        type="time"
+                        name="end_time"
+                        defaultValue="09:00"
+                        className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                        required
+                      />
+                    </div>
+                    <textarea
+                      name="description"
+                      rows={2}
+                      className="rounded-md border border-slate-200 bg-slate-50/70 px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400"
+                      placeholder="Optional details"
+                    />
+                    <SubmitButton className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-emerald-700" loadingText="Creating...">
+                      Add Block
+                    </SubmitButton>
+                  </form>
+                </div>
+              </details>
+            ) : null
           ) : null}
 
           {hiddenScheduledJobs.length ? (
@@ -1453,12 +1552,12 @@ export async function CalendarView(props: Props) {
         <main className="order-1 min-w-0 space-y-4 xl:order-2">
           {uiView === 'list' ? (
             <section className="overflow-x-auto px-1">
-              <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} tech={activeTech} />
+              <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} tech={activeTech} selectedBlockId={selectedBlockId} />
             </section>
           ) : uiView === 'month' ? (
             <section>
               <div className="lg:hidden px-1">
-                <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} tech={activeTech} />
+                <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} tech={activeTech} selectedBlockId={selectedBlockId} />
               </div>
               <div className="hidden overflow-x-auto lg:block">
                 <CalendarMonthGrid
@@ -1468,6 +1567,7 @@ export async function CalendarView(props: Props) {
                   tech={activeTech}
                   selectedDate={data.anchorDate}
                   selectedJobId={selectedJobId}
+                  selectedBlockId={selectedBlockId}
                 />
               </div>
             </section>

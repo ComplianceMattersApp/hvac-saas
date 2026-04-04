@@ -1532,9 +1532,6 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   const phoneHref = telHref(customerPhone);
   const textHref = smsHref(customerPhone);
   const hasRetestReady = hasSignalEventForJob(latestRetestReadyByJob, jobId);
-  const scheduleText = j?.scheduled_date
-    ? `${formatBusinessDateUS(String(j.scheduled_date))} ${displayWindowLA(j.window_start, j.window_end) || ""}`.trim()
-    : "Not scheduled";
   const scheduleDateText = j?.scheduled_date ? formatBusinessDateUS(String(j.scheduled_date)) : "Not scheduled";
   const scheduleWindowText = displayWindowLA(j.window_start, j.window_end) || (j?.scheduled_date ? "Window TBD" : "No time set");
   const nextStep = nextActionLabel(j, {
@@ -1582,121 +1579,128 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     : "Awaiting correction or retest decision.";
   const hasPrimaryStatusCallout = isFailedFamily || pendingInfoSignal || onHoldSignal;
   const showStatusPill = !hasPrimaryStatusCallout && statusMeta.label !== "Open";
-  const metadataCardClass = "px-0 py-0 xl:rounded-lg xl:border xl:border-slate-200 xl:bg-slate-50/80 xl:px-3.5 xl:py-3";
-  const previewMetadataGridClass = "mt-3 grid grid-cols-2 gap-x-5 gap-y-3";
-  const activeQueueMetadataGridClass = "mt-3 grid gap-x-5 gap-y-3 xl:grid-cols-3";
+  const scheduleLabel = showDate ? "Scheduled" : "Schedule";
+  const metadataItemClass = "min-w-0 rounded-md border border-slate-200/80 bg-slate-50/70 px-2.5 py-2";
+  const previewMetadataGridClass = "mt-2.5 grid grid-cols-2 gap-2";
+  const activeQueueMetadataGridClass = "mt-2.5 grid grid-cols-2 gap-2 xl:grid-cols-4";
 
   return (
     <div
       key={j.id}
       className={[
-        "relative rounded-xl border bg-white p-4 shadow-sm transition-all hover:-translate-y-px hover:shadow-md",
+        "relative rounded-lg border bg-white p-3.5 shadow-sm transition-all hover:-translate-y-px hover:shadow-md",
         emphasize && needsAttention
           ? "border-amber-300 bg-amber-50/40"
           : "border-gray-200",
       ].join(" ")}
     >
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <div className="min-w-0 flex-1">
-          <Link
-            href={`/jobs/${j.id}?tab=ops`}
-            className="inline-block text-base font-semibold leading-6 text-blue-700 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1"
-          >
-            {displayTitle}
-          </Link>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <Link
+              href={`/jobs/${j.id}?tab=ops`}
+              className="inline-block text-[15px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1"
+            >
+              {displayTitle}
+            </Link>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              {emphasize && needsAttention ? (
+                <span className="inline-flex rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 font-semibold uppercase tracking-[0.08em] text-amber-800">
+                  Attention
+                </span>
+              ) : null}
+              {showStatusPill ? (
+                <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
+                  {statusMeta.label}
+                </span>
+              ) : null}
+            </div>
+          </div>
           {isFailedFamily ? (
-            <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-3 text-rose-900">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-700">Status</div>
-              <div className="mt-1 text-sm font-semibold">{failedStatusLabel}</div>
-              <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-700">Reason</div>
-              <div className="mt-1 text-sm font-medium text-rose-900">{failedReasonText}</div>
+            <div className="mt-2.5 rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 text-rose-900">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-700">{failedStatusLabel}</div>
+                <div className="text-sm font-medium text-rose-900">{failedReasonText}</div>
+              </div>
               {failedSupportText ? (
-                <div className="mt-2 text-xs leading-5 text-rose-900/80">{failedSupportText}</div>
+                <div className="mt-1 text-xs leading-4.5 text-rose-900/80">{failedSupportText}</div>
               ) : null}
             </div>
           ) : null}
           {pendingInfoSignal ? (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3 text-amber-900">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">Status</div>
-              <div className="mt-1 text-sm font-semibold">Pending Info</div>
-              <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">Reason</div>
-              <div className="mt-1 text-sm font-medium text-amber-900">{pendingInfoContext}</div>
+            <div className="mt-2.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-900">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">Pending Info</div>
+                <div className="text-sm font-medium text-amber-900">{pendingInfoContext}</div>
+              </div>
             </div>
           ) : null}
           {onHoldSignal ? (
-            <div className="mt-3 rounded-lg border border-slate-300 bg-slate-100 px-3.5 py-3 text-slate-800">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Status</div>
-              <div className="mt-1 text-sm font-semibold text-slate-900">On Hold</div>
-              <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Reason</div>
-              <div className="mt-1 text-sm font-medium text-slate-800">{onHoldContext}</div>
+            <div className="mt-2.5 rounded-md border border-slate-300 bg-slate-100 px-3 py-2.5 text-slate-800">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">On Hold</div>
+                <div className="text-sm font-medium text-slate-800">{onHoldContext}</div>
+              </div>
             </div>
           ) : null}
           {emphasize ? (
             <div className={previewMetadataGridClass}>
-              <div>
+              <div className={metadataItemClass}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Customer</div>
-                <div className="mt-1 text-sm font-medium text-slate-900">{customerName}</div>
-                <div className="text-xs text-slate-600">{customerPhone || "No phone on file"}</div>
+                <div className="mt-0.5 text-sm font-medium leading-5 text-slate-900">{customerName}</div>
+                <div className="text-[11px] leading-4 text-slate-600">{customerPhone || "No phone on file"}</div>
               </div>
-              <div>
+              <div className={metadataItemClass}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Address</div>
-                <div className="mt-1 text-sm text-slate-800">{addressLine(j)}</div>
+                <div className="mt-0.5 text-sm leading-5 text-slate-800">{addressLine(j)}</div>
               </div>
-              <div>
+              <div className={metadataItemClass}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Contractor</div>
-                <div className="mt-1 text-sm text-slate-800">{contractorName}</div>
+                <div className="mt-0.5 text-sm leading-5 text-slate-800">{contractorName}</div>
               </div>
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Schedule</div>
-                <div className="mt-1 text-sm font-semibold text-slate-900">{scheduleDateText}</div>
-                <div className="mt-0.5 text-xs text-slate-600">{scheduleWindowText}</div>
+              <div className={metadataItemClass}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{scheduleLabel}</div>
+                <div className="mt-0.5 text-sm font-semibold leading-5 text-slate-900">{scheduleDateText}</div>
+                <div className="text-[11px] leading-4 text-slate-600">{scheduleWindowText}</div>
               </div>
-              <div>
+              <div className={metadataItemClass}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Assigned</div>
-                <div className="mt-1 text-sm text-slate-800">{assignmentSummary}</div>
+                <div className="mt-0.5 text-sm leading-5 text-slate-800">{assignmentSummary}</div>
               </div>
             </div>
           ) : (
             <div className={activeQueueMetadataGridClass}>
-              <div className={metadataCardClass}>
+              <div className={metadataItemClass}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Customer</div>
-                <div className="mt-1 text-sm font-medium text-slate-900">{customerName}</div>
-                <div className="text-xs text-slate-600">{customerPhone || "No phone on file"}</div>
+                <div className="mt-0.5 text-sm font-medium leading-5 text-slate-900">{customerName}</div>
+                <div className="text-[11px] leading-4 text-slate-600">{customerPhone || "No phone on file"}</div>
               </div>
-              <div className={metadataCardClass}>
+              <div className={metadataItemClass}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Address</div>
-                <div className="mt-1 text-sm text-slate-800">{addressLine(j)}</div>
+                <div className="mt-0.5 text-sm leading-5 text-slate-800">{addressLine(j)}</div>
               </div>
-              <div className={metadataCardClass}>
+              <div className={metadataItemClass}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Contractor</div>
-                <div className="mt-1 text-sm text-slate-800">{contractorName}</div>
+                <div className="mt-0.5 text-sm leading-5 text-slate-800">{contractorName}</div>
               </div>
-              <div className="px-0 py-0 xl:rounded-lg xl:border xl:border-slate-200 xl:bg-white xl:px-3.5 xl:py-3 xl:shadow-sm xl:ring-1 xl:ring-slate-100">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Schedule</div>
-                <div className="mt-1 text-sm font-semibold text-slate-900">{scheduleDateText}</div>
-                <div className="mt-0.5 text-xs text-slate-600">{scheduleWindowText}</div>
-              </div>
-              <div className={metadataCardClass}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Assigned</div>
-                <div className="mt-1 text-sm text-slate-800">{assignmentSummary}</div>
+              <div className={metadataItemClass}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{scheduleLabel}</div>
+                <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm leading-5 text-slate-800">
+                  <span className="font-semibold text-slate-900">{scheduleDateText}</span>
+                  <span className="text-[11px] leading-4 text-slate-600">{scheduleWindowText}</span>
+                </div>
+                <div className="mt-1 text-[11px] leading-4 text-slate-600">Assigned: {assignmentSummary}</div>
               </div>
             </div>
           )}
           {!hasPrimaryStatusCallout ? (
-            <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/80 px-3.5 py-3 shadow-sm">
+            <div className="mt-2.5 rounded-md border border-blue-200 bg-blue-50/80 px-3 py-2 shadow-sm">
               <div className="flex flex-wrap items-start gap-2 sm:items-center sm:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">Next Step</div>
-                  <div className="mt-1 text-sm font-semibold text-blue-950">{nextStep}</div>
+                  <div className="mt-0.5 text-sm font-semibold leading-5 text-blue-950">{nextStep}</div>
                   {detailLine ? (
-                    <div className="mt-1 text-xs leading-5 text-blue-900/75">{detailLine}</div>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                  {showStatusPill ? (
-                    <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
-                      {statusMeta.label}
-                    </span>
+                    <div className="mt-0.5 text-[11px] leading-4 text-blue-900/75">{detailLine}</div>
                   ) : null}
                 </div>
               </div>
@@ -1704,17 +1708,17 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
           ) : null}
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-2.5">
         <Link
           href={`/jobs/${j.id}?tab=ops`}
-          className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
+          className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
         >
           View Job
         </Link>
         {phoneHref ? (
           <a
             href={phoneHref}
-            className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40"
+            className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40"
           >
             Call
           </a>
@@ -1722,7 +1726,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         {textHref ? (
           <a
             href={textHref}
-            className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40"
+            className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40"
           >
             Text
           </a>

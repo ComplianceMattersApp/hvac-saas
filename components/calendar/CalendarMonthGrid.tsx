@@ -16,17 +16,19 @@ interface CalendarMonthGridProps {
   tech?: string | null;
   selectedDate?: string;
   selectedJobId?: string;
+  selectedBlockId?: string;
 }
 
 function buildCalendarHref(
   view: 'day' | 'week' | 'list' | 'month',
   date: string,
-  params?: { job?: string | null; tech?: string | null; prefillDate?: string | null },
+  params?: { job?: string | null; block?: string | null; tech?: string | null; prefillDate?: string | null },
 ) {
   const q = new URLSearchParams();
   q.set('view', view);
   q.set('date', date);
   if (params?.job) q.set('job', params.job);
+  if (params?.block) q.set('block', params.block);
   if (params?.tech) q.set('tech', params.tech);
   if (params?.prefillDate) q.set('prefill_date', params.prefillDate);
   return `/calendar?${q.toString()}`;
@@ -89,7 +91,7 @@ function clickStartedInsideInteractiveElement(target: EventTarget | null) {
   return Boolean(target.closest('a, button, input, select, textarea, summary'));
 }
 
-export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, selectedDate, selectedJobId }: CalendarMonthGridProps) {
+export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, selectedDate, selectedJobId, selectedBlockId }: CalendarMonthGridProps) {
   const router = useRouter();
   const [dropTargetDate, setDropTargetDate] = useState<string | null>(null);
   const days = getCalendarGridDays(monthDate);
@@ -247,11 +249,18 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
 
                 {visibleBlockEvents.map((event) => (
                   <div key={event.id} className="group relative">
-                    <div className="flex min-h-[24px] items-center gap-2 rounded-md border border-emerald-200 border-dashed bg-emerald-50/70 px-2 py-1 text-[11px] text-emerald-950 shadow-sm">
+                    <div className={`flex min-h-[24px] items-center gap-2 rounded-md border border-emerald-200 border-dashed bg-emerald-50/70 px-2 py-1 text-[11px] text-emerald-950 shadow-sm ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}>
                       <span className="inline-flex rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                         Block
                       </span>
                       <div className="min-w-0 flex-1 truncate font-medium">{event.title}</div>
+                      <Link
+                        href={buildCalendarHref('month', monthDate, { block: event.id, tech })}
+                        scroll={false}
+                        className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700 underline-offset-2 hover:underline"
+                      >
+                        Edit
+                      </Link>
                     </div>
 
                     <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-64 rounded-lg border border-emerald-200 bg-white p-3 text-xs text-slate-900 shadow-lg group-hover:block group-focus-within:block">

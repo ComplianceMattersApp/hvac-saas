@@ -78,6 +78,78 @@ export async function createCalendarBlockEventFromForm(formData: FormData) {
   redirect(withBanner(returnTo, 'calendar_block_created'));
 }
 
+export async function updateCalendarBlockEventFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+
+  const returnTo = normalizeCalendarReturnTo(formData.get('return_to'));
+  const eventId = String(formData.get('event_id') ?? '').trim();
+  const internalUserId = String(formData.get('internal_user_id') ?? '').trim();
+  const date = String(formData.get('date') ?? '').trim();
+  const startTime = String(formData.get('start_time') ?? '').trim();
+  const endTime = String(formData.get('end_time') ?? '').trim();
+  const title = String(formData.get('title') ?? '').trim();
+  const description = String(formData.get('description') ?? '').trim();
+
+  if (!eventId) redirect(withBanner(returnTo, 'calendar_block_update_missing'));
+  if (!internalUserId) redirect(withBanner(returnTo, 'calendar_block_user_required'));
+  if (!title || !date || !startTime || !endTime) redirect(withBanner(returnTo, 'calendar_block_invalid'));
+
+  let startAtIso = '';
+  let endAtIso = '';
+
+  try {
+    startAtIso = laDateTimeToUtcIso(date, startTime);
+    endAtIso = laDateTimeToUtcIso(date, endTime);
+  } catch {
+    redirect(withBanner(returnTo, 'calendar_block_invalid'));
+  }
+
+  if (new Date(endAtIso).getTime() <= new Date(startAtIso).getTime()) {
+    redirect(withBanner(returnTo, 'calendar_block_invalid_range'));
+  }
+
+  const { data: existing, error: existingErr } = await supabase
+    .from('calendar_events')
+    .select('id')
+    .eq('id', eventId)
+    .eq('owner_user_id', internalUser.account_owner_user_id)
+    .eq('event_type', 'block')
+    .maybeSingle();
+
+  if (existingErr) throw existingErr;
+  if (!existing?.id) redirect(withBanner(returnTo, 'calendar_block_update_missing'));
+
+  const { data: targetUser, error: targetErr } = await supabase
+    .from('internal_users')
+    .select('user_id')
+    .eq('user_id', internalUserId)
+    .eq('account_owner_user_id', internalUser.account_owner_user_id)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (targetErr) throw targetErr;
+  if (!targetUser?.user_id) redirect(withBanner(returnTo, 'calendar_block_user_required'));
+
+  const { error: updateErr } = await supabase
+    .from('calendar_events')
+    .update({
+      title,
+      description: description || null,
+      internal_user_id: internalUserId,
+      start_at: startAtIso,
+      end_at: endAtIso,
+    })
+    .eq('id', eventId)
+    .eq('owner_user_id', internalUser.account_owner_user_id)
+    .eq('event_type', 'block');
+
+  if (updateErr) throw updateErr;
+
+  revalidatePath('/calendar');
+  redirect(withBanner(returnTo, 'calendar_block_updated'));
+}
+
 export async function deleteCalendarBlockEventFromForm(formData: FormData) {
   const supabase = await createClient();
   const { internalUser } = await requireInternalUser({ supabase });
