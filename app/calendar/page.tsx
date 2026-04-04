@@ -1,4 +1,7 @@
 import { CalendarView } from '@/components/calendar/calendar-view';
+import { redirect } from 'next/navigation';
+
+import { createClient } from '@/lib/supabase/server';
 
 function todayYmdLA(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -21,6 +24,20 @@ export default async function CalendarPage({
     prefill_date?: string;
   }>;
 }) {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+
+  if (userData?.user?.id) {
+    const { data: contractorUser, error: contractorErr } = await supabase
+      .from('contractor_users')
+      .select('contractor_id')
+      .eq('user_id', userData.user.id)
+      .maybeSingle();
+
+    if (contractorErr) throw contractorErr;
+    if (contractorUser?.contractor_id) redirect('/portal');
+  }
+
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const date = String(sp.date ?? '').trim() || todayYmdLA();
 

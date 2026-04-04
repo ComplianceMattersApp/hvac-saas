@@ -3,6 +3,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import {
+  isInternalAccessError,
+  requireInternalUser,
+} from "@/lib/auth/internal-user";
 import { redirect } from "next/navigation"
 
 function toFullName(first?: string | null, last?: string | null) {
@@ -196,6 +200,16 @@ export async function archiveCustomerFromForm(formData: FormData) {
   "use server";
   const supabase = await createClient();
 
+  try {
+    await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirect("/login");
+    }
+
+    throw error;
+  }
+
   const customer_id = String(formData.get("customer_id") ?? "").trim();
   if (!customer_id) throw new Error("Missing customer_id");
 
@@ -228,6 +242,16 @@ export async function archiveCustomerFromForm(formData: FormData) {
 
 export async function updateCustomerNotesFromForm(formData: FormData) {
   const supabase = await createClient();
+
+  try {
+    await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirect("/login");
+    }
+
+    throw error;
+  }
 
   const customer_id = String(formData.get("customer_id") ?? "").trim();
   if (!customer_id) throw new Error("Missing customer_id");

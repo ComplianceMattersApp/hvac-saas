@@ -202,6 +202,22 @@ When chain-scoped narrative is shown, page copy should explicitly state chain sc
 
 Parent/child chain history must preserve failed-parent historical truth while allowing the active child revisit job to carry current operational and closeout ownership.
 
+In /ops, active queue visibility is chain-owned, not ancestor-stacked.
+
+Only one active operative record from a linked chain should be visible in the working queue at a time.
+
+Current live ECC failed/retest rule:
+if a failed-family record has no active retest child, it may remain the visible active queue record
+if a failed-family record has an active retest child, that ancestor must be suppressed from active queue visibility
+the visible active queue record should be the current operative leaf in the chain, not older failed ancestors
+
+This is a queue-visibility ownership rule only.
+Do not alter parent/child linkage.
+Do not alter audit/history visibility.
+
+This same active-chain ownership principle should apply as service chains / linked visits expand further.
+Once a newer operative linked record exists, older linked ancestors must not remain as duplicate active queue items.
+
 9. Staffing / Assignment System (Locked)
 9.1 Source of truth
 

@@ -1,5 +1,39 @@
 import type { DispatchJob } from '@/lib/actions/calendar';
 
+const CALENDAR_STATUS_LABELS: Record<string, string> = {
+  scheduled: 'Scheduled',
+  on_my_way: 'On My Way',
+  in_progress: 'In Progress',
+  field_complete: 'Field Complete',
+  failed: 'Failed',
+  closed: 'Closed',
+  cancelled: 'Cancelled',
+};
+
+const CALENDAR_STATUS_DOT_CLASSES: Record<string, string> = {
+  scheduled: 'bg-cyan-500',
+  on_my_way: 'bg-blue-700',
+  in_progress: 'bg-indigo-600',
+  field_complete: 'bg-amber-500',
+  failed: 'bg-rose-600',
+  closed: 'bg-green-600',
+  cancelled: 'bg-slate-400',
+};
+
+export const CALENDAR_STATUS_LEGEND = [
+  'scheduled',
+  'on_my_way',
+  'in_progress',
+  'field_complete',
+  'failed',
+  'closed',
+  'cancelled',
+].map((key) => ({
+  key,
+  label: CALENDAR_STATUS_LABELS[key] ?? key,
+  dot: CALENDAR_STATUS_DOT_CLASSES[key] ?? 'bg-gray-300',
+}));
+
 // Locked calendar display rule: use lifecycle truth for historical/in-flight markers,
 // otherwise derive the display state from ops_status.
 export function getCalendarDisplayStatus(job: DispatchJob) {
@@ -21,24 +55,9 @@ export function getCalendarDisplayStatus(job: DispatchJob) {
 }
 
 export function formatCalendarDisplayStatus(status: string) {
-  const map: Record<string, string> = {
-    scheduled: 'Scheduled',
-    on_my_way: 'On My Way',
-    in_progress: 'In Progress',
-    field_complete: 'Field Complete',
-    closed: 'Closed',
-    cancelled: 'Cancelled',
-  };
-
-  return map[status] || status;
+  return CALENDAR_STATUS_LABELS[status] || status;
 }
 
 export function calendarStatusDotClass(status: string) {
-  if (status === 'scheduled') return 'bg-sky-500';
-  if (status === 'on_my_way') return 'bg-blue-500';
-  if (status === 'in_progress') return 'bg-indigo-600';
-  if (status === 'field_complete') return 'bg-amber-500';
-  if (status === 'closed') return 'bg-green-600';
-  if (status === 'cancelled') return 'bg-slate-400';
-  return 'bg-gray-300';
+  return CALENDAR_STATUS_DOT_CLASSES[status] || 'bg-gray-300';
 }

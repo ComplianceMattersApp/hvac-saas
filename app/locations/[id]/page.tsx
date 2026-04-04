@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateLocationNotesFromForm } from "./notes-actions";
+import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -440,7 +441,7 @@ export default async function LocationDetailPage(props: {
                 </td>
 
                 <td className="px-3 py-2 font-medium text-gray-900">
-                  {job.title || "Untitled Job"}
+                  {normalizeRetestLinkedJobTitle(job.title) || "Untitled Job"}
                 </td>
 
                 <td className="px-3 py-2">

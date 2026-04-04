@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 
 type LifecycleFilter =
   | "all"
@@ -222,7 +223,7 @@ export default function OpsFilteredPreviewClient(props: Props) {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <Link href={`/jobs/${job.id}?tab=ops`} className="text-sm font-semibold text-blue-700 hover:underline">
-                      {job.title || "Untitled Job"}
+                      {normalizeRetestLinkedJobTitle(job.title) || "Untitled Job"}
                     </Link>
                     <div className="mt-0.5 text-xs text-gray-700">{customerLine(job)}</div>
                     <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">

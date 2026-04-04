@@ -3,15 +3,17 @@ import { X } from 'lucide-react';
 import { eachWeekOfInterval, endOfMonth, format as formatDate, parseISO, startOfMonth } from 'date-fns';
 
 import CalendarMonthGrid from './CalendarMonthGrid';
-import { calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
+import { CALENDAR_STATUS_LEGEND, calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
 import SubmitButton from '@/components/SubmitButton';
+import { createCalendarBlockEventFromForm, deleteCalendarBlockEventFromForm } from '@/lib/actions/calendar-event-actions';
 import {
   assignJobAssigneeFromForm,
   removeJobAssigneeFromForm,
   updateJobScheduleFromForm,
 } from '@/lib/actions/job-actions';
 import { logCustomerContactAttemptFromForm } from '@/lib/actions/job-contact-actions';
-import { getDispatchCalendarData, type DispatchJob, type DispatchViewMode } from '@/lib/actions/calendar';
+import { getDispatchCalendarData, type DispatchCalendarBlockEvent, type DispatchJob, type DispatchViewMode } from '@/lib/actions/calendar';
+import { normalizeRetestLinkedJobTitle } from '@/lib/utils/job-title-display';
 import { displayWindowLA, formatBusinessDateUS } from '@/lib/utils/schedule-la';
 
 type CalendarUIView = 'day' | 'week' | 'list' | 'month';
@@ -38,15 +40,6 @@ const TECH_COLOR_PALETTE = [
   'bg-amber-500',
 ];
 
-const STATUS_LEGEND = [
-  { key: 'scheduled', label: 'Scheduled', dot: 'bg-sky-500' },
-  { key: 'on_my_way', label: 'On My Way', dot: 'bg-blue-500' },
-  { key: 'in_progress', label: 'In Progress', dot: 'bg-indigo-600' },
-  { key: 'field_complete', label: 'Field Complete', dot: 'bg-amber-500' },
-  { key: 'closed', label: 'Closed', dot: 'bg-green-600' },
-  { key: 'cancelled', label: 'Cancelled', dot: 'bg-slate-400' },
-];
-
 function bannerMessage(banner?: string) {
   const map: Record<string, string> = {
     schedule_saved: 'Schedule updated.',
@@ -58,6 +51,13 @@ function bannerMessage(banner?: string) {
     assignment_user_required: 'Select a technician before assigning.',
     contact_attempt_logged_call: 'Call attempt logged.',
     contact_attempt_logged_text: 'Text attempt logged.',
+    calendar_block_created: 'Calendar block added.',
+    calendar_block_deleted: 'Calendar block removed.',
+    calendar_block_delete_invalid: 'Select a valid calendar block to remove.',
+    calendar_block_delete_missing: 'That calendar block no longer exists.',
+    calendar_block_invalid: 'Enter a title, date, and valid start/end times.',
+    calendar_block_invalid_range: 'End time must be after start time.',
+    calendar_block_user_required: 'Select an internal user for the block.',
   };
 
   const key = String(banner ?? '').trim();
@@ -67,12 +67,15 @@ function bannerMessage(banner?: string) {
 
 function dispatchBlockClass(status?: string | null) {
   const value = String(status ?? '').toLowerCase();
-  if (value === 'failed') return 'border-red-200 bg-red-100 text-red-900';
+  if (value === 'failed') return 'border-rose-300 bg-rose-100 text-rose-950';
   if (value === 'pending_info') return 'border-amber-200 bg-amber-100 text-amber-900';
   if (value === 'on_hold') return 'border-slate-300 bg-slate-100 text-slate-900';
+  if (value === 'on_my_way') return 'border-blue-300 bg-blue-100 text-blue-950';
+  if (value === 'in_progress') return 'border-indigo-300 bg-indigo-100 text-indigo-950';
+  if (value === 'field_complete') return 'border-amber-200 bg-amber-100 text-amber-900';
   if (value === 'cancelled') return 'border-slate-300 border-dashed bg-slate-100 text-slate-500';
-  if (value === 'closed') return 'border-slate-300 border-dashed bg-slate-100 text-slate-500';
-  if (value === 'scheduled') return 'border-blue-200 bg-blue-100 text-blue-900';
+  if (value === 'closed') return 'border-green-200 border-dashed bg-green-50 text-green-900';
+  if (value === 'scheduled') return 'border-cyan-300 bg-cyan-100 text-cyan-950';
   return 'border-indigo-200 bg-indigo-50 text-indigo-900';
 }
 
@@ -247,7 +250,7 @@ function formatDayDateHeader(ymd: string) {
 }
 
 function shortTitle(job: DispatchJob) {
-  const title = String(job.title ?? '').trim();
+  const title = normalizeRetestLinkedJobTitle(job.title);
   if (!title) return `Job ${job.id.slice(0, 8)}`;
   return title.length > 42 ? `${title.slice(0, 39)}...` : title;
 }
@@ -303,6 +306,19 @@ function dispatchVisibilityIssueLabels(job: DispatchJob) {
   return labels;
 }
 
+function unscheduledJobCueLabels(job: DispatchJob) {
+  const labels: string[] = [];
+  const jobType = String(job.job_type ?? '').trim();
+  const contractorName = String(job.contractor_name ?? '').trim();
+  const isRetest = Boolean(String(job.parent_job_id ?? '').trim());
+
+  if (jobType) labels.push(jobType.replace(/_/g, ' '));
+  if (contractorName) labels.push(contractorName);
+  if (isRetest) labels.push('Retest');
+
+  return labels;
+}
+
 function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | null }) {
   const { view, date, tech } = props;
   const today = todayYmdLA();
@@ -339,11 +355,14 @@ function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | n
 
 function DispatchGrid(props: {
   jobs: DispatchJob[];
+  blockEvents: DispatchCalendarBlockEvent[];
+  assignableUsers: Array<{ user_id: string; display_name: string }>;
   mode: DispatchViewMode;
   date: string;
+  tech?: string | null;
   selectedJobId?: string;
 }) {
-  const { jobs, mode, date, selectedJobId } = props;
+  const { jobs, blockEvents, assignableUsers, mode, date, tech, selectedJobId } = props;
   const startHour = 6;
   const endHour = 18;
   const hourHeight = 50;
@@ -362,10 +381,19 @@ function DispatchGrid(props: {
       return true;
     });
 
+  const gridBlockEvents = blockEvents
+    .filter((event) => event.calendar_date === date)
+    .map((event) => ({
+      event,
+      user_id: event.internal_user_id,
+    }));
+
   type LaneItem = {
     id: string;
     user_id: string;
-    job: DispatchJob;
+    kind: 'job' | 'block';
+    job?: DispatchJob;
+    event?: DispatchCalendarBlockEvent;
     start: number;
     end: number;
     lane: number;
@@ -388,7 +416,31 @@ function DispatchGrid(props: {
     const row: LaneItem = {
       id: `${item.job.id}-${item.user_id}`,
       user_id: item.user_id,
+      kind: 'job',
       job: item.job,
+      start: clampedStart,
+      end: clampedEnd,
+      lane: 0,
+      laneCount: 1,
+    };
+
+    if (!laneItemsByUser.has(item.user_id)) laneItemsByUser.set(item.user_id, []);
+    laneItemsByUser.get(item.user_id)!.push(row);
+  }
+
+  for (const item of gridBlockEvents) {
+    const start = parseMinutes(item.event.start_time);
+    const parsedEnd = parseMinutes(item.event.end_time);
+    if (start == null || parsedEnd == null) continue;
+
+    const clampedStart = Math.max(start, gridStartMinutes);
+    const clampedEnd = Math.min(Math.max(parsedEnd, clampedStart + 30), gridEndMinutes);
+
+    const row: LaneItem = {
+      id: `${item.event.id}-${item.user_id}`,
+      user_id: item.user_id,
+      kind: 'block',
+      event: item.event,
       start: clampedStart,
       end: clampedEnd,
       lane: 0,
@@ -447,9 +499,13 @@ function DispatchGrid(props: {
   }
 
   const techMap = new Map<string, string>();
+  const displayNameByUserId = new Map(assignableUsers.map((user) => [user.user_id, user.display_name]));
   for (const item of gridJobs) {
     const techName = item.job.assignments.find((a) => a.user_id === item.user_id)?.display_name ?? 'Tech';
     techMap.set(item.user_id, techName);
+  }
+  for (const item of gridBlockEvents) {
+    techMap.set(item.user_id, displayNameByUserId.get(item.user_id) ?? 'Tech');
   }
 
   const columns = uniqueById(
@@ -464,7 +520,7 @@ function DispatchGrid(props: {
   const nowTop = showNowLine ? ((Number(nowMinutes) - gridStartMinutes) / 60) * hourHeight : 0;
 
   if (!columns.length) {
-    return <div className="py-10 text-sm text-slate-500">No assigned scheduled jobs for this {mode}.</div>;
+    return <div className="py-10 text-sm text-slate-500">No assigned scheduled jobs or blocks for this {mode}.</div>;
   }
 
   const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i);
@@ -526,27 +582,70 @@ function DispatchGrid(props: {
             {showNowLine ? <div className="absolute left-0 right-0 border-t border-rose-400/70" style={{ top: `${nowTop}px` }} /> : null}
 
             {(laneItemsByUser.get(col.user_id) ?? []).map((row) => {
-              const { job } = row;
               const top = ((row.start - gridStartMinutes) / 60) * hourHeight;
               const height = Math.max(((row.end - row.start) / 60) * hourHeight, 36);
+              const laneWidthPct = 100 / Math.max(row.laneCount, 1);
+              const laneLeftPct = row.lane * laneWidthPct;
+              const laneGapPx = 3;
+
+              if (row.kind === 'block' && row.event) {
+                const blockEvent = row.event;
+
+                return (
+                  <div
+                    key={row.id}
+                    className="absolute left-1 right-1 overflow-hidden rounded-lg border border-emerald-300 border-dashed bg-emerald-50/95 px-2.5 py-1.5 text-emerald-950 shadow-sm"
+                    style={{
+                      top: `${top}px`,
+                      height: `${height}px`,
+                      left: `calc(${laneLeftPct}% + ${laneGapPx}px)`,
+                      width: `calc(${laneWidthPct}% - ${laneGapPx * 2}px)`,
+                      right: 'auto',
+                    }}
+                  >
+                    <div className="flex h-full min-w-0 items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-semibold leading-4 text-emerald-950">{blockEvent.title}</p>
+                        {blockEvent.description ? (
+                          <p className="mt-0.5 truncate text-[10px] leading-4 text-emerald-900/75">{blockEvent.description}</p>
+                        ) : null}
+                      </div>
+                      <form action={deleteCalendarBlockEventFromForm} className="ml-2 shrink-0 self-center">
+                          <input type="hidden" name="event_id" value={blockEvent.id} />
+                          <input type="hidden" name="return_to" value={buildCalendarHref(mode, date, { tech })} />
+                          <SubmitButton className="rounded-md border border-emerald-300 bg-white/95 px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-800 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700" loadingText="...">
+                            Remove
+                          </SubmitButton>
+                      </form>
+                    </div>
+                  </div>
+                );
+              }
+
+              const job = row.job!;
               const isSelected = selectedJobId === job.id;
               const assignees = Array.isArray(job.assignments) ? job.assignments : [];
               const colorBars = assignees.slice(0, 3);
               const overflowCount = Math.max(assignees.length - colorBars.length, 0);
               const initials = assignees.slice(0, 2).map((a) => initialsFromName(a.display_name)).join(' ');
               const lifecycle = getCalendarDisplayStatus(job);
-              const isCancelled = lifecycle === 'cancelled';
-
-              const laneWidthPct = 100 / Math.max(row.laneCount, 1);
-              const laneLeftPct = row.lane * laneWidthPct;
-              const laneGapPx = 3;
+              const statusBadgeLabel =
+                lifecycle === 'cancelled' || lifecycle === 'on_my_way' || lifecycle === 'in_progress'
+                  ? formatCalendarDisplayStatus(lifecycle)
+                  : null;
+              const statusBadgeClass =
+                lifecycle === 'cancelled'
+                  ? 'border-slate-300 bg-slate-200 text-slate-600'
+                  : lifecycle === 'on_my_way'
+                    ? 'border-blue-300 bg-blue-100 text-blue-950'
+                    : 'border-indigo-300 bg-indigo-100 text-indigo-900';
 
               return (
                 <Link
                   key={row.id}
-                  href={buildCalendarHref(mode, date, { job: job.id })}
+                  href={buildCalendarHref(mode, date, { job: job.id, tech })}
                   scroll={false}
-                  className={`absolute left-1 right-1 rounded-md border py-0.5 pr-1.5 pl-5 shadow-sm transition hover:cursor-pointer hover:shadow-md hover:brightness-[1.03] ${dispatchBlockClass(job.ops_status)} ${isSelected ? 'ring-2 ring-slate-800/45 border-slate-700' : ''}`}
+                  className={`absolute left-1 right-1 rounded-md border py-0.5 pr-1.5 pl-5 shadow-sm transition hover:cursor-pointer hover:shadow-md hover:brightness-[1.03] ${dispatchBlockClass(lifecycle)} ${isSelected ? 'ring-2 ring-slate-800/45 border-slate-700' : ''}`}
                   style={{
                     top: `${top}px`,
                     height: `${height}px`,
@@ -570,9 +669,9 @@ function DispatchGrid(props: {
                     ) : null}
                   </div>
                   <p className="truncate text-xs font-semibold leading-4">{shortTitle(job)}</p>
-                  {isCancelled ? (
-                    <span className="ml-1 inline-block rounded border border-slate-300 bg-slate-200 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-600">
-                      Cancelled
+                  {statusBadgeLabel ? (
+                    <span className={`ml-1 inline-block rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${statusBadgeClass}`}>
+                      {statusBadgeLabel}
                     </span>
                   ) : null}
                   {job.scheduled_date && (!job.assignments || job.assignments.length === 0) ? (
@@ -597,10 +696,11 @@ function DispatchGrid(props: {
 
 function AgendaList(props: {
   jobs: DispatchJob[];
+  blockEvents: DispatchCalendarBlockEvent[];
   date: string;
   tech?: string | null;
 }) {
-  const { jobs, date, tech } = props;
+  const { jobs, blockEvents, date, tech } = props;
 
   const grouped = new Map<string, DispatchJob[]>();
   for (const job of jobs) {
@@ -609,10 +709,18 @@ function AgendaList(props: {
     grouped.get(job.scheduled_date)?.push(job);
   }
 
-  const sortedDates = Array.from(grouped.keys()).sort();
+  const groupedBlocks = new Map<string, DispatchCalendarBlockEvent[]>();
+  for (const event of blockEvents) {
+    const eventDate = String(event.calendar_date ?? '').trim();
+    if (!eventDate) continue;
+    if (!groupedBlocks.has(eventDate)) groupedBlocks.set(eventDate, []);
+    groupedBlocks.get(eventDate)?.push(event);
+  }
+
+  const sortedDates = Array.from(new Set([...grouped.keys(), ...groupedBlocks.keys()])).sort();
 
   if (!sortedDates.length) {
-    return <div className="py-8 text-sm text-slate-500">No scheduled jobs for this month.</div>;
+    return <div className="py-8 text-sm text-slate-500">No scheduled jobs or blocks for this month.</div>;
   }
 
   return (
@@ -622,7 +730,14 @@ function AgendaList(props: {
           <div className="mb-2 flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-700">{formatDayDateHeader(dateKey)}</span>
             <span className="text-xs text-slate-400">
-              {(grouped.get(dateKey)?.length ?? 0)} job{(grouped.get(dateKey)?.length ?? 0) > 1 ? 's' : ''}
+              {(() => {
+                const jobCount = grouped.get(dateKey)?.length ?? 0;
+                const blockCount = groupedBlocks.get(dateKey)?.length ?? 0;
+                const parts: string[] = [];
+                if (jobCount) parts.push(`${jobCount} job${jobCount > 1 ? 's' : ''}`);
+                if (blockCount) parts.push(`${blockCount} block${blockCount > 1 ? 's' : ''}`);
+                return parts.join(' · ');
+              })()}
             </span>
           </div>
           <div className="space-y-1">
@@ -645,7 +760,7 @@ function AgendaList(props: {
                       <div className="truncate text-sm font-medium text-slate-900">{job.job_address || shortTitle(job)}</div>
                       <div className="truncate text-[11px] text-slate-600">{job.city || 'No city'}</div>
                       <div className="truncate text-[11px] text-slate-600">{listTimeWindowLabel(job.window_start, job.window_end)}</div>
-                      <div className="truncate text-[11px] text-slate-500">{job.job_type || job.title}</div>
+                      <div className="truncate text-[11px] text-slate-500">{job.job_type || normalizeRetestLinkedJobTitle(job.title)}</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-500">{formatCalendarDisplayStatus(lifecycle)}</span>
@@ -659,6 +774,24 @@ function AgendaList(props: {
                 </Link>
               );
             })}
+
+            {(groupedBlocks.get(dateKey) ?? []).map((event) => (
+              <div
+                key={event.id}
+                className="flex items-center gap-3 rounded border border-emerald-200 border-dashed bg-emerald-50/70 px-3 py-2 text-[13px] text-emerald-950 shadow-sm"
+              >
+                <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                  Block
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-emerald-950">{event.title}</div>
+                  <div className="truncate text-[11px] text-emerald-800/80">
+                    {event.start_time} - {event.end_time}
+                    {event.description ? ` · ${event.description}` : ''}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ))}
@@ -682,129 +815,162 @@ function DetailPanel(props: {
   const hasPhone = Boolean(phoneHref);
   const customerId = String(job.customer_id ?? '').trim() || null;
   const locationId = String(job.location_id ?? '').trim() || null;
+  const lifecycle = getCalendarDisplayStatus(job);
+  const lifecycleLabel = lifecycle ? formatCalendarDisplayStatus(lifecycle) : 'Unknown';
+  const lifecycleDotClass = lifecycle ? calendarStatusDotClass(lifecycle) : 'bg-slate-300';
+  const normalizedTitle = normalizeRetestLinkedJobTitle(job.title) || `Job ${job.id.slice(0, 8)}`;
+  const overviewChips = [job.job_type, job.contractor_name].map((value) => String(value ?? '').trim()).filter(Boolean);
 
   return (
-    <aside className={`overflow-y-auto bg-white p-4 pt-5 pr-5 sm:p-5 sm:pt-6 sm:pr-6 ${className}`}>
-      <div className="mb-4 flex items-start justify-between gap-2 border-b pb-4">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Job Details</p>
-          <h3 className="text-base font-semibold text-gray-900">{job.title || `Job ${job.id.slice(0, 8)}`}</h3>
-          <p className="mt-1 text-xs text-gray-600">
-            {customerName(job)} • {job.city || 'No city'}
-          </p>
-          <p className="mt-2 truncate text-xs text-gray-600">{customerAddressLine1(job)}</p>
-          <p className="mt-0.5 truncate text-xs text-gray-500">{customerAddressLine2(job)}</p>
-          <p className="mt-1.5 text-xs text-gray-700">{phone || 'Phone not available'}</p>
-          <div className="mt-2.5">
-            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Contact Actions</p>
-            <div className="grid grid-cols-2 gap-2">
-              {hasPhone ? (
-                <a href={`tel:${phoneHref}`} className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50">
-                  Call Customer
-                </a>
-              ) : (
-                <span className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-400">Call Customer</span>
-              )}
+    <aside className={`overflow-y-auto bg-white p-4 sm:p-5 ${className}`}>
+      <div className="border-b border-slate-200 pb-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-3">
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Job Details</p>
+              <h3 className="text-lg font-semibold leading-tight text-slate-900">{normalizedTitle}</h3>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                <span className="font-medium text-slate-700">{customerName(job)}</span>
+                <span className="text-slate-300">•</span>
+                <span>{job.city || 'No city'}</span>
+              </div>
+            </div>
 
-              {hasPhone ? (
-                <a href={`sms:${phoneHref}`} className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50">
-                  Send Text
-                </a>
-              ) : (
-                <span className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-400">Send Text</span>
-              )}
-
-              <form action={logCustomerContactAttemptFromForm}>
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="method" value="call" />
-                <input type="hidden" name="result" value="spoke" />
-                <input type="hidden" name="return_to" value={buildCalendarHref(view, date, { job: job.id, tech })} />
-                <input type="hidden" name="success_banner" value="contact_attempt_logged_call" />
-                <SubmitButton className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50" loadingText="...">
-                  Called
-                </SubmitButton>
-              </form>
-              <form action={logCustomerContactAttemptFromForm}>
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="method" value="text" />
-                <input type="hidden" name="result" value="sent" />
-                <input type="hidden" name="return_to" value={buildCalendarHref(view, date, { job: job.id, tech })} />
-                <input type="hidden" name="success_banner" value="contact_attempt_logged_text" />
-                <SubmitButton className="rounded border px-2.5 py-1 text-center text-xs font-medium text-gray-700 hover:bg-gray-50" loadingText="...">
-                  Text Sent
-                </SubmitButton>
-              </form>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700">
+                <span className={`h-2 w-2 rounded-full ${lifecycleDotClass}`} />
+                {lifecycleLabel}
+              </span>
+              {overviewChips.map((chip) => (
+                <span key={`${job.id}-${chip}`} className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                  {chip}
+                </span>
+              ))}
             </div>
           </div>
+          <Link
+            href={buildCalendarHref(view, date, { tech })}
+            scroll={false}
+            aria-label="Close details"
+            className="shrink-0 rounded-lg border border-transparent p-2 text-slate-500 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-800"
+          >
+            <X className="h-4 w-4" />
+          </Link>
         </div>
-        <Link
-          href={buildCalendarHref(view, date, { tech })}
-          scroll={false}
-          aria-label="Close details"
-          className="mr-1 mt-1 shrink-0 rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-        >
-          <X className="h-4 w-4" />
-        </Link>
+
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <div className="space-y-1.5">
+            <p className="truncate text-sm font-medium text-slate-800">{customerAddressLine1(job)}</p>
+            <p className="truncate text-xs text-slate-500">{customerAddressLine2(job)}</p>
+            <p className="text-sm text-slate-700">{phone || 'Phone not available'}</p>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {hasPhone ? (
+              <a href={`tel:${phoneHref}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100">
+                Call Customer
+              </a>
+            ) : (
+              <span className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-400">Call Customer</span>
+            )}
+
+            {hasPhone ? (
+              <a href={`sms:${phoneHref}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100">
+                Send Text
+              </a>
+            ) : (
+              <span className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-400">Send Text</span>
+            )}
+
+            <form action={logCustomerContactAttemptFromForm}>
+              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="method" value="call" />
+              <input type="hidden" name="result" value="spoke" />
+              <input type="hidden" name="return_to" value={buildCalendarHref(view, date, { job: job.id, tech })} />
+              <input type="hidden" name="success_banner" value="contact_attempt_logged_call" />
+              <SubmitButton className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100" loadingText="...">
+                Called
+              </SubmitButton>
+            </form>
+            <form action={logCustomerContactAttemptFromForm}>
+              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="method" value="text" />
+              <input type="hidden" name="result" value="sent" />
+              <input type="hidden" name="return_to" value={buildCalendarHref(view, date, { job: job.id, tech })} />
+              <input type="hidden" name="success_banner" value="contact_attempt_logged_text" />
+              <SubmitButton className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100" loadingText="...">
+                Text Sent
+              </SubmitButton>
+            </form>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href={`/jobs/${job.id}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+            Open Job
+          </Link>
+          {customerId ? (
+            <Link href={`/customers/${customerId}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+              Open Customer
+            </Link>
+          ) : null}
+          {locationId ? (
+            <Link href={`/locations/${locationId}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+              Open Location
+            </Link>
+          ) : null}
+        </div>
       </div>
 
-      <div className="mb-5 flex flex-wrap gap-2.5">
-        <Link href={`/jobs/${job.id}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-          Open Job
-        </Link>
-        {customerId ? (
-          <Link href={`/customers/${customerId}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-            Open Customer
-          </Link>
-        ) : null}
-        {locationId ? (
-          <Link href={`/locations/${locationId}`} className="rounded border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-            Open Location
-          </Link>
-        ) : null}
-      </div>
-
-      <div className="space-y-5">
-        <section>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Schedule</p>
-          {job.scheduled_date ? (
-            <p className="mb-3 rounded bg-sky-50 px-2 py-1.5 text-xs text-sky-800">
-              {formatBusinessDateUS(job.scheduled_date)}
-              {job.window_start ? ` · ${displayWindowLA(job.window_start, job.window_end) ?? ''}` : ''}
-            </p>
-          ) : (
-            <p className="mb-3 text-xs text-slate-400">Not yet scheduled</p>
-          )}
+      <div className="mt-5 space-y-4">
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Schedule</p>
+              <p className="mt-1 text-xs text-slate-500">Adjust date and window without leaving calendar.</p>
+            </div>
+            {job.scheduled_date ? (
+              <p className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-800">
+                {formatBusinessDateUS(job.scheduled_date)}
+                {job.window_start ? ` · ${displayWindowLA(job.window_start, job.window_end) ?? ''}` : ''}
+              </p>
+            ) : (
+              <p className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500">Not yet scheduled</p>
+            )}
+          </div>
           <form action={updateJobScheduleFromForm} className="grid gap-3">
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="return_to" value={returnTo} />
-            <input type="date" name="scheduled_date" defaultValue={prefillDate ?? job.scheduled_date ?? ''} className="rounded border px-2 py-2 text-sm" />
+            <input type="date" name="scheduled_date" defaultValue={prefillDate ?? job.scheduled_date ?? ''} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900" />
             <div className="grid grid-cols-2 gap-2">
-              <input type="time" name="window_start" defaultValue={job.window_start ?? ''} className="rounded border px-2 py-2 text-sm" />
-              <input type="time" name="window_end" defaultValue={job.window_end ?? ''} className="rounded border px-2 py-2 text-sm" />
+              <input type="time" name="window_start" defaultValue={job.window_start ?? ''} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900" />
+              <input type="time" name="window_end" defaultValue={job.window_end ?? ''} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900" />
             </div>
-            <SubmitButton className="rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white" loadingText="Saving...">
+            <SubmitButton className="rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700" loadingText="Saving...">
               Save Schedule
             </SubmitButton>
           </form>
           {job.scheduled_date ? (
-            <form action={updateJobScheduleFromForm} className="mt-3">
+            <form action={updateJobScheduleFromForm} className="mt-3 border-t border-slate-100 pt-3">
               <input type="hidden" name="job_id" value={job.id} />
               <input type="hidden" name="return_to" value={returnTo} />
               <input type="hidden" name="unschedule" value="1" />
-              <SubmitButton className="w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-500 hover:border-red-200 hover:text-red-700" loadingText="Removing...">
+              <SubmitButton className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-red-200 hover:text-red-700" loadingText="Removing...">
                 Unschedule
               </SubmitButton>
             </form>
           ) : null}
         </section>
 
-        <section>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Assignment</p>
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+          <div className="mb-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Assignment</p>
+            <p className="mt-1 text-xs text-slate-500">Assign or remove internal technicians for this visit.</p>
+          </div>
           <form action={assignJobAssigneeFromForm} className="grid gap-3">
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="tab" value="ops" />
             <input type="hidden" name="return_to" value={returnTo} />
-            <select name="user_id" className="rounded border px-2 py-2 text-sm" defaultValue="" required>
+            <select name="user_id" className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900" defaultValue="" required>
               <option value="" disabled>
                 Select internal user
               </option>
@@ -814,26 +980,28 @@ function DetailPanel(props: {
                 </option>
               ))}
             </select>
-            <SubmitButton className="rounded bg-gray-900 px-3 py-2 text-sm font-semibold text-white" loadingText="Assigning...">
+            <SubmitButton className="rounded-lg bg-gray-900 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-black" loadingText="Assigning...">
               Assign Technician
             </SubmitButton>
           </form>
 
           {job.assignments.length ? (
-            <div className="mt-4 space-y-2.5">
+            <div className="mt-4 space-y-2.5 border-t border-slate-100 pt-4">
               {job.assignments.map((assignment) => (
-                <div key={`${job.id}-${assignment.user_id}`} className="flex items-center justify-between gap-2 rounded border bg-gray-50 px-2.5 py-2 text-xs">
-                  <span>
-                    {assignment.display_name}
-                    {assignment.is_primary ? ' (primary)' : ''}
-                  </span>
+                <div key={`${job.id}-${assignment.user_id}`} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs">
+                  <div className="min-w-0">
+                    <span className="block truncate font-medium text-slate-800">
+                      {assignment.display_name}
+                      {assignment.is_primary ? ' (primary)' : ''}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <form action={removeJobAssigneeFromForm}>
                       <input type="hidden" name="job_id" value={job.id} />
                       <input type="hidden" name="user_id" value={assignment.user_id} />
                       <input type="hidden" name="tab" value="ops" />
                       <input type="hidden" name="return_to" value={returnTo} />
-                      <SubmitButton className="rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700" loadingText="...">
+                      <SubmitButton className="rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-700 transition hover:border-red-300 hover:bg-red-50" loadingText="...">
                         Remove
                       </SubmitButton>
                     </form>
@@ -845,6 +1013,66 @@ function DetailPanel(props: {
         </section>
       </div>
     </aside>
+  );
+}
+
+function MonthInspectorDaySummary(props: {
+  date: string;
+  jobs: DispatchJob[];
+  tech?: string | null;
+}) {
+  const { date, jobs, tech } = props;
+
+  if (!jobs.length) {
+    return (
+      <div className="mt-3 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-xs text-slate-500">
+        No scheduled jobs for this day.
+      </div>
+    );
+  }
+
+  const previewJobs = jobs.slice(0, 5);
+  const remainingCount = Math.max(jobs.length - previewJobs.length, 0);
+
+  return (
+    <div className="mt-3 space-y-2">
+      {previewJobs.map((job) => {
+        const lifecycle = getCalendarDisplayStatus(job);
+        const dotClass = calendarStatusDotClass(lifecycle);
+        const needsTech = !!job.scheduled_date && (!job.assignments || job.assignments.length === 0);
+        const cueParts = [listTimeWindowLabel(job.window_start, job.window_end), formatCalendarDisplayStatus(lifecycle)];
+
+        return (
+          <Link
+            key={job.id}
+            href={buildCalendarHref('month', date, { job: job.id, tech })}
+            scroll={false}
+            className="block rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm transition hover:bg-slate-50"
+          >
+            <div className="flex items-start gap-2">
+              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-semibold text-slate-900">{customerName(job)}</div>
+                <div className="truncate text-[11px] text-slate-700">{normalizeRetestLinkedJobTitle(job.title) || shortTitle(job)}</div>
+                <div className="truncate text-[11px] text-slate-500">{job.job_address || job.city || 'Address not available'}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
+                  <span>{cueParts.filter(Boolean).join(' · ')}</span>
+                  {needsTech ? (
+                    <span className="rounded border border-amber-200 bg-amber-100 px-1 py-0.5 font-semibold text-amber-800">
+                      Needs Tech
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </Link>
+        );
+      })}
+
+      {remainingCount > 0 ? (
+        <p className="px-1 text-[11px] text-slate-500">+{remainingCount} more scheduled job{remainingCount === 1 ? '' : 's'} for this day.</p>
+      ) : null}
+    </div>
   );
 }
 
@@ -863,6 +1091,7 @@ export async function CalendarView(props: Props) {
   const banner = bannerMessage(props.banner);
   const selectedJobId = String(props.job ?? '').trim();
   const prefillDate = normalizeYmd(props.prefillDate);
+  let canonicalBlockEventsForRange = data.calendarBlockEvents;
 
   let canonicalDispatchJobsByDay = data.week.days.map((day) => ({
     date: day.date,
@@ -888,6 +1117,7 @@ export async function CalendarView(props: Props) {
     );
 
     const dayMap = new Map<string, DispatchJob[]>();
+    const blockMap = new Map<string, DispatchCalendarBlockEvent>();
 
     for (const result of weekResults) {
       for (const day of result.week.days) {
@@ -896,7 +1126,16 @@ export async function CalendarView(props: Props) {
         for (const job of day.jobs) merged.set(job.id, job);
         dayMap.set(day.date, Array.from(merged.values()));
       }
+      for (const event of result.calendarBlockEvents) {
+        if (!blockMap.has(event.id)) blockMap.set(event.id, event);
+      }
     }
+
+    canonicalBlockEventsForRange = Array.from(blockMap.values()).sort((a, b) => {
+      if (a.calendar_date !== b.calendar_date) return a.calendar_date.localeCompare(b.calendar_date);
+      if (a.start_time !== b.start_time) return a.start_time.localeCompare(b.start_time);
+      return a.title.localeCompare(b.title);
+    });
 
     const monthNumber = anchor.getMonth();
     const yearNumber = anchor.getFullYear();
@@ -907,6 +1146,7 @@ export async function CalendarView(props: Props) {
         date,
         jobs: jobs.filter((job) => {
           if (!job.scheduled_date) return false;
+          if (uiView === 'month') return true;
           const jobDate = parseISO(job.scheduled_date);
           return jobDate.getMonth() === monthNumber && jobDate.getFullYear() === yearNumber;
         }),
@@ -915,6 +1155,10 @@ export async function CalendarView(props: Props) {
 
     canonicalDispatchJobsForRange = canonicalDispatchJobsByDay.flatMap((day) => day.jobs);
   }
+
+  const techFilteredBlockEvents = activeTech
+    ? canonicalBlockEventsForRange.filter((event) => event.internal_user_id === activeTech)
+    : canonicalBlockEventsForRange;
 
   const selectedJob =
     (selectedJobId ? canonicalDispatchJobsForRange.find((job) => job.id === selectedJobId) : null) ||
@@ -933,8 +1177,12 @@ export async function CalendarView(props: Props) {
     jobs: day.jobs.filter((job) => isDispatchVisibleForLayout(job)),
   }));
 
-  const hiddenScheduledJobs = techFilteredScheduledJobsByDay
-    .flatMap((day) => day.jobs.filter((job) => !isDispatchVisibleForLayout(job)))
+  const attentionWindowScheduledJobs = activeTech
+    ? data.scheduledAttentionWindowJobs.filter((job) => job.assignments.some((a) => a.user_id === activeTech))
+    : data.scheduledAttentionWindowJobs;
+
+  const hiddenScheduledJobs = attentionWindowScheduledJobs
+    .filter((job) => !isDispatchVisibleForLayout(job))
     .sort((a, b) => {
       const dateA = String(a.scheduled_date ?? '');
       const dateB = String(b.scheduled_date ?? '');
@@ -1002,31 +1250,47 @@ export async function CalendarView(props: Props) {
           </div>
 
           {data.assignableUsers.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href={buildCalendarHref(uiView, data.anchorDate)}
-                className={`rounded px-2.5 py-1 text-xs font-medium ${
-                  !activeTech ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                All technicians
-              </Link>
-              {data.assignableUsers.map((user) => (
+            <div className="w-full max-w-3xl rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Technician Filter</p>
+                  <p className="mt-0.5 text-xs text-slate-500">Show all technicians or focus the calendar on one assigned technician.</p>
+                </div>
+                <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                  {activeTech ? 'Single technician view' : 'All technicians'}
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-1.5">
                 <Link
-                  key={user.user_id}
-                  href={buildCalendarHref(uiView, data.anchorDate, { tech: user.user_id })}
-                  className={`rounded px-2.5 py-1 text-xs font-medium ${
-                    activeTech === user.user_id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+                  href={buildCalendarHref(uiView, data.anchorDate)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    !activeTech
+                      ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
-                  {user.display_name}
+                  All technicians
                 </Link>
-              ))}
+                {data.assignableUsers.map((user) => (
+                  <Link
+                    key={user.user_id}
+                    href={buildCalendarHref(uiView, data.anchorDate, { tech: user.user_id })}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      activeTech === user.user_id
+                        ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    {user.display_name}
+                  </Link>
+                ))}
+              </div>
             </div>
           ) : null}
 
           <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-            {STATUS_LEGEND.map((item) => (
+            {CALENDAR_STATUS_LEGEND.map((item) => (
               <span key={item.key} className="inline-flex items-center gap-1.5">
                 <span className={`h-2 w-2 rounded-full ${item.dot}`} />
                 <span>{item.label}</span>
@@ -1038,6 +1302,83 @@ export async function CalendarView(props: Props) {
 
       <div className={`grid gap-5 ${showDesktopInspectorColumn ? 'xl:grid-cols-[260px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[260px_minmax(0,1fr)]'}`}>
         <aside className="order-2 xl:order-1">
+          {(uiView === 'day' || uiView === 'week') && data.assignableUsers.length ? (
+            <details className="group mb-4 rounded-lg border border-emerald-100 bg-white/90">
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-2 rounded-lg px-2.5 py-2 text-left transition hover:bg-emerald-50/40 [&::-webkit-details-marker]:hidden">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Add Block</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Create an internal time block only when needed.</p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                    Internal only
+                  </span>
+                  <span aria-hidden="true" className="inline-block text-xs font-semibold text-slate-400 transition-transform group-open:rotate-90">
+                    {'>'}
+                  </span>
+                </div>
+              </summary>
+              <div className="border-t border-emerald-100 px-2.5 pb-2.5 pt-2">
+                <form action={createCalendarBlockEventFromForm} className="grid gap-2">
+                  <input type="hidden" name="return_to" value={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })} />
+                  <input
+                    name="title"
+                    className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400"
+                    placeholder="Event name"
+                    required
+                  />
+                  <select
+                    name="internal_user_id"
+                    defaultValue={activeTech ?? ''}
+                    className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                    required
+                  >
+                    <option value="" disabled>
+                      Select technician
+                    </option>
+                    {data.assignableUsers.map((user) => (
+                      <option key={`block-user-${user.user_id}`} value={user.user_id}>
+                        {user.display_name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="grid gap-1.5 sm:grid-cols-2">
+                    <input
+                      type="date"
+                      name="date"
+                      defaultValue={data.anchorDate}
+                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 sm:col-span-2"
+                      required
+                    />
+                    <input
+                      type="time"
+                      name="start_time"
+                      defaultValue="08:00"
+                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                      required
+                    />
+                    <input
+                      type="time"
+                      name="end_time"
+                      defaultValue="09:00"
+                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                      required
+                    />
+                  </div>
+                  <textarea
+                    name="description"
+                    rows={2}
+                    className="rounded-md border border-slate-200 bg-slate-50/70 px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400"
+                    placeholder="Optional details"
+                  />
+                  <SubmitButton className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-emerald-700" loadingText="Creating...">
+                    Add Block
+                  </SubmitButton>
+                </form>
+              </div>
+            </details>
+          ) : null}
+
           {hiddenScheduledJobs.length ? (
             <>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Scheduled Jobs Needing Attention</h3>
@@ -1067,19 +1408,42 @@ export async function CalendarView(props: Props) {
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unscheduled Jobs</h3>
           <div className="mt-2 max-h-[70vh] space-y-1 overflow-y-auto pr-1">
             {unscheduledJobs.length ? (
-              unscheduledJobs.map((job) => (
-                <Link
-                  key={`unassigned-${job.id}`}
-                  href={buildCalendarHref(uiView, data.anchorDate, { job: job.id, tech: activeTech })}
-                  draggable
-                  scroll={false}
-                  className="group block cursor-grab rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow active:cursor-grabbing active:opacity-85"
-                >
-                  <p className="truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
-                  <p className="truncate text-[11px] text-slate-600">{job.city || job.contractor_name || 'No city or contractor'}</p>
-                  <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-500 group-hover:text-slate-700">Drag to a day</p>
-                </Link>
-              ))
+              unscheduledJobs.map((job) => {
+                const cueLabels = unscheduledJobCueLabels(job);
+                const customerLabel = customerName(job);
+                const addressLine = customerAddressLine1(job);
+                const cityLabel = String(job.city ?? '').trim();
+
+                return (
+                  <Link
+                    key={`unassigned-${job.id}`}
+                    href={buildCalendarHref(uiView, data.anchorDate, { job: job.id, tech: activeTech })}
+                    draggable
+                    scroll={false}
+                    className="group block cursor-grab rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow active:cursor-grabbing active:opacity-85"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
+                      {cueLabels.length ? (
+                        <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-600">
+                          {cueLabels[0]}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 truncate text-[11px] font-medium text-slate-700">{customerLabel}</p>
+                    <p className="truncate text-[11px] text-slate-600">{addressLine}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
+                      {cityLabel ? <span className="truncate">{cityLabel}</span> : null}
+                      {cueLabels.slice(1).map((label) => (
+                        <span key={`${job.id}-${label}`} className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 leading-none text-[9px] font-medium text-slate-600">
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-500 group-hover:text-slate-700">Drag to a day</p>
+                  </Link>
+                );
+              })
             ) : (
               <div className="py-2 text-xs text-slate-500">No unscheduled jobs.</div>
             )}
@@ -1089,17 +1453,18 @@ export async function CalendarView(props: Props) {
         <main className="order-1 min-w-0 space-y-4 xl:order-2">
           {uiView === 'list' ? (
             <section className="overflow-x-auto px-1">
-              <AgendaList jobs={filteredJobsForRange} date={data.anchorDate} tech={activeTech} />
+              <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} tech={activeTech} />
             </section>
           ) : uiView === 'month' ? (
             <section>
               <div className="lg:hidden px-1">
-                <AgendaList jobs={filteredJobsForRange} date={data.anchorDate} tech={activeTech} />
+                <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} tech={activeTech} />
               </div>
               <div className="hidden overflow-x-auto lg:block">
                 <CalendarMonthGrid
                   monthDate={data.anchorDate}
                   jobs={filteredJobsForRange}
+                  blockEvents={techFilteredBlockEvents}
                   tech={activeTech}
                   selectedDate={data.anchorDate}
                   selectedJobId={selectedJobId}
@@ -1110,8 +1475,11 @@ export async function CalendarView(props: Props) {
             <section className="overflow-x-auto">
               <DispatchGrid
                 jobs={filteredDayJobs}
+                blockEvents={techFilteredBlockEvents}
+                assignableUsers={data.assignableUsers}
                 mode={baseMode}
                 date={data.day.date}
+                tech={activeTech}
                 selectedJobId={selectedJobId}
               />
             </section>
@@ -1125,8 +1493,11 @@ export async function CalendarView(props: Props) {
                   </div>
                   <DispatchGrid
                     jobs={day.jobs}
+                    blockEvents={techFilteredBlockEvents}
+                    assignableUsers={data.assignableUsers}
                     mode={baseMode}
                     date={day.date}
+                    tech={activeTech}
                     selectedJobId={selectedJobId}
                   />
                 </div>
@@ -1155,7 +1526,8 @@ export async function CalendarView(props: Props) {
                 <p className="mt-2 text-xs text-slate-600">
                   {selectedDayJobs.length} scheduled job{selectedDayJobs.length === 1 ? '' : 's'} in this day context.
                 </p>
-                <p className="mt-3 text-xs text-slate-500">Select a job chip to open schedule and assignment controls.</p>
+                <MonthInspectorDaySummary date={data.anchorDate} jobs={selectedDayJobs} tech={activeTech} />
+                <p className="mt-3 text-xs text-slate-500">Select a preview row or job chip to open schedule and assignment controls.</p>
               </div>
             ) : null}
           </aside>

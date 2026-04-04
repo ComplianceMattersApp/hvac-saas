@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 
 import EquipmentEditCard from "../_components/EquipmentEditCard";
 import EquipmentCreateForm from "../_components/EquipmentCreateForm";
@@ -63,7 +64,7 @@ if (!job) return notFound();
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm text-gray-600">Capture Info</div>
-          <h1 className="text-xl font-semibold">{job.title}</h1>
+          <h1 className="text-xl font-semibold">{normalizeRetestLinkedJobTitle(job.title) || "Job"}</h1>
           <div className="text-sm text-gray-600">{job.city ?? "—"}</div>
         </div>
 

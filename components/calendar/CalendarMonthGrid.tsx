@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO } from 'date-fns';
-import type { DispatchJob } from '@/lib/actions/calendar';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, isSameMonth, isToday, parseISO, startOfWeek } from 'date-fns';
+import type { DispatchCalendarBlockEvent, DispatchJob } from '@/lib/actions/calendar';
 import Link from 'next/link';
+import { normalizeRetestLinkedJobTitle } from '@/lib/utils/job-title-display';
 import { displayWindowLA } from '@/lib/utils/schedule-la';
 import { calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
 import { useRouter } from 'next/navigation';
@@ -11,6 +12,7 @@ import { useRouter } from 'next/navigation';
 interface CalendarMonthGridProps {
   monthDate: string; // YYYY-MM-DD (first day of month)
   jobs: DispatchJob[];
+  blockEvents: DispatchCalendarBlockEvent[];
   tech?: string | null;
   selectedDate?: string;
   selectedJobId?: string;
@@ -48,15 +50,11 @@ function extractDraggedJobId(event: React.DragEvent<HTMLElement>) {
   }
 }
 
-function getMonthDays(monthDate: string) {
+function getCalendarGridDays(monthDate: string) {
   const date = parseISO(monthDate);
-  const start = startOfMonth(date);
-  const end = endOfMonth(date);
+  const start = startOfWeek(startOfMonth(date));
+  const end = endOfWeek(endOfMonth(date));
   return eachDayOfInterval({ start, end });
-}
-
-function getLeadingEmptyCellCount(monthDate: string) {
-  return startOfMonth(parseISO(monthDate)).getDay();
 }
 
 function jobsByDate(jobs: DispatchJob[]) {
@@ -69,21 +67,36 @@ function jobsByDate(jobs: DispatchJob[]) {
   return map;
 }
 
+function blockEventsByDate(blockEvents: DispatchCalendarBlockEvent[]) {
+  const map = new Map<string, DispatchCalendarBlockEvent[]>();
+  for (const event of blockEvents) {
+    const date = String(event.calendar_date ?? '').trim();
+    if (!date) continue;
+    if (!map.has(date)) map.set(date, []);
+    map.get(date)?.push(event);
+  }
+  return map;
+}
+
 function shortTitle(job: DispatchJob) {
-  const title = String(job.title ?? '').trim();
+  const title = normalizeRetestLinkedJobTitle(job.title);
   if (!title) return `Job ${job.id.slice(0, 8)}`;
   return title.length > 32 ? `${title.slice(0, 29)}...` : title;
 }
 
-export default function CalendarMonthGrid({ monthDate, jobs, tech, selectedDate, selectedJobId }: CalendarMonthGridProps) {
+function clickStartedInsideInteractiveElement(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest('a, button, input, select, textarea, summary'));
+}
+
+export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, selectedDate, selectedJobId }: CalendarMonthGridProps) {
   const router = useRouter();
   const [dropTargetDate, setDropTargetDate] = useState<string | null>(null);
-  const days = getMonthDays(monthDate);
-  const leadingEmptyCellCount = getLeadingEmptyCellCount(monthDate);
-  const trailingEmptyCellCount = (7 - ((leadingEmptyCellCount + days.length) % 7)) % 7;
+  const days = getCalendarGridDays(monthDate);
   const jobMap = jobsByDate(jobs);
+  const blockEventMap = blockEventsByDate(blockEvents);
   const month = parseISO(monthDate);
-  const maxJobsPerCell = 3;
+  const maxEntriesPerCell = 4;
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
@@ -97,21 +110,26 @@ export default function CalendarMonthGrid({ monthDate, jobs, tech, selectedDate,
       </div>
 
       <div className="grid grid-cols-7 gap-2">
-        {Array.from({ length: leadingEmptyCellCount }, (_, index) => (
-          <div
-            key={`leading-empty-${index}`}
-            aria-hidden="true"
-            className="min-h-24 rounded-xl border border-transparent bg-transparent p-3"
-          />
-        ))}
         {days.map((day) => {
           const ymd = format(day, 'yyyy-MM-dd');
           const dayJobs = jobMap.get(ymd) || [];
+          const dayBlockEvents = blockEventMap.get(ymd) || [];
           const isSelectedDate = ymd === selectedDate;
+          const isAdjacentMonthDay = !isSameMonth(day, month);
+          const visibleJobs = dayJobs.slice(0, maxEntriesPerCell);
+          const remainingSlots = Math.max(maxEntriesPerCell - visibleJobs.length, 0);
+          const visibleBlockEvents = dayBlockEvents.slice(0, remainingSlots);
+          const hiddenEntryCount = Math.max(dayJobs.length + dayBlockEvents.length - visibleJobs.length - visibleBlockEvents.length, 0);
 
           return (
             <div
               key={ymd}
+              onClick={(event) => {
+                if (event.defaultPrevented) return;
+                if (clickStartedInsideInteractiveElement(event.target)) return;
+
+                router.push(buildCalendarHref('month', ymd, { tech }), { scroll: false });
+              }}
               onDragOver={(event) => {
                 if (!event.dataTransfer) return;
                 event.preventDefault();
@@ -137,14 +155,14 @@ export default function CalendarMonthGrid({ monthDate, jobs, tech, selectedDate,
                 );
               }}
               className={`min-h-24 rounded-xl border border-gray-200 p-3 transition-colors ${
-                isToday(day) ? 'bg-blue-50' : isSameMonth(day, month) ? 'bg-white' : 'bg-gray-50'
+                isToday(day) ? 'bg-blue-50' : isAdjacentMonthDay ? 'bg-gray-50' : 'bg-white'
               } hover:bg-gray-50 ${isSelectedDate ? 'ring-2 ring-slate-800/45 border-slate-500' : ''} ${dropTargetDate === ymd ? 'ring-2 ring-blue-400 border-blue-500 bg-blue-50/80' : ''}`}
             >
               <div className="mb-2 flex items-center justify-between">
                 <Link
                   href={buildCalendarHref('month', ymd, { tech })}
                   className={`rounded-sm text-lg font-bold hover:underline ${
-                    isToday(day) ? 'rounded-full bg-blue-600 px-2 text-white' : 'text-gray-900'
+                    isToday(day) ? 'rounded-full bg-blue-600 px-2 text-white' : isAdjacentMonthDay ? 'text-gray-400' : 'text-gray-900'
                   } ${isSelectedDate && !isToday(day) ? 'rounded bg-slate-100 px-2' : ''}`}
                 >
                   {format(day, 'd')}
@@ -157,13 +175,13 @@ export default function CalendarMonthGrid({ monthDate, jobs, tech, selectedDate,
               </div>
 
               <div className="flex flex-col gap-1">
-                {dayJobs.slice(0, maxJobsPerCell).map((job) => {
+                {visibleJobs.map((job) => {
                   const needsTech = !!job.scheduled_date && (!job.assignments || job.assignments.length === 0);
                   const lifecycle = getCalendarDisplayStatus(job);
                   const dotClass = calendarStatusDotClass(lifecycle);
                   const faded = lifecycle === 'closed' || lifecycle === 'cancelled' ? 'opacity-50' : '';
                   const primaryLine = job.job_address || shortTitle(job);
-                  const secondaryLine = job.job_type || job.title || 'Job';
+                  const secondaryLine = job.job_type || normalizeRetestLinkedJobTitle(job.title) || 'Job';
 
                   return (
                     <div key={job.id} className="group relative">
@@ -193,7 +211,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, tech, selectedDate,
                       </Link>
 
                       <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-72 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-900 shadow-lg group-hover:block group-focus-within:block">
-                        <div className="mb-1 font-semibold">{job.title || shortTitle(job)}</div>
+                        <div className="mb-1 font-semibold">{normalizeRetestLinkedJobTitle(job.title) || shortTitle(job)}</div>
                         <div className="mb-1 text-slate-700">{job.job_address || 'No address'}</div>
 
                         {job.customer_first_name || job.customer_last_name ? (
@@ -227,20 +245,38 @@ export default function CalendarMonthGrid({ monthDate, jobs, tech, selectedDate,
                   );
                 })}
 
-                {dayJobs.length > maxJobsPerCell ? (
-                  <div className="mt-1 text-center text-xs text-gray-500">+{dayJobs.length - maxJobsPerCell} more</div>
+                {visibleBlockEvents.map((event) => (
+                  <div key={event.id} className="group relative">
+                    <div className="flex min-h-[24px] items-center gap-2 rounded-md border border-emerald-200 border-dashed bg-emerald-50/70 px-2 py-1 text-[11px] text-emerald-950 shadow-sm">
+                      <span className="inline-flex rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                        Block
+                      </span>
+                      <div className="min-w-0 flex-1 truncate font-medium">{event.title}</div>
+                    </div>
+
+                    <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-64 rounded-lg border border-emerald-200 bg-white p-3 text-xs text-slate-900 shadow-lg group-hover:block group-focus-within:block">
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="inline-flex rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                          Block
+                        </span>
+                        <span className="text-slate-500">{event.calendar_date}</span>
+                      </div>
+                      <div className="mb-1 font-semibold text-slate-900">{event.title}</div>
+                      <div className="mb-1 text-slate-600">Time: {event.start_time} - {event.end_time}</div>
+                      {event.description ? (
+                        <div className="text-slate-600">{event.description}</div>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+
+                {hiddenEntryCount > 0 ? (
+                  <div className="mt-1 text-center text-xs text-gray-500">+{hiddenEntryCount} more</div>
                 ) : null}
               </div>
             </div>
           );
         })}
-        {Array.from({ length: trailingEmptyCellCount }, (_, index) => (
-          <div
-            key={`trailing-empty-${index}`}
-            aria-hidden="true"
-            className="min-h-24 rounded-xl border border-transparent bg-transparent p-3"
-          />
-        ))}
       </div>
     </div>
   );

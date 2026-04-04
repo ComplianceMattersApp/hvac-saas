@@ -6,7 +6,6 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath, refresh } from "next/cache";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
-import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from "@/lib/actions/job-evaluator";
@@ -1617,6 +1616,7 @@ async function resolveSystemIdForRun(params: {
 
 export async function updateJobTypeFromForm(formData: FormData) {
   const supabase = await createClient();
+  const { userId: actingUserId } = await requireInternalUser({ supabase });
 
   const jobId = String(formData.get("job_id") ?? "").trim();
   const rawType = String(formData.get("job_type") ?? "").trim().toLowerCase();
@@ -1631,6 +1631,19 @@ export async function updateJobTypeFromForm(formData: FormData) {
     throw new Error("Invalid job type");
   }
 
+  const { data: beforeJob, error: beforeErr } = await supabase
+    .from("jobs")
+    .select("job_type")
+    .eq("id", jobId)
+    .single();
+
+  if (beforeErr) {
+    console.error("Job type read failed", beforeErr);
+    throw new Error("Unable to load existing job type");
+  }
+
+  const previousJobType = String(beforeJob?.job_type ?? "").trim().toLowerCase() || null;
+
   const { error } = await supabase
     .from("jobs")
     .update({
@@ -1642,6 +1655,25 @@ export async function updateJobTypeFromForm(formData: FormData) {
   if (error) {
     console.error("Job type update failed", error);
     throw new Error("Unable to update job type");
+  }
+
+  if (previousJobType !== rawType) {
+    await insertJobEvent({
+      supabase,
+      jobId,
+      event_type: "ops_update",
+      meta: {
+        source: "job_detail_info",
+        changes: [
+          {
+            field: "job_type",
+            from: previousJobType,
+            to: rawType,
+          },
+        ],
+      },
+      userId: actingUserId,
+    });
   }
 
   revalidatePath(`/jobs/${jobId}`);
@@ -2371,6 +2403,9 @@ export async function createContractorFromForm(formData: FormData) {
 }
 
 export async function updateJobContractorFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { userId: actingUserId } = await requireInternalUser({ supabase });
+
   const jobId = String(formData.get("job_id") || "").trim();
   const contractorIdRaw = String(formData.get("contractor_id") || "").trim();
   const tabRaw = String(formData.get("tab") || "").trim();
@@ -2380,8 +2415,6 @@ export async function updateJobContractorFromForm(formData: FormData) {
 
   // empty string means "clear"
   const contractor_id = contractorIdRaw ? contractorIdRaw : null;
-
-  const supabase = await createClient();
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")
@@ -2425,6 +2458,23 @@ export async function updateJobContractorFromForm(formData: FormData) {
       returnToRaw,
     });
   }
+
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: "ops_update",
+    meta: {
+      source: "job_detail_info",
+      changes: [
+        {
+          field: "contractor_id",
+          from: currentContractorId,
+          to: contractor_id,
+        },
+      ],
+    },
+    userId: actingUserId,
+  });
 
   revalidatePath(`/jobs/${jobId}`, "page");
   revalidatePath("/jobs", "page");
@@ -5579,12 +5629,9 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     redirectToScheduleTarget("schedule_saved_ops_eval_failed");
   }
 
-  const hadPendingInfoSignal = getPendingInfoSignal({
-    pending_info_reason: before?.pending_info_reason,
-    follow_up_date: before?.follow_up_date,
-    next_action_note: before?.next_action_note,
-    action_required_by: before?.action_required_by,
-  });
+  const hadPendingInfoSignal =
+    String(before?.ops_status ?? "").trim().toLowerCase() === "pending_info" ||
+    String(before?.pending_info_reason ?? "").trim().length > 0;
   const hasPermitNumber = String(permit_number ?? "").trim().length > 0;
 
   if (hadPendingInfoSignal && hasPermitNumber) {
@@ -5868,6 +5915,7 @@ export async function completeDataEntryFromForm(formData: FormData) {
   const completedAt = new Date().toISOString();
 
   const supabase = await createClient();
+  const { userId: actingUserId } = await requireInternalUser({ supabase });
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
@@ -5907,7 +5955,7 @@ if (jobType !== "ecc") {
         { field: "data_entry_completed_at", from: job?.data_entry_completed_at ?? null, to: completedAt },
       ],
     },
-    userId: null,
+    userId: actingUserId,
   });
 
   await evaluateJobOpsStatus(id);
@@ -5939,7 +5987,7 @@ if (jobType !== "ecc") {
         { field: "data_entry_completed_at", from: job?.data_entry_completed_at ?? null, to: completedAt },
       ],
     },
-    userId: null,
+    userId: actingUserId,
   });
 
   await evaluateJobOpsStatus(id);

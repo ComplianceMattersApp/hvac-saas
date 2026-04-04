@@ -3,9 +3,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
+  isInternalAccessError,
+  requireInternalUser,
+} from "@/lib/auth/internal-user";
+import {
   archiveCustomerFromForm,
   updateCustomerNotesFromForm,
 } from "@/lib/actions/customer-actions";
+import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 
 
 type CustomerRow = {
@@ -235,6 +240,16 @@ export default async function CustomerDetailPage(props: {
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
+
+  try {
+    await requireInternalUser({ supabase, userId: userData.user.id });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirect("/login");
+    }
+
+    throw error;
+  }
 
   const { id } = await props.params;
   const sp = props.searchParams ? await props.searchParams : {};
@@ -476,24 +491,24 @@ const { data: jobsData, error: jobsErr } = await supabase
         <div className="space-y-6 md:space-y-7">
 
         {/* Open status summary */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+        <section className="rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
               Open Jobs Summary
             </h2>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="flex flex-wrap gap-1 sm:gap-1.5">
             {summaryOrder().map((key) => (
               <div
                 key={key}
-                className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/80 px-2.5 py-2"
               >
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  {opsStatusLabel(key)}
-                </div>
-                <div className="mt-2 text-2xl font-semibold text-slate-900">
+                <div className="text-lg font-semibold leading-none tracking-tight text-slate-900">
                   {opsCounts[key] ?? 0}
+                </div>
+                <div className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.08em] text-slate-500">
+                  {opsStatusLabel(key)}
                 </div>
               </div>
             ))}
@@ -540,7 +555,7 @@ const { data: jobsData, error: jobsErr } = await supabase
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Quick Actions</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Summary</h2>
 
             <div className="mt-4 flex flex-wrap gap-2">
               {callHref ? (
@@ -676,7 +691,7 @@ const { data: jobsData, error: jobsErr } = await supabase
                         </div>
 
                         <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
-                          {jobsByLocationCount.get(locId) ?? 0} job
+                          {jobsByLocationCount.get(locId) ?? 0} active job
                           {(jobsByLocationCount.get(locId) ?? 0) === 1 ? "" : "s"}
                         </div>
                       </div>
@@ -733,10 +748,6 @@ const { data: jobsData, error: jobsErr } = await supabase
                   : null;
                 const isArchived = Boolean(job.deleted_at);
                 const isCancelled = normalizeLifecycleStatus(job.status) === "cancelled";
-                const isResolvedParent =
-                  normalizeOpsStatus(job.ops_status) === "failed" &&
-                  resolvedRetestParentIds.has(job.id);
-
                 const address = [job.job_address, job.city]
                   .map((v) => String(v ?? "").trim())
                   .filter(Boolean)
@@ -759,25 +770,17 @@ const { data: jobsData, error: jobsErr } = await supabase
                             href={`/jobs/${job.id}`}
                             className="text-sm font-semibold text-slate-900 underline-offset-2 hover:underline"
                           >
-                            {job.title?.trim() || `Job ${job.id.slice(0, 8)}`}
+                            {normalizeRetestLinkedJobTitle(job.title) || `Job ${job.id.slice(0, 8)}`}
                           </Link>
 
                           <span
                             className={[
                               "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
-                              isResolvedParent
-                                ? "border-slate-200 bg-slate-100 text-slate-400 line-through"
-                                : opsBadgeClass(job.ops_status),
+                              opsBadgeClass(job.ops_status),
                             ].join(" ")}
                           >
                             {opsStatusLabel(job.ops_status)}
                           </span>
-
-                          {isResolvedParent && (
-                            <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">
-                              Retest Resolved ✓
-                            </span>
-                          )}
 
                           {isCancelled && !isArchived ? (
                             <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">

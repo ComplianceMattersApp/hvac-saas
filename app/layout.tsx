@@ -132,12 +132,14 @@ export default async function RootLayout({
                         >
                           + New Job
                         </Link>
-                        <Link
-                          href="/calendar"
-                          className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                        >
-                          View Calendar
-                        </Link>
+                        {isInternalUser ? (
+                          <Link
+                            href="/calendar"
+                            className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                          >
+                            View Calendar
+                          </Link>
+                        ) : null}
                         <Link
                           href="/customers"
                           className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
@@ -202,12 +204,14 @@ export default async function RootLayout({
                     >
                       + New Job
                     </Link>
-                    <Link
-                      href="/calendar"
-                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
-                    >
-                      View Calendar
-                    </Link>
+                    {isInternalUser ? (
+                      <Link
+                        href="/calendar"
+                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
+                      >
+                        View Calendar
+                      </Link>
+                    ) : null}
                     <Link
                       href="/customers"
                       className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"

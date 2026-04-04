@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 
 
 const QUEUES = [
@@ -115,7 +116,7 @@ if (countsData) {
   let query = supabase
     .from("jobs")
     .select(
-      "id, title, status, scheduled_date, created_at, ops_status, follow_up_date, next_action_note, pending_info_reason, job_notes, customer_id, location_id, customer_first_name, customer_last_name, customer_phone, job_address, city"
+      "id, title, status, scheduled_date, created_at, ops_status, follow_up_date, next_action_note, pending_info_reason, on_hold_reason, job_notes, customer_id, location_id, customer_first_name, customer_last_name, customer_phone, job_address, city"
     )
     .is("deleted_at", null);
 
@@ -274,13 +275,25 @@ const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.
 
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="font-medium">{job.title}</div>
+                  <div className="font-medium">{normalizeRetestLinkedJobTitle(job.title) || "Job"}</div>
 
                   <div className="text-sm text-gray-600">
                     {displayCity} • {job.status ?? "—"} •{" "}
                     <span className="font-medium">{formatOpsStatusLabel(job.ops_status)}</span>
                     {job.follow_up_date ? <> • Follow-up: {job.follow_up_date}</> : null}
                   </div>
+
+                  {job.ops_status === "pending_info" ? (
+                    <div className="text-xs text-gray-500 mt-1">
+                      Pending Info: {String(job.pending_info_reason ?? "").trim() || "Reason not set."}
+                    </div>
+                  ) : null}
+
+                  {job.ops_status === "on_hold" ? (
+                    <div className="text-xs text-gray-500 mt-1">
+                      On Hold: {String((job as any).on_hold_reason ?? "").trim() || "Reason not set."}
+                    </div>
+                  ) : null}
 
                   {(job.customer_first_name || job.customer_last_name) ? (
                     <div className="text-sm text-gray-600 mt-1">
@@ -292,12 +305,6 @@ const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.
                   {job.next_action_note ? (
                     <div className="text-xs text-gray-500 mt-1">
                       Next: {job.next_action_note.length > 90 ? `${job.next_action_note.slice(0, 90)}…` : job.next_action_note}
-                    </div>
-                  ) : null}
-
-                  {job.pending_info_reason ? (
-                    <div className="text-xs text-gray-500 mt-1">
-                      Pending: {job.pending_info_reason}
                     </div>
                   ) : null}
 

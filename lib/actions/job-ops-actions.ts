@@ -55,10 +55,25 @@ function isActionRequiredBy(value: unknown): value is ActionRequiredBy {
 type OpsSnapshot = {
   ops_status: string | null;
   pending_info_reason: string | null;
+  on_hold_reason: string | null;
   follow_up_date: string | null;
   next_action_note: string | null;
   action_required_by: string | null;
 };
+
+function hasExplicitPendingInfo(snapshot: Pick<OpsSnapshot, "ops_status" | "pending_info_reason">): boolean {
+  return (
+    String(snapshot.ops_status ?? "").trim().toLowerCase() === "pending_info" ||
+    typeof snapshot.pending_info_reason === "string" && snapshot.pending_info_reason.trim().length > 0
+  );
+}
+
+function hasExplicitOnHold(snapshot: Pick<OpsSnapshot, "ops_status" | "on_hold_reason">): boolean {
+  return (
+    String(snapshot.ops_status ?? "").trim().toLowerCase() === "on_hold" ||
+    (typeof snapshot.on_hold_reason === "string" && snapshot.on_hold_reason.trim().length > 0)
+  );
+}
 
 async function requireInternalOpsAccessOrRedirect(
   supabase: any,
@@ -931,7 +946,7 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from('jobs')
-    .select('ops_status, pending_info_reason, follow_up_date, next_action_note, action_required_by')
+    .select('ops_status, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by')
     .eq('id', jobId)
     .single();
 
@@ -940,37 +955,14 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
   const before: OpsSnapshot = {
     ops_status: beforeJob.ops_status ?? null,
     pending_info_reason: beforeJob.pending_info_reason ?? null,
+    on_hold_reason: beforeJob.on_hold_reason ?? null,
     follow_up_date: beforeJob.follow_up_date ?? null,
     next_action_note: beforeJob.next_action_note ?? null,
     action_required_by: beforeJob.action_required_by ?? null,
   };
-  const opsStatusRaw = formData.get("ops_status");
-  const allowedSignalOpsStatuses = ["pending_info", "on_hold"] as const;
-  const isAllowedSignalOpsStatus = (
-    value: unknown
-  ): value is (typeof allowedSignalOpsStatuses)[number] =>
-    typeof value === "string" &&
-    allowedSignalOpsStatuses.includes(
-      value as (typeof allowedSignalOpsStatuses)[number]
-    );
-
-  let ops_status = before.ops_status;
-  if (opsStatusRaw != null) {
-    if (!isAllowedSignalOpsStatus(opsStatusRaw)) {
-      throw new Error("Invalid ops_status");
-    }
-    // pending_info is a signal-only state: keep lifecycle ops_status unchanged.
-    ops_status = opsStatusRaw === "pending_info" ? before.ops_status : opsStatusRaw;
-  }
-  const pendingInfoReasonRaw = formData.get('pending_info_reason');
   const followUpDateRaw = formData.get('follow_up_date');
   const nextActionNoteRaw = formData.get('next_action_note');
   const actionRequiredByRaw = formData.get('action_required_by');
-
-  const pending_info_reason =
-    typeof pendingInfoReasonRaw === 'string' && pendingInfoReasonRaw.trim()
-      ? pendingInfoReasonRaw.trim()
-      : null;
 
   const next_action_note =
     typeof nextActionNoteRaw === 'string' && nextActionNoteRaw.trim()
@@ -986,8 +978,6 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
 
   const after: OpsSnapshot = {
     ...before,
-    ops_status,
-    pending_info_reason,
     follow_up_date,
     next_action_note,
     action_required_by,
@@ -1002,8 +992,6 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
   const { error: updateErr } = await supabase
     .from('jobs')
     .update({
-      ops_status,
-      pending_info_reason,
       follow_up_date,
       next_action_note,
       action_required_by,
@@ -1032,7 +1020,7 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
   const { data: before, error: beforeErr } = await supabase
     .from("jobs")
     .select(
-      "id, status, job_type, ops_status, field_complete, certs_complete, invoice_complete, scheduled_date, window_start, window_end, pending_info_reason, follow_up_date, next_action_note, action_required_by"
+      "id, status, job_type, ops_status, field_complete, certs_complete, invoice_complete, scheduled_date, window_start, window_end, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by"
     )
     .eq("id", jobId)
     .single();
@@ -1040,14 +1028,12 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
   if (beforeErr) throw new Error(beforeErr.message);
   if (!before?.id) throw new Error("Job not found");
 
-  const hasPendingInfoSignal = getPendingInfoSignal({
-    pending_info_reason: before.pending_info_reason,
-    follow_up_date: before.follow_up_date,
-    next_action_note: before.next_action_note,
-    action_required_by: before.action_required_by,
+  const hasPendingInfoState = hasExplicitPendingInfo({
+    ops_status: before.ops_status ?? null,
+    pending_info_reason: before.pending_info_reason ?? null,
   });
 
-  if (!hasPendingInfoSignal) return before.ops_status ?? null;
+  if (!hasPendingInfoState) return before.ops_status ?? null;
 
   const currentOps = String(before.ops_status ?? "").trim().toLowerCase();
   const releasable = new Set([
@@ -1063,6 +1049,7 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
     const beforeSnapshot: OpsSnapshot = {
       ops_status: before.ops_status ?? null,
       pending_info_reason: before.pending_info_reason ?? null,
+      on_hold_reason: before.on_hold_reason ?? null,
       follow_up_date: before.follow_up_date ?? null,
       next_action_note: before.next_action_note ?? null,
       action_required_by: before.action_required_by ?? null,
@@ -1071,9 +1058,6 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
     const afterSnapshot: OpsSnapshot = {
       ...beforeSnapshot,
       pending_info_reason: null,
-      follow_up_date: null,
-      next_action_note: null,
-      action_required_by: null,
     };
 
     const changes = buildOpsChanges(beforeSnapshot, afterSnapshot);
@@ -1082,9 +1066,6 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
       .from("jobs")
       .update({
         pending_info_reason: null,
-        follow_up_date: null,
-        next_action_note: null,
-        action_required_by: null,
       })
       .eq("id", jobId);
 
@@ -1122,7 +1103,7 @@ export async function releaseAndReevaluate(
   const { data: before, error: beforeErr } = await supabase
     .from("jobs")
     .select(
-      "id, status, job_type, ops_status, field_complete, certs_complete, invoice_complete, scheduled_date, window_start, window_end, pending_info_reason, follow_up_date, next_action_note, action_required_by"
+      "id, status, job_type, ops_status, field_complete, certs_complete, invoice_complete, scheduled_date, window_start, window_end, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by"
     )
     .eq("id", jobId)
     .single();
@@ -1141,6 +1122,11 @@ export async function releaseAndReevaluate(
   ]);
 
   if (!releasable.has(currentOps)) return before.ops_status ?? null;
+
+  const hasOnHoldState = hasExplicitOnHold({
+    ops_status: before.ops_status ?? null,
+    on_hold_reason: before.on_hold_reason ?? null,
+  });
 
   const isEcc = String(before.job_type ?? "").trim().toLowerCase() === "ecc";
   const isFieldCompleteOrCompleted =
@@ -1163,9 +1149,7 @@ export async function releaseAndReevaluate(
     const releasePatch: Record<string, any> = {
       ops_status: neutralOps,
       pending_info_reason: null,
-      follow_up_date: null,
-      next_action_note: null,
-      action_required_by: null,
+      on_hold_reason: hasOnHoldState ? null : before.on_hold_reason ?? null,
     };
 
     if (shouldSetCompletedLifecycle) {
@@ -1205,9 +1189,7 @@ export async function releaseAndReevaluate(
     const releasePatch: Record<string, any> = {
       ops_status: nextOps,
       pending_info_reason: null,
-      follow_up_date: null,
-      next_action_note: null,
-      action_required_by: null,
+      on_hold_reason: hasOnHoldState ? null : before.on_hold_reason ?? null,
     };
 
     if (shouldSetCompletedLifecycle) {
@@ -1226,6 +1208,7 @@ export async function releaseAndReevaluate(
     {
       ops_status: before.ops_status ?? null,
       pending_info_reason: before.pending_info_reason ?? null,
+      on_hold_reason: before.on_hold_reason ?? null,
       follow_up_date: before.follow_up_date ?? null,
       next_action_note: before.next_action_note ?? null,
       action_required_by: before.action_required_by ?? null,
@@ -1233,9 +1216,10 @@ export async function releaseAndReevaluate(
     {
       ops_status: nextOps,
       pending_info_reason: null,
-      follow_up_date: null,
-      next_action_note: null,
-      action_required_by: null,
+      on_hold_reason: hasOnHoldState ? null : before.on_hold_reason ?? null,
+      follow_up_date: before.follow_up_date ?? null,
+      next_action_note: before.next_action_note ?? null,
+      action_required_by: before.action_required_by ?? null,
     }
   );
 
@@ -1290,6 +1274,7 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
 
   const jobId = formData.get("job_id");
   const opsStatusRaw = formData.get("ops_status");
+  const statusReasonRaw = formData.get("status_reason");
 
   if (typeof jobId !== "string" || !jobId) {
     throw new Error("Missing job_id");
@@ -1300,6 +1285,7 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   }
 
   const allowedManualOpsStatuses = [
+    "pending_info",
     "on_hold",
   ] as const;
 
@@ -1311,7 +1297,19 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
     );
 
   if (!isAllowedManualOpsStatus(opsStatusRaw)) {
-    const banner = encodeURIComponent("Use Ops Details to set Pending Info");
+    const banner = encodeURIComponent("Select On Hold or Pending Info");
+    redirect(`/jobs/${jobId}?tab=ops&banner=${banner}`);
+  }
+
+  const statusReason =
+    typeof statusReasonRaw === "string" && statusReasonRaw.trim()
+      ? statusReasonRaw.trim()
+      : null;
+
+  if (!statusReason) {
+    const banner = opsStatusRaw === "pending_info"
+      ? "pending_info_reason_required"
+      : "on_hold_reason_required";
     redirect(`/jobs/${jobId}?tab=ops&banner=${banner}`);
   }
 
@@ -1319,7 +1317,7 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")
     .select(
-      "ops_status, pending_info_reason, follow_up_date, next_action_note, action_required_by"
+      "ops_status, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by"
     )
     .eq("id", jobId)
     .single();
@@ -1329,6 +1327,7 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   const before: OpsSnapshot = {
     ops_status: beforeJob.ops_status ?? null,
     pending_info_reason: beforeJob.pending_info_reason ?? null,
+    on_hold_reason: beforeJob.on_hold_reason ?? null,
     follow_up_date: beforeJob.follow_up_date ?? null,
     next_action_note: beforeJob.next_action_note ?? null,
     action_required_by: beforeJob.action_required_by ?? null,
@@ -1336,7 +1335,12 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
 
   const nextOpsStatus = opsStatusRaw;
 
-  const after: OpsSnapshot = { ...before, ops_status: nextOpsStatus };
+  const after: OpsSnapshot = {
+    ...before,
+    ops_status: nextOpsStatus,
+    pending_info_reason: nextOpsStatus === "pending_info" ? statusReason : null,
+    on_hold_reason: nextOpsStatus === "on_hold" ? statusReason : null,
+  };
 
   const changes = buildOpsChanges(before, after);
   if (changes.length === 0) {
@@ -1347,7 +1351,11 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   // UPDATE
   const { error: updateErr } = await supabase
     .from("jobs")
-    .update({ ops_status: nextOpsStatus })
+    .update({
+      ops_status: nextOpsStatus,
+      pending_info_reason: nextOpsStatus === "pending_info" ? statusReason : null,
+      on_hold_reason: nextOpsStatus === "on_hold" ? statusReason : null,
+    })
     .eq("id", jobId);
 
   if (updateErr) throw new Error(updateErr.message);

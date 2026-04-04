@@ -1,7 +1,7 @@
 // app/jobs/[id]/page
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
   isInternalAccessError,
   requireInternalUser,
@@ -48,9 +48,10 @@ import { displayDateLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
 import UnscheduleButton from "./_components/UnscheduleButton";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
-import { getPendingInfoSignal } from "@/lib/utils/ops-status";
 import ContractorReportPanel from "./_components/ContractorReportPanel";
 import { resolveContractorResponseTracking } from "@/lib/portal/resolveContractorIssues";
+import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
+import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import {
   getAssignableInternalUsers,
   getActiveJobAssignmentDisplayMap,
@@ -119,6 +120,18 @@ function formatTimeDisplay(time?: string | null) {
 function finalRunPass(run: any): boolean | null {
   if (!run) return null;
   return run.override_pass != null ? !!run.override_pass : !!run.computed_pass;
+}
+
+function isFailedFamilyOpsStatus(value?: string | null) {
+  return ["failed", "retest_needed", "pending_office_review"].includes(
+    String(value ?? "").toLowerCase()
+  );
+}
+
+function serviceChainVisitLabel(visit: any, idx: number) {
+  if (idx === 0 && !visit?.parent_job_id) return "Original visit";
+  if (visit?.parent_job_id) return "Retest visit";
+  return `Visit ${idx + 1}`;
 }
 
 
@@ -458,6 +471,7 @@ export default async function JobDetailPage({
       invoice_complete,
       invoice_number,
       pending_info_reason,
+      on_hold_reason,
       follow_up_date,
       next_action_note,
       action_required_by,
@@ -568,22 +582,6 @@ export default async function JobDetailPage({
 const parentJobId = (job as any).parent_job_id as string | null;
 const retestRootId = parentJobId ?? jobId;
 
-const { data: parentJob } = parentJobId
-  ? await supabase
-      .from("jobs")
-      .select("id, title, status, ops_status, created_at")
-      .eq("id", parentJobId)
-      .maybeSingle()
-  : { data: null };
-
-const { data: childJobs, error: childErr } = await supabase
-  .from("jobs")
-  .select("id, title, status, ops_status, created_at")
-  .eq("parent_job_id", retestRootId)
-  .order("created_at", { ascending: false });
-
-if (childErr) throw new Error(childErr.message);
-
 // --- Service Chain (full case history) ---
 const serviceCaseId = (job as any).service_case_id as string | null;
 
@@ -591,7 +589,7 @@ const { data: serviceChainJobs, error: serviceChainErr } = serviceCaseId
   ? await supabase
       .from("jobs")
       .select(
-        "id, title, status, ops_status, created_at, scheduled_date, window_start, window_end, parent_job_id"
+        "id, title, status, ops_status, job_type, created_at, scheduled_date, window_start, window_end, parent_job_id"
       )
       .eq("service_case_id", serviceCaseId)
       .is("deleted_at", null)
@@ -608,7 +606,7 @@ const { data: serviceChainRuns, error: serviceChainRunsErr } =
     ? await supabase
         .from("ecc_test_runs")
         .select(
-          "id, job_id, created_at, test_type, computed_pass, override_pass, is_completed"
+          "id, job_id, created_at, test_type, computed, computed_pass, override_pass, is_completed"
         )
         .in("job_id", serviceChainJobIds)
         .eq("is_completed", true)
@@ -618,13 +616,25 @@ const { data: serviceChainRuns, error: serviceChainRunsErr } =
 if (serviceChainRunsErr) throw new Error(serviceChainRunsErr.message);
 
 const latestServiceChainRunByJob = new Map<string, any>();
+const latestFailedServiceChainRunByJob = new Map<string, any>();
 
 for (const run of serviceChainRuns ?? []) {
   // because we ordered newest first,
   // the first run we see for a job is the newest one
-  if (!latestServiceChainRunByJob.has(run.job_id)) {
-    latestServiceChainRunByJob.set(run.job_id, run);
+  const rowJobId = String(run.job_id ?? "").trim();
+  if (!rowJobId) continue;
+  if (!latestServiceChainRunByJob.has(rowJobId)) {
+    latestServiceChainRunByJob.set(rowJobId, run);
   }
+  if (finalRunPass(run) === false && !latestFailedServiceChainRunByJob.has(rowJobId)) {
+    latestFailedServiceChainRunByJob.set(rowJobId, run);
+  }
+}
+
+const serviceChainFailureReasonByJob = new Map<string, string>();
+for (const [rowJobId, run] of latestFailedServiceChainRunByJob.entries()) {
+  const primaryReason = String(extractFailureReasons(run)[0] ?? "").trim();
+  if (primaryReason) serviceChainFailureReasonByJob.set(rowJobId, primaryReason);
 }
 
 const { data: timelineJobs, error: timelineJobsErr } = await supabase
@@ -711,20 +721,51 @@ const { data: attachmentRows, error: attachmentErr } = await supabase
 
 if (attachmentErr) throw new Error(attachmentErr.message);
 
+const attachmentAdmin = createAdminClient();
+
 const attachmentItems = await Promise.all(
   (attachmentRows ?? []).map(async (a: any) => {
+    const bucket = String(a?.bucket ?? "").trim();
+    const storagePath = String(a?.storage_path ?? "").trim().replace(/^\/+/, "");
+    const contentType =
+      typeof a?.content_type === "string" && a.content_type.trim().length > 0
+        ? a.content_type.trim()
+        : null;
+
     let signedUrl: string | null = null;
 
-    if (a.bucket && a.storage_path) {
-      const { data } = await supabase.storage
-        .from(String(a.bucket))
-        .createSignedUrl(String(a.storage_path), 60 * 60);
+    if (!bucket || !storagePath) {
+      console.warn("Job attachment row missing bucket/storage_path", {
+        jobId,
+        attachmentId: String(a?.id ?? "").trim() || null,
+        bucket: bucket || null,
+        storagePath: storagePath || null,
+        contentType,
+      });
+    } else {
+      const { data, error: signErr } = await attachmentAdmin.storage
+        .from(bucket)
+        .createSignedUrl(storagePath, 60 * 60);
 
-      signedUrl = data?.signedUrl ?? null;
+      if (signErr || !data?.signedUrl) {
+        console.warn("Job attachment signing failed", {
+          jobId,
+          attachmentId: String(a?.id ?? "").trim() || null,
+          bucket,
+          storagePath,
+          contentType,
+          error: signErr?.message ?? "missing_signed_url",
+        });
+      } else {
+        signedUrl = data.signedUrl;
+      }
     }
 
     return {
       ...a,
+      bucket,
+      storage_path: storagePath,
+      content_type: contentType,
       signedUrl,
     };
   })
@@ -870,6 +911,20 @@ const customerEmail =
     !!job.scheduled_date &&
     !!job.window_start &&
     !!job.window_end;
+
+  const appointmentDateLabel = job.scheduled_date
+    ? formatBusinessDateUS(String(job.scheduled_date))
+    : "No appointment scheduled";
+  const appointmentTimeLabel =
+    job.window_start && job.window_end
+      ? `${formatTimeDisplay(job.window_start)}–${formatTimeDisplay(job.window_end)}`
+      : job.window_start
+      ? `Starts ${formatTimeDisplay(job.window_start)}`
+      : job.window_end
+      ? `Ends ${formatTimeDisplay(job.window_end)}`
+      : job.scheduled_date
+      ? "Time window TBD"
+      : "Use the schedule controls below to assign a visit time.";
 
 function formatOpsStatusLabel(value?: string | null) {
   const v = String(value ?? "").trim();
@@ -1044,16 +1099,26 @@ const canShowReleaseAndReevaluate = [
   "invoice_required",
 ].includes(String(job.ops_status ?? "").toLowerCase());
 
-const pendingInfoSignal = getPendingInfoSignal({
-  ops_status: job.ops_status,
-  pending_info_reason: (job as any).pending_info_reason,
-  follow_up_date: (job as any).follow_up_date,
-  next_action_note: (job as any).next_action_note,
-  action_required_by: (job as any).action_required_by,
-});
-const actionablePendingInfo =
-  pendingInfoSignal &&
-  ["pending_info", "on_hold"].includes(String(job.ops_status ?? "").toLowerCase());
+const currentOpsStatus = String(job.ops_status ?? "").toLowerCase();
+const pendingInfoReasonText = String((job as any).pending_info_reason ?? "").trim();
+const onHoldReasonText = String((job as any).on_hold_reason ?? "").trim();
+const explicitPendingInfoActive = currentOpsStatus === "pending_info";
+const onHoldActive = currentOpsStatus === "on_hold";
+const actionablePendingInfo = explicitPendingInfoActive;
+const hasFollowUpReminder =
+  Boolean((job as any).follow_up_date) ||
+  Boolean(String((job as any).next_action_note ?? "").trim()) ||
+  Boolean(String((job as any).action_required_by ?? "").trim());
+const currentStatusReasonLabel = explicitPendingInfoActive
+  ? "Pending Info blocker"
+  : onHoldActive
+  ? "On Hold reason"
+  : null;
+const currentStatusReasonText = explicitPendingInfoActive
+  ? pendingInfoReasonText
+  : onHoldActive
+  ? onHoldReasonText
+  : "";
 
 const locationId = serviceLocation?.id ?? null;
 
@@ -1094,9 +1159,7 @@ const contactPreviewItems = attemptItems.slice(0, 3);
 const contactOverflowItems = attemptItems.slice(3);
 
 const showRetestSection =
-  ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? "")) ||
-  !!parentJob ||
-  (childJobs?.length ?? 0) > 0;
+  ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
 
 const renderAttemptItem = (a: any, key: string) => {
   const method = a?.meta?.method ? String(a.meta.method) : "";
@@ -1325,6 +1388,34 @@ const renderTimelineItem = (e: any, key: string) => {
     </div>
   </div>
 
+  <div className="mb-4 rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Appointment</div>
+        <div className="mt-1 text-xl font-semibold tracking-tight text-slate-900">{appointmentDateLabel}</div>
+        <div className="mt-1 text-sm text-slate-600">{appointmentTimeLabel}</div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
+        <span
+          className={[
+            "inline-flex rounded-full px-2.5 py-1",
+            job.scheduled_date
+              ? "bg-emerald-100 text-emerald-800"
+              : "bg-slate-100 text-slate-700",
+          ].join(" ")}
+        >
+          {job.scheduled_date ? "Scheduled" : "Unscheduled"}
+        </span>
+        {job.scheduled_date ? (
+          <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">
+            {hasFullSchedule ? "Time window set" : "Time window pending"}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  </div>
+
   <div className={`mb-4 grid gap-4${job.job_type === "ecc" ? " xl:grid-cols-[minmax(300px,0.95fr)_minmax(420px,1.28fr)_minmax(280px,0.72fr)]" : " xl:grid-cols-[minmax(320px,0.96fr)_minmax(440px,1.34fr)]"}`}>
     {/* Left: customer / contact info */}
     <div className="rounded-xl border border-slate-200 bg-white/85 p-4">
@@ -1455,7 +1546,15 @@ const renderTimelineItem = (e: any, key: string) => {
       <span className={`rounded-md px-2 py-1 ${isFieldComplete ? "bg-green-100 text-green-800" : "bg-blue-50 text-blue-700"}`}>Field: {formatStatus(job.status)}</span>
       <span className="rounded-md bg-blue-50 px-2 py-1 text-blue-700">Ops: {formatOpsStatusLabel(job.ops_status)}</span>
       {actionablePendingInfo ? <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800">Pending Info</span> : null}
+      {onHoldActive ? <span className="rounded-md border border-slate-300 bg-slate-100 px-2 py-1 text-slate-800">On Hold</span> : null}
     </div>
+
+    {currentStatusReasonLabel ? (
+      <div className="mb-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        <span className="font-semibold text-slate-900">{currentStatusReasonLabel}:</span>{" "}
+        {currentStatusReasonText || "Reason not set."}
+      </div>
+    ) : null}
 
     <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
       <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Assigned Team</div>
@@ -1744,6 +1843,20 @@ const renderTimelineItem = (e: any, key: string) => {
         />
       )}
 
+      {banner === "pending_info_reason_required" && (
+        <FlashBanner
+          type="warning"
+          message="Pending Info reason is required."
+        />
+      )}
+
+      {banner === "on_hold_reason_required" && (
+        <FlashBanner
+          type="warning"
+          message="On Hold reason is required."
+        />
+      )}
+
       {banner === "contact_attempt_logged" && (
         <FlashBanner
           type="success"
@@ -1865,12 +1978,16 @@ const renderTimelineItem = (e: any, key: string) => {
           : actionablePendingInfo
             ? {
                 title: "Job completed — pending information",
-                body: "Some required info is still missing (ex: permit number, required fields, or notes). Add it to close out.",
+                body: pendingInfoReasonText
+                  ? `Blocker: ${pendingInfoReasonText}`
+                  : "Some required info is still missing before closeout can finish.",
               }
             : ops === "on_hold"
               ? {
                   title: "Job completed — on hold",
-                  body: "This job is on hold and is not in the closeout work queue until the hold is cleared.",
+                  body: onHoldReasonText
+                    ? `Hold reason: ${onHoldReasonText}`
+                    : "This job is on hold and is not in the closeout work queue until the hold is cleared.",
                 }
           : ops === "need_to_schedule"
             ? {
@@ -2247,6 +2364,14 @@ const renderTimelineItem = (e: any, key: string) => {
         </div>
       </summary>
       <div className="px-4 pb-4">
+        <div className="mb-3 flex items-center justify-end">
+          <Link
+            href={`/jobs/${job.id}/attachments`}
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            View All Attachments
+          </Link>
+        </div>
         <JobAttachmentsInternal
           jobId={job.id}
           initialItems={attachmentItems}
@@ -2315,10 +2440,10 @@ const renderTimelineItem = (e: any, key: string) => {
       ) : (
         <div className="mt-4 max-h-96 space-y-2 overflow-auto pr-1 sm:max-h-none sm:overflow-visible sm:pr-0">
           {serviceChainJobs.map((visit: any, idx: number) => {
-
-            const latestRun = latestServiceChainRunByJob.get(visit.id) ?? null;
-            const eccPass = finalRunPass(latestRun);
+            const visitId = String(visit.id ?? "").trim();
             const isCurrent = visit.id === jobId;
+            const visitLabel = serviceChainVisitLabel(visit, idx);
+            const failureReason = serviceChainFailureReasonByJob.get(visitId) ?? "";
             const win =
               visit.scheduled_date && visit.window_start && visit.window_end
                 ? `${formatTimeDisplay(visit.window_start)}–${formatTimeDisplay(visit.window_end)}`
@@ -2336,7 +2461,7 @@ const renderTimelineItem = (e: any, key: string) => {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="text-sm font-semibold text-gray-900 dark:text-gray-600">
-                        {idx === 0 ? "Original Visit" : `Retest ${idx}`}
+                        {visitLabel}
                         {isCurrent && (
                           <span className="text-blue-600 dark:text-blue-400"> • Active</span>
                         )}
@@ -2352,7 +2477,7 @@ const renderTimelineItem = (e: any, key: string) => {
                     </div>
 
                     <div className="mt-1 text-sm text-gray-800">
-                      {visit.title ?? "Untitled Job"}
+                      {normalizeRetestLinkedJobTitle(visit.title) || "Untitled Job"}
                     </div>
 
                     <div className="mt-1 text-xs text-gray-500">
@@ -2361,38 +2486,12 @@ const renderTimelineItem = (e: any, key: string) => {
                       {visit.scheduled_date ? ` • Scheduled: ${visit.scheduled_date}` : ""}
                       {win ? ` • ${win}` : ""}
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-gray-500">ECC:</span>
-
-                      {latestRun ? (
-                        <span
-                          className={[
-                            "inline-flex rounded px-2 py-1 text-xs font-medium",
-                            eccPass === true
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800",
-                          ].join(" ")}
-                        >
-                          {eccPass === true ? "Passed" : "Failed"}
-                        </span>
-                      ) : (
-                        <span className="inline-flex rounded px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700">
-                          No completed tests yet
-                        </span>
-                      )}
-
-                      {latestRun?.test_type ? (
-                        <span className="text-xs text-gray-500">
-                          {String(latestRun.test_type)}
-                        </span>
-                      ) : null}
-
-                      {latestRun?.created_at ? (
-                        <span className="text-xs text-gray-500">
-                          • {formatDateLAFromIso(String(latestRun.created_at))}
-                        </span>
-                      ) : null}
-                    </div>
+                    {isFailedFamilyOpsStatus(visit.ops_status) && failureReason ? (
+                      <div className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs text-rose-900">
+                        <span className="font-semibold uppercase tracking-[0.08em] text-rose-700">Reason:</span>{" "}
+                        {failureReason}
+                      </div>
+                    ) : null}
                   </div>
 
                   {!isCurrent ? (
@@ -2467,22 +2566,51 @@ const renderTimelineItem = (e: any, key: string) => {
 
       <select
         name="ops_status"
-        defaultValue="on_hold"
+        defaultValue={explicitPendingInfoActive ? "pending_info" : "on_hold"}
         className="w-full rounded border px-2 py-2 text-sm border-gray-300"
       >
+        <option value="pending_info">Pending Info</option>
         <option value="on_hold">On Hold</option>
       </select>
 
       <p className="mt-2 text-xs text-gray-600">
-        Manual ops updates here support only On Hold.
-        Use Follow Up fields for pending info signals; lifecycle and closeout states are workflow-driven.
+        Choose the status-change type here. Use the reason field below for either a Pending Info blocker or an On Hold pause reason. Follow Up stays separate for reminders and next actions.
       </p>
+
+      <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
+        <label className="block text-xs text-amber-900 mb-1 font-semibold">Status Reason</label>
+        <textarea
+          name="status_reason"
+          defaultValue={explicitPendingInfoActive ? pendingInfoReasonText : onHoldReasonText}
+          className="w-full rounded border border-amber-300 bg-white px-3 py-2 text-sm text-gray-900"
+          rows={3}
+          placeholder="If Pending Info is selected, describe the blocker. If On Hold is selected, describe why the job is paused."
+        />
+        <p className="mt-2 text-xs text-amber-900/80">
+          Required for both Pending Info and On Hold. It will be stored against the selected status only.
+        </p>
+      </div>
     </div>
 
     <SubmitButton loadingText="Saving..." className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 sm:shrink-0">
       Save
     </SubmitButton>
   </form>
+
+  {(String(job.ops_status ?? "").toLowerCase() === "on_hold" || explicitPendingInfoActive) ? (
+    <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+      <div className="font-semibold text-slate-900">Current Status Detail</div>
+      <div className="mt-1">
+        {explicitPendingInfoActive
+          ? (pendingInfoReasonText
+              ? `Pending Info blocker: ${pendingInfoReasonText}`
+              : "Pending Info is active. Add the missing blocker detail if needed.")
+          : (onHoldReasonText
+              ? `On Hold reason: ${onHoldReasonText}`
+              : "On Hold is active. Add the pause reason if needed.")}
+      </div>
+    </div>
+  ) : null}
 
         {canShowReleaseAndReevaluate ? (
           <form action={releaseAndReevaluateFromForm} className="mt-2">
@@ -2510,12 +2638,18 @@ const renderTimelineItem = (e: any, key: string) => {
         <summary className="cursor-pointer list-none">
           <CollapsibleHeader
             title="Follow Up"
-            subtitle="Edit pending info, next actions, and follow-up schedule."
+            subtitle="Reminder and task tracking for what to resolve, for who, and by when."
           />
         </summary>
 
         <div className="mt-3 border-t border-slate-200 pt-4">
           <div className="rounded-lg border border-gray-200 bg-white p-4">
+
+          {hasFollowUpReminder ? (
+            <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Follow Up stays separate from Pending Info. Use this area for reminder ownership, due date, and next-action notes.
+            </div>
+          ) : null}
 
           <form action={updateJobOpsDetailsFromForm} className="grid gap-3">
             <input type="hidden" name="job_id" value={job.id} />
@@ -2547,15 +2681,6 @@ const renderTimelineItem = (e: any, key: string) => {
             </div>
 
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Pending Info Reason</label>
-              <input
-                name="pending_info_reason"
-                defaultValue={job.pending_info_reason ?? ""}
-                className="w-full rounded border px-2 py-2 text-sm"
-              />
-            </div>
-
-            <div>
               <label className="block text-xs text-gray-600 mb-1">Next Action Note</label>
               <textarea
                 name="next_action_note"
@@ -2578,63 +2703,27 @@ const renderTimelineItem = (e: any, key: string) => {
           {/* Retest + Linked Jobs */}
 {showRetestSection ? (
 <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 text-gray-900 shadow-sm">
-  <div className="text-sm font-semibold mb-3">Retest</div>
+  <div className="text-sm font-semibold mb-3">Retest Actions</div>
 
-  {["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? "")) ? (
-    <form action={createRetestJobFromForm} className="mb-4">
-      <input type="hidden" name="parent_job_id" value={job.id} />
+  <form action={createRetestJobFromForm} className="space-y-3">
+    <input type="hidden" name="parent_job_id" value={job.id} />
 
-        <label className="flex items-center gap-2 text-sm text-gray-700 mb-3">
-          <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
-          Copy equipment from original
-        </label>
-
-      <button
-        type="submit"
-        className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded bg-black text-white text-sm"
-      >
-        Create Retest Job
-      </button>
-    </form>
-  ) : (
-    <div className="text-sm text-gray-600 mb-4">
-      Retest button appears when Ops Status is <span className="font-medium">Failed</span> or{" "}
-      <span className="font-medium">Retest Needed</span> or <span className="font-medium">Pending Office Review</span>.
+    <div className="text-sm text-gray-600">
+      Create a new retest visit when this failure requires a physical return visit.
     </div>
-  )}
 
-  {parentJob ? (
-    <div className="text-sm mb-3">
-      <div className="text-xs text-gray-600 mb-1">Original Job</div>
-      <Link className="underline" href={`/jobs/${parentJob.id}?tab=ops`}>
-        {parentJob.title ?? parentJob.id}
-      </Link>
-      <div className="text-xs text-gray-600 mt-1">
-        Status: {String(parentJob.status)} • Ops: {String(parentJob.ops_status ?? "—")}
-      </div>
-    </div>
-  ) : null}
+    <label className="flex items-center gap-2 text-sm text-gray-700">
+      <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
+      Copy equipment from original
+    </label>
 
-  <div className="text-sm">
-    <div className="text-xs text-gray-600 mb-1">Retests</div>
-
-    {childJobs?.length ? (
-      <div className="space-y-2">
-        {childJobs.map((cj: any) => (
-          <div key={cj.id} className="rounded border p-3 text-sm">
-            <Link className="underline" href={`/jobs/${cj.id}?tab=ops`}>
-              {cj.title ?? cj.id}
-            </Link>
-            <div className="text-xs text-gray-600 mt-1">
-              Status: {String(cj.status)} • Ops: {String(cj.ops_status ?? "—")}
-            </div>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <div className="text-sm text-gray-600">No retests yet.</div>
-    )}
-  </div>
+    <button
+      type="submit"
+      className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded bg-black text-white text-sm"
+    >
+      Create Retest Job
+    </button>
+  </form>
 </div>
 ) : null}
 

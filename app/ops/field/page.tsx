@@ -5,6 +5,7 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
+import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
 function todayBusinessDateLA() {
@@ -92,7 +93,7 @@ function renderJobCard(job: any) {
             href={`/jobs/${job.id}?tab=ops`}
             className="text-sm font-semibold text-blue-700 hover:text-blue-800 hover:underline"
           >
-            {String(job?.title ?? "Untitled Job")}
+            {normalizeRetestLinkedJobTitle(job?.title) || "Untitled Job"}
           </Link>
           <div className="mt-0.5 text-sm font-medium text-gray-800">{customerName(job)}</div>
           <div className="text-xs text-gray-600">Contractor: {contractorName(job)}</div>

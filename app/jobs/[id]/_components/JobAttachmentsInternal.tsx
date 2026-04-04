@@ -20,6 +20,51 @@ type Item = {
   signedUrl: string | null;
 };
 
+function formatFileSize(bytes: number | null) {
+  if (!bytes || bytes <= 0) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function formatAttachmentDate(value: string) {
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(parsed);
+}
+
+function fileExtension(name: string) {
+  const trimmed = String(name ?? "").trim();
+  const lastDot = trimmed.lastIndexOf(".");
+  if (lastDot <= 0 || lastDot === trimmed.length - 1) return "FILE";
+  return trimmed.slice(lastDot + 1).toUpperCase();
+}
+
+function fileTypeLabel(contentType: string | null, name: string) {
+  const normalized = String(contentType ?? "").toLowerCase();
+  if (normalized.startsWith("image/")) return "Image";
+  if (normalized.includes("pdf")) return "PDF";
+  if (normalized.includes("spreadsheet") || normalized.includes("excel") || normalized.includes("csv")) return "Spreadsheet";
+  if (normalized.includes("word") || normalized.includes("document") || normalized.includes("text/")) return "Document";
+  if (normalized.includes("zip") || normalized.includes("archive") || normalized.includes("compressed")) return "Archive";
+  return fileExtension(name);
+}
+
+function fileGlyph(contentType: string | null, name: string) {
+  const normalized = String(contentType ?? "").toLowerCase();
+  if (normalized.startsWith("image/")) return "IMG";
+  if (normalized.includes("pdf")) return "PDF";
+  if (normalized.includes("spreadsheet") || normalized.includes("excel") || normalized.includes("csv")) return "XLS";
+  if (normalized.includes("word") || normalized.includes("document") || normalized.includes("text/")) return "DOC";
+  if (normalized.includes("zip") || normalized.includes("archive") || normalized.includes("compressed")) return "ZIP";
+  return fileExtension(name);
+}
+
 export default function JobAttachmentsInternal({
   jobId,
   initialItems,
@@ -38,6 +83,9 @@ export default function JobAttachmentsInternal({
   const [ok, setOk] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [failedPreviewIds, setFailedPreviewIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [sharedAttachmentIds, setSharedAttachmentIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -146,10 +194,10 @@ export default function JobAttachmentsInternal({
   }
 
   return (
-    <div className="rounded-lg border bg-white text-gray-900 shadow-sm overflow-hidden mb-6">
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+    <div className="mb-6 overflow-hidden rounded-xl border border-slate-200 bg-white text-gray-900 shadow-sm">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-4 py-3">
         <div className="text-sm font-semibold">Attachments</div>
-        <div className="text-xs text-gray-500">
+        <div className="text-xs font-medium text-slate-500">
           {initialItems?.length ?? 0} files
         </div>
       </div>
@@ -164,20 +212,20 @@ export default function JobAttachmentsInternal({
           disabled={isPending}
         />
 
-        {error ? <div className="text-sm text-red-600">{error}</div> : null}
-        {ok ? <div className="text-sm text-emerald-700">{ok}</div> : null}
+        {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
+        {ok ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{ok}</div> : null}
 
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={openPicker}
             disabled={isPending}
-            className="inline-flex min-h-11 items-center justify-center px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
             Choose Files
           </button>
 
-          <div className="text-xs text-gray-700">
+          <div className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600">
             {hasFiles
               ? `Selected: ${files.length} file${files.length === 1 ? "" : "s"}`
               : "No files selected"}
@@ -188,7 +236,7 @@ export default function JobAttachmentsInternal({
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
           placeholder="Optional caption (e.g., gauges, nameplate, permit photo)"
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500"
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-slate-400"
           disabled={isPending}
         />
 
@@ -196,7 +244,7 @@ export default function JobAttachmentsInternal({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Optional note for this upload batch..."
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500"
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-slate-400"
           rows={3}
           disabled={isPending}
         />
@@ -205,57 +253,123 @@ export default function JobAttachmentsInternal({
           type="button"
           onClick={uploadInternal}
           disabled={!canAct}
-          className="inline-flex min-h-11 items-center justify-center px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black disabled:opacity-50"
         >
           {isPending ? "Uploading…" : "Upload Files"}
         </button>
 
-        <div className="pt-2 border-t border-gray-200">
+        <div className="border-t border-slate-200 pt-2">
           {!initialItems || initialItems.length === 0 ? (
-        <div className="text-sm text-gray-700">No files uploaded yet.</div>
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-600">
+              No files uploaded yet.
+            </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               {initialItems.map((a) => {
                 const isImage =
                   !!a.content_type &&
                   a.content_type.toLowerCase().startsWith("image/");
-                const hasThumb = isImage && !!a.signedUrl;
+                const hasThumb =
+                  isImage &&
+                  !!a.signedUrl &&
+                  !failedPreviewIds.has(a.id);
                 const isShared = sharedAttachmentIds.has(a.id);
+                const createdLabel = formatAttachmentDate(a.created_at);
+                const sizeLabel = formatFileSize(a.file_size);
+                const typeLabel = fileTypeLabel(a.content_type, a.file_name);
+                const glyph = fileGlyph(a.content_type, a.file_name);
 
                 return (
                   <div
                     key={a.id}
-                    className="rounded-lg border bg-gray-50 overflow-hidden"
+                    className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
                   >
                     {hasThumb ? (
-                      <a href={a.signedUrl!} target="_blank" rel="noreferrer">
+                      <a
+                        href={a.signedUrl!}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group block cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+                        aria-label={`Open ${a.file_name}`}
+                        title={`Open ${a.file_name}`}
+                      >
                         <img
                           src={a.signedUrl!}
                           alt={a.file_name}
-                          className="w-full h-40 object-cover bg-black/5"
+                          className="h-32 w-full object-cover bg-slate-100 transition-transform duration-200 group-hover:scale-[1.01]"
                           loading="lazy"
+                          onError={() => {
+                            setFailedPreviewIds((prev) => {
+                              if (prev.has(a.id)) return prev;
+                              const next = new Set(prev);
+                              next.add(a.id);
+                              return next;
+                            });
+                          }}
                         />
                       </a>
                     ) : (
-                      <div className="w-full h-40 flex items-center justify-center text-xs text-gray-500 bg-white/40">
-                        {a.content_type ? a.content_type : "file"}
+                      <div className="flex h-28 w-full items-center gap-3 bg-gradient-to-br from-slate-50 via-white to-slate-100 px-4">
+                        <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-[11px] font-semibold tracking-[0.12em] text-slate-500 shadow-sm">
+                          {glyph}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-slate-800" title={a.file_name}>
+                            {a.file_name}
+                          </div>
+                          <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+                            {typeLabel}
+                          </div>
+                        </div>
                       </div>
                     )}
 
-                    <div className="p-3 flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium truncate">
-                          {a.file_name}
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          {a.caption ? a.caption : "—"}
+                    <div className="p-3.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          {hasThumb ? (
+                            <div
+                              className="truncate text-sm font-semibold text-slate-900"
+                              title={a.file_name}
+                            >
+                              {a.file_name}
+                            </div>
+                          ) : null}
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+                            <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
+                              {typeLabel}
+                            </span>
+                            {sizeLabel ? <span>{sizeLabel}</span> : null}
+                            {createdLabel ? <span>{createdLabel}</span> : null}
+                          </div>
                         </div>
 
+                        {a.signedUrl && !hasThumb ? (
+                          <a
+                            href={a.signedUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
+                          >
+                            Open
+                          </a>
+                        ) : null}
+                      </div>
+
+                      {a.caption ? (
+                        <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2">
+                          <div className="line-clamp-2 text-sm text-slate-700">
+                            {a.caption}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
                         <button
                           type="button"
                           onClick={() => shareToContractor(a)}
                           disabled={isPending || sharingId === a.id || isShared}
-                          className="mt-2 inline-flex min-h-11 items-center px-3 rounded-md border text-xs font-medium hover:bg-gray-100 transition-colors disabled:opacity-50"
+                          className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
                         >
                           {isShared
                             ? "Shared ✓"
@@ -263,22 +377,18 @@ export default function JobAttachmentsInternal({
                             ? "Sharing..."
                             : "Share to Contractor"}
                         </button>
-                      </div>
 
-                      {a.signedUrl ? (
-                        <a
-                          href={a.signedUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="shrink-0 px-3 py-1.5 rounded-md border text-xs font-medium hover:bg-gray-50 transition whitespace-nowrap"
-                        >
-                          Download
-                        </a>
-                      ) : (
-                        <span className="shrink-0 text-xs text-gray-500">
-                          (no link)
-                        </span>
-                      )}
+                        {a.signedUrl ? (
+                          <a
+                            href={a.signedUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-slate-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-black whitespace-nowrap"
+                          >
+                            Download
+                          </a>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 );

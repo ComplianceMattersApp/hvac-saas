@@ -9,6 +9,7 @@ import {
   resolveContractorIssues,
   type ContractorIssue,
 } from "@/lib/portal/resolveContractorIssues";
+import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isPortalVisibleJob } from "@/lib/visibility/portal";
 
@@ -392,7 +393,7 @@ export default async function PortalAllJobsPage({
                       </div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-2">
                         <div className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                          {j.title ?? "Untitled Job"}
+                          {normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
                         </div>
                       </div>
                       <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
@@ -469,7 +470,7 @@ export default async function PortalAllJobsPage({
                         {customerName(j)}
                       </div>
                       <div className="mt-0.5 truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                        {j.title ?? "Untitled Job"}
+                        {normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
                       </div>
                       <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                         {displayAddress(j)}
@@ -546,7 +547,7 @@ export default async function PortalAllJobsPage({
                         {customerName(j)}
                       </div>
                       <div className="mt-0.5 truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                        {j.title ?? "Untitled Job"}
+                        {normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
                       </div>
                       <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                         {displayAddress(j)}

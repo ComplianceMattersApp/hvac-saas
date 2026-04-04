@@ -31,6 +31,7 @@ import {
   isPackageSystem,
 } from "@/lib/ecc/rule-profiles";
 import { equipmentRoleLabel, isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
+import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
 function getEffectiveResultLabel(t: any) {
@@ -874,7 +875,7 @@ const defaultHeatingOutputBtu =
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between print:hidden">
         <div className="min-w-0">
           <div className="text-sm text-slate-700">Job Tests</div>
-          <h1 className="text-xl font-semibold">{job.title}</h1>
+          <h1 className="text-xl font-semibold">{normalizeRetestLinkedJobTitle(job.title) || "Job"}</h1>
           <div className="text-sm text-slate-700">{job.city ?? "—"}</div>
         </div>
 

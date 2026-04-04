@@ -1,7 +1,9 @@
 'use server';
 
+import { requireInternalUser } from '@/lib/auth/internal-user';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveJobAssignmentDisplayMap, getAssignableInternalUsers } from '@/lib/staffing/human-layer';
+import { displayDateLA, displayTimeLA, laDateTimeToUtcIso } from '@/lib/utils/schedule-la';
 
 export type DispatchViewMode = 'day' | 'week';
 
@@ -46,11 +48,26 @@ export type DispatchCalendarData = {
     endDate: string;
     days: Array<{ date: string; jobs: DispatchJob[] }>;
   };
+  scheduledAttentionWindowJobs: DispatchJob[];
   unassignedScheduledJobs: DispatchJob[];
+  calendarBlockEvents: DispatchCalendarBlockEvent[];
   assignableUsers: Array<{
     user_id: string;
     display_name: string;
   }>;
+};
+
+export type DispatchCalendarBlockEvent = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string | null;
+  internal_user_id: string;
+  start_at: string;
+  end_at: string;
+  calendar_date: string;
+  start_time: string;
+  end_time: string;
 };
 
 type JobDispatchRow = {
@@ -82,6 +99,17 @@ type JobEventRow = {
   job_id: string | null;
   event_type: string | null;
   created_at: string | null;
+};
+
+type CalendarEventRow = {
+  id: string | null;
+  title: string | null;
+  description: string | null;
+  status: string | null;
+  internal_user_id: string | null;
+  start_at: string | null;
+  end_at: string | null;
+  event_type: string | null;
 };
 
 function laTodayYmd(now = new Date()): string {
@@ -191,10 +219,7 @@ function mergeJobRow(params: {
   };
 }
 
-function suppressRetestParentRows(rows: JobDispatchRow[], params: {
-  openRetestParentIds: Set<string>;
-  resolvedFailedParentIds: Set<string>;
-}) {
+function suppressRetestParentRows(rows: JobDispatchRow[], hiddenFailedParentIds: Set<string>) {
   return rows.filter((row) => {
     const jobId = String(row?.id ?? '').trim();
     if (!jobId) return false;
@@ -202,8 +227,7 @@ function suppressRetestParentRows(rows: JobDispatchRow[], params: {
     const ops = String(row?.ops_status ?? '').toLowerCase();
     if (ops !== 'failed') return true;
 
-    if (params.openRetestParentIds.has(jobId)) return false;
-    if (params.resolvedFailedParentIds.has(jobId)) return false;
+    if (hiddenFailedParentIds.has(jobId)) return false;
     return true;
   });
 }
@@ -213,8 +237,11 @@ export async function getDispatchCalendarData(params: {
   anchorDate?: string | null;
 }): Promise<DispatchCalendarData> {
   const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
   const mode = params.mode === 'week' ? 'week' : 'day';
   const anchorDate = normalizeAnchorDate(params.anchorDate);
+  const dispatchAttentionWindowStart = addDaysYmd(laTodayYmd(), -7);
+  const dispatchAttentionWindowEnd = addDaysYmd(laTodayYmd(), 21);
 
   const weekStart = startOfWeekYmd(anchorDate);
   const weekEnd = addDaysYmd(weekStart, 6);
@@ -279,12 +306,20 @@ export async function getDispatchCalendarData(params: {
   // Filter out any rows that are not valid JobDispatchRow
   const validRows = (allRows ?? []).filter(isJobDispatchRow) as unknown as JobDispatchRow[];
 
+  const activeRetestParentIds = new Set(
+    validRows
+      .filter((row) => isActive(row) && !!String(row.parent_job_id ?? '').trim())
+      .map((row) => String(row.parent_job_id ?? '').trim())
+      .filter(Boolean)
+  );
+
   // Canonical scheduled calendar jobs exclude on-hold work from dispatch surfaces.
   const scheduledCalendarRows = validRows.filter((row) => isCalendarScheduled(row));
 
   // Canonical unscheduled active jobs
-  const unscheduledActiveRows = validRows.filter(
-    (row) => isActive(row) && !row.scheduled_date
+  const unscheduledActiveRows = suppressRetestParentRows(
+    validRows.filter((row) => isActive(row) && !row.scheduled_date),
+    activeRetestParentIds,
   );
 
   // Assignment and event mapping
@@ -320,6 +355,12 @@ export async function getDispatchCalendarData(params: {
     mergeJobRow({ row, assignmentMap, latestEventByJob })
   );
 
+  const scheduledAttentionWindowJobs = scheduledCalendarJobs.filter((job) => {
+    const scheduledDate = String(job.scheduled_date ?? '').trim();
+    if (!scheduledDate) return false;
+    return scheduledDate >= dispatchAttentionWindowStart && scheduledDate <= dispatchAttentionWindowEnd;
+  });
+
   // Build day/week/month/list from canonical scheduled jobs
   const dayJobs = scheduledCalendarJobs.filter((job) => String(job.scheduled_date) === anchorDate);
   const weekDays = Array.from({ length: 7 }).map((_, index) => {
@@ -328,10 +369,62 @@ export async function getDispatchCalendarData(params: {
     return { date, jobs };
   });
 
-  const assignableUsers = (await getAssignableInternalUsers({ supabase })).map((user) => ({
+  const assignableUsers = (await getAssignableInternalUsers({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  })).map((user) => ({
     user_id: String(user.user_id),
     display_name: String(user.display_name),
   }));
+
+  const assignableUserIds = assignableUsers.map((user) => user.user_id);
+  const calendarBlockEvents: DispatchCalendarBlockEvent[] = [];
+
+  if (assignableUserIds.length) {
+    const blockRangeStart = laDateTimeToUtcIso(weekStart, '00:00');
+    const blockRangeEnd = laDateTimeToUtcIso(addDaysYmd(weekEnd, 1), '00:00');
+
+    const { data: eventRows, error: eventErr } = await supabase
+      .from('calendar_events')
+      .select('id, title, description, status, internal_user_id, start_at, end_at, event_type')
+      .eq('owner_user_id', internalUser.account_owner_user_id)
+      .eq('event_type', 'block')
+      .in('internal_user_id', assignableUserIds)
+      .gte('start_at', blockRangeStart)
+      .lt('start_at', blockRangeEnd)
+      .order('start_at', { ascending: true });
+
+    if (eventErr) throw eventErr;
+
+    for (const row of (eventRows ?? []) as CalendarEventRow[]) {
+      const id = String(row?.id ?? '').trim();
+      const internalUserId = String(row?.internal_user_id ?? '').trim();
+      const startAt = String(row?.start_at ?? '').trim();
+      const endAt = String(row?.end_at ?? '').trim();
+      if (!id || !internalUserId || !startAt || !endAt) continue;
+
+      const calendarDate = displayDateLA(startAt);
+      const endDate = displayDateLA(endAt);
+      const startTime = displayTimeLA(startAt);
+      const endTime = displayTimeLA(endAt);
+
+      if (!calendarDate || !startTime || !endTime) continue;
+      if (calendarDate !== endDate) continue;
+
+      calendarBlockEvents.push({
+        id,
+        title: String(row?.title ?? '').trim() || 'Blocked',
+        description: row?.description ? String(row.description).trim() || null : null,
+        status: row?.status ? String(row.status) : null,
+        internal_user_id: internalUserId,
+        start_at: startAt,
+        end_at: endAt,
+        calendar_date: calendarDate,
+        start_time: startTime,
+        end_time: endTime,
+      });
+    }
+  }
 
   return {
     mode,
@@ -345,8 +438,10 @@ export async function getDispatchCalendarData(params: {
       endDate: weekEnd,
       days: weekDays,
     },
+    scheduledAttentionWindowJobs,
     // All calendar consumers must use these canonical collections
     unassignedScheduledJobs: unscheduledActiveJobs,
+    calendarBlockEvents,
     assignableUsers,
   };
 }

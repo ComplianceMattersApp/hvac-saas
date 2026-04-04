@@ -15,7 +15,7 @@ import {
   startOfTodayUtcIsoLA,
   startOfTomorrowUtcIsoLA,
 } from "@/lib/utils/schedule-la";
-import { getPendingInfoSignal } from "@/lib/utils/ops-status";
+import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
@@ -291,7 +291,7 @@ const resolvedFailedParentIds = new Set(
 
 const { data: activeRetestChildren, error: activeRetestErr } = await supabase
   .from("jobs")
-  .select("parent_job_id, service_case_id, ops_status, status")
+  .select("parent_job_id, service_case_id, ops_status, status, created_at, scheduled_date, window_start, window_end")
   .not("parent_job_id", "is", null)
   .is("deleted_at", null)
   .neq("status", "cancelled")
@@ -311,19 +311,52 @@ const activeRetestServiceCaseIds = new Set(
     .filter(Boolean)
 );
 
+const openRetestChildByParentId = new Map<string, any>();
+for (const child of activeRetestChildren ?? []) {
+  const parentId = String(child?.parent_job_id ?? "").trim();
+  if (!parentId) continue;
+
+  const current = openRetestChildByParentId.get(parentId);
+  if (!current || toEpochMs(child?.created_at) > toEpochMs(current?.created_at)) {
+    openRetestChildByParentId.set(parentId, child);
+  }
+}
+
+function retestScheduleLabelForJob(jobId: string) {
+  const child = openRetestChildByParentId.get(jobId);
+  if (!child) return "";
+  const date = child?.scheduled_date ? formatBusinessDateUS(String(child.scheduled_date)) : "";
+  const window = displayWindowLA(child?.window_start, child?.window_end);
+  if (date && window) return `${date} ${window}`;
+  return date || window || "";
+}
+
+function retestStateForJob(jobId: string): "none" | "pending_scheduling" | "scheduled" {
+  const child = openRetestChildByParentId.get(jobId);
+  if (!child) return "none";
+  return retestScheduleLabelForJob(jobId) ? "scheduled" : "pending_scheduling";
+}
+
+function hasScheduledRetestForJob(jobId: string) {
+  return !!retestScheduleLabelForJob(jobId);
+}
+
 function shouldHideFailedParentJob(j: any) {
   const opsStatus = String(j?.ops_status ?? "").toLowerCase();
   const parentJobId = String(j?.parent_job_id ?? "").trim();
   const jobId = String(j?.id ?? "").trim();
   const serviceCaseId = String(j?.service_case_id ?? "").trim();
+  const hasActiveRetestChild = failedParentIdsWithRetestChild.has(jobId);
 
-  if (opsStatus !== "failed") return false;
+  if (![
+    "failed",
+    "pending_office_review",
+    "retest_needed",
+  ].includes(opsStatus)) return false;
+  if (hasActiveRetestChild) return true;
   if (parentJobId) return false;
 
-  return (
-    failedParentIdsWithRetestChild.has(jobId) ||
-    (!!serviceCaseId && activeRetestServiceCaseIds.has(serviceCaseId))
-  );
+  return !!serviceCaseId && activeRetestServiceCaseIds.has(serviceCaseId);
 }
 
 
@@ -335,7 +368,7 @@ function shouldHideFailedParentJob(j: any) {
 
   // Common job select (keep lightweight)
  const baseSelect =
-   "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, permit_number, pending_info_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at";
+   "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, permit_number, pending_info_reason, on_hold_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -804,7 +837,10 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "on_hold" || status === "on_hold") {
-    return "On hold — awaiting resolution before closeout";
+    const onHoldReason = String(j?.on_hold_reason ?? "").trim();
+    return onHoldReason
+      ? `On hold — ${onHoldReason}`
+      : "On hold — awaiting resolution before closeout";
   }
 
   if (status === "need_to_schedule") {
@@ -850,7 +886,8 @@ function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJo
   const isFieldComplete = Boolean(j?.field_complete);
 
   if (opts?.scheduledRetest) return "No Immediate Action";
-  if (status === "pending_info" || status === "on_hold") return "Provide Requested Information";
+  if (status === "pending_info") return "Provide Requested Information";
+  if (status === "on_hold") return "Await Hold Release";
   if (status === "pending_office_review") return "Review Contractor Submission";
   if (status === "failed" || status === "retest_needed") return "Await Contractor Correction";
   if (status === "need_to_schedule") return "Need to Schedule Visit";
@@ -955,37 +992,6 @@ const uniqueAllOpenOpsJobs = Array.from(
       .map((j: any) => [String(j.id ?? ""), j])
   ).values()
 ) as any[];
-
-const openRetestChildByParentId = new Map<string, any>();
-for (const j of uniqueAllOpenOpsJobs) {
-  const parentId = String(j?.parent_job_id ?? "").trim();
-  if (!parentId) continue;
-  if (String(j?.ops_status ?? "").toLowerCase() === "closed") continue;
-
-  const current = openRetestChildByParentId.get(parentId);
-  if (!current || safeDateValue(j?.created_at) > safeDateValue(current?.created_at)) {
-    openRetestChildByParentId.set(parentId, j);
-  }
-}
-
-function retestScheduleLabelForJob(jobId: string) {
-  const child = openRetestChildByParentId.get(jobId);
-  if (!child) return "";
-  const date = child?.scheduled_date ? formatBusinessDateUS(String(child.scheduled_date)) : "";
-  const window = displayWindowLA(child?.window_start, child?.window_end);
-  if (date && window) return `${date} ${window}`;
-  return date || window || "";
-}
-
-function retestStateForJob(jobId: string): "none" | "pending_scheduling" | "scheduled" {
-  const child = openRetestChildByParentId.get(jobId);
-  if (!child) return "none";
-  return retestScheduleLabelForJob(jobId) ? "scheduled" : "pending_scheduling";
-}
-
-function hasScheduledRetestForJob(jobId: string) {
-  return !!retestScheduleLabelForJob(jobId);
-}
 
 const filteredBucketJobs =
   bucket === "failed" || bucket === "attention" || bucket === "retest_needed"
@@ -1348,6 +1354,11 @@ const workflowCards = [
     count: counts.get("need_to_schedule") ?? 0,
   },
   {
+    key: "scheduled",
+    label: "Scheduled",
+    count: counts.get("scheduled") ?? 0,
+  },
+  {
     key: "pending_info",
     label: "Pending Info",
     count: counts.get("pending_info") ?? 0,
@@ -1435,13 +1446,7 @@ function isNeedsAttentionJob(j: any) {
     return true;
   }
 
-  const pendingInfoSignal = getPendingInfoSignal({
-    ops_status: j?.ops_status,
-    pending_info_reason: j?.pending_info_reason,
-    follow_up_date: j?.follow_up_date,
-    next_action_note: j?.next_action_note,
-    action_required_by: j?.action_required_by,
-  });
+  const pendingInfoSignal = status === "pending_info";
 
   if (pendingInfoSignal && createdMs <= safeDateValue(attentionBusinessCutoffIso)) {
     return true;
@@ -1461,13 +1466,7 @@ function isNeedsAttentionJob(j: any) {
 
 function actionablePriorityRank(j: any) {
   const opsStatus = String(j?.ops_status ?? "").toLowerCase();
-  const pendingInfoSignal = getPendingInfoSignal({
-    ops_status: j?.ops_status,
-    pending_info_reason: j?.pending_info_reason,
-    follow_up_date: j?.follow_up_date,
-    next_action_note: j?.next_action_note,
-    action_required_by: j?.action_required_by,
-  });
+  const pendingInfoSignal = opsStatus === "pending_info";
 
   if (isNeedsAttentionJob(j)) return 0;
   if (pendingInfoSignal || opsStatus === "pending_info") return 1;
@@ -1487,14 +1486,20 @@ function prioritizeActionableJobs<T>(jobs: T[]) {
     .map((entry) => entry.job);
 }
 
+function displayOpsCardTitle(value: unknown) {
+  return normalizeRetestLinkedJobTitle(value) || "Job";
+}
+
 function compactRow(j: any, showDate = false, note?: string, emphasize = false) {
   const jobId = String(j?.id ?? "");
+  const displayTitle = displayOpsCardTitle(j?.title);
   const assignmentSummary = assignmentSummaryForJob(jobId);
   const retestState = retestStateForJob(jobId);
   const scheduledRetestLabel = retestScheduleLabelForJob(jobId);
   const lifecycleStatus = String(j?.status ?? "").toLowerCase();
   const opsStatus = String(j?.ops_status ?? "").toLowerCase();
   const isFailed = opsStatus === "failed";
+  const isFailedFamily = ["failed", "retest_needed", "pending_office_review"].includes(opsStatus);
   const isPendingOfficeReview = opsStatus === "pending_office_review";
   const isRetestChild = Boolean(String(j?.parent_job_id ?? "").trim());
   const statusMeta = isFailed
@@ -1512,28 +1517,28 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     : opsStatus === "scheduled"
     ? { label: "Scheduled", tone: "border-slate-200 bg-slate-50 text-slate-800" }
     : { label: "Open", tone: "border-slate-200 bg-slate-50 text-slate-800" };
-  const pendingInfoSignal = getPendingInfoSignal({
-    ops_status: j?.ops_status,
-    pending_info_reason: j?.pending_info_reason,
-    follow_up_date: j?.follow_up_date,
-    next_action_note: j?.next_action_note,
-    action_required_by: j?.action_required_by,
-  });
+  const pendingInfoSignal = opsStatus === "pending_info";
   const onHoldSignal = opsStatus === "on_hold";
   const needsAttention = isNeedsAttentionJob(j);
   const pendingInfoReason = String(j?.pending_info_reason ?? "").trim();
+  const onHoldReason = String(j?.on_hold_reason ?? "").trim();
   const pendingInfoContext = pendingInfoReason
     ? pendingInfoReason
-    : String(j?.next_action_note ?? "").trim() || "Awaiting requested details";
-  const onHoldContext =
-    String(j?.next_action_note ?? "").trim() ||
-    String(j?.action_required_by ?? "").trim() ||
-    pendingInfoReason;
+    : "Reason not set";
+  const onHoldContext = onHoldReason || "Reason not set";
+  const customerName = customerNameOnly(j);
+  const customerPhone = customerPhoneOnly(j);
+  const contractorName = contractorNameOnly(j);
+  const phoneHref = telHref(customerPhone);
+  const textHref = smsHref(customerPhone);
+  const hasRetestReady = hasSignalEventForJob(latestRetestReadyByJob, jobId);
   const scheduleText = j?.scheduled_date
     ? `${formatBusinessDateUS(String(j.scheduled_date))} ${displayWindowLA(j.window_start, j.window_end) || ""}`.trim()
     : "Not scheduled";
+  const scheduleDateText = j?.scheduled_date ? formatBusinessDateUS(String(j.scheduled_date)) : "Not scheduled";
+  const scheduleWindowText = displayWindowLA(j.window_start, j.window_end) || (j?.scheduled_date ? "Window TBD" : "No time set");
   const nextStep = nextActionLabel(j, {
-        retestReady: hasSignalEventForJob(latestRetestReadyByJob, jobId),
+        retestReady: hasRetestReady,
         newContractorJob:
           String(j?.ops_status ?? "").toLowerCase() === "need_to_schedule" &&
           hasSignalEventForJob(latestContractorCreatedByJob, jobId),
@@ -1550,115 +1555,174 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     : "";
   const rawFailureReason = String(primaryFailureReasonByJob.get(jobId) ?? "").trim();
   const normalizedFailureReason = rawFailureReason.replace(/^failed\s*[-:]\s*/i, "").trim();
-  const fallbackFailureReason = String(note ?? "").replace(/^failed\s*[-:]\s*/i, "").trim();
-  const failedReasonText = isRetestChild
-    ? fallbackFailureReason || "Retest follow-up for prior failed inspection"
-    : normalizedFailureReason || fallbackFailureReason || "Test requirement not met";
+  const failedReasonText = normalizedFailureReason || "Test requirement not met";
+  const failedStatusLabel = isPendingOfficeReview
+    ? "Under Review"
+    : retestState === "scheduled"
+    ? "Retest Scheduled"
+    : retestState === "pending_scheduling"
+    ? "Retest Pending Scheduling"
+    : opsStatus === "retest_needed"
+    ? "Retest Needed"
+    : isRetestChild
+    ? "Failed Retest"
+    : "Failed";
+  const failedSupportText = isPendingOfficeReview
+    ? "Corrections submitted. Internal review is in progress."
+    : retestState === "scheduled"
+    ? `Retest scheduled for ${scheduledRetestLabel}`
+    : retestState === "pending_scheduling"
+    ? "Retest child exists but still needs a scheduled date/time."
+    : opsStatus === "retest_needed"
+    ? hasRetestReady
+      ? "Contractor marked correction complete and is ready for retest review."
+      : "Retest is required before this failure can be cleared."
+    : isRetestChild
+    ? "This retest also failed and still needs correction."
+    : "Awaiting correction or retest decision.";
+  const hasPrimaryStatusCallout = isFailedFamily || pendingInfoSignal || onHoldSignal;
+  const showStatusPill = !hasPrimaryStatusCallout && statusMeta.label !== "Open";
+  const metadataCardClass = "px-0 py-0 xl:rounded-lg xl:border xl:border-slate-200 xl:bg-slate-50/80 xl:px-3.5 xl:py-3";
+  const previewMetadataGridClass = "mt-3 grid grid-cols-2 gap-x-5 gap-y-3";
+  const activeQueueMetadataGridClass = "mt-3 grid gap-x-5 gap-y-3 xl:grid-cols-3";
 
   return (
     <div
       key={j.id}
       className={[
-        "relative rounded-lg border bg-white p-3 shadow-sm transition-shadow hover:shadow-md",
+        "relative rounded-xl border bg-white p-4 shadow-sm transition-all hover:-translate-y-px hover:shadow-md",
         emphasize && needsAttention
           ? "border-amber-300 bg-amber-50/40"
           : "border-gray-200",
       ].join(" ")}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
+      <div className="flex flex-col gap-4">
+        <div className="min-w-0 flex-1">
           <Link
             href={`/jobs/${j.id}?tab=ops`}
-            className="text-sm font-semibold text-blue-700 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1"
+            className="inline-block text-base font-semibold leading-6 text-blue-700 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1"
           >
-            {j.title}
+            {displayTitle}
           </Link>
-          {emphasize && (pendingInfoSignal || onHoldSignal) ? (
-            <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-gray-700">
-              {pendingInfoSignal ? (
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-                  <span aria-hidden>⚠</span>
-                  <span>Pending Info: {pendingInfoContext}</span>
-                </span>
-              ) : null}
-              {onHoldSignal ? (
-                <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 font-medium text-slate-800">
-                  <span aria-hidden>⏸</span>
-                  <span>On Hold{onHoldContext ? `: ${onHoldContext}` : ""}</span>
-                </span>
+          {isFailedFamily ? (
+            <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-3 text-rose-900">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-700">Status</div>
+              <div className="mt-1 text-sm font-semibold">{failedStatusLabel}</div>
+              <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-700">Reason</div>
+              <div className="mt-1 text-sm font-medium text-rose-900">{failedReasonText}</div>
+              {failedSupportText ? (
+                <div className="mt-2 text-xs leading-5 text-rose-900/80">{failedSupportText}</div>
               ) : null}
             </div>
           ) : null}
-          <div className="mt-0.5 text-xs font-medium text-gray-700">{customerNameOnly(j)} • {customerPhoneOnly(j) || "-"}</div>
-          <div className="text-xs text-gray-600">{addressLine(j)}</div>
-          <div className="text-xs text-gray-600">Contractor: {contractorNameOnly(j)}</div>
-          <div className="text-xs text-gray-600">Schedule: {scheduleText}</div>
-          <div className="text-xs text-gray-600">Assigned: {assignmentSummary}</div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-            {!isFailed ? (
-              <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
-                {statusMeta.label}
-              </span>
-            ) : null}
-            {pendingInfoSignal ? (
-              <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-                Pending Info
-              </span>
-            ) : null}
-            {onHoldSignal ? (
-              <span className="inline-flex rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 font-medium text-slate-800">
-                On Hold
-              </span>
-            ) : null}
-          </div>
-          {isFailed ? (
-            <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-sm text-blue-900">
-              <div className="mt-0.5 text-xs font-medium text-blue-900/90">
-                {`Reason: ${failedReasonText}`}
+          {pendingInfoSignal ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3 text-amber-900">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">Status</div>
+              <div className="mt-1 text-sm font-semibold">Pending Info</div>
+              <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">Reason</div>
+              <div className="mt-1 text-sm font-medium text-amber-900">{pendingInfoContext}</div>
+            </div>
+          ) : null}
+          {onHoldSignal ? (
+            <div className="mt-3 rounded-lg border border-slate-300 bg-slate-100 px-3.5 py-3 text-slate-800">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Status</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">On Hold</div>
+              <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Reason</div>
+              <div className="mt-1 text-sm font-medium text-slate-800">{onHoldContext}</div>
+            </div>
+          ) : null}
+          {emphasize ? (
+            <div className={previewMetadataGridClass}>
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Customer</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">{customerName}</div>
+                <div className="text-xs text-slate-600">{customerPhone || "No phone on file"}</div>
+              </div>
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Address</div>
+                <div className="mt-1 text-sm text-slate-800">{addressLine(j)}</div>
+              </div>
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Contractor</div>
+                <div className="mt-1 text-sm text-slate-800">{contractorName}</div>
+              </div>
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Schedule</div>
+                <div className="mt-1 text-sm font-semibold text-slate-900">{scheduleDateText}</div>
+                <div className="mt-0.5 text-xs text-slate-600">{scheduleWindowText}</div>
+              </div>
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Assigned</div>
+                <div className="mt-1 text-sm text-slate-800">{assignmentSummary}</div>
               </div>
             </div>
           ) : (
-            <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-sm font-semibold text-blue-900">
-              {`Next Step: ${nextStep}`}
+            <div className={activeQueueMetadataGridClass}>
+              <div className={metadataCardClass}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Customer</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">{customerName}</div>
+                <div className="text-xs text-slate-600">{customerPhone || "No phone on file"}</div>
+              </div>
+              <div className={metadataCardClass}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Address</div>
+                <div className="mt-1 text-sm text-slate-800">{addressLine(j)}</div>
+              </div>
+              <div className={metadataCardClass}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Contractor</div>
+                <div className="mt-1 text-sm text-slate-800">{contractorName}</div>
+              </div>
+              <div className="px-0 py-0 xl:rounded-lg xl:border xl:border-slate-200 xl:bg-white xl:px-3.5 xl:py-3 xl:shadow-sm xl:ring-1 xl:ring-slate-100">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Schedule</div>
+                <div className="mt-1 text-sm font-semibold text-slate-900">{scheduleDateText}</div>
+                <div className="mt-0.5 text-xs text-slate-600">{scheduleWindowText}</div>
+              </div>
+              <div className={metadataCardClass}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Assigned</div>
+                <div className="mt-1 text-sm text-slate-800">{assignmentSummary}</div>
+              </div>
             </div>
           )}
-          {detailLine ? (
-            <div className="mt-1 text-xs text-gray-600">
-              {detailLine}
+          {!hasPrimaryStatusCallout ? (
+            <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/80 px-3.5 py-3 shadow-sm">
+              <div className="flex flex-wrap items-start gap-2 sm:items-center sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">Next Step</div>
+                  <div className="mt-1 text-sm font-semibold text-blue-950">{nextStep}</div>
+                  {detailLine ? (
+                    <div className="mt-1 text-xs leading-5 text-blue-900/75">{detailLine}</div>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                  {showStatusPill ? (
+                    <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
+                      {statusMeta.label}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
             </div>
           ) : null}
         </div>
-        {isFailed || showDate ? (
-          <div className="text-right text-[11px] text-gray-500">
-            {isFailed ? (
-              <div className="mb-1 inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-800">
-                FAILED
-              </div>
-            ) : null}
-            <div className="font-medium text-gray-700">{j.scheduled_date ? formatBusinessDateUS(String(j.scheduled_date)) : "-"}</div>
-            <div>{displayWindowLA(j.window_start, j.window_end) || "-"}</div>
-          </div>
-        ) : null}
       </div>
-      <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
         <Link
           href={`/jobs/${j.id}?tab=ops`}
-          className="rounded-md border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/40"
+          className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
         >
           View Job
         </Link>
-        {telHref(customerPhoneOnly(j)) ? (
+        {phoneHref ? (
           <a
-            href={telHref(customerPhoneOnly(j))}
-            className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/40"
+            href={phoneHref}
+            className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40"
           >
             Call
           </a>
         ) : null}
-        {smsHref(customerPhoneOnly(j)) ? (
+        {textHref ? (
           <a
-            href={smsHref(customerPhoneOnly(j))}
-            className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/40"
+            href={textHref}
+            className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40"
           >
             Text
           </a>

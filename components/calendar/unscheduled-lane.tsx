@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import SubmitButton from "@/components/SubmitButton";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
+import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 
 type UnscheduledJob = {
   id: string;
@@ -134,7 +135,7 @@ export default function UnscheduledLane({ jobs, onSchedule }: Props) {
               "Unnamed customer";
 
             const address = [job.job_address, job.city].filter(Boolean).join(", ");
-            const label = job.title || job.job_type || "Job";
+            const label = normalizeRetestLinkedJobTitle(job.title) || job.job_type || "Job";
 
             return (
               <div key={job.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
