@@ -1536,6 +1536,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   const contractorName = contractorNameOnly(j);
   const phoneHref = telHref(customerPhone);
   const textHref = smsHref(customerPhone);
+  const preferredPhoneHref = phoneHref || textHref;
   const hasRetestReady = hasSignalEventForJob(latestRetestReadyByJob, jobId);
   const scheduleDateText = j?.scheduled_date ? formatBusinessDateUS(String(j.scheduled_date)) : "Not scheduled";
   const scheduleWindowText = displayWindowLA(j.window_start, j.window_end) || (j?.scheduled_date ? "Window TBD" : "No time set");
@@ -1586,16 +1587,35 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   const showStatusPill = !hasPrimaryStatusCallout && statusMeta.label !== "Open";
   const scheduleLabel = showDate ? "Scheduled" : "Schedule";
   const metaItems = [
-    customerPhone ? customerPhone : null,
-    contractorName !== "Unassigned" ? `Contractor: ${contractorName}` : null,
-    assignmentSummary !== "Unassigned" ? `Assigned: ${assignmentSummary}` : null,
-  ].filter(Boolean) as string[];
+    customerPhone
+      ? {
+          key: "phone",
+          label: "Phone",
+          value: customerPhone,
+          href: preferredPhoneHref || undefined,
+        }
+      : null,
+    contractorName !== "Unassigned"
+      ? {
+          key: "contractor",
+          label: "Contractor",
+          value: contractorName,
+        }
+      : null,
+    assignmentSummary !== "Unassigned"
+      ? {
+          key: "assigned",
+          label: "Assigned",
+          value: assignmentSummary,
+        }
+      : null,
+  ].filter(Boolean) as Array<{ key: string; label: string; value: string; href?: string }>;
 
   return (
     <div
       key={j.id}
       className={[
-        "relative rounded-2xl border bg-white px-3 py-2.5 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.32)] ring-1 ring-slate-200/70 transition-all duration-150 hover:-translate-y-px hover:shadow-[0_16px_34px_-22px_rgba(15,23,42,0.35)] sm:px-3.5 sm:py-3",
+        "relative rounded-xl border bg-white px-3 py-2 shadow-[0_10px_20px_-22px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70 transition-all duration-150 hover:-translate-y-px hover:shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] sm:px-3 sm:py-2.5",
         emphasize && needsAttention
           ? "border-amber-300 bg-amber-50/35"
           : "border-slate-200/90",
@@ -1606,21 +1626,22 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
           <div className="min-w-0 flex-1">
             <Link
               href={`/jobs/${j.id}?tab=ops`}
-              className="inline-block text-[15px] font-semibold leading-5 tracking-[-0.01em] text-blue-700 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1"
+              className="inline-block text-[14px] font-semibold leading-5 tracking-[-0.01em] text-blue-700 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1"
             >
               {displayTitle}
             </Link>
-            <div className="mt-1 text-[14px] font-semibold leading-5 text-slate-950">{customerName}</div>
-            <div className="mt-0.5 text-[12px] leading-4.5 text-slate-600">{addressLine(j)}</div>
+            <div className="mt-0.5 text-[13px] font-semibold leading-5 text-slate-950">{customerName}</div>
+            <div className="text-[11px] leading-4 text-slate-600">{addressLine(j)}</div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-1.5 text-[11px]">
+          <div className="flex flex-wrap items-center justify-end gap-1.5 text-[10px]">
             {emphasize && needsAttention ? (
-              <span className="inline-flex rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 font-semibold uppercase tracking-[0.08em] text-amber-800 shadow-sm">
+              <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-[0.08em] text-amber-800">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
                 Attention
               </span>
             ) : null}
             {showStatusPill ? (
-              <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium shadow-sm ${statusMeta.tone}`}>
+              <span className={`inline-flex rounded-md border px-1.5 py-0.5 font-medium ${statusMeta.tone}`}>
                 {statusMeta.label}
               </span>
             ) : null}
@@ -1628,72 +1649,85 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         </div>
 
         {isFailedFamily ? (
-          <div className="mt-2 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-rose-900">
+          <div className="mt-2 rounded-lg border border-rose-200/80 bg-rose-50/60 px-2.5 py-1.5 text-rose-900">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-rose-700">{failedStatusLabel}</div>
-              <div className="text-sm font-medium text-rose-900">{failedReasonText}</div>
+              <div className="text-[13px] font-medium leading-5 text-rose-900">{failedReasonText}</div>
             </div>
             {failedSupportText ? (
-              <div className="mt-1 text-[11px] leading-4 text-rose-900/80">{failedSupportText}</div>
+              <div className="mt-0.5 text-[11px] leading-4 text-rose-900/80">{failedSupportText}</div>
             ) : null}
           </div>
         ) : null}
 
         {pendingInfoSignal ? (
-          <div className="mt-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-2.5 py-1.5 text-amber-900">
+          <div className="mt-2 rounded-lg border border-amber-200/80 bg-amber-50/60 px-2.5 py-1.5 text-amber-900">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-700">Pending Info</div>
-              <div className="text-sm font-medium text-amber-900">{pendingInfoContext}</div>
+              <div className="text-[13px] font-medium leading-5 text-amber-900">{pendingInfoContext}</div>
             </div>
           </div>
         ) : null}
 
         {onHoldSignal ? (
-          <div className="mt-2 rounded-xl border border-slate-300/90 bg-slate-100/80 px-2.5 py-1.5 text-slate-800">
+          <div className="mt-2 rounded-lg border border-slate-300/90 bg-slate-100/80 px-2.5 py-1.5 text-slate-800">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-600">On Hold</div>
-              <div className="text-sm font-medium text-slate-800">{onHoldContext}</div>
+              <div className="text-[13px] font-medium leading-5 text-slate-800">{onHoldContext}</div>
             </div>
           </div>
         ) : null}
 
-        <div className="mt-2 space-y-1.5 border-t border-slate-200/80 pt-2">
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            <div className="min-w-0 rounded-xl border border-slate-200/80 bg-slate-50/80 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
+        <div className="mt-2 border-t border-slate-200/80 pt-2">
+          <div className="grid gap-2 sm:grid-cols-[minmax(10rem,0.75fr)_minmax(0,1.25fr)]">
+            <div className="min-w-0">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{scheduleLabel}</div>
-              <div className="mt-0.5 text-sm font-semibold leading-5 text-slate-950">{scheduleDateText}</div>
-              <div className="text-[12px] leading-4.5 text-slate-600">{scheduleWindowText}</div>
+              <div className="mt-0.5 text-[13px] font-semibold leading-5 text-slate-950">{scheduleDateText}</div>
+              <div className="text-[11px] leading-4 text-slate-600">{scheduleWindowText}</div>
             </div>
-            <div className="min-w-0 rounded-xl border border-blue-100/90 bg-[linear-gradient(180deg,rgba(248,250,252,0.92),rgba(255,255,255,0.98))] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+            <div className="min-w-0 sm:border-l sm:border-slate-200 sm:pl-3">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">Next Step</div>
-              <div className="mt-0.5 text-sm font-semibold leading-5 text-slate-950">{nextStep}</div>
+              <div className="mt-0.5 text-[13px] font-semibold leading-5 text-slate-950">{nextStep}</div>
               {detailLine ? (
-                <div className="mt-0.5 text-[12px] leading-4.5 text-slate-600">{detailLine}</div>
+                <div className="mt-0.5 text-[11px] leading-4 text-slate-600">{detailLine}</div>
               ) : null}
             </div>
           </div>
           {metaItems.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 text-[11px] leading-4 text-slate-600">
-              {metaItems.map((item) => (
-                <span key={item} className="inline-flex rounded-full border border-slate-300/80 bg-slate-100/90 px-2 py-0.5 font-medium text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
-                  {item}
-                </span>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-4 text-slate-600">
+              {metaItems.map((item, index) => (
+                <div key={item.key} className="inline-flex items-center gap-2">
+                  {index > 0 ? <span className="text-slate-300" aria-hidden="true">/</span> : null}
+                  <span className="inline-flex items-center gap-1">
+                    <span className="font-medium text-slate-500">{item.label}</span>
+                    {item.href ? (
+                      <a
+                        href={item.href}
+                        className="font-medium text-slate-700 transition-colors hover:text-slate-950"
+                      >
+                        {item.value}
+                      </a>
+                    ) : (
+                      <span className="font-medium text-slate-700">{item.value}</span>
+                    )}
+                  </span>
+                </div>
               ))}
             </div>
           ) : null}
         </div>
       </div>
-      <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-2">
         <Link
           href={`/jobs/${j.id}?tab=ops`}
-          className="inline-flex min-h-10 flex-[1.35] items-center justify-center rounded-xl border border-slate-900 bg-[linear-gradient(180deg,rgba(15,23,42,1),rgba(30,41,59,0.98))] px-3 py-2 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(15,23,42,0.55)] transition-all hover:-translate-y-px hover:border-slate-800 hover:bg-[linear-gradient(180deg,rgba(15,23,42,1),rgba(15,23,42,1))] hover:shadow-[0_18px_30px_-18px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50 active:translate-y-0 sm:min-h-9 sm:flex-none sm:px-3 sm:py-1.5 sm:text-xs"
+          className="inline-flex min-h-9 flex-[1.3] items-center justify-center rounded-lg border border-slate-900 bg-[linear-gradient(180deg,rgba(15,23,42,1),rgba(30,41,59,0.98))] px-3 py-1.5 text-xs font-semibold text-white shadow-[0_12px_20px_-18px_rgba(15,23,42,0.55)] transition-all hover:-translate-y-px hover:border-slate-800 hover:bg-[linear-gradient(180deg,rgba(15,23,42,1),rgba(15,23,42,1))] hover:shadow-[0_16px_26px_-18px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50 active:translate-y-0 sm:min-h-8 sm:flex-none sm:px-3 sm:py-1.5"
         >
           View Job
         </Link>
         {phoneHref ? (
           <a
             href={phoneHref}
-            className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-slate-300/90 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.96))] px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_18px_-18px_rgba(15,23,42,0.4)] transition-all hover:-translate-y-px hover:border-slate-400 hover:bg-white hover:text-slate-900 hover:shadow-[0_14px_22px_-18px_rgba(15,23,42,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 active:translate-y-0 sm:min-h-9 sm:flex-none sm:px-3 sm:py-1.5 sm:text-xs"
+            className="inline-flex min-h-9 flex-1 items-center justify-center rounded-lg border border-slate-300/90 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.96))] px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-[0_10px_18px_-18px_rgba(15,23,42,0.4)] transition-all hover:-translate-y-px hover:border-slate-400 hover:bg-white hover:text-slate-900 hover:shadow-[0_14px_22px_-18px_rgba(15,23,42,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 active:translate-y-0 sm:min-h-8 sm:flex-none sm:px-2.5 sm:py-1.5"
           >
             Call
           </a>
@@ -1701,7 +1735,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         {textHref ? (
           <a
             href={textHref}
-            className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-slate-300/90 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.96))] px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_18px_-18px_rgba(15,23,42,0.4)] transition-all hover:-translate-y-px hover:border-slate-400 hover:bg-white hover:text-slate-900 hover:shadow-[0_14px_22px_-18px_rgba(15,23,42,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 active:translate-y-0 sm:min-h-9 sm:flex-none sm:px-3 sm:py-1.5 sm:text-xs"
+            className="inline-flex min-h-9 flex-1 items-center justify-center rounded-lg border border-slate-300/90 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.96))] px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-[0_10px_18px_-18px_rgba(15,23,42,0.4)] transition-all hover:-translate-y-px hover:border-slate-400 hover:bg-white hover:text-slate-900 hover:shadow-[0_14px_22px_-18px_rgba(15,23,42,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 active:translate-y-0 sm:min-h-8 sm:flex-none sm:px-2.5 sm:py-1.5"
           >
             Text
           </a>
@@ -1746,23 +1780,23 @@ function quietSectionEmptyState(message: string, tone: "neutral" | "success" = "
 }
 
 const sectionActionLinkClass =
-  "inline-flex items-center rounded-xl border border-slate-300/80 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-[0_8px_18px_-16px_rgba(15,23,42,0.35)] transition-all hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70 active:translate-y-0";
+  "inline-flex items-center rounded-lg border border-slate-300/80 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-[0_8px_18px_-16px_rgba(15,23,42,0.35)] transition-all hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70 active:translate-y-0";
 
 const inlineSectionLinkClass =
-  "inline-flex items-center rounded-lg border border-slate-200/80 bg-white/85 px-2 py-0.5 text-[11px] font-semibold text-blue-700 shadow-[0_6px_16px_-14px_rgba(15,23,42,0.25)] transition-colors hover:border-blue-200 hover:bg-blue-50/70 hover:text-blue-800";
+  "inline-flex items-center rounded-md border border-slate-200/80 bg-white/85 px-2 py-0.5 text-[11px] font-semibold text-blue-700 shadow-[0_6px_16px_-14px_rgba(15,23,42,0.25)] transition-colors hover:border-blue-200 hover:bg-blue-50/70 hover:text-blue-800";
 
 function sectionCountPill(count: number, tone: "neutral" | "danger" = "neutral") {
   const className =
     tone === "danger"
-      ? "inline-flex min-w-8 items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 shadow-[0_6px_16px_-14px_rgba(225,29,72,0.28)]"
-      : "inline-flex min-w-8 items-center justify-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-[0_6px_16px_-14px_rgba(15,23,42,0.2)]";
+      ? "text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-700"
+      : "text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500";
 
-  return <span className={className}>{count}</span>;
+  return <span className={className}>{count} jobs</span>;
 }
 
 return (
-  <div className="mx-auto max-w-6xl space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 lg:space-y-5">
-    <section className="relative overflow-hidden rounded-2xl border border-slate-300/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_60%,rgba(239,246,255,0.75))] p-3.5 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/60 sm:p-4">
+  <div className="mx-auto max-w-7xl space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 lg:space-y-4.5">
+    <section className="relative overflow-hidden rounded-2xl border border-slate-300/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_60%,rgba(239,246,255,0.75))] p-3 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/60 sm:p-3.5">
       <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-28 w-28 rounded-full bg-blue-100/50 blur-3xl" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
@@ -1775,8 +1809,11 @@ return (
             <div className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">Operational queues, field follow-up, and closeout work in one surface.</div>
           </div>
         </div>
-        <div className={`inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-[0_6px_18px_-16px_rgba(15,23,42,0.35)] ${selectedContractorName ? "border-blue-200 bg-blue-50/85 text-blue-800" : "border-slate-300/80 bg-white text-slate-700"}`}>
-          <span className="truncate">{selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}</span>
+        <div className="text-right">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Scope</div>
+          <div className={`text-[12px] font-medium ${selectedContractorName ? "text-blue-800" : "text-slate-700"}`}>
+            {selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
+          </div>
         </div>
       </div>
     </section>
@@ -1837,9 +1874,9 @@ return (
           <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Internal</div>
           <div className="text-[15px] font-semibold tracking-tight text-slate-950">Filters</div>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-slate-300/80 bg-white px-3 py-1 text-[11px] shadow-[0_8px_18px_-16px_rgba(15,23,42,0.3)]">
-          <span className="font-semibold uppercase tracking-wide text-slate-500">Queue</span>
-          <span className="font-medium text-slate-800">{OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}</span>
+        <div className="text-right text-[11px] leading-4">
+          <div className="font-semibold uppercase tracking-[0.12em] text-slate-500">Queue</div>
+          <div className="font-medium text-slate-800">{OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}</div>
         </div>
       </div>
       <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
@@ -1903,7 +1940,7 @@ return (
           <div className="text-[15px] font-semibold tracking-tight text-slate-950">System Alerts</div>
         </div>
         {!hasActiveSystemAlerts && !signal ? null : (
-          <div className="rounded-full border border-blue-200/80 bg-blue-50/70 px-2 py-0.5 text-[10px] font-medium text-blue-700 shadow-[0_8px_18px_-16px_rgba(37,99,235,0.35)]">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">
             Active alerts
           </div>
         )}
@@ -1911,7 +1948,7 @@ return (
       {visibleSignalCards.length === 0 && !signal
         ? quietSectionEmptyState("No active contractor-driven alerts right now.")
         : (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {visibleSignalCards.map((card) => {
               const isActive = signal === card.key;
               return (
@@ -1925,14 +1962,14 @@ return (
                     signal: card.key,
                   })}#ops-queues`}
                   className={[
-                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium shadow-sm transition-colors",
+                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium shadow-sm transition-colors",
                     isActive
                       ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
                       : `${signalToneClass(card.key)} hover:bg-white`,
                   ].join(" ")}
                 >
                   <span>{card.label}</span>
-                  <span className={isActive ? "text-slate-200" : "text-current/80"}>{card.count}</span>
+                  <span className={`font-semibold tabular-nums ${isActive ? "text-slate-200" : "text-current/80"}`}>{card.count}</span>
                 </Link>
               );
             })}
@@ -1941,7 +1978,7 @@ return (
     </section>
 
     <section className="grid grid-cols-1 gap-2.5 lg:grid-cols-3">
-      <div className={`rounded-2xl border ${callListVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70 sm:p-3.5"}`}>
+      <div className={`rounded-2xl border ${callListVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="text-[15px] font-semibold tracking-tight text-slate-950">Call List</div>
           <div className="flex items-center gap-3">
@@ -1970,7 +2007,7 @@ return (
         )}
       </div>
 
-    <div className={`rounded-2xl border ${prioritizedFieldWorkJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70 sm:p-3.5"}`}>
+    <div className={`rounded-2xl border ${prioritizedFieldWorkJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="text-[15px] font-semibold tracking-tight text-slate-950">Field Work</div>
         <div className="flex items-center gap-3">
@@ -2002,7 +2039,7 @@ return (
   )}
 </div>
 
-      <div className={`rounded-2xl border ${closeoutVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70 sm:p-3.5"}`}>
+      <div className={`rounded-2xl border ${closeoutVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="text-[15px] font-semibold tracking-tight text-slate-950">Closeout Work Queue</div>
           <div className="flex items-center gap-3">
@@ -2034,7 +2071,7 @@ return (
       </div>
     </section>
 
-    <section className={`rounded-2xl border ${exceptionVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70 sm:p-3.5"}`}>
+    <section className={`rounded-2xl border ${exceptionVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="text-[15px] font-semibold tracking-tight text-slate-950">Exceptions (Still Open Past Scheduled Date)</div>
         <div className="flex items-center gap-3">
@@ -2108,14 +2145,14 @@ return (
                     signal: "",
                   })}#ops-queues`}
                   className={[
-                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium shadow-sm transition-colors",
+                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium shadow-sm transition-colors",
                     isActive
                       ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
                       : `${workflowToneClass(card.key)} hover:bg-white`,
                   ].join(" ")}
                 >
                   <span className={isActive ? "text-slate-200" : "text-current/80"}>{card.label}</span>
-                  <span className="font-semibold">{card.count}</span>
+                  <span className="font-semibold tabular-nums">{card.count}</span>
                 </Link>
               );
             })}
@@ -2129,7 +2166,7 @@ return (
             Active Queue: {activeQueueLabel}
             {activeSignalLabel ? ` (${activeSignalLabel})` : ""}
           </div>
-          <div className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-gray-600 shadow-sm">{sortedBucketJobs.length} jobs</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{sortedBucketJobs.length} jobs</div>
         </div>
 
         {sortedBucketJobs.length === 0 ? (
