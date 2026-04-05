@@ -1396,6 +1396,11 @@ const signalCards = [
   },
 ];
 
+const visibleSignalCards = signalCards.filter(
+  (card) => card.count > 0 || signal === card.key
+);
+const hasActiveSystemAlerts = visibleSignalCards.some((card) => card.count > 0);
+
 const activeQueueLabel = OPS_TABS.find((t) => t.key === bucket)?.label ?? bucket;
 const activeSignalLabel =
   signal === "retest_ready"
@@ -1580,145 +1585,115 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   const hasPrimaryStatusCallout = isFailedFamily || pendingInfoSignal || onHoldSignal;
   const showStatusPill = !hasPrimaryStatusCallout && statusMeta.label !== "Open";
   const scheduleLabel = showDate ? "Scheduled" : "Schedule";
-  const metadataItemClass = "min-w-0 rounded-md border border-slate-200/80 bg-slate-50/70 px-2.5 py-2";
-  const previewMetadataGridClass = "mt-2.5 grid grid-cols-2 gap-2";
-  const activeQueueMetadataGridClass = "mt-2.5 grid grid-cols-2 gap-2 xl:grid-cols-4";
+  const metaItems = [
+    customerPhone ? customerPhone : null,
+    contractorName !== "Unassigned" ? `Contractor: ${contractorName}` : null,
+    assignmentSummary !== "Unassigned" ? `Assigned: ${assignmentSummary}` : null,
+  ].filter(Boolean) as string[];
 
   return (
     <div
       key={j.id}
       className={[
-        "relative rounded-lg border bg-white p-3.5 shadow-sm transition-all hover:-translate-y-px hover:shadow-md",
+        "relative rounded-lg border bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:shadow-md sm:p-3.5",
         emphasize && needsAttention
           ? "border-amber-300 bg-amber-50/40"
           : "border-gray-200",
       ].join(" ")}
     >
-      <div className="flex flex-col gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-start justify-between gap-2">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
             <Link
               href={`/jobs/${j.id}?tab=ops`}
               className="inline-block text-[15px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1"
             >
               {displayTitle}
             </Link>
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-              {emphasize && needsAttention ? (
-                <span className="inline-flex rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 font-semibold uppercase tracking-[0.08em] text-amber-800">
-                  Attention
-                </span>
-              ) : null}
-              {showStatusPill ? (
-                <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
-                  {statusMeta.label}
-                </span>
+            <div className="mt-1 text-sm font-medium leading-5 text-slate-900">{customerName}</div>
+            <div className="mt-0.5 text-xs leading-4.5 text-slate-600">{addressLine(j)}</div>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-1.5 text-[11px]">
+            {emphasize && needsAttention ? (
+              <span className="inline-flex rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 font-semibold uppercase tracking-[0.08em] text-amber-800">
+                Attention
+              </span>
+            ) : null}
+            {showStatusPill ? (
+              <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
+                {statusMeta.label}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {isFailedFamily ? (
+          <div className="mt-2.5 rounded-md border border-rose-200/80 bg-rose-50/70 px-2.5 py-2 text-rose-900">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-rose-700">{failedStatusLabel}</div>
+              <div className="text-sm font-medium text-rose-900">{failedReasonText}</div>
+            </div>
+            {failedSupportText ? (
+              <div className="mt-1 text-[11px] leading-4 text-rose-900/80">{failedSupportText}</div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {pendingInfoSignal ? (
+          <div className="mt-2.5 rounded-md border border-amber-200/80 bg-amber-50/70 px-2.5 py-2 text-amber-900">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-700">Pending Info</div>
+              <div className="text-sm font-medium text-amber-900">{pendingInfoContext}</div>
+            </div>
+          </div>
+        ) : null}
+
+        {onHoldSignal ? (
+          <div className="mt-2.5 rounded-md border border-slate-300/90 bg-slate-100/80 px-2.5 py-2 text-slate-800">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-600">On Hold</div>
+              <div className="text-sm font-medium text-slate-800">{onHoldContext}</div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-2.5 space-y-2 border-t border-slate-200/80 pt-2.5">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{scheduleLabel}</div>
+              <div className="mt-0.5 text-sm font-semibold leading-5 text-slate-900">{scheduleDateText}</div>
+              <div className="text-xs leading-4.5 text-slate-600">{scheduleWindowText}</div>
+            </div>
+            <div className="min-w-0 sm:max-w-[52%]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">Next Step</div>
+              <div className="mt-0.5 text-sm font-semibold leading-5 text-slate-950">{nextStep}</div>
+              {detailLine ? (
+                <div className="mt-0.5 text-xs leading-4.5 text-slate-600">{detailLine}</div>
               ) : null}
             </div>
           </div>
-          {isFailedFamily ? (
-            <div className="mt-2.5 rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 text-rose-900">
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-700">{failedStatusLabel}</div>
-                <div className="text-sm font-medium text-rose-900">{failedReasonText}</div>
-              </div>
-              {failedSupportText ? (
-                <div className="mt-1 text-xs leading-4.5 text-rose-900/80">{failedSupportText}</div>
-              ) : null}
-            </div>
-          ) : null}
-          {pendingInfoSignal ? (
-            <div className="mt-2.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-900">
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">Pending Info</div>
-                <div className="text-sm font-medium text-amber-900">{pendingInfoContext}</div>
-              </div>
-            </div>
-          ) : null}
-          {onHoldSignal ? (
-            <div className="mt-2.5 rounded-md border border-slate-300 bg-slate-100 px-3 py-2.5 text-slate-800">
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">On Hold</div>
-                <div className="text-sm font-medium text-slate-800">{onHoldContext}</div>
-              </div>
-            </div>
-          ) : null}
-          {emphasize ? (
-            <div className={previewMetadataGridClass}>
-              <div className={metadataItemClass}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Customer</div>
-                <div className="mt-0.5 text-sm font-medium leading-5 text-slate-900">{customerName}</div>
-                <div className="text-[11px] leading-4 text-slate-600">{customerPhone || "No phone on file"}</div>
-              </div>
-              <div className={metadataItemClass}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Address</div>
-                <div className="mt-0.5 text-sm leading-5 text-slate-800">{addressLine(j)}</div>
-              </div>
-              <div className={metadataItemClass}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Contractor</div>
-                <div className="mt-0.5 text-sm leading-5 text-slate-800">{contractorName}</div>
-              </div>
-              <div className={metadataItemClass}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{scheduleLabel}</div>
-                <div className="mt-0.5 text-sm font-semibold leading-5 text-slate-900">{scheduleDateText}</div>
-                <div className="text-[11px] leading-4 text-slate-600">{scheduleWindowText}</div>
-              </div>
-              <div className={metadataItemClass}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Assigned</div>
-                <div className="mt-0.5 text-sm leading-5 text-slate-800">{assignmentSummary}</div>
-              </div>
-            </div>
-          ) : (
-            <div className={activeQueueMetadataGridClass}>
-              <div className={metadataItemClass}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Customer</div>
-                <div className="mt-0.5 text-sm font-medium leading-5 text-slate-900">{customerName}</div>
-                <div className="text-[11px] leading-4 text-slate-600">{customerPhone || "No phone on file"}</div>
-              </div>
-              <div className={metadataItemClass}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Address</div>
-                <div className="mt-0.5 text-sm leading-5 text-slate-800">{addressLine(j)}</div>
-              </div>
-              <div className={metadataItemClass}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Contractor</div>
-                <div className="mt-0.5 text-sm leading-5 text-slate-800">{contractorName}</div>
-              </div>
-              <div className={metadataItemClass}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{scheduleLabel}</div>
-                <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm leading-5 text-slate-800">
-                  <span className="font-semibold text-slate-900">{scheduleDateText}</span>
-                  <span className="text-[11px] leading-4 text-slate-600">{scheduleWindowText}</span>
-                </div>
-                <div className="mt-1 text-[11px] leading-4 text-slate-600">Assigned: {assignmentSummary}</div>
-              </div>
-            </div>
-          )}
-          {!hasPrimaryStatusCallout ? (
-            <div className="mt-2.5 rounded-md border border-blue-200 bg-blue-50/80 px-3 py-2 shadow-sm">
-              <div className="flex flex-wrap items-start gap-2 sm:items-center sm:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">Next Step</div>
-                  <div className="mt-0.5 text-sm font-semibold leading-5 text-blue-950">{nextStep}</div>
-                  {detailLine ? (
-                    <div className="mt-0.5 text-[11px] leading-4 text-blue-900/75">{detailLine}</div>
-                  ) : null}
-                </div>
-              </div>
+          {metaItems.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5 text-[11px] leading-4 text-slate-500">
+              {metaItems.map((item) => (
+                <span key={item} className="inline-flex rounded-full bg-slate-100/80 px-2 py-0.5">
+                  {item}
+                </span>
+              ))}
             </div>
           ) : null}
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-2.5">
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2.5">
         <Link
           href={`/jobs/${j.id}?tab=ops`}
-          className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
+          className="inline-flex min-h-10 flex-1 items-center justify-center rounded-md border border-slate-300 bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50 sm:min-h-8 sm:flex-none sm:px-2.5 sm:py-1 sm:text-xs"
         >
           View Job
         </Link>
         {phoneHref ? (
           <a
             href={phoneHref}
-            className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40"
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 sm:min-h-8 sm:px-2.5 sm:py-1 sm:text-xs"
           >
             Call
           </a>
@@ -1726,7 +1701,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         {textHref ? (
           <a
             href={textHref}
-            className="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40"
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 sm:min-h-8 sm:px-2.5 sm:py-1 sm:text-xs"
           >
             Text
           </a>
@@ -1754,39 +1729,42 @@ function signalToneClass(key: string) {
   return "border-gray-200 bg-white text-gray-900";
 }
 
-return (
-  <div className="mx-auto max-w-6xl space-y-6 p-4 text-gray-900 lg:space-y-7">
-    <section className="rounded-xl border border-gray-200 bg-gradient-to-b from-white to-slate-50/70 p-4 shadow-sm sm:p-6">
-      <div className="mb-4 border-b border-slate-200/80 pb-4">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Command Center</div>
-        <div className="mt-1 text-sm text-slate-600">Page-specific operations and queue controls for dispatch workflow.</div>
-      </div>
+function quietSectionEmptyState(message: string, tone: "neutral" | "success" = "neutral") {
+  const toneClass =
+    tone === "success"
+      ? "border-emerald-200 bg-emerald-50/70 text-emerald-800"
+      : "border-slate-200 bg-slate-50 text-slate-600";
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm">
-              <Image src="/icon.png" alt="Compliance Matters logo" width={22} height={22} className="h-5.5 w-5.5 rounded-sm" />
-            </div>
-            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-              Compliance Matters
-            </div>
+  return (
+    <div className={`rounded-md border px-2.5 py-1.5 text-xs ${toneClass}`}>
+      {message}
+    </div>
+  );
+}
+
+return (
+  <div className="mx-auto max-w-6xl space-y-4 p-3 text-gray-900 sm:space-y-5 sm:p-4 lg:space-y-6">
+    <section className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm">
+            <Image src="/icon.png" alt="Compliance Matters logo" width={22} height={22} className="h-5.5 w-5.5 rounded-sm" />
           </div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Ops Dashboard</h1>
+          <div className="min-w-0">
+            <div className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Compliance Matters</div>
+            <h1 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">Ops Dashboard</h1>
           </div>
-          <p className="text-sm text-slate-600">
-            {selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
-          </p>
+        </div>
+        <div className="inline-flex max-w-full items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700">
+          <span className="truncate">{selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}</span>
         </div>
       </div>
     </section>
 
-    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-slate-50/55 p-3.5 shadow-sm sm:p-4">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Recent Notifications</h2>
-          <p className="text-xs text-slate-500">Latest internal signals for Ops.</p>
         </div>
         <Link
           href="/ops/notifications"
@@ -1832,10 +1810,14 @@ return (
       )}
     </section>
 
-    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-end">
-        <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs">
-          <span className="font-semibold uppercase tracking-wide text-slate-500">Queue Focus</span>
+    <section className="rounded-lg border border-slate-200 bg-slate-50/55 p-3.5 shadow-sm sm:p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Internal</div>
+          <div className="text-sm font-semibold text-slate-900">Filters</div>
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px]">
+          <span className="font-semibold uppercase tracking-wide text-slate-500">Queue</span>
           <span className="font-medium text-slate-800">{OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}</span>
         </div>
       </div>
@@ -1893,38 +1875,52 @@ return (
       </div>
     </section>
 
-    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="mb-2 text-sm font-semibold text-gray-900">System Alerts</div>
-      <div className="flex flex-wrap gap-2">
-        {signalCards.map((card) => {
-          const isActive = signal === card.key;
-          return (
-            <Link
-              key={card.key}
-              href={`/ops${buildQueryString({
-                bucket: card.bucket,
-                contractor: contractor ?? "",
-                q: q ?? "",
-                sort: sort ?? "",
-                signal: card.key,
-              })}#ops-queues`}
-              className={[
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : `${signalToneClass(card.key)} hover:bg-white`,
-              ].join(" ")}
-            >
-              <span>{card.label}</span>
-              <span className={isActive ? "text-slate-200" : "text-current/80"}>{card.count}</span>
-            </Link>
-          );
-        })}
+    <section className="rounded-lg border border-indigo-100 bg-indigo-50/35 p-3 shadow-sm sm:p-3.5">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-indigo-700">Contractor-driven</div>
+          <div className="text-sm font-semibold text-gray-900">System Alerts</div>
+        </div>
+        {!hasActiveSystemAlerts && !signal ? (
+          <div className="rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+            No active alerts
+          </div>
+        ) : null}
       </div>
+      {visibleSignalCards.length === 0 && !signal
+        ? null
+        : (
+          <div className="flex flex-wrap gap-2">
+            {visibleSignalCards.map((card) => {
+              const isActive = signal === card.key;
+              return (
+                <Link
+                  key={card.key}
+                  href={`/ops${buildQueryString({
+                    bucket: card.bucket,
+                    contractor: contractor ?? "",
+                    q: q ?? "",
+                    sort: sort ?? "",
+                    signal: card.key,
+                  })}#ops-queues`}
+                  className={[
+                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+                    isActive
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : `${signalToneClass(card.key)} hover:bg-white`,
+                  ].join(" ")}
+                >
+                  <span>{card.label}</span>
+                  <span className={isActive ? "text-slate-200" : "text-current/80"}>{card.count}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
     </section>
 
-    <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+      <div className={`rounded-lg border ${callListVisibleJobs.length === 0 ? "border-slate-200 bg-white/85 p-3" : "border-slate-200 bg-white p-3.5 sm:p-4"} shadow-sm`}>
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-semibold text-gray-900">Call List</div>
           <div className="flex items-center gap-3">
@@ -1946,10 +1942,14 @@ return (
             ) : null}
           </div>
         </div>
-        <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j, false, undefined, true))}</div>
+        {callListVisibleJobs.length === 0 ? (
+          quietSectionEmptyState("No jobs need scheduling right now.")
+        ) : (
+          <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j, false, undefined, true))}</div>
+        )}
       </div>
 
-     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+     <div className={`rounded-lg border ${prioritizedFieldWorkJobs.length === 0 ? "border-slate-200 bg-white/85 p-3" : "border-slate-200 bg-white p-3.5 sm:p-4"} shadow-sm`}>
       <div className="mb-2 flex items-center justify-between">
         <div className="text-sm font-semibold text-gray-900">Field Work</div>
         <div className="flex items-center gap-3">
@@ -1973,9 +1973,7 @@ return (
       </div>
 
   {prioritizedFieldWorkJobs.length === 0 ? (
-    <div className="flex h-32 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-sm font-medium text-emerald-800">
-      <span className="mr-1.5 text-emerald-700">✓</span> Field work complete for today
-    </div>
+    quietSectionEmptyState("Field work complete for today.", "success")
   ) : (
     <div className="space-y-2">
       {fieldWorkVisibleJobs.map((j: any) => compactRow(j, true, undefined, true))}
@@ -1983,7 +1981,7 @@ return (
   )}
 </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className={`rounded-lg border ${closeoutVisibleJobs.length === 0 ? "border-slate-200 bg-white/85 p-3" : "border-slate-200 bg-white p-3.5 sm:p-4"} shadow-sm`}>
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-semibold text-gray-900">Closeout Work Queue</div>
           <div className="flex items-center gap-3">
@@ -2005,13 +2003,17 @@ return (
             ) : null}
           </div>
         </div>
-        <div className="space-y-2">
-          {closeoutVisibleJobs.map((j: any) => compactRow(j, false, closeoutLabel(j), true))}
-        </div>
+        {closeoutVisibleJobs.length === 0 ? (
+          quietSectionEmptyState("No closeout work is waiting right now.")
+        ) : (
+          <div className="space-y-2">
+            {closeoutVisibleJobs.map((j: any) => compactRow(j, false, closeoutLabel(j), true))}
+          </div>
+        )}
       </div>
     </section>
 
-    <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section className={`rounded-lg border ${exceptionVisibleJobs.length === 0 ? "border-slate-200 bg-white/85 p-3" : "border-slate-200 bg-white p-3.5 sm:p-4"} shadow-sm`}>
       <div className="mb-2 flex items-center justify-between">
         <div className="text-sm font-semibold text-gray-900">Exceptions (Still Open Past Scheduled Date)</div>
         <div className="flex items-center gap-3">
@@ -2033,26 +2035,30 @@ return (
           ) : null}
         </div>
       </div>
-      <div className="space-y-2">
-        {exceptionVisibleJobs.map((j: any) => {
-          const meta = exceptionMetaById.get(String(j?.id ?? ""));
-          const note = meta ? `${meta.reason} | ${meta.aging}` : "Exception";
-          return compactRow(j, true, note);
-        })}
-      </div>
+      {exceptionVisibleJobs.length === 0 ? (
+        quietSectionEmptyState("No exception jobs with the current filters.")
+      ) : (
+        <div className="space-y-2">
+          {exceptionVisibleJobs.map((j: any) => {
+            const meta = exceptionMetaById.get(String(j?.id ?? ""));
+            const note = meta ? `${meta.reason} | ${meta.aging}` : "Exception";
+            return compactRow(j, true, note);
+          })}
+        </div>
+      )}
     </section>
 
-    <section id="ops-queues" className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section id="ops-queues" className="rounded-lg border border-indigo-100 bg-indigo-50/35 p-3.5 shadow-sm sm:p-4">
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-indigo-700">Contractor-driven</div>
           <div className="text-sm font-semibold text-gray-900">System / Contractor Work</div>
-          <div className="text-xs text-gray-600">Workflow signal queues for active operational coordination.</div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-1">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-1">
+        <div className="rounded-lg border border-indigo-100/80 bg-white/85 p-3 shadow-sm">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <div className="text-sm font-semibold text-gray-900">Workflow Queues</div>
             <Link
               href={`/ops${buildQueryString({
@@ -2067,7 +2073,7 @@ return (
               View All
             </Link>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="flex flex-wrap gap-1.5">
             {workflowCards.map((card) => {
               const isActive = bucket === card.key && !signal;
               return (
@@ -2081,16 +2087,14 @@ return (
                     signal: "",
                   })}#ops-queues`}
                   className={[
-                    "rounded-md border p-2.5 shadow-sm transition-all hover:-translate-y-[1px] hover:shadow",
+                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
                     isActive
                       ? "border-slate-900 bg-slate-900 text-white"
                       : `${workflowToneClass(card.key)} hover:bg-white`,
                   ].join(" ")}
                 >
-                  <div className={`text-[11px] font-medium ${isActive ? "text-slate-200" : "text-current/80"}`}>
-                    {card.label}
-                  </div>
-                  <div className="text-lg font-semibold">{card.count}</div>
+                  <span className={isActive ? "text-slate-200" : "text-current/80"}>{card.label}</span>
+                  <span className="font-semibold">{card.count}</span>
                 </Link>
               );
             })}
@@ -2098,7 +2102,7 @@ return (
         </div>
       </div>
 
-      <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <div className="mt-3 rounded-lg border border-indigo-100/80 bg-white/85 p-3">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-semibold text-gray-900">
             Active Queue: {activeQueueLabel}
@@ -2108,9 +2112,7 @@ return (
         </div>
 
         {sortedBucketJobs.length === 0 ? (
-          <div className="rounded-md border border-dashed border-gray-300 bg-white px-3 py-4 text-sm text-gray-600">
-            No jobs in this queue with current filters.
-          </div>
+          quietSectionEmptyState("No jobs in this queue with current filters.")
         ) : (
           <div className="space-y-2">
             {sortedBucketJobs.slice(0, 20).map((j: any) => {
