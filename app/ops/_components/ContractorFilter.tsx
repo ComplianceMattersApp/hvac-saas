@@ -28,9 +28,9 @@ export default function ContractorFilter({
 
   return (
     <div className="grid gap-1">
-      <label className="text-xs text-gray-600">Contractor</label>
+      <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contractor</label>
       <select
-        className="w-full rounded border px-2 py-2 text-sm"
+        className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition-colors hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50"
         value={selectedId}
         onChange={handleChange}
       >

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import LogoutButton from "@/components/auth/LogoutButton";
+import MobileShellMenu from "@/components/layout/MobileShellMenu";
 import UserAccountMenu from "@/components/layout/UserAccountMenu";
 import { getInternalUser } from "@/lib/auth/internal-user";
 import { getInternalUnreadNotificationCount } from "@/lib/actions/notification-read-actions";
@@ -91,7 +92,10 @@ export default async function RootLayout({
   const accountFirstName = firstNameFromDisplayName(accountDisplayName, "Account");
   const accountLabel = accountFirstName;
   const unreadNotificationBadgeLabel = unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount);
-
+  const shellSecondaryLinkClass =
+    "inline-flex items-center justify-center rounded-xl border border-slate-300/80 bg-white px-3.5 py-2 text-sm font-semibold text-slate-800 shadow-[0_10px_18px_-16px_rgba(15,23,42,0.32)] transition-all hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70 active:translate-y-0";
+  const shellUtilityLinkClass =
+    "inline-flex items-center gap-1.5 rounded-xl border border-slate-300/80 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_18px_-16px_rgba(15,23,42,0.3)] transition-all hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70 active:translate-y-0";
   return (
     <html lang="en">
       <body
@@ -102,132 +106,67 @@ export default async function RootLayout({
           {user ? (
             <>
               {/* Top Bar */}
-              <header className="fixed top-0 inset-x-0 z-50 border-b bg-white px-4 py-3 sm:px-6 print:hidden">
+              <header className="fixed top-0 inset-x-0 z-50 border-b border-slate-300/80 bg-white/88 px-4 py-3 backdrop-blur-md shadow-[0_14px_28px_-24px_rgba(15,23,42,0.4)] sm:px-6 print:hidden">
+                <div className="mx-auto max-w-7xl">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0 flex items-center gap-2.5">
+                  <div className="min-w-0 flex items-center gap-3">
                     <Link
                       href={homeHref}
-                      className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300/80 bg-white shadow-[0_12px_22px_-18px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                     >
                       <Image src="/icon.png" alt="Compliance Matters logo" width={18} height={18} className="rounded-sm" />
                     </Link>
                     <Link
                       href={homeHref}
-                      className="truncate text-sm font-semibold text-slate-900 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                      className="min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                     >
-                      Compliance Matters
+                      <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Compliance Matters</span>
+                      <span className="block truncate text-sm font-semibold tracking-[-0.01em] text-slate-950 transition-colors hover:text-slate-700">Operations Software</span>
                     </Link>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {/* Mobile-only action menu */}
-                    <details className="relative shrink-0 sm:hidden">
-                      <summary className="list-none rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
-                        ⋮ Menu
-                      </summary>
-                      <div className="absolute right-12 z-50 mt-2 w-48 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
-                        <Link
-                          href="/jobs/new"
-                          className="block rounded-md px-3 py-2 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50"
-                        >
-                          + New Job
-                        </Link>
-                        {isInternalUser ? (
-                          <Link
-                            href="/calendar"
-                            className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                          >
-                            View Calendar
-                          </Link>
-                        ) : null}
-                        <Link
-                          href="/customers"
-                          className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                        >
-                          Search Customers
-                        </Link>
-                        {isInternalUser && (
-                          <Link
-                            href="/ops/notifications"
-                            className="flex items-center justify-between gap-2 rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                          >
-                            <span>Notifications</span>
-                            {unreadNotificationCount > 0 ? (
-                              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-1.5 text-[11px] font-semibold text-blue-700">
-                                  {unreadNotificationBadgeLabel}
-                              </span>
-                            ) : null}
-                          </Link>
-                        )}
-                        {isInternalUser && (
-                          <Link
-                            href="/ops/field"
-                            className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                          >
-                            My Work
-                          </Link>
-                        )}
-                        {isAdmin && (
-                          <Link
-                            href="/ops/admin"
-                            className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                          >
-                            Admin
-                          </Link>
-                        )}
-                        {isInternalUser && (
-                          <Link
-                            href="/notes"
-                            className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                          >
-                            Notes
-                          </Link>
-                        )}
-                        <div className="my-1 border-t border-slate-100" />
-                        <Link
-                          href="/account"
-                          className="block rounded-md px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                        >
-                          Profile
-                        </Link>
-                        <LogoutButton className="w-full rounded-md px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900" />
-                      </div>
-                    </details>
+                    <MobileShellMenu
+                      isInternalUser={isInternalUser}
+                      isAdmin={isAdmin}
+                      unreadNotificationCount={unreadNotificationCount}
+                      unreadNotificationBadgeLabel={unreadNotificationBadgeLabel}
+                    />
                   </div>
                 </div>
 
-                <div className="mt-3 hidden items-center justify-between gap-4 sm:flex">
-                  <div className="flex flex-wrap items-center gap-2">
+                <div className="mt-3 hidden items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.92),rgba(255,255,255,0.98))] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] sm:flex">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <Link
                       href="/jobs/new"
-                      className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 sm:px-4 sm:py-2 sm:text-sm"
+                      className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_22px_-18px_rgba(37,99,235,0.58)] transition-all hover:-translate-y-px hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:translate-y-0"
                     >
                       + New Job
                     </Link>
                     {isInternalUser ? (
                       <Link
                         href="/calendar"
-                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
+                        className={shellSecondaryLinkClass}
                       >
                         View Calendar
                       </Link>
                     ) : null}
                     <Link
                       href="/customers"
-                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:px-4 sm:py-2 sm:text-sm"
+                      className={shellSecondaryLinkClass}
                     >
                       Search Customers
                     </Link>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 border-l border-slate-200 pl-4">
+                  <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white/88 px-1.5 py-1 shadow-[0_10px_18px_-18px_rgba(15,23,42,0.22)]">
                     {isInternalUser && (
                       <Link
                         href="/ops/notifications"
-                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                        className={shellUtilityLinkClass}
                       >
                         <span>Notifications</span>
                         {unreadNotificationCount > 0 ? (
-                          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-1 text-[10px] font-semibold text-blue-700">
+                          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-1 text-[10px] font-semibold text-blue-700 shadow-[0_6px_12px_-10px_rgba(37,99,235,0.42)]">
                             {unreadNotificationBadgeLabel}
                           </span>
                         ) : null}
@@ -236,7 +175,7 @@ export default async function RootLayout({
                     {isInternalUser && (
                       <Link
                         href="/ops/field"
-                        className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                        className={shellUtilityLinkClass}
                       >
                         My Work
                       </Link>
@@ -244,13 +183,14 @@ export default async function RootLayout({
                     {isInternalUser && (
                       <Link
                         href="/notes"
-                        className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                        className={shellUtilityLinkClass}
                       >
                         Notes
                       </Link>
                     )}
                     <UserAccountMenu accountFirstName={accountFirstName} accountLabel={accountLabel} isAdmin={isAdmin} />
                   </div>
+                </div>
                 </div>
               </header>
             </>

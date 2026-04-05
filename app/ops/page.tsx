@@ -1595,10 +1595,10 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     <div
       key={j.id}
       className={[
-        "relative rounded-lg border bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:shadow-md sm:p-3.5",
+        "relative rounded-2xl border bg-white px-3 py-2.5 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.32)] ring-1 ring-slate-200/70 transition-all duration-150 hover:-translate-y-px hover:shadow-[0_16px_34px_-22px_rgba(15,23,42,0.35)] sm:px-3.5 sm:py-3",
         emphasize && needsAttention
-          ? "border-amber-300 bg-amber-50/40"
-          : "border-gray-200",
+          ? "border-amber-300 bg-amber-50/35"
+          : "border-slate-200/90",
       ].join(" ")}
     >
       <div className="min-w-0">
@@ -1606,21 +1606,21 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
           <div className="min-w-0 flex-1">
             <Link
               href={`/jobs/${j.id}?tab=ops`}
-              className="inline-block text-[15px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1"
+              className="inline-block text-[15px] font-semibold leading-5 tracking-[-0.01em] text-blue-700 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1"
             >
               {displayTitle}
             </Link>
-            <div className="mt-1 text-sm font-medium leading-5 text-slate-900">{customerName}</div>
-            <div className="mt-0.5 text-xs leading-4.5 text-slate-600">{addressLine(j)}</div>
+            <div className="mt-1 text-[14px] font-semibold leading-5 text-slate-950">{customerName}</div>
+            <div className="mt-0.5 text-[12px] leading-4.5 text-slate-600">{addressLine(j)}</div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5 text-[11px]">
             {emphasize && needsAttention ? (
-              <span className="inline-flex rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 font-semibold uppercase tracking-[0.08em] text-amber-800">
+              <span className="inline-flex rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 font-semibold uppercase tracking-[0.08em] text-amber-800 shadow-sm">
                 Attention
               </span>
             ) : null}
             {showStatusPill ? (
-              <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
+              <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium shadow-sm ${statusMeta.tone}`}>
                 {statusMeta.label}
               </span>
             ) : null}
@@ -1628,7 +1628,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         </div>
 
         {isFailedFamily ? (
-          <div className="mt-2.5 rounded-md border border-rose-200/80 bg-rose-50/70 px-2.5 py-2 text-rose-900">
+          <div className="mt-2 rounded-xl border border-rose-200/80 bg-rose-50/70 px-2.5 py-1.5 text-rose-900">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-rose-700">{failedStatusLabel}</div>
               <div className="text-sm font-medium text-rose-900">{failedReasonText}</div>
@@ -1640,7 +1640,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         ) : null}
 
         {pendingInfoSignal ? (
-          <div className="mt-2.5 rounded-md border border-amber-200/80 bg-amber-50/70 px-2.5 py-2 text-amber-900">
+          <div className="mt-2 rounded-xl border border-amber-200/80 bg-amber-50/70 px-2.5 py-1.5 text-amber-900">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-700">Pending Info</div>
               <div className="text-sm font-medium text-amber-900">{pendingInfoContext}</div>
@@ -1649,7 +1649,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         ) : null}
 
         {onHoldSignal ? (
-          <div className="mt-2.5 rounded-md border border-slate-300/90 bg-slate-100/80 px-2.5 py-2 text-slate-800">
+          <div className="mt-2 rounded-xl border border-slate-300/90 bg-slate-100/80 px-2.5 py-1.5 text-slate-800">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-600">On Hold</div>
               <div className="text-sm font-medium text-slate-800">{onHoldContext}</div>
@@ -1657,25 +1657,25 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
           </div>
         ) : null}
 
-        <div className="mt-2.5 space-y-2 border-t border-slate-200/80 pt-2.5">
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-            <div className="min-w-0">
+        <div className="mt-2 space-y-1.5 border-t border-slate-200/80 pt-2">
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div className="min-w-0 rounded-xl border border-slate-200/80 bg-slate-50/80 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{scheduleLabel}</div>
-              <div className="mt-0.5 text-sm font-semibold leading-5 text-slate-900">{scheduleDateText}</div>
-              <div className="text-xs leading-4.5 text-slate-600">{scheduleWindowText}</div>
+              <div className="mt-0.5 text-sm font-semibold leading-5 text-slate-950">{scheduleDateText}</div>
+              <div className="text-[12px] leading-4.5 text-slate-600">{scheduleWindowText}</div>
             </div>
-            <div className="min-w-0 sm:max-w-[52%]">
+            <div className="min-w-0 rounded-xl border border-blue-100/90 bg-[linear-gradient(180deg,rgba(248,250,252,0.92),rgba(255,255,255,0.98))] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">Next Step</div>
               <div className="mt-0.5 text-sm font-semibold leading-5 text-slate-950">{nextStep}</div>
               {detailLine ? (
-                <div className="mt-0.5 text-xs leading-4.5 text-slate-600">{detailLine}</div>
+                <div className="mt-0.5 text-[12px] leading-4.5 text-slate-600">{detailLine}</div>
               ) : null}
             </div>
           </div>
           {metaItems.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 text-[11px] leading-4 text-slate-500">
+            <div className="flex flex-wrap gap-1.5 text-[11px] leading-4 text-slate-600">
               {metaItems.map((item) => (
-                <span key={item} className="inline-flex rounded-full bg-slate-100/80 px-2 py-0.5">
+                <span key={item} className="inline-flex rounded-full border border-slate-300/80 bg-slate-100/90 px-2 py-0.5 font-medium text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
                   {item}
                 </span>
               ))}
@@ -1683,17 +1683,17 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
           ) : null}
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2.5">
+      <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2">
         <Link
           href={`/jobs/${j.id}?tab=ops`}
-          className="inline-flex min-h-10 flex-1 items-center justify-center rounded-md border border-slate-300 bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50 sm:min-h-8 sm:flex-none sm:px-2.5 sm:py-1 sm:text-xs"
+          className="inline-flex min-h-10 flex-[1.35] items-center justify-center rounded-xl border border-slate-900 bg-[linear-gradient(180deg,rgba(15,23,42,1),rgba(30,41,59,0.98))] px-3 py-2 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(15,23,42,0.55)] transition-all hover:-translate-y-px hover:border-slate-800 hover:bg-[linear-gradient(180deg,rgba(15,23,42,1),rgba(15,23,42,1))] hover:shadow-[0_18px_30px_-18px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50 active:translate-y-0 sm:min-h-9 sm:flex-none sm:px-3 sm:py-1.5 sm:text-xs"
         >
           View Job
         </Link>
         {phoneHref ? (
           <a
             href={phoneHref}
-            className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 sm:min-h-8 sm:px-2.5 sm:py-1 sm:text-xs"
+            className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-slate-300/90 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.96))] px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_18px_-18px_rgba(15,23,42,0.4)] transition-all hover:-translate-y-px hover:border-slate-400 hover:bg-white hover:text-slate-900 hover:shadow-[0_14px_22px_-18px_rgba(15,23,42,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 active:translate-y-0 sm:min-h-9 sm:flex-none sm:px-3 sm:py-1.5 sm:text-xs"
           >
             Call
           </a>
@@ -1701,7 +1701,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         {textHref ? (
           <a
             href={textHref}
-            className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 sm:min-h-8 sm:px-2.5 sm:py-1 sm:text-xs"
+            className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-slate-300/90 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,0.96))] px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_18px_-18px_rgba(15,23,42,0.4)] transition-all hover:-translate-y-px hover:border-slate-400 hover:bg-white hover:text-slate-900 hover:shadow-[0_14px_22px_-18px_rgba(15,23,42,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 active:translate-y-0 sm:min-h-9 sm:flex-none sm:px-3 sm:py-1.5 sm:text-xs"
           >
             Text
           </a>
@@ -1732,43 +1732,64 @@ function signalToneClass(key: string) {
 function quietSectionEmptyState(message: string, tone: "neutral" | "success" = "neutral") {
   const toneClass =
     tone === "success"
-      ? "border-emerald-200 bg-emerald-50/70 text-emerald-800"
-      : "border-slate-200 bg-slate-50 text-slate-600";
+      ? "border-emerald-200 bg-emerald-50/60 text-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
+      : "border-slate-300/80 bg-white/92 text-slate-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]";
+
+  const dotClass = tone === "success" ? "bg-emerald-500" : "bg-slate-400";
 
   return (
-    <div className={`rounded-md border px-2.5 py-1.5 text-xs ${toneClass}`}>
-      {message}
+    <div className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-[11px] font-medium ${toneClass}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} aria-hidden="true" />
+      <span>{message}</span>
     </div>
   );
 }
 
+const sectionActionLinkClass =
+  "inline-flex items-center rounded-xl border border-slate-300/80 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-[0_8px_18px_-16px_rgba(15,23,42,0.35)] transition-all hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70 active:translate-y-0";
+
+const inlineSectionLinkClass =
+  "inline-flex items-center rounded-lg border border-slate-200/80 bg-white/85 px-2 py-0.5 text-[11px] font-semibold text-blue-700 shadow-[0_6px_16px_-14px_rgba(15,23,42,0.25)] transition-colors hover:border-blue-200 hover:bg-blue-50/70 hover:text-blue-800";
+
+function sectionCountPill(count: number, tone: "neutral" | "danger" = "neutral") {
+  const className =
+    tone === "danger"
+      ? "inline-flex min-w-8 items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 shadow-[0_6px_16px_-14px_rgba(225,29,72,0.28)]"
+      : "inline-flex min-w-8 items-center justify-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-[0_6px_16px_-14px_rgba(15,23,42,0.2)]";
+
+  return <span className={className}>{count}</span>;
+}
+
 return (
-  <div className="mx-auto max-w-6xl space-y-4 p-3 text-gray-900 sm:space-y-5 sm:p-4 lg:space-y-6">
-    <section className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm sm:p-5">
+  <div className="mx-auto max-w-6xl space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 lg:space-y-5">
+    <section className="relative overflow-hidden rounded-2xl border border-slate-300/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_60%,rgba(239,246,255,0.75))] p-3.5 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/60 sm:p-4">
+      <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-28 w-28 rounded-full bg-blue-100/50 blur-3xl" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/90 bg-white shadow-[0_12px_24px_-18px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70">
             <Image src="/icon.png" alt="Compliance Matters logo" width={22} height={22} className="h-5.5 w-5.5 rounded-sm" />
           </div>
           <div className="min-w-0">
-            <div className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Compliance Matters</div>
-            <h1 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">Ops Dashboard</h1>
+            <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Compliance Matters</div>
+            <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-[1.45rem]">Ops Dashboard</h1>
+            <div className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">Operational queues, field follow-up, and closeout work in one surface.</div>
           </div>
         </div>
-        <div className="inline-flex max-w-full items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700">
+        <div className={`inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-[0_6px_18px_-16px_rgba(15,23,42,0.35)] ${selectedContractorName ? "border-blue-200 bg-blue-50/85 text-blue-800" : "border-slate-300/80 bg-white text-slate-700"}`}>
           <span className="truncate">{selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}</span>
         </div>
       </div>
     </section>
 
-    <section className="rounded-lg border border-slate-200 bg-slate-50/55 p-3.5 shadow-sm sm:p-4">
-      <div className="mb-3 flex items-center justify-between">
+    <section className="rounded-2xl border border-slate-300/75 bg-slate-50/75 p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-4">
+      <div className="mb-2.5 flex items-center justify-between gap-2">
         <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Internal</div>
           <h2 className="text-sm font-semibold text-slate-900">Recent Notifications</h2>
         </div>
         <Link
           href="/ops/notifications"
-          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+          className={sectionActionLinkClass}
         >
           View all
         </Link>
@@ -1781,7 +1802,7 @@ return (
           {recentNotifications.map((n) => (
             <div
               key={n.id}
-              className="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-slate-50/60 px-3 py-2"
+              className="flex items-start justify-between gap-3 rounded-xl border border-slate-300/70 bg-white px-3 py-2 shadow-[0_10px_22px_-20px_rgba(15,23,42,0.24)]"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -1799,7 +1820,7 @@ return (
               {n.job_id ? (
                 <Link
                   href={`/jobs/${n.job_id}`}
-                  className="inline-flex shrink-0 items-center rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                  className="inline-flex shrink-0 items-center rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 shadow-sm transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
                 >
                   Job
                 </Link>
@@ -1810,21 +1831,21 @@ return (
       )}
     </section>
 
-    <section className="rounded-lg border border-slate-200 bg-slate-50/55 p-3.5 shadow-sm sm:p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <section className="rounded-2xl border border-slate-300/75 bg-slate-50/80 p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-4">
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Internal</div>
-          <div className="text-sm font-semibold text-slate-900">Filters</div>
+          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Filters</div>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px]">
+        <div className="inline-flex items-center gap-2 rounded-full border border-slate-300/80 bg-white px-3 py-1 text-[11px] shadow-[0_8px_18px_-16px_rgba(15,23,42,0.3)]">
           <span className="font-semibold uppercase tracking-wide text-slate-500">Queue</span>
           <span className="font-medium text-slate-800">{OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}</span>
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
         <div className="grid gap-1">
-          <label className="text-xs font-medium uppercase tracking-wide text-gray-600">Sort</label>
+          <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Sort</label>
           <form action="/ops" method="get" className="flex flex-col gap-2 sm:flex-row">
             <input type="hidden" name="bucket" value={bucket} />
             <input type="hidden" name="contractor" value={contractor ?? ""} />
@@ -1833,7 +1854,7 @@ return (
             <select
               name="sort"
               defaultValue={sort}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+              className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
             >
               <option value="default">Default queue order</option>
               <option value="customer">Customer</option>
@@ -1843,16 +1864,16 @@ return (
             </select>
             <button
               type="submit"
-              className="inline-flex min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
+              className="inline-flex min-h-10 items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-px hover:bg-slate-800 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50 active:translate-y-0"
             >
               Apply
             </button>
           </form>
         </div>
       </div>
-      <div className="mt-3 grid gap-1">
+      <div className="mt-2.5 grid gap-1">
         <div>
-          <label className="text-xs font-medium uppercase tracking-wide text-gray-600">Filter Jobs</label>
+          <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Filter Jobs</label>
           <p className="mt-0.5 text-xs text-gray-500">Searches visible jobs on this page only</p>
         </div>
         <form action="/ops" method="get" className="flex flex-col gap-2 sm:flex-row">
@@ -1863,10 +1884,10 @@ return (
             name="q"
             defaultValue={q ?? ""}
             placeholder="Name, phone, address, city, title"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+            className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
           />
           <button
-            className="inline-flex min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50"
+            className="inline-flex min-h-10 items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-px hover:bg-slate-800 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/50 active:translate-y-0"
             type="submit"
           >
             Search
@@ -1875,20 +1896,20 @@ return (
       </div>
     </section>
 
-    <section className="rounded-lg border border-indigo-100 bg-indigo-50/35 p-3 shadow-sm sm:p-3.5">
+    <section className={`rounded-2xl border p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-3.5 ${hasActiveSystemAlerts || signal ? "border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))]" : "border-slate-300/75 bg-slate-50/75"}`}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-indigo-700">Contractor-driven</div>
-          <div className="text-sm font-semibold text-gray-900">System Alerts</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">Contractor-driven</div>
+          <div className="text-[15px] font-semibold tracking-tight text-slate-950">System Alerts</div>
         </div>
-        {!hasActiveSystemAlerts && !signal ? (
-          <div className="rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[10px] font-medium text-slate-500">
-            No active alerts
+        {!hasActiveSystemAlerts && !signal ? null : (
+          <div className="rounded-full border border-blue-200/80 bg-blue-50/70 px-2 py-0.5 text-[10px] font-medium text-blue-700 shadow-[0_8px_18px_-16px_rgba(37,99,235,0.35)]">
+            Active alerts
           </div>
-        ) : null}
+        )}
       </div>
       {visibleSignalCards.length === 0 && !signal
-        ? null
+        ? quietSectionEmptyState("No active contractor-driven alerts right now.")
         : (
           <div className="flex flex-wrap gap-2">
             {visibleSignalCards.map((card) => {
@@ -1904,9 +1925,9 @@ return (
                     signal: card.key,
                   })}#ops-queues`}
                   className={[
-                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium shadow-sm transition-colors",
                     isActive
-                      ? "border-slate-900 bg-slate-900 text-white"
+                      ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
                       : `${signalToneClass(card.key)} hover:bg-white`,
                   ].join(" ")}
                 >
@@ -1919,12 +1940,12 @@ return (
         )}
     </section>
 
-    <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-      <div className={`rounded-lg border ${callListVisibleJobs.length === 0 ? "border-slate-200 bg-white/85 p-3" : "border-slate-200 bg-white p-3.5 sm:p-4"} shadow-sm`}>
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold text-gray-900">Call List</div>
+    <section className="grid grid-cols-1 gap-2.5 lg:grid-cols-3">
+      <div className={`rounded-2xl border ${callListVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70 sm:p-3.5"}`}>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Call List</div>
           <div className="flex items-center gap-3">
-            <div className="text-xs text-gray-500">{prioritizedCallListJobs.length}</div>
+            {sectionCountPill(prioritizedCallListJobs.length)}
             {prioritizedCallListJobs.length > PREVIEW_LIMIT ? (
               <Link
                 href={`/ops${buildQueryString({
@@ -1935,7 +1956,7 @@ return (
                   signal: signal ?? "",
                   panel: isPanelExpanded("call_list") ? "" : "call_list",
                 })}`}
-                className="text-xs font-medium text-blue-700 hover:text-blue-800 hover:underline"
+                className={inlineSectionLinkClass}
               >
                 {isPanelExpanded("call_list") ? "Show less" : "View all"}
               </Link>
@@ -1949,11 +1970,11 @@ return (
         )}
       </div>
 
-     <div className={`rounded-lg border ${prioritizedFieldWorkJobs.length === 0 ? "border-slate-200 bg-white/85 p-3" : "border-slate-200 bg-white p-3.5 sm:p-4"} shadow-sm`}>
-      <div className="mb-2 flex items-center justify-between">
-        <div className="text-sm font-semibold text-gray-900">Field Work</div>
+    <div className={`rounded-2xl border ${prioritizedFieldWorkJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70 sm:p-3.5"}`}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="text-[15px] font-semibold tracking-tight text-slate-950">Field Work</div>
         <div className="flex items-center gap-3">
-          <div className="text-xs text-gray-500">{prioritizedFieldWorkJobs.length}</div>
+          {sectionCountPill(prioritizedFieldWorkJobs.length)}
           {prioritizedFieldWorkJobs.length > PREVIEW_LIMIT ? (
             <Link
               href={`/ops${buildQueryString({
@@ -1964,7 +1985,7 @@ return (
                 signal: signal ?? "",
                 panel: isPanelExpanded("field_work") ? "" : "field_work",
               })}`}
-              className="text-xs font-medium text-blue-700 hover:text-blue-800 hover:underline"
+              className={inlineSectionLinkClass}
             >
               {isPanelExpanded("field_work") ? "Show less" : "View all"}
             </Link>
@@ -1981,11 +2002,11 @@ return (
   )}
 </div>
 
-      <div className={`rounded-lg border ${closeoutVisibleJobs.length === 0 ? "border-slate-200 bg-white/85 p-3" : "border-slate-200 bg-white p-3.5 sm:p-4"} shadow-sm`}>
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold text-gray-900">Closeout Work Queue</div>
+      <div className={`rounded-2xl border ${closeoutVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70 sm:p-3.5"}`}>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Closeout Work Queue</div>
           <div className="flex items-center gap-3">
-            <div className="text-xs text-gray-500">{prioritizedCloseoutJobs.length}</div>
+            {sectionCountPill(prioritizedCloseoutJobs.length)}
             {prioritizedCloseoutJobs.length > PREVIEW_LIMIT ? (
               <Link
                 href={`/ops${buildQueryString({
@@ -1996,7 +2017,7 @@ return (
                   signal: signal ?? "",
                   panel: isPanelExpanded("closeout") ? "" : "closeout",
                 })}`}
-                className="text-xs font-medium text-blue-700 hover:text-blue-800 hover:underline"
+                className={inlineSectionLinkClass}
               >
                 {isPanelExpanded("closeout") ? "Show less" : "View all"}
               </Link>
@@ -2013,11 +2034,11 @@ return (
       </div>
     </section>
 
-    <section className={`rounded-lg border ${exceptionVisibleJobs.length === 0 ? "border-slate-200 bg-white/85 p-3" : "border-slate-200 bg-white p-3.5 sm:p-4"} shadow-sm`}>
-      <div className="mb-2 flex items-center justify-between">
-        <div className="text-sm font-semibold text-gray-900">Exceptions (Still Open Past Scheduled Date)</div>
+    <section className={`rounded-2xl border ${exceptionVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70 sm:p-3.5"}`}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="text-[15px] font-semibold tracking-tight text-slate-950">Exceptions (Still Open Past Scheduled Date)</div>
         <div className="flex items-center gap-3">
-          <div className="text-xs font-semibold text-red-700">{sortedExceptionJobs.length}</div>
+          {sectionCountPill(sortedExceptionJobs.length, "danger")}
           {sortedExceptionJobs.length > EXCEPTION_PREVIEW_LIMIT ? (
             <Link
               href={`/ops${buildQueryString({
@@ -2028,7 +2049,7 @@ return (
                 signal: signal ?? "",
                 panel: isPanelExpanded("exceptions") ? "" : "exceptions",
               })}`}
-              className="text-xs font-medium text-blue-700 hover:text-blue-800 hover:underline"
+              className={inlineSectionLinkClass}
             >
               {isPanelExpanded("exceptions") ? "Show less" : "View all"}
             </Link>
@@ -2048,18 +2069,18 @@ return (
       )}
     </section>
 
-    <section id="ops-queues" className="rounded-lg border border-indigo-100 bg-indigo-50/35 p-3.5 shadow-sm sm:p-4">
+    <section id="ops-queues" className="rounded-2xl border border-slate-300/80 bg-slate-100/70 p-3 shadow-[0_18px_42px_-32px_rgba(15,23,42,0.38)] sm:p-4">
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-indigo-700">Contractor-driven</div>
-          <div className="text-sm font-semibold text-gray-900">System / Contractor Work</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Workflow</div>
+          <div className="text-[15px] font-semibold tracking-tight text-slate-950">System / Contractor Work</div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-1">
-        <div className="rounded-lg border border-indigo-100/80 bg-white/85 p-3 shadow-sm">
+        <div className="rounded-2xl border border-slate-300/80 bg-white/88 p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.32)]">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="text-sm font-semibold text-gray-900">Workflow Queues</div>
+            <div className="text-[15px] font-semibold tracking-tight text-slate-950">Workflow Queues</div>
             <Link
               href={`/ops${buildQueryString({
                 bucket: "workflow_all",
@@ -2068,7 +2089,7 @@ return (
                 sort: sort ?? "",
                 signal: "",
               })}#ops-queues`}
-              className="text-xs font-medium text-blue-700 hover:text-blue-800 hover:underline"
+              className={inlineSectionLinkClass}
             >
               View All
             </Link>
@@ -2087,9 +2108,9 @@ return (
                     signal: "",
                   })}#ops-queues`}
                   className={[
-                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium shadow-sm transition-colors",
                     isActive
-                      ? "border-slate-900 bg-slate-900 text-white"
+                      ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
                       : `${workflowToneClass(card.key)} hover:bg-white`,
                   ].join(" ")}
                 >
@@ -2102,13 +2123,13 @@ return (
         </div>
       </div>
 
-      <div className="mt-3 rounded-lg border border-indigo-100/80 bg-white/85 p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold text-gray-900">
+      <div className="mt-3 rounded-2xl border border-slate-300/80 bg-white/94 p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.34)] ring-1 ring-slate-200/60">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="text-[15px] font-semibold tracking-tight text-slate-950">
             Active Queue: {activeQueueLabel}
             {activeSignalLabel ? ` (${activeSignalLabel})` : ""}
           </div>
-          <div className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-600 shadow-sm">{sortedBucketJobs.length} jobs</div>
+          <div className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-gray-600 shadow-sm">{sortedBucketJobs.length} jobs</div>
         </div>
 
         {sortedBucketJobs.length === 0 ? (
