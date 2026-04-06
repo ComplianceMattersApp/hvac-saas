@@ -1,11 +1,11 @@
-// middleware.ts
+// proxy.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // ✅ Bypass auth for static + PWA assets (must NOT redirect these)
+  // Bypass auth for static + PWA assets so they never redirect through the auth gate.
   const isPublicAsset =
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
@@ -21,7 +21,7 @@ export async function middleware(req: NextRequest) {
 
   if (isPublicAsset) return NextResponse.next();
 
-  // Allow login + auth routes without a session
+  // Allow login + auth routes without a session.
   const isAuthRoute =
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth") ||
@@ -50,7 +50,6 @@ export async function middleware(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // If not logged in, force to /login
   if (!user && !isAuthRoute) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
