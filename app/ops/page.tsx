@@ -785,6 +785,18 @@ function toEpochMs(value?: string | null) {
   return Number.isFinite(t) ? t : 0;
 }
 
+function pendingInfoBannerText(j: any) {
+  const pendingInfoReason = String(j?.pending_info_reason ?? "").trim();
+  if (/permit/i.test(pendingInfoReason) || !String(j?.permit_number ?? "").trim()) {
+    return "Missing permit number";
+  }
+  return pendingInfoReason;
+}
+
+function onHoldBannerText(j: any) {
+  return String(j?.on_hold_reason ?? "").trim();
+}
+
 function queueReason(j: any, activeBucket: string) {
   const status = String(j?.ops_status ?? "").toLowerCase();
   const jobId = String(j?.id ?? "");
@@ -814,11 +826,8 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "pending_info" || status === "pending_info") {
-    const pendingInfoReason = String(j?.pending_info_reason ?? "").trim();
-    if (/permit/i.test(pendingInfoReason) || !String(j?.permit_number ?? "").trim()) {
-      return "Pending info — missing permit number";
-    }
-    return pendingInfoReason ? `Pending info — ${pendingInfoReason}` : "Pending info — waiting for required information";
+    const pendingInfoReason = pendingInfoBannerText(j);
+    return pendingInfoReason ? `Pending info — ${pendingInfoReason}` : "";
   }
 
   if (status === "pending_office_review") {
@@ -837,10 +846,10 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "on_hold" || status === "on_hold") {
-    const onHoldReason = String(j?.on_hold_reason ?? "").trim();
+    const onHoldReason = onHoldBannerText(j);
     return onHoldReason
       ? `On hold — ${onHoldReason}`
-      : "On hold — awaiting resolution before closeout";
+      : "";
   }
 
   if (status === "need_to_schedule") {
@@ -1525,12 +1534,10 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   const pendingInfoSignal = opsStatus === "pending_info";
   const onHoldSignal = opsStatus === "on_hold";
   const needsAttention = isNeedsAttentionJob(j);
-  const pendingInfoReason = String(j?.pending_info_reason ?? "").trim();
-  const onHoldReason = String(j?.on_hold_reason ?? "").trim();
-  const pendingInfoContext = pendingInfoReason
-    ? pendingInfoReason
-    : "Reason not set";
-  const onHoldContext = onHoldReason || "Reason not set";
+  const pendingInfoContext = pendingInfoBannerText(j);
+  const onHoldContext = onHoldBannerText(j);
+  const showPendingInfoBanner = pendingInfoSignal && Boolean(pendingInfoContext);
+  const showOnHoldBanner = onHoldSignal && Boolean(onHoldContext);
   const customerName = customerNameOnly(j);
   const customerPhone = customerPhoneOnly(j);
   const contractorName = contractorNameOnly(j);
@@ -1549,7 +1556,9 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
       });
   const noteText = String(note ?? "").trim();
   const nextStepNorm = nextStep.toLowerCase();
-  const detailLine = !isFailed
+  const hasMeaningfulStatusBanner = isFailedFamily || showPendingInfoBanner || showOnHoldBanner;
+  const showNextStepSection = !hasMeaningfulStatusBanner || isPendingOfficeReview;
+  const detailLine = !isFailed && showNextStepSection
     ? scheduledRetestLabel
       ? `Retest scheduled for ${scheduledRetestLabel}`
       : noteText && noteText.toLowerCase() !== nextStepNorm
@@ -1583,7 +1592,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     : isRetestChild
     ? "This retest also failed and still needs correction."
     : "Awaiting correction or retest decision.";
-  const hasPrimaryStatusCallout = isFailedFamily || pendingInfoSignal || onHoldSignal;
+  const hasPrimaryStatusCallout = hasMeaningfulStatusBanner;
   const showStatusPill = !hasPrimaryStatusCallout && statusMeta.label !== "Open";
   const scheduleLabel = showDate ? "Scheduled" : "Schedule";
   const metaItems = [
@@ -1660,7 +1669,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
           </div>
         ) : null}
 
-        {pendingInfoSignal ? (
+        {showPendingInfoBanner ? (
           <div className="mt-2 rounded-lg border border-amber-200/80 bg-amber-50/60 px-2.5 py-1.5 text-amber-900">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-700">Pending Info</div>
@@ -1669,7 +1678,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
           </div>
         ) : null}
 
-        {onHoldSignal ? (
+        {showOnHoldBanner ? (
           <div className="mt-2 rounded-lg border border-slate-300/90 bg-slate-100/80 px-2.5 py-1.5 text-slate-800">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-600">On Hold</div>
@@ -1679,19 +1688,21 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         ) : null}
 
         <div className="mt-2 border-t border-slate-200/80 pt-2">
-          <div className="grid gap-2 sm:grid-cols-[minmax(10rem,0.75fr)_minmax(0,1.25fr)]">
+          <div className={showNextStepSection ? "grid gap-2 sm:grid-cols-[minmax(10rem,0.75fr)_minmax(0,1.25fr)]" : "grid gap-2"}>
             <div className="min-w-0">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{scheduleLabel}</div>
               <div className="mt-0.5 text-[13px] font-semibold leading-5 text-slate-950">{scheduleDateText}</div>
               <div className="text-[11px] leading-4 text-slate-600">{scheduleWindowText}</div>
             </div>
-            <div className="min-w-0 sm:border-l sm:border-slate-200 sm:pl-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">Next Step</div>
-              <div className="mt-0.5 text-[13px] font-semibold leading-5 text-slate-950">{nextStep}</div>
-              {detailLine ? (
-                <div className="mt-0.5 text-[11px] leading-4 text-slate-600">{detailLine}</div>
-              ) : null}
-            </div>
+            {showNextStepSection ? (
+              <div className="min-w-0 sm:border-l sm:border-slate-200 sm:pl-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">Next Step</div>
+                <div className="mt-0.5 text-[13px] font-semibold leading-5 text-slate-950">{nextStep}</div>
+                {detailLine ? (
+                  <div className="mt-0.5 text-[11px] leading-4 text-slate-600">{detailLine}</div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           {metaItems.length > 0 ? (
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-4 text-slate-600">

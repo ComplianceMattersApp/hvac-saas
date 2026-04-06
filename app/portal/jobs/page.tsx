@@ -313,6 +313,31 @@ export default async function PortalAllJobsPage({
     return { label: "In progress", tone: "border-slate-200 bg-slate-50 text-slate-800" };
   }
 
+  function preferredStatusMessage(row: { job: any; resolved: any; openRetestChild?: any }) {
+    const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
+    const detailLine = cardDetailLine(row.resolved);
+    if (detailLine) return detailLine;
+
+    const pendingInfoReason = String(row.job.pending_info_reason ?? "").trim();
+    if (ops === "pending_info") {
+      return pendingInfoReason ? `Missing info: ${pendingInfoReason}` : "";
+    }
+
+    if (ops === "pending_office_review") {
+      return String(row.resolved?.primaryIssue?.explanation ?? "").trim();
+    }
+
+    if (ops === "failed" || ops === "retest_needed") {
+      const stage = String(row.resolved?.primaryIssue?.stage ?? "").trim().toLowerCase();
+      if (["awaiting_review", "retest_pending_scheduling", "retest_scheduled"].includes(stage)) {
+        return String(row.resolved?.primaryIssue?.explanation ?? row.resolved?.primaryIssue?.headline ?? "").trim();
+      }
+      return "";
+    }
+
+    return "";
+  }
+
   function nextStepText(row: { job: any; resolved: any; openRetestChild?: any }) {
     const lifecycle = String(row.job.status ?? "").trim().toLowerCase();
     const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
@@ -374,7 +399,7 @@ export default async function PortalAllJobsPage({
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {actionRequiredJobs.map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
-              const detailLine = cardDetailLine(resolved);
+              const detailLine = preferredStatusMessage({ job: j, resolved, openRetestChild });
               const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
               const isPendingInfoOps = String(j?.ops_status ?? "").trim().toLowerCase() === "pending_info";
               return (
@@ -409,11 +434,12 @@ export default async function PortalAllJobsPage({
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                        {nextStepText({ job: j, resolved, openRetestChild })}
-                      </div>
                       {detailLine ? (
                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{detailLine}</div>
+                      ) : (
+                        <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+                          {nextStepText({ job: j, resolved, openRetestChild })}
+                        </div>
                       ) : null}
                     </div>
                     <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -455,7 +481,7 @@ export default async function PortalAllJobsPage({
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {inProgressJobs.map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
-              const detailLine = cardDetailLine(resolved);
+              const detailLine = preferredStatusMessage({ job: j, resolved, openRetestChild });
               const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
               const isPendingInfoOps = String(j?.ops_status ?? "").trim().toLowerCase() === "pending_info";
               return (
@@ -485,11 +511,12 @@ export default async function PortalAllJobsPage({
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                        {nextStepText({ job: j, resolved, openRetestChild })}
-                      </div>
                       {detailLine ? (
                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{detailLine}</div>
+                      ) : (
+                        <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+                          {nextStepText({ job: j, resolved, openRetestChild })}
+                        </div>
                       ) : null}
                     </div>
                     <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -532,7 +559,7 @@ export default async function PortalAllJobsPage({
             {passedJobs.map(({ job: j, resolved }) => {
               const resolvedAt = j.data_entry_completed_at ?? j.created_at;
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
-              const detailLine = cardDetailLine(resolved);
+              const detailLine = preferredStatusMessage({ job: j, resolved, openRetestChild });
               const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
               const isPendingInfoOps = String(j?.ops_status ?? "").trim().toLowerCase() === "pending_info";
               return (
@@ -562,11 +589,12 @@ export default async function PortalAllJobsPage({
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                        {nextStepText({ job: j, resolved, openRetestChild })}
-                      </div>
                       {detailLine ? (
                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{detailLine}</div>
+                      ) : (
+                        <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+                          {nextStepText({ job: j, resolved, openRetestChild })}
+                        </div>
                       ) : null}
                     </div>
                     <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">

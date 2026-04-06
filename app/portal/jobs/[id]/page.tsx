@@ -178,6 +178,10 @@ function buildAddressLines(opts: {
   };
 }
 
+function normalizeMessageForCompare(value?: string | null) {
+  return String(value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 export default async function PortalJobDetailPage({
   params,
   searchParams,
@@ -472,7 +476,22 @@ export default async function PortalJobDetailPage({
     (latestSentFailureSummary?.what_needs_correction?.length ?? 0) > 0
       ? latestSentFailureSummary?.what_needs_correction
       : primaryIssue.detailLines;
-  const statusNextStep = latestSentFailureSummary?.next_step || resolvedIssues.nextStep;
+  const rawStatusNextStep = latestSentFailureSummary?.next_step || resolvedIssues.nextStep;
+  const normalizedStatusNextStep = normalizeMessageForCompare(rawStatusNextStep);
+  const normalizedStatusHeadline = normalizeMessageForCompare(statusHeadline);
+  const normalizedStatusExplanation = normalizeMessageForCompare(statusExplanation);
+  const normalizedStatusDetailLines = new Set(
+    (statusDetailLines ?? []).map((line: string) => normalizeMessageForCompare(line)).filter(Boolean)
+  );
+  const showStatusNextStep = Boolean(normalizedStatusNextStep) &&
+    normalizedStatusNextStep !== normalizedStatusHeadline &&
+    normalizedStatusNextStep !== normalizedStatusExplanation &&
+    !normalizedStatusDetailLines.has(normalizedStatusNextStep) &&
+    (
+      Boolean(latestSentFailureSummary?.next_step) ||
+      !["pending_info", "failed", "retest_needed", "pending_office_review"].includes(opsStatus)
+    );
+  const statusNextStep = showStatusNextStep ? rawStatusNextStep : "";
 
   const timelineEvents = contractorSafeEvents.filter((e: any) => {
     const type = String(e?.event_type ?? "");
