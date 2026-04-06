@@ -194,10 +194,10 @@ export default function JobAttachmentsInternal({
   }
 
   return (
-    <div className="mb-6 overflow-hidden rounded-xl border border-slate-200 bg-white text-gray-900 shadow-sm">
+    <div className="mb-6 overflow-hidden rounded-xl border border-slate-200/80 bg-white/96 text-gray-900 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-4 py-3">
-        <div className="text-sm font-semibold">Attachments</div>
-        <div className="text-xs font-medium text-slate-500">
+        <div className="text-sm font-semibold">Upload & Share</div>
+        <div className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
           {initialItems?.length ?? 0} files
         </div>
       </div>
@@ -220,7 +220,7 @@ export default function JobAttachmentsInternal({
             type="button"
             onClick={openPicker}
             disabled={isPending}
-            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-50"
           >
             Choose Files
           </button>
@@ -249,19 +249,20 @@ export default function JobAttachmentsInternal({
           disabled={isPending}
         />
 
-        <button
+          <button
           type="button"
           onClick={uploadInternal}
           disabled={!canAct}
-          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black disabled:opacity-50"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-50"
         >
           {isPending ? "Uploading…" : "Upload Files"}
         </button>
 
         <div className="border-t border-slate-200 pt-2">
           {!initialItems || initialItems.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-600">
-              No files uploaded yet.
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/72 px-4 py-8 text-center text-sm text-slate-600">
+              <div className="font-medium text-slate-700">No files uploaded yet.</div>
+              <div className="mt-1 text-xs text-slate-500">Upload job photos, reports, or permit documents here.</div>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -282,7 +283,7 @@ export default function JobAttachmentsInternal({
                 return (
                   <div
                     key={a.id}
-                    className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+                    className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_10px_20px_-24px_rgba(15,23,42,0.22)] transition-shadow hover:shadow-[0_16px_28px_-24px_rgba(15,23,42,0.24)]"
                   >
                     {hasThumb ? (
                       <a
@@ -349,7 +350,7 @@ export default function JobAttachmentsInternal({
                             href={a.signedUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
+                            className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
                           >
                             Open
                           </a>
@@ -369,7 +370,7 @@ export default function JobAttachmentsInternal({
                           type="button"
                           onClick={() => shareToContractor(a)}
                           disabled={isPending || sharingId === a.id || isShared}
-                          className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                          className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
                         >
                           {isShared
                             ? "Shared ✓"
@@ -383,7 +384,7 @@ export default function JobAttachmentsInternal({
                             href={a.signedUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-slate-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-black whitespace-nowrap"
+                            className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-black whitespace-nowrap"
                           >
                             Download
                           </a>

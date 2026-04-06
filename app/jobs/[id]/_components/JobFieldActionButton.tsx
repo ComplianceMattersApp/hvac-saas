@@ -17,7 +17,7 @@ function FieldActionSubmitButton({ label }: { label: string }) {
     <button
       type="submit"
       disabled={pending}
-        className="w-full min-h-11 inline-flex items-center justify-center whitespace-nowrap rounded-md border border-blue-600 bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+      className="inline-flex min-h-10 w-full items-center justify-center whitespace-nowrap rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_16px_28px_-20px_rgba(37,99,235,0.42)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_18px_30px_-20px_rgba(37,99,235,0.48)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
     >
       {pending ? "Updating..." : label}
     </button>
@@ -43,7 +43,7 @@ export function JobFieldActionButton({
 
   if (isDone) {
     return (
-        <span className="w-full min-h-10 inline-flex items-center justify-center whitespace-nowrap rounded-md border border-green-600 bg-green-600 px-4 text-sm font-semibold text-white shadow-sm sm:w-auto">
+      <span className="inline-flex min-h-10 w-full items-center justify-center whitespace-nowrap rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(5,150,105,0.34)] sm:w-auto">
         ✓ Field visit complete
       </span>
     );

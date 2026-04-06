@@ -346,22 +346,28 @@ function CollapsibleHeader(props: {
 }) {
   const { title, subtitle, meta } = props;
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex items-start gap-2">
+    <div className="flex min-w-0 items-start justify-between gap-4 py-0.5">
+      <div className="flex min-w-0 items-start gap-2.5">
         <span
           aria-hidden
-          className="disclosure-icon mt-[2px] inline-block text-[11px] text-slate-500 transition-transform duration-150 group-open:rotate-90"
+          className="disclosure-icon mt-0.5 inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md border border-slate-200/70 bg-white/80 text-[9px] text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-transform duration-150 group-open:rotate-90"
         >
           ▶
         </span>
-        <div>
-          <div className="text-base font-semibold">{title}</div>
-          {subtitle ? <div className="text-xs text-gray-500">{subtitle}</div> : null}
+        <div className="min-w-0 pt-0.5">
+          <div className="text-[14.5px] font-semibold tracking-[-0.02em] text-slate-950">{title}</div>
+          {subtitle ? <div className="mt-1 max-w-[42rem] text-[11.5px] leading-[1.45] text-slate-500">{subtitle}</div> : null}
         </div>
       </div>
-      {meta ? <div className="text-xs text-gray-500">{meta}</div> : null}
+      {meta ? <div className="mt-0.5 shrink-0 rounded-lg border border-slate-200/70 bg-slate-50/72 px-2.5 py-[0.3125rem] text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{meta}</div> : null}
     </div>
   );
+}
+
+function truncateSummaryText(value: string, maxLength = 84) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
 }
 
 
@@ -373,6 +379,40 @@ type JobSearchParams = {
 };
 
 type SearchParams = Record<string, string | string[] | undefined>;
+
+const workspacePanelClass =
+  "rounded-2xl border border-slate-200/90 bg-white shadow-[0_16px_36px_-28px_rgba(15,23,42,0.28)]";
+const workspaceSectionClass = `${workspacePanelClass} p-5 sm:p-6`;
+const workspaceInsetClass =
+  "rounded-xl border border-slate-200/80 bg-slate-50/70 px-4 py-3";
+const workspaceSubtleCardClass =
+  "rounded-xl border border-slate-200/80 bg-white/88 px-4 py-3";
+const workspaceFieldLabelClass =
+  "mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+const workspaceInputClass =
+  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,box-shadow,background-color] focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200 [color-scheme:light]";
+const workspaceTextareaClass = `${workspaceInputClass} min-h-[7rem]`;
+const primaryButtonClass =
+  "inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_16px_28px_-20px_rgba(37,99,235,0.42)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_18px_30px_-20px_rgba(37,99,235,0.48)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
+const secondaryButtonClass =
+  "inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]";
+const compactSecondaryButtonClass =
+  "inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:min-h-10 sm:px-4";
+const darkButtonClass =
+  "inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_28px_-22px_rgba(15,23,42,0.55)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_16px_30px_-22px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-[0.5px]";
+const infoChipClass =
+  "inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700";
+const compactUtilityButtonClass =
+  "inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200/90 bg-white/78 px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-300 hover:bg-white hover:shadow-[0_8px_18px_-18px_rgba(15,23,42,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]";
+const workspaceDetailsClass =
+  `${workspaceSectionClass} group text-gray-900 transition-shadow duration-150 hover:shadow-[0_18px_38px_-30px_rgba(15,23,42,0.32)] [&[open]_.disclosure-icon]:rotate-90`;
+const workspaceDetailsDividerClass = "mt-3 border-t border-slate-200/90 pt-4";
+const workspaceSoftCardClass =
+  "rounded-xl border border-slate-200/80 bg-slate-50/72 p-4";
+const workspaceEmptyStateClass =
+  "rounded-lg border border-dashed border-slate-300 bg-slate-50/72 px-4 py-4 text-sm text-slate-600";
+const workspaceUtilityControlClass =
+  "rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200";
 
 export default async function JobDetailPage({
   params,
@@ -1134,6 +1174,13 @@ const serviceMapsLink =
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(serviceAddressDisplay)}`
     : "";
 
+const permitNumber = String(job.permit_number ?? "").trim();
+const permitJurisdiction = String((job as any).jurisdiction ?? "").trim();
+const permitDateValue = String((job as any).permit_date ?? "").trim();
+const permitDateLabel = permitDateValue ? displayDateLA(permitDateValue) : "";
+const permitDetailCount = Number(Boolean(permitNumber)) + Number(Boolean(permitJurisdiction)) + Number(Boolean(permitDateValue));
+const hasPermitDetails = permitDetailCount > 0;
+
 const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
 const equipmentItems = Array.isArray(job.job_equipment) ? job.job_equipment : [];
 const equipmentCount = equipmentItems.length;
@@ -1157,9 +1204,58 @@ const timelineOverflowItems = timelineItems.slice(3);
 const attemptItems = customerAttempts ?? [];
 const contactPreviewItems = attemptItems.slice(0, 3);
 const contactOverflowItems = attemptItems.slice(3);
+const followUpOwnerLabel = String((job as any).action_required_by ?? "").trim();
+const followUpDateValue = String((job as any).follow_up_date ?? "").trim();
+const followUpDateSummary = followUpDateValue ? displayDateLA(followUpDateValue) : "";
+const nextActionPreview = truncateSummaryText(String((job as any).next_action_note ?? ""), 78);
+const jobStatusSummaryText = explicitPendingInfoActive
+  ? `Pending Info${pendingInfoReasonText ? ` • ${truncateSummaryText(pendingInfoReasonText, 72)}` : ""}`
+  : onHoldActive
+  ? `On Hold${onHoldReasonText ? ` • ${truncateSummaryText(onHoldReasonText, 72)}` : ""}`
+  : `Current lifecycle: ${formatOpsStatusLabel(job.ops_status)}`;
+const followUpSummaryText = hasFollowUpReminder
+  ? [
+      followUpOwnerLabel ? `For ${followUpOwnerLabel}` : null,
+      followUpDateSummary ? `Due ${followUpDateSummary}` : null,
+      nextActionPreview || null,
+    ]
+      .filter(Boolean)
+      .join(" • ")
+  : "No follow-up reminder set yet.";
+const followUpHistorySummaryText = attemptItems.length
+  ? `Last contact logged ${lastAttemptLabel}.`
+  : "No contact attempts logged yet.";
+const serviceChainSummaryText = serviceCaseId
+  ? "Visit history across the linked service case."
+  : "No linked service case yet.";
+const eccSummaryText = job.ecc_test_runs?.length
+  ? "Recorded test history with direct workspace access."
+  : "No ECC runs recorded yet.";
+const latestSharedNoteAt = sharedNotes[0]?.created_at ? formatDateLAFromIso(String(sharedNotes[0].created_at)) : "";
+const latestInternalNoteAt = internalNotes[0]?.created_at ? formatDateLAFromIso(String(internalNotes[0].created_at)) : "";
+const latestTimelineAt = timelineItems[0]?.created_at ? formatDateTimeLAFromIso(String(timelineItems[0].created_at)) : "";
+const sharedNotesSummaryText = latestSharedNoteAt
+  ? `Latest shared activity ${latestSharedNoteAt}.`
+  : "No shared note activity yet.";
+const internalNotesSummaryText = latestInternalNoteAt
+  ? `Latest internal note ${latestInternalNoteAt}.`
+  : "No internal note activity yet.";
+const timelineSummaryText = latestTimelineAt
+  ? `Latest activity ${latestTimelineAt}.`
+  : "No activity recorded yet.";
 
 const showRetestSection =
   ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
+const showCorrectionReviewResolution =
+  isInternalUser &&
+  job.job_type === "ecc" &&
+  ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
+const failureResolutionSummaryText = showRetestSection && showCorrectionReviewResolution
+  ? "Choose between retest creation and correction review resolution."
+  : showRetestSection
+  ? "Create a retest visit when a physical return is required."
+  : "Resolve this failure through correction review only when a return visit is not needed.";
+const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrectionReviewResolution);
 
 const renderAttemptItem = (a: any, key: string) => {
   const method = a?.meta?.method ? String(a.meta.method) : "";
@@ -1174,21 +1270,21 @@ const renderAttemptItem = (a: any, key: string) => {
     (result || "—");
 
   return (
-    <div key={key} className="rounded border p-3 text-sm bg-white">
+    <div key={key} className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3 text-sm shadow-[0_10px_24px_-24px_rgba(15,23,42,0.35)]">
       <div className="flex items-start justify-between gap-3">
-        <div className="text-xs text-gray-600">{when}</div>
-        <div className="text-xs text-gray-500">
+        <div className="text-xs font-medium text-slate-500">{when}</div>
+        <div className="text-xs text-slate-400">
           {a?.meta?.attempt_number ? `#${String(a.meta.attempt_number)}` : null}
         </div>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs">
+        <span className={infoChipClass}>
           <span>{methodIcon}</span>
           <span className="capitalize">{method || "—"}</span>
         </span>
 
-        <span className="inline-flex items-center rounded-full border px-2 py-1 text-xs">
+        <span className={infoChipClass}>
           {resultLabel}
         </span>
       </div>
@@ -1234,24 +1330,24 @@ const renderTimelineItem = (e: any, key: string) => {
     "📝";
 
   return (
-    <div key={key} className="rounded border p-3 text-sm bg-white">
+    <div key={key} className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3 text-sm shadow-[0_10px_24px_-24px_rgba(15,23,42,0.35)]">
       <div className="flex items-start justify-between gap-3">
-        <div className="text-xs font-medium text-gray-600">{when}</div>
-        <div className="text-xs text-gray-500">{icon}</div>
+        <div className="text-xs font-medium text-slate-500">{when}</div>
+        <div className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-xs text-slate-500">{icon}</div>
       </div>
 
-      <div className="mt-2 font-medium text-gray-900">
+      <div className="mt-2 font-medium text-slate-950">
         {title}
       </div>
 
       {detailText ? (
-        <div className="mt-1 text-sm text-gray-700">
+        <div className="mt-1 text-sm leading-6 text-slate-700">
           {detailText}
         </div>
       ) : null}
 
       {actorDisplayName ? (
-        <div className="mt-1 text-xs text-gray-500">By {actorDisplayName}</div>
+        <div className="mt-1 text-xs text-slate-500">By {actorDisplayName}</div>
       ) : null}
 
       {type === "retest_created" && meta?.child_job_id ? (
@@ -1312,44 +1408,31 @@ const renderTimelineItem = (e: any, key: string) => {
 };
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[88rem] space-y-6 overflow-x-hidden p-6">
+    <div className="mx-auto w-full min-w-0 max-w-[88rem] space-y-5 overflow-x-hidden p-4 sm:p-6">
 
-<section className="mb-6 rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50/40 p-5 shadow-sm sm:p-6">
+<section className={`${workspaceSectionClass} mb-6 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] shadow-[0_20px_44px_-34px_rgba(15,23,42,0.26)]`}>
   <div className="mb-4 border-b border-slate-200/80 pb-4">
-    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-600">Job Center</div>
-    <p className="mt-1 text-sm text-slate-600">Active job workspace and field dispatch.</p>
-    <div className="mb-4 mt-3 flex flex-wrap items-center gap-2 lg:flex-nowrap lg:justify-between">
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/ops"
-          className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-sm transition hover:-translate-y-px hover:bg-slate-50"
-        >
-          Back to Ops
-        </Link>
+    <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+      <span>Job Workspace</span>
+      <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/88 px-2.5 py-1 text-[10px] tracking-[0.12em] text-slate-500 shadow-[0_8px_18px_-22px_rgba(15,23,42,0.2)]">
+        <span className="text-slate-400">ID</span>
+        <span className="font-mono text-[11px] text-slate-700">{job.id}</span>
+      </span>
+    </div>
 
-        {job.customer_id ? (
-          <Link
-            href={`/customers/${job.customer_id}`}
-            className="inline-flex h-10 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-sm transition hover:-translate-y-px hover:bg-slate-50"
-          >
-            Open Customer
-          </Link>
-        ) : null}
-
-        {job.job_type === "ecc" ? (
-          <Link
-            href={`/jobs/${job.id}/tests`}
-            className="inline-flex h-10 items-center rounded-md bg-slate-900 px-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-px hover:bg-black"
-          >
-            Open Tests Workspace
-          </Link>
-        ) : null}
+    <div className="mt-3 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div className="min-w-0 max-w-3xl">
+        <h1 className="text-[clamp(1.35rem,2vw,1.85rem)] font-semibold tracking-[-0.02em] text-slate-950">
+          {normalizeRetestLinkedJobTitle(job.title) || "Operational job workspace"}
+        </h1>
+        <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-600">
+          Single-job control center for scheduling, field progress, closeout, and record history.
+        </p>
       </div>
-
-      <div className="w-full lg:ml-auto lg:w-auto lg:shrink-0">
+      <div className="flex w-full flex-col gap-2.5 xl:w-auto xl:min-w-[24rem] xl:items-end">
         {!isFieldComplete ? (
-          <div className="flex w-full flex-col items-start gap-2 lg:items-end">
-            <div className="flex w-full flex-wrap justify-start gap-2 lg:justify-end [&_button]:h-10 [&_button]:rounded-md [&_button]:px-4 [&_button]:text-sm [&_button]:font-semibold [&_button]:shadow-sm">
+          <div className="flex w-full flex-col items-start gap-2 xl:items-end">
+            <div className="flex w-full flex-wrap justify-start gap-2 xl:justify-end">
               <JobFieldActionButton
                 jobId={job.id}
                 currentStatus={job.status}
@@ -1363,7 +1446,7 @@ const renderTimelineItem = (e: any, key: string) => {
                   <input type="hidden" name="tab" value={tab} />
                   <SubmitButton
                     loadingText="Undoing..."
-                    className="w-full rounded-md border border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:w-auto"
+                    className="w-full rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px] sm:w-auto"
                   >
                     Undo On the Way
                   </SubmitButton>
@@ -1372,54 +1455,90 @@ const renderTimelineItem = (e: any, key: string) => {
             </div>
 
             {onTheWayUndoEligibility.eligible ? (
-              <div className="text-xs text-slate-500 lg:text-right">
+              <div className="text-xs text-slate-500 xl:text-right">
                 Available only until any later job activity occurs.
               </div>
             ) : null}
           </div>
         ) : (
-          <div className="flex w-full justify-start lg:justify-end">
-            <span className="inline-flex h-10 items-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm">
+          <div className="flex w-full justify-start xl:justify-end">
+            <span className="inline-flex min-h-10 items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(37,99,235,0.55)]">
               Field Complete
             </span>
           </div>
         )}
+
+        <div className="flex w-full flex-wrap gap-2 xl:justify-end">
+          <Link
+            href="/ops"
+            className={compactUtilityButtonClass}
+          >
+            Back to Ops
+          </Link>
+
+          {job.customer_id ? (
+            <Link
+              href={`/customers/${job.customer_id}`}
+              className={compactUtilityButtonClass}
+            >
+              Open Customer
+            </Link>
+          ) : null}
+
+          {job.job_type === "ecc" ? (
+            <Link
+              href={`/jobs/${job.id}/tests`}
+              className={compactUtilityButtonClass}
+            >
+              Open Tests Workspace
+            </Link>
+          ) : null}
+        </div>
       </div>
     </div>
   </div>
 
-  <div className="mb-4 rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
+  <div className={`${workspaceInsetClass} mb-4 border-slate-200/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.82),rgba(255,255,255,0.99))] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]`}>
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.95fr)] lg:items-center">
+      <div className="min-w-0">
         <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Appointment</div>
-        <div className="mt-1 text-xl font-semibold tracking-tight text-slate-900">{appointmentDateLabel}</div>
-        <div className="mt-1 text-sm text-slate-600">{appointmentTimeLabel}</div>
+        <div className="mt-1 text-[1.32rem] font-semibold tracking-[-0.02em] text-slate-950">{appointmentDateLabel}</div>
+        <div className="mt-1 text-sm leading-6 text-slate-600">{appointmentTimeLabel}</div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
-        <span
-          className={[
-            "inline-flex rounded-full px-2.5 py-1",
-            job.scheduled_date
-              ? "bg-emerald-100 text-emerald-800"
-              : "bg-slate-100 text-slate-700",
-          ].join(" ")}
-        >
-          {job.scheduled_date ? "Scheduled" : "Unscheduled"}
-        </span>
-        {job.scheduled_date ? (
-          <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">
-            {hasFullSchedule ? "Time window set" : "Time window pending"}
-          </span>
-        ) : null}
+      <div className="rounded-2xl border border-white/80 bg-white/76 px-3.5 py-3 shadow-[0_12px_28px_-30px_rgba(15,23,42,0.3)] backdrop-blur-[2px]">
+        <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Schedule</div>
+            <div className={`mt-1 text-[15px] font-semibold tracking-[-0.01em] ${job.scheduled_date ? "text-emerald-800" : "text-slate-700"}`}>
+              {job.scheduled_date ? "Scheduled" : "Unscheduled"}
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Time Window</div>
+            <div className="mt-1 text-[15px] font-semibold tracking-[-0.01em] text-slate-800">
+              {job.scheduled_date ? (hasFullSchedule ? "Confirmed" : "Pending") : "Not set"}
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Field</div>
+            <div className={`mt-1 text-[15px] font-semibold tracking-[-0.01em] ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>
+              {formatStatus(job.status)}
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Ops</div>
+            <div className="mt-1 text-[15px] font-semibold tracking-[-0.01em] text-slate-800">{formatOpsStatusLabel(job.ops_status)}</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div className={`mb-4 grid gap-4${job.job_type === "ecc" ? " xl:grid-cols-[minmax(300px,0.95fr)_minmax(420px,1.28fr)_minmax(280px,0.72fr)]" : " xl:grid-cols-[minmax(320px,0.96fr)_minmax(440px,1.34fr)]"}`}>
+  <div className={`mb-4 grid items-stretch gap-4${job.job_type === "ecc" ? " xl:grid-cols-[minmax(300px,0.94fr)_minmax(420px,1.22fr)_minmax(250px,0.74fr)]" : " xl:grid-cols-[minmax(320px,0.96fr)_minmax(440px,1.28fr)]"}`}>
     {/* Left: customer / contact info */}
-    <div className="rounded-xl border border-slate-200 bg-white/85 p-4">
-      <div className="text-lg font-semibold uppercase tracking-wide text-slate-800">
+    <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4 sm:p-5`}>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
         {(job.job_type ? String(job.job_type).toUpperCase() : "SERVICE")}
         {serviceCity ? ` • ${serviceCity}` : ""}
       </div>
@@ -1427,29 +1546,32 @@ const renderTimelineItem = (e: any, key: string) => {
       {job.customer_id ? (
         <Link
           href={`/customers/${job.customer_id}`}
-          className="mt-2 block text-2xl font-semibold tracking-tight text-slate-900 hover:underline"
+          className="mt-2 block text-[1.55rem] font-semibold tracking-[-0.02em] text-slate-950 hover:underline"
         >
           {customerName}
         </Link>
       ) : (
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{customerName}</h1>
+        <h1 className="mt-2 text-[1.55rem] font-semibold tracking-[-0.02em] text-slate-950">{customerName}</h1>
       )}
 
-      <div className="mt-2 text-sm text-gray-600">
-        Contractor: <span className="font-medium text-gray-700">{contractorName}</span>
+      <div className="mt-4 grid gap-x-6 gap-y-3 border-t border-slate-200/70 pt-4 text-sm sm:grid-cols-2">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Contractor</div>
+          <div className="mt-1 font-semibold text-slate-800">{contractorName}</div>
+        </div>
+        {customerPhone !== "—" ? (
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Phone</div>
+            <div className="mt-1 font-semibold text-slate-800">{customerPhone}</div>
+          </div>
+        ) : null}
       </div>
 
-      {customerPhone !== "—" ? (
-        <div className="mt-1 text-sm text-gray-600">
-          Phone: <span className="font-medium text-gray-700">{customerPhone}</span>
-        </div>
-      ) : null}
-
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2 sm:gap-1.5 lg:gap-2">
         {telLink ? (
           <a
             href={telLink}
-            className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 hover:bg-slate-50"
+            className={compactSecondaryButtonClass}
           >
             Call
           </a>
@@ -1458,21 +1580,32 @@ const renderTimelineItem = (e: any, key: string) => {
         {customerPhone !== "—" ? (
           <a
             href={`sms:${digitsOnly(customerPhone)}`}
-            className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 hover:bg-slate-50"
+            className={compactSecondaryButtonClass}
           >
             Text
           </a>
         ) : null}
+
+        {serviceMapsLink ? (
+          <a
+            href={serviceMapsLink}
+            target="_blank"
+            rel="noreferrer"
+            className={compactSecondaryButtonClass}
+          >
+            Open Map
+          </a>
+        ) : null}
       </div>
 
-      <div className="mt-3 border-t border-slate-100 pt-3">
-        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Contact Actions</div>
+      <div className="mt-4 border-t border-slate-200/80 pt-4">
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Contact Logging</div>
         <div className="flex flex-wrap gap-2">
           <form action={logCustomerContactAttemptFromForm}>
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="method" value="call" />
             <input type="hidden" name="result" value="no_answer" />
-            <SubmitButton loadingText="..." className="inline-flex h-8 items-center rounded border border-slate-200 bg-slate-50 px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100">
+            <SubmitButton loadingText="..." className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
               No Answer
             </SubmitButton>
           </form>
@@ -1481,26 +1614,24 @@ const renderTimelineItem = (e: any, key: string) => {
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="method" value="text" />
             <input type="hidden" name="result" value="sent" />
-            <SubmitButton loadingText="..." className="inline-flex h-8 items-center rounded border border-slate-200 bg-slate-50 px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100">
+            <SubmitButton loadingText="..." className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
               Sent Text
             </SubmitButton>
           </form>
         </div>
-        <div className="mt-1.5 text-[11px] text-slate-400">
+        <div className="mt-2 text-[11px] text-slate-500">
           {attemptCount} attempt{attemptCount === 1 ? "" : "s"} • last: {lastAttemptLabel}
         </div>
       </div>
     </div>
 
     {/* Center: destination panel */}
-    <div className="relative flex min-h-[22rem] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/85">
-      {serviceAddressDisplay ? (
-        <div className="absolute right-3 top-3 z-10">
-          <div className="rounded-md bg-slate-900/65 px-2.5 py-1.5 backdrop-blur-sm">
-            <div className="text-right text-[11px] font-medium leading-snug text-white/90">{serviceAddressDisplay}</div>
-          </div>
+    <div className="relative flex min-h-[20rem] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.28)]">
+      <div className="absolute left-3 top-3 z-10">
+        <div className="rounded-full border border-white/70 bg-white/76 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.3)] backdrop-blur-sm">
+          Service Location
         </div>
-      ) : null}
+      </div>
       <div className="w-full flex-1 overflow-hidden bg-slate-100">
         <JobLocationPreview
           addressLine1={serviceAddressLine1}
@@ -1508,6 +1639,7 @@ const renderTimelineItem = (e: any, key: string) => {
           city={serviceCity}
           state={serviceState}
           zip={serviceZip}
+          showAddressFooter
           className="flex h-full flex-col [&>div:last-child]:!mt-auto [&>div:last-child]:pt-3"
         />
       </div>
@@ -1515,59 +1647,85 @@ const renderTimelineItem = (e: any, key: string) => {
 
     {/* Right: ECC permit reference panel (ECC only) */}
     {job.job_type === "ecc" ? (
-      <div className="rounded-xl border border-slate-200 bg-white/85 p-4">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Permit</div>
-        <div className="space-y-3">
+      <div className={`${workspaceSubtleCardClass} border-slate-200/70 p-4 sm:p-5 ${hasPermitDetails ? "bg-white/92" : "bg-slate-50/88"}`}>
+        <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-gray-400">Permit #</div>
-            <div className="mt-0.5 text-sm font-semibold text-gray-800">{job.permit_number || "—"}</div>
-          </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-gray-400">Jurisdiction</div>
-            <div className="mt-0.5 text-sm font-semibold text-gray-800">{(job as any).jurisdiction || "—"}</div>
-          </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-gray-400">Permit Date</div>
-            <div className="mt-0.5 text-sm font-semibold text-gray-800">
-              {(job as any).permit_date ? displayDateLA(String((job as any).permit_date)) : "—"}
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Permit</div>
+            <div className="mt-1 text-sm text-slate-600">
+              {hasPermitDetails
+                ? `${permitDetailCount} of 3 reference field${permitDetailCount === 1 ? "" : "s"} available`
+                : "Permit information pending"}
             </div>
           </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-gray-400">Job ID</div>
-            <div className="mt-0.5 break-all font-mono text-[11px] text-gray-500">{job.id}</div>
-          </div>
+          <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            ECC
+          </span>
         </div>
+
+        {hasPermitDetails ? (
+          <div className="space-y-2.5">
+            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
+              <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Permit #</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">{permitNumber || "Not added"}</div>
+            </div>
+            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
+              <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Jurisdiction</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">{permitJurisdiction || "Not added"}</div>
+            </div>
+            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
+              <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Permit Date</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">{permitDateLabel || "Not added"}</div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white/90 px-4 py-4 text-sm text-slate-600">
+            No permit details recorded yet.
+          </div>
+        )}
       </div>
     ) : null}
   </div>
 
-  <div className="mt-4">
-    <div className="flex gap-2 mb-2 text-xs flex-wrap font-medium">
-      <span className={`rounded-md px-2 py-1 ${isFieldComplete ? "bg-green-100 text-green-800" : "bg-blue-50 text-blue-700"}`}>Field: {formatStatus(job.status)}</span>
-      <span className="rounded-md bg-blue-50 px-2 py-1 text-blue-700">Ops: {formatOpsStatusLabel(job.ops_status)}</span>
-      {actionablePendingInfo ? <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800">Pending Info</span> : null}
-      {onHoldActive ? <span className="rounded-md border border-slate-300 bg-slate-100 px-2 py-1 text-slate-800">On Hold</span> : null}
+  <div className="mt-3.5 grid gap-3 xl:grid-cols-[minmax(250px,0.7fr)_minmax(0,1.3fr)] xl:items-start">
+    <div className="rounded-xl border border-slate-200/80 bg-slate-50/78 px-4 py-3.5 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)]">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Immediate Context</div>
+      <div className="mt-2 text-sm leading-6 text-slate-700">
+        Field status <span className="font-semibold text-slate-900">{formatStatus(job.status)}</span>. Ops status <span className="font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status)}</span>.
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+        {actionablePendingInfo ? <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-amber-800">Pending Info</span> : null}
+        {onHoldActive ? <span className="inline-flex rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-slate-800">On Hold</span> : null}
+        {hasFollowUpReminder ? <span className="inline-flex rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-700">Follow Up Set</span> : null}
+      </div>
+
+      {currentStatusReasonLabel ? (
+        <div className="mt-3 rounded-lg border border-slate-200/80 bg-white/92 px-3.5 py-3 text-sm text-slate-700">
+          <span className="font-semibold text-slate-900">{currentStatusReasonLabel}:</span>{" "}
+          {currentStatusReasonText || "Reason not set."}
+        </div>
+      ) : (
+        <div className="mt-3 text-sm text-slate-500">
+          {hasFollowUpReminder ? "Follow-up planning is already on file for this job." : "No immediate blocker is active on this job right now."}
+        </div>
+      )}
     </div>
 
-    {currentStatusReasonLabel ? (
-      <div className="mb-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-        <span className="font-semibold text-slate-900">{currentStatusReasonLabel}:</span>{" "}
-        {currentStatusReasonText || "Reason not set."}
+    <div className="rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)]">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Assigned Team</div>
+        <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
       </div>
-    ) : null}
-
-    <div className="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Assigned Team</div>
       {assignedTeam.length > 0 ? (
-        <div className="mt-2 flex min-w-0 flex-wrap gap-2">
+        <div className="mt-3 flex min-w-0 flex-wrap gap-2">
           {assignedTeam.map((assignee) => (
             <div
               key={`${assignee.job_id}-${assignee.user_id}`}
-              className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-800"
+              className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-800 shadow-[0_8px_20px_-24px_rgba(15,23,42,0.22)]"
             >
               <span className="max-w-full break-words">{assignee.display_name}</span>
               {assignee.is_primary ? (
-                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                   Primary
                 </span>
               ) : null}
@@ -1579,7 +1737,7 @@ const renderTimelineItem = (e: any, key: string) => {
                   <input type="hidden" name="tab" value={tab} />
                   <button
                     type="submit"
-                    className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+                    className={workspaceUtilityControlClass}
                   >
                     Make Primary
                   </button>
@@ -1593,7 +1751,7 @@ const renderTimelineItem = (e: any, key: string) => {
                   <input type="hidden" name="tab" value={tab} />
                   <button
                     type="submit"
-                    className="rounded-full border border-red-300 bg-white px-2 py-0.5 text-[11px] font-medium text-red-700 hover:bg-red-50"
+                    className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
                   >
                     Remove
                   </button>
@@ -1603,7 +1761,9 @@ const renderTimelineItem = (e: any, key: string) => {
           ))}
         </div>
       ) : (
-        <div className="mt-1 text-sm text-gray-500">Unassigned</div>
+        <div className={`mt-3 ${workspaceEmptyStateClass}`}>
+          No team assigned yet.
+        </div>
       )}
 
       {isInternalUser ? (
@@ -1612,7 +1772,7 @@ const renderTimelineItem = (e: any, key: string) => {
           <input type="hidden" name="tab" value={tab} />
           <select
             name="user_id"
-            className="w-full min-w-0 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 sm:w-auto"
+            className={`${workspaceInputClass} w-full min-w-0 sm:w-auto sm:min-w-[14rem]`}
             required
             defaultValue=""
             disabled={assignmentCandidates.length === 0}
@@ -1627,7 +1787,7 @@ const renderTimelineItem = (e: any, key: string) => {
             ))}
           </select>
 
-          <label className="inline-flex items-center gap-1 text-xs text-gray-600">
+          <label className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
             <input type="checkbox" name="make_primary" value="1" className="h-3.5 w-3.5" />
             Set as primary
           </label>
@@ -1635,7 +1795,7 @@ const renderTimelineItem = (e: any, key: string) => {
           <button
             type="submit"
             disabled={assignmentCandidates.length === 0}
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             Assign
           </button>
@@ -1650,7 +1810,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
       {/* Closeout Actions (Internal Only) */}
     {showCloseoutRow && (
-  <div className="mt-3 min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
+      <div className="mt-3 min-w-0 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)]">
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div className="text-sm font-medium text-gray-700">Closeout</div>
 
@@ -1661,7 +1821,7 @@ const renderTimelineItem = (e: any, key: string) => {
               <input type="hidden" name="job_id" value={job.id} />
               <SubmitButton
                 loadingText="Saving..."
-                className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                className={darkButtonClass}
               >
                 ✓ Certs Complete
               </SubmitButton>
@@ -1673,7 +1833,7 @@ const renderTimelineItem = (e: any, key: string) => {
             <input type="hidden" name="job_id" value={job.id} />
             <SubmitButton
               loadingText="Saving..."
-              className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+              className={darkButtonClass}
             >
               ✓ Invoice Complete
             </SubmitButton>
@@ -2004,7 +2164,7 @@ const renderTimelineItem = (e: any, key: string) => {
       if (!meta) return null;
                     
       return (
-        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 mt-3">
+        <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50/90 p-3.5 text-amber-900">
           <div className="text-sm font-semibold">{meta.title}</div>
           <div className="mt-1 text-sm">
             Current Ops Status: <span className="font-medium">{formatOpsStatusLabel(ops)}</span>. {meta.body}
@@ -2015,7 +2175,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
       {/* Single-workspace context (tab query preserved for compatibility) */}
      
-          <details className="group mb-6 rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90">
+          <details className={`${workspaceDetailsClass} mb-6`}>
             <summary className="cursor-pointer list-none">
               <CollapsibleHeader
                 title="Edit Job"
@@ -2023,9 +2183,9 @@ const renderTimelineItem = (e: any, key: string) => {
               />
             </summary>
 
-            <div className="mt-3 border-t border-slate-200 pt-4">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-semibold mb-3 text-slate-900">Scheduling</div>
+            <div className={workspaceDetailsDividerClass}>
+              <div className={`${workspaceInsetClass} p-4`}>
+                <div className="mb-3 text-sm font-semibold text-slate-900">Scheduling</div>
 
                 <form action={updateJobScheduleFromForm} className="space-y-4">
                   <input type="hidden" name="job_id" value={job.id} />
@@ -2035,39 +2195,39 @@ const renderTimelineItem = (e: any, key: string) => {
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div className="space-y-1">
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                      <label className={workspaceFieldLabelClass}>
                         Scheduled Date
                       </label>
                       <input
                         type="date"
                         name="scheduled_date"
                         defaultValue={displayDateLA(job.scheduled_date)}
-                        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:light]"
+                        className={workspaceInputClass}
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                      <label className={workspaceFieldLabelClass}>
                         Window Start
                       </label>
                       <input
                         type="time"
                         name="window_start"
                         defaultValue={timeToTimeInput(job.window_start)}
-                        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:light]"
+                        className={workspaceInputClass}
                       />
                       <div className="text-[11px] text-gray-500">08:00</div>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                      <label className={workspaceFieldLabelClass}>
                         Window End
                       </label>
                       <input
                         type="time"
                         name="window_end"
                         defaultValue={timeToTimeInput(job.window_end)}
-                        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:light]"
+                        className={workspaceInputClass}
                       />
                       <div className="text-[11px] text-gray-500">10:00</div>
                     </div>
@@ -2076,7 +2236,7 @@ const renderTimelineItem = (e: any, key: string) => {
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     <SubmitButton
                       loadingText="Saving..."
-                      className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                      className={primaryButtonClass}
                     >
                       Save Scheduling
                     </SubmitButton>
@@ -2087,7 +2247,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
                     <Link
                       href="/ops"
-                      className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50"
+                      className={secondaryButtonClass}
                     >
                       Back to Ops
                     </Link>
@@ -2098,7 +2258,7 @@ const renderTimelineItem = (e: any, key: string) => {
               {job.job_type === "ecc" ? (
                 <details
                   open
-                  className="group mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm [&[open]_.disclosure-icon]:rotate-90"
+                  className="group mt-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90"
                 >
                     <summary className="cursor-pointer list-none">
                       <CollapsibleHeader
@@ -2114,39 +2274,39 @@ const renderTimelineItem = (e: any, key: string) => {
 
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1">
-                          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Permit #</label>
+                          <label className={workspaceFieldLabelClass}>Permit #</label>
                           <input
                             name="permit_number"
                             defaultValue={job.permit_number ?? ""}
                             placeholder="Optional"
-                            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={workspaceInputClass}
                           />
                         </div>
 
                         <div className="space-y-1">
-                          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Jurisdiction</label>
+                          <label className={workspaceFieldLabelClass}>Jurisdiction</label>
                           <input
                             name="jurisdiction"
                             defaultValue={(job as any).jurisdiction ?? ""}
                             placeholder="City or county permit office"
-                            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={workspaceInputClass}
                           />
                         </div>
 
                         <div className="space-y-1">
-                          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Permit Date</label>
+                          <label className={workspaceFieldLabelClass}>Permit Date</label>
                           <input
                             type="date"
                             name="permit_date"
                             defaultValue={(job as any).permit_date ?? ""}
-                            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:light]"
+                            className={workspaceInputClass}
                           />
                         </div>
                       </div>
 
                       <SubmitButton
                         loadingText="Saving..."
-                        className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                        className={primaryButtonClass}
                       >
                         Save Permit Info
                       </SubmitButton>
@@ -2155,7 +2315,7 @@ const renderTimelineItem = (e: any, key: string) => {
               ) : null}
 
               <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <details className="group w-full rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm [&[open]_.disclosure-icon]:rotate-90">
+                <details className="group w-full rounded-xl border border-slate-200/80 bg-white p-4 text-sm shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90">
                   <summary className="cursor-pointer list-none">
                     <CollapsibleHeader
                       title="Change Job Type"
@@ -2168,14 +2328,14 @@ const renderTimelineItem = (e: any, key: string) => {
                     className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center"
                   >
                     <input type="hidden" name="job_id" value={job.id} />
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs text-slate-600">
                       Current type: {job.job_type ?? "service"}
                     </p>
 
                     <select
                       name="job_type"
                       defaultValue={job.job_type ?? "service"}
-                      className="rounded border border-gray-300 px-2 py-1.5"
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                     >
                       <option value="service">Service</option>
                       <option value="ecc">ECC</option>
@@ -2183,14 +2343,14 @@ const renderTimelineItem = (e: any, key: string) => {
 
                     <button
                       type="submit"
-                      className="inline-flex min-h-10 items-center justify-center rounded bg-blue-600 text-white px-3 py-1.5 font-medium transition-colors hover:bg-blue-700"
+                      className={primaryButtonClass}
                     >
                       Update
                     </button>
                   </form>
                 </details>
 
-                <details className="group w-full rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm [&[open]_.disclosure-icon]:rotate-90">
+                <details className="group w-full rounded-xl border border-slate-200/80 bg-white p-4 text-sm shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90">
                   <summary className="cursor-pointer list-none">
                     <CollapsibleHeader
                       title="Change Contractor"
@@ -2205,13 +2365,13 @@ const renderTimelineItem = (e: any, key: string) => {
                       <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=info`} />
 
                       <div className="flex-1">
-                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                        <label className={workspaceFieldLabelClass}>
                           Assigned contractor
                         </label>
                         <select
                           name="contractor_id"
                           defaultValue={job.contractor_id ?? ""}
-                          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+                          className={workspaceInputClass}
                         >
                           <option value="">— No contractor —</option>
                           {(contractors ?? []).map((contractor: any) => (
@@ -2224,7 +2384,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
                       <SubmitButton
                         loadingText="Saving..."
-                        className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100"
+                        className={secondaryButtonClass}
                       >
                         Save contractor
                       </SubmitButton>
@@ -2233,7 +2393,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 </details>
               </div>
 
-              <details className="group mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm [&[open]_.disclosure-icon]:rotate-90">
+              <details className="group mt-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90">
                 <summary className="cursor-pointer list-none">
                   <CollapsibleHeader
                     title="Admin Archive Controls"
@@ -2242,7 +2402,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 </summary>
 
                 <div className="mt-3 space-y-3">
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm leading-6 text-slate-600">
                     Archive hides this job across Ops, portal, and searches. This can be undone later (by clearing deleted_at).
                   </div>
 
@@ -2251,7 +2411,7 @@ const renderTimelineItem = (e: any, key: string) => {
                       <input type="hidden" name="job_id" value={job.id} />
                       <SubmitButton
                         loadingText="Archiving..."
-                        className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+                        className="inline-flex min-h-10 items-center justify-center rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
                       >
                         Archive Job
                       </SubmitButton>
@@ -2271,8 +2431,8 @@ const renderTimelineItem = (e: any, key: string) => {
 
     
 {["data_entry", "invoice_required"].includes(String(job.ops_status ?? "").toLowerCase()) ? (
-  <div className="rounded-lg border bg-yellow-50 p-4 mt-6">
-    <div className="font-semibold mb-2">
+  <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-amber-950 shadow-[0_12px_24px_-22px_rgba(180,83,9,0.35)]">
+    <div className="mb-2 font-semibold">
       Data Entry Required
     </div>
 
@@ -2281,17 +2441,17 @@ const renderTimelineItem = (e: any, key: string) => {
 
       
       <div className="flex flex-col">
-        <label className="text-sm">Invoice # (optional)</label>
+        <label className="mb-1 text-sm font-medium text-amber-900">Invoice # (optional)</label>
         <input
           name="invoice_number"
           defaultValue={String(job.invoice_number ?? "")}
-          className="rounded border px-3 py-2 text-sm"
+          className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-900"
         />
       </div>
     
       <SubmitButton
         loadingText="Saving..."
-        className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded border text-sm bg-black text-white"
+        className={darkButtonClass}
       >
         Mark Data Entry Complete
       </SubmitButton>
@@ -2303,39 +2463,40 @@ const renderTimelineItem = (e: any, key: string) => {
   <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.92fr)] xl:items-start">
   <div className="order-2 flex flex-col gap-5 xl:order-2">
     {/* Equipment */}
-  <details open={equipmentCount === 0} className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm xl:order-2 sm:p-6 [&[open]_.disclosure-icon]:rotate-90">
+  <details open={equipmentCount === 0} className={`${workspaceDetailsClass} xl:order-2`}>
       <summary className="cursor-pointer list-none">
         <CollapsibleHeader
           title="Equipment"
-          subtitle="Location-based equipment context for this job."
+          subtitle={equipmentSummaryLabel}
+          meta={`${equipmentCount} item${equipmentCount === 1 ? "" : "s"}`}
         />
       </summary>
 
-      <div className="mt-3 border-t border-slate-200 pt-4">
+      <div className={workspaceDetailsDividerClass}>
 
-      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-        <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+      <div className={workspaceInsetClass}>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
           Status
         </div>
-        <div className="mt-1 text-sm font-semibold text-gray-900">
+        <div className="mt-1 text-sm font-semibold text-slate-950">
           {equipmentSummaryLabel}
         </div>
       </div>
 
       {equipmentCount > 0 ? (
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 text-sm">
-          <div className="rounded-md border border-gray-200 bg-white px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wide text-gray-500">Condenser</div>
-            <div className="font-medium text-gray-900">
+          <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-slate-500">Condenser</div>
+            <div className="mt-1 font-medium text-slate-900">
               {outdoorEquipment
                 ? `${outdoorEquipment.manufacturer ?? "—"} ${outdoorEquipment.model ?? ""}`.trim()
                 : "—"}
             </div>
           </div>
 
-          <div className="rounded-md border border-gray-200 bg-white px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wide text-gray-500">Indoor Equipment</div>
-            <div className="font-medium text-gray-900">
+          <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-slate-500">Indoor Equipment</div>
+            <div className="mt-1 font-medium text-slate-900">
               {indoorEquipment
                 ? `${indoorEquipment.manufacturer ?? "—"} ${indoorEquipment.model ?? ""}`.trim()
                 : "—"}
@@ -2347,7 +2508,7 @@ const renderTimelineItem = (e: any, key: string) => {
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Link
           href={`/jobs/${job.id}/info?f=equipment`}
-          className="inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          className={darkButtonClass}
         >
           {equipmentCount > 0 ? "View / Edit Equipment" : "Capture Equipment"}
         </Link>
@@ -2356,18 +2517,19 @@ const renderTimelineItem = (e: any, key: string) => {
     </details>
 
     {/* Attachments - moved up from bottom */}
-    <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90">
+    <details className={workspaceDetailsClass}>
       <summary className="cursor-pointer list-none">
-        <div className="flex items-center gap-2 text-slate-900">
-          <span aria-hidden className="disclosure-icon inline-block text-[11px] text-slate-500 transition-transform duration-150 group-open:rotate-90">▶</span>
-          <span className="text-base font-semibold">Attachments ({attachmentItems.length})</span>
-        </div>
+        <CollapsibleHeader
+          title="Attachments"
+          subtitle={attachmentItems.length ? "Uploaded files and shareable job records." : "No job files uploaded yet."}
+          meta={`${attachmentItems.length} item${attachmentItems.length === 1 ? "" : "s"}`}
+        />
       </summary>
-      <div className="px-4 pb-4">
+      <div className={`${workspaceDetailsDividerClass} px-0 pb-0`}>
         <div className="mb-3 flex items-center justify-end">
           <Link
             href={`/jobs/${job.id}/attachments`}
-            className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            className={secondaryButtonClass}
           >
             View All Attachments
           </Link>
@@ -2379,24 +2541,27 @@ const renderTimelineItem = (e: any, key: string) => {
       </div>
     </details>
 
-    <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90">
+    <details className={workspaceDetailsClass}>
       <summary className="cursor-pointer list-none">
         <CollapsibleHeader
           title="Follow-Up History"
-          subtitle="Customer contact attempts and activity."
+          subtitle={followUpHistorySummaryText}
+          meta={`${attemptItems.length} attempt${attemptItems.length === 1 ? "" : "s"}`}
         />
       </summary>
 
-      <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
+      <div className={`${workspaceDetailsDividerClass} rounded-xl border border-slate-200/80 bg-white/96 p-4`}>
         {!attemptItems.length ? (
-          <div className="text-sm text-gray-600">No contact attempts logged yet.</div>
+          <div className={workspaceEmptyStateClass}>
+            No contact attempts logged yet.
+          </div>
         ) : (
           <div className="space-y-2">
             {contactPreviewItems.map((a: any, idx: number) => renderAttemptItem(a, `attempt-preview-${idx}`))}
 
             {contactOverflowItems.length > 0 ? (
               <details className="pt-1">
-                <summary className="cursor-pointer text-sm text-gray-700 underline">
+                <summary className="cursor-pointer text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-4">
                   Show all attempts ({attemptItems.length})
                 </summary>
                 <div className="mt-2 space-y-2">
@@ -2413,150 +2578,160 @@ const renderTimelineItem = (e: any, key: string) => {
 
 
 
-  <section id="service-chain" className="rounded-xl border border-slate-300 bg-gradient-to-b from-white to-slate-50 p-5 shadow-sm xl:order-1 sm:p-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Service Chain</h2>
-          <p className="text-sm text-muted-foreground">
-            Full visit history for this service case.
-          </p>
-        </div>
+  <details id="service-chain" className={`${workspaceDetailsClass} xl:order-1`}>
+      <summary className="cursor-pointer list-none">
+        <CollapsibleHeader
+          title="Service Chain"
+          subtitle={serviceChainSummaryText}
+          meta={`${serviceCaseVisitCount} visit${serviceCaseVisitCount === 1 ? "" : "s"}`}
+        />
+      </summary>
 
+      <div className={workspaceDetailsDividerClass}>
         {serviceCaseId ? (
-          <div className="text-xs text-gray-500">
+          <div className="mb-3 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
             Case: {serviceCaseId.slice(0, 8)}…
           </div>
         ) : null}
-      </div>
 
-      {!serviceCaseId ? (
-        <div className="mt-3 text-sm text-gray-600">
-          This job is not attached to a service case yet.
-        </div>
-      ) : !serviceChainJobs || serviceChainJobs.length === 0 ? (
-        <div className="mt-3 text-sm text-gray-600">
-          No visits found in this service case.
-        </div>
-      ) : (
-        <div className="mt-4 max-h-96 space-y-2 overflow-auto pr-1 sm:max-h-none sm:overflow-visible sm:pr-0">
-          {serviceChainJobs.map((visit: any, idx: number) => {
-            const visitId = String(visit.id ?? "").trim();
-            const isCurrent = visit.id === jobId;
-            const visitLabel = serviceChainVisitLabel(visit, idx);
-            const failureReason = serviceChainFailureReasonByJob.get(visitId) ?? "";
-            const win =
-              visit.scheduled_date && visit.window_start && visit.window_end
-                ? `${formatTimeDisplay(visit.window_start)}–${formatTimeDisplay(visit.window_end)}`
-                : null;
+        {!serviceCaseId ? (
+          <div className={workspaceEmptyStateClass}>
+            This job is not attached to a service case yet.
+          </div>
+        ) : !serviceChainJobs || serviceChainJobs.length === 0 ? (
+          <div className={workspaceEmptyStateClass}>
+            No visits found in this service case.
+          </div>
+        ) : (
+          <div className="max-h-96 space-y-2 overflow-auto pr-1 sm:max-h-none sm:overflow-visible sm:pr-0">
+            {serviceChainJobs.map((visit: any, idx: number) => {
+              const visitId = String(visit.id ?? "").trim();
+              const isCurrent = visit.id === jobId;
+              const visitLabel = serviceChainVisitLabel(visit, idx);
+              const failureReason = serviceChainFailureReasonByJob.get(visitId) ?? "";
+              const win =
+                visit.scheduled_date && visit.window_start && visit.window_end
+                  ? `${formatTimeDisplay(visit.window_start)}–${formatTimeDisplay(visit.window_end)}`
+                  : null;
 
-            return (
-              <div
-                key={visit.id}
-                className={[
-                  "rounded-lg border p-3 shadow-sm",
-                  isCurrent ? "border-slate-900 bg-slate-50" : "border-slate-200 bg-white",
-                ].join(" ")}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="text-sm font-semibold text-gray-900 dark:text-gray-600">
-                        {visitLabel}
-                        {isCurrent && (
-                          <span className="text-blue-600 dark:text-blue-400"> • Active</span>
-                        )}
+              return (
+                <div
+                  key={visit.id}
+                  className={[
+                    "rounded-xl border p-3.5 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.35)]",
+                    isCurrent ? "border-slate-900/90 bg-slate-50" : "border-slate-200/80 bg-white",
+                  ].join(" ")}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm font-semibold text-slate-950">
+                          {visitLabel}
+                          {isCurrent && (
+                            <span className="text-blue-600"> • Active</span>
+                          )}
+                        </div>
+                        <span
+                          className={[
+                            "inline-flex rounded-md px-2 py-1 text-xs font-semibold",
+                            serviceChainBadgeClass(visit.ops_status, isCurrent),
+                          ].join(" ")}
+                        >
+                          {formatOpsStatusLabel(visit.ops_status)}
+                        </span>
                       </div>
-                      <span
-                        className={[
-                          "inline-flex rounded px-2 py-1 text-xs font-medium",
-                          serviceChainBadgeClass(visit.ops_status, isCurrent),
-                        ].join(" ")}
+
+                      <div className="mt-1 text-sm text-slate-800">
+                        {normalizeRetestLinkedJobTitle(visit.title) || "Untitled Job"}
+                      </div>
+
+                      <div className="mt-1 text-xs text-slate-500">
+                        Created:{" "}
+                        {visit.created_at ? formatDateLAFromIso(String(visit.created_at)) : "—"}
+                        {visit.scheduled_date ? ` • Scheduled: ${visit.scheduled_date}` : ""}
+                        {win ? ` • ${win}` : ""}
+                      </div>
+                      {isFailedFamilyOpsStatus(visit.ops_status) && failureReason ? (
+                        <div className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs text-rose-900">
+                          <span className="font-semibold uppercase tracking-[0.08em] text-rose-700">Reason:</span>{" "}
+                          {failureReason}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {!isCurrent ? (
+                      <Link
+                        href={`/jobs/${visit.id}?tab=ops`}
+                        className="text-sm font-medium text-blue-700 underline decoration-blue-200 underline-offset-4"
                       >
-                        {formatOpsStatusLabel(visit.ops_status)}
-                      </span>
-                    </div>
-
-                    <div className="mt-1 text-sm text-gray-800">
-                      {normalizeRetestLinkedJobTitle(visit.title) || "Untitled Job"}
-                    </div>
-
-                    <div className="mt-1 text-xs text-gray-500">
-                      Created:{" "}
-                      {visit.created_at ? formatDateLAFromIso(String(visit.created_at)) : "—"}
-                      {visit.scheduled_date ? ` • Scheduled: ${visit.scheduled_date}` : ""}
-                      {win ? ` • ${win}` : ""}
-                    </div>
-                    {isFailedFamilyOpsStatus(visit.ops_status) && failureReason ? (
-                      <div className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs text-rose-900">
-                        <span className="font-semibold uppercase tracking-[0.08em] text-rose-700">Reason:</span>{" "}
-                        {failureReason}
-                      </div>
+                        View Job
+                      </Link>
                     ) : null}
                   </div>
-
-                  {!isCurrent ? (
-                    <Link
-                      href={`/jobs/${visit.id}?tab=ops`}
-                      className="text-sm underline"
-                    >
-                      View Job
-                    </Link>
-                  ) : null}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </details>
 
       {job.job_type === "ecc" ? (
-      <section className="rounded-xl border border-slate-300 bg-gradient-to-br from-slate-50 to-white p-5 text-gray-900 shadow-sm xl:order-3 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-slate-900">ECC Summary</div>
-            <div className="mt-1 text-xs text-slate-600">
-              ECC execution remains in the dedicated tests workspace.
+      <details className={`${workspaceDetailsClass} xl:order-3`}>
+        <summary className="cursor-pointer list-none">
+          <CollapsibleHeader
+            title="ECC Summary"
+            subtitle={eccSummaryText}
+            meta={`${job.ecc_test_runs?.length ?? 0} run${(job.ecc_test_runs?.length ?? 0) === 1 ? "" : "s"}`}
+          />
+        </summary>
+
+        <div className={workspaceDetailsDividerClass}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className={`${job.ecc_test_runs?.length ? "rounded-xl border border-slate-200/80 bg-white/96" : workspaceEmptyStateClass} px-4 py-4 text-sm text-slate-600 sm:flex-1`}>
+              {job.ecc_test_runs?.length ? (
+                <span>{job.ecc_test_runs.length} test run(s) recorded.</span>
+              ) : (
+                <span>No tests recorded yet.</span>
+              )}
             </div>
+
+            <Link
+              href={`/jobs/${job.id}/tests`}
+              className={darkButtonClass}
+            >
+              Open Tests Workspace
+            </Link>
           </div>
-
-          <Link
-            href={`/jobs/${job.id}/tests`}
-            className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-px hover:bg-black"
-          >
-            Open Tests Workspace
-          </Link>
         </div>
-
-        <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-          {job.ecc_test_runs?.length ? (
-            <span>{job.ecc_test_runs.length} test run(s) recorded.</span>
-          ) : (
-            <span>No tests recorded yet.</span>
-          )}
-        </div>
-      </section>
+      </details>
       ) : null}
     </div>
 
     <div className="order-1 space-y-6 xl:order-1">
       {/* Unified operations workspace */}
-        <>
 <div className="space-y-5">
           {/* Job Status (ops_status) */}
-<div className="rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6">
-  <div className="mb-3 text-sm font-semibold">Job Status</div>
+<details className={workspaceDetailsClass}>
+  <summary className="cursor-pointer list-none">
+    <CollapsibleHeader
+      title="Job Status"
+      subtitle={jobStatusSummaryText}
+    />
+  </summary>
+
+  <div className={workspaceDetailsDividerClass}>
 
   <form action={updateJobOpsFromForm} className="flex flex-col gap-3 sm:gap-2 sm:flex-row sm:items-end sm:flex-wrap">
     <input type="hidden" name="job_id" value={job.id} />
 
     <div className="flex-1 min-w-xs">
-      <label className="block text-xs text-gray-600 mb-1 font-semibold">Ops Status</label>
+      <label className={workspaceFieldLabelClass}>Ops Status</label>
 
       {!["need_to_schedule", "scheduled", "pending_info", "on_hold"].includes(
         String(job.ops_status ?? "")
       ) ? (
-        <div className="mb-3 rounded-md border bg-blue-50 border-blue-200 px-3 py-2 text-sm text-slate-900 font-medium">
+        <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50/80 px-3.5 py-3 text-sm font-medium text-slate-900">
           Current lifecycle state:{" "}
           <span>
             {formatOpsStatusLabel(job.ops_status)}
@@ -2567,22 +2742,22 @@ const renderTimelineItem = (e: any, key: string) => {
       <select
         name="ops_status"
         defaultValue={explicitPendingInfoActive ? "pending_info" : "on_hold"}
-        className="w-full rounded border px-2 py-2 text-sm border-gray-300"
+        className={workspaceInputClass}
       >
         <option value="pending_info">Pending Info</option>
         <option value="on_hold">On Hold</option>
       </select>
 
-      <p className="mt-2 text-xs text-gray-600">
+      <p className="mt-2 text-xs leading-5 text-slate-600">
         Choose the status-change type here. Use the reason field below for either a Pending Info blocker or an On Hold pause reason. Follow Up stays separate for reminders and next actions.
       </p>
 
-      <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
-        <label className="block text-xs text-amber-900 mb-1 font-semibold">Status Reason</label>
+      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3">
+        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-900">Status Reason</label>
         <textarea
           name="status_reason"
           defaultValue={explicitPendingInfoActive ? pendingInfoReasonText : onHoldReasonText}
-          className="w-full rounded border border-amber-300 bg-white px-3 py-2 text-sm text-gray-900"
+          className="min-h-[7rem] w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm text-slate-900"
           rows={3}
           placeholder="If Pending Info is selected, describe the blocker. If On Hold is selected, describe why the job is paused."
         />
@@ -2592,13 +2767,13 @@ const renderTimelineItem = (e: any, key: string) => {
       </div>
     </div>
 
-    <SubmitButton loadingText="Saving..." className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 sm:shrink-0">
+    <SubmitButton loadingText="Saving..." className={`${primaryButtonClass} sm:shrink-0`}>
       Save
     </SubmitButton>
   </form>
 
   {(String(job.ops_status ?? "").toLowerCase() === "on_hold" || explicitPendingInfoActive) ? (
-    <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+    <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-700">
       <div className="font-semibold text-slate-900">Current Status Detail</div>
       <div className="mt-1">
         {explicitPendingInfoActive
@@ -2615,7 +2790,7 @@ const renderTimelineItem = (e: any, key: string) => {
         {canShowReleaseAndReevaluate ? (
           <form action={releaseAndReevaluateFromForm} className="mt-2">
             <input type="hidden" name="job_id" value={job.id} />
-            <SubmitButton loadingText="Updating..." className="w-full inline-flex items-center justify-center min-h-10 px-3 py-2 rounded border text-sm bg-white hover:bg-gray-100 sm:w-auto">
+            <SubmitButton loadingText="Updating..." className={`w-full ${secondaryButtonClass} sm:w-auto`}>
               {String(job.ops_status ?? "").toLowerCase() === "pending_info"
                 ? "Release Pending Info & Re-evaluate"
                 : "Release & Re-evaluate"}
@@ -2625,28 +2800,29 @@ const renderTimelineItem = (e: any, key: string) => {
       </div>
 
       {job.job_notes ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-gray-900 shadow-sm">
-          <div className="text-sm font-semibold mb-2">Job Notes</div>
-          <div className="whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
+        <div className={`${workspacePanelClass} p-4 text-gray-900`}>
+          <div className="mb-2 text-sm font-semibold text-slate-950">Job Notes</div>
+          <div className="whitespace-pre-wrap rounded-xl border border-slate-200/80 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-800">
             {job.job_notes}
           </div>
         </div>
       ) : null}
+</details>
 
       {/* Section A: Follow Up (Active Edit Area) */}
-      <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90">
+      <details className={workspaceDetailsClass}>
         <summary className="cursor-pointer list-none">
           <CollapsibleHeader
             title="Follow Up"
-            subtitle="Reminder and task tracking for what to resolve, for who, and by when."
+            subtitle={followUpSummaryText}
           />
         </summary>
 
-        <div className="mt-3 border-t border-slate-200 pt-4">
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <div className={workspaceDetailsDividerClass}>
+          <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4">
 
           {hasFollowUpReminder ? (
-            <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            <div className="mb-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2.5 text-xs leading-5 text-slate-600">
               Follow Up stays separate from Pending Info. Use this area for reminder ownership, due date, and next-action notes.
             </div>
           ) : null}
@@ -2654,13 +2830,13 @@ const renderTimelineItem = (e: any, key: string) => {
           <form action={updateJobOpsDetailsFromForm} className="grid gap-3">
             <input type="hidden" name="job_id" value={job.id} />
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Action Required By</label>
+                <label className={workspaceFieldLabelClass}>Action Required By</label>
                 <select
                   name="action_required_by"
                   defaultValue={job.action_required_by ?? ""}
-                  className="w-full rounded border px-2 py-2 text-sm"
+                  className={workspaceInputClass}
                 >
                   <option value="">—</option>
                   <option value="rater">Rater</option>
@@ -2670,27 +2846,27 @@ const renderTimelineItem = (e: any, key: string) => {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Follow-up Date</label>
+                <label className={workspaceFieldLabelClass}>Follow-up Date</label>
                 <input
                   type="date"
                   name="follow_up_date"
                   defaultValue={job.follow_up_date ? dateToDateInput(String(job.follow_up_date)) : ""}
-                  className="w-full rounded border px-2 py-2 text-sm"
+                  className={workspaceInputClass}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Next Action Note</label>
+              <label className={workspaceFieldLabelClass}>Next Action Note</label>
               <textarea
                 name="next_action_note"
                 defaultValue={job.next_action_note ?? ""}
-                className="w-full rounded border px-2 py-2 text-sm"
+                className={workspaceTextareaClass}
                 rows={4}
               />
             </div>
 
-            <SubmitButton loadingText="Saving..." className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded bg-black text-white text-sm w-fit">
+            <SubmitButton loadingText="Saving..." className={`${darkButtonClass} w-fit`}>
               Save Follow Up
             </SubmitButton>
           </form>
@@ -2700,68 +2876,79 @@ const renderTimelineItem = (e: any, key: string) => {
 
  </div>
 
-          {/* Retest + Linked Jobs */}
-{showRetestSection ? (
-<div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 text-gray-900 shadow-sm">
-  <div className="text-sm font-semibold mb-3">Retest Actions</div>
+          {/* Failure Resolution */}
+{(showRetestSection || showCorrectionReviewResolution) ? (
+<details className={`${workspaceDetailsClass} mb-5`}>
+  <summary className="cursor-pointer list-none">
+    <CollapsibleHeader
+      title="Failure Resolution"
+      subtitle={failureResolutionSummaryText}
+      meta={`${failureResolutionPathCount} path${failureResolutionPathCount === 1 ? "" : "s"} available`}
+    />
+  </summary>
 
-  <form action={createRetestJobFromForm} className="space-y-3">
-    <input type="hidden" name="parent_job_id" value={job.id} />
+  <div className={workspaceDetailsDividerClass}>
+  <div className={`grid gap-4${showRetestSection && showCorrectionReviewResolution ? " lg:grid-cols-2" : ""}`}>
+    {showRetestSection ? (
+      <div className={workspaceSoftCardClass}>
+        <div className="mb-2 text-sm font-semibold text-slate-950">Create Retest Job</div>
+        <div className="mb-3 text-sm leading-6 text-slate-600">
+          Create a new retest visit when this failure requires a physical return visit.
+        </div>
 
-    <div className="text-sm text-gray-600">
-      Create a new retest visit when this failure requires a physical return visit.
-    </div>
+        <form action={createRetestJobFromForm} className="space-y-3">
+          <input type="hidden" name="parent_job_id" value={job.id} />
 
-    <label className="flex items-center gap-2 text-sm text-gray-700">
-      <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
-      Copy equipment from original
-    </label>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
+            Copy equipment from original
+          </label>
 
-    <button
-      type="submit"
-      className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded bg-black text-white text-sm"
-    >
-      Create Retest Job
-    </button>
-  </form>
-</div>
-) : null}
-
-{isInternalUser &&
- job.job_type === "ecc" &&
- ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? "")) && (
-  <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 text-gray-900 shadow-sm">
-    <div className="text-sm font-semibold mb-3">Correction Review Resolution</div>
-
-    <div className="text-sm text-gray-600 mb-3">
-      Use this only when submitted correction notes/photos are sufficient to resolve the failure
-      without sending a technician back out for a physical retest.
-    </div>
-
-    <form action={resolveFailureByCorrectionReviewFromForm} className="space-y-3">
-      <input type="hidden" name="job_id" value={job.id} />
-
-      <div>
-        <label className="block text-xs text-gray-600 mb-1">
-          Review Note (optional)
-        </label>
-        <textarea
-          name="review_note"
-          rows={3}
-          placeholder="Explain why the failure was resolved by correction review..."
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
+          <button
+            type="submit"
+            className={darkButtonClass}
+          >
+            Create Retest Job
+          </button>
+        </form>
       </div>
+    ) : null}
 
-      <button
-        type="submit"
-        className="inline-flex items-center justify-center min-h-10 px-3 py-2 rounded bg-black text-white text-sm"
-      >
-        Resolve Failure by Correction Review
-      </button>
-    </form>
+    {showCorrectionReviewResolution ? (
+      <div className={workspaceSoftCardClass}>
+        <div className="mb-2 text-sm font-semibold text-slate-950">Resolve by Correction Review</div>
+        <div className="mb-3 text-sm leading-6 text-slate-600">
+          Use this only when submitted correction notes/photos are sufficient to resolve the failure without sending a technician back out for a physical retest.
+        </div>
+
+        <form action={resolveFailureByCorrectionReviewFromForm} className="space-y-3">
+          <input type="hidden" name="job_id" value={job.id} />
+
+          <div>
+            <label className={workspaceFieldLabelClass}>
+              Review Note (optional)
+            </label>
+            <textarea
+              name="review_note"
+              rows={3}
+              placeholder="Explain why the failure was resolved by correction review..."
+              className={workspaceTextareaClass}
+            />
+          </div>
+
+          <button
+            type="submit"
+            className={darkButtonClass}
+          >
+            Resolve Failure by Correction Review
+          </button>
+        </form>
+      </div>
+    ) : null}
   </div>
-) }
+</div>
+</details>
+) : null}
 
 {isInternalUser && ["failed", "pending_info"].includes(String(job.ops_status ?? "")) ? (
   <>
@@ -2771,9 +2958,9 @@ const renderTimelineItem = (e: any, key: string) => {
       contractorResponseSubLabel={contractorResponseSubLabel}
     />
 
-    <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 text-gray-900 shadow-sm">
-      <div className="text-sm font-semibold mb-1">Internal Follow-Up Note</div>
-      <div className="text-xs text-gray-600 mb-3">
+    <div className={`${workspacePanelClass} mb-5 p-4 text-gray-900`}>
+      <div className="mb-1 text-sm font-semibold text-slate-950">Internal Follow-Up Note</div>
+      <div className="mb-3 text-xs leading-5 text-slate-600">
         Internal-only note tied to contractor report/review activity.
       </div>
 
@@ -2792,21 +2979,21 @@ const renderTimelineItem = (e: any, key: string) => {
           name="note"
           rows={3}
           placeholder="Add an internal follow-up note for this contractor report..."
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+          className={workspaceTextareaClass}
         />
 
         <div className="flex justify-end">
           <SubmitButton
             loadingText="Adding note..."
-            className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100"
+            className={secondaryButtonClass}
           >
             Save follow-up note
           </SubmitButton>
         </div>
       </form>
 
-      <div className="mt-4 border-t border-gray-200 pt-3">
-        <div className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">
+      <div className="mt-4 border-t border-slate-200 pt-3">
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
           Report Follow-Up Notes
         </div>
 
@@ -2818,38 +3005,36 @@ const renderTimelineItem = (e: any, key: string) => {
               const noteText = getEventNoteText(meta);
 
               return (
-                <div key={`report-follow-up-${String(e?.id ?? idx)}`} className="rounded-md border border-gray-200 bg-gray-50 p-3">
-                  <div className="text-xs text-gray-600">{when}</div>
+                <div key={`report-follow-up-${String(e?.id ?? idx)}`} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3">
+                  <div className="text-xs text-slate-500">{when}</div>
                   {noteText ? (
-                    <div className="mt-2 whitespace-pre-wrap text-sm text-gray-800">
+                    <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
                       {noteText}
                     </div>
                   ) : (
-                    <div className="mt-2 text-sm text-gray-500">(No note text)</div>
+                    <div className="mt-2 text-sm text-slate-500">(No note text)</div>
                   )}
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="text-sm text-gray-600">No report follow-up notes yet.</div>
+          <div className={workspaceEmptyStateClass}>No report follow-up notes yet.</div>
         )}
       </div>
     </div>
   </>
 ) : null}
 
-
-        </>
     <section className="mt-2 space-y-4">
       <div className="space-y-4">
         {/* Shared Notes */}
-        <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90" open>
+        <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title="Shared Notes" subtitle="Notes across this direct job chain, visible to contractor and team." />
+            <CollapsibleHeader title="Shared Notes" subtitle={sharedNotesSummaryText} meta={`${sharedNotes.length} note${sharedNotes.length === 1 ? "" : "s"}`} />
           </summary>
 
-          <div className="mt-3 border-t border-slate-200 pt-4 space-y-2">
+          <div className={`${workspaceDetailsDividerClass} space-y-2`}>
 
   <form action={addPublicNoteFromForm} className="mb-4 space-y-3">
     <input type="hidden" name="job_id" value={job.id} />
@@ -2859,13 +3044,13 @@ const renderTimelineItem = (e: any, key: string) => {
       name="note"
       rows={3}
       placeholder="Add a note visible to the contractor..."
-      className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+      className={workspaceTextareaClass}
     />
 
     <div className="flex justify-end">
       <SubmitButton
         loadingText="Adding note..."
-        className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100"
+        className={secondaryButtonClass}
       >
         Save shared note
       </SubmitButton>
@@ -2882,10 +3067,10 @@ const renderTimelineItem = (e: any, key: string) => {
         const attachmentLabel = getEventAttachmentLabel(meta);
 
         return (
-          <div key={idx} className="rounded-md border border-gray-200 bg-gray-50 p-3">
+          <div key={idx} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
             <div className="flex items-start justify-between gap-3">
-              <div className="text-xs text-gray-600">{when}</div>
-              <div className="text-xs font-medium text-gray-500">
+              <div className="text-xs text-slate-500">{when}</div>
+              <div className="text-xs font-medium text-slate-500">
                 {type === "contractor_note"
                   ? "Contractor"
                   : type === "public_note"
@@ -2896,18 +3081,18 @@ const renderTimelineItem = (e: any, key: string) => {
               </div>
             </div>
 
-            <div className="mt-2 text-sm font-medium text-gray-900">
+            <div className="mt-2 text-sm font-medium text-slate-950">
               {formatSharedHistoryHeading(type, meta)}
             </div>
 
             {noteText ? (
-              <div className="mt-2 whitespace-pre-wrap text-sm text-gray-800">
+              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
                 {noteText}
               </div>
             ) : null}
 
             {attachmentLabel ? (
-              <div className="mt-2 inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+              <div className="mt-2 inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
                 {attachmentLabel}
               </div>
             ) : null}
@@ -2915,19 +3100,19 @@ const renderTimelineItem = (e: any, key: string) => {
         );
       })
     ) : (
-      <div className="text-sm text-gray-600">No shared notes yet.</div>
+      <div className={workspaceEmptyStateClass}>No shared notes yet.</div>
     )}
   </div>
           </div>
         </details>
 
         {/* Internal Notes */}
-        <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90" open>
+        <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title="Internal Notes" subtitle="Internal-only notes across this direct job chain for your team." />
+            <CollapsibleHeader title="Internal Notes" subtitle={internalNotesSummaryText} meta={`${internalNotes.length} note${internalNotes.length === 1 ? "" : "s"}`} />
           </summary>
 
-          <div className="mt-3 border-t border-slate-200 pt-4 space-y-2">
+          <div className={`${workspaceDetailsDividerClass} space-y-2`}>
 
   <form action={addInternalNoteFromForm} className="mb-4 space-y-3">
     <input type="hidden" name="job_id" value={job.id} />
@@ -2937,13 +3122,13 @@ const renderTimelineItem = (e: any, key: string) => {
       name="note"
       rows={3}
       placeholder="Add an internal note visible only to your team..."
-      className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+      className={workspaceTextareaClass}
     />
 
     <div className="flex justify-end">
       <SubmitButton
         loadingText="Adding note..."
-        className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-100"
+        className={secondaryButtonClass}
       >
         Save internal note
       </SubmitButton>
@@ -2958,15 +3143,15 @@ const renderTimelineItem = (e: any, key: string) => {
         const noteText = getEventNoteText(meta);
 
         return (
-          <div key={idx} className="rounded-md border border-gray-200 bg-gray-50 p-3">
-            <div className="text-xs text-gray-600">{when}</div>
+          <div key={idx} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+            <div className="text-xs text-slate-500">{when}</div>
 
-            <div className="mt-2 text-sm font-medium text-gray-900">
+            <div className="mt-2 text-sm font-medium text-slate-950">
               Internal note
             </div>
 
             {noteText ? (
-              <div className="mt-2 whitespace-pre-wrap text-sm text-gray-800">
+              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
                 {noteText}
               </div>
             ) : null}
@@ -2974,23 +3159,23 @@ const renderTimelineItem = (e: any, key: string) => {
         );
       })
     ) : (
-      <div className="text-sm text-gray-600">No internal notes yet.</div>
+      <div className={workspaceEmptyStateClass}>No internal notes yet.</div>
     )}
   </div>
           </div>
         </details>
 
         {/* Timeline - Activity/History */}
-        <details className="group rounded-xl border border-slate-200 bg-white p-5 text-gray-900 shadow-sm sm:p-6 [&[open]_.disclosure-icon]:rotate-90">
+        <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title="Timeline"
-              subtitle="Activity history across this direct job chain."
+              subtitle={timelineSummaryText}
               meta={`${timelineItems.length} event(s)`}
             />
           </summary>
 
-          <div className="mt-3 border-t border-slate-200 pt-4 space-y-2">
+          <div className={`${workspaceDetailsDividerClass} space-y-2`}>
     {timelineItems.length ? (
       <>
         {timelinePreviewItems.map((e: any, idx: number) =>
@@ -2999,7 +3184,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
         {timelineOverflowItems.length > 0 ? (
           <details className="pt-1">
-            <summary className="cursor-pointer text-sm text-gray-700 underline">
+            <summary className="cursor-pointer text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-4">
               Show all timeline entries ({timelineItems.length})
             </summary>
             <div className="mt-2 space-y-2">
@@ -3011,7 +3196,7 @@ const renderTimelineItem = (e: any, key: string) => {
         ) : null}
       </>
     ) : (
-      <div className="text-sm text-gray-600">No timeline events yet.</div>
+      <div className={workspaceEmptyStateClass}>No timeline events yet.</div>
     )}
           </div>
         </details>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import FlashBanner from "@/components/ui/FlashBanner";
+import PortalJobListItem from "@/components/portal/PortalJobListItem";
 import {
   extractFailureReasons,
   finalRunPass,
@@ -37,6 +38,11 @@ type SP = Record<string, string | string[] | undefined>;
 function sp1(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v;
 }
+
+const portalSecondaryButtonClass =
+  "inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800";
+const portalMetricChipClass =
+  "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em]";
 
 export default async function PortalAllJobsPage({
   searchParams,
@@ -300,14 +306,15 @@ export default async function PortalAllJobsPage({
     const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
     const resolvedLabel = String(row.resolved?.statusLabel ?? "").trim();
 
+    if (ops === "pending_info" || row.resolved?.primaryIssue?.group === "needs_info") return { label: "Needs info", tone: "border-amber-200 bg-amber-50 text-amber-800" };
     if (resolvedLabel === "Retest Scheduled") return { label: "Retest Scheduled", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
-    if (resolvedLabel === "Retest Pending Scheduling") return { label: "Needs to be scheduled", tone: "border-amber-200 bg-amber-50 text-amber-800" };
+    if (resolvedLabel === "Retest Pending Scheduling") return { label: "Ready to schedule", tone: "border-amber-200 bg-amber-50 text-amber-800" };
     if (resolvedLabel === "Under Review") return { label: "Under review", tone: "border-cyan-200 bg-cyan-50 text-cyan-800" };
     if (resolvedLabel === "Failed") return { label: "Needs correction", tone: "border-rose-200 bg-rose-50 text-rose-800" };
-    if (ops === "paperwork_required") return { label: "Paperwork in Progress", tone: "border-violet-200 bg-violet-50 text-violet-800" };
+    if (ops === "paperwork_required") return { label: "Final paperwork", tone: "border-violet-200 bg-violet-50 text-violet-800" };
     if (ops === "invoice_required") return { label: "Final Processing", tone: "border-indigo-200 bg-indigo-50 text-indigo-800" };
     if (lifecycle === "on_the_way") return { label: "On the way", tone: "border-sky-200 bg-sky-50 text-sky-800" };
-    if (lifecycle === "in_progress" || lifecycle === "in_process" || ops === "in_process") return { label: "Work in progress", tone: "border-blue-200 bg-blue-50 text-blue-800" };
+    if (lifecycle === "in_progress" || lifecycle === "in_process" || ops === "in_process") return { label: "In progress", tone: "border-blue-200 bg-blue-50 text-blue-800" };
     if (ops === "scheduled") return { label: "Scheduled", tone: "border-slate-200 bg-slate-50 text-slate-800" };
     if (row.resolved.bucket === "passed") return { label: "Passed", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
     return { label: "In progress", tone: "border-slate-200 bg-slate-50 text-slate-800" };
@@ -355,7 +362,7 @@ export default async function PortalAllJobsPage({
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 text-gray-900 dark:text-gray-100">
+    <div className="mx-auto max-w-6xl space-y-6 text-gray-900 dark:text-gray-100">
       {banner === "invalid_request" ? (
         <FlashBanner
           type="warning"
@@ -363,102 +370,90 @@ export default async function PortalAllJobsPage({
         />
       ) : null}
 
-      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-white via-gray-50 to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950 p-6 shadow-md">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
+      <div className="rounded-[30px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_60%,rgba(239,246,255,0.68))] p-5 shadow-[0_26px_52px_-36px_rgba(15,23,42,0.28)] dark:border-slate-800 dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(17,24,39,0.96)_62%,rgba(15,23,42,0.92))] sm:p-6 lg:p-6">
+        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_240px] lg:items-start lg:gap-5">
+          <div className="max-w-2xl">
+            <div className="text-sm text-slate-500 dark:text-slate-400">
               <Link href="/portal" className="hover:underline">
                 ← Portal
               </Link>
             </div>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-              All Jobs
-            </h1>
-            <div className="mt-1 text-sm font-medium text-gray-600 dark:text-gray-300">
+            <div className="mt-4 inline-flex items-center rounded-full border border-slate-200/80 bg-white/92 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.24)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
               {contractorName}
             </div>
+            <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+              Contractor Jobs
+            </div>
+            <h1 className="mt-1 text-[clamp(1.7rem,3vw,2.4rem)] font-semibold tracking-[-0.03em] text-slate-950 dark:text-slate-100">
+              Active jobs portfolio
+            </h1>
+            <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+              Every portal-visible job, with status and next step surfaced for faster review.
+            </p>
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400 pt-1">
-            {resolvedJobs.length} total
+
+          <div className="flex flex-wrap gap-2 lg:max-w-[240px] lg:justify-end">
+            <div className={`${portalMetricChipClass} border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300`}>
+              {actionRequiredJobs.length} attention
+            </div>
+            <div className={`${portalMetricChipClass} border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300`}>
+              {inProgressJobs.length} in progress
+            </div>
+            <div className={`${portalMetricChipClass} border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300`}>
+              {passedJobs.length} passed
+            </div>
+            <div className="inline-flex items-center rounded-full border border-slate-200/80 bg-white/92 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+              {activeResolvedJobs.length} total
+            </div>
           </div>
         </div>
       </div>
 
       {/* Needs Attention */}
-      <section className="space-y-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+      <section className="space-y-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+              Priority Queue
+            </div>
+          <h2 className="mt-0.5 text-[1.1rem] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">
             {labelWithCount("Needs Attention", actionRequiredJobs.length)}
           </h2>
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            Failed and missing-information items are prioritized.
+          </div>
+          <div className="max-w-md text-sm leading-5 text-slate-600 dark:text-slate-300 sm:text-right">
+            Waiting on your response, correction, or scheduling.
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
+        <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/96 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950/80">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {actionRequiredJobs.map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = preferredStatusMessage({ job: j, resolved, openRetestChild });
               const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
-              const isPendingInfoOps = String(j?.ops_status ?? "").trim().toLowerCase() === "pending_info";
               return (
-                <Link
+                <PortalJobListItem
                   key={j.id}
                   href={`/portal/jobs/${j.id}`}
-                  className={[
-                    "block p-4 transition-all duration-150",
-                    "hover:bg-gray-50 hover:shadow-sm dark:hover:bg-gray-800/40",
-                  ].join(" ")}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
-                        {customerName(j)}
-                      </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                        <div className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                          {normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
-                        </div>
-                      </div>
-                      <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                        {displayAddress(j)}
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
-                          {statusMeta.label}
-                        </span>
-                        {isPendingInfoOps ? (
-                          <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-                            Pending Info
-                          </span>
-                        ) : null}
-                      </div>
-                      {detailLine ? (
-                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{detailLine}</div>
-                      ) : (
-                        <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                          {nextStepText({ job: j, resolved, openRetestChild })}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
-                      {j.scheduled_date
-                        ? `Service ${formatBusinessDateUS(j.scheduled_date)}`
-                        : "Service date pending"}
-                    </div>
-                  </div>
-                </Link>
+                  customerName={customerName(j)}
+                  title={normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
+                  address={displayAddress(j)}
+                  statusLabel={statusMeta.label}
+                  statusToneClass={statusMeta.tone}
+                  detailLine={detailLine}
+                  nextStep={nextStepText({ job: j, resolved, openRetestChild })}
+                  secondaryMeta={j.scheduled_date ? `Service ${formatBusinessDateUS(j.scheduled_date)}` : "Service date pending"}
+                />
               );
             })}
 
             {actionRequiredJobs.length === 0 && (
-              <div className="p-8 text-center">
+              <div className="px-6 py-6 text-center">
                 <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   No jobs need attention.
                 </div>
                 <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  New failed or pending-info jobs will appear here.
+                  New follow-up items will appear here.
                 </div>
               </div>
             )}
@@ -467,75 +462,50 @@ export default async function PortalAllJobsPage({
       </section>
 
       {/* In Progress */}
-      <section className="space-y-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+      <section className="space-y-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+              Active Work
+            </div>
+          <h2 className="mt-0.5 text-[1.1rem] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">
             {labelWithCount("In Progress", inProgressJobs.length)}
           </h2>
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            Field work and office follow-through in progress.
+          </div>
+          <div className="max-w-md text-sm leading-5 text-slate-600 dark:text-slate-300 sm:text-right">
+            Work underway or moving through final processing.
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
+        <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/96 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950/80">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {inProgressJobs.map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = preferredStatusMessage({ job: j, resolved, openRetestChild });
               const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
-              const isPendingInfoOps = String(j?.ops_status ?? "").trim().toLowerCase() === "pending_info";
               return (
-                <Link
+                <PortalJobListItem
                   key={j.id}
                   href={`/portal/jobs/${j.id}`}
-                  className="block p-4 transition-all duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-gray-800/40"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
-                        {customerName(j)}
-                      </div>
-                      <div className="mt-0.5 truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                        {normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
-                      </div>
-                      <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                        {displayAddress(j)}
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
-                          {statusMeta.label}
-                        </span>
-                        {isPendingInfoOps ? (
-                          <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-                            Pending Info
-                          </span>
-                        ) : null}
-                      </div>
-                      {detailLine ? (
-                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{detailLine}</div>
-                      ) : (
-                        <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                          {nextStepText({ job: j, resolved, openRetestChild })}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
-                      {j.scheduled_date
-                        ? `Service ${formatBusinessDateUS(String(j.scheduled_date))}`
-                        : "Schedule pending"}
-                    </div>
-                  </div>
-                </Link>
+                  customerName={customerName(j)}
+                  title={normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
+                  address={displayAddress(j)}
+                  statusLabel={statusMeta.label}
+                  statusToneClass={statusMeta.tone}
+                  detailLine={detailLine}
+                  nextStep={nextStepText({ job: j, resolved, openRetestChild })}
+                  secondaryMeta={j.scheduled_date ? `Service ${formatBusinessDateUS(String(j.scheduled_date))}` : "Schedule pending"}
+                />
               );
             })}
 
             {inProgressJobs.length === 0 && (
-              <div className="p-8 text-center">
+              <div className="px-6 py-6 text-center">
                 <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   No in-progress jobs.
                 </div>
                 <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Scheduled jobs and office follow-through appear here.
+                  Active work will appear here.
                 </div>
               </div>
             )}
@@ -544,76 +514,51 @@ export default async function PortalAllJobsPage({
       </section>
 
       {/* Passed */}
-      <section className="space-y-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+      <section className="space-y-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+              Completed Outcomes
+            </div>
+          <h2 className="mt-0.5 text-[1.1rem] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">
             {labelWithCount("Passed", passedJobs.length)}
           </h2>
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            Passed jobs and completion processing.
+          </div>
+          <div className="max-w-md text-sm leading-5 text-slate-600 dark:text-slate-300 sm:text-right">
+            Passed jobs and recent completion outcomes.
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 dark:border-gray-800">
+        <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/96 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950/80">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {passedJobs.map(({ job: j, resolved }) => {
               const resolvedAt = j.data_entry_completed_at ?? j.created_at;
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = preferredStatusMessage({ job: j, resolved, openRetestChild });
               const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
-              const isPendingInfoOps = String(j?.ops_status ?? "").trim().toLowerCase() === "pending_info";
               return (
-                <Link
+                <PortalJobListItem
                   key={j.id}
                   href={`/portal/jobs/${j.id}`}
-                  className="block p-4 transition-all duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-gray-800/40"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
-                        {customerName(j)}
-                      </div>
-                      <div className="mt-0.5 truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                        {normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
-                      </div>
-                      <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                        {displayAddress(j)}
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${statusMeta.tone}`}>
-                          {statusMeta.label}
-                        </span>
-                        {isPendingInfoOps ? (
-                          <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-                            Pending Info
-                          </span>
-                        ) : null}
-                      </div>
-                      {detailLine ? (
-                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{detailLine}</div>
-                      ) : (
-                        <div className="mt-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-                          {nextStepText({ job: j, resolved, openRetestChild })}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="shrink-0 whitespace-nowrap text-xs font-medium text-gray-500 dark:text-gray-400">
-                      {resolvedAt
-                        ? `Resolved ${formatDateLA(String(resolvedAt))}`
-                        : "Resolved recently"}
-                    </div>
-                  </div>
-                </Link>
+                  customerName={customerName(j)}
+                  title={normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
+                  address={displayAddress(j)}
+                  statusLabel={statusMeta.label}
+                  statusToneClass={statusMeta.tone}
+                  detailLine={detailLine}
+                  nextStep={nextStepText({ job: j, resolved, openRetestChild })}
+                  secondaryMeta={resolvedAt ? `Resolved ${formatDateLA(String(resolvedAt))}` : "Resolved recently"}
+                />
               );
             })}
 
             {passedJobs.length === 0 && (
-              <div className="p-8 text-center">
+              <div className="px-6 py-6 text-center">
                 <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   No passed jobs.
                 </div>
                 <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Passed jobs will appear here.
+                  Completed results will appear here.
                 </div>
               </div>
             )}

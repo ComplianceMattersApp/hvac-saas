@@ -10,6 +10,13 @@ import {
 } from "@/lib/actions/attachment-actions";
 import ActionFeedback from "@/components/ui/ActionFeedback";
 
+const portalPrimaryButtonClass =
+  "inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_26px_-20px_rgba(37,99,235,0.42)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_16px_28px_-20px_rgba(37,99,235,0.46)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] disabled:opacity-50";
+const portalSecondaryButtonClass =
+  "inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800";
+const portalInputClass =
+  "w-full rounded-xl border border-slate-300/80 bg-white px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500";
+
 type Item = {
   id: string;
   bucket: string;
@@ -180,10 +187,13 @@ export default function JobAttachments({
   }
 
   return (
-    <div className="rounded-xl border bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-        <div className="text-sm font-semibold">Photos / Documents</div>
-        <div className="text-xs text-gray-500 dark:text-gray-300">
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/96 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.22)] dark:border-slate-800 dark:bg-slate-950/85">
+      <div className="flex items-center justify-between border-b border-slate-200/80 bg-slate-50/80 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
+        <div>
+          <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">Photos / Documents</div>
+          <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Share supporting files or submit corrections for review.</div>
+        </div>
+        <div className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
           {initialItems?.length ?? 0} files
         </div>
       </div>
@@ -208,12 +218,12 @@ export default function JobAttachments({
             type="button"
             onClick={openPicker}
             disabled={isPending}
-            className="px-4 py-2 rounded-lg border bg-white dark:bg-gray-900 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-50"
+            className={portalSecondaryButtonClass}
           >
             Choose Files
           </button>
 
-          <div className="text-xs text-gray-600 dark:text-gray-300">
+          <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             {hasFiles ? (
               <>Selected: {files.map((f) => f.name).join(", ")}</>
             ) : (
@@ -227,7 +237,7 @@ export default function JobAttachments({
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
           placeholder="Optional caption (e.g., before/after, gauges, etc.)"
-          className="w-full rounded-lg border px-3 py-2 text-sm bg-white dark:bg-gray-900"
+          className={portalInputClass}
           disabled={isPending}
         />
 
@@ -236,19 +246,19 @@ export default function JobAttachments({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Optional note (model/serial, context, what changed, etc.)"
-          className="w-full rounded-lg border px-3 py-2 text-sm bg-white dark:bg-gray-900"
+          className={portalInputClass}
           rows={4}
           disabled={isPending}
         />
 
         {/* Intent */}
 <div className="space-y-2">
-  <div className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
     What are you sending this for?
   </div>
 
   <div className="flex flex-col sm:flex-row gap-2">
-    <label className="flex items-start gap-2 rounded-lg border p-3 cursor-pointer bg-white dark:bg-gray-900">
+    <label className={`flex items-start gap-2 rounded-xl border p-3 cursor-pointer transition-colors ${intent === "upload" ? "border-slate-300 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-900" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950"}`}>
       <input
         type="radio"
         name="intent"
@@ -258,14 +268,14 @@ export default function JobAttachments({
         disabled={isPending}
       />
       <div>
-        <div className="text-sm font-medium">Upload only</div>
-        <div className="text-xs text-gray-600 dark:text-gray-300">
+        <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Upload only</div>
+        <div className="text-xs leading-5 text-slate-600 dark:text-slate-300">
           Share photos/documents (ex: model/serial photos). No retest request.
         </div>
       </div>
     </label>
 
-    <label className="flex items-start gap-2 rounded-lg border p-3 cursor-pointer bg-white dark:bg-gray-900">
+    <label className={`flex items-start gap-2 rounded-xl border p-3 cursor-pointer transition-colors ${intent === "review" ? "border-blue-200 bg-blue-50/70 dark:border-blue-800 dark:bg-blue-950/20" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950"}`}>
       <input
         type="radio"
         name="intent"
@@ -275,8 +285,8 @@ export default function JobAttachments({
         disabled={isPending}
       />
       <div>
-        <div className="text-sm font-medium">Correction / Ready for review</div>
-        <div className="text-xs text-gray-600 dark:text-gray-300">
+        <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Correction / Ready for review</div>
+        <div className="text-xs leading-5 text-slate-600 dark:text-slate-300">
           Marks this job as “Needs internal review” (usually leads to a retest).
         </div>
       </div>
@@ -285,19 +295,14 @@ export default function JobAttachments({
 </div>
 
 {/* Action */}
-<div className="text-xs text-gray-500 dark:text-gray-300">
+<div className="text-xs text-slate-500 dark:text-slate-300">
 If this job failed testing, choose &quot;Correction / Ready for review&quot;.
 </div>
 <button
   type="button"
   onClick={intent === "review" ? submitForReview : uploadOnly}
   disabled={!canAct}
-  className={[
-    "px-4 py-2 rounded-lg text-sm font-medium transition disabled:opacity-50",
-    intent === "review"
-      ? "bg-blue-600 text-white hover:bg-blue-700"
-      : "border bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800",
-  ].join(" ")}
+  className={intent === "review" ? portalPrimaryButtonClass : portalSecondaryButtonClass}
 >
   {isPending
     ? intent === "review"
@@ -309,9 +314,9 @@ If this job failed testing, choose &quot;Correction / Ready for review&quot;.
 </button>
 
         {/* Existing attachments list (images only thumbs) */}
-        <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
+        <div className="border-t border-slate-200/80 pt-2 dark:border-slate-800">
           {!initialItems || initialItems.length === 0 ? (
-            <div className="text-sm text-gray-600 dark:text-gray-300">
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-6 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/55 dark:text-slate-300">
               No files uploaded yet.
             </div>
           ) : (
@@ -325,7 +330,7 @@ If this job failed testing, choose &quot;Correction / Ready for review&quot;.
                 return (
                   <div
                     key={a.id}
-                    className="rounded-lg border bg-gray-50 dark:bg-gray-800/40 overflow-hidden"
+                    className="overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/80 shadow-[0_12px_24px_-26px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:bg-slate-900/55"
                   >
                     {hasThumb ? (
                       <a href={a.signedUrl!} target="_blank" rel="noreferrer">
@@ -337,17 +342,17 @@ If this job failed testing, choose &quot;Correction / Ready for review&quot;.
                         />
                       </a>
                     ) : (
-                      <div className="w-full h-40 flex items-center justify-center text-xs text-gray-500 dark:text-gray-300 bg-white/40 dark:bg-gray-900/30">
+                      <div className="flex h-40 w-full items-center justify-center bg-white/50 text-xs text-slate-500 dark:bg-slate-950/40 dark:text-slate-300">
                         {a.content_type ? a.content_type : "file"}
                       </div>
                     )}
 
                     <div className="p-3 flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium truncate">
+                        <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                           {a.file_name}
                         </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-300">
+                        <div className="text-xs text-slate-600 dark:text-slate-300">
                           {a.caption ? a.caption : "—"}
                         </div>
                       </div>
@@ -357,12 +362,12 @@ If this job failed testing, choose &quot;Correction / Ready for review&quot;.
                           href={a.signedUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="shrink-0 px-3 py-1.5 rounded-md border text-xs font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition whitespace-nowrap"
+                          className="shrink-0 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 whitespace-nowrap"
                         >
                           Download
                         </a>
                       ) : (
-                        <span className="shrink-0 text-xs text-gray-500 dark:text-gray-300">
+                        <span className="shrink-0 text-xs text-slate-500 dark:text-slate-300">
                           (no link)
                         </span>
                       )}

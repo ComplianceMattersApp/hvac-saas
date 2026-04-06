@@ -5,6 +5,7 @@ type JobLocationPreviewProps = {
   state?: string | null;
   zip?: string | null;
   className?: string;
+  showAddressFooter?: boolean;
 };
 
 type StreetViewMetadataResponse = {
@@ -112,23 +113,31 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
         )}
       </a>
 
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <a
-          href={mapsDirectionsUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
-        >
-          Navigate
-        </a>
-        <a
-          href={mapsSearchUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50"
-        >
-          Open in Maps
-        </a>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <a
+            href={mapsDirectionsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+          >
+            Navigate
+          </a>
+          <a
+            href={mapsSearchUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50"
+          >
+            Open in Maps
+          </a>
+        </div>
+
+        {props.showAddressFooter ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-sm font-medium leading-6 text-slate-700 sm:max-w-[20rem] sm:text-right">
+            {addressDisplay}
+          </div>
+        ) : null}
       </div>
     </div>
   );
