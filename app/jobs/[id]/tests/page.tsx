@@ -310,8 +310,10 @@ function includesBlocked(computed: any, needle: string) {
 }
 
 function getComputedFailures(run: any) {
-  const failures = Array.isArray(run?.computed?.failures) ? run.computed.failures : [];
-  return Array.from(new Set(failures.map((value: any) => String(value ?? "").trim()).filter(Boolean)));
+  const failures: string[] = Array.isArray(run?.computed?.failures)
+    ? run.computed.failures.map((value: any) => String(value ?? "").trim()).filter(Boolean)
+    : [];
+  return Array.from(new Set<string>(failures));
 }
 
 function hasFilterDrierFailure(run: any) {
