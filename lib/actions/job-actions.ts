@@ -137,38 +137,6 @@ async function applyRetestResolution(params: {
       event_type: "retest_passed",
       meta: { child_job_id: childJobId },
     });
-
-    const { data: parent, error: parentErr } = await supabase
-      .from("jobs")
-      .select("ops_status")
-      .eq("id", parentJobId)
-      .maybeSingle();
-
-    if (parentErr) throw parentErr;
-
-    const parentOps = String(parent?.ops_status ?? "").trim() || null;
-
-    // Resolve parent out of failure workflow, but do NOT auto-close
-    if (parentOps === "failed" || parentOps === "retest_needed") {
-      const { error: updErr } = await supabase
-        .from("jobs")
-        .update({ ops_status: "paperwork_required" })
-        .eq("id", parentJobId);
-
-      if (updErr) throw updErr;
-      
-
-      await insertJobEvent({
-        supabase,
-        jobId: parentJobId,
-        event_type: "status_changed",
-        meta: {
-          from: parentOps,
-          to: "paperwork_required",
-          reason: "retest_passed",
-        },
-      });
-    }
   }
 
   if (becameFailed) {
