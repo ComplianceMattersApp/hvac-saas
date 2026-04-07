@@ -5366,7 +5366,6 @@ export async function advanceJobStatusFromForm(formData: FormData) {
                 supabase,
                 jobId: id,
                 event_type: "ops_update",
-                message: "Service work marked complete - invoice required",
                 meta: {
                   changes: [
                     { field: "status", from: current, to: next },
