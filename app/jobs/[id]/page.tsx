@@ -1117,7 +1117,9 @@ const canShowCertsButton =
   !isFailedUnresolved;
 
 const canShowInvoiceButton =
-  !job.invoice_complete && String(job.ops_status ?? "") !== "closed";
+  job.job_type === "ecc" &&
+  !job.invoice_complete &&
+  String(job.ops_status ?? "") !== "closed";
 
 const showCloseoutRow =
   isInternalUser &&

@@ -164,6 +164,16 @@ function isLifecycleComplete(v?: string | null) {
   return ["completed", "closed", "cancelled"].includes(status);
 }
 
+function isOperationallyActiveJob(job: Pick<JobRow, "status" | "ops_status" | "deleted_at">) {
+  if (job.deleted_at) return false;
+
+  const lifecycleStatus = normalizeLifecycleStatus(job.status);
+  if (lifecycleStatus === "cancelled") return false;
+
+  const opsStatus = normalizeOpsStatus(job.ops_status);
+  return opsStatus !== "closed" && opsStatus !== "completed";
+}
+
 function opsStatusLabel(v?: string | null) {
   const s = normalizeOpsStatus(v);
   if (s === "need_to_schedule") return "Need to Schedule";
@@ -228,6 +238,8 @@ function summaryOrder() {
     "failed",
     "pending_office_review",
     "retest_needed",
+    "paperwork_required",
+    "invoice_required",
     "on_hold",
   ] as const;
 }
@@ -351,9 +363,7 @@ const { data: jobsData, error: jobsErr } = await supabase
   if (jobsErr) throw jobsErr;
 
   const jobs = (jobsData ?? []) as JobRow[];
-  const activeJobs = jobs.filter(
-    (job) => !job.deleted_at && !isLifecycleComplete(job.status)
-  );
+  const activeJobs = jobs.filter((job) => isOperationallyActiveJob(job));
 
   // Lightweight service-case awareness
   const serviceCaseIds = Array.from(

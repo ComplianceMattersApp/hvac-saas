@@ -5,15 +5,13 @@ import { createServerClient } from "@supabase/ssr";
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Bypass auth for static + PWA assets so they never redirect through the auth gate.
+  // Bypass auth for static assets so they never redirect through the auth gate.
   const isPublicAsset =
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
     pathname === "/manifest.webmanifest" ||
-    pathname === "/sw.js" ||
-    pathname.startsWith("/workbox-") ||
     pathname === "/icon.png" ||
     pathname === "/icon-192.png" ||
     pathname === "/apple-icon.png" ||
@@ -62,6 +60,6 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|sw.js|workbox-.*|icon.png|icon-192.png|apple-icon.png).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|icon.png|icon-192.png|apple-icon.png).*)",
   ],
 };

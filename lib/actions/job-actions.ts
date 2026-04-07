@@ -9,6 +9,7 @@ import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from "@/lib/actions/job-evaluator";
+import { forceSetOpsStatus } from "@/lib/actions/ops-status";
 import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
 import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions/job-event-meta";
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
@@ -136,38 +137,6 @@ async function applyRetestResolution(params: {
       event_type: "retest_passed",
       meta: { child_job_id: childJobId },
     });
-
-    const { data: parent, error: parentErr } = await supabase
-      .from("jobs")
-      .select("ops_status")
-      .eq("id", parentJobId)
-      .maybeSingle();
-
-    if (parentErr) throw parentErr;
-
-    const parentOps = String(parent?.ops_status ?? "").trim() || null;
-
-    // Resolve parent out of failure workflow, but do NOT auto-close
-    if (parentOps === "failed" || parentOps === "retest_needed") {
-      const { error: updErr } = await supabase
-        .from("jobs")
-        .update({ ops_status: "paperwork_required" })
-        .eq("id", parentJobId);
-
-      if (updErr) throw updErr;
-      
-
-      await insertJobEvent({
-        supabase,
-        jobId: parentJobId,
-        event_type: "status_changed",
-        meta: {
-          from: parentOps,
-          to: "paperwork_required",
-          reason: "retest_passed",
-        },
-      });
-    }
   }
 
   if (becameFailed) {
@@ -5198,24 +5167,36 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   } else {
     console.log("[ADVANCE_STATUS_BRANCH]", { jobId: id, branch: "else", current, next });
     const updatePayload: Record<string, any> = { status: next };
+    let completedJobType: string | null = null;
+    let completedAt: string | null = null;
+    let beforeOpsStatus: string | null = null;
+    let beforeFieldComplete = false;
+    let beforeFieldCompleteAt: string | null = null;
 
     // ✅ When field marks completed, push into Data Entry queue
     // When field marks completed, push into the correct Ops queue
     if (next === "completed") {
       const { data: jt, error: jtErr } = await supabase
         .from("jobs")
-        .select("job_type, ops_status, certs_complete, invoice_complete, scheduled_date, window_start, window_end")
+        .select("job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, scheduled_date, window_start, window_end")
         .eq("id", id)
         .single();
 
       if (jtErr) throw jtErr;
 
       const jobType = String(jt?.job_type ?? "").trim().toLowerCase();
+      completedJobType = jobType;
+      completedAt = new Date().toISOString();
+      beforeOpsStatus = jt?.ops_status ?? null;
+      beforeFieldComplete = Boolean(jt?.field_complete);
+      beforeFieldCompleteAt = jt?.field_complete_at ?? null;
 
       if (jobType === "ecc") {
         updatePayload.field_complete = true;
-        updatePayload.field_complete_at = new Date().toISOString();
+        updatePayload.field_complete_at = completedAt;
       } else {
+        updatePayload.field_complete = true;
+        updatePayload.field_complete_at = completedAt;
         updatePayload.ops_status = "invoice_required";
       }
     }
@@ -5379,6 +5360,27 @@ export async function advanceJobStatusFromForm(formData: FormData) {
               },
               userId: actingUserId,
             });
+
+            if (completedJobType && completedJobType !== "ecc") {
+              await insertJobEvent({
+                supabase,
+                jobId: id,
+                event_type: "ops_update",
+                message: "Service work marked complete - invoice required",
+                meta: {
+                  changes: [
+                    { field: "status", from: current, to: next },
+                    { field: "field_complete", from: beforeFieldComplete, to: true },
+                    { field: "field_complete_at", from: beforeFieldCompleteAt, to: completedAt },
+                    { field: "ops_status", from: beforeOpsStatus, to: "invoice_required" },
+                  ],
+                  source: "advance_job_status_from_form",
+                  actor_user_id: actingUserId,
+                  ...(assignmentId ? { assignment_id: assignmentId } : {}),
+                },
+                userId: actingUserId,
+              });
+            }
           } catch (ancillaryError) {
             console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
               jobId: id,
@@ -5966,7 +5968,7 @@ export async function completeDataEntryFromForm(formData: FormData) {
   // Service: data entry completion = invoice sent/recorded -> closed
   const jobType = String(job?.job_type ?? "").trim().toLowerCase();
 
-// Any non-ECC job resolves through projection after invoice/data entry.
+// Service closes locally after successful invoice/data entry save.
 // Only ECC stays in paperwork flow.
 if (jobType !== "ecc") {
   const { error } = await supabase
@@ -5994,6 +5996,29 @@ if (jobType !== "ecc") {
     },
     userId: actingUserId,
   });
+
+  if (jobType === "service") {
+    const previousOpsStatus = job?.ops_status ?? null;
+
+    if (String(previousOpsStatus ?? "").trim().toLowerCase() !== "closed") {
+      await forceSetOpsStatus(id, "closed");
+
+      await insertJobEvent({
+        supabase,
+        jobId: id,
+        event_type: "ops_update",
+        meta: {
+          source: "job_detail_data_entry_closeout",
+          changes: [
+            { field: "ops_status", from: previousOpsStatus, to: "closed" },
+          ],
+        },
+        userId: actingUserId,
+      });
+    }
+
+    redirect(`/jobs/${id}`);
+  }
 
   await evaluateJobOpsStatus(id);
   await healStalePaperworkOpsStatus(id);
