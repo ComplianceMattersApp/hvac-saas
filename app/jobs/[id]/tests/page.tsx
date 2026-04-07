@@ -309,6 +309,30 @@ function includesBlocked(computed: any, needle: string) {
   return blocked.some((b: any) => String(b ?? "").toLowerCase().includes(needle.toLowerCase()));
 }
 
+function getComputedFailures(run: any) {
+  const failures = Array.isArray(run?.computed?.failures) ? run.computed.failures : [];
+  return Array.from(new Set(failures.map((value: any) => String(value ?? "").trim()).filter(Boolean)));
+}
+
+function hasFilterDrierFailure(run: any) {
+  return getComputedFailures(run).some((failure) => failure.toLowerCase().includes("filter drier"));
+}
+
+function refrigerantNumericChecksPassing(run: any) {
+  const computed = run?.computed ?? {};
+  const measuredSubcool = computed?.measured_subcool_f;
+  const targetSubcool = run?.data?.target_subcool_f;
+  const measuredSuperheat = computed?.measured_superheat_f;
+
+  return (
+    measuredSubcool != null &&
+    targetSubcool != null &&
+    measuredSuperheat != null &&
+    !includesFailure(computed, "subcool") &&
+    !includesFailure(computed, "superheat")
+  );
+}
+
 function outdoorQualificationStatus(run: any) {
   const computed = run?.computed ?? {};
   if (includesBlocked(computed, "outdoor temp below")) {
@@ -2172,9 +2196,25 @@ const defaultHeatingOutputBtu =
 
                 <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
                 <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <div>Overall Result: {getEffectiveResultLabel(runRC)}</div>
                   <div>Measured Subcool: {fmtValue(runRC.computed?.measured_subcool_f, "°F")}</div>
                   <div>Measured Superheat: {fmtValue(runRC.computed?.measured_superheat_f, "°F")}</div>
                   <div>Status: {fallbackText(runRC.computed?.status)}</div>
+                  {getComputedFailures(runRC).length > 0 ? (
+                    <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                      <div className="font-medium">Why overall result is failing</div>
+                      <ul className="mt-1 list-disc pl-5">
+                        {getComputedFailures(runRC).map((failure) => (
+                          <li key={failure}>{failure}</li>
+                        ))}
+                      </ul>
+                      {hasFilterDrierFailure(runRC) && refrigerantNumericChecksPassing(runRC) ? (
+                        <div className="mt-2">
+                          Subcool and superheat are passing. Overall result still fails until Filter drier installed is confirmed.
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
                 
                 <div className="text-sm font-semibold text-slate-900">Override (Optional)</div>

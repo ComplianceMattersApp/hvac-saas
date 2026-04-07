@@ -102,10 +102,10 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-md">
-      <div className="mb-2 grid grid-cols-7 gap-2">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+      <div className="mb-3 grid grid-cols-7 gap-2">
         {weekdayLabels.map((label) => (
-          <div key={label} className="text-center text-[11px] font-medium uppercase tracking-wide text-gray-500">
+          <div key={label} className="rounded-xl bg-slate-50 px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
             {label}
           </div>
         ))}
@@ -156,21 +156,25 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                   { scroll: false },
                 );
               }}
-              className={`min-h-24 rounded-xl border border-gray-200 p-3 transition-colors ${
-                isToday(day) ? 'bg-blue-50' : isAdjacentMonthDay ? 'bg-gray-50' : 'bg-white'
-              } hover:bg-gray-50 ${isSelectedDate ? 'ring-2 ring-slate-800/45 border-slate-500' : ''} ${dropTargetDate === ymd ? 'ring-2 ring-blue-400 border-blue-500 bg-blue-50/80' : ''}`}
+              className={`min-h-28 rounded-2xl border p-3 transition ${
+                isToday(day)
+                  ? 'border-blue-200 bg-blue-50/70'
+                  : isAdjacentMonthDay
+                  ? 'border-slate-200 bg-slate-50/70'
+                  : 'border-slate-200 bg-white'
+              } hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-sm ${isSelectedDate ? 'ring-2 ring-slate-800/35 border-slate-400 bg-slate-50/80 shadow-sm' : ''} ${dropTargetDate === ymd ? 'ring-2 ring-blue-400 border-blue-500 bg-blue-50/80' : ''}`}
             >
               <div className="mb-2 flex items-center justify-between">
                 <Link
                   href={buildCalendarHref('month', ymd, { tech })}
-                  className={`rounded-sm text-lg font-bold hover:underline ${
-                    isToday(day) ? 'rounded-full bg-blue-600 px-2 text-white' : isAdjacentMonthDay ? 'text-gray-400' : 'text-gray-900'
-                  } ${isSelectedDate && !isToday(day) ? 'rounded bg-slate-100 px-2' : ''}`}
+                  className={`rounded-full px-2.5 py-1 text-lg font-bold transition hover:bg-slate-100 ${
+                    isToday(day) ? 'bg-blue-600 text-white shadow-sm' : isAdjacentMonthDay ? 'text-slate-400' : 'text-slate-900'
+                  } ${isSelectedDate && !isToday(day) ? 'bg-slate-100 text-slate-900' : ''}`}
                 >
                   {format(day, 'd')}
                 </Link>
                 {dayJobs.length > 0 ? (
-                  <span className="text-xs font-semibold text-emerald-700">
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                     {dayJobs.length} job{dayJobs.length > 1 ? 's' : ''}
                   </span>
                 ) : null}
@@ -194,25 +198,25 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                           event.dataTransfer.setData('application/x-cm-job-id', job.id);
                           event.dataTransfer.effectAllowed = 'move';
                         }}
-                        className={`flex min-h-[32px] items-start gap-2 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm hover:bg-slate-50 ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700' : ''}`}
+                        className={`flex min-h-[36px] items-start gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
                         scroll={false}
                       >
                         <div className={`mt-[5px] h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
                         <div className="min-w-0 flex-1">
                           <div className="truncate font-medium text-slate-900">{primaryLine}</div>
-                          <div className="truncate text-[10px] text-slate-500">{secondaryLine}</div>
+                          <div className="mt-0.5 truncate text-[10px] text-slate-500">{secondaryLine}</div>
                           {lifecycle === 'cancelled' ? (
                             <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Cancelled</div>
                           ) : null}
                         </div>
                         {needsTech ? (
-                          <span className="ml-auto shrink-0 rounded border border-amber-200 bg-amber-100 px-1 py-0.5 text-[9px] font-semibold text-amber-800">
+                          <span className="ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
                             Needs Tech
                           </span>
                         ) : null}
                       </Link>
 
-                      <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-72 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-900 shadow-lg group-hover:block group-focus-within:block">
+                      <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-72 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-900 shadow-xl shadow-slate-950/10 group-hover:block group-focus-within:block">
                         <div className="mb-1 font-semibold">{normalizeRetestLinkedJobTitle(job.title) || shortTitle(job)}</div>
                         <div className="mb-1 text-slate-700">{job.job_address || 'No address'}</div>
 
@@ -249,21 +253,21 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
 
                 {visibleBlockEvents.map((event) => (
                   <div key={event.id} className="group relative">
-                    <div className={`flex min-h-[24px] items-center gap-2 rounded-md border border-emerald-200 border-dashed bg-emerald-50/70 px-2 py-1 text-[11px] text-emerald-950 shadow-sm ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}>
-                      <span className="inline-flex rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                    <div className={`flex min-h-[28px] items-center gap-2 rounded-xl border border-emerald-200 border-dashed bg-emerald-50/70 px-2.5 py-1.5 text-[11px] text-emerald-950 shadow-sm shadow-emerald-950/5 ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}>
+                      <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                         Block
                       </span>
                       <div className="min-w-0 flex-1 truncate font-medium">{event.title}</div>
                       <Link
                         href={buildCalendarHref('month', monthDate, { block: event.id, tech })}
                         scroll={false}
-                        className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700 underline-offset-2 hover:underline"
+                        className="shrink-0 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700 transition hover:bg-emerald-100"
                       >
                         Edit
                       </Link>
                     </div>
 
-                    <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-64 rounded-lg border border-emerald-200 bg-white p-3 text-xs text-slate-900 shadow-lg group-hover:block group-focus-within:block">
+                    <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-64 rounded-xl border border-emerald-200 bg-white p-3 text-xs text-slate-900 shadow-xl shadow-emerald-950/10 group-hover:block group-focus-within:block">
                       <div className="mb-1 flex items-center gap-2">
                         <span className="inline-flex rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                           Block
@@ -280,7 +284,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                 ))}
 
                 {hiddenEntryCount > 0 ? (
-                  <div className="mt-1 text-center text-xs text-gray-500">+{hiddenEntryCount} more</div>
+                  <div className="mt-1 text-center text-[11px] font-medium text-slate-500">+{hiddenEntryCount} more</div>
                 ) : null}
               </div>
             </div>

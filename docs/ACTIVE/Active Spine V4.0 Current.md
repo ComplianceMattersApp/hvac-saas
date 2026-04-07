@@ -118,6 +118,8 @@ ecc_test_runs
 
 Job ECC resolution is derived from completed test runs and projected into jobs.ops_status.
 
+Refrigerant charge overall pass requires all active refrigerant-charge checks to pass, not just numeric subcool and superheat checks. Unless an approved charge exemption applies, overall pass also requires filter drier confirmation and applicable temperature qualification. UI surfaces must show non-numeric failure reasons from ecc_test_runs.computed.failures and must not imply that numeric check chips alone determine the final result.
+
 6.3 UI discipline
 
 ECC-specific actions and surfaces must only appear when ECC behavior actually applies.
