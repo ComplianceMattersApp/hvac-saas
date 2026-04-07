@@ -1661,9 +1661,9 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
               {displayTitle}
             </Link>
             <div className="mt-0.5 text-[13px] font-semibold leading-5 text-slate-950">{customerName}</div>
-            <div className="text-[11px] leading-4 text-slate-600">{addressLine(j)}</div>
+            <div className={`${opsSupportTextClass} text-slate-600`}>{addressLine(j)}</div>
             {customerPhone ? (
-              <div className="mt-0.5 text-[11px] leading-4 text-slate-600">
+              <div className={`mt-0.5 ${opsSupportTextClass} text-slate-600`}>
                 <span className="font-medium text-slate-500">Phone</span>{" "}
                 {preferredPhoneHref ? (
                   <a
@@ -1679,7 +1679,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
             ) : null}
           </div>
           <div className="flex w-full flex-col gap-1.5 sm:min-w-0 sm:items-start sm:border-l sm:border-slate-200 sm:pl-3">
-            <div className="flex flex-wrap items-center gap-1.5 text-[10px] sm:justify-start">
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] sm:justify-start sm:text-[10px]">
               {emphasize && needsAttention ? (
                 <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-[0.08em] text-amber-800">
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
@@ -1695,7 +1695,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
             {reasonCallout ? (
               <div className={`inline-block max-w-full rounded-lg border px-2.5 py-1.5 ${reasonCallout.tone}`}>
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <div className={`text-[10px] font-semibold uppercase tracking-[0.1em] ${reasonCallout.labelTone}`}>
+                  <div className={`text-[11px] font-semibold uppercase tracking-[0.09em] sm:text-[10px] sm:tracking-[0.1em] ${reasonCallout.labelTone}`}>
                     {reasonCallout.label}
                   </div>
                   <div className={`text-[13px] font-medium leading-5 ${reasonCallout.bodyTone}`}>
@@ -1703,7 +1703,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
                   </div>
                 </div>
                 {reasonCallout.support ? (
-                  <div className={`mt-0.5 text-[11px] leading-4 ${reasonCallout.supportTone}`}>
+                  <div className={`mt-0.5 ${opsSupportTextClass} ${reasonCallout.supportTone}`}>
                     {reasonCallout.support}
                   </div>
                 ) : null}
@@ -1715,26 +1715,26 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         <div className="mt-1.5 border-t border-slate-200/80 pt-1.5 sm:mt-2 sm:pt-2">
           <div className={showNextStepSection ? "grid gap-2 sm:grid-cols-[minmax(10rem,0.75fr)_minmax(0,1.25fr)]" : "grid gap-2"}>
             <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{scheduleLabel}</div>
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>{scheduleLabel}</div>
               <div className="mt-0.5 text-[13px] font-semibold leading-5 text-slate-950">{scheduleDateText}</div>
-              <div className="text-[11px] leading-4 text-slate-600">{scheduleWindowText}</div>
+              <div className={`${opsSupportTextClass} text-slate-600`}>{scheduleWindowText}</div>
             </div>
             {showNextStepSection ? (
               <div className="min-w-0 sm:border-l sm:border-slate-200 sm:pl-4">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">Next Step</div>
+                <div className={`${opsUtilityLabelClass} text-blue-700`}>Next Step</div>
                 <div className="mt-0.5 text-[13px] font-semibold leading-5 text-slate-950">{nextStep}</div>
                 {detailLine ? (
-                  <div className="mt-0.5 text-[11px] leading-4 text-slate-600">{detailLine}</div>
+                  <div className={`mt-0.5 ${opsSupportTextClass} text-slate-600`}>{detailLine}</div>
                 ) : null}
               </div>
             ) : null}
           </div>
           {metaItems.length > 0 ? (
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-4 text-slate-600">
+            <div className={`mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 ${opsSupportTextClass} text-slate-600`}>
               {metaItems.map((item, index) => (
                 <div
                   key={item.key}
-                  className={item.framed ? "inline-flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50/80 px-1.5 py-0.5 text-sky-900" : "inline-flex items-center gap-2"}
+                  className={item.framed ? "inline-flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50/80 px-2 py-1 text-sky-900 sm:px-1.5 sm:py-0.5" : "inline-flex items-center gap-2"}
                 >
                   {index > 0 ? <span className="text-slate-300" aria-hidden="true">/</span> : null}
                   <span className="inline-flex items-center gap-1">
@@ -1811,7 +1811,7 @@ function quietSectionEmptyState(message: string, tone: "neutral" | "success" = "
   const dotClass = tone === "success" ? "bg-emerald-500" : "bg-slate-400";
 
   return (
-    <div className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-[11px] font-medium ${toneClass}`}>
+    <div className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 text-[12px] font-medium leading-5 sm:py-1.5 sm:text-[11px] sm:leading-4 ${toneClass}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} aria-hidden="true" />
       <span>{message}</span>
     </div>
@@ -1819,10 +1819,10 @@ function quietSectionEmptyState(message: string, tone: "neutral" | "success" = "
 }
 
 const opsPrimaryActionClass =
-  "inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-900 bg-[linear-gradient(180deg,rgba(15,23,42,1),rgba(30,41,59,0.98))] px-3 py-1.5 text-xs font-semibold text-white shadow-[0_12px_20px_-18px_rgba(15,23,42,0.55)] transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-800 hover:bg-[linear-gradient(180deg,rgba(15,23,42,1),rgba(15,23,42,1))] hover:shadow-[0_16px_26px_-18px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-[0.5px] sm:min-h-8 sm:flex-none sm:px-3 sm:py-1.5";
+  "inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-900 bg-[linear-gradient(180deg,rgba(15,23,42,1),rgba(30,41,59,0.98))] px-3 py-2 text-sm font-semibold text-white shadow-[0_12px_20px_-18px_rgba(15,23,42,0.55)] transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-800 hover:bg-[linear-gradient(180deg,rgba(15,23,42,1),rgba(15,23,42,1))] hover:shadow-[0_16px_26px_-18px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-[0.5px] sm:min-h-8 sm:flex-none sm:px-3 sm:py-1.5 sm:text-xs";
 
 const opsSecondaryActionClass =
-  "inline-flex min-h-9 flex-1 items-center justify-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:min-h-8 sm:flex-none sm:px-2.5 sm:py-1.5";
+  "inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:min-h-8 sm:flex-none sm:px-2.5 sm:py-1.5 sm:text-xs";
 
 const opsFilterControlClass =
   "w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200";
@@ -1834,16 +1834,25 @@ const opsDarkButtonClass =
   "inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-900 bg-[linear-gradient(180deg,rgba(15,23,42,1),rgba(30,41,59,0.98))] px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_28px_-22px_rgba(15,23,42,0.55)] transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-800 hover:bg-[linear-gradient(180deg,rgba(15,23,42,1),rgba(15,23,42,1))] hover:shadow-[0_16px_30px_-22px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-[0.5px]";
 
 const sectionActionLinkClass =
-  "inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]";
+  "inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]";
 
 const inlineSectionLinkClass =
-  "inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-0.5 text-[11px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]";
+  "inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-0.5 sm:text-[11px]";
+
+const opsUtilityLabelClass =
+  "text-[11px] font-semibold uppercase tracking-[0.11em] sm:text-[10px] sm:tracking-[0.12em]";
+
+const opsSupportTextClass =
+  "text-[12.5px] leading-5 sm:text-[11px] sm:leading-4";
+
+const opsQueueChipClass =
+  "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium leading-5 shadow-sm transition-colors sm:py-1 sm:text-[11px] sm:leading-none";
 
 function sectionCountPill(count: number, tone: "neutral" | "danger" = "neutral") {
   const className =
     tone === "danger"
-      ? "inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-700"
-      : "inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600";
+      ? "inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.11em] text-rose-700 sm:px-2 sm:py-0.5 sm:text-[10px] sm:tracking-[0.12em]"
+      : "inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-600 sm:px-2 sm:py-0.5 sm:text-[10px] sm:tracking-[0.12em]";
 
   return <span className={className}>{count} jobs</span>;
 }
@@ -1858,14 +1867,14 @@ return (
             <Image src="/icon.png" alt="Compliance Matters logo" width={22} height={22} className="h-5.5 w-5.5 rounded-sm" />
           </div>
           <div className="min-w-0">
-            <div className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Compliance Matters</div>
+            <div className={`${opsUtilityLabelClass} truncate text-slate-500`}>Compliance Matters</div>
             <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-[1.45rem]">Ops Dashboard</h1>
             <div className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">Operational queues, field follow-up, and closeout work in one surface.</div>
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Scope</div>
-          <div className={`text-[12px] font-medium ${selectedContractorName ? "text-blue-800" : "text-slate-700"}`}>
+          <div className={`${opsUtilityLabelClass} text-slate-500`}>Scope</div>
+          <div className={`text-[13px] font-medium leading-5 sm:text-[12px] sm:leading-4 ${selectedContractorName ? "text-blue-800" : "text-slate-700"}`}>
             {selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
           </div>
         </div>
@@ -1875,7 +1884,7 @@ return (
     <section className="rounded-2xl border border-slate-300/75 bg-slate-50/75 p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-4">
       <div className="mb-2.5 flex items-center justify-between gap-2">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Internal</div>
+          <div className={`${opsUtilityLabelClass} text-slate-500`}>Internal</div>
           <h2 className="text-sm font-semibold text-slate-900">Recent Notifications</h2>
         </div>
         <Link
@@ -1904,14 +1913,14 @@ return (
                     <span className="inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true" />
                   ) : null}
                 </div>
-                <p className="mt-0.5 line-clamp-1 text-xs text-slate-600">
+                <p className="mt-0.5 line-clamp-1 text-[13px] leading-5 text-slate-600 sm:text-xs sm:leading-4">
                   {n.body || "No additional details."}
                 </p>
               </div>
               {n.job_id ? (
                 <Link
                   href={`/jobs/${n.job_id}`}
-                  className="inline-flex shrink-0 items-center rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 shadow-sm transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                  className="inline-flex shrink-0 items-center rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[12px] font-medium text-blue-700 shadow-sm transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 sm:py-1 sm:text-xs"
                 >
                   Job
                 </Link>
@@ -1925,18 +1934,18 @@ return (
     <section className="rounded-2xl border border-slate-300/75 bg-slate-50/80 p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-4">
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Internal</div>
+          <div className={`${opsUtilityLabelClass} text-slate-500`}>Internal</div>
           <div className="text-[15px] font-semibold tracking-tight text-slate-950">Filters</div>
         </div>
-        <div className="text-right text-[11px] leading-4">
-          <div className="font-semibold uppercase tracking-[0.12em] text-slate-500">Queue</div>
+        <div className="text-right text-[12px] leading-5 sm:text-[11px] sm:leading-4">
+          <div className={`${opsUtilityLabelClass} text-slate-500`}>Queue</div>
           <div className="font-medium text-slate-800">{OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}</div>
         </div>
       </div>
       <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
         <div className="grid gap-1">
-          <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Sort</label>
+          <label className={`${opsUtilityLabelClass} text-slate-500`}>Sort</label>
           <form action="/ops" method="get" className="flex flex-col gap-2 sm:flex-row">
             <input type="hidden" name="bucket" value={bucket} />
             <input type="hidden" name="contractor" value={contractor ?? ""} />
@@ -1964,8 +1973,8 @@ return (
       </div>
       <div className="mt-2.5 grid gap-1">
         <div>
-          <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Filter Jobs</label>
-          <p className="mt-0.5 text-xs text-gray-500">Searches visible jobs on this page only</p>
+          <label className={`${opsUtilityLabelClass} text-slate-500`}>Filter Jobs</label>
+          <p className="mt-0.5 text-[13px] leading-5 text-gray-500 sm:text-xs sm:leading-4">Searches visible jobs on this page only</p>
         </div>
         <form action="/ops" method="get" className="flex flex-col gap-2 sm:flex-row">
           <input type="hidden" name="bucket" value={bucket} />
@@ -1990,11 +1999,11 @@ return (
     <section className={`rounded-2xl border p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-3.5 ${hasActiveSystemAlerts || signal ? "border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))]" : "border-slate-300/75 bg-slate-50/75"}`}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">Contractor-driven</div>
+          <div className={`${opsUtilityLabelClass} text-blue-700`}>Contractor-driven</div>
           <div className="text-[15px] font-semibold tracking-tight text-slate-950">System Alerts</div>
         </div>
         {!hasActiveSystemAlerts && !signal ? null : (
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">
+          <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-blue-700 sm:text-[11px]">
             Active alerts
           </div>
         )}
@@ -2016,7 +2025,7 @@ return (
                     signal: card.key,
                   })}#ops-queues`}
                   className={[
-                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium shadow-sm transition-colors",
+                    opsQueueChipClass,
                     isActive
                       ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
                       : `${signalToneClass(card.key)} hover:bg-white`,
@@ -2163,7 +2172,7 @@ return (
     <section id="ops-queues" className="rounded-2xl border border-slate-300/80 bg-slate-100/70 p-3 shadow-[0_18px_42px_-32px_rgba(15,23,42,0.38)] sm:p-4">
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Workflow</div>
+          <div className={`${opsUtilityLabelClass} text-slate-500`}>Workflow</div>
           <div className="text-[15px] font-semibold tracking-tight text-slate-950">System / Contractor Work</div>
         </div>
       </div>
@@ -2199,7 +2208,7 @@ return (
                     signal: "",
                   })}#ops-queues`}
                   className={[
-                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium shadow-sm transition-colors",
+                    opsQueueChipClass,
                     isActive
                       ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
                       : `${workflowToneClass(card.key)} hover:bg-white`,
@@ -2220,7 +2229,7 @@ return (
             Active Queue: {activeQueueLabel}
             {activeSignalLabel ? ` (${activeSignalLabel})` : ""}
           </div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{sortedBucketJobs.length} jobs</div>
+          <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500 sm:text-[11px]">{sortedBucketJobs.length} jobs</div>
         </div>
 
         {sortedBucketJobs.length === 0 ? (
