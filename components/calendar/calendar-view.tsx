@@ -259,6 +259,23 @@ function shortTitle(job: DispatchJob) {
   return title.length > 42 ? `${title.slice(0, 39)}...` : title;
 }
 
+function calendarJobTooltip(job: DispatchJob) {
+  const lifecycle = formatCalendarDisplayStatus(getCalendarDisplayStatus(job));
+  const summary = [
+    shortTitle(job),
+    customerName(job),
+    customerAddressLine1(job),
+    customerAddressLine2(job),
+    `Window: ${listTimeWindowLabel(job.window_start, job.window_end)}`,
+    `Status: ${lifecycle}`,
+  ];
+
+  if (job.contractor_name) summary.push(`Contractor: ${job.contractor_name}`);
+  if (job.scheduled_date && (!job.assignments || job.assignments.length === 0)) summary.push('Needs Tech');
+
+  return summary.filter((line) => String(line ?? '').trim()).join('\n');
+}
+
 function uniqueById(users: Array<{ user_id: string; display_name: string }>) {
   const seen = new Set<string>();
   const out: Array<{ user_id: string; display_name: string }> = [];
@@ -681,6 +698,7 @@ function DispatchGrid(props: {
                 <Link
                   key={row.id}
                   href={buildCalendarHref(mode, date, { job: job.id, tech })}
+                  title={calendarJobTooltip(job)}
                   scroll={false}
                   className={`absolute left-1 right-1 rounded-xl border py-1 pr-2 pl-5 shadow-sm shadow-slate-950/5 transition hover:cursor-pointer hover:-translate-y-px hover:shadow-md hover:brightness-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${dispatchBlockClass(lifecycle)} ${isSelected ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
                   style={{
@@ -789,6 +807,7 @@ function AgendaList(props: {
                 <Link
                   key={job.id}
                   href={buildCalendarHref('list', date, { job: job.id, tech })}
+                  title={calendarJobTooltip(job)}
                   scroll={false}
                   className={`block rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${faded}`}
                 >
@@ -1094,6 +1113,7 @@ function MonthInspectorDaySummary(props: {
           <Link
             key={job.id}
             href={buildCalendarHref('month', date, { job: job.id, tech })}
+            title={calendarJobTooltip(job)}
             scroll={false}
             className="block rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
           >
@@ -1533,6 +1553,7 @@ export async function CalendarView(props: Props) {
                     <Link
                       key={`hidden-scheduled-${job.id}`}
                       href={buildCalendarHref(uiView, job.scheduled_date ?? data.anchorDate, { job: job.id, tech: activeTech })}
+                      title={calendarJobTooltip(job)}
                       draggable
                       scroll={false}
                       className="group block cursor-grab rounded-xl border border-amber-200 bg-white/90 px-3 py-3 shadow-sm shadow-amber-950/5 transition hover:-translate-y-px hover:border-amber-300 hover:bg-white hover:shadow-md active:cursor-grabbing active:opacity-85"
@@ -1567,6 +1588,7 @@ export async function CalendarView(props: Props) {
                   <Link
                     key={`unassigned-${job.id}`}
                     href={buildCalendarHref(uiView, data.anchorDate, { job: job.id, tech: activeTech })}
+                    title={calendarJobTooltip(job)}
                     draggable
                     scroll={false}
                     className="group block cursor-grab rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:cursor-grabbing active:opacity-85"
