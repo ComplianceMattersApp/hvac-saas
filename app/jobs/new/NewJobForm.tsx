@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createJobFromForm } from "@/lib/actions";
 import JobCoreFields from "@/components/jobs/JobCoreFields";
@@ -188,6 +188,7 @@ const [billingRecipient, setBillingRecipient] = useState<
   // Optional equipment
   const [systems, setSystems] = useState<EquipmentSystem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLockedRef = useRef(false);
 
   const isNewLocation = isExistingCustomer && locationId === "__new__";
 
@@ -374,11 +375,12 @@ const [billingRecipient, setBillingRecipient] = useState<
   }
 
   function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
-    if (isSubmitting) {
+    if (submitLockedRef.current || isSubmitting) {
       event.preventDefault();
       return;
     }
 
+    submitLockedRef.current = true;
     setIsSubmitting(true);
   }
 

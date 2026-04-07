@@ -3899,8 +3899,12 @@ export async function updateJob(input: {
   return data;
 }
 
-export async function createJob(input: CreateJobInput): Promise<{ id: string; service_case_id: string | null }> {
+export async function createJob(
+  input: CreateJobInput,
+  options?: { serviceCaseWriteClient?: any }
+): Promise<{ id: string; service_case_id: string | null }> {
   const supabase = await createClient();
+  const serviceCaseWriteClient = options?.serviceCaseWriteClient ?? supabase;
 
   const payload = {
     parent_job_id: input.parent_job_id ?? null,
@@ -3958,14 +3962,14 @@ export async function createJob(input: CreateJobInput): Promise<{ id: string; se
     }
 
     serviceCaseId = await resolveServiceCaseIdForNewJob({
-      supabase,
+      supabase: serviceCaseWriteClient,
       customerId: String(data.customer_id),
       locationId: String(data.location_id),
       title: data.title,
       jobNotes: data.job_notes,
     });
 
-    const { error: updErr } = await supabase
+    const { error: updErr } = await serviceCaseWriteClient
       .from("jobs")
       .update({ service_case_id: serviceCaseId })
       .eq("id", data.id);
@@ -4548,6 +4552,21 @@ async function logIntakeSubmitted(jobId: string) {
 
 
 async function postCreate(createdJobId: string, metaSource: string) {
+  async function runBestEffortPostCreateStep(
+    step: string,
+    work: () => Promise<void>
+  ) {
+    try {
+      await work();
+    } catch (error) {
+      console.error("Post-create step failed after durable create:", {
+        step,
+        createdJobId,
+        isContractorUser,
+        error: error instanceof Error ? error.message : "Unknown post-create error",
+      });
+    }
+  }
 
   if (!isContractorUser) {
   // Internal users can write system timeline events
@@ -4578,71 +4597,83 @@ async function postCreate(createdJobId: string, metaSource: string) {
     await sendContractorScheduledEmailForJob({ supabase, jobId: createdJobId });
   }
   } else {
-    await insertJobEvent({
-      supabase,
-      jobId: createdJobId,
-      event_type: "contractor_job_created",
-      meta: {
-        source: "contractor_portal",
-        next_action: "review_and_schedule",
-      },
-      userId,
+    await runBestEffortPostCreateStep("contractor_job_created_event", async () => {
+      await insertJobEvent({
+        supabase,
+        jobId: createdJobId,
+        event_type: "contractor_job_created",
+        meta: {
+          source: "contractor_portal",
+          next_action: "review_and_schedule",
+        },
+        userId,
+      });
     });
 
-    await notifyInternalNextActionChanged({
-      supabase,
-      jobId: createdJobId,
-      eventType: "contractor_job_created",
-      meta: {
-        next_action: "review_and_schedule",
-      },
+    await runBestEffortPostCreateStep("contractor_next_action_notification", async () => {
+      await notifyInternalNextActionChanged({
+        supabase,
+        jobId: createdJobId,
+        eventType: "contractor_job_created",
+        meta: {
+          next_action: "review_and_schedule",
+        },
+      });
     });
 
-    try {
+    await runBestEffortPostCreateStep("contractor_intake_alert_email", async () => {
       await sendInternalContractorIntakeAlertEmail({
         jobId: createdJobId,
         accountOwnerUserId: canonicalOwnerUserId,
       });
-    } catch (error) {
-      console.error("Internal contractor intake alert email send failed:", {
-        jobId: createdJobId,
-        accountOwnerUserId: canonicalOwnerUserId,
-        error: error instanceof Error ? error.message : "Unknown send error",
-      });
-    }
+    });
 
     if (scheduled_date) {
-      await insertJobEvent({
-        supabase,
-        jobId: createdJobId,
-        event_type: "contractor_schedule_updated",
-        meta: {
-          source: "contractor_portal",
-          scheduled_date,
-          window_start: window_start ?? null,
-          window_end: window_end ?? null,
-        },
-        userId,
+      await runBestEffortPostCreateStep("contractor_schedule_updated_event", async () => {
+        await insertJobEvent({
+          supabase,
+          jobId: createdJobId,
+          event_type: "contractor_schedule_updated",
+          meta: {
+            source: "contractor_portal",
+            scheduled_date,
+            window_start: window_start ?? null,
+            window_end: window_end ?? null,
+          },
+          userId,
+        });
       });
 
-      await insertInternalNotificationForEvent({
-        supabase,
-        jobId: createdJobId,
-        eventType: "contractor_schedule_updated",
-        actorUserId: userId,
+      await runBestEffortPostCreateStep("contractor_schedule_updated_notification", async () => {
+        await insertInternalNotificationForEvent({
+          supabase,
+          jobId: createdJobId,
+          eventType: "contractor_schedule_updated",
+          actorUserId: userId,
+        });
       });
     }
 }
 
-await insertEquipmentForJob(createdJobId);
+  await runBestEffortPostCreateStep("job_equipment_attach", async () => {
+    await insertEquipmentForJob(createdJobId);
+  });
 
   // refresh views
-  revalidatePath(`/jobs/${createdJobId}`);
-  revalidatePath(`/ops`);
+  await runBestEffortPostCreateStep("revalidate_jobs_detail", async () => {
+    revalidatePath(`/jobs/${createdJobId}`);
+  });
+  await runBestEffortPostCreateStep("revalidate_ops", async () => {
+    revalidatePath(`/ops`);
+  });
 
   if (isContractorUser) {
-    revalidatePath(`/portal`);
-    revalidatePath(`/portal/jobs/${createdJobId}`);
+    await runBestEffortPostCreateStep("revalidate_portal_home", async () => {
+      revalidatePath(`/portal`);
+    });
+    await runBestEffortPostCreateStep("revalidate_portal_job_detail", async () => {
+      revalidatePath(`/portal/jobs/${createdJobId}`);
+    });
     redirect(`/portal/jobs/${createdJobId}?banner=job_created`);
   }
 
@@ -4725,6 +4756,8 @@ function canContractorWriteEvent(event_type: string) {
       billing_city,
       billing_state,
       billing_zip,
+    }, {
+      serviceCaseWriteClient: canonicalWriteClient,
     });
 
  await postCreate(created.id, "customer");
@@ -4829,6 +4862,8 @@ if (existingCustomerId && !existingLocationId) {
     billing_city,
     billing_state,
     billing_zip,
+  }, {
+    serviceCaseWriteClient: canonicalWriteClient,
   });
 
   await postCreate(created.id, "customer_new_location");
@@ -4932,6 +4967,8 @@ const created = await createJob({
   billing_city,
   billing_state,
   billing_zip,
+}, {
+  serviceCaseWriteClient: canonicalWriteClient,
 });
 
 const banner = reused ? "customer_reused" : "customer_created";
