@@ -15,6 +15,7 @@ import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import { requireInternalUser } from "@/lib/auth/internal-user";
+import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { renderSystemEmailLayout, escapeHtml, resolveAppUrl } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { assertAssignableInternalUser } from "@/lib/staffing/human-layer";
@@ -332,6 +333,9 @@ function buildCustomerScheduledEmailHtml(args: {
   scheduledWindow: string;
   serviceType: string | null;
   companyName: string | null;
+  supportDisplayName: string;
+  supportPhone: string | null;
+  supportEmail: string | null;
 }) {
   const details: string[] = [
     `<li><strong>Customer:</strong> ${escapeHtml(args.customerName)}</li>`,
@@ -354,13 +358,18 @@ function buildCustomerScheduledEmailHtml(args: {
     details.push(`<li><strong>Customer Phone:</strong> ${escapeHtml(args.customerPhone)}</li>`);
   }
 
+  const supportDetails = [args.supportPhone, args.supportEmail].filter(Boolean).join(" • ");
+  const supportLine = supportDetails
+    ? `${escapeHtml(args.supportDisplayName)} (${escapeHtml(supportDetails)})`
+    : escapeHtml(args.supportDisplayName);
+
   return renderSystemEmailLayout({
     title: "Your Job Is Scheduled",
     bodyHtml: `
       <p style="margin: 0 0 12px 0;">Your upcoming service has been scheduled.</p>
       <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
       <p style="margin: 0 0 12px 0;">Please ensure someone can provide access to the service location during the scheduled time window.</p>
-      <p style="margin: 0;">If you need to make changes, please contact us as soon as possible.</p>
+      <p style="margin: 0;">If you need to make changes, please contact ${supportLine} as soon as possible.</p>
     `,
   });
 }
@@ -425,7 +434,8 @@ type OperationalEmailRecipientType = "customer" | "contractor" | "internal";
 type OperationalEmailNotificationType =
   | "customer_job_scheduled_email"
   | "contractor_job_scheduled_email"
-  | "internal_contractor_job_intake_email";
+  | "internal_contractor_job_intake_email"
+  | "internal_job_created_email";
 
 type OperationalEmailDeliveryStatus = "queued" | "sent" | "failed";
 
@@ -655,6 +665,76 @@ function buildContractorIntakeAlertEmailHtml(args: {
   });
 }
 
+function buildInternalJobCreatedAlertEmailHtml(args: {
+  customerName: string;
+  serviceAddress: string;
+  serviceType: string;
+  createdAtText: string;
+  jobUrl?: string | null;
+}) {
+  const details = [
+    `<li><strong>Customer:</strong> ${escapeHtml(args.customerName)}</li>`,
+    `<li><strong>Service Address:</strong> ${escapeHtml(args.serviceAddress)}</li>`,
+    `<li><strong>Service Type:</strong> ${escapeHtml(args.serviceType)}</li>`,
+    `<li><strong>Created:</strong> ${escapeHtml(args.createdAtText)}</li>`,
+  ];
+
+  const linkBlock = args.jobUrl
+    ? `<p style="margin: 0 0 12px 0;"><strong>Job Link:</strong> <a href="${escapeHtml(args.jobUrl)}">${escapeHtml(args.jobUrl)}</a></p>`
+    : "";
+
+  return renderSystemEmailLayout({
+    title: "New Job Created",
+    bodyHtml: `
+      <p style="margin: 0 0 12px 0;">A new job was created and is ready for internal review or scheduling follow-up.</p>
+      <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
+      ${linkBlock}
+      <p style="margin: 0;">Review the new job in Ops and continue the next workflow step.</p>
+    `,
+  });
+}
+
+async function resolveInternalOpsRecipientEmails(params: {
+  admin: any;
+  accountOwnerUserId: string;
+}): Promise<string[]> {
+  const { admin, accountOwnerUserId } = params;
+
+  const { data: internalRows, error: internalErr } = await admin
+    .from("internal_users")
+    .select("user_id, role, is_active")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("is_active", true)
+    .in("role", ["admin", "office"]);
+
+  if (internalErr) throw internalErr;
+
+  const recipientUserIds = Array.from(
+    new Set(
+      (internalRows ?? [])
+        .map((row: any) => String(row?.user_id ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (recipientUserIds.length === 0) return [];
+
+  const { data: profileRows, error: profileErr } = await admin
+    .from("profiles")
+    .select("id, email")
+    .in("id", recipientUserIds);
+
+  if (profileErr) throw profileErr;
+
+  return Array.from(
+    new Set(
+      (profileRows ?? [])
+        .map((row: any) => String(row?.email ?? "").trim().toLowerCase())
+        .filter((email: string) => email.includes("@")),
+    ),
+  );
+}
+
 async function sendInternalContractorIntakeAlertEmail(params: {
   jobId: string;
   accountOwnerUserId: string;
@@ -675,39 +755,10 @@ async function sendInternalContractorIntakeAlertEmail(params: {
 
   if (existingDelivery) return;
 
-  const { data: internalRows, error: internalErr } = await admin
-    .from("internal_users")
-    .select("user_id, role, is_active")
-    .eq("account_owner_user_id", accountOwnerUserId)
-    .eq("is_active", true)
-    .in("role", ["admin", "office"]);
-
-  if (internalErr) throw internalErr;
-
-  const recipientUserIds = Array.from(
-    new Set(
-      (internalRows ?? [])
-        .map((row: any) => String(row?.user_id ?? "").trim())
-        .filter(Boolean),
-    ),
-  );
-
-  if (recipientUserIds.length === 0) return;
-
-  const { data: profileRows, error: profileErr } = await admin
-    .from("profiles")
-    .select("id, email")
-    .in("id", recipientUserIds);
-
-  if (profileErr) throw profileErr;
-
-  const recipientEmails = Array.from(
-    new Set(
-      (profileRows ?? [])
-        .map((row: any) => String(row?.email ?? "").trim().toLowerCase())
-        .filter((email: string) => email.includes("@")),
-    ),
-  );
+  const recipientEmails = await resolveInternalOpsRecipientEmails({
+    admin,
+    accountOwnerUserId,
+  });
 
   if (recipientEmails.length === 0) return;
 
@@ -807,6 +858,120 @@ async function sendInternalContractorIntakeAlertEmail(params: {
   }
 }
 
+async function sendInternalJobCreatedAlertEmail(params: {
+  jobId: string;
+  accountOwnerUserId: string;
+}): Promise<void> {
+  const { jobId, accountOwnerUserId } = params;
+  const admin = createAdminClient();
+  const dedupeKey = buildOperationalEmailDedupeKey({
+    jobId,
+    notificationType: "internal_job_created_email",
+    scope: "initial_submission",
+  });
+
+  const existingDelivery = await findExistingOperationalEmailDelivery({
+    supabase: admin,
+    notificationType: "internal_job_created_email",
+    dedupeKey,
+  });
+
+  if (existingDelivery) return;
+
+  const recipientEmails = await resolveInternalOpsRecipientEmails({
+    admin,
+    accountOwnerUserId,
+  });
+
+  if (recipientEmails.length === 0) return;
+
+  const { data: jobSnapshot, error: jobErr } = await admin
+    .from("jobs")
+    .select(
+      `
+      id,
+      created_at,
+      job_type,
+      project_type,
+      city,
+      job_address,
+      customer_first_name,
+      customer_last_name,
+      locations:location_id (address_line1, address_line2, city, state, zip)
+      `,
+    )
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+  if (!jobSnapshot?.id) return;
+
+  const customerName =
+    [
+      String((jobSnapshot as any)?.customer_first_name ?? "").trim(),
+      String((jobSnapshot as any)?.customer_last_name ?? "").trim(),
+    ]
+      .filter(Boolean)
+      .join(" ") || "Customer";
+
+  const serviceAddress = formatServiceAddress(jobSnapshot) || "Address not available";
+  const jobTypeRaw = String((jobSnapshot as any)?.job_type ?? "").trim();
+  const projectTypeRaw = String((jobSnapshot as any)?.project_type ?? "").trim();
+  const serviceType = [toTitleCase(jobTypeRaw), toTitleCase(projectTypeRaw)]
+    .filter(Boolean)
+    .join(" / ") || "Not specified";
+  const createdAtText = formatCreatedDateTimeLA(
+    String((jobSnapshot as any)?.created_at ?? "").trim() || null,
+  );
+
+  const appUrl = resolveOpsAlertAppUrl();
+  const jobUrl = appUrl ? `${appUrl}/jobs/${jobId}` : null;
+  const subject = `New Job Created - ${customerName} - ${serviceAddress}`;
+  const html = buildInternalJobCreatedAlertEmailHtml({
+    customerName,
+    serviceAddress,
+    serviceType,
+    createdAtText,
+    jobUrl,
+  });
+
+  const queuedDelivery = await insertOperationalEmailDeliveryNotification({
+    supabase: admin,
+    jobId,
+    notificationType: "internal_job_created_email",
+    recipientType: "internal",
+    subject,
+    body: "Internal ops/admin alert for internally created job.",
+    dedupeKey,
+    status: "queued",
+  });
+
+  try {
+    await sendEmail({
+      to: recipientEmails,
+      subject,
+      html,
+    });
+
+    await markOperationalEmailDeliveryNotification({
+      supabase: admin,
+      notificationId: queuedDelivery.id,
+      status: "sent",
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown send error";
+
+    await markOperationalEmailDeliveryNotification({
+      supabase: admin,
+      notificationId: queuedDelivery.id,
+      status: "failed",
+      errorDetail: errorMessage,
+    });
+
+    throw error;
+  }
+}
+
 async function sendCustomerScheduledEmailForJob({
   supabase,
   jobId,
@@ -830,7 +995,7 @@ async function sendCustomerScheduledEmailForJob({
       window_start,
       window_end,
       contractor_id,
-      contractors:contractor_id ( name ),
+      contractors:contractor_id ( name, owner_user_id ),
       locations:location_id (address_line1, address_line2, city, state, zip)
       `
     )
@@ -865,6 +1030,16 @@ async function sendCustomerScheduledEmailForJob({
   const serviceTypeRaw = String(scheduledJob?.job_type ?? "").trim();
   const serviceType = serviceTypeRaw ? toTitleCase(serviceTypeRaw) : null;
   const companyName = String((scheduledJob as any)?.contractors?.name ?? "").trim() || null;
+  const accountOwnerUserId = String((scheduledJob as any)?.contractors?.owner_user_id ?? "").trim();
+  const internalBusinessProfile = accountOwnerUserId
+    ? await getInternalBusinessProfileByAccountOwnerId({
+        supabase,
+        accountOwnerUserId,
+      })
+    : null;
+  const supportDisplayName = internalBusinessProfile?.display_name ?? "Compliance Matters";
+  const supportPhone = internalBusinessProfile?.support_phone ?? null;
+  const supportEmail = internalBusinessProfile?.support_email ?? null;
   const subjectDate = scheduledDateText && scheduledDateText !== "Not available"
     ? scheduledDateText
     : "Date TBD";
@@ -914,6 +1089,9 @@ async function sendCustomerScheduledEmailForJob({
         scheduledWindow: scheduledWindowText,
         serviceType,
         companyName,
+        supportDisplayName,
+        supportPhone,
+        supportEmail,
       }),
     });
 
@@ -4548,6 +4726,13 @@ async function postCreate(createdJobId: string, metaSource: string) {
   });
 
   await logIntakeSubmitted(createdJobId);
+
+  await runBestEffortPostCreateStep("internal_job_created_alert_email", async () => {
+    await sendInternalJobCreatedAlertEmail({
+      jobId: createdJobId,
+      accountOwnerUserId: canonicalOwnerUserId,
+    });
+  });
 
   if (scheduled_date) {
     await insertJobEvent({

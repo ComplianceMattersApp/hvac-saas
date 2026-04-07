@@ -1,5 +1,5 @@
 import { requireInternalUser } from "@/lib/auth/internal-user";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 export type AssignableInternalUser = {
@@ -17,6 +17,96 @@ function toDisplayName(input: { full_name?: unknown; email?: unknown }) {
     email: input.email,
     fallback: "User",
   });
+}
+
+type IdentitySource = {
+  full_name: string | null;
+  email: string | null;
+  metadata_name?: string | null;
+  metadata_full_name?: string | null;
+  metadata_first_name?: string | null;
+  metadata_last_name?: string | null;
+  metadata_given_name?: string | null;
+};
+
+function identityDisplayName(input: IdentitySource) {
+  return resolveHumanDisplayName({
+    profileFullName: input.full_name,
+    metadataName: input.metadata_name,
+    metadataFullName: input.metadata_full_name,
+    metadataFirstName: input.metadata_first_name,
+    metadataLastName: input.metadata_last_name,
+    metadataGivenName: input.metadata_given_name,
+    email: input.email,
+    fallback: "User",
+  });
+}
+
+async function resolveIdentitySourceMap(params: {
+  userIds: string[];
+  supabase?: any;
+}): Promise<Map<string, IdentitySource>> {
+  const supabase = params.supabase ?? (await createClient());
+  const userIds = Array.from(
+    new Set(
+      (params.userIds ?? [])
+        .map((id) => String(id ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  const identityById = new Map<string, IdentitySource>();
+
+  if (!userIds.length) return identityById;
+
+  const { data: profiles, error: profileErr } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .in("id", userIds);
+
+  if (profileErr) throw profileErr;
+
+  for (const profile of profiles ?? []) {
+    const userId = String(profile?.id ?? "").trim();
+    if (!userId) continue;
+
+    identityById.set(userId, {
+      full_name: profile?.full_name ? String(profile.full_name) : null,
+      email: profile?.email ? String(profile.email) : null,
+    });
+  }
+
+  const unresolvedIds = userIds.filter((userId) => {
+    const identity = identityById.get(userId);
+    return identityDisplayName(identity ?? { full_name: null, email: null }) === "User";
+  });
+
+  if (!unresolvedIds.length) return identityById;
+
+  const admin = createAdminClient();
+
+  for (const userId of unresolvedIds) {
+    const { data, error } = await admin.auth.admin.getUserById(userId);
+    if (error) throw error;
+
+    const authUser = data?.user;
+    if (!authUser) continue;
+
+    const metadata = (authUser.user_metadata ?? {}) as Record<string, unknown>;
+    const existing = identityById.get(userId) ?? { full_name: null, email: null };
+
+    identityById.set(userId, {
+      full_name: existing.full_name,
+      email: existing.email ?? (authUser.email ? String(authUser.email).trim() : null),
+      metadata_name: metadata.name ? String(metadata.name).trim() : null,
+      metadata_full_name: metadata.full_name ? String(metadata.full_name).trim() : null,
+      metadata_first_name: metadata.first_name ? String(metadata.first_name).trim() : null,
+      metadata_last_name: metadata.last_name ? String(metadata.last_name).trim() : null,
+      metadata_given_name: metadata.given_name ? String(metadata.given_name).trim() : null,
+    });
+  }
+
+  return identityById;
 }
 
 async function resolveAccountOwnerScope(params: {
@@ -57,32 +147,16 @@ export async function getAssignableInternalUsers(params: {
     .map((r: any) => String(r?.user_id ?? "").trim())
     .filter(Boolean);
 
-  let profileById = new Map<string, { full_name: string | null; email: string | null }>();
-
-  if (userIds.length) {
-    const { data: profiles, error: profileErr } = await supabase
-      .from("profiles")
-      .select("id, full_name, email")
-      .in("id", userIds);
-
-    if (profileErr) throw profileErr;
-
-    profileById = new Map(
-      (profiles ?? []).map((p: any) => [
-        String(p?.id ?? ""),
-        {
-          full_name: p?.full_name ? String(p.full_name) : null,
-          email: p?.email ? String(p.email) : null,
-        },
-      ]),
-    );
-  }
+  const identityById = await resolveIdentitySourceMap({
+    supabase,
+    userIds,
+  });
 
   const rows: AssignableInternalUser[] = (internalRows ?? []).map((row: any) => {
     const userId = String(row?.user_id ?? "");
-    const profile = profileById.get(userId);
-    const fullName = profile?.full_name ?? null;
-    const email = profile?.email ?? null;
+    const identity = identityById.get(userId);
+    const fullName = identity?.full_name ?? null;
+    const email = identity?.email ?? null;
 
     return {
       user_id: userId,
@@ -90,7 +164,7 @@ export async function getAssignableInternalUsers(params: {
       is_active: Boolean(row?.is_active),
       full_name: fullName,
       email,
-      display_name: toDisplayName({ full_name: fullName, email }),
+      display_name: identityDisplayName(identity ?? { full_name: fullName, email }),
     } as AssignableInternalUser;
   });
 
@@ -158,30 +232,15 @@ export async function resolveUserDisplayMap(params: {
 
   if (!userIds.length) return {};
 
-  const { data: profiles, error } = await supabase
-    .from("profiles")
-    .select("id, full_name, email")
-    .in("id", userIds);
-
-  if (error) throw error;
-
-  const profileById = new Map<string, { full_name: string | null; email: string | null }>(
-    (profiles ?? []).map((p: any) => [
-      String(p?.id ?? ""),
-      {
-        full_name: p?.full_name ? String(p.full_name) : null,
-        email: p?.email ? String(p.email) : null,
-      },
-    ]),
-  );
+  const identityById = await resolveIdentitySourceMap({
+    supabase,
+    userIds,
+  });
 
   const map: Record<string, string> = {};
   for (const userId of userIds) {
-    const profile = profileById.get(userId);
-    map[userId] = toDisplayName({
-      full_name: profile?.full_name,
-      email: profile?.email,
-    });
+    const identity = identityById.get(userId) ?? { full_name: null, email: null };
+    map[userId] = identityDisplayName(identity);
   }
 
   return map;

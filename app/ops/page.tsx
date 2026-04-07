@@ -23,6 +23,7 @@ import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/sear
 import {
   listInternalNotifications,
 } from "@/lib/actions/notification-read-actions";
+import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -169,11 +170,14 @@ export default async function OpsPage({
 
   if (!user) redirect("/login");
 
+  let internalUser: Awaited<ReturnType<typeof requireInternalUser>>["internalUser"];
+
   try {
-    await requireInternalUser({
+    const internalAccess = await requireInternalUser({
       supabase,
       userId: user.id,
     });
+    internalUser = internalAccess.internalUser;
   } catch (error) {
     if (isInternalAccessError(error)) {
       const { data: cu, error: cuErr } = await supabase
@@ -193,6 +197,12 @@ export default async function OpsPage({
 
     throw error;
   }
+
+  const internalBusinessProfile = await getInternalBusinessProfileByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+  const internalBusinessDisplayName = internalBusinessProfile?.display_name ?? "Compliance Matters";
 
   const recentNotifications = await listInternalNotifications({
     limit: 3,
@@ -742,7 +752,7 @@ function contractorNameOnly(j: any) {
   ).trim();
   if (byIdName) return byIdName;
 
-  return "Unassigned";
+  return internalBusinessDisplayName;
 }
 
 function normalizeFailureLine(line: string, testTypeRaw: string): string {

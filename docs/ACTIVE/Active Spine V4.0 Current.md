@@ -436,17 +436,35 @@ future branding/settings/business-profile formalization
 
 Current behavior implies an internal-company fallback when no contractor is selected, but this is not yet modeled explicitly.
 
-This remains the next important unresolved model decision.
+Company profile / internal business identity is now defined as an account-owner-scoped internal business profile.
 
-Questions still to answer:
+Current purpose:
 
-display-only profile vs canonical entity
-fallback semantics
-future reporting / invoicing implications
-whether schema is required
+provide canonical internal-company fallback identity when no contractor is selected
+provide canonical internal business display/contact identity for system emails, reports, and support/help copy
+provide future-safe branding hooks without expanding into a broad settings framework yet
+
 18.2 Rule
 
-Do not implement company fallback behavior further until the model is explicitly defined.
+Current rule:
+
+internal users remain human identities
+contractors remain external business partners
+account_owner_user_id remains the ownership scope anchor
+the internal business profile is the canonical business identity for that owner scope
+
+This model does not yet own:
+
+full billing / invoicing
+broad tenant settings
+business administration workflows
+role / permission semantics
+
+Implementation discipline:
+
+do not use hardcoded company fallback text where canonical internal business identity is required
+do not overload user profiles to represent company identity
+keep the initial implementation narrow and identity-focused only
 
 19. Current Product Assessment
 19.1 Honest state
