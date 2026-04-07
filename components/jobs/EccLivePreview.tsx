@@ -225,7 +225,7 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
       } else if (blocked.length > 0) {
         overallTone = "blocked";
         overallLabel = "Preview BLOCKED";
-      } else if (failures.length > 0) {
+      } else if (hasCoreCompute && failures.length > 0) {
         overallTone = "fail";
         overallLabel = "Preview FAIL";
       } else if (hasCoreCompute) {
@@ -249,6 +249,9 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
           : measuredSuperheat < 25
           ? "pass"
           : "fail";
+      const uniqueFailures = Array.from(new Set(failures));
+      const filterDrierFailure = uniqueFailures.includes("Filter drier not confirmed");
+      const numericChecksPassing = subcoolTone === "pass" && superheatTone === "pass";
 
       setContent(
         <div className="min-h-[168px] rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
@@ -292,6 +295,21 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
             <div className="mt-1 text-xs text-emerald-700">
               {exemptionReason}
               {overrideDetails ? ` (${overrideDetails})` : ""}
+            </div>
+          ) : null}
+          {!isChargeExempt && overallTone === "fail" ? (
+            <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-2 py-2 text-xs text-red-800">
+              <div className="font-medium">Overall result is failing for:</div>
+              <ul className="mt-1 list-disc pl-4">
+                {uniqueFailures.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+              {filterDrierFailure && numericChecksPassing ? (
+                <div className="mt-1">
+                  Subcool and superheat are passing. Overall result still fails until Filter drier installed is confirmed.
+                </div>
+              ) : null}
             </div>
           ) : null}
           {!isChargeExempt && blocked.length > 0 ? (

@@ -326,6 +326,7 @@ function unscheduledJobCueLabels(job: DispatchJob) {
 function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | null }) {
   const { view, date, tech } = props;
   const today = todayYmdLA();
+  const showDateJump = view === 'day' || view === 'week';
 
   const prev =
     view === 'month' || view === 'list'
@@ -343,16 +344,39 @@ function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | n
       : today;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Link href={buildCalendarHref(view, prev, { tech })} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2 py-2 shadow-sm shadow-slate-950/5">
+      <Link href={buildCalendarHref(view, prev, { tech })} className="rounded-xl border border-transparent px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
         Previous
       </Link>
-      <Link href={buildCalendarHref(view, todayTarget, { tech })} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+      <Link href={buildCalendarHref(view, todayTarget, { tech })} className="rounded-xl border border-slate-200 bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
         Today
       </Link>
-      <Link href={buildCalendarHref(view, next, { tech })} className="rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+      <Link href={buildCalendarHref(view, next, { tech })} className="rounded-xl border border-transparent px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
         Next
       </Link>
+      {showDateJump ? (
+        <form action="/calendar" method="get" className="ml-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-1.5">
+          <input type="hidden" name="view" value={view} />
+          {tech ? <input type="hidden" name="tech" value={tech} /> : null}
+          <label htmlFor={`calendar-jump-${view}`} className="text-xs font-medium text-slate-500">
+            Jump to
+          </label>
+          <input
+            id={`calendar-jump-${view}`}
+            type="date"
+            name="date"
+            defaultValue={date}
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 shadow-sm shadow-slate-950/5"
+            aria-label={view === 'week' ? 'Jump to week containing date' : 'Jump to date'}
+          />
+          <button
+            type="submit"
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+          >
+            Go
+          </button>
+        </form>
+      ) : null}
     </div>
   );
 }
@@ -524,26 +548,26 @@ function DispatchGrid(props: {
   const nowTop = showNowLine ? ((Number(nowMinutes) - gridStartMinutes) / 60) * hourHeight : 0;
 
   if (!columns.length) {
-    return <div className="py-10 text-sm text-slate-500">No assigned scheduled jobs or blocks for this {mode}.</div>;
+    return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-sm text-slate-500">No assigned scheduled jobs or blocks for this {mode}.</div>;
   }
 
   const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i);
 
   return (
-    <div className="overflow-hidden bg-white">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
       <div className="grid" style={{ gridTemplateColumns: `84px repeat(${columns.length}, minmax(190px, 1fr))` }}>
-        <div className="border-b border-r border-slate-100 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Time</div>
+        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Time</div>
         {columns.map((col) => {
           const tech = splitTechnicianLabel(col.display_name, col.user_id);
           return (
-            <div key={col.user_id} className="border-b border-r border-slate-100 bg-slate-50 px-3 py-2.5">
+            <div key={col.user_id} className="border-b border-r border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-3">
               <p className="truncate text-sm font-semibold text-slate-900">{tech.name}</p>
-              <p className="truncate text-[11px] text-slate-500">{tech.email}</p>
+              <p className="mt-0.5 truncate text-[11px] text-slate-500">{tech.email}</p>
             </div>
           );
         })}
 
-        <div className="relative border-r border-slate-100 bg-white" style={{ height: `${totalGridHeight}px` }}>
+        <div className="relative border-r border-slate-200 bg-white" style={{ height: `${totalGridHeight}px` }}>
           {Array.from({ length: endHour - startHour }, (_, i) => (
             <div
               key={`shade-${i}`}
@@ -556,7 +580,7 @@ function DispatchGrid(props: {
             const label = hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`;
             return (
               <div key={hour} className="absolute left-0 right-0" style={{ top: `${y}px` }}>
-                <div className="-translate-y-1/2 px-3 text-xs text-slate-500">{label}</div>
+                <div className="-translate-y-1/2 px-3 text-[11px] font-medium text-slate-500">{label}</div>
               </div>
             );
           })}
@@ -571,7 +595,7 @@ function DispatchGrid(props: {
         </div>
 
         {columns.map((col) => (
-          <div key={col.user_id} className="relative border-r border-slate-100 bg-white" style={{ height: `${totalGridHeight}px` }}>
+          <div key={col.user_id} className="relative border-r border-slate-200 bg-white" style={{ height: `${totalGridHeight}px` }}>
             {Array.from({ length: endHour - startHour }, (_, i) => (
               <div
                 key={`col-${col.user_id}-shade-${i}`}
@@ -581,7 +605,7 @@ function DispatchGrid(props: {
             ))}
             {hours.map((hour) => {
               const y = (hour - startHour) * hourHeight;
-              return <div key={hour} className="absolute left-0 right-0 border-t border-slate-100/70" style={{ top: `${y}px` }} />;
+              return <div key={hour} className="absolute left-0 right-0 border-t border-slate-100/90" style={{ top: `${y}px` }} />;
             })}
             {showNowLine ? <div className="absolute left-0 right-0 border-t border-rose-400/70" style={{ top: `${nowTop}px` }} /> : null}
 
@@ -598,7 +622,7 @@ function DispatchGrid(props: {
                 return (
                   <div
                     key={row.id}
-                    className="absolute left-1 right-1 overflow-hidden rounded-lg border border-emerald-300 border-dashed bg-emerald-50/95 px-2.5 py-1.5 text-emerald-950 shadow-sm"
+                    className="absolute left-1 right-1 overflow-hidden rounded-xl border border-emerald-300 border-dashed bg-emerald-50/95 px-2.5 py-1.5 text-emerald-950 shadow-sm shadow-emerald-950/5"
                     style={{
                       top: `${top}px`,
                       height: `${height}px`,
@@ -619,13 +643,13 @@ function DispatchGrid(props: {
                           <Link
                             href={buildCalendarHref(mode, date, { block: blockEvent.id, tech })}
                             scroll={false}
-                            className="inline-flex h-6 w-14 items-center justify-center rounded-md border border-emerald-300 bg-white/95 px-1.5 py-1 text-[9px] font-semibold uppercase leading-none tracking-wide text-emerald-800 transition hover:bg-emerald-100"
+                            className="inline-flex h-6 w-14 items-center justify-center rounded-lg border border-emerald-300 bg-white/95 px-1.5 py-1 text-[9px] font-semibold uppercase leading-none tracking-wide text-emerald-800 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                           >
                             Edit
                           </Link>
                           <input type="hidden" name="event_id" value={blockEvent.id} />
                           <input type="hidden" name="return_to" value={buildCalendarHref(mode, date, { tech })} />
-                          <SubmitButton className="appearance-none !inline-flex !h-6 !min-h-0 !w-14 items-center justify-center rounded-md border border-emerald-300 bg-white/95 px-1.5 py-1 text-[9px] font-semibold uppercase leading-none tracking-wide text-emerald-800 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700" loadingText="...">
+                          <SubmitButton className="appearance-none !inline-flex !h-6 !min-h-0 !w-14 items-center justify-center rounded-lg border border-emerald-300 bg-white/95 px-1.5 py-1 text-[9px] font-semibold uppercase leading-none tracking-wide text-emerald-800 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700" loadingText="...">
                             Remove
                           </SubmitButton>
                         </div>
@@ -658,7 +682,7 @@ function DispatchGrid(props: {
                   key={row.id}
                   href={buildCalendarHref(mode, date, { job: job.id, tech })}
                   scroll={false}
-                  className={`absolute left-1 right-1 rounded-md border py-0.5 pr-1.5 pl-5 shadow-sm transition hover:cursor-pointer hover:shadow-md hover:brightness-[1.03] ${dispatchBlockClass(lifecycle)} ${isSelected ? 'ring-2 ring-slate-800/45 border-slate-700' : ''}`}
+                  className={`absolute left-1 right-1 rounded-xl border py-1 pr-2 pl-5 shadow-sm shadow-slate-950/5 transition hover:cursor-pointer hover:-translate-y-px hover:shadow-md hover:brightness-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${dispatchBlockClass(lifecycle)} ${isSelected ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
                   style={{
                     top: `${top}px`,
                     height: `${height}px`,
@@ -681,21 +705,21 @@ function DispatchGrid(props: {
                       </span>
                     ) : null}
                   </div>
-                  <p className="truncate text-xs font-semibold leading-4">{shortTitle(job)}</p>
+                  <p className="truncate text-xs font-semibold leading-4 text-slate-950">{shortTitle(job)}</p>
                   {statusBadgeLabel ? (
-                    <span className={`ml-1 inline-block rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${statusBadgeClass}`}>
+                    <span className={`ml-1 inline-block rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${statusBadgeClass}`}>
                       {statusBadgeLabel}
                     </span>
                   ) : null}
                   {job.scheduled_date && (!job.assignments || job.assignments.length === 0) ? (
-                    <span className="ml-2 inline-block rounded border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                    <span className="ml-2 inline-block rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
                       Needs Tech
                     </span>
                   ) : null}
-                  <p className="truncate text-[11px] leading-4 opacity-90">{job.city || job.contractor_name || 'No city or contractor'}</p>
-                  <div className="mt-0.5 flex items-center justify-between gap-2">
-                    <p className="truncate text-[10px] font-medium uppercase tracking-wide opacity-80">{blockTimeLabel(row.start, row.end)}</p>
-                    {initials ? <p className="truncate text-[9px] font-semibold uppercase tracking-wide opacity-70">{initials}</p> : null}
+                  <p className="truncate text-[11px] leading-4 text-slate-700/90">{job.city || job.contractor_name || 'No city or contractor'}</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className="truncate rounded-full bg-white/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-700/90">{blockTimeLabel(row.start, row.end)}</p>
+                    {initials ? <p className="truncate text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-700/70">{initials}</p> : null}
                   </div>
                 </Link>
               );
@@ -740,9 +764,9 @@ function AgendaList(props: {
   return (
     <div className="space-y-6">
       {sortedDates.map((dateKey) => (
-        <div key={dateKey}>
-          <div className="mb-2 flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-700">{formatDayDateHeader(dateKey)}</span>
+        <div key={dateKey} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm shadow-slate-950/5">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">{formatDayDateHeader(dateKey)}</span>
             <span className="text-xs text-slate-400">
               {(() => {
                 const jobCount = grouped.get(dateKey)?.length ?? 0;
@@ -754,7 +778,7 @@ function AgendaList(props: {
               })()}
             </span>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             {(grouped.get(dateKey) ?? []).map((job) => {
               const needsTech = job.scheduled_date && (!job.assignments || job.assignments.length === 0);
               const lifecycle = getCalendarDisplayStatus(job);
@@ -766,23 +790,26 @@ function AgendaList(props: {
                   key={job.id}
                   href={buildCalendarHref('list', date, { job: job.id, tech })}
                   scroll={false}
-                  className={`block rounded border border-slate-200 bg-white px-3 py-2 shadow-sm hover:bg-slate-50 ${faded}`}
+                  className={`block rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${faded}`}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
+                  <div className="flex items-start gap-3">
+                    <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-slate-900">{job.job_address || shortTitle(job)}</div>
-                      <div className="truncate text-[11px] text-slate-600">{job.city || 'No city'}</div>
-                      <div className="truncate text-[11px] text-slate-600">{listTimeWindowLabel(job.window_start, job.window_end)}</div>
-                      <div className="truncate text-[11px] text-slate-500">{job.job_type || normalizeRetestLinkedJobTitle(job.title)}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">{formatCalendarDisplayStatus(lifecycle)}</span>
-                      {needsTech ? (
-                        <span className="inline-block rounded border border-amber-200 bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800">
-                          Needs Tech
+                      <div className="truncate text-sm font-semibold text-slate-900">{job.job_address || shortTitle(job)}</div>
+                      <div className="mt-0.5 truncate text-[11px] text-slate-600">{job.city || 'No city'}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium text-slate-700">{listTimeWindowLabel(job.window_start, job.window_end)}</span>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-600">
+                          <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
+                          {formatCalendarDisplayStatus(lifecycle)}
                         </span>
-                      ) : null}
+                        {needsTech ? (
+                          <span className="inline-block rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                            Needs Tech
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 truncate text-[11px] text-slate-500">{job.job_type || normalizeRetestLinkedJobTitle(job.title)}</div>
                     </div>
                   </div>
                 </Link>
@@ -792,14 +819,14 @@ function AgendaList(props: {
             {(groupedBlocks.get(dateKey) ?? []).map((event) => (
               <div
                 key={event.id}
-                className={`flex items-center gap-3 rounded border border-emerald-200 border-dashed bg-emerald-50/70 px-3 py-2 text-[13px] text-emerald-950 shadow-sm ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}
+                className={`flex items-center gap-3 rounded-xl border border-emerald-200 border-dashed bg-emerald-50/70 px-3.5 py-3 text-[13px] text-emerald-950 shadow-sm shadow-emerald-950/5 ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}
               >
-                <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                   Block
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-emerald-950">{event.title}</div>
-                  <div className="truncate text-[11px] text-emerald-800/80">
+                  <div className="truncate text-sm font-semibold text-emerald-950">{event.title}</div>
+                  <div className="mt-0.5 truncate text-[11px] text-emerald-800/80">
                     {event.start_time} - {event.end_time}
                     {event.description ? ` · ${event.description}` : ''}
                   </div>
@@ -807,7 +834,7 @@ function AgendaList(props: {
                 <Link
                   href={buildCalendarHref('list', date, { block: event.id, tech })}
                   scroll={false}
-                  className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700 underline-offset-2 hover:underline"
+                  className="shrink-0 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700 transition hover:bg-emerald-100"
                 >
                   Edit
                 </Link>
@@ -1046,7 +1073,7 @@ function MonthInspectorDaySummary(props: {
 
   if (!jobs.length) {
     return (
-      <div className="mt-3 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-xs text-slate-500">
+      <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-xs text-slate-500 shadow-sm shadow-slate-950/5">
         No scheduled jobs for this day.
       </div>
     );
@@ -1056,7 +1083,7 @@ function MonthInspectorDaySummary(props: {
   const remainingCount = Math.max(jobs.length - previewJobs.length, 0);
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className="mt-3 space-y-2.5">
       {previewJobs.map((job) => {
         const lifecycle = getCalendarDisplayStatus(job);
         const dotClass = calendarStatusDotClass(lifecycle);
@@ -1068,18 +1095,18 @@ function MonthInspectorDaySummary(props: {
             key={job.id}
             href={buildCalendarHref('month', date, { job: job.id, tech })}
             scroll={false}
-            className="block rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm transition hover:bg-slate-50"
+            className="block rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
           >
             <div className="flex items-start gap-2">
-              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
+              <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-xs font-semibold text-slate-900">{customerName(job)}</div>
-                <div className="truncate text-[11px] text-slate-700">{normalizeRetestLinkedJobTitle(job.title) || shortTitle(job)}</div>
+                <div className="mt-0.5 truncate text-[11px] text-slate-700">{normalizeRetestLinkedJobTitle(job.title) || shortTitle(job)}</div>
                 <div className="truncate text-[11px] text-slate-500">{job.job_address || job.city || 'Address not available'}</div>
-                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
-                  <span>{cueParts.filter(Boolean).join(' · ')}</span>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">{cueParts.filter(Boolean).join(' · ')}</span>
                   {needsTech ? (
-                    <span className="rounded border border-amber-200 bg-amber-100 px-1 py-0.5 font-semibold text-amber-800">
+                    <span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">
                       Needs Tech
                     </span>
                   ) : null}
@@ -1243,26 +1270,28 @@ export async function CalendarView(props: Props) {
   const unscheduledJobs = data.unassignedScheduledJobs;
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-5 pb-8">
       {banner ? (
-        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-base text-emerald-900">{banner}</div>
+        <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-base text-emerald-900 shadow-sm shadow-emerald-950/5">{banner}</div>
       ) : null}
 
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 pb-5">
+      <div className="rounded-[28px] border border-slate-200 bg-white px-4 py-3.5 shadow-sm shadow-slate-950/5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Dispatch Calendar</h2>
-          <p className="mt-2 text-sm font-medium text-gray-500">{headerLabel}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Operations</p>
+          <h2 className="mt-1 text-2xl font-bold text-gray-900">Dispatch Calendar</h2>
+          <p className="mt-1.5 text-sm font-medium text-slate-500">{headerLabel}</p>
         </div>
 
-        <div className="flex flex-col items-end gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex items-center rounded-xl bg-gray-100 p-2">
+        <div className="flex flex-col items-end gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="inline-flex items-center rounded-2xl border border-slate-200 bg-slate-50 p-1.5 shadow-sm shadow-slate-950/5">
               {(['day', 'week', 'month', 'list'] as CalendarUIView[]).map((viewValue) => (
                 <Link
                   key={viewValue}
                   href={buildCalendarHref(viewValue, targetDateForView(viewValue), { tech: activeTech, job: selectedJobId || null })}
-                  className={`rounded-lg px-4 py-2 text-base font-semibold ${
-                    uiView === viewValue ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-200'
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                    uiView === viewValue ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-700 hover:bg-white hover:text-slate-900'
                   }`}
                 >
                   {viewValue.charAt(0).toUpperCase() + viewValue.slice(1)}
@@ -1271,20 +1300,23 @@ export async function CalendarView(props: Props) {
             </div>
             <NavLinks view={uiView} date={data.anchorDate} tech={activeTech} />
           </div>
+        </div>
+        </div>
 
+        <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3 shadow-sm shadow-slate-950/5">
           {data.assignableUsers.length > 0 ? (
-            <div className="w-full max-w-3xl rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm">
+            <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Technician Filter</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Technician Filter</p>
                   <p className="mt-0.5 text-xs text-slate-500">Show all technicians or focus the calendar on one assigned technician.</p>
                 </div>
-                <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                <div className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">
                   {activeTech ? 'Single technician view' : 'All technicians'}
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-1.5">
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
                 <Link
                   href={buildCalendarHref(uiView, data.anchorDate)}
                   className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -1312,9 +1344,12 @@ export async function CalendarView(props: Props) {
             </div>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+          <div className={`${data.assignableUsers.length > 0 ? 'mt-3 border-t border-slate-200 pt-3' : ''} flex flex-wrap items-center gap-3 text-xs text-slate-500`}>
+            <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Status Legend
+            </span>
             {CALENDAR_STATUS_LEGEND.map((item) => (
-              <span key={item.key} className="inline-flex items-center gap-1.5">
+              <span key={item.key} className="inline-flex items-center gap-1.5 rounded-full border border-transparent bg-white/70 px-2.5 py-1">
                 <span className={`h-2 w-2 rounded-full ${item.dot}`} />
                 <span>{item.label}</span>
               </span>
@@ -1323,11 +1358,11 @@ export async function CalendarView(props: Props) {
         </div>
       </div>
 
-      <div className={`grid gap-5 ${showDesktopInspectorColumn ? 'xl:grid-cols-[260px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[260px_minmax(0,1fr)]'}`}>
-        <aside className="order-2 xl:order-1">
+      <div className={`grid gap-5 ${showDesktopInspectorColumn ? 'xl:grid-cols-[280px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[280px_minmax(0,1fr)]'}`}>
+        <aside className="order-2 space-y-4 xl:order-1">
           {data.assignableUsers.length ? (
             selectedBlock ? (
-              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/70 p-2.5">
+              <div className="rounded-2xl border border-emerald-200 bg-white p-3 shadow-sm shadow-slate-950/5">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Edit Block</p>
@@ -1336,26 +1371,26 @@ export async function CalendarView(props: Props) {
                   <Link
                     href={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })}
                     scroll={false}
-                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 transition hover:bg-slate-50"
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 transition hover:bg-slate-100"
                   >
                     Close
                   </Link>
                 </div>
-                <div className="mt-2 border-t border-emerald-100 pt-2">
+                <div className="mt-3 border-t border-slate-200 pt-3">
                   <form action={updateCalendarBlockEventFromForm} className="grid gap-2">
                     <input type="hidden" name="event_id" value={selectedBlock.id} />
                     <input type="hidden" name="return_to" value={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })} />
                     <input
                       name="title"
                       defaultValue={selectedBlock.title}
-                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400"
                       placeholder="Event name"
                       required
                     />
                     <select
                       name="internal_user_id"
                       defaultValue={selectedBlock.internal_user_id}
-                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
                       required
                     >
                       {data.assignableUsers.map((user) => (
@@ -1369,21 +1404,21 @@ export async function CalendarView(props: Props) {
                         type="date"
                         name="date"
                         defaultValue={selectedBlock.calendar_date}
-                        className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 sm:col-span-2"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 sm:col-span-2"
                         required
                       />
                       <input
                         type="time"
                         name="start_time"
                         defaultValue={selectedBlock.start_time}
-                        className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
                         required
                       />
                       <input
                         type="time"
                         name="end_time"
                         defaultValue={selectedBlock.end_time}
-                        className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
                         required
                       />
                     </div>
@@ -1391,24 +1426,28 @@ export async function CalendarView(props: Props) {
                       name="description"
                       rows={2}
                       defaultValue={selectedBlock.description ?? ''}
-                      className="rounded-md border border-slate-200 bg-slate-50/70 px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400"
                       placeholder="Optional details"
                     />
-                    <SubmitButton className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-emerald-700" loadingText="Saving...">
+                    <SubmitButton className="rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-emerald-700" loadingText="Saving...">
                       Save Block
                     </SubmitButton>
                   </form>
                 </div>
               </div>
-            ) : (uiView === 'day' || uiView === 'week') ? (
-              <details className="group mb-4 rounded-lg border border-emerald-100 bg-white/90">
-                <summary className="flex cursor-pointer list-none items-start justify-between gap-2 rounded-lg px-2.5 py-2 text-left transition hover:bg-emerald-50/40 [&::-webkit-details-marker]:hidden">
+            ) : (uiView === 'day' || uiView === 'week' || uiView === 'month') ? (
+              <details id="calendar-add-block" className="group rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-2 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Add Block</p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">Create an internal time block only when needed.</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      {uiView === 'month'
+                        ? 'Create an internal time block for the selected day only when needed.'
+                        : 'Create an internal time block only when needed.'}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                       Internal only
                     </span>
                     <span aria-hidden="true" className="inline-block text-xs font-semibold text-slate-400 transition-transform group-open:rotate-90">
@@ -1416,19 +1455,19 @@ export async function CalendarView(props: Props) {
                     </span>
                   </div>
                 </summary>
-                <div className="border-t border-emerald-100 px-2.5 pb-2.5 pt-2">
+                <div className="border-t border-slate-200 px-3 pb-3 pt-3">
                   <form action={createCalendarBlockEventFromForm} className="grid gap-2">
                     <input type="hidden" name="return_to" value={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })} />
                     <input
                       name="title"
-                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400"
                       placeholder="Event name"
                       required
                     />
                     <select
                       name="internal_user_id"
                       defaultValue={activeTech ?? ''}
-                      className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
                       required
                     >
                       <option value="" disabled>
@@ -1445,31 +1484,31 @@ export async function CalendarView(props: Props) {
                         type="date"
                         name="date"
                         defaultValue={data.anchorDate}
-                        className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900 sm:col-span-2"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 sm:col-span-2"
                         required
                       />
                       <input
                         type="time"
                         name="start_time"
                         defaultValue="08:00"
-                        className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
                         required
                       />
                       <input
                         type="time"
                         name="end_time"
                         defaultValue="09:00"
-                        className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] text-slate-900"
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
                         required
                       />
                     </div>
                     <textarea
                       name="description"
                       rows={2}
-                      className="rounded-md border border-slate-200 bg-slate-50/70 px-2.5 py-2 text-[13px] text-slate-900 placeholder:text-slate-400"
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400"
                       placeholder="Optional details"
                     />
-                    <SubmitButton className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-emerald-700" loadingText="Creating...">
+                    <SubmitButton className="rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-emerald-700" loadingText="Creating...">
                       Add Block
                     </SubmitButton>
                   </form>
@@ -1479,9 +1518,14 @@ export async function CalendarView(props: Props) {
           ) : null}
 
           {hiddenScheduledJobs.length ? (
-            <>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Scheduled Jobs Needing Attention</h3>
-              <div className="mt-2 max-h-[32vh] space-y-1 overflow-y-auto pr-1">
+            <section className="rounded-2xl border border-amber-200/70 bg-amber-50/60 p-3 shadow-sm shadow-slate-950/5">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800">Scheduled Jobs Needing Attention</h3>
+                  <p className="mt-0.5 text-[11px] text-amber-800/75">Hidden from the dispatch canvas but still need operator review.</p>
+                </div>
+              </div>
+              <div className="max-h-[32vh] space-y-2 overflow-y-auto pr-1">
                 {hiddenScheduledJobs.map((job) => {
                   const issueSummary = dispatchVisibilityIssueLabels(job).join(' · ') || 'Needs review';
 
@@ -1491,21 +1535,27 @@ export async function CalendarView(props: Props) {
                       href={buildCalendarHref(uiView, job.scheduled_date ?? data.anchorDate, { job: job.id, tech: activeTech })}
                       draggable
                       scroll={false}
-                      className="group block cursor-grab rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 shadow-sm transition hover:-translate-y-px hover:border-amber-300 hover:bg-amber-100 hover:shadow active:cursor-grabbing active:opacity-85"
+                      className="group block cursor-grab rounded-xl border border-amber-200 bg-white/90 px-3 py-3 shadow-sm shadow-amber-950/5 transition hover:-translate-y-px hover:border-amber-300 hover:bg-white hover:shadow-md active:cursor-grabbing active:opacity-85"
                     >
                       <p className="truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
-                      <p className="truncate text-[11px] text-slate-600">{formatBusinessDateUS(job.scheduled_date ?? data.anchorDate)}</p>
-                      <p className="truncate text-[11px] text-amber-800">{issueSummary}</p>
+                      <p className="mt-0.5 truncate text-[11px] text-slate-600">{formatBusinessDateUS(job.scheduled_date ?? data.anchorDate)}</p>
+                      <p className="mt-1 truncate text-[11px] font-medium text-amber-900">{issueSummary}</p>
                       <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-amber-700/90 group-hover:text-amber-800">Drag to a day</p>
                     </Link>
                   );
                 })}
               </div>
-            </>
+            </section>
           ) : null}
 
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unscheduled Jobs</h3>
-          <div className="mt-2 max-h-[70vh] space-y-1 overflow-y-auto pr-1">
+          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm shadow-slate-950/5">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">Unscheduled Jobs</h3>
+              <p className="mt-0.5 text-[11px] text-slate-500">Drag onto the calendar when a visit is ready to place.</p>
+            </div>
+          </div>
+          <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
             {unscheduledJobs.length ? (
               unscheduledJobs.map((job) => {
                 const cueLabels = unscheduledJobCueLabels(job);
@@ -1519,7 +1569,7 @@ export async function CalendarView(props: Props) {
                     href={buildCalendarHref(uiView, data.anchorDate, { job: job.id, tech: activeTech })}
                     draggable
                     scroll={false}
-                    className="group block cursor-grab rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow active:cursor-grabbing active:opacity-85"
+                    className="group block cursor-grab rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:cursor-grabbing active:opacity-85"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="min-w-0 truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
@@ -1531,8 +1581,8 @@ export async function CalendarView(props: Props) {
                     </div>
                     <p className="mt-1 truncate text-[11px] font-medium text-slate-700">{customerLabel}</p>
                     <p className="truncate text-[11px] text-slate-600">{addressLine}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
-                      {cityLabel ? <span className="truncate">{cityLabel}</span> : null}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
+                      {cityLabel ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 truncate">{cityLabel}</span> : null}
                       {cueLabels.slice(1).map((label) => (
                         <span key={`${job.id}-${label}`} className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 leading-none text-[9px] font-medium text-slate-600">
                           {label}
@@ -1544,9 +1594,10 @@ export async function CalendarView(props: Props) {
                 );
               })
             ) : (
-              <div className="py-2 text-xs text-slate-500">No unscheduled jobs.</div>
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-xs text-slate-500">No unscheduled jobs.</div>
             )}
           </div>
+          </section>
         </aside>
 
         <main className="order-1 min-w-0 space-y-4 xl:order-2">
@@ -1572,7 +1623,13 @@ export async function CalendarView(props: Props) {
               </div>
             </section>
           ) : baseMode === 'day' ? (
-            <section className="overflow-x-auto">
+            <section className="space-y-2 overflow-x-auto">
+              <div className="flex items-center justify-between px-1">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Day Schedule</p>
+                  <p className="mt-0.5 text-sm font-medium text-slate-700">{formatDayDateHeader(data.day.date)}</p>
+                </div>
+              </div>
               <DispatchGrid
                 jobs={filteredDayJobs}
                 blockEvents={techFilteredBlockEvents}
@@ -1584,12 +1641,15 @@ export async function CalendarView(props: Props) {
               />
             </section>
           ) : (
-            <section className="space-y-6 overflow-x-auto">
+            <section className="space-y-5 overflow-x-auto">
               {filteredJobsByDay.map((day) => (
-                <div key={day.date}>
-                  <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-slate-900">{formatDayDateHeader(day.date)}</h3>
-                    <p className="text-xs text-slate-500">{day.jobs.length} jobs</p>
+                <div key={day.date} className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Weekday Schedule</p>
+                      <h3 className="mt-0.5 text-sm font-semibold text-slate-900">{formatDayDateHeader(day.date)}</h3>
+                    </div>
+                    <p className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">{day.jobs.length} jobs</p>
                   </div>
                   <DispatchGrid
                     jobs={day.jobs}
@@ -1617,16 +1677,19 @@ export async function CalendarView(props: Props) {
                 date={data.anchorDate}
                 tech={activeTech}
                 prefillDate={prefillDate}
-                className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-md border border-slate-200 bg-white shadow-lg"
+                className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-950/10"
               />
             ) : uiView === 'month' ? (
-              <div className="sticky top-24 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="sticky top-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Inspector</p>
                 <h3 className="mt-1 text-sm font-semibold text-slate-900">{formatDayDateHeader(data.anchorDate)}</h3>
                 <p className="mt-2 text-xs text-slate-600">
                   {selectedDayJobs.length} scheduled job{selectedDayJobs.length === 1 ? '' : 's'} in this day context.
                 </p>
                 <MonthInspectorDaySummary date={data.anchorDate} jobs={selectedDayJobs} tech={activeTech} />
+                <p className="mt-3 text-xs text-slate-600">
+                  Use Add Block in the planner column to create an internal block for this selected day.
+                </p>
                 <p className="mt-3 text-xs text-slate-500">Select a preview row or job chip to open schedule and assignment controls.</p>
               </div>
             ) : null}
@@ -1644,7 +1707,7 @@ export async function CalendarView(props: Props) {
             date={data.anchorDate}
             tech={activeTech}
             prefillDate={prefillDate}
-            className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-xl border border-slate-200 shadow-xl"
+            className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-2xl border border-slate-200 shadow-xl shadow-slate-950/10"
           />
         </div>
       ) : null}
