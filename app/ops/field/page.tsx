@@ -5,6 +5,7 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
+import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
@@ -50,8 +51,8 @@ function customerName(job: any) {
   );
 }
 
-function contractorName(job: any) {
-  return String((job as any)?.contractors?.name ?? "").trim() || "Unassigned";
+function contractorName(job: any, internalBusinessDisplayName: string) {
+  return String((job as any)?.contractors?.name ?? "").trim() || internalBusinessDisplayName;
 }
 
 function addressLine(job: any) {
@@ -78,7 +79,7 @@ function isLifecycleComplete(job: any) {
   return ["completed", "closed", "cancelled"].includes(status);
 }
 
-function renderJobCard(job: any) {
+function renderJobCard(job: any, internalBusinessDisplayName: string) {
   const phone = String(job?.customer_phone ?? "").trim();
   const navigateHref = mapsHref({
     address: job?.job_address,
@@ -96,7 +97,7 @@ function renderJobCard(job: any) {
             {normalizeRetestLinkedJobTitle(job?.title) || "Untitled Job"}
           </Link>
           <div className="mt-0.5 text-sm font-medium text-gray-800">{customerName(job)}</div>
-          <div className="text-xs text-gray-600">Contractor: {contractorName(job)}</div>
+          <div className="text-xs text-gray-600">Contractor: {contractorName(job, internalBusinessDisplayName)}</div>
           <div className="text-xs text-gray-500">{addressLine(job)}</div>
           <div className="mt-1 text-xs text-gray-600">
             {job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "Schedule pending"}
@@ -155,11 +156,19 @@ export default async function OpsFieldPage() {
 
   if (!user) redirect("/login");
 
+  let internalBusinessDisplayName = "Compliance Matters";
+
   try {
-    await requireInternalUser({
+    const internalAccess = await requireInternalUser({
       supabase,
       userId: user.id,
     });
+
+    const internalBusinessProfile = await getInternalBusinessProfileByAccountOwnerId({
+      supabase,
+      accountOwnerUserId: internalAccess.internalUser.account_owner_user_id,
+    });
+    internalBusinessDisplayName = internalBusinessProfile?.display_name ?? internalBusinessDisplayName;
   } catch (error) {
     if (isInternalAccessError(error)) {
       const { data: cu, error: cuErr } = await supabase
@@ -313,7 +322,7 @@ export default async function OpsFieldPage() {
           </div>
 
           {section.jobs.length > 0 ? (
-            <div className="grid gap-3">{section.jobs.map((job: any) => renderJobCard(job))}</div>
+            <div className="grid gap-3">{section.jobs.map((job: any) => renderJobCard(job, internalBusinessDisplayName))}</div>
           ) : (
             <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-500">
               No jobs in this section.

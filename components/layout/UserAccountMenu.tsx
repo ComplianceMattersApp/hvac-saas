@@ -6,12 +6,12 @@ import { useEffect, useRef, useState } from "react";
 import LogoutButton from "@/components/auth/LogoutButton";
 
 type Props = {
-  accountFirstName: string;
+  accountName: string;
   accountLabel: string;
   isAdmin: boolean;
 };
 
-export default function UserAccountMenu({ accountFirstName, accountLabel, isAdmin }: Props) {
+export default function UserAccountMenu({ accountName, accountLabel, isAdmin }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -55,7 +55,7 @@ export default function UserAccountMenu({ accountFirstName, accountLabel, isAdmi
       >
         <span className="inline-flex items-center gap-2">
           <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-slate-200/90 bg-slate-50 px-1 text-[10px] font-semibold text-slate-700">
-            {accountFirstName ? accountFirstName.slice(0, 1).toUpperCase() : "A"}
+            {accountName ? accountName.slice(0, 1).toUpperCase() : "A"}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span>{accountLabel}</span>

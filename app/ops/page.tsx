@@ -1874,10 +1874,10 @@ return (
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/90 bg-white shadow-[0_12px_24px_-18px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70">
-            <Image src="/icon.png" alt="Compliance Matters logo" width={22} height={22} className="h-5.5 w-5.5 rounded-sm" />
+            <Image src="/icon.png" alt={`${internalBusinessDisplayName} logo`} width={22} height={22} className="h-5.5 w-5.5 rounded-sm" />
           </div>
           <div className="min-w-0">
-            <div className={`${opsUtilityLabelClass} truncate text-slate-500`}>Compliance Matters</div>
+            <div className={`${opsUtilityLabelClass} truncate text-slate-500`}>{internalBusinessDisplayName}</div>
             <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-[1.45rem]">Ops Dashboard</h1>
             <div className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">Operational queues, field follow-up, and closeout work in one surface.</div>
           </div>

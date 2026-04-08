@@ -4,6 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+function normalizeText(raw: FormDataEntryValue | null, maxLength = 120) {
+  return String(raw ?? "").replace(/\u0000/g, "").trim().slice(0, maxLength);
+}
+
+function normalizePhone(raw: FormDataEntryValue | null) {
+  return String(raw ?? "").replace(/\u0000/g, "").trim().slice(0, 40);
+}
+
 export async function logout() {
   const supabase = await createClient();
   const { error } = await supabase.auth.signOut();
@@ -19,7 +27,8 @@ export async function updateOwnProfileFromForm(formData: FormData) {
   const user = userData?.user;
   if (!user) redirect("/login");
 
-  const displayName = String(formData.get("display_name") ?? "").replace(/\u0000/g, "").trim();
+  const displayName = normalizeText(formData.get("display_name"));
+  const phone = normalizePhone(formData.get("phone"));
   if (!displayName) {
     redirect("/account/edit?banner=missing_name");
   }
@@ -51,17 +60,22 @@ export async function updateOwnProfileFromForm(formData: FormData) {
     if (profileInsertErr) throw profileInsertErr;
   }
 
+  const existingMetadata = (user.user_metadata ?? {}) as Record<string, unknown>;
   const { error: authUpdateErr } = await supabase.auth.updateUser({
     data: {
+      ...existingMetadata,
       name: displayName,
       full_name: displayName,
       first_name: displayName.split(/\s+/)[0] ?? displayName,
+      phone: phone || null,
+      phone_number: phone || null,
     },
   });
 
   if (authUpdateErr) throw authUpdateErr;
 
   revalidatePath("/account");
+  revalidatePath("/account/edit");
   revalidatePath("/");
   redirect("/account?banner=profile_updated");
 }

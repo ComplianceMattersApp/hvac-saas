@@ -19,6 +19,7 @@ import {
   insertInternalNotificationForEvent,
   markContractorReportEmailDeliveryNotification,
 } from "@/lib/actions/notification-actions";
+import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { resolveAppUrl, renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
@@ -249,20 +250,31 @@ function buildContractorFailureSummaryV1(args: {
   };
 }
 
-function buildContractorReportEmailHtml(args: { bodyText: string; portalJobUrl?: string | null }) {
+function buildContractorReportEmailHtml(args: {
+  bodyText: string;
+  portalJobUrl?: string | null;
+  supportDisplayName: string;
+  supportPhone?: string | null;
+  supportEmail?: string | null;
+}) {
   const bodyHtml = escapeHtml(args.bodyText).replace(/\n/g, "<br />");
   const portalUrl = String(args.portalJobUrl ?? "").trim();
+  const supportDetails = [args.supportPhone, args.supportEmail].filter(Boolean).join(" • ");
+  const supportLine = supportDetails
+    ? `${escapeHtml(args.supportDisplayName)} (${escapeHtml(supportDetails)})`
+    : escapeHtml(args.supportDisplayName);
 
   const portalSection = portalUrl
     ? `<p style="margin-top:16px;">Open your job in the portal: <a href="${escapeHtml(portalUrl)}">${escapeHtml(portalUrl)}</a></p>`
     : "";
 
   return renderSystemEmailLayout({
-    title: "Compliance Matters Report",
+    title: `${args.supportDisplayName} Report`,
     bodyHtml: `
       <p style="margin: 0 0 12px 0;">Please review and address the report details below.</p>
       <div style="white-space: normal;">${bodyHtml}</div>
       ${portalSection}
+      <p style="margin: 16px 0 0 0;">If you need help, contact ${supportLine}.</p>
     `,
   });
 }
@@ -469,7 +481,7 @@ export async function sendContractorReport(input: {
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
-    .select("id, contractor_id, contractors:contractor_id ( email )")
+    .select("id, contractor_id, contractors:contractor_id ( email, owner_user_id )")
     .eq("id", jobId)
     .single();
 
@@ -539,9 +551,19 @@ export async function sendContractorReport(input: {
   });
 
   const contractorEmail = String((job as any)?.contractors?.email ?? "").trim().toLowerCase();
+  const accountOwnerUserId = String((job as any)?.contractors?.owner_user_id ?? "").trim();
+  const internalBusinessProfile = accountOwnerUserId
+    ? await getInternalBusinessProfileByAccountOwnerId({
+        supabase,
+        accountOwnerUserId,
+      })
+    : null;
+  const supportDisplayName = internalBusinessProfile?.display_name ?? "Compliance Matters";
+  const supportPhone = internalBusinessProfile?.support_phone ?? null;
+  const supportEmail = internalBusinessProfile?.support_email ?? null;
   const customerName = String(report.customer_name ?? "").trim() || "Customer";
   const jobAddress = String(report.location_text ?? "").trim() || "Location not available";
-  const subject = `Compliance Matters Report – ${customerName} – ${jobAddress}`;
+  const subject = `${supportDisplayName} Report – ${customerName} – ${jobAddress}`;
 
   if (!contractorEmail) {
     await insertContractorReportEmailDeliveryNotification({
@@ -571,6 +593,9 @@ export async function sendContractorReport(input: {
   const emailHtml = buildContractorReportEmailHtml({
     bodyText: bodyText,
     portalJobUrl,
+    supportDisplayName,
+    supportPhone,
+    supportEmail,
   });
 
   if (!existingDelivery?.id) {

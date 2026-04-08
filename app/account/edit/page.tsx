@@ -48,7 +48,10 @@ export default async function AccountEditPage({
     email: user.email,
     fallback: "Account",
   });
-
+  const phone =
+    String(userMetadata.phone ?? "").trim() ||
+    String(userMetadata.phone_number ?? "").trim() ||
+    String(user.phone ?? "").trim();
   const email = String(user.email ?? "").trim() || "No email on file";
 
   return (
@@ -59,7 +62,7 @@ export default async function AccountEditPage({
             <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Account</div>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Edit Profile</h1>
             <p className="mt-2 text-sm text-slate-600">
-              Update the name shown in the app header and timeline activity.
+              Update the personal details used across your account profile and activity history.
             </p>
           </div>
           <Link
@@ -92,6 +95,22 @@ export default async function AccountEditPage({
               maxLength={120}
               required
             />
+          </div>
+
+          <div>
+            <label htmlFor="phone" className="block text-sm font-medium text-slate-900">
+              Phone Number
+            </label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              defaultValue={phone}
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-slate-900"
+              maxLength={40}
+              placeholder="(555) 555-5555"
+            />
+            <div className="mt-1 text-xs text-slate-500">Used as your app-managed contact number. Leave blank to clear it.</div>
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-slate-50/70 px-4 py-3">

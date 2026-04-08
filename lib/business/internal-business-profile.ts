@@ -1,5 +1,7 @@
 import { requireInternalUser } from "@/lib/auth/internal-user";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
+
+const INTERNAL_BUSINESS_LOGO_STORAGE_PREFIX = "storage://attachments/";
 
 export type InternalBusinessProfile = {
   account_owner_user_id: string;
@@ -10,6 +12,51 @@ export type InternalBusinessProfile = {
   created_at: string;
   updated_at: string;
 };
+
+export function buildInternalBusinessProfileLogoStorageRef(storagePath: string) {
+  const normalizedPath = String(storagePath ?? "").trim().replace(/^\/+/, "");
+  return normalizedPath ? `${INTERNAL_BUSINESS_LOGO_STORAGE_PREFIX}${normalizedPath}` : null;
+}
+
+export function parseInternalBusinessProfileLogoStorageRef(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized.startsWith(INTERNAL_BUSINESS_LOGO_STORAGE_PREFIX)) return null;
+
+  const storagePath = normalized.slice(INTERNAL_BUSINESS_LOGO_STORAGE_PREFIX.length).replace(/^\/+/, "");
+  if (!storagePath) return null;
+
+  return {
+    bucket: "attachments",
+    storagePath,
+  };
+}
+
+export async function resolveInternalBusinessProfileLogoUrl(params: {
+  logoUrl: string | null | undefined;
+  expiresIn?: number;
+}) {
+  const normalized = String(params.logoUrl ?? "").trim();
+  if (!normalized) return null;
+
+  const storageRef = parseInternalBusinessProfileLogoStorageRef(normalized);
+  if (!storageRef) return normalized;
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.storage
+    .from(storageRef.bucket)
+    .createSignedUrl(storageRef.storagePath, params.expiresIn ?? 60 * 60);
+
+  if (error || !data?.signedUrl) {
+    console.warn("Failed to resolve internal business profile logo URL", {
+      bucket: storageRef.bucket,
+      storagePath: storageRef.storagePath,
+      error: error?.message ?? null,
+    });
+    return null;
+  }
+
+  return data.signedUrl;
+}
 
 function normalizeInternalBusinessProfileRow(row: any): InternalBusinessProfile | null {
   const accountOwnerUserId = String(row?.account_owner_user_id ?? "").trim();
