@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { firstNameFromDisplayName, resolveHumanDisplayName } from "@/lib/utils/identity-display";
+import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -63,12 +63,11 @@ export default async function AccountPage({
     email: user.email,
     fallback: "Account",
   });
-  const firstName = firstNameFromDisplayName(displayName, "Account");
   const email = String(user.email ?? "").trim() || "No email on file";
   const phone =
-    String(user.phone ?? "").trim() ||
     String(userMetadata.phone ?? "").trim() ||
-    String(userMetadata.phone_number ?? "").trim();
+    String(userMetadata.phone_number ?? "").trim() ||
+    String(user.phone ?? "").trim();
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 text-gray-900 sm:p-6">
@@ -84,7 +83,7 @@ export default async function AccountPage({
             Account
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-            {firstName}
+            {displayName}
           </h1>
           <p className="max-w-xl text-sm text-slate-600 sm:text-base">
             This is your account profile. Keep your display name current so activity history is easier to read.

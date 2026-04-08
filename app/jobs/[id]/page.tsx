@@ -57,6 +57,7 @@ import {
   getActiveJobAssignmentDisplayMap,
   resolveUserDisplayMap,
 } from "@/lib/staffing/human-layer";
+import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
 
 import JobAttachmentsInternal from "./_components/JobAttachmentsInternal";
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from "@/lib/actions/job-evaluator";
@@ -467,10 +468,17 @@ export default async function JobDetailPage({
   if (!user) redirect("/login");
 
   let isInternalUser = false;
+  let internalBusinessDisplayName = "Compliance Matters";
 
   try {
-    await requireInternalUser({ supabase, userId: user.id });
+    const internalAccess = await requireInternalUser({ supabase, userId: user.id });
     isInternalUser = true;
+
+    const internalBusinessProfile = await getInternalBusinessProfileByAccountOwnerId({
+      supabase,
+      accountOwnerUserId: internalAccess.internalUser.account_owner_user_id,
+    });
+    internalBusinessDisplayName = internalBusinessProfile?.display_name ?? internalBusinessDisplayName;
   } catch (error) {
     if (isInternalAccessError(error)) {
       const { data: cu, error: cuErr } = await supabase
@@ -2377,7 +2385,7 @@ const renderTimelineItem = (e: any, key: string) => {
                           defaultValue={job.contractor_id ?? ""}
                           className={workspaceInputClass}
                         >
-                          <option value="">— No contractor —</option>
+                          <option value="">— No contractor ({internalBusinessDisplayName}) —</option>
                           {(contractors ?? []).map((contractor: any) => (
                             <option key={contractor.id} value={contractor.id}>
                               {contractor.name}

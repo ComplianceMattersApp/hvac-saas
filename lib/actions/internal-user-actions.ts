@@ -38,6 +38,22 @@ function revalidateInternalUserViews() {
   revalidatePath("/ops");
   revalidatePath("/ops/admin");
   revalidatePath("/ops/admin/internal-users");
+  revalidatePath("/ops/admin/users");
+  revalidatePath("/account");
+  revalidatePath("/");
+}
+
+function normalizeText(raw: FormDataEntryValue | null, maxLength = 120) {
+  return String(raw ?? "").replace(/\u0000/g, "").trim().slice(0, maxLength);
+}
+
+function normalizePhone(raw: FormDataEntryValue | null) {
+  const value = String(raw ?? "").replace(/\u0000/g, "").trim();
+  return value.slice(0, 40);
+}
+
+function buildInternalUserProfileNoticeHref(userId: string, notice: string) {
+  return `/ops/admin/internal-users/${encodeURIComponent(userId)}?profile_status=${encodeURIComponent(notice)}`;
 }
 
 function isForeignKeyViolation(error: any) {
@@ -508,4 +524,84 @@ export async function deleteInternalUserFromForm(formData: FormData): Promise<vo
   if (deleteError) throw deleteError;
 
   revalidateInternalUserViews();
+}
+
+export async function updateInternalUserProfileFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const { internalUser: actorInternalUser } = await requireInternalRole(
+    "admin",
+    { supabase },
+  );
+
+  const admin = createAdminClient();
+
+  const targetUserId = String(formData.get("user_id") ?? "").trim();
+  if (!targetUserId) {
+    throw new Error("MISSING_TARGET_USER_ID");
+  }
+
+  const displayName = normalizeText(formData.get("display_name"));
+  const phone = normalizePhone(formData.get("phone"));
+
+  if (!displayName) {
+    redirect(buildInternalUserProfileNoticeHref(targetUserId, "missing_name"));
+  }
+
+  await requireScopedTarget(
+    admin,
+    actorInternalUser.account_owner_user_id,
+    targetUserId,
+  );
+
+  const { data: authData, error: authError } = await admin.auth.admin.getUserById(targetUserId);
+  if (authError || !authData?.user) {
+    throw authError ?? new Error("TARGET_AUTH_USER_NOT_FOUND");
+  }
+
+  const authUser = authData.user as any;
+  const existingMetadata = (authUser.user_metadata ?? {}) as Record<string, unknown>;
+  const nextMetadata = {
+    ...existingMetadata,
+    name: displayName,
+    full_name: displayName,
+    first_name: displayName.split(/\s+/)[0] ?? displayName,
+    phone: phone || null,
+    phone_number: phone || null,
+  };
+
+  const { data: existingProfile, error: profileReadErr } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("id", targetUserId)
+    .maybeSingle();
+
+  if (profileReadErr) throw profileReadErr;
+
+  if (existingProfile?.id) {
+    const { error: profileUpdateErr } = await admin
+      .from("profiles")
+      .update({ full_name: displayName })
+      .eq("id", targetUserId);
+
+    if (profileUpdateErr) throw profileUpdateErr;
+  } else {
+    const { error: profileInsertErr } = await admin
+      .from("profiles")
+      .insert({
+        id: targetUserId,
+        email: String(authUser.email ?? "").trim() || null,
+        full_name: displayName,
+      });
+
+    if (profileInsertErr) throw profileInsertErr;
+  }
+
+  const { error: authUpdateErr } = await admin.auth.admin.updateUserById(targetUserId, {
+    user_metadata: nextMetadata,
+  });
+
+  if (authUpdateErr) throw authUpdateErr;
+
+  revalidateInternalUserViews();
+  redirect(buildInternalUserProfileNoticeHref(targetUserId, "saved"));
 }

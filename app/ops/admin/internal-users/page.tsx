@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth/internal-user";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
+import DeleteInternalUserButton from "./_components/DeleteInternalUserButton";
 import {
   activateInternalUserFromForm,
   createInternalUserFromForm,
@@ -159,7 +160,7 @@ export default async function AdminInternalUsersPage({
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Ops Admin</p>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Internal Users</h1>
             <p className="text-sm text-slate-600">
-              Manage internal account users and role assignment.
+              Manage internal account users, role assignment, and practical profile details.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -294,6 +295,13 @@ export default async function AdminInternalUsersPage({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      href={`/ops/admin/internal-users/${encodeURIComponent(String(row.user_id ?? ""))}`}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
+                    >
+                      Edit Profile
+                    </Link>
+
                     <form action={updateInternalUserRoleFromForm} className="flex items-center gap-2">
                       <input type="hidden" name="user_id" value={row.user_id} />
                       <select
@@ -335,28 +343,7 @@ export default async function AdminInternalUsersPage({
                       </form>
                     )}
 
-                    {!row.is_active ? (
-                      <form
-                        action={deleteInternalUserFromForm}
-                        onSubmit={(e) => {
-                          if (
-                            !confirm(
-                              `Are you sure you want to permanently delete ${displayName}? This cannot be undone.`,
-                            )
-                          ) {
-                            e.preventDefault();
-                          }
-                        }}
-                      >
-                        <input type="hidden" name="user_id" value={row.user_id} />
-                        <button
-                          type="submit"
-                          className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
-                        >
-                          Delete
-                        </button>
-                      </form>
-                    ) : null}
+                    {!row.is_active ? <DeleteInternalUserButton userId={String(row.user_id)} displayName={displayName} /> : null}
                   </div>
                 </div>
               </div>

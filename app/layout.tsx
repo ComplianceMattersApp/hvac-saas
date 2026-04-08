@@ -8,7 +8,7 @@ import UserAccountMenu from "@/components/layout/UserAccountMenu";
 import { getInternalUser } from "@/lib/auth/internal-user";
 import { getInternalUnreadNotificationCount } from "@/lib/actions/notification-read-actions";
 import { createClient } from "@/lib/supabase/server";
-import { firstNameFromDisplayName, resolveHumanDisplayName } from "@/lib/utils/identity-display";
+import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -88,8 +88,7 @@ export default async function RootLayout({
     email: user?.email,
     fallback: "Account",
   });
-  const accountFirstName = firstNameFromDisplayName(accountDisplayName, "Account");
-  const accountLabel = accountFirstName;
+  const accountLabel = accountDisplayName;
   const unreadNotificationBadgeLabel = unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount);
   const shellSecondaryLinkClass =
     "inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70";
@@ -181,7 +180,7 @@ export default async function RootLayout({
                       </Link>
                     )}
                     <div className="ml-1 border-l border-slate-200/80 pl-2">
-                      <UserAccountMenu accountFirstName={accountFirstName} accountLabel={accountLabel} isAdmin={isAdmin} />
+                      <UserAccountMenu accountName={accountDisplayName} accountLabel={accountLabel} isAdmin={isAdmin} />
                     </div>
                   </div>
 

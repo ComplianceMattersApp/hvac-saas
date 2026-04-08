@@ -60,6 +60,12 @@ export default async function OpsAdminPage() {
       enabled: true,
     },
     {
+      title: "Company Profile",
+      description: "View and edit the internal business identity for your current owner scope.",
+      href: "/ops/admin/company-profile",
+      enabled: true,
+    },
+    {
       title: "Access",
       description: "Future access and policy administration tools.",
       href: "#",
