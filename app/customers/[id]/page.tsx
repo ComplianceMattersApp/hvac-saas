@@ -425,6 +425,13 @@ const { data: jobsData, error: jobsErr } = await supabase
     opsCounts[key] = (opsCounts[key] ?? 0) + 1;
   }
 
+  const activeWorkCount = activeJobs.length;
+  const completedJobsCount = jobs.filter((job) => {
+    if (job.deleted_at) return false;
+    const opsStatus = normalizeOpsStatus(job.ops_status);
+    return opsStatus === "closed" || opsStatus === "completed";
+  }).length;
+
   const lastScheduledActiveDate = activeJobs
     .map((j) => j.scheduled_date)
     .filter(Boolean)
@@ -611,24 +618,16 @@ const { data: jobsData, error: jobsErr } = await supabase
                   Active Work (Incl. Closeout)
                 </div>
                 <div className="mt-2 text-2xl font-semibold text-slate-900">
-                  {(opsCounts["need_to_schedule"] ?? 0) +
-                    (opsCounts["scheduled"] ?? 0) +
-                    (opsCounts["pending_info"] ?? 0) +
-                    (opsCounts["failed"] ?? 0) +
-                    (opsCounts["pending_office_review"] ?? 0) +
-                    (opsCounts["retest_needed"] ?? 0) +
-                    (opsCounts["on_hold"] ?? 0) +
-                    (opsCounts["paperwork_required"] ?? 0) +
-                    (opsCounts["invoice_required"] ?? 0)}
+                  {activeWorkCount}
                 </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-xs uppercase tracking-wide text-slate-500">
-                  Completed (Active)
+                  Completed / Closed
                 </div>
                 <div className="mt-2 text-2xl font-semibold text-slate-900">
-                  {opsCounts["completed"] ?? 0}
+                  {completedJobsCount}
                 </div>
               </div>
             </div>

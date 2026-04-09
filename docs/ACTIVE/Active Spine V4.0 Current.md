@@ -196,7 +196,7 @@ prior failed result may be shown later as comparison/reference context
 
 8.4 Narrative visibility on /jobs/[id]
 
-The /jobs/[id] Timeline, Shared Notes, and Internal Notes sections may intentionally aggregate narrative entries across the direct job chain (current job plus parent/child lineage via parent_job_id).
+The /jobs/[id] Timeline, Shared Notes, and Internal Notes sections may intentionally aggregate narrative entries across the direct retest/job chain (current job plus parent/child lineage via parent_job_id).
 
 When chain-scoped narrative is shown, page copy should explicitly state chain scope and should not imply current-job-only history.
 

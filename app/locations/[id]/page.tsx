@@ -2,6 +2,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  isInternalAccessError,
+  requireInternalUser,
+} from "@/lib/auth/internal-user";
 import { updateLocationNotesFromForm } from "./notes-actions";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 
@@ -115,6 +119,16 @@ export default async function LocationDetailPage(props: {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
 
+  try {
+    await requireInternalUser({ supabase, userId: userData.user.id });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirect("/login");
+    }
+
+    throw error;
+  }
+
   const { id } = await props.params;
   if (!id || !isUuid(id)) redirect("/customers");
 
@@ -170,20 +184,20 @@ export default async function LocationDetailPage(props: {
 
   const jobRows = (jobs ?? []) as any[];
   const activeSummaryRows = jobRows.filter((j) => !j?.deleted_at);
-  const lifecycleOpenRows = activeSummaryRows.filter((j) => {
-    const s = String(j?.status ?? "").toLowerCase();
-    return !!s && !["completed", "closed", "cancelled"].includes(s);
+  const operationalSummaryRows = activeSummaryRows.filter((j) => {
+    const opsStatus = String(j?.ops_status ?? "").toLowerCase();
+    return opsStatus !== "closed" && opsStatus !== "completed";
   });
 
   const totalJobs = jobRows.length;
-  const openJobs = lifecycleOpenRows.length;
-  const failedJobs = lifecycleOpenRows.filter((j) =>
+  const openJobs = operationalSummaryRows.length;
+  const failedJobs = operationalSummaryRows.filter((j) =>
     String(j?.ops_status ?? "").toLowerCase() === "failed"
   ).length;
-  const pendingInfoJobs = lifecycleOpenRows.filter((j) =>
+  const pendingInfoJobs = operationalSummaryRows.filter((j) =>
     String(j?.ops_status ?? "").toLowerCase() === "pending_info"
   ).length;
-  const pendingOfficeReviewJobs = lifecycleOpenRows.filter((j) =>
+  const pendingOfficeReviewJobs = operationalSummaryRows.filter((j) =>
     String(j?.ops_status ?? "").toLowerCase() === "pending_office_review"
   ).length;
 
@@ -433,9 +447,14 @@ export default async function LocationDetailPage(props: {
         <tbody className="divide-y">
           {jobRows.map((job) => {
             const serviceCaseId = String(job?.service_case_id ?? "").trim();
+            const isArchived = Boolean(job.deleted_at);
+            const isCancelled = String(job?.status ?? "").toLowerCase() === "cancelled";
 
             return (
-              <tr key={job.id} className="hover:bg-gray-50">
+              <tr
+                key={job.id}
+                className={isArchived || isCancelled ? "bg-slate-50/70 text-slate-700 hover:bg-slate-100/70" : "hover:bg-gray-50"}
+              >
                 <td className="px-3 py-2 whitespace-nowrap">
                   {displayDateLA(job.scheduled_date || job.created_at)}
                 </td>
@@ -451,13 +470,25 @@ export default async function LocationDetailPage(props: {
                 </td>
 
                 <td className="px-3 py-2">
-                  <span
-                    className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${opsBadgeClasses(
-                      job.ops_status
-                    )}`}
-                  >
-                    {formatOpsLabel(job.ops_status || job.status)}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${opsBadgeClasses(
+                        job.ops_status
+                      )}`}
+                    >
+                      {formatOpsLabel(job.ops_status || job.status)}
+                    </span>
+                    {isCancelled ? (
+                      <span className="inline-flex rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                        Cancelled history
+                      </span>
+                    ) : null}
+                    {isArchived ? (
+                      <span className="inline-flex rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                        Archived history
+                      </span>
+                    ) : null}
+                  </div>
                 </td>
 
                 <td className="px-3 py-2">

@@ -167,6 +167,10 @@ export default async function PortalPage({
     return qs ? `/portal?${qs}` : "/portal";
   }
 
+  function portalResetHref() {
+    return "/portal";
+  }
+
   const scopedJobs = jobs.filter(matchesSearch);
 
   const scopedJobIds = scopedJobs.map((j: any) => j.id);
@@ -409,7 +413,7 @@ export default async function PortalPage({
             </button>
             {q && (
               <Link
-                href={portalHref()}
+                href={portalResetHref()}
                 className={portalSecondaryButtonClass}
               >
                 Reset

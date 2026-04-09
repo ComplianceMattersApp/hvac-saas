@@ -1,21 +1,47 @@
 import type { DispatchJob } from '@/lib/actions/calendar';
 
 const CALENDAR_STATUS_LABELS: Record<string, string> = {
+  open: 'Open',
+  pending: 'Pending',
+  need_to_schedule: 'Needs Scheduling',
   scheduled: 'Scheduled',
+  pending_info: 'Pending Info',
+  pending_information: 'Pending Info',
+  on_hold: 'On Hold',
   on_my_way: 'On My Way',
   in_progress: 'In Progress',
   field_complete: 'Field Complete',
+  completed: 'Completed',
+  completed_paperwork_pending: 'Completed Paperwork Pending',
+  paperwork_required: 'Paperwork Required',
+  invoice_required: 'Invoice Required',
+  pending_office_review: 'Pending Office Review',
   failed: 'Failed',
+  failed_pending_retest: 'Failed Pending Retest',
+  retest_needed: 'Retest Needed',
   closed: 'Closed',
   cancelled: 'Cancelled',
 };
 
 const CALENDAR_STATUS_DOT_CLASSES: Record<string, string> = {
+  open: 'bg-slate-500',
+  pending: 'bg-slate-500',
+  need_to_schedule: 'bg-slate-500',
   scheduled: 'bg-cyan-500',
+  pending_info: 'bg-amber-500',
+  pending_information: 'bg-amber-500',
+  on_hold: 'bg-slate-400',
   on_my_way: 'bg-blue-700',
   in_progress: 'bg-indigo-600',
   field_complete: 'bg-amber-500',
+  completed: 'bg-green-600',
+  completed_paperwork_pending: 'bg-amber-500',
+  paperwork_required: 'bg-amber-500',
+  invoice_required: 'bg-amber-500',
+  pending_office_review: 'bg-amber-500',
   failed: 'bg-rose-600',
+  failed_pending_retest: 'bg-rose-600',
+  retest_needed: 'bg-rose-600',
   closed: 'bg-green-600',
   cancelled: 'bg-slate-400',
 };
@@ -34,30 +60,18 @@ export const CALENDAR_STATUS_LEGEND = [
   dot: CALENDAR_STATUS_DOT_CLASSES[key] ?? 'bg-gray-300',
 }));
 
-// Locked calendar display rule: use lifecycle truth for historical/in-flight markers,
-// otherwise derive the display state from ops_status.
+// Locked calendar display rule: operational state must reflect jobs.ops_status.
 export function getCalendarDisplayStatus(job: DispatchJob) {
-  const lifecycleStatus = String(job.status ?? '').trim().toLowerCase();
-  if (lifecycleStatus === 'cancelled') return 'cancelled';
-  if (lifecycleStatus === 'on_the_way') return 'on_my_way';
-  if (lifecycleStatus === 'in_progress') return 'in_progress';
-
   const opsStatus = String(job.ops_status ?? '').trim().toLowerCase();
-  if (!opsStatus) return 'scheduled';
-  if (opsStatus === 'field_complete' || opsStatus === 'completed' || opsStatus === 'completed_paperwork_pending') {
-    return 'field_complete';
-  }
-  if (opsStatus === 'open' || opsStatus === 'need_to_schedule' || opsStatus === 'pending' || opsStatus === 'pending_information') {
-    return 'scheduled';
-  }
-
-  return opsStatus;
+  return opsStatus || 'scheduled';
 }
 
 export function formatCalendarDisplayStatus(status: string) {
-  return CALENDAR_STATUS_LABELS[status] || status;
+  const normalized = String(status ?? '').trim().toLowerCase();
+  if (!normalized) return 'Unknown';
+  return CALENDAR_STATUS_LABELS[normalized] || normalized.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export function calendarStatusDotClass(status: string) {
-  return CALENDAR_STATUS_DOT_CLASSES[status] || 'bg-gray-300';
+  return CALENDAR_STATUS_DOT_CLASSES[String(status ?? '').trim().toLowerCase()] || 'bg-gray-300';
 }

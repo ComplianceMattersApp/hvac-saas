@@ -295,7 +295,7 @@ export async function getDispatchCalendarData(params: {
   }
 
   function isCalendarScheduled(job: JobDispatchRow) {
-    return !!job.scheduled_date && !isOnHold(job);
+    return !!job.scheduled_date && isActive(job);
   }
 
   // Type guard for JobDispatchRow
@@ -313,7 +313,7 @@ export async function getDispatchCalendarData(params: {
       .filter(Boolean)
   );
 
-  // Canonical scheduled calendar jobs exclude on-hold work from dispatch surfaces.
+  // Canonical scheduled calendar jobs exclude non-active historical rows from dispatch surfaces.
   const scheduledCalendarRows = validRows.filter((row) => isCalendarScheduled(row));
 
   // Canonical unscheduled active jobs

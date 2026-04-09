@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { upsertCustomerProfileFromForm, claimNullOwnerCustomer } from "@/lib/actions/customer-actions";
+import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 
 export default async function CustomerEditPage({
   params,
@@ -22,6 +23,16 @@ export default async function CustomerEditPage({
   } = await supabase.auth.getUser();
 
   if (!user || userErr) redirect("/login");
+
+  try {
+    await requireInternalUser({ supabase, userId: user.id });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirect("/login");
+    }
+
+    throw error;
+  }
 
   const { data: customer, error } = await supabase
     .from("customers")
