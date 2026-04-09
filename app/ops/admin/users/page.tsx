@@ -581,7 +581,7 @@ export default async function AdminUsersCommandCenterPage({
                         </form>
                       ) : null}
 
-                      {record.email && record.category === "internal" ? (
+                      {record.email && record.category === "internal" && record.role ? (
                         <form action={resendInternalInviteFromForm}>
                           <input type="hidden" name="email" value={record.email} />
                           <input type="hidden" name="role" value={record.role} />
