@@ -521,13 +521,21 @@ export default async function PortalJobDetailPage({
     ? formatDateTimeLA(String(latestSentReportEvent.created_at))
     : "";
   const latestSentContractorNote = String(latestSentReportMeta?.contractor_note ?? "").trim();
-  const statusHeadline = latestSentFailureSummary?.what_failed || primaryIssue.headline;
-  const statusExplanation = latestSentFailureSummary?.contractor_safe_summary || primaryIssue.explanation;
+  const useLatestReportSummaryForCurrentStatus =
+    Boolean(latestSentFailureSummary) && ["failed", "retest_needed"].includes(opsStatus);
+  const statusHeadline = useLatestReportSummaryForCurrentStatus
+    ? latestSentFailureSummary?.what_failed || primaryIssue.headline
+    : primaryIssue.headline;
+  const statusExplanation = useLatestReportSummaryForCurrentStatus
+    ? latestSentFailureSummary?.contractor_safe_summary || primaryIssue.explanation
+    : primaryIssue.explanation;
   const statusDetailLines =
-    (latestSentFailureSummary?.what_needs_correction?.length ?? 0) > 0
+    useLatestReportSummaryForCurrentStatus && (latestSentFailureSummary?.what_needs_correction?.length ?? 0) > 0
       ? latestSentFailureSummary?.what_needs_correction
       : primaryIssue.detailLines;
-  const rawStatusNextStep = latestSentFailureSummary?.next_step || resolvedIssues.nextStep;
+  const rawStatusNextStep = useLatestReportSummaryForCurrentStatus
+    ? latestSentFailureSummary?.next_step || resolvedIssues.nextStep
+    : resolvedIssues.nextStep;
   const normalizedStatusNextStep = normalizeMessageForCompare(rawStatusNextStep);
   const normalizedStatusHeadline = normalizeMessageForCompare(statusHeadline);
   const normalizedStatusExplanation = normalizeMessageForCompare(statusExplanation);
@@ -846,7 +854,9 @@ export default async function PortalJobDetailPage({
             </div>
             {latestSentFailureSummary ? (
               <div className="text-xs text-slate-500 dark:text-slate-400">
-                Status summary above is sourced from the latest contractor report.
+                {useLatestReportSummaryForCurrentStatus
+                  ? "Current status above reflects the latest contractor report."
+                  : "The latest contractor report remains available here for historical context."}
               </div>
             ) : null}
             {latestSentContractorNote ? (

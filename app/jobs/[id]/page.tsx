@@ -697,6 +697,7 @@ const { data: timelineJobs, error: timelineJobsErr } = await supabase
 if (timelineJobsErr) throw new Error(timelineJobsErr.message);
 
 const timelineJobIds = (timelineJobs ?? []).map((j: any) => String(j.id ?? "")).filter(Boolean);
+const hasDirectNarrativeChain = timelineJobIds.some((id) => id !== jobId);
 
 // --- Unified Timeline (job_events) ---
 const { data: timelineEvents, error: tlErr } = await supabase
@@ -1246,14 +1247,29 @@ const eccSummaryText = job.ecc_test_runs?.length
 const latestSharedNoteAt = sharedNotes[0]?.created_at ? formatDateLAFromIso(String(sharedNotes[0].created_at)) : "";
 const latestInternalNoteAt = internalNotes[0]?.created_at ? formatDateLAFromIso(String(internalNotes[0].created_at)) : "";
 const latestTimelineAt = timelineItems[0]?.created_at ? formatDateTimeLAFromIso(String(timelineItems[0].created_at)) : "";
+const sharedNotesTitle = hasDirectNarrativeChain ? "Shared Notes Across Job Chain" : "Shared Notes";
+const internalNotesTitle = hasDirectNarrativeChain ? "Internal Notes Across Job Chain" : "Internal Notes";
+const timelineTitle = hasDirectNarrativeChain ? "Job Chain Timeline" : "Timeline";
 const sharedNotesSummaryText = latestSharedNoteAt
-  ? `Latest shared activity ${latestSharedNoteAt}.`
+  ? hasDirectNarrativeChain
+    ? `Latest shared chain activity ${latestSharedNoteAt}.`
+    : `Latest shared activity ${latestSharedNoteAt}.`
+  : hasDirectNarrativeChain
+  ? "No shared note activity in this direct retest chain yet."
   : "No shared note activity yet.";
 const internalNotesSummaryText = latestInternalNoteAt
-  ? `Latest internal note ${latestInternalNoteAt}.`
+  ? hasDirectNarrativeChain
+    ? `Latest internal chain note ${latestInternalNoteAt}.`
+    : `Latest internal note ${latestInternalNoteAt}.`
+  : hasDirectNarrativeChain
+  ? "No internal note activity in this direct retest chain yet."
   : "No internal note activity yet.";
 const timelineSummaryText = latestTimelineAt
-  ? `Latest activity ${latestTimelineAt}.`
+  ? hasDirectNarrativeChain
+    ? `Latest chain activity ${latestTimelineAt}.`
+    : `Latest activity ${latestTimelineAt}.`
+  : hasDirectNarrativeChain
+  ? "No activity recorded in this direct retest chain yet."
   : "No activity recorded yet.";
 
 const showRetestSection =
@@ -3043,7 +3059,7 @@ const renderTimelineItem = (e: any, key: string) => {
         {/* Shared Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title="Shared Notes" subtitle={sharedNotesSummaryText} meta={`${sharedNotes.length} note${sharedNotes.length === 1 ? "" : "s"}`} />
+            <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} meta={`${sharedNotes.length} note${sharedNotes.length === 1 ? "" : "s"}`} />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -3112,7 +3128,7 @@ const renderTimelineItem = (e: any, key: string) => {
         );
       })
     ) : (
-      <div className={workspaceEmptyStateClass}>No shared notes yet.</div>
+      <div className={workspaceEmptyStateClass}>{hasDirectNarrativeChain ? "No shared notes in this direct retest chain yet." : "No shared notes yet."}</div>
     )}
   </div>
           </div>
@@ -3121,7 +3137,7 @@ const renderTimelineItem = (e: any, key: string) => {
         {/* Internal Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title="Internal Notes" subtitle={internalNotesSummaryText} meta={`${internalNotes.length} note${internalNotes.length === 1 ? "" : "s"}`} />
+            <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} meta={`${internalNotes.length} note${internalNotes.length === 1 ? "" : "s"}`} />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -3171,7 +3187,7 @@ const renderTimelineItem = (e: any, key: string) => {
         );
       })
     ) : (
-      <div className={workspaceEmptyStateClass}>No internal notes yet.</div>
+      <div className={workspaceEmptyStateClass}>{hasDirectNarrativeChain ? "No internal notes in this direct retest chain yet." : "No internal notes yet."}</div>
     )}
   </div>
           </div>
@@ -3181,7 +3197,7 @@ const renderTimelineItem = (e: any, key: string) => {
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
-              title="Timeline"
+              title={timelineTitle}
               subtitle={timelineSummaryText}
               meta={`${timelineItems.length} event(s)`}
             />
@@ -3208,7 +3224,7 @@ const renderTimelineItem = (e: any, key: string) => {
         ) : null}
       </>
     ) : (
-      <div className={workspaceEmptyStateClass}>No timeline events yet.</div>
+      <div className={workspaceEmptyStateClass}>{hasDirectNarrativeChain ? "No timeline events in this direct retest chain yet." : "No timeline events yet."}</div>
     )}
           </div>
         </details>

@@ -326,67 +326,81 @@ export default async function AdminUsersCommandCenterPage({
   const returnTo = `/ops/admin/users?type=${encodeURIComponent(filterType || "all")}&q=${encodeURIComponent(query)}`;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 text-gray-900 sm:p-6">
-      <div className="rounded-xl border border-gray-200 bg-gradient-to-b from-white to-slate-50/60 p-5 shadow-sm">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 text-gray-900 sm:space-y-8 sm:p-6">
+      <div className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98)_58%,rgba(226,232,240,0.7))] p-6 shadow-[0_28px_60px_-36px_rgba(15,23,42,0.28)]">
+        <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-slate-200/70 blur-3xl" />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">Ops Admin</p>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">User Command Center</h1>
-            <p className="text-sm text-slate-600">
-              Manage internal and contractor user access, onboarding, and password operations.
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
+            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">People &amp; Access</h1>
+            <p className="max-w-2xl text-sm leading-6 text-slate-600">
+              Search every internal and contractor account, resend access emails, and handle recovery from one place.
             </p>
+            <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+              Cross-role account operations live here. Internal Team handles internal membership changes.
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/ops/admin/internal-users"
-              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100"
-            >
-              Internal Users
-            </Link>
+          <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/ops/admin"
-              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100"
+              className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >
-              Admin Home
+              Admin Center
+            </Link>
+            <Link
+              href="/ops/admin/internal-users"
+              className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
+            >
+              Internal Team
+            </Link>
+            <Link
+              href="/ops/admin/contractors"
+              className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
+            >
+              Contractors
             </Link>
           </div>
         </div>
       </div>
 
       {notice ? (
-        <div className={`rounded-lg border px-4 py-3 text-sm ${bannerClass(notice.tone)}`}>
+        <div className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${bannerClass(notice.tone)}`}>
           {notice.message}
         </div>
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Visible Users</p>
+        <div className="rounded-[22px] border border-slate-200/80 bg-white px-4 py-3.5 shadow-[0_18px_32px_-28px_rgba(15,23,42,0.22)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Users in view</p>
           <p className="mt-1 text-2xl font-semibold text-slate-900">{summary.total}</p>
         </div>
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Active</p>
+        <div className="rounded-[22px] border border-emerald-200/80 bg-emerald-50/80 px-4 py-3.5 shadow-[0_18px_32px_-28px_rgba(5,150,105,0.22)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Active</p>
           <p className="mt-1 text-2xl font-semibold text-emerald-900">{summary.active}</p>
         </div>
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-amber-700">Invited</p>
+        <div className="rounded-[22px] border border-amber-200/80 bg-amber-50/80 px-4 py-3.5 shadow-[0_18px_32px_-28px_rgba(217,119,6,0.22)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Invited</p>
           <p className="mt-1 text-2xl font-semibold text-amber-900">{summary.invited}</p>
         </div>
-        <div className="rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-600">Inactive</p>
+        <div className="rounded-[22px] border border-slate-300/80 bg-slate-50/90 px-4 py-3.5 shadow-[0_18px_32px_-28px_rgba(15,23,42,0.16)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Inactive</p>
           <p className="mt-1 text-2xl font-semibold text-gray-900">{summary.inactive}</p>
         </div>
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+        <div className="mb-4 space-y-1">
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Filter directory</h2>
+          <p className="text-sm leading-6 text-slate-600">Refine the current view by account type or search across names, emails, and companies.</p>
+        </div>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <form method="get" className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:w-full">
             <div>
-              <label className="text-xs font-medium uppercase tracking-wide text-gray-500">Type</label>
+              <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Type</label>
               <select
                 name="type"
                 defaultValue={filterType || "all"}
-                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-2 focus:ring-slate-200"
               >
                 <option value="all">All users</option>
                 <option value="internal">Internal users</option>
@@ -396,7 +410,7 @@ export default async function AdminUsersCommandCenterPage({
               </select>
             </div>
             <div className="sm:col-span-2">
-              <label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Search (name, email, company)
               </label>
               <div className="mt-1 flex gap-2">
@@ -404,11 +418,11 @@ export default async function AdminUsersCommandCenterPage({
                   name="q"
                   defaultValue={query}
                   placeholder="Search users..."
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
                 />
                 <button
                   type="submit"
-                  className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                  className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
                 >
                   Apply
                 </button>
@@ -419,21 +433,21 @@ export default async function AdminUsersCommandCenterPage({
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          <h2 className="text-base font-semibold text-gray-900">Invite Internal User</h2>
-          <p className="mt-1 text-sm text-gray-600">Preserves existing internal invite onboarding flow.</p>
+        <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Quick invite</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">Send an onboarding email and attach the selected internal role in one step.</p>
           <form action={inviteInternalUserFromForm} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
             <input
               name="email"
               type="email"
               placeholder="name@company.com"
-              className="sm:col-span-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+              className="sm:col-span-2 rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
               required
             />
             <select
               name="role"
               defaultValue="office"
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+              className="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-2 focus:ring-slate-200"
             >
               <option value="admin">admin</option>
               <option value="office">office</option>
@@ -441,25 +455,25 @@ export default async function AdminUsersCommandCenterPage({
             </select>
             <button
               type="submit"
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+              className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
             >
-              Invite
+              Send invite
             </button>
           </form>
         </div>
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-200 px-4 py-3 sm:px-5">
-          <h2 className="text-base font-semibold text-gray-900">Current Users</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            Active and invited users across internal and contractor memberships.
+      <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
+        <div className="border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">People directory</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            Internal and contractor accounts in the current view.
           </p>
         </div>
 
         {filtered.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-gray-600 sm:px-5">
-            No users matched your filters.
+          <div className="px-5 py-12 text-center text-sm leading-6 text-slate-600">
+            No users match the current filters.
           </div>
         ) : (
           <div className="divide-y divide-gray-200">

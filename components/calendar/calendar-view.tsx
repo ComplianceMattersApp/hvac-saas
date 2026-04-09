@@ -1561,7 +1561,9 @@ export async function CalendarView(props: Props) {
                       <p className="truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
                       <p className="mt-0.5 truncate text-[11px] text-slate-600">{formatBusinessDateUS(job.scheduled_date ?? data.anchorDate)}</p>
                       <p className="mt-1 truncate text-[11px] font-medium text-amber-900">{issueSummary}</p>
-                      <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-amber-700/90 group-hover:text-amber-800">Drag to a day</p>
+                      <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-amber-700/90 group-hover:text-amber-800">
+                        {uiView === 'month' ? 'Drag to a day' : 'Open to review'}
+                      </p>
                     </Link>
                   );
                 })}
@@ -1573,7 +1575,11 @@ export async function CalendarView(props: Props) {
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
               <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">Unscheduled Jobs</h3>
-              <p className="mt-0.5 text-[11px] text-slate-500">Drag onto the calendar when a visit is ready to place.</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                {uiView === 'month'
+                  ? 'Drag onto the calendar when a visit is ready to place.'
+                  : 'Open a job to review and place it on the schedule.'}
+              </p>
             </div>
           </div>
           <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
@@ -1611,7 +1617,9 @@ export async function CalendarView(props: Props) {
                         </span>
                       ))}
                     </div>
-                    <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-500 group-hover:text-slate-700">Drag to a day</p>
+                    <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-500 group-hover:text-slate-700">
+                      {uiView === 'month' ? 'Drag to a day' : 'Open to schedule'}
+                    </p>
                   </Link>
                 );
               })

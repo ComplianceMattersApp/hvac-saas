@@ -216,11 +216,6 @@ export function resolveContractorIssues(
   const pendingInfoReason = String(input.job.pending_info_reason ?? "").trim();
   const nextActionNote = String(input.job.next_action_note ?? "").trim();
   const failureReasons = (input.failureReasons ?? []).map(String).map((s) => s.trim()).filter(Boolean);
-  const events = input.events ?? [];
-
-  const hasCorrectionSubmission = events.some(
-    (e) => normalize(e?.event_type) === "contractor_correction_submission"
-  );
   const hasOpenRetestChild = Boolean(input.chain?.hasOpenRetestChild);
   const retestSchedule = hasOpenRetestChild ? formatRetestSchedule(input.chain) : "";
   const retestState: "none" | "pending_scheduling" | "scheduled" =
@@ -265,27 +260,24 @@ export function resolveContractorIssues(
         stage: "retest_pending_scheduling",
       };
     } else {
-      const stage = hasCorrectionSubmission ? "awaiting_review" : "action_needed";
-
       primaryIssue = {
         group: "failed",
-        headline:
-          stage === "awaiting_review"
-            ? "Failed - Awaiting review"
-            : "Failed - Action needed",
-        explanation:
-          stage === "awaiting_review"
-            ? "Corrections submitted. Our team is reviewing your submission."
-            : "Please correct the failed items and submit for review.",
+        headline: "Failed - Action needed",
+        explanation: "Please correct the failed items and submit for review.",
         detailLines: failureReasons.length > 0 ? failureReasons : undefined,
-        stage,
+        stage: "action_needed",
       };
     }
   } else if (["need_to_schedule", "scheduled", "on_hold"].includes(opsStatus)) {
     primaryIssue = {
       group: "in_progress",
       headline: inProgressHeadline(opsStatus),
-      explanation: "Work is in progress.",
+      explanation:
+        opsStatus === "need_to_schedule"
+          ? "We are working to schedule this job."
+          : opsStatus === "scheduled"
+            ? "Your visit is scheduled."
+            : "This job is currently on hold.",
       stage: opsStatus,
     };
   } else if (["paperwork_required", "invoice_required"].includes(opsStatus)) {

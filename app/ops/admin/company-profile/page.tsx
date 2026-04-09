@@ -83,27 +83,21 @@ export default async function AdminCompanyProfilePage({
         <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-36 w-36 rounded-full bg-emerald-100/70 blur-3xl" />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Company Profile</p>
-            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Make your company feel at home in the app</h1>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
+            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Company Profile</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Add your company name, support contact details, and logo so your team sees a polished, familiar experience.
+              Keep your company name, support details, and logo polished anywhere your team expects to see them.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Shown in select internal views, emails, and support touchpoints
+              Shown in internal views, emails, and support touchpoints
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Link
               href="/ops/admin"
-              className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
+              className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >
-              Admin Home
-            </Link>
-            <Link
-              href="/ops"
-              className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
-            >
-              Ops
+              Admin Center
             </Link>
           </div>
         </div>
@@ -118,7 +112,7 @@ export default async function AdminCompanyProfilePage({
       <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
           <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
-            <div className="text-sm font-semibold text-slate-950">Brand Preview</div>
+            <div className="text-sm font-semibold text-slate-950">Brand preview</div>
             <div className="mt-1 text-sm text-slate-600">A quick look at how your company appears today.</div>
           </div>
           <div className="space-y-4 p-5">

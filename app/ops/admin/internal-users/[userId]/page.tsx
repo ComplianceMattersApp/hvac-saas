@@ -145,45 +145,55 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
   const isSelf = actorUserId === targetUserId;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 text-gray-900 sm:p-6">
-      <section className="rounded-2xl border border-gray-200 bg-gradient-to-b from-white to-slate-50/70 p-5 shadow-sm sm:p-6">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 text-gray-900 sm:space-y-8 sm:p-6">
+      <section className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98)_58%,rgba(226,232,240,0.7))] p-6 shadow-[0_28px_60px_-36px_rgba(15,23,42,0.28)] sm:p-6">
+        <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-slate-200/70 blur-3xl" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Ops Admin</div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Internal User Profile</h1>
-            <p className="max-w-2xl text-sm text-slate-600 sm:text-base">
-              Edit practical profile details used across the app without changing sign-in credentials or membership access.
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</div>
+            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Edit internal profile</h1>
+            <p className="max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+              Update the practical profile details your team sees across the app without changing sign-in credentials or account ownership.
             </p>
+            <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+              Profile details only. Role changes and broader recovery actions stay in the parent admin workspaces.
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href="/ops/admin/internal-users"
-              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100"
+              href="/ops/admin"
+              className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >
-              Back to Internal Users
+              Admin Center
             </Link>
             <Link
-              href="/ops/admin"
-              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100"
+              href="/ops/admin/internal-users"
+              className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >
-              Admin Home
+              Back to Internal Team
+            </Link>
+            <Link
+              href="/ops/admin/users"
+              className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
+            >
+              People &amp; Access
             </Link>
           </div>
         </div>
       </section>
 
       {notice ? (
-        <div className={`rounded-lg border px-4 py-3 text-sm ${bannerClass(notice.tone)}`}>
+        <div className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${bannerClass(notice.tone)}`}>
           {notice.message}
         </div>
       ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+        <section className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-slate-900">Profile Details</h2>
-            <p className="text-sm text-slate-600">
-              These fields control how this internal user appears in the product and provide a practical contact number for internal reference.
+            <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Profile details</h2>
+            <p className="text-sm leading-6 text-slate-600">
+              Keep the visible name and practical contact number current for internal use.
             </p>
           </div>
 
@@ -199,7 +209,7 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
                 name="display_name"
                 type="text"
                 defaultValue={displayName}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-slate-900"
+                className="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-2 focus:ring-slate-200"
                 maxLength={120}
                 required
               />
@@ -214,41 +224,41 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
                 name="phone"
                 type="tel"
                 defaultValue={phone}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-slate-900"
+                className="mt-1 w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-2 focus:ring-slate-200"
                 maxLength={40}
                 placeholder="(555) 555-5555"
               />
               <p className="mt-1 text-xs text-slate-500">Leave blank to clear the app-managed phone value.</p>
             </div>
 
-            <div className="rounded-xl border border-gray-200 bg-slate-50/70 px-4 py-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3.5">
               <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Email</div>
               <div className="mt-1 break-all text-sm font-medium text-slate-900">{email}</div>
-              <div className="mt-1 text-xs text-slate-500">Email remains read-only here because sign-in identity is managed separately.</div>
+              <div className="mt-1 text-xs text-slate-500">Email stays read-only here because sign-in identity is managed separately.</div>
             </div>
 
             <div className="flex items-center justify-end gap-2">
               <Link
                 href="/ops/admin/internal-users"
-                className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-100"
+                className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
               >
                 Cancel
               </Link>
               <button
                 type="submit"
-                className="inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+                className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
               >
-                Save Profile
+                Save changes
               </button>
             </div>
           </form>
         </section>
 
         <aside className="space-y-4">
-          <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+          <section className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
             <div className="space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">User Summary</div>
-              <h2 className="text-xl font-semibold tracking-tight text-slate-900">{displayName}</h2>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">User summary</div>
+              <h2 className="text-xl font-semibold tracking-[-0.02em] text-slate-950">{displayName}</h2>
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -281,10 +291,10 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
             </dl>
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 shadow-sm sm:p-6">
-            <h2 className="text-sm font-semibold text-slate-900">Boundaries</h2>
+          <section className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-5 shadow-[0_18px_32px_-30px_rgba(15,23,42,0.18)] sm:p-6">
+            <h2 className="text-sm font-semibold text-slate-900">What this page controls</h2>
             <p className="mt-2 text-sm text-slate-600">
-              This page only edits practical profile data. Role changes, activation, invites, and password operations stay on the main internal users admin screen.
+              Edit profile details here. Use Internal Team for role changes and People &amp; Access for broader invite or password work.
             </p>
           </section>
         </aside>
