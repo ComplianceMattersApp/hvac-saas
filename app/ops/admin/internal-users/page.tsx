@@ -137,6 +137,7 @@ export default async function AdminInternalUsersPage({
 
   const admin = createAdminClient();
   const emailConfirmedMap = new Map<string, boolean | null>();
+  const emailMap = new Map<string, string | null>();
   await Promise.all(
     (internalUsers ?? []).map(async (row: any) => {
       const targetUserId = String(row?.user_id ?? "").trim();
@@ -145,10 +146,12 @@ export default async function AdminInternalUsersPage({
       const { data, error: authErr } = await admin.auth.admin.getUserById(targetUserId);
       if (authErr || !data?.user) {
         emailConfirmedMap.set(targetUserId, null);
+        emailMap.set(targetUserId, null);
         return;
       }
 
       emailConfirmedMap.set(targetUserId, Boolean((data.user as any).email_confirmed_at));
+      emailMap.set(targetUserId, String((data.user as any).email ?? "").trim() || null);
     }),
   );
 
@@ -272,6 +275,7 @@ export default async function AdminInternalUsersPage({
               const resolved = String(userDisplayMap[String(row.user_id ?? "").trim()] ?? "").trim();
               return resolved && resolved !== "User" ? resolved : "Unknown User";
             })();
+            const secondaryIdentifier = emailMap.get(targetUserId) || targetUserId;
 
             return (
               <div key={row.user_id} className="px-4 py-4 sm:px-5">
@@ -299,6 +303,7 @@ export default async function AdminInternalUsersPage({
                         </span>
                       ) : null}
                     </div>
+                    <div className="break-all text-xs text-slate-500">{secondaryIdentifier}</div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">

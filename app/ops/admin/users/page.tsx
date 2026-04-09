@@ -33,7 +33,7 @@ type UserRecord = {
   email: string;
   name: string;
   company: string;
-  role: string;
+  role: string | null;
   lifecycle: Lifecycle;
   canDeactivateReactivate: boolean;
   isActiveFlag: boolean | null;
@@ -262,6 +262,7 @@ export default async function AdminUsersCommandCenterPage({
     const contractor = contractorMap.get(contractorId);
     const profile = profileMap.get(id);
     const email = String(profile?.email ?? "").trim().toLowerCase();
+    const role = toRoleLabel(String(row.role ?? ""));
     if (email) contractorMembershipEmails.add(`${contractorId}:${email}`);
 
     records.push({
@@ -271,7 +272,7 @@ export default async function AdminUsersCommandCenterPage({
       email,
       name: String(profile?.fullName ?? "").trim() || "Unknown User",
       company: contractor?.name ?? "Contractor",
-      role: "contractor_user",
+      role,
       lifecycle: getContractorLifecycle(authConfirmedMap.get(id) ?? null),
       canDeactivateReactivate: false,
       isActiveFlag: null,
@@ -293,7 +294,7 @@ export default async function AdminUsersCommandCenterPage({
       email,
       name: "Pending Invite",
       company: contractorMap.get(contractorId)?.name ?? "Contractor",
-      role: "contractor_user",
+      role: null,
       lifecycle: "invited",
       canDeactivateReactivate: false,
       isActiveFlag: null,
@@ -495,13 +496,15 @@ export default async function AdminUsersCommandCenterPage({
                         >
                           {record.category}
                         </span>
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${roleBadgeClass(
-                            record.role,
-                          )}`}
-                        >
-                          {record.role}
-                        </span>
+                        {record.role ? (
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${roleBadgeClass(
+                              record.role,
+                            )}`}
+                          >
+                            {record.role}
+                          </span>
+                        ) : null}
                         <span
                           className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${lifecycleBadgeClass(
                             record.lifecycle,

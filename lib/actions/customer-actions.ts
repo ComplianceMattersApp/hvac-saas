@@ -71,7 +71,7 @@ const { error: jobsSnapErr } = await supabase
   customer_first_name: first_name,
   customer_last_name: last_name,
   customer_email: email,
-  customer_phone: phone,
+  customer_phone: phone ?? "",
   })
   .eq("customer_id", customer_id);
 
