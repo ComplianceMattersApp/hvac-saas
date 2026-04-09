@@ -652,8 +652,8 @@ export default async function PortalPage({
             {passedJobs.slice(0, 5).map(({ job: j, resolved }) => {
               const resolvedAt = j.data_entry_completed_at ?? j.created_at;
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
-              const detailLine = preferredStatusMessage({ job: j, resolved, openRetestChild });
-              const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
+              const detailLine = getPortalJobDetailLine({ job: j, resolved, openRetestChild });
+              const statusMeta = getPortalJobStatusMeta({ job: j, resolved, openRetestChild });
               return (
                 <PortalJobListItem
                   key={j.id}
@@ -664,7 +664,7 @@ export default async function PortalPage({
                   statusLabel={statusMeta.label}
                   statusToneClass={statusMeta.tone}
                   detailLine={detailLine}
-                  nextStep={nextStepText({ job: j, resolved, openRetestChild })}
+                  nextStep={getPortalJobNextStep({ job: j, resolved, openRetestChild })}
                   secondaryMeta={resolvedAt ? `Resolved ${formatDateLA(String(resolvedAt))}` : "Resolved recently"}
                   photoCount={attachmentCountByJob.get(String(j.id)) ?? 0}
                 />
