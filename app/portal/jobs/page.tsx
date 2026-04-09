@@ -8,10 +8,16 @@ import {
   extractFailureReasons,
   finalRunPass,
   resolveContractorIssues,
-  type ContractorIssue,
 } from "@/lib/portal/resolveContractorIssues";
+import {
+  getPortalJobDetailLine,
+  getPortalJobNextStep,
+  getPortalJobSection,
+  getPortalJobStatusMeta,
+  getPortalSectionSecondaryMeta,
+} from "@/lib/portal/portal-job-presentation";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
-import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isPortalVisibleJob } from "@/lib/visibility/portal";
 
 function formatDateLA(iso: string) {
@@ -88,6 +94,7 @@ export default async function PortalAllJobsPage({
       ops_status,
       permit_number,
       pending_info_reason,
+      on_hold_reason,
       next_action_note,
       action_required_by,
       parent_job_id,
@@ -216,7 +223,7 @@ export default async function PortalAllJobsPage({
   );
 
   const actionRequiredJobs = activeResolvedJobs
-    .filter((row) => row.resolved.bucket === "action_required")
+    .filter((row) => getPortalJobSection(row) === "action_required")
     .sort((a, b) => {
       const urgencyA = Number(
         !!a.job.follow_up_date && String(a.job.follow_up_date) <= String(today)
@@ -228,8 +235,20 @@ export default async function PortalAllJobsPage({
       return toDateMs(b.job.created_at) - toDateMs(a.job.created_at);
     });
 
-  const inProgressJobs = activeResolvedJobs
-    .filter((row) => row.resolved.bucket === "in_progress")
+  const upcomingScheduledJobs = activeResolvedJobs
+    .filter((row) => getPortalJobSection(row) === "upcoming_scheduled")
+    .sort((a, b) => {
+      const aDate = toDateMs(a.job.scheduled_date ?? a.job.created_at);
+      const bDate = toDateMs(b.job.scheduled_date ?? b.job.created_at);
+      return aDate - bDate;
+    });
+
+  const activeWorkJobs = activeResolvedJobs
+    .filter((row) => getPortalJobSection(row) === "active_work")
+    .sort((a, b) => toDateMs(b.job.created_at) - toDateMs(a.job.created_at));
+
+  const waitingJobs = activeResolvedJobs
+    .filter((row) => getPortalJobSection(row) === "waiting")
     .sort((a, b) => toDateMs(b.job.created_at) - toDateMs(a.job.created_at));
 
   const passedJobs = activeResolvedJobs
@@ -239,34 +258,6 @@ export default async function PortalAllJobsPage({
       const bResolved = toDateMs(b.job.data_entry_completed_at ?? b.job.created_at);
       return bResolved - aResolved;
     });
-
-  function cardDetailLine(input: {
-    primaryIssue: ContractorIssue;
-    secondaryIssues?: ContractorIssue[];
-  }) {
-
-    const failedIssue =
-      input.primaryIssue.group === "failed"
-        ? input.primaryIssue
-        : (input.secondaryIssues ?? []).find((issue) => issue.group === "failed");
-
-    const firstFailure = String((failedIssue?.detailLines ?? [])[0] ?? "").trim();
-    if (firstFailure) {
-      return firstFailure.toLowerCase().startsWith("failed") ? firstFailure : `Failed - ${firstFailure}`;
-    }
-
-    const needsInfoIssue =
-      input.primaryIssue.group === "needs_info"
-        ? input.primaryIssue
-        : (input.secondaryIssues ?? []).find((issue) => issue.group === "needs_info");
-
-    const needsInfoHeadline = String(needsInfoIssue?.headline ?? "").trim();
-    if (needsInfoHeadline) {
-      return `Missing info: ${needsInfoHeadline}`;
-    }
-
-    return "";
-  }
 
   function customerName(job: any) {
     const full = [
@@ -293,74 +284,6 @@ export default async function PortalAllJobsPage({
     return cityStateZip ? `${addr}, ${cityStateZip}` : addr;
   }
 
-  function retestScheduleLabel(child: any) {
-    if (!child) return "";
-    const date = child.scheduled_date ? formatBusinessDateUS(String(child.scheduled_date)) : "";
-    const window = displayWindowLA(child.window_start, child.window_end);
-    if (date && window) return `${date} ${window}`;
-    return date || window || "";
-  }
-
-  function cardStatusMeta(row: { job: any; resolved: any; openRetestChild?: any }) {
-    const lifecycle = String(row.job.status ?? "").trim().toLowerCase();
-    const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
-    const resolvedLabel = String(row.resolved?.statusLabel ?? "").trim();
-
-    if (ops === "pending_info" || row.resolved?.primaryIssue?.group === "needs_info") return { label: "Needs info", tone: "border-amber-200 bg-amber-50 text-amber-800" };
-    if (resolvedLabel === "Retest Scheduled") return { label: "Retest Scheduled", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
-    if (resolvedLabel === "Retest Pending Scheduling") return { label: "Ready to schedule", tone: "border-amber-200 bg-amber-50 text-amber-800" };
-    if (resolvedLabel === "Under Review") return { label: "Under review", tone: "border-cyan-200 bg-cyan-50 text-cyan-800" };
-    if (resolvedLabel === "Failed") return { label: "Needs correction", tone: "border-rose-200 bg-rose-50 text-rose-800" };
-    if (ops === "paperwork_required") return { label: "Final paperwork", tone: "border-violet-200 bg-violet-50 text-violet-800" };
-    if (ops === "invoice_required") return { label: "Final Processing", tone: "border-indigo-200 bg-indigo-50 text-indigo-800" };
-    if (lifecycle === "on_the_way") return { label: "On the way", tone: "border-sky-200 bg-sky-50 text-sky-800" };
-    if (lifecycle === "in_progress" || lifecycle === "in_process" || ops === "in_process") return { label: "In progress", tone: "border-blue-200 bg-blue-50 text-blue-800" };
-    if (ops === "scheduled") return { label: "Scheduled", tone: "border-slate-200 bg-slate-50 text-slate-800" };
-    if (row.resolved.bucket === "passed") return { label: "Passed", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
-    return { label: "In progress", tone: "border-slate-200 bg-slate-50 text-slate-800" };
-  }
-
-  function preferredStatusMessage(row: { job: any; resolved: any; openRetestChild?: any }) {
-    const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
-    const detailLine = cardDetailLine(row.resolved);
-    if (detailLine) return detailLine;
-
-    const pendingInfoReason = String(row.job.pending_info_reason ?? "").trim();
-    if (ops === "pending_info") {
-      return pendingInfoReason ? `Missing info: ${pendingInfoReason}` : "";
-    }
-
-    if (ops === "pending_office_review") {
-      return String(row.resolved?.primaryIssue?.explanation ?? "").trim();
-    }
-
-    if (ops === "failed" || ops === "retest_needed") {
-      const stage = String(row.resolved?.primaryIssue?.stage ?? "").trim().toLowerCase();
-      if (["awaiting_review", "retest_pending_scheduling", "retest_scheduled"].includes(stage)) {
-        return String(row.resolved?.primaryIssue?.explanation ?? row.resolved?.primaryIssue?.headline ?? "").trim();
-      }
-      return "";
-    }
-
-    return "";
-  }
-
-  function nextStepText(row: { job: any; resolved: any; openRetestChild?: any }) {
-    const lifecycle = String(row.job.status ?? "").trim().toLowerCase();
-    const ops = String(row.job.ops_status ?? "").trim().toLowerCase();
-    if (row.resolved?.retestState === "scheduled" || row.resolved?.bucket === "passed") return "Open the job to review details.";
-    if (ops === "pending_office_review") return "Corrections were submitted and are currently under internal review.";
-    if (row.resolved?.primaryIssue?.group === "needs_info") return "Open this job to provide the requested information.";
-    if (ops === "failed" || ops === "retest_needed" || row.resolved?.primaryIssue?.group === "failed") return "Open this job to review the issue details and next step.";
-    if (ops === "paperwork_required") return "Field work is complete. We're finishing the paperwork.";
-    if (ops === "invoice_required") return "Field work is complete. We're completing final processing.";
-    if (row.resolved?.retestState === "pending_scheduling") return "Open this job to schedule a retest.";
-    if (lifecycle === "on_the_way" || lifecycle === "in_progress" || lifecycle === "in_process" || ops === "scheduled" || ops === "in_process") {
-      return "Your technician is on the way or work is scheduled.";
-    }
-    return "Open this job for details.";
-  }
-
   return (
     <div className="mx-auto max-w-6xl space-y-6 text-gray-900 dark:text-gray-100">
       {banner === "invalid_request" ? (
@@ -385,10 +308,10 @@ export default async function PortalAllJobsPage({
               Contractor Jobs
             </div>
             <h1 className="mt-1 text-[clamp(1.7rem,3vw,2.4rem)] font-semibold tracking-[-0.03em] text-slate-950 dark:text-slate-100">
-              Active jobs portfolio
+              Portal jobs portfolio
             </h1>
             <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Every portal-visible job, with status and next step surfaced for faster review.
+              Every portal-visible job, grouped by honest current state for faster review.
             </p>
           </div>
 
@@ -396,8 +319,14 @@ export default async function PortalAllJobsPage({
             <div className={`${portalMetricChipClass} border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300`}>
               {actionRequiredJobs.length} attention
             </div>
+            <div className={`${portalMetricChipClass} border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200`}>
+              {upcomingScheduledJobs.length} upcoming
+            </div>
             <div className={`${portalMetricChipClass} border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300`}>
-              {inProgressJobs.length} in progress
+              {activeWorkJobs.length} active
+            </div>
+            <div className={`${portalMetricChipClass} border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200`}>
+              {waitingJobs.length} waiting
             </div>
             <div className={`${portalMetricChipClass} border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300`}>
               {passedJobs.length} passed
@@ -429,8 +358,8 @@ export default async function PortalAllJobsPage({
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {actionRequiredJobs.map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
-              const detailLine = preferredStatusMessage({ job: j, resolved, openRetestChild });
-              const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
+              const detailLine = getPortalJobDetailLine({ job: j, resolved, openRetestChild });
+              const statusMeta = getPortalJobStatusMeta({ job: j, resolved, openRetestChild });
               return (
                 <PortalJobListItem
                   key={j.id}
@@ -441,8 +370,8 @@ export default async function PortalAllJobsPage({
                   statusLabel={statusMeta.label}
                   statusToneClass={statusMeta.tone}
                   detailLine={detailLine}
-                  nextStep={nextStepText({ job: j, resolved, openRetestChild })}
-                  secondaryMeta={j.scheduled_date ? `Service ${formatBusinessDateUS(j.scheduled_date)}` : "Service date pending"}
+                  nextStep={getPortalJobNextStep({ job: j, resolved, openRetestChild })}
+                  secondaryMeta={getPortalSectionSecondaryMeta("action_required")}
                 />
               );
             })}
@@ -461,28 +390,28 @@ export default async function PortalAllJobsPage({
         </div>
       </section>
 
-      {/* In Progress */}
+      {/* Upcoming Scheduled */}
       <section className="space-y-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-              Active Work
+              Upcoming Scheduled
             </div>
           <h2 className="mt-0.5 text-[1.1rem] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">
-            {labelWithCount("In Progress", inProgressJobs.length)}
+            {labelWithCount("Upcoming Scheduled", upcomingScheduledJobs.length)}
           </h2>
           </div>
           <div className="max-w-md text-sm leading-5 text-slate-600 dark:text-slate-300 sm:text-right">
-            Work underway or moving through final processing.
+            Scheduled visits that are confirmed but not yet live.
           </div>
         </div>
 
         <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/96 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950/80">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
-            {inProgressJobs.map(({ job: j, resolved }) => {
+            {upcomingScheduledJobs.map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
-              const detailLine = preferredStatusMessage({ job: j, resolved, openRetestChild });
-              const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
+              const detailLine = getPortalJobDetailLine({ job: j, resolved, openRetestChild });
+              const statusMeta = getPortalJobStatusMeta({ job: j, resolved, openRetestChild });
               return (
                 <PortalJobListItem
                   key={j.id}
@@ -493,19 +422,123 @@ export default async function PortalAllJobsPage({
                   statusLabel={statusMeta.label}
                   statusToneClass={statusMeta.tone}
                   detailLine={detailLine}
-                  nextStep={nextStepText({ job: j, resolved, openRetestChild })}
-                  secondaryMeta={j.scheduled_date ? `Service ${formatBusinessDateUS(String(j.scheduled_date))}` : "Schedule pending"}
+                  nextStep={getPortalJobNextStep({ job: j, resolved, openRetestChild })}
+                  secondaryMeta={j.scheduled_date ? `Service ${formatBusinessDateUS(String(j.scheduled_date))}` : getPortalSectionSecondaryMeta("upcoming_scheduled")}
                 />
               );
             })}
 
-            {inProgressJobs.length === 0 && (
+            {upcomingScheduledJobs.length === 0 && (
               <div className="px-6 py-6 text-center">
                 <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  No in-progress jobs.
+                  No upcoming scheduled visits.
                 </div>
                 <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Active work will appear here.
+                  Confirmed visits will appear here.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Active Work */}
+      <section className="space-y-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+              Active Work
+            </div>
+          <h2 className="mt-0.5 text-[1.1rem] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">
+            {labelWithCount("Active Work", activeWorkJobs.length)}
+          </h2>
+          </div>
+          <div className="max-w-md text-sm leading-5 text-slate-600 dark:text-slate-300 sm:text-right">
+            Live visits that are on the way or already in progress.
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/96 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950/80">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
+            {activeWorkJobs.map(({ job: j, resolved }) => {
+              const openRetestChild = openRetestChildByParentId.get(String(j.id));
+              const detailLine = getPortalJobDetailLine({ job: j, resolved, openRetestChild });
+              const statusMeta = getPortalJobStatusMeta({ job: j, resolved, openRetestChild });
+              return (
+                <PortalJobListItem
+                  key={j.id}
+                  href={`/portal/jobs/${j.id}`}
+                  customerName={customerName(j)}
+                  title={normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
+                  address={displayAddress(j)}
+                  statusLabel={statusMeta.label}
+                  statusToneClass={statusMeta.tone}
+                  detailLine={detailLine}
+                  nextStep={getPortalJobNextStep({ job: j, resolved, openRetestChild })}
+                  secondaryMeta={getPortalSectionSecondaryMeta("active_work")}
+                />
+              );
+            })}
+
+            {activeWorkJobs.length === 0 && (
+              <div className="px-6 py-6 text-center">
+                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  No active work right now.
+                </div>
+                <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Live visits will appear here.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Waiting */}
+      <section className="space-y-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+              Waiting States
+            </div>
+          <h2 className="mt-0.5 text-[1.1rem] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">
+            {labelWithCount("Waiting", waitingJobs.length)}
+          </h2>
+          </div>
+          <div className="max-w-md text-sm leading-5 text-slate-600 dark:text-slate-300 sm:text-right">
+            On-hold, pending-information, review, and final-processing jobs that are not currently live.
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/96 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950/80">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
+            {waitingJobs.map(({ job: j, resolved }) => {
+              const openRetestChild = openRetestChildByParentId.get(String(j.id));
+              const detailLine = getPortalJobDetailLine({ job: j, resolved, openRetestChild });
+              const statusMeta = getPortalJobStatusMeta({ job: j, resolved, openRetestChild });
+              return (
+                <PortalJobListItem
+                  key={j.id}
+                  href={`/portal/jobs/${j.id}`}
+                  customerName={customerName(j)}
+                  title={normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
+                  address={displayAddress(j)}
+                  statusLabel={statusMeta.label}
+                  statusToneClass={statusMeta.tone}
+                  detailLine={detailLine}
+                  nextStep={getPortalJobNextStep({ job: j, resolved, openRetestChild })}
+                  secondaryMeta={getPortalSectionSecondaryMeta("waiting")}
+                />
+              );
+            })}
+
+            {waitingJobs.length === 0 && (
+              <div className="px-6 py-6 text-center">
+                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  No waiting-state jobs.
+                </div>
+                <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Non-live waits and processing updates will appear here.
                 </div>
               </div>
             )}
@@ -534,8 +567,8 @@ export default async function PortalAllJobsPage({
             {passedJobs.map(({ job: j, resolved }) => {
               const resolvedAt = j.data_entry_completed_at ?? j.created_at;
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
-              const detailLine = preferredStatusMessage({ job: j, resolved, openRetestChild });
-              const statusMeta = cardStatusMeta({ job: j, resolved, openRetestChild });
+              const detailLine = getPortalJobDetailLine({ job: j, resolved, openRetestChild });
+              const statusMeta = getPortalJobStatusMeta({ job: j, resolved, openRetestChild });
               return (
                 <PortalJobListItem
                   key={j.id}
@@ -546,7 +579,7 @@ export default async function PortalAllJobsPage({
                   statusLabel={statusMeta.label}
                   statusToneClass={statusMeta.tone}
                   detailLine={detailLine}
-                  nextStep={nextStepText({ job: j, resolved, openRetestChild })}
+                  nextStep={getPortalJobNextStep({ job: j, resolved, openRetestChild })}
                   secondaryMeta={resolvedAt ? `Resolved ${formatDateLA(String(resolvedAt))}` : "Resolved recently"}
                 />
               );
