@@ -904,7 +904,7 @@ const customerEmail =
   customerBilling?.email ?? job.customer_email ?? "—";
 
   const contractorName =
-    contractors?.find((c: any) => c.id === job.contractor_id)?.name ?? "—";
+    contractors?.find((c: any) => c.id === job.contractor_id)?.name ?? internalBusinessDisplayName;
 
   const firstNonEmpty = (...values: Array<unknown>) => {
     for (const v of values) {

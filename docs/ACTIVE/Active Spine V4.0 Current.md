@@ -438,6 +438,8 @@ Current behavior implies an internal-company fallback when no contractor is sele
 
 Company profile / internal business identity is now defined as an account-owner-scoped internal business profile.
 
+Internal / no-contractor display identity must resolve from owner-scoped internal_business_profiles.display_name.
+
 Current purpose:
 
 provide canonical internal-company fallback identity when no contractor is selected
