@@ -3,6 +3,7 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
+import { createClient } from "@/lib/supabase/server";
 import {
   listInternalNotifications,
   markNotificationAsRead,
@@ -16,10 +17,25 @@ export const metadata = {
 };
 
 export default async function NotificationsPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
   try {
-    await requireInternalUser();
+    await requireInternalUser({ supabase, userId: user.id });
   } catch (error) {
     if (isInternalAccessError(error)) {
+      const { data: cu, error: cuErr } = await supabase
+        .from("contractor_users")
+        .select("contractor_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (cuErr) throw cuErr;
+      if (cu?.contractor_id) redirect("/portal");
       redirect("/login");
     }
     throw error;

@@ -7,6 +7,7 @@ import PrintButton from "@/components/ui/PrintButton";
 import SubmitButton from "@/components/SubmitButton";
 import EccLivePreview from "@/components/jobs/EccLivePreview";
 import DuctLeakageMethodFields from "@/components/jobs/DuctLeakageMethodFields";
+import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
 
 import {
   completeEccTestRunFromForm,
@@ -412,6 +413,7 @@ export default async function JobTestsPage({
     .select(
       `
       id,
+      owner_user_id,
       title,
       parent_job_id,
       job_address,
@@ -477,8 +479,19 @@ export default async function JobTestsPage({
   if (error) throw error;
   if (!job) return notFound();
 
+  let internalBusinessDisplayName = "Compliance Matters";
+  const jobOwnerUserId = String(job.owner_user_id ?? "").trim();
+
+  if (jobOwnerUserId) {
+    const internalBusinessProfile = await getInternalBusinessProfileByAccountOwnerId({
+      supabase,
+      accountOwnerUserId: jobOwnerUserId,
+    });
+    internalBusinessDisplayName = internalBusinessProfile?.display_name ?? "Compliance Matters";
+  }
+
   const contractorId = String(job.contractor_id ?? "").trim();
-  let contractorName = "—";
+  let contractorName = internalBusinessDisplayName;
 
   if (contractorId) {
     const { data: contractor, error: contractorError } = await supabase
@@ -1473,7 +1486,6 @@ const defaultHeatingOutputBtu =
 
                 <div className="text-xs text-muted-foreground">
                   This ties the new test run to a specific system/location.
-                </div>
               </div>
 
               <div className="grid gap-1">

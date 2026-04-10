@@ -125,6 +125,18 @@ export async function inviteContractor(args: {
     if (vErr) throw new Error(vErr.message);
   }
 
+  const { data: existingInvite, error: existingInviteErr } = await supabase
+    .from("contractor_invites")
+    .select("id, status, sent_count")
+    .eq("owner_user_id", ownerUserId)
+    .eq("contractor_id", contractorId)
+    .eq("email", email)
+    .maybeSingle();
+
+  if (existingInviteErr) throw new Error(existingInviteErr.message);
+
+  const nextInviteStatus = existingInvite?.status === "accepted" ? "accepted" : "pending";
+
   // 2) Upsert invite row (status tracking + resend support)
   // We store one invite row per (owner, contractor, email). Resends just update it.
   const { data: inviteRow, error: upErr } = await supabase
@@ -135,7 +147,7 @@ export async function inviteContractor(args: {
         contractor_id: contractorId,
         email,
         invited_by: invitedBy,
-        status: "pending",
+        status: nextInviteStatus,
       },
       { onConflict: "owner_user_id,contractor_id,email" }
     )
@@ -214,9 +226,9 @@ export async function inviteContractor(args: {
   // 6) Update tracking fields.
   //    auth_user_id column added via migration 20260319_contractor_invites_auth_user_column.sql
   const trackUpdate: Record<string, unknown> = {
-    sent_count: (inviteRow.sent_count ?? 0) + 1,
+    sent_count: (existingInvite?.sent_count ?? inviteRow.sent_count ?? 0) + 1,
     last_sent_at: new Date().toISOString(),
-    status: "pending",
+    status: nextInviteStatus,
   };
   if (authUserId) trackUpdate.auth_user_id = authUserId;
 
@@ -234,7 +246,7 @@ export async function inviteContractor(args: {
       id: inviteRow.id,
       contractor_id: contractorId,
       email,
-      status: "pending",
+      status: nextInviteStatus,
     },
   };
 }
