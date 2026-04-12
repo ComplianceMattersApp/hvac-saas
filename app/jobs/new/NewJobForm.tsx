@@ -403,7 +403,23 @@ const [billingRecipient, setBillingRecipient] = useState<
 
       <ActionFeedback
         type="warning"
-        message={errorCode === "missing_address" ? "Could not create job. Service address is required." : null}
+        message={
+          errorCode === "missing_address"
+            ? "Could not create job. Service address is required."
+            : errorCode === "contractor_proposal_submit_failed"
+            ? "Could not submit contractor intake proposal. Please try again."
+            : null
+        }
+        className="mb-5"
+      />
+
+      <ActionFeedback
+        type="success"
+        message={
+          errorCode === "contractor_proposal_submitted"
+            ? "Contractor intake proposal submitted. Internal review is required before canonical customer/location finalization."
+            : null
+        }
         className="mb-5"
       />
 
@@ -512,6 +528,12 @@ const [billingRecipient, setBillingRecipient] = useState<
 
         <section className="space-y-3">
           <h2 className="text-base font-semibold text-slate-900">Customer &amp; Location</h2>
+
+          {isContractorMode ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-2.5 text-xs leading-5 text-amber-900">
+              Contractor-submitted customer/location details are treated as intake proposals and require internal finalization before canonical customer/location linkage.
+            </div>
+          ) : null}
 
           {/* Existing Customer / Location Mode */}
           {isExistingCustomer && existingCustomer?.id ? (

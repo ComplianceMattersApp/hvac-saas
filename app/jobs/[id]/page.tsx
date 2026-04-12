@@ -467,11 +467,13 @@ export default async function JobDetailPage({
   if (!user) redirect("/login");
 
   let isInternalUser = false;
+  let isInternalAdmin = false;
   let internalBusinessDisplayName = "";
 
   try {
     const internalAccess = await requireInternalUser({ supabase, userId: user.id });
     isInternalUser = true;
+    isInternalAdmin = internalAccess.internalUser.role === "admin";
 
     const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
       supabase,
@@ -513,6 +515,7 @@ export default async function JobDetailPage({
       status,
       scheduled_date,
       created_at,
+      deleted_at,
       contractor_id,
       ops_status,
       field_complete,
@@ -583,6 +586,7 @@ export default async function JobDetailPage({
 
   if (jobError) throw jobError;
   if (!job) return notFound();
+  if (job.deleted_at) redirect("/ops?saved=job_archived");
 
   const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
     supabase,
@@ -2393,6 +2397,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 </details>
               </div>
 
+              {isInternalAdmin ? (
               <details className="group mt-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90">
                 <summary className="cursor-pointer list-none">
                   <CollapsibleHeader
@@ -2423,6 +2428,7 @@ const renderTimelineItem = (e: any, key: string) => {
                   </div>
                 </div>
               </details>
+              ) : null}
             </div>
           </details>
 
