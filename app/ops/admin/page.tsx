@@ -72,6 +72,15 @@ export default async function OpsAdminPage() {
       enabled: true,
     },
     {
+      section: "people",
+      eyebrow: "Contractors",
+      title: "Intake Proposals",
+      description: "Review pending contractor-submitted customer/location proposals and finalize them into canonical jobs.",
+      href: "/ops/admin/contractor-intake-submissions",
+      ctaLabel: "Review proposals",
+      enabled: true,
+    },
+    {
       section: "organization",
       eyebrow: "Organization",
       title: "Company Profile",

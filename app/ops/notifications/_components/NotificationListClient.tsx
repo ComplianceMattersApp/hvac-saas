@@ -17,10 +17,12 @@ function notificationTypeLabel(value?: string | null) {
     retest_ready_requested: "Retest Ready Requested",
     contractor_note: "Contractor Note",
     contractor_schedule_updated: "Contractor Schedule Updated",
+    contractor_intake_proposal_submitted: "Contractor Intake Proposal",
     contractor_report_email: "Contractor Report Email",
     customer_job_scheduled_email: "Customer Scheduled Email",
     contractor_job_scheduled_email: "Contractor Scheduled Email",
     internal_contractor_job_intake_email: "Internal Intake Email",
+    internal_contractor_intake_proposal_email: "Internal Intake Proposal Email",
   };
 
   return labels[key] ?? "Notification";
@@ -63,7 +65,11 @@ export function NotificationListClient({
 
   return (
     <div className="space-y-3">
-      {notifications.map(notif => (
+      {notifications.map(notif => {
+        const payload = (notif.payload ?? {}) as Record<string, unknown>;
+        const proposalId = String(payload.contractor_intake_submission_id ?? "").trim() || null;
+
+        return (
         <div
           key={notif.id}
           className={`relative overflow-hidden rounded-lg border bg-white p-4 transition ${
@@ -127,10 +133,21 @@ export function NotificationListClient({
                   View job
                 </Link>
               )}
+
+              {!notif.job_id && proposalId && (
+                <Link
+                  href={`/ops/admin/contractor-intake-submissions/${proposalId}`}
+                  className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  title="Review proposal"
+                >
+                  Review proposal
+                </Link>
+              )}
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

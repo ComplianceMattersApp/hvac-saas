@@ -1909,7 +1909,11 @@ return (
         <p className="text-sm text-slate-500">You're all caught up.</p>
       ) : (
         <div className="space-y-2">
-          {recentNotifications.map((n) => (
+          {recentNotifications.map((n) => {
+            const payload = (n.payload ?? {}) as Record<string, unknown>;
+            const proposalId = String(payload.contractor_intake_submission_id ?? "").trim() || null;
+
+            return (
             <div
               key={n.id}
               className="flex items-start justify-between gap-3 rounded-xl border border-slate-300/70 bg-white px-3 py-2 shadow-[0_10px_22px_-20px_rgba(15,23,42,0.24)]"
@@ -1934,9 +1938,17 @@ return (
                 >
                   Job
                 </Link>
+              ) : proposalId ? (
+                <Link
+                  href={`/ops/admin/contractor-intake-submissions/${proposalId}`}
+                  className="inline-flex shrink-0 items-center rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[12px] font-medium text-blue-700 shadow-sm transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 sm:py-1 sm:text-xs"
+                >
+                  Proposal
+                </Link>
               ) : null}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

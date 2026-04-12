@@ -437,7 +437,8 @@ type OperationalEmailNotificationType =
   | "customer_job_scheduled_email"
   | "contractor_job_scheduled_email"
   | "internal_contractor_job_intake_email"
-  | "internal_job_created_email";
+  | "internal_job_created_email"
+  | "internal_contractor_intake_proposal_email";
 
 type OperationalEmailDeliveryStatus = "queued" | "sent" | "failed";
 
@@ -663,6 +664,37 @@ function buildContractorIntakeAlertEmailHtml(args: {
       <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
       ${linkBlock}
       <p style="margin: 0;">Please review scheduling and next steps in Ops.</p>
+    `,
+  });
+}
+
+function buildContractorIntakeProposalAlertEmailHtml(args: {
+  contractorName: string;
+  customerName: string;
+  proposedAddress: string;
+  serviceType: string;
+  submittedAtText: string;
+  proposalUrl: string | null;
+}) {
+  const details: string[] = [
+    `<li><strong>Contractor:</strong> ${escapeHtml(args.contractorName)}</li>`,
+    `<li><strong>Proposed Customer:</strong> ${escapeHtml(args.customerName)}</li>`,
+    `<li><strong>Proposed Address:</strong> ${escapeHtml(args.proposedAddress)}</li>`,
+    `<li><strong>Service/Test Type:</strong> ${escapeHtml(args.serviceType)}</li>`,
+    `<li><strong>Submitted:</strong> ${escapeHtml(args.submittedAtText)}</li>`,
+  ];
+
+  const linkBlock = args.proposalUrl
+    ? `<p style="margin: 0 0 12px 0;"><strong>Proposal Link:</strong> <a href="${escapeHtml(args.proposalUrl)}">${escapeHtml(args.proposalUrl)}</a></p>`
+    : "";
+
+  return renderSystemEmailLayout({
+    title: "New Contractor Intake Proposal",
+    bodyHtml: `
+      <p style="margin: 0 0 12px 0;">A contractor submitted a new intake proposal that requires internal review before canonical job creation.</p>
+      <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
+      ${linkBlock}
+      <p style="margin: 0;">Please review and finalize or reject from the Admin intake proposals queue.</p>
     `,
   });
 }
@@ -966,6 +998,148 @@ async function sendInternalJobCreatedAlertEmail(params: {
     await markOperationalEmailDeliveryNotification({
       supabase: admin,
       notificationId: queuedDelivery.id,
+      status: "failed",
+      errorDetail: errorMessage,
+    });
+
+    throw error;
+  }
+}
+
+async function sendInternalContractorIntakeProposalAlertEmail(params: {
+  proposalId: string;
+  accountOwnerUserId: string;
+}): Promise<void> {
+  const proposalId = String(params.proposalId ?? "").trim();
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+  if (!proposalId || !accountOwnerUserId) return;
+
+  const admin = createAdminClient();
+  const dedupeKey = `internal_contractor_intake_proposal_email:${proposalId}:initial_submission`;
+
+  const existingDelivery = await findExistingOperationalEmailDelivery({
+    supabase: admin,
+    notificationType: "internal_contractor_intake_proposal_email",
+    dedupeKey,
+  });
+
+  if (existingDelivery) return;
+
+  const recipientEmails = await resolveInternalOpsRecipientEmails({
+    admin,
+    accountOwnerUserId,
+  });
+
+  if (recipientEmails.length === 0) return;
+
+  const { data: proposal, error: proposalErr } = await admin
+    .from("contractor_intake_submissions")
+    .select(
+      `
+      id,
+      created_at,
+      contractor_id,
+      proposed_customer_first_name,
+      proposed_customer_last_name,
+      proposed_address_line1,
+      proposed_city,
+      proposed_zip,
+      proposed_job_type,
+      proposed_project_type,
+      contractors:contractor_id ( name )
+      `,
+    )
+    .eq("id", proposalId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (proposalErr) throw proposalErr;
+  if (!proposal?.id) return;
+
+  const contractorName = String((proposal as any)?.contractors?.name ?? "").trim() || "Contractor";
+  const customerName = [
+    String((proposal as any)?.proposed_customer_first_name ?? "").trim(),
+    String((proposal as any)?.proposed_customer_last_name ?? "").trim(),
+  ]
+    .filter(Boolean)
+    .join(" ") || "Customer";
+
+  const proposedAddress = [
+    String((proposal as any)?.proposed_address_line1 ?? "").trim(),
+    String((proposal as any)?.proposed_city ?? "").trim(),
+    String((proposal as any)?.proposed_zip ?? "").trim(),
+  ]
+    .filter(Boolean)
+    .join(", ") || "Address not available";
+
+  const serviceType = [
+    toTitleCase(String((proposal as any)?.proposed_job_type ?? "").trim()),
+    toTitleCase(String((proposal as any)?.proposed_project_type ?? "").trim()),
+  ]
+    .filter(Boolean)
+    .join(" / ") || "Not specified";
+
+  const submittedAtText = formatCreatedDateTimeLA(
+    String((proposal as any)?.created_at ?? "").trim() || null,
+  );
+
+  const appUrl = resolveOpsAlertAppUrl();
+  const proposalUrl = appUrl
+    ? `${appUrl}/ops/admin/contractor-intake-submissions/${proposalId}`
+    : null;
+
+  const subject = `New Contractor Intake Proposal - ${customerName} - ${proposedAddress}`;
+  const html = buildContractorIntakeProposalAlertEmailHtml({
+    contractorName,
+    customerName,
+    proposedAddress,
+    serviceType,
+    submittedAtText,
+    proposalUrl,
+  });
+
+  const { data: queuedDelivery, error: queueErr } = await admin
+    .from("notifications")
+    .insert({
+      job_id: null,
+      recipient_type: "internal",
+      recipient_ref: null,
+      channel: "email",
+      notification_type: "internal_contractor_intake_proposal_email",
+      subject,
+      body: "Internal ops/admin alert for contractor-submitted intake proposal.",
+      payload: {
+        source: "contractor_intake_submissions",
+        dedupe_key: dedupeKey,
+        contractor_intake_submission_id: proposalId,
+      },
+      status: "queued",
+      sent_at: null,
+    })
+    .select("id")
+    .single();
+
+  if (queueErr) throw queueErr;
+  if (!queuedDelivery?.id) throw new Error("Failed to create proposal email notification row");
+
+  try {
+    await sendEmail({
+      to: recipientEmails,
+      subject,
+      html,
+    });
+
+    await markOperationalEmailDeliveryNotification({
+      supabase: admin,
+      notificationId: String(queuedDelivery.id),
+      status: "sent",
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown send error";
+
+    await markOperationalEmailDeliveryNotification({
+      supabase: admin,
+      notificationId: String(queuedDelivery.id),
       status: "failed",
       errorDetail: errorMessage,
     });
@@ -5048,6 +5222,96 @@ function canContractorWriteEvent(event_type: string) {
 
  await postCreate(created.id, "customer");
  return;
+  }
+
+  // Contractor proposal seam:
+  // when canonical customer+location are not explicitly supplied,
+  // persist intake proposal data for internal finalization instead of
+  // creating canonical customer/location entities in this path.
+  if (isContractorUser && (!existingCustomerId || !existingLocationId)) {
+    const submittingUserId = String(userId ?? "").trim();
+    const proposalContractorId = String(contractorIdFinal ?? "").trim();
+    const proposalOwnerUserId = String(canonicalOwnerUserId ?? "").trim();
+
+    if (!submittingUserId || !proposalContractorId || !proposalOwnerUserId) {
+      redirect("/jobs/new?err=contractor_proposal_submit_failed");
+    }
+
+    const proposalWriteClient = createAdminClient();
+
+    const { data: proposalRow, error: proposalErr } = await proposalWriteClient
+      .from("contractor_intake_submissions")
+      .insert({
+        account_owner_user_id: proposalOwnerUserId,
+        submitted_by_user_id: submittingUserId,
+        contractor_id: proposalContractorId,
+        proposed_customer_first_name: customerFirstNameRaw || null,
+        proposed_customer_last_name: customerLastNameRaw || null,
+        proposed_customer_phone: customerPhoneRaw || null,
+        proposed_customer_email: customerEmailRaw || null,
+        proposed_address_line1: address_line1 || null,
+        proposed_city: city || null,
+        proposed_zip: zip || null,
+        proposed_location_nickname: locationNickname || null,
+        proposed_job_type: jobType || null,
+        proposed_project_type: projectType || null,
+        proposed_title: titleFinal || null,
+        proposed_job_notes: jobNotesRaw || null,
+      })
+      .select("id")
+      .single();
+
+    if (proposalErr) {
+      throw proposalErr;
+    }
+
+    const proposalId = String((proposalRow as any)?.id ?? "").trim();
+
+    if (proposalId) {
+      try {
+        await proposalWriteClient.from("notifications").insert({
+          job_id: null,
+          recipient_type: "internal",
+          recipient_ref: null,
+          channel: "in_app",
+          notification_type: "contractor_intake_proposal_submitted",
+          subject: "New Contractor Intake Proposal",
+          body: "A contractor submitted an intake proposal pending internal finalization.",
+          payload: {
+            source: "contractor_intake_submissions",
+            contractor_intake_submission_id: proposalId,
+            contractor_id: proposalContractorId,
+            submitted_by_user_id: submittingUserId,
+            account_owner_user_id: proposalOwnerUserId,
+          },
+          status: "queued",
+        });
+      } catch (error) {
+        console.error("proposal_internal_notification_insert_failed", {
+          proposalId,
+          error: error instanceof Error ? error.message : "Unknown notification insert error",
+        });
+      }
+
+      try {
+        await sendInternalContractorIntakeProposalAlertEmail({
+          proposalId,
+          accountOwnerUserId: proposalOwnerUserId,
+        });
+      } catch (error) {
+        console.error("proposal_internal_email_alert_failed", {
+          proposalId,
+          error: error instanceof Error ? error.message : "Unknown proposal alert email error",
+        });
+      }
+    }
+
+    revalidatePath("/ops");
+    revalidatePath("/ops/notifications");
+    revalidatePath("/ops/admin");
+    revalidatePath("/ops/admin/contractor-intake-submissions");
+    revalidatePath("/portal");
+    redirect("/jobs/new?err=contractor_proposal_submitted");
   }
 
   // If no service address, bounce back (your existing behavior)
