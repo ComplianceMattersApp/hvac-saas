@@ -5,6 +5,7 @@ import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-
 import {
   finalizeContractorIntakeSubmissionFromForm,
   rejectContractorIntakeSubmissionFromForm,
+  markContractorIntakeSubmissionAsDuplicateFromForm,
 } from "@/lib/actions/contractor-intake-actions";
 import GuidedFinalizationWizard from "./_components/GuidedFinalizationWizard";
 
@@ -62,6 +63,7 @@ function formatDateTime(value: string | null) {
 function noticeText(notice: string) {
   const key = normalizeText(notice).toLowerCase();
   if (key === "rejected") return "Proposal rejected.";
+  if (key === "duplicate") return "Proposal marked as duplicate of an existing job.";
   return "";
 }
 
@@ -360,6 +362,7 @@ export default async function ContractorIntakeSubmissionDetailPage({
             customers={customerOptions}
             locations={locationOptions}
             disabled={!isPending}
+            duplicateAction={markContractorIntakeSubmissionAsDuplicateFromForm}
             permitNumber={proposedPermitNum || null}
             permitMatches={permitMatchRows}
             proposed={{

@@ -1870,7 +1870,14 @@ const renderTimelineItem = (e: any, key: string) => {
       {banner === "job_created" && (
         <FlashBanner
           type="success"
-          message="Job created."
+          message="Job created and ready for next steps."
+        />
+      )}
+
+      {banner === "contractor_intake_finalized" && (
+        <FlashBanner
+          type="success"
+          message="Contractor intake finalized. Job created from submitted intake details."
         />
       )}
 

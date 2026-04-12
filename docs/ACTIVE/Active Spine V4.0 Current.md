@@ -186,6 +186,28 @@ Invalid posted customer/location pairings must not create jobs and must fail saf
 
 Internal intake may create or link canonical customer/location records through this shared flow, using reuse-first linking behavior.
 
+7.8 Internal/admin `/jobs/new` flow lock (Phase 2)
+
+Internal/admin `/jobs/new` is a guided workflow, not a flat admin form.
+
+Locked internal sequence:
+
+- Customer/location resolution first.
+- Then job setup/details.
+- Then scheduling/billing.
+- Then optional details.
+- Then a concise human-facing final confidence check.
+
+Internal customer resolution behavior is locked to reuse-first guidance:
+
+- Live customer finder is name-first friendly.
+- Results include address context for recognition, with phone/email as supporting signals.
+- Create-new customer remains a fallback path and must not be the default entry state.
+
+The confidence layer is intentional for internal intake, but must stay concise and human-facing (not technical/debug-style wording).
+
+This internal/admin guided-flow lock does not alter or reopen contractor intake proposal architecture; contractor intake boundaries in 7.7 remain in force.
+
 8. Service Case Container Model (Locked)
 8.1 Container rule
 
@@ -421,10 +443,18 @@ existing customer + existing location
 existing customer + new location
 new customer + new location
 
-Implementation note (current behavior under review):
+Implementation lock (finalized):
 
-Current live shared-create behavior may still directly create canonical customer/location records during contractor-originated intake.
-Treat this as current behavior under review, not the intended long-term authority rule.
+Contractor intake authority is now locked as follows:
+
+- Contractor submissions without an explicit canonical `customer_id` + `location_id` pairing persist as contractor intake proposals for internal review/finalization.
+- In this proposal path, contractor-originated intake does not directly create canonical customer/location records.
+- Internal finalization resolves proposal data into canonical records through:
+  - existing customer + existing location
+  - existing customer + new location
+  - new customer + new location
+- Internal intake remains permitted to create/link canonical customer/location records directly through shared intake rules.
+- Contractor intake boundaries do not grant contractors lifecycle or scheduling authority.
 
 14. Repo / Environment Guardrails (Locked)
 14.1 Project trees
@@ -614,9 +644,19 @@ UPDDATES:
 
 on_the_way is a field lifecycle state only and must never be written to ops_status.
 
-2. retest_needed clarification
+2. retest_needed closure
 
-The locked ECC failed-job model is centered on failed -> pending_office_review -> approve/reject/revisit.
-retest_needed must only exist if a valid setter exists; otherwise it must be removed from the system.
+retest_needed is not an active production target state in the current ECC model.
+
+Current ECC retest flow is governed by:
+- failed parent historical truth
+- pending_office_review internal review stage where applicable
+- retest child job creation for revisit/retest work
+- paperwork_required/invoice_required/closed closeout progression as resolver-driven outcomes
+
+Implementation rule:
+- New writes must not set jobs.ops_status to retest_needed.
+- Existing historical retest_needed rows may be read for compatibility during transition cleanup.
+- Active behavioral model should treat retest_needed as legacy compatibility-only, not a forward state.
 
 Compliance Matters Software is a stabilized, event-driven operational system for compliance and service workflows, with complete scheduling and staffing foundations, strong auditability, and future-ready business-layer expansion.

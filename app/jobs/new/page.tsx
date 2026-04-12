@@ -12,12 +12,32 @@ type ExistingCustomerRow = {
   email: string | null;
 };
 
+type CustomerLookupRow = {
+  id: string;
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  email: string | null;
+};
+
 type LocationRow = {
   id: string;
   address_line1: string | null;
   city: string | null;
   state: string | null;
   zip: string | null;
+  nickname: string | null;
+};
+
+type LocationLookupRow = {
+  id: string;
+  customer_id: string;
+  address_line1: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  postal_code: string | null;
   nickname: string | null;
 };
 
@@ -75,6 +95,35 @@ export default async function NewJobPage(props: {
   let existingCustomer: ExistingCustomerRow | null = null;
   let customerLocations: LocationRow[] = [];
 
+  // Internal guided mode lookup data
+  let customerLookupRows: CustomerLookupRow[] = [];
+  let locationLookupRows: LocationLookupRow[] = [];
+
+  if (!myContractor?.id) {
+    const { data: lookupCustomers, error: lookupCustomerErr } = await supabase
+      .from("customers")
+      .select("id, full_name, first_name, last_name, phone, email")
+      .order("full_name", { ascending: true })
+      .limit(500);
+
+    if (lookupCustomerErr) throw lookupCustomerErr;
+    customerLookupRows = (lookupCustomers ?? []) as CustomerLookupRow[];
+
+    const customerIds = customerLookupRows.map((c) => c.id).filter(Boolean);
+
+    if (customerIds.length > 0) {
+      const { data: lookupLocations, error: lookupLocationErr } = await supabase
+        .from("locations")
+        .select("id, customer_id, address_line1, city, state, zip, postal_code, nickname")
+        .in("customer_id", customerIds)
+        .order("created_at", { ascending: false })
+        .limit(1200);
+
+      if (lookupLocationErr) throw lookupLocationErr;
+      locationLookupRows = (lookupLocations ?? []) as LocationLookupRow[];
+    }
+  }
+
   if (customerId && isUuid(customerId)) {
     const { data: cRow, error: cErr } = await supabase
       .from("customers")
@@ -100,6 +149,8 @@ export default async function NewJobPage(props: {
       contractors={contractors ?? []}
       existingCustomer={existingCustomer}
       locations={customerLocations}
+      customerLookupRows={customerLookupRows}
+      locationLookupRows={locationLookupRows}
       myContractor={myContractor}
       errorCode={errorCode}
     />

@@ -465,3 +465,58 @@ export async function rejectContractorIntakeSubmissionFromForm(formData: FormDat
 
   redirect(`/ops/admin/contractor-intake-submissions/${submission.id}?notice=rejected`);
 }
+
+export async function markContractorIntakeSubmissionAsDuplicateFromForm(formData: FormData) {
+  const { userId, admin, accountOwnerUserId } = await requireInternalReviewer();
+
+  const submissionId = normalizeText(formData.get("submission_id"));
+  const duplicateJobId = normalizeText(formData.get("duplicate_job_id"));
+  const reviewNote = normalizeText(formData.get("review_note")) || null;
+
+  if (!isUuid(submissionId)) throw new Error("Invalid submission_id");
+  if (!isUuid(duplicateJobId)) throw new Error("Invalid duplicate_job_id");
+
+  // Verify the referenced job is in this account's scope
+  const { data: jobRow, error: jobErr } = await admin
+    .from("jobs")
+    .select("id, customer_id")
+    .eq("id", duplicateJobId)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+  if (!jobRow?.id) throw new Error("Referenced job not found");
+
+  const { data: custRow } = await admin
+    .from("customers")
+    .select("id")
+    .eq("id", normalizeText(jobRow.customer_id))
+    .eq("owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (!custRow?.id) throw new Error("Referenced job is not in account scope");
+
+  // Verify submission is still pending
+  await loadScopedPendingSubmission({ admin, submissionId, accountOwnerUserId });
+
+  const reviewedAtIso = new Date().toISOString();
+  const { error } = await admin
+    .from("contractor_intake_submissions")
+    .update({
+      review_status: "rejected",
+      review_note: reviewNote || `duplicate_of_job:${duplicateJobId}`,
+      reviewed_by_user_id: userId,
+      reviewed_at: reviewedAtIso,
+      duplicate_of_job_id: duplicateJobId,
+      updated_at: reviewedAtIso,
+    })
+    .eq("id", submissionId)
+    .eq("review_status", "pending");
+
+  if (error) throw error;
+
+  revalidatePath("/ops");
+  revalidatePath("/ops/admin/contractor-intake-submissions");
+  revalidatePath(`/ops/admin/contractor-intake-submissions/${submissionId}`);
+
+  redirect(`/ops/admin/contractor-intake-submissions/${submissionId}?notice=duplicate`);
+}

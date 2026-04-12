@@ -48,6 +48,7 @@ type Props = {
   disabled: boolean;
   proposed: Proposed;
   submitAction: (formData: FormData) => Promise<void>;
+  duplicateAction: (formData: FormData) => Promise<void>;
   permitNumber: string | null;
   permitMatches: PermitMatchRow[];
 };
@@ -207,6 +208,7 @@ export default function GuidedFinalizationWizard({
   disabled,
   proposed,
   submitAction,
+  duplicateAction,
   permitNumber,
   permitMatches,
 }: Props) {
@@ -218,6 +220,7 @@ export default function GuidedFinalizationWizard({
   // Operator explicitly chose "none match — create new"
   const [goingNew, setGoingNew] = useState(false);
   const [permitInterceptAcknowledged, setPermitInterceptAcknowledged] = useState(false);
+  const [selectedDuplicateJobId, setSelectedDuplicateJobId] = useState<string | null>(null);
 
   // ── Derived finalization mode ───────────────────────────────────────────────
   const finalizationMode =
@@ -338,8 +341,8 @@ export default function GuidedFinalizationWizard({
   }
 
   return (
-    <form action={submitAction} className="space-y-3">
-      {/* ── PERMIT INTERCEPT (ECC only, shown before workflow) ────────────────── */}
+    <div className="space-y-3">
+      {/* ── PERMIT INTERCEPT AND DUPLICATE RESOLUTION (outside main form) ─── */}
       {permitNumber && permitMatches.length > 0 && !permitInterceptAcknowledged ? (
         <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-5 shadow-sm space-y-3">
           <div className="flex items-start gap-2.5">
@@ -361,7 +364,12 @@ export default function GuidedFinalizationWizard({
             {permitMatches.map((match) => (
               <div
                 key={match.id}
-                className="rounded-xl border border-amber-200 bg-white px-3 py-2.5"
+                className={[
+                  "rounded-xl border bg-white px-3 py-2.5",
+                  selectedDuplicateJobId === match.id
+                    ? "border-rose-300 ring-1 ring-rose-200"
+                    : "border-amber-200",
+                ].join(" ")}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -383,6 +391,22 @@ export default function GuidedFinalizationWizard({
                   >
                     Open →
                   </a>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedDuplicateJobId(
+                        selectedDuplicateJobId === match.id ? null : match.id,
+                      )
+                    }
+                    className={[
+                      "mt-1 rounded-lg border px-2.5 py-1 text-xs font-medium",
+                      selectedDuplicateJobId === match.id
+                        ? "border-rose-400 bg-rose-100 text-rose-800"
+                        : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100",
+                    ].join(" ")}
+                  >
+                    {selectedDuplicateJobId === match.id ? "✓ Selected" : "Mark as duplicate"}
+                  </button>
                 </div>
               </div>
             ))}
@@ -399,6 +423,44 @@ export default function GuidedFinalizationWizard({
               Continue anyway
             </button>
           </div>
+          {selectedDuplicateJobId ? (
+            <form action={duplicateAction} className="border-t border-amber-200 pt-3 space-y-3">
+              <input type="hidden" name="submission_id" value={submissionId} />
+              <input type="hidden" name="duplicate_job_id" value={selectedDuplicateJobId} />
+              <div>
+                <p className="text-xs font-semibold text-rose-800">
+                  Mark as duplicate of:{" "}
+                  <span className="italic">
+                    {permitMatches.find((m) => m.id === selectedDuplicateJobId)?.title}
+                  </span>
+                </p>
+                <p className="mt-0.5 text-xs text-rose-700">
+                  The proposal will be closed without creating a new job.
+                </p>
+              </div>
+              <textarea
+                name="review_note"
+                placeholder="Optional note for this decision…"
+                className="w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs"
+                rows={2}
+              />
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  className="rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-rose-800 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-700 focus-visible:ring-offset-1"
+                >
+                  Confirm — mark as duplicate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDuplicateJobId(null)}
+                  className="text-xs text-slate-500 underline hover:text-slate-700"
+                >
+                  ← Cancel
+                </button>
+              </div>
+            </form>
+          ) : null}
         </div>
       ) : null}
       {permitNumber && permitMatches.length > 0 && permitInterceptAcknowledged ? (
@@ -412,6 +474,7 @@ export default function GuidedFinalizationWizard({
         </div>
       ) : null}
 
+      <form action={submitAction} className="space-y-3">
       {/* Hidden form contract fields */}
       <input type="hidden" name="submission_id" value={submissionId} />
       {finalizationMode ? (
@@ -982,6 +1045,7 @@ export default function GuidedFinalizationWizard({
           </button>
         </div>
       ) : null}
-    </form>
+      </form>
+    </div>
   );
 }
