@@ -1,5 +1,5 @@
 // app/jobs/[id]/tests/page
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveEccScenario } from "@/lib/ecc/scenario-resolver";
 import Link from "next/link";
@@ -7,7 +7,11 @@ import PrintButton from "@/components/ui/PrintButton";
 import SubmitButton from "@/components/SubmitButton";
 import EccLivePreview from "@/components/jobs/EccLivePreview";
 import DuctLeakageMethodFields from "@/components/jobs/DuctLeakageMethodFields";
-import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import {
+  isInternalAccessError,
+  requireInternalUser,
+} from "@/lib/auth/internal-user";
 
 import {
   completeEccTestRunFromForm,
@@ -201,9 +205,10 @@ function fallbackText(value: unknown) {
 function equipmentSummaryLine(eq: any) {
   const rawType = String(eq?.equipment_role ?? eq?.component_type ?? "").trim();
   const equipmentType = rawType ? equipmentRoleLabel(rawType) : "—";
+  const manufacturer = fallbackText(eq?.manufacturer);
   const model = fallbackText(eq?.model);
   const serial = fallbackText(eq?.serial);
-  return `${equipmentType} | Model: ${model} | Serial: ${serial}`;
+  return `${equipmentType} | Manufacturer: ${manufacturer} | Model: ${model} | Serial: ${serial}`;
 }
 
 function canonicalId(value: unknown) {
@@ -408,12 +413,41 @@ export default async function JobTestsPage({
 
   const supabase = await createClient();
 
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user ?? null;
+
+  if (!user) redirect("/login");
+
+  let internalUser: Awaited<ReturnType<typeof requireInternalUser>>["internalUser"] | null = null;
+
+  try {
+    const internalAccess = await requireInternalUser({ supabase, userId: user.id });
+    internalUser = internalAccess.internalUser;
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      const { data: contractorUser, error: contractorUserErr } = await supabase
+        .from("contractor_users")
+        .select("contractor_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (contractorUserErr) throw contractorUserErr;
+
+      if (contractorUser?.contractor_id) {
+        redirect(`/portal/jobs/${id}`);
+      }
+
+      redirect("/login");
+    }
+
+    throw error;
+  }
+
   const { data: job, error } = await supabase
     .from("jobs")
     .select(
       `
       id,
-      owner_user_id,
       title,
       parent_job_id,
       job_address,
@@ -422,6 +456,9 @@ export default async function JobTestsPage({
       project_type,
       permit_number,
       contractor_id,
+      contractors (
+        owner_user_id
+      ),
       customer_first_name,
       customer_last_name,
       customer_phone,
@@ -479,16 +516,19 @@ export default async function JobTestsPage({
   if (error) throw error;
   if (!job) return notFound();
 
-  let internalBusinessDisplayName = "Compliance Matters";
-  const jobOwnerUserId = String(job.owner_user_id ?? "").trim();
-
-  if (jobOwnerUserId) {
-    const internalBusinessProfile = await getInternalBusinessProfileByAccountOwnerId({
-      supabase,
-      accountOwnerUserId: jobOwnerUserId,
-    });
-    internalBusinessDisplayName = internalBusinessProfile?.display_name ?? "Compliance Matters";
+  if (String(job.job_type ?? "").trim().toLowerCase() !== "ecc") {
+    redirect(`/jobs/${id}?tab=ops`);
   }
+
+  let internalBusinessDisplayName = "";
+  const jobOwnerUserId = String((job as any)?.contractors?.owner_user_id ?? "").trim();
+  const internalBusinessOwnerId = jobOwnerUserId || String(internalUser?.account_owner_user_id ?? "").trim();
+
+  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalBusinessOwnerId,
+  });
+  internalBusinessDisplayName = internalBusinessIdentity.display_name;
 
   const contractorId = String(job.contractor_id ?? "").trim();
   let contractorName = internalBusinessDisplayName;
@@ -503,6 +543,16 @@ export default async function JobTestsPage({
     if (contractorError) throw contractorError;
     contractorName = fallbackText(contractor?.name);
   }
+
+  const reportBusinessLabel = contractorId ? "Contractor Attached To" : "Internal Business";
+  const reportBusinessName = contractorId ? contractorName : internalBusinessDisplayName;
+  const reportTestedDates = aggregateField(
+    (job.ecc_test_runs ?? []).filter((run: any) => run?.is_completed === true),
+    (run: any) => {
+      const timestamp = String(run?.updated_at ?? run?.created_at ?? "").trim();
+      return timestamp ? formatBusinessDateUS(timestamp) : "";
+    }
+  );
 
   const customerName =
     [job.customer_first_name, job.customer_last_name]
@@ -939,7 +989,7 @@ const defaultHeatingOutputBtu =
 
       <div className="hidden space-y-4 peer-checked:block print:block">
       <div className="hidden border-b border-slate-400 pb-2 print:block">
-        <h1 className="text-lg font-bold text-slate-950">Compliance Matters Test Results</h1>
+        <h1 className="text-lg font-bold text-slate-950">{internalBusinessDisplayName} Test Results</h1>
       </div>
       <section className="rounded-lg border border-slate-400 bg-white p-5 space-y-4 text-slate-900 print:rounded-none print:border-slate-500 print:p-3 print:space-y-3">
         <div>
@@ -969,8 +1019,8 @@ const defaultHeatingOutputBtu =
 
           <div className="space-y-3 print:space-y-2">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Contractor Attached To</div>
-              <div className="text-sm font-medium text-slate-950">{contractorName}</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">{reportBusinessLabel}</div>
+              <div className="text-sm font-medium text-slate-950">{reportBusinessName}</div>
             </div>
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">City / State / ZIP</div>
@@ -991,6 +1041,10 @@ const defaultHeatingOutputBtu =
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Project Type</div>
               <div className="text-sm font-medium capitalize text-slate-950">{fallbackText(projectTypeLabel)}</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Date Tested</div>
+              <div className="text-sm font-medium text-slate-950">{reportTestedDates}</div>
             </div>
           </div>
         </div>

@@ -143,6 +143,49 @@ When canonical customer/location data changes, required job snapshot fields must
 Location-edit sync and revalidation gaps identified during audit were corrected.
 This area is now considered stabilized for current scope.
 
+7.5 Customer visibility rule
+
+/customers and /customers/[id] share one scoped visibility rule.
+
+Internal users may search and view customers within their account-visible scope.
+
+Contractor users may search and view only customers within their own contractor-visible scope.
+
+Customer list and customer detail must follow the same scope rule so a contractor-visible customer in /customers does not dead-end at /customers/[id].
+
+Customer search/index remains read-only; this rule does not expand customer mutation authority for contractors.
+
+7.6 Customer edit boundary
+
+/customers/[id]/edit is a customer/billing edit surface only.
+
+Canonical service-address editing belongs to the Location domain.
+
+Customer edit must not guess, imply, or mutate a canonical "primary" location unless the target location is made explicit.
+
+7.7 Shared intake lock (/jobs/new)
+
+`/jobs/new` is a shared intake surface for internal users and constrained contractor submission.
+
+Create-time lifecycle/status rules are server-enforced:
+
+- Create-time `status` is always intake-safe and server-forced to `open`; posted status values are ignored.
+- Contractor intake is server-normalized to unscheduled:
+  - `scheduled_date = null`
+  - `window_start = null`
+  - `window_end = null`
+  - `ops_status = need_to_schedule`
+
+Posted existing entity references must be validated before create:
+
+- `customer_id` must belong to canonical owner scope.
+- `location_id` must belong to canonical owner scope.
+- `location_id` must belong to the resolved/posted customer before job creation.
+
+Invalid posted customer/location pairings must not create jobs and must fail safely through intake error handling.
+
+Internal intake may create or link canonical customer/location records through this shared flow, using reuse-first linking behavior.
+
 8. Service Case Container Model (Locked)
 8.1 Container rule
 
@@ -358,6 +401,31 @@ Contractors interact through constrained portal paths only.
 For ECC failed jobs under pending_office_review, internal users own the review queue/actions.
 Contractor-facing portal state should be plain-language "under review," and contractors may continue adding notes/photos while review is pending.
 
+13.4 Contractor intake boundary
+
+/jobs/new is a shared intake surface.
+
+Internal users may create intake records directly.
+
+Contractor users may also submit constrained intake / call-list jobs through /jobs/new.
+
+This intake path does not grant contractors scheduling authority or lifecycle control.
+
+Internal users remain the owners of downstream review, scheduling, and lifecycle decisions after intake submission.
+
+Contractor-submitted customer/contact/location values are proposed intake data, not final canonical identity authority.
+
+Intended canonical finalization model after contractor submission:
+
+existing customer + existing location
+existing customer + new location
+new customer + new location
+
+Implementation note (current behavior under review):
+
+Current live shared-create behavior may still directly create canonical customer/location records during contractor-originated intake.
+Treat this as current behavior under review, not the intended long-term authority rule.
+
 14. Repo / Environment Guardrails (Locked)
 14.1 Project trees
 
@@ -429,31 +497,46 @@ maintenance / agreement systems
 optional drag-and-drop dispatch UX
 deeper notification prioritization/escalation layers
 broader role model refinement
-company profile / internal business identity implementation
 future branding/settings/business-profile formalization
-18. What Is Unresolved / Next Design Item
-18.1 Company profile / internal business identity
+18. Internal Business Identity vs Product Brand Identity (Locked)
+18.1 Internal Business Identity (tenant operational identity)
 
-Current behavior implies an internal-company fallback when no contractor is selected, but this is not yet modeled explicitly.
+Internal Business Identity is account-owner-scoped operational identity from internal_business_profiles.
 
-Company profile / internal business identity is now defined as an account-owner-scoped internal business profile.
+Owner scope anchor:
 
-Internal / no-contractor display identity must resolve from owner-scoped internal_business_profiles.display_name.
+account_owner_user_id
 
-Current purpose:
+Operational identity fields:
 
-provide canonical internal-company fallback identity when no contractor is selected
-provide canonical internal business display/contact identity for system emails, reports, and support/help copy
-provide future-safe branding hooks without expanding into a broad settings framework yet
+display_name
+support_email
+support_phone
+logo_url
 
-18.2 Rule
+Operational surfaces must resolve tenant identity through the internal business identity resolver boundary in the business profile layer.
 
-Current rule:
+UI/action/email callers in operational flows must not carry local hardcoded tenant fallback literals.
+
+18.2 Product Brand Identity (global platform identity)
+
+Product Brand Identity remains global platform identity for shell/auth/default infrastructure surfaces.
+
+Examples include:
+
+app shell metadata
+manifest
+auth page branding copy
+global email/platform branding defaults
+
+Do not blur tenant operational identity into global product branding rules unless explicitly approved as a separate branding initiative.
+
+18.3 Boundary rule
 
 internal users remain human identities
 contractors remain external business partners
-account_owner_user_id remains the ownership scope anchor
-the internal business profile is the canonical business identity for that owner scope
+tenant operational identity is resolved from internal_business_profiles
+global product brand identity remains separately owned
 
 This model does not yet own:
 
@@ -461,12 +544,40 @@ full billing / invoicing
 broad tenant settings
 business administration workflows
 role / permission semantics
-
-Implementation discipline:
-
-do not use hardcoded company fallback text where canonical internal business identity is required
 do not overload user profiles to represent company identity
 keep the initial implementation narrow and identity-focused only
+
+18.3 Equipment Domain — Canonical Role Vocabulary and Field Contract
+
+The job_equipment table uses equipment_role as the single canonical classification field.
+
+**Canonical stored vocabulary:**
+
+| Stored value | Physical meaning | Field group |
+|---|---|---|
+| outdoor_unit | Outdoor AC condenser | Cooling |
+| indoor_unit | Indoor coil | Cooling |
+| air_handler | Air handler | Cooling |
+| heat_pump | Heat pump outdoor unit | Cooling |
+| package_unit | Package unit (any fuel type) | Cooling |
+| mini_split_outdoor | Mini-split outdoor unit | Cooling (design deferred) |
+| mini_split_head | Mini-split indoor head | Cooling (design deferred) |
+| furnace | Furnace (any fuel type) | Heating-only |
+| other | Unknown / specialist | Permissive |
+
+**Intake mapping:** The /jobs/new intake form uses detailed component sub-types (condenser_ac, furnace_gas, air_handler_electric, heat_pump_outdoor, package_gas_electric, package_heat_pump, coil) that are mapped to canonical values before persistence. The mapping is owned by lib/utils/equipment-domain.ts.
+
+**Field contract by role:**
+
+- Furnace (heating-only): valid fields are heating_capacity_kbtu, heating_efficiency_percent, heating_output_btu. tonnage and refrigerant_type must be NULL.
+- Cooling roles (all others except furnace and other): valid fields are tonnage and refrigerant_type. All heating_* fields must be NULL.
+- Other: all numeric fields are optional with no role-based filtering.
+
+**Enforcement:** lib/utils/equipment-domain.ts exports mapToCanonicalRole() and sanitizeEquipmentFields(). Every write path (intake create, post-create add, post-create edit) uses these helpers. Filtering logic is not duplicated.
+
+**Stability:** equipment_role is currently editable for correction. Changing role re-sanitizes incompatible fields server-side. Full immutability is a future option, not currently locked.
+
+**Out of scope:** component_type column is not part of this contract. Mini-split full treatment is deferred.
 
 19. Current Product Assessment
 19.1 Honest state

@@ -1,11 +1,10 @@
 // app/customers/[id]/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
-  isInternalAccessError,
-  requireInternalUser,
-} from "@/lib/auth/internal-user";
+  resolveCustomerVisibilityScope,
+} from "@/lib/customers/visibility";
 import {
   archiveCustomerFromForm,
   updateCustomerNotesFromForm,
@@ -171,7 +170,7 @@ function isOperationallyActiveJob(job: Pick<JobRow, "status" | "ops_status" | "d
   if (lifecycleStatus === "cancelled") return false;
 
   const opsStatus = normalizeOpsStatus(job.ops_status);
-  return opsStatus !== "closed" && opsStatus !== "completed";
+  return opsStatus !== "closed";
 }
 
 function opsStatusLabel(v?: string | null) {
@@ -185,8 +184,6 @@ function opsStatusLabel(v?: string | null) {
   if (s === "retest_needed") return "Retest Needed";
   if (s === "paperwork_required") return "Paperwork Required";
   if (s === "invoice_required") return "Invoice Required";
-  if (s === "closeout") return "Closeout";
-  if (s === "completed") return "Completed";
   return s ? s.replace(/_/g, " ") : "Unknown";
 }
 
@@ -220,13 +217,6 @@ function opsBadgeClass(v?: string | null) {
   if (s === "invoice_required") {
     return "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800";
   }
-  if (s === "closeout") {
-    return "border-indigo-200 bg-indigo-50 text-indigo-800";
-  }
-  if (s === "completed") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  }
-
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
@@ -249,19 +239,19 @@ export default async function CustomerDetailPage(props: {
   searchParams?: Promise<{ err?: string }>;
 }) {
   const supabase = await createClient();
+  const admin = createAdminClient();
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
 
-  try {
-    await requireInternalUser({ supabase, userId: userData.user.id });
-  } catch (error) {
-    if (isInternalAccessError(error)) {
-      redirect("/login");
-    }
+  const visibilityScope = await resolveCustomerVisibilityScope({
+    supabase,
+    userId: userData.user.id,
+  });
 
-    throw error;
-  }
+  if (!visibilityScope) redirect("/login");
+
+  const isInternalViewer = visibilityScope.kind === "internal";
 
   const { id } = await props.params;
   const sp = props.searchParams ? await props.searchParams : {};
@@ -273,11 +263,7 @@ export default async function CustomerDetailPage(props: {
 
   const customerId = id;
 
-  // Customer
-  const { data: customerData, error: customerErr } = await supabase
-    .from("customers")
-    .select(
-      `
+  const customerSelect = `
       id,
       first_name,
       last_name,
@@ -290,12 +276,86 @@ export default async function CustomerDetailPage(props: {
       billing_city,
       billing_state,
       billing_zip
-    `
-    )
-    .eq("id", customerId)
-    .maybeSingle();
+    `;
 
-  if (customerErr) throw customerErr;
+  let customerData: CustomerRow | null = null;
+  let jobs: JobRow[] = [];
+
+  if (isInternalViewer) {
+    const { data, error: customerErr } = await admin
+      .from("customers")
+      .select(customerSelect)
+      .eq("id", customerId)
+      .eq("owner_user_id", visibilityScope.accountOwnerUserId)
+      .maybeSingle();
+
+    if (customerErr) throw customerErr;
+    customerData = (data as CustomerRow | null) ?? null;
+
+    const { data: jobsData, error: jobsErr } = await admin
+      .from("jobs")
+      .select(
+        `
+        id,
+        title,
+        status,
+        job_address,
+        city,
+        scheduled_date,
+        created_at,
+        ops_status,
+        contractor_id,
+        service_case_id,
+        parent_job_id,
+        location_id,
+        deleted_at
+        `,
+      )
+      .eq("customer_id", customerId)
+      .order("scheduled_date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false });
+
+    if (jobsErr) throw jobsErr;
+    jobs = (jobsData ?? []) as JobRow[];
+  } else {
+    const { data: jobsData, error: jobsErr } = await admin
+      .from("jobs")
+      .select(
+        `
+        id,
+        title,
+        status,
+        job_address,
+        city,
+        scheduled_date,
+        created_at,
+        ops_status,
+        contractor_id,
+        service_case_id,
+        parent_job_id,
+        location_id,
+        deleted_at
+        `,
+      )
+      .eq("customer_id", customerId)
+      .eq("contractor_id", visibilityScope.contractorId)
+      .order("scheduled_date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false });
+
+    if (jobsErr) throw jobsErr;
+    jobs = (jobsData ?? []) as JobRow[];
+
+    if (jobs.length > 0) {
+      const { data, error: customerErr } = await admin
+        .from("customers")
+        .select(customerSelect)
+        .eq("id", customerId)
+        .maybeSingle();
+
+      if (customerErr) throw customerErr;
+      customerData = (data as CustomerRow | null) ?? null;
+    }
+  }
 
   if (!customerData) {
     return (
@@ -313,56 +373,65 @@ export default async function CustomerDetailPage(props: {
 
   const customer = customerData as CustomerRow;
 
-  // Locations
-  const { data: locationsData, error: locationsErr } = await supabase
-    .from("locations")
-    .select(
-      `
-      id,
-      customer_id,
-      nickname,
-      label,
-      address_line1,
-      address_line2,
-      city,
-      state,
-      zip,
-      postal_code
-    `
-    )
-    .eq("customer_id", customerId)
-    .order("created_at", { ascending: true });
+  let locationsData: LocationRow[] = [];
 
-  if (locationsErr) throw locationsErr;
+  if (isInternalViewer) {
+    const { data, error: locationsErr } = await admin
+      .from("locations")
+      .select(
+        `
+        id,
+        customer_id,
+        nickname,
+        label,
+        address_line1,
+        address_line2,
+        city,
+        state,
+        zip,
+        postal_code
+      `,
+      )
+      .eq("customer_id", customerId)
+      .order("created_at", { ascending: true });
+
+    if (locationsErr) throw locationsErr;
+    locationsData = (data ?? []) as LocationRow[];
+  } else {
+    const visibleLocationIds = Array.from(
+      new Set(
+        jobs
+          .map((job) => String(job.location_id ?? "").trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (visibleLocationIds.length > 0) {
+      const { data, error: locationsErr } = await admin
+        .from("locations")
+        .select(
+          `
+          id,
+          customer_id,
+          nickname,
+          label,
+          address_line1,
+          address_line2,
+          city,
+          state,
+          zip,
+          postal_code
+        `,
+        )
+        .in("id", visibleLocationIds)
+        .order("created_at", { ascending: true });
+
+      if (locationsErr) throw locationsErr;
+      locationsData = (data ?? []) as LocationRow[];
+    }
+  }
 
   const locations = (locationsData ?? []) as LocationRow[];
-
-  // Jobs across whole customer
-const { data: jobsData, error: jobsErr } = await supabase
-  .from("jobs")
-  .select(
-    `
-    id,
-    title,
-    status,
-    job_address,
-    city,
-    scheduled_date,
-    created_at,
-    ops_status,
-    contractor_id,
-    service_case_id,
-    parent_job_id,
-    location_id,
-    deleted_at
-    `
-  )
-  .eq("customer_id", customerId)
-  .order("scheduled_date", { ascending: false, nullsFirst: false })
-  .order("created_at", { ascending: false });
-  if (jobsErr) throw jobsErr;
-
-  const jobs = (jobsData ?? []) as JobRow[];
   const activeJobs = jobs.filter((job) => isOperationallyActiveJob(job));
 
   // Lightweight service-case awareness
@@ -376,10 +445,16 @@ const { data: jobsData, error: jobsErr } = await supabase
 
   const serviceCaseVisitCounts = new Map<string, number>();
   if (serviceCaseIds.length > 0) {
-    const { data: serviceCaseJobs, error: scErr } = await supabase
+    let serviceCaseQuery = admin
       .from("jobs")
       .select("service_case_id")
       .in("service_case_id", serviceCaseIds);
+
+    if (!isInternalViewer) {
+      serviceCaseQuery = serviceCaseQuery.eq("contractor_id", visibilityScope.contractorId);
+    }
+
+    const { data: serviceCaseJobs, error: scErr } = await serviceCaseQuery;
 
     if (scErr) throw scErr;
 
@@ -397,12 +472,18 @@ const { data: jobsData, error: jobsErr } = await supabase
 
   const resolvedRetestParentIds = new Set<string>();
   if (failedJobIds.length > 0) {
-    const { data: retestChildren, error: retestErr } = await supabase
+    let retestQuery = admin
       .from("jobs")
       .select("parent_job_id")
       .in("parent_job_id", failedJobIds)
       .in("ops_status", ["paperwork_required", "invoice_required", "closed"])
       .is("deleted_at", null);
+
+    if (!isInternalViewer) {
+      retestQuery = retestQuery.eq("contractor_id", visibilityScope.contractorId);
+    }
+
+    const { data: retestChildren, error: retestErr } = await retestQuery;
 
     if (retestErr) throw retestErr;
 
@@ -429,7 +510,7 @@ const { data: jobsData, error: jobsErr } = await supabase
   const completedJobsCount = jobs.filter((job) => {
     if (job.deleted_at) return false;
     const opsStatus = normalizeOpsStatus(job.ops_status);
-    return opsStatus === "closed" || opsStatus === "completed";
+    return opsStatus === "closed";
   }).length;
 
   const lastScheduledActiveDate = activeJobs
@@ -487,21 +568,23 @@ const { data: jobsData, error: jobsErr } = await supabase
           </div>
 
           <div className="flex flex-col items-stretch gap-3 rounded-xl border border-slate-200 bg-white/85 p-3 md:items-end">
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href={`/customers/${customerId}/edit`}
-                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
-              >
-                Edit Customer
-              </Link>
+            {isInternalViewer ? (
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/customers/${customerId}/edit`}
+                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                >
+                  Edit Customer
+                </Link>
 
-              <Link
-                href={`/jobs/new?customer_id=${customerId}`}
-                className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-              >
-                New Job for Customer
-              </Link>
-            </div>
+                <Link
+                  href={`/jobs/new?customer_id=${customerId}`}
+                  className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                >
+                  New Job for Customer
+                </Link>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -634,32 +717,34 @@ const { data: jobsData, error: jobsErr } = await supabase
           </div>
         </section>
 
-        <section id="customer-notes" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-3">
-            <h2 className="text-lg font-semibold text-slate-900">Customer Notes</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Internal notes and context for this customer.
-            </p>
-          </div>
-          <form action={updateCustomerNotesFromForm} className="space-y-3">
-            <input type="hidden" name="customer_id" value={customerId} />
-            <textarea
-              name="notes"
-              defaultValue={customer.notes ?? ""}
-              rows={6}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
-              placeholder="Add customer notes..."
-            />
-            <div>
-              <button
-                type="submit"
-                className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-              >
-                Save
-              </button>
+        {isInternalViewer ? (
+          <section id="customer-notes" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-3">
+              <h2 className="text-lg font-semibold text-slate-900">Customer Notes</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Internal notes and context for this customer.
+              </p>
             </div>
-          </form>
-        </section>
+            <form action={updateCustomerNotesFromForm} className="space-y-3">
+              <input type="hidden" name="customer_id" value={customerId} />
+              <textarea
+                name="notes"
+                defaultValue={customer.notes ?? ""}
+                rows={6}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+                placeholder="Add customer notes..."
+              />
+              <div>
+                <button
+                  type="submit"
+                  className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </section>
+        ) : null}
 
         {/* Locations */}
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -717,7 +802,7 @@ const { data: jobsData, error: jobsErr } = await supabase
                           </a>
                         ) : null}
 
-                        {locId ? (
+                        {locId && isInternalViewer ? (
                           <Link
                             href={`/locations/${locId}`}
                             className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
@@ -740,7 +825,9 @@ const { data: jobsData, error: jobsErr } = await supabase
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Job History</h2>
               <p className="text-sm text-slate-500">
-                All jobs for this customer across every location.
+                {isInternalViewer
+                  ? "All jobs for this customer across every location."
+                  : "Jobs for this customer within your contractor scope."}
               </p>
             </div>
           </div>
@@ -776,7 +863,7 @@ const { data: jobsData, error: jobsErr } = await supabase
                       <div className="min-w-0 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <Link
-                            href={`/jobs/${job.id}`}
+                            href={isInternalViewer ? `/jobs/${job.id}` : `/portal/jobs/${job.id}`}
                             className="text-sm font-semibold text-slate-900 underline-offset-2 hover:underline"
                           >
                             {normalizeRetestLinkedJobTitle(job.title) || `Job ${job.id.slice(0, 8)}`}
@@ -829,7 +916,7 @@ const { data: jobsData, error: jobsErr } = await supabase
 
                       <div className="flex flex-wrap gap-2">
                         <Link
-                          href={`/jobs/${job.id}`}
+                          href={isInternalViewer ? `/jobs/${job.id}` : `/portal/jobs/${job.id}`}
                           className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
                         >
                           Open Job
@@ -843,24 +930,26 @@ const { data: jobsData, error: jobsErr } = await supabase
           )}
         </section>
 
-        <section className="rounded-2xl border border-red-200 bg-red-50/40 p-5 shadow-sm">
-          <div className="mb-3">
-            <h2 className="text-lg font-semibold text-red-900">Danger Zone</h2>
-            <p className="text-sm text-red-800/90">
-              Archive this customer record after all related jobs have been removed or archived.
-            </p>
-          </div>
+        {isInternalViewer ? (
+          <section className="rounded-2xl border border-red-200 bg-red-50/40 p-5 shadow-sm">
+            <div className="mb-3">
+              <h2 className="text-lg font-semibold text-red-900">Danger Zone</h2>
+              <p className="text-sm text-red-800/90">
+                Archive this customer record after all related jobs have been removed or archived.
+              </p>
+            </div>
 
-          <form action={archiveCustomerFromForm}>
-            <input type="hidden" name="customer_id" value={customerId} />
-            <button
-              type="submit"
-              className="inline-flex items-center rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
-            >
-              Archive Customer
-            </button>
-          </form>
-        </section>
+            <form action={archiveCustomerFromForm}>
+              <input type="hidden" name="customer_id" value={customerId} />
+              <button
+                type="submit"
+                className="inline-flex items-center rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+              >
+                Archive Customer
+              </button>
+            </form>
+          </section>
+        ) : null}
       </div>
       </div>
     </div>

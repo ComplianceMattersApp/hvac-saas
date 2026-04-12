@@ -23,7 +23,7 @@ import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/sear
 import {
   listInternalNotifications,
 } from "@/lib/actions/notification-read-actions";
-import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -198,11 +198,11 @@ export default async function OpsPage({
     throw error;
   }
 
-  const internalBusinessProfile = await getInternalBusinessProfileByAccountOwnerId({
+  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
-  const internalBusinessDisplayName = internalBusinessProfile?.display_name ?? "Compliance Matters";
+  const internalBusinessDisplayName = internalBusinessIdentity.display_name;
 
   const recentNotifications = await listInternalNotifications({
     limit: 3,

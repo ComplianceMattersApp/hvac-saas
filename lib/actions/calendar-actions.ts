@@ -294,8 +294,15 @@ export async function getDispatchCalendarData(params: {
     return true;
   }
 
+  function isCancelledHistorical(job: JobDispatchRow) {
+    const ops = String(job.ops_status ?? '').toLowerCase();
+    const status = String(job.status ?? '').toLowerCase();
+    return ops === 'cancelled' || status === 'cancelled';
+  }
+
   function isCalendarScheduled(job: JobDispatchRow) {
-    return !!job.scheduled_date && isActive(job);
+    if (!job.scheduled_date) return false;
+    return isActive(job) || isCancelledHistorical(job);
   }
 
   // Type guard for JobDispatchRow

@@ -13,6 +13,15 @@ export type InternalBusinessProfile = {
   updated_at: string;
 };
 
+export type ResolvedInternalBusinessIdentity = {
+  display_name: string;
+  support_email: string | null;
+  support_phone: string | null;
+  logo_url: string | null;
+};
+
+const DEFAULT_INTERNAL_BUSINESS_DISPLAY_NAME = "Compliance Matters";
+
 export function buildInternalBusinessProfileLogoStorageRef(storagePath: string) {
   const normalizedPath = String(storagePath ?? "").trim().replace(/^\/+/, "");
   return normalizedPath ? `${INTERNAL_BUSINESS_LOGO_STORAGE_PREFIX}${normalizedPath}` : null;
@@ -107,4 +116,32 @@ export async function getCurrentInternalBusinessProfile(params: {
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
+}
+
+export async function resolveInternalBusinessIdentityByAccountOwnerId(params: {
+  accountOwnerUserId: string | null | undefined;
+  supabase?: any;
+}): Promise<ResolvedInternalBusinessIdentity> {
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+
+  if (!accountOwnerUserId) {
+    return {
+      display_name: DEFAULT_INTERNAL_BUSINESS_DISPLAY_NAME,
+      support_email: null,
+      support_phone: null,
+      logo_url: null,
+    };
+  }
+
+  const profile = await getInternalBusinessProfileByAccountOwnerId({
+    supabase: params.supabase,
+    accountOwnerUserId,
+  });
+
+  return {
+    display_name: profile?.display_name ?? DEFAULT_INTERNAL_BUSINESS_DISPLAY_NAME,
+    support_email: profile?.support_email ?? null,
+    support_phone: profile?.support_phone ?? null,
+    logo_url: profile?.logo_url ?? null,
+  };
 }

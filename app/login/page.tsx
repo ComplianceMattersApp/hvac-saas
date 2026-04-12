@@ -2,8 +2,68 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import { createClient } from "../../lib/supabase/client";
 
+async function resolveLoginDestination(supabase: ReturnType<typeof createClient>, userId: string) {
+  const { data: contractorUser, error: contractorError } = await supabase
+    .from("contractor_users")
+    .select("contractor_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (contractorError) throw contractorError;
+
+  if (contractorUser?.contractor_id) {
+    return "/portal";
+  }
+
+  const { data: internalUser, error: internalUserError } = await supabase
+    .from("internal_users")
+    .select("user_id, is_active")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (internalUserError) throw internalUserError;
+
+  if (internalUser?.user_id && internalUser.is_active) {
+    return "/ops";
+  }
+
+  return null;
+}
+
+function resolvePasswordResetRedirect() {
+  const configuredAppUrl = String(process.env.NEXT_PUBLIC_APP_URL ?? "").trim();
+
+  if (configuredAppUrl) {
+    try {
+      const parsed = new URL(configuredAppUrl);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        return `${configuredAppUrl.replace(/\/$/, "")}/auth/callback`;
+      }
+    } catch {
+      // Fall back to the active browser origin when the configured URL is invalid.
+    }
+  }
+
+  return new URL("/auth/callback", window.location.origin).toString();
+}
+
+function createPasswordRecoveryClient() {
+  return createSupabaseJsClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        flowType: "implicit",
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,12 +73,15 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setErrorMsg(null);
+    setSuccessMsg(null);
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -32,26 +95,50 @@ export default function LoginPage() {
       return;
     }
 
-// Check if this user is mapped to a contractor
-const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-if (user) {
-  const { data: cu } = await supabase
-    .from("contractor_users")
-    .select("contractor_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+    if (!user) {
+      setErrorMsg("Session could not be confirmed.");
+      return;
+    }
 
-  if (cu?.contractor_id) {
-    // Contractor login
-    router.push("/portal");
-  } else {
-    // Internal/admin login
-    router.push("/ops");
+    const destination = await resolveLoginDestination(supabase, user.id);
+
+    if (!destination) {
+      setErrorMsg("This account is not configured for portal or internal access.");
+      return;
+    }
+
+    router.push(destination);
+    router.refresh();
   }
 
-  router.refresh();
-}
+  async function onForgotPassword() {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!email) {
+      setErrorMsg("Enter your email to reset your password.");
+      return;
+    }
+
+    setResetLoading(true);
+
+    const recoveryClient = createPasswordRecoveryClient();
+    const { error } = await recoveryClient.auth.resetPasswordForEmail(email, {
+      redirectTo: resolvePasswordResetRedirect(),
+    });
+
+    setResetLoading(false);
+
+    if (error) {
+      setErrorMsg(error.message || "We could not send a reset link.");
+      return;
+    }
+
+    setSuccessMsg("If that account exists, we sent a password reset link.");
   }
 
   return (
@@ -92,15 +179,28 @@ if (user) {
             autoComplete="current-password"
             required
           />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              disabled={loading || resetLoading}
+              className="text-sm text-gray-600 underline-offset-4 hover:underline dark:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {resetLoading ? "Sending reset link..." : "Forgot password?"}
+            </button>
+          </div>
         </div>
 
         {errorMsg ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">{errorMsg}</div>
         ) : null}
+        {successMsg ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">{successMsg}</div>
+        ) : null}
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || resetLoading}
           className="w-full rounded-lg bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loading ? "Signing in…" : "Sign in"}

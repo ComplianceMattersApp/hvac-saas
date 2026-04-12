@@ -4,15 +4,46 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+async function waitForSessionCommit(supabase: ReturnType<typeof createClient>) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return false;
+}
+
+async function waitForRecoverySignal(getHandledRecovery: () => boolean) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if (getHandledRecovery()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return false;
+}
+
 export default function AuthCallbackPage() {
   const router = useRouter();
   const [status, setStatus] = useState("Signing you in...");
 
   useEffect(() => {
+    const supabase = createClient();
+    let handledRecovery = false;
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        handledRecovery = true;
+      }
+    });
+
     const handleCallback = async () => {
       try {
-        const supabase = createClient();
-
         // Parse hash fragment for tokens from Supabase redirect (invite flows)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const hashAccessToken = hashParams.get("access_token");
@@ -48,6 +79,7 @@ export default function AuthCallbackPage() {
           // Invite or recovery: send to password setup
           if (hashType === "invite" || hashType === "recovery") {
             setStatus("Redirecting to set password...");
+            await waitForSessionCommit(supabase);
             router.push("/set-password?mode=invite");
             return;
           }
@@ -67,6 +99,23 @@ export default function AuthCallbackPage() {
             return;
           }
 
+          // Persisted browser session + PASSWORD_RECOVERY event can lag code exchange by a moment.
+          // Wait briefly before deciding between recovery handoff and normal sign-in routing.
+          await waitForSessionCommit(supabase);
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          const sawRecoverySignal =
+            queryType === "recovery" || handledRecovery || (await waitForRecoverySignal(() => handledRecovery));
+
+          if (sawRecoverySignal) {
+            setStatus("Redirecting to set password...");
+            router.push("/set-password?mode=invite");
+            return;
+          }
           setStatus("Finishing sign-in...");
           await routeByRole(supabase, router, setStatus);
           return;
@@ -88,6 +137,7 @@ export default function AuthCallbackPage() {
           // OTP flows: if invite or recovery, to password setup
           if (queryType === "invite" || queryType === "recovery") {
             setStatus("Redirecting to set password...");
+            await waitForSessionCommit(supabase);
             router.push("/set-password?mode=invite");
             return;
           }
@@ -107,6 +157,10 @@ export default function AuthCallbackPage() {
     };
 
     handleCallback();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   return (

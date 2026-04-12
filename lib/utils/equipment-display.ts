@@ -17,6 +17,8 @@ export const EQUIPMENT_ROLE_OPTIONS = [
   { value: "furnace", label: "Furnace" },
   { value: "heat_pump", label: "Heat Pump" },
   { value: "package_unit", label: "Pack Unit" },
+  { value: "mini_split_outdoor", label: "Mini-Split Outdoor" },
+  { value: "mini_split_head", label: "Mini-Split Indoor Head" },
   { value: "other", label: "Other" },
 ] as const;
 

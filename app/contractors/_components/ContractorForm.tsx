@@ -37,13 +37,13 @@ export function ContractorForm({
           <div className="text-sm text-zinc-400">
             {isEdit
               ? "Update company contact + billing profile."
-              : "Create contractor with full company + billing profile."}
+              : "Create contractor with full company + billing profile. If an email is provided, submitting may also send an invite email."}
           </div>
         </div>
 
         <div className="flex gap-2">
           <Link
-            href="/contractors"
+            href="/ops/admin/contractors"
             className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
           >
             ← Back

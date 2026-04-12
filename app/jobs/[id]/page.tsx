@@ -57,10 +57,9 @@ import {
   getActiveJobAssignmentDisplayMap,
   resolveUserDisplayMap,
 } from "@/lib/staffing/human-layer";
-import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 
 import JobAttachmentsInternal from "./_components/JobAttachmentsInternal";
-import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from "@/lib/actions/job-evaluator";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -468,17 +467,17 @@ export default async function JobDetailPage({
   if (!user) redirect("/login");
 
   let isInternalUser = false;
-  let internalBusinessDisplayName = "Compliance Matters";
+  let internalBusinessDisplayName = "";
 
   try {
     const internalAccess = await requireInternalUser({ supabase, userId: user.id });
     isInternalUser = true;
 
-    const internalBusinessProfile = await getInternalBusinessProfileByAccountOwnerId({
+    const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
       supabase,
       accountOwnerUserId: internalAccess.internalUser.account_owner_user_id,
     });
-    internalBusinessDisplayName = internalBusinessProfile?.display_name ?? internalBusinessDisplayName;
+    internalBusinessDisplayName = internalBusinessIdentity.display_name;
   } catch (error) {
     if (isInternalAccessError(error)) {
       const { data: cu, error: cuErr } = await supabase
@@ -584,27 +583,6 @@ export default async function JobDetailPage({
 
   if (jobError) throw jobError;
   if (!job) return notFound();
-
-  const looksStalePaperworkStatus =
-    String(job.ops_status ?? "").toLowerCase() === "paperwork_required" &&
-    Boolean(job.field_complete) &&
-    Boolean(job.certs_complete) &&
-    Boolean(job.invoice_complete);
-
-  if (looksStalePaperworkStatus) {
-    await evaluateJobOpsStatus(jobId);
-    await healStalePaperworkOpsStatus(jobId);
-
-    const { data: healedRow, error: healedErr } = await supabase
-      .from("jobs")
-      .select("ops_status")
-      .eq("id", jobId)
-      .single();
-
-    if (!healedErr && healedRow?.ops_status != null) {
-      job.ops_status = healedRow.ops_status;
-    }
-  }
 
   const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
     supabase,
@@ -1867,12 +1845,6 @@ const renderTimelineItem = (e: any, key: string) => {
             </SubmitButton>
           </form>
         )}
-
-        {/* Done state */}
-        {((job.job_type === "service" && job.invoice_complete) ||
-          (job.job_type === "ecc" && job.invoice_complete && job.certs_complete)) && (
-          <span className="text-sm font-semibold text-green-700">Admin Complete</span>
-        )}
       </div>
     </div>
   </div>
@@ -2769,9 +2741,17 @@ const renderTimelineItem = (e: any, key: string) => {
 
       <select
         name="ops_status"
-        defaultValue={explicitPendingInfoActive ? "pending_info" : "on_hold"}
+        defaultValue={
+          explicitPendingInfoActive
+            ? "pending_info"
+            : onHoldActive
+            ? "on_hold"
+            : ""
+        }
+        required
         className={workspaceInputClass}
       >
+        <option value="" disabled>Select interrupt state…</option>
         <option value="pending_info">Pending Info</option>
         <option value="on_hold">On Hold</option>
       </select>

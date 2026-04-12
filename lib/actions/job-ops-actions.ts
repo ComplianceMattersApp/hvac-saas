@@ -19,7 +19,7 @@ import {
   insertInternalNotificationForEvent,
   markContractorReportEmailDeliveryNotification,
 } from "@/lib/actions/notification-actions";
-import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { resolveAppUrl, renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
@@ -552,15 +552,13 @@ export async function sendContractorReport(input: {
 
   const contractorEmail = String((job as any)?.contractors?.email ?? "").trim().toLowerCase();
   const accountOwnerUserId = String((job as any)?.contractors?.owner_user_id ?? "").trim();
-  const internalBusinessProfile = accountOwnerUserId
-    ? await getInternalBusinessProfileByAccountOwnerId({
-        supabase,
-        accountOwnerUserId,
-      })
-    : null;
-  const supportDisplayName = internalBusinessProfile?.display_name ?? "Compliance Matters";
-  const supportPhone = internalBusinessProfile?.support_phone ?? null;
-  const supportEmail = internalBusinessProfile?.support_email ?? null;
+  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    supabase,
+    accountOwnerUserId,
+  });
+  const supportDisplayName = internalBusinessIdentity.display_name;
+  const supportPhone = internalBusinessIdentity.support_phone;
+  const supportEmail = internalBusinessIdentity.support_email;
   const customerName = String(report.customer_name ?? "").trim() || "Customer";
   const jobAddress = String(report.location_text ?? "").trim() || "Location not available";
   const subject = `${supportDisplayName} Report – ${customerName} – ${jobAddress}`;
@@ -965,6 +963,7 @@ if (!updatedInvoiceRow?.id || updatedInvoiceRow.invoice_complete !== true) {
 }
 export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
+  await requireInternalUser({ supabase });
 
   const jobId = formData.get('job_id');
   if (typeof jobId !== 'string' || !jobId) throw new Error('Missing job_id');
@@ -1296,6 +1295,7 @@ export async function releaseAndReevaluateFromForm(formData: FormData): Promise<
 
 export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
+  await requireInternalUser({ supabase });
 
   const jobId = formData.get("job_id");
   const opsStatusRaw = formData.get("ops_status");
@@ -1407,6 +1407,7 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
 
 export async function markJobFieldCompleteFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
+  const { userId: actingUserId } = await requireInternalUser({ supabase });
 
   const jobId = formData.get("job_id");
   if (typeof jobId !== "string" || !jobId) throw new Error("Missing job_id");
@@ -1526,15 +1527,6 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
 
   nextOps =
     (await recomputeOpsAfterCloseoutMutation(supabase, jobId)) ?? nextOps;
-
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-
-  if (userErr) throw new Error(userErr.message);
-
-  const actingUserId = user?.id ?? null;
 
   let assignmentId: string | null = null;
   if (actingUserId) {

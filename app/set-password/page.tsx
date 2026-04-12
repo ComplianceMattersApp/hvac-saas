@@ -27,6 +27,30 @@ async function handoffRedirectAfterPasswordSet(
   window.location.replace(target);
 }
 
+async function resolveSetPasswordDestination(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  isContractor: boolean,
+) {
+  if (isContractor) {
+    return "/portal" as const;
+  }
+
+  const { data: internalUser, error: internalUserError } = await supabase
+    .from("internal_users")
+    .select("user_id, is_active")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (internalUserError) throw internalUserError;
+
+  if (internalUser?.user_id && internalUser.is_active) {
+    return "/ops" as const;
+  }
+
+  return null;
+}
+
 export default function SetPasswordPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -112,7 +136,26 @@ export default function SetPasswordPage() {
       return;
     }
 
-    const target = isContractor ? "/portal" : "/ops";
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setLoading(false);
+      setSuccessMsg(null);
+      setErrorMsg("Session could not be confirmed.");
+      return;
+    }
+
+    const target = await resolveSetPasswordDestination(supabase, user.id, isContractor);
+
+    if (!target) {
+      setLoading(false);
+      setSuccessMsg(null);
+      setErrorMsg("This account is not configured for portal or internal access.");
+      return;
+    }
+
     await handoffRedirectAfterPasswordSet(supabase, target);
   }
 

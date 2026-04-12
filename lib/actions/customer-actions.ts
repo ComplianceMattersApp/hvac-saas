@@ -17,9 +17,34 @@ function toFullName(first?: string | null, last?: string | null) {
 
 export async function upsertCustomerProfileFromForm(formData: FormData) {
   const supabase = await createClient();
+  const admin = createAdminClient();
+
+  let internalUser;
+  try {
+    ({ internalUser } = await requireInternalUser({ supabase }));
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirect("/login");
+    }
+
+    throw error;
+  }
 
   const customer_id = String(formData.get("customer_id") ?? "").trim();
   if (!customer_id) throw new Error("Missing customer_id");
+
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  if (!accountOwnerUserId) throw new Error("Missing account owner scope");
+
+  const { data: scopedCustomer, error: scopedCustomerErr } = await admin
+    .from("customers")
+    .select("id")
+    .eq("id", customer_id)
+    .eq("owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (scopedCustomerErr) throw scopedCustomerErr;
+  if (!scopedCustomer?.id) throw new Error("Customer not found in internal account scope");
 
   // Customer identity/contact
   const first_name = String(formData.get("first_name") ?? "").trim() || null;
@@ -36,15 +61,8 @@ export async function upsertCustomerProfileFromForm(formData: FormData) {
 
   const full_name = toFullName(first_name, last_name) || null;
 
-  // Service address (locations table) — we will create or update the first location for this customer
-  const address_line1 = String(formData.get("address_line1") ?? "").trim() || null;
-  const address_line2 = String(formData.get("address_line2") ?? "").trim() || null;
-  const city = String(formData.get("city") ?? "").trim() || null;
-  const state = String(formData.get("state") ?? "").trim() || null;
-  const zip = String(formData.get("zip") ?? "").trim() || null;
-
   // 1) Update customer
-  const { error: custErr } = await supabase
+  const { error: custErr } = await admin
     .from("customers")
     .update({
       first_name,
@@ -64,124 +82,18 @@ export async function upsertCustomerProfileFromForm(formData: FormData) {
   if (custErr) throw custErr;
 
   // 1B) Sync job snapshot fields for all jobs tied to this customer
-// This keeps /ops + job cards accurate even if they still read from jobs.* fields.
-const { error: jobsSnapErr } = await supabase
-  .from("jobs")
-  .update({
-  customer_first_name: first_name,
-  customer_last_name: last_name,
-  customer_email: email,
-  customer_phone: phone ?? "",
-  })
-  .eq("customer_id", customer_id);
+  // This keeps /ops + job cards accurate even if they still read from jobs.* fields.
+  const { error: jobsSnapErr } = await admin
+    .from("jobs")
+    .update({
+      customer_first_name: first_name,
+      customer_last_name: last_name,
+      customer_email: email,
+      customer_phone: phone ?? "",
+    })
+    .eq("customer_id", customer_id);
 
-if (jobsSnapErr) throw jobsSnapErr;
-
-  // 2) Upsert primary location
-  // If all service fields are blank, do nothing (optional)
-  const anyService =
-    !!address_line1 || !!address_line2 || !!city || !!state || !!zip;
-
-  if (anyService) {
-    const { data: existingLoc, error: locFetchErr } = await supabase
-      .from("locations")
-      .select("id")
-      .eq("customer_id", customer_id)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (locFetchErr) throw locFetchErr;
-
-    if (existingLoc?.id) {
-      const { error: locUpdErr } = await supabase
-        .from("locations")
-        .update({
-          address_line1,
-          address_line2,
-          city,
-          state,
-          zip,
-          postal_code: zip, // keep both fields consistent
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existingLoc.id);
-
-      if (locUpdErr) throw locUpdErr;
-      // 2B) Sync job address snapshots for jobs at this location
-      const { error: jobsAddrErr } = await supabase
-        .from("jobs")
-        .update({
-          job_address: address_line1,
-          address_line2,
-          city,
-        })
-        .eq("location_id", existingLoc.id);
-
-      if (jobsAddrErr) throw jobsAddrErr;
-
-      // Fetch affected job IDs for explicit revalidation of detail routes
-      const { data: affectedJobsExisting } = await supabase
-        .from("jobs")
-        .select("id")
-        .eq("location_id", existingLoc.id);
-
-      if (affectedJobsExisting) {
-        affectedJobsExisting.forEach(job => {
-          revalidatePath(`/jobs/${job.id}`);
-          revalidatePath(`/jobs/${job.id}/info`);
-          revalidatePath(`/jobs/${job.id}/tests`);
-        });
-      }
-
-    } else {
-      const { data: newLoc, error: locInsErr } = await supabase
-        .from("locations")
-        .insert({
-          customer_id,
-          nickname: null,
-          label: "Primary",
-          address_line1,
-          address_line2,
-          city,
-          state,
-          zip,
-          postal_code: zip,
-        })
-        .select("id")
-        .single();
-
-      if (locInsErr) throw locInsErr;
-
-      // Sync job address snapshots for jobs tied to this customer that may point at this new primary location later.
-      // (Safe even if 0 rows match.)
-      const { error: jobsAddrErr } = await supabase
-        .from("jobs")
-        .update({
-          job_address: address_line1,
-          address_line2,
-          city,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("location_id", newLoc.id);
-
-      if (jobsAddrErr) throw jobsAddrErr;
-
-      // Fetch affected job IDs for explicit revalidation of detail routes
-      const { data: affectedJobsNew } = await supabase
-        .from("jobs")
-        .select("id")
-        .eq("location_id", newLoc.id);
-
-      if (affectedJobsNew) {
-        affectedJobsNew.forEach(job => {
-          revalidatePath(`/jobs/${job.id}`);
-          revalidatePath(`/jobs/${job.id}/info`);
-          revalidatePath(`/jobs/${job.id}/tests`);
-        });
-      }
-    }
-  }
+  if (jobsSnapErr) throw jobsSnapErr;
 
   
 
@@ -283,20 +195,20 @@ export async function updateCustomerNotesFromForm(formData: FormData) {
  */
 export async function claimNullOwnerCustomer(customerId: string, _formData: FormData) {
   const supabase = await createClient();
-  const { data: { user }, error: userErr } = await supabase.auth.getUser();
-  if (!user || userErr) redirect("/login");
+  let internalUser;
+  try {
+    ({ internalUser } = await requireInternalUser({ supabase }));
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirect("/login");
+    }
 
-  // Contractors must not claim internal customer records
-  const { data: cu } = await supabase
-    .from("contractor_users")
-    .select("contractor_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (cu?.contractor_id) {
-    redirect(`/customers/${customerId}/edit?claimError=contractors_not_allowed`);
+    throw error;
   }
 
   const admin = createAdminClient();
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  if (!accountOwnerUserId) throw new Error("Missing account owner scope");
 
   const { data: row, error: rowErr } = await admin
     .from("customers")
@@ -314,7 +226,7 @@ export async function claimNullOwnerCustomer(customerId: string, _formData: Form
 
   const { error: updateErr } = await admin
     .from("customers")
-    .update({ owner_user_id: user.id })
+    .update({ owner_user_id: accountOwnerUserId })
     .eq("id", customerId)
     .is("owner_user_id", null); // guard: only update if still null
 

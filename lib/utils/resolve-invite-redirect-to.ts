@@ -17,9 +17,13 @@ export function resolveInviteRedirectTo(): string {
     }
   }
 
+  // Development: safe to use localhost for testing
   if (process.env.NODE_ENV !== "production") {
     return "http://localhost:3000/auth/callback";
   }
 
-  throw new Error("MISSING_INVITE_REDIRECT_URL");
+  // Production: use hardcoded known URL if env vars not set.
+  // If you're in production and need a different URL, set NEXT_PUBLIC_APP_URL in environment.
+  const productionFallback = "https://hvac-saas-xi.vercel.app";
+  return `${productionFallback}/auth/callback`;
 }

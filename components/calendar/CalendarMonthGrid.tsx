@@ -184,6 +184,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                 {visibleJobs.map((job) => {
                   const needsTech = !!job.scheduled_date && (!job.assignments || job.assignments.length === 0);
                   const lifecycle = getCalendarDisplayStatus(job);
+                  const isCancelledJob = lifecycle === 'cancelled';
                   const dotClass = calendarStatusDotClass(lifecycle);
                   const faded = lifecycle === 'closed' || lifecycle === 'cancelled' ? 'opacity-50' : '';
                   const primaryLine = job.job_address || shortTitle(job);
@@ -193,12 +194,16 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                     <div key={job.id} className="group relative">
                       <Link
                         href={buildCalendarHref('month', ymd, { job: job.id, tech })}
-                        draggable
+                        draggable={!isCancelledJob}
                         onDragStart={(event) => {
+                          if (isCancelledJob) {
+                            event.preventDefault();
+                            return;
+                          }
                           event.dataTransfer.setData('application/x-cm-job-id', job.id);
                           event.dataTransfer.effectAllowed = 'move';
                         }}
-                        className={`flex min-h-[36px] items-start gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
+                        className={`flex min-h-[36px] items-start gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-sm shadow-slate-950/5 transition ${isCancelledJob ? 'cursor-default' : 'cursor-grab active:cursor-grabbing hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'} ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
                         scroll={false}
                       >
                         <div className={`mt-[5px] h-2 w-2 shrink-0 rounded-full ${dotClass}`} />

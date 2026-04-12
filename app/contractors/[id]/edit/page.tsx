@@ -1,4 +1,8 @@
 import { redirect } from "next/navigation";
+import {
+  isInternalAccessError,
+  requireInternalRole,
+} from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
 import { ContractorForm } from "@/app/contractors/_components/ContractorForm";
 import { updateContractorFromForm } from "@/lib/actions/contractor-actions";
@@ -35,6 +39,19 @@ export default async function EditContractorPage({
 
   if (!user || userErr) redirect("/login");
 
+  try {
+    await requireInternalRole(["admin", "office"], {
+      supabase,
+      userId: user.id,
+    });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirect("/ops");
+    }
+
+    throw error;
+  }
+
   const { data: contractor, error } = await supabase
   .from("contractors")
   .select(
@@ -43,7 +60,7 @@ export default async function EditContractorPage({
   .eq("id", id)
   .maybeSingle();
 
-  if (error || !contractor) redirect("/contractors");
+  if (error || !contractor) redirect("/ops/admin/contractors");
 
   return (
     <div className="space-y-4">

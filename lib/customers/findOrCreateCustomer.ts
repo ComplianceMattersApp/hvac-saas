@@ -10,18 +10,19 @@ export async function findOrCreateCustomer(params: {
   lastName?: string | null;
   phone?: string | null;
   email?: string | null;
-  ownerUserId?: string | null;
+  ownerUserId: string;
 }) {
   const { supabase, firstName, lastName, phone, email, ownerUserId } = params;
 
   const inputFullName = normalizeFullName(firstName ?? "", lastName ?? "");
   const inputPhone10 = normalizePhone10(phone ?? "");
   const hasInputFullName = Boolean(inputFullName);
-  let userId = ownerUserId ?? null;
+  const userId = String(ownerUserId ?? "").trim() || null;
+
   if (!userId) {
-    const { data: auth } = await supabase.auth.getUser();
-    userId = auth?.user?.id ?? null;
+    throw new Error("findOrCreateCustomer requires ownerUserId");
   }
+
   // Try to reuse existing customer by (name + phone)
   if (inputPhone10) {
     const digits = inputPhone10; // already last-10 digits

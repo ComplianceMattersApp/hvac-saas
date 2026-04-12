@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { requireInternalUser } from "@/lib/auth/internal-user";
 type AttemptMethod = "call" | "text";
 
 function addDays(dateYYYYMMDD: string, days: number) {
@@ -37,9 +38,7 @@ function nextFollowUpDate(attemptCountAfterInsert: number) {
 export async function logCustomerContactAttemptFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
 
-    // Actor (for timeline attribution)
-  const { data: userData } = await supabase.auth.getUser();
-  const actorId = userData?.user?.id ?? null;
+  const { userId: actorId } = await requireInternalUser({ supabase });
 
   const jobId = String(formData.get("job_id") || "").trim();
   const method = String(formData.get("method") || "").trim() as AttemptMethod;

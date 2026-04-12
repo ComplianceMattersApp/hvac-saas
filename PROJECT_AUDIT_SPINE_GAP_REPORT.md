@@ -145,3 +145,17 @@ Compliance snapshot:
 - MISSING: 1 domain
 - DRIFT: 2 cross-cutting artifacts
 
+## 10) Intake Authority Clarification (2026-04-12)
+
+Locked intended rule:
+- Internal intake may create/link canonical customer/location records through reuse-first intake flow.
+- Contractor intake submits proposed customer/contact/location data and is not final canonical identity authority by default.
+- Internal review finalizes identity linkage as one of:
+	- existing customer + existing location
+	- existing customer + new location
+	- new customer + new location
+
+Current behavior note:
+- Current live shared create path can still directly create canonical customer/location records in contractor-originated intake branches.
+- This is tracked as current behavior under review, not intended long-term authority.
+

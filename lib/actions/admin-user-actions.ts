@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requireInternalRole } from "@/lib/auth/internal-user";
 import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
@@ -29,6 +30,86 @@ function parseInternalRoleForInvite(raw: FormDataEntryValue | null): "admin" | "
   if (role === "admin" || role === "office" || role === "tech") return role;
   if (role === "technician") return "tech";
   return "office";
+}
+
+async function getAuthUserIdByEmail(admin: any, email: string): Promise<string | null> {
+  const normalized = String(email ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id, email")
+    .ilike("email", normalized)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (data?.id) return String(data.id);
+
+  let page = 1;
+
+  while (page <= 5) {
+    const { data: listed, error: listErr } = await admin.auth.admin.listUsers({
+      page,
+      perPage: 200,
+    });
+
+    if (listErr) throw listErr;
+
+    const users = Array.isArray((listed as any)?.users)
+      ? (listed as any).users
+      : [];
+
+    const match = users.find((u: any) =>
+      String(u?.email ?? "").trim().toLowerCase() === normalized,
+    );
+
+    if (match?.id) return String(match.id);
+    if (users.length < 200) break;
+    page += 1;
+  }
+
+  return null;
+}
+
+async function assertOwnerScopedInternalTargetByEmail(params: {
+  admin: any;
+  email: string;
+  accountOwnerUserId: string;
+}) {
+  const { admin, email, accountOwnerUserId } = params;
+
+  const targetUserId = await getAuthUserIdByEmail(admin, email);
+  if (!targetUserId) {
+    throw new Error("OUT_OF_SCOPE_TARGET");
+  }
+
+  const { data: scopedInternalUser, error: scopedInternalUserErr } = await admin
+    .from("internal_users")
+    .select("user_id")
+    .eq("user_id", targetUserId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (scopedInternalUserErr) throw scopedInternalUserErr;
+  if (!scopedInternalUser?.user_id) {
+    throw new Error("OUT_OF_SCOPE_TARGET");
+  }
+}
+
+function createPasswordRecoveryClient() {
+  return createSupabaseJsClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        flowType: "implicit",
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
 }
 
 async function sendRecoveryEmail(params: {
@@ -72,7 +153,7 @@ async function sendRecoveryEmail(params: {
 
 export async function resendInternalInviteFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
-  await requireInternalRole("admin", { supabase });
+  const { internalUser } = await requireInternalRole("admin", { supabase });
 
   const returnTo = safeReturnTo(String(formData.get("return_to") ?? ""));
   const email = normalizeEmail(formData.get("email"));
@@ -83,6 +164,16 @@ export async function resendInternalInviteFromForm(formData: FormData): Promise<
   }
 
   const admin = createAdminClient();
+
+  try {
+    await assertOwnerScopedInternalTargetByEmail({
+      admin,
+      email,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } catch {
+    redirect(returnTo);
+  }
 
   const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo: resolveInviteRedirectTo(),
@@ -109,7 +200,7 @@ export async function resendInternalInviteFromForm(formData: FormData): Promise<
 
 export async function sendPasswordResetFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
-  await requireInternalRole("admin", { supabase });
+  const { internalUser } = await requireInternalRole("admin", { supabase });
 
   const returnTo = safeReturnTo(String(formData.get("return_to") ?? ""));
   const email = normalizeEmail(formData.get("email"));
@@ -120,13 +211,25 @@ export async function sendPasswordResetFromForm(formData: FormData): Promise<voi
 
   const admin = createAdminClient();
 
-  await sendRecoveryEmail({
-    admin,
-    email,
-    subject: "Reset your Compliance Matters password",
-    headline: "Reset your password",
-    body: "Use the link below to reset your password.",
+  try {
+    await assertOwnerScopedInternalTargetByEmail({
+      admin,
+      email,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } catch {
+    redirect(returnTo);
+  }
+
+  // Use the same implicit-flow initiation strategy as /login forgot-password.
+  const recoveryClient = createPasswordRecoveryClient();
+  const { error } = await recoveryClient.auth.resetPasswordForEmail(email, {
+    redirectTo: resolveInviteRedirectTo(),
   });
+
+  if (error) {
+    redirect(withNotice(returnTo, "password_reset_failed"));
+  }
 
   redirect(withNotice(returnTo, "password_reset_sent"));
 }
