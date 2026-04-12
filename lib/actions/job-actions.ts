@@ -5257,6 +5257,7 @@ function canContractorWriteEvent(event_type: string) {
         proposed_project_type: projectType || null,
         proposed_title: titleFinal || null,
         proposed_job_notes: jobNotesRaw || null,
+        proposed_permit_number: permit_number || null,
       })
       .select("id")
       .single();

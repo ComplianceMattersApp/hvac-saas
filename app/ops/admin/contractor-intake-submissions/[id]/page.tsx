@@ -6,7 +6,7 @@ import {
   finalizeContractorIntakeSubmissionFromForm,
   rejectContractorIntakeSubmissionFromForm,
 } from "@/lib/actions/contractor-intake-actions";
-import CustomerLocationFinalizationFields from "./_components/CustomerLocationFinalizationFields";
+import GuidedFinalizationWizard from "./_components/GuidedFinalizationWizard";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -162,6 +162,68 @@ export default async function ContractorIntakeSubmissionDetailPage({
     locationRows = locationsData ?? [];
   }
 
+  // ── ECC permit match check (isolated — column may not yet exist in DB) ──────────
+  let proposedPermitNum = "";
+  const proposedTypeIsEcc =
+    normalizeText(submission.proposed_job_type).toLowerCase() !== "service";
+
+  let permitMatchRows: Array<{
+    id: string;
+    title: string;
+    jobAddress: string | null;
+    city: string | null;
+    permitNumber: string | null;
+    opsStatus: string | null;
+    status: string | null;
+    createdAt: string | null;
+    customerName: string;
+  }> = [];
+
+  if (proposedTypeIsEcc && customerIds.length > 0) {
+    try {
+      const { data: permitRow } = await admin
+        .from("contractor_intake_submissions")
+        .select("proposed_permit_number")
+        .eq("id", id)
+        .maybeSingle();
+      proposedPermitNum = normalizeText((permitRow as any)?.proposed_permit_number);
+    } catch {
+      // Column does not yet exist — migration pending. Degrade gracefully.
+      proposedPermitNum = "";
+    }
+  }
+
+  if (proposedPermitNum && proposedTypeIsEcc && customerIds.length > 0) {
+    try {
+      const { data: pmData } = await admin
+        .from("jobs")
+        .select(
+          "id, title, job_address, city, permit_number, ops_status, status, created_at, customer_first_name, customer_last_name",
+        )
+        .eq("permit_number", proposedPermitNum)
+        .eq("job_type", "ecc")
+        .in("customer_id", customerIds)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      permitMatchRows = (pmData ?? []).map((row: any) => ({
+        id: normalizeText(row.id),
+        title: normalizeText(row.title) || "—",
+        jobAddress: normalizeText(row.job_address) || null,
+        city: normalizeText(row.city) || null,
+        permitNumber: normalizeText(row.permit_number) || null,
+        opsStatus: normalizeText(row.ops_status) || null,
+        status: normalizeText(row.status) || null,
+        createdAt: normalizeText(row.created_at) || null,
+        customerName:
+          [normalizeText(row.customer_first_name), normalizeText(row.customer_last_name)]
+            .filter(Boolean)
+            .join(" ") || "—",
+      }));
+    } catch {
+      permitMatchRows = [];
+    }
+  }
   const customerOptions = (customerRows ?? []).map((row: any) => ({
     id: normalizeText(row?.id),
     displayName: customerDisplayName(row),
@@ -174,6 +236,7 @@ export default async function ContractorIntakeSubmissionDetailPage({
       id: normalizeText(row?.id),
       customerId: normalizeText(row?.customer_id),
       displayName: locationDisplayName(row),
+      addressLine1: normalizeText(row?.address_line1) || null,
       city: normalizeText(row?.city) || null,
       zip: normalizeText(row?.zip || row?.postal_code) || null,
     }))
@@ -213,151 +276,116 @@ export default async function ContractorIntakeSubmissionDetailPage({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Proposed customer</h2>
-          <div className="mt-3 space-y-1 text-sm text-slate-800">
-            <div><span className="font-medium">Name:</span> {customerName || "-"}</div>
-            <div><span className="font-medium">Phone:</span> {normalizeText(submission.proposed_customer_phone) || "-"}</div>
-            <div><span className="font-medium">Email:</span> {normalizeText(submission.proposed_customer_email) || "-"}</div>
-          </div>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Proposed customer</h2>
+          <dl className="mt-3 space-y-2.5">
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Name</dt>
+              <dd className="mt-0.5 text-sm font-medium text-slate-900">{customerName || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Phone</dt>
+              <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_customer_phone) || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Email</dt>
+              <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_customer_email) || "—"}</dd>
+            </div>
+          </dl>
 
-          <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-slate-500">Proposed location</h2>
-          <div className="mt-3 space-y-1 text-sm text-slate-800">
-            <div><span className="font-medium">Address:</span> {normalizeText(submission.proposed_address_line1) || "-"}</div>
-            <div><span className="font-medium">City:</span> {normalizeText(submission.proposed_city) || "-"}</div>
-            <div><span className="font-medium">ZIP:</span> {normalizeText(submission.proposed_zip) || "-"}</div>
-            <div><span className="font-medium">Nickname:</span> {normalizeText(submission.proposed_location_nickname) || "-"}</div>
-          </div>
+          <div className="my-5 border-t border-slate-100" />
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Proposed location</h2>
+          <dl className="mt-3 space-y-2.5">
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Address</dt>
+              <dd className="mt-0.5 text-sm font-medium text-slate-900">{normalizeText(submission.proposed_address_line1) || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">City</dt>
+              <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_city) || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">ZIP</dt>
+              <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_zip) || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nickname</dt>
+              <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_location_nickname) || "—"}</dd>
+            </div>
+          </dl>
 
-          <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-slate-500">Job intent</h2>
-          <div className="mt-3 space-y-1 text-sm text-slate-800">
-            <div><span className="font-medium">Type:</span> {normalizeText(submission.proposed_job_type) || "-"}</div>
-            <div><span className="font-medium">Project type:</span> {normalizeText(submission.proposed_project_type) || "-"}</div>
-            <div><span className="font-medium">Title:</span> {normalizeText(submission.proposed_title) || "-"}</div>
-            <div><span className="font-medium">Notes:</span> {normalizeText(submission.proposed_job_notes) || "-"}</div>
-          </div>
+          <div className="my-5 border-t border-slate-100" />
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Job intent</h2>
+          <dl className="mt-3 space-y-2.5">
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Type</dt>
+              <dd className="mt-0.5 text-sm font-medium text-slate-900">{normalizeText(submission.proposed_job_type) || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Project type</dt>
+              <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_project_type) || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Title</dt>
+              <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_title) || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Notes</dt>
+              <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_job_notes) || "—"}</dd>
+            </div>
+            {proposedTypeIsEcc && proposedPermitNum ? (
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Permit #</dt>
+                <dd className="mt-0.5 text-sm font-mono font-medium text-slate-900">{proposedPermitNum}</dd>
+              </div>
+            ) : null}
+          </dl>
 
-          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            Status: {normalizeText(submission.review_status) || "-"}
-            {submission.reviewed_at ? ` • Reviewed ${formatDateTime(submission.reviewed_at)}` : ""}
+          <div className="mt-5 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <span className={[
+              "inline-block h-2 w-2 shrink-0 rounded-full",
+              normalizeText(submission.review_status).toLowerCase() === "pending" ? "bg-amber-400" :
+              normalizeText(submission.review_status).toLowerCase() === "finalized" ? "bg-emerald-500" :
+              normalizeText(submission.review_status).toLowerCase() === "rejected" ? "bg-rose-500" : "bg-slate-400",
+            ].join(" ")} />
+            <span className="text-xs text-slate-600">
+              {normalizeText(submission.review_status) || "—"}
+              {submission.reviewed_at ? ` · Reviewed ${formatDateTime(submission.reviewed_at)}` : ""}
+            </span>
           </div>
         </section>
 
         <section className="space-y-4">
-          <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" open={isPending}>
-            <summary className="cursor-pointer text-sm font-semibold text-slate-900">Finalize as existing customer + existing location</summary>
-            <form action={finalizeContractorIntakeSubmissionFromForm} className="mt-3 space-y-3">
-              <input type="hidden" name="submission_id" value={submission.id} />
-              <input type="hidden" name="finalization_mode" value="existing_existing" />
+          <GuidedFinalizationWizard
+            submissionId={submission.id}
+            customers={customerOptions}
+            locations={locationOptions}
+            disabled={!isPending}
+            permitNumber={proposedPermitNum || null}
+            permitMatches={permitMatchRows}
+            proposed={{
+              customerFirstName: normalizeText(submission.proposed_customer_first_name),
+              customerLastName: normalizeText(submission.proposed_customer_last_name),
+              customerPhone: normalizeText(submission.proposed_customer_phone),
+              customerEmail: normalizeText(submission.proposed_customer_email),
+              addressLine1: normalizeText(submission.proposed_address_line1),
+              city: normalizeText(submission.proposed_city),
+              zip: normalizeText(submission.proposed_zip),
+              locationNickname: normalizeText(submission.proposed_location_nickname),
+            }}
+            submitAction={finalizeContractorIntakeSubmissionFromForm}
+          />
 
-              <CustomerLocationFinalizationFields
-                mode="existing_existing"
-                customers={customerOptions}
-                locations={locationOptions}
-                disabled={!isPending}
-              />
-              <textarea name="review_note" placeholder="Optional review note" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" rows={2} disabled={!isPending} />
-
-              <button type="submit" disabled={!isPending} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                Finalize
-              </button>
-            </form>
-          </details>
-
-          <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-900">Finalize as existing customer + new location</summary>
-            <form action={finalizeContractorIntakeSubmissionFromForm} className="mt-3 space-y-3">
-              <input type="hidden" name="submission_id" value={submission.id} />
-              <input type="hidden" name="finalization_mode" value="existing_new" />
-
-              <CustomerLocationFinalizationFields
-                mode="existing_new"
-                customers={customerOptions}
-                locations={locationOptions}
-                disabled={!isPending}
-              />
-
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="new_location_nickname">Location nickname (optional)</label>
-                <input id="new_location_nickname" name="new_location_nickname" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue={normalizeText(submission.proposed_location_nickname)} disabled={!isPending} />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="new_address_line1_existing_new">Address line 1</label>
-                <input id="new_address_line1_existing_new" name="new_address_line1" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue={normalizeText(submission.proposed_address_line1)} required disabled={!isPending} />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="new_city_existing_new">City</label>
-                  <input id="new_city_existing_new" name="new_city" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue={normalizeText(submission.proposed_city)} required disabled={!isPending} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="new_zip_existing_new">ZIP</label>
-                  <input id="new_zip_existing_new" name="new_zip" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue={normalizeText(submission.proposed_zip)} required disabled={!isPending} />
-                </div>
-              </div>
-              <textarea name="review_note" placeholder="Optional review note" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" rows={2} disabled={!isPending} />
-
-              <button type="submit" disabled={!isPending} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                Finalize
-              </button>
-            </form>
-          </details>
-
-          <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-900">Finalize as new customer + new location</summary>
-            <form action={finalizeContractorIntakeSubmissionFromForm} className="mt-3 space-y-3">
-              <input type="hidden" name="submission_id" value={submission.id} />
-              <input type="hidden" name="finalization_mode" value="new_new" />
-
-              <p className="text-xs text-slate-600">Create a new canonical customer and location from this proposal.</p>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="new_customer_first_name">Customer first name</label>
-                  <input id="new_customer_first_name" name="new_customer_first_name" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue={normalizeText(submission.proposed_customer_first_name)} disabled={!isPending} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="new_customer_last_name">Customer last name</label>
-                  <input id="new_customer_last_name" name="new_customer_last_name" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue={normalizeText(submission.proposed_customer_last_name)} disabled={!isPending} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="new_customer_phone">Customer phone</label>
-                  <input id="new_customer_phone" name="new_customer_phone" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue={normalizeText(submission.proposed_customer_phone)} disabled={!isPending} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="new_customer_email">Customer email</label>
-                  <input id="new_customer_email" name="new_customer_email" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue={normalizeText(submission.proposed_customer_email)} disabled={!isPending} />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="new_location_nickname_new_new">Location nickname (optional)</label>
-                <input id="new_location_nickname_new_new" name="new_location_nickname" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue={normalizeText(submission.proposed_location_nickname)} disabled={!isPending} />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="new_address_line1_new_new">Address line 1</label>
-                <input id="new_address_line1_new_new" name="new_address_line1" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue={normalizeText(submission.proposed_address_line1)} required disabled={!isPending} />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="new_city_new_new">City</label>
-                  <input id="new_city_new_new" name="new_city" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue={normalizeText(submission.proposed_city)} required disabled={!isPending} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="new_zip_new_new">ZIP</label>
-                  <input id="new_zip_new_new" name="new_zip" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" defaultValue={normalizeText(submission.proposed_zip)} required disabled={!isPending} />
-                </div>
-              </div>
-              <textarea name="review_note" placeholder="Optional review note" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" rows={2} disabled={!isPending} />
-
-              <button type="submit" disabled={!isPending} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                Finalize
-              </button>
-            </form>
-          </details>
+          <div className="relative my-2">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-slate-100" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-slate-50 px-3 text-xs text-slate-400">or</span>
+            </div>
+          </div>
 
           <details className="rounded-2xl border border-rose-200 bg-white p-4 shadow-sm">
-            <summary className="cursor-pointer text-sm font-semibold text-rose-800">Reject proposal</summary>
+            <summary className="cursor-pointer text-sm font-medium text-rose-700">Reject proposal</summary>
             <form action={rejectContractorIntakeSubmissionFromForm} className="mt-3 space-y-3">
               <input type="hidden" name="submission_id" value={submission.id} />
               <textarea name="review_note" placeholder="Optional reject note" className="w-full rounded-lg border border-rose-300 px-3 py-2 text-sm" rows={3} disabled={!isPending} />
