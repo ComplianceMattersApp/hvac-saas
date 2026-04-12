@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   createJobAttachmentUploadToken,
+  discardInternalJobAttachmentUpload,
+  finalizeInternalJobAttachmentUpload,
   shareJobAttachmentToContractor,
 } from "@/lib/actions/attachment-actions";
 
@@ -116,14 +118,27 @@ export default function JobAttachmentsInternal({
       caption: caption.trim() || undefined,
     });
 
-    const { error: upErr } = await supabase.storage
-      .from(tok.bucket)
-      .uploadToSignedUrl(tok.path, tok.token, file, {
-        contentType: file.type || "application/octet-stream",
-      });
+    try {
+      const { error: upErr } = await supabase.storage
+        .from(tok.bucket)
+        .uploadToSignedUrl(tok.path, tok.token, file, {
+          contentType: file.type || "application/octet-stream",
+        });
 
-    if (upErr) throw new Error(upErr.message);
-    return (tok as { attachmentId?: string | null }).attachmentId ?? null;
+      if (upErr) throw new Error(upErr.message);
+      return (tok as { attachmentId?: string | null }).attachmentId ?? null;
+    } catch (error) {
+      const attachmentId = (tok as { attachmentId?: string | null }).attachmentId ?? null;
+      if (attachmentId) {
+        try {
+          await discardInternalJobAttachmentUpload({ jobId, attachmentId });
+        } catch (cleanupError) {
+          console.error("discardInternalJobAttachmentUpload failed", cleanupError);
+        }
+      }
+
+      throw error;
+    }
   }
 
   async function uploadInternal() {
@@ -131,9 +146,9 @@ export default function JobAttachmentsInternal({
     setOk(null);
 
     startTransition(async () => {
-      try {
-        const uploadedIds: string[] = [];
+      const uploadedIds: string[] = [];
 
+      try {
         for (const f of files) {
           const id = await uploadOne(f);
           if (id) uploadedIds.push(id);
@@ -143,21 +158,13 @@ export default function JobAttachmentsInternal({
         const count = fileNames.length;
         const trimmed = note.trim();
 
-        // Single summary event for the whole batch
-        const { error: evErr } = await supabase.from("job_events").insert({
-          job_id: jobId,
-          event_type: "attachment_added",
-          meta: {
-            source: "internal",
-            count,
-            note: trimmed || null,
-            caption: caption.trim() || null,
-            attachment_ids: uploadedIds,
-            file_names: fileNames,
-          },
+        await finalizeInternalJobAttachmentUpload({
+          jobId,
+          note: trimmed,
+          caption: caption.trim(),
+          attachmentIds: uploadedIds,
+          fileNames,
         });
-
-        if (evErr) throw new Error(evErr.message);
 
         setFiles([]);
         setCaption("");
@@ -165,6 +172,14 @@ export default function JobAttachmentsInternal({
         setOk(`Uploaded ${count} attachment${count === 1 ? "" : "s"}.`);
         router.refresh();
       } catch (e: unknown) {
+        for (const attachmentId of uploadedIds) {
+          try {
+            await discardInternalJobAttachmentUpload({ jobId, attachmentId });
+          } catch (cleanupError) {
+            console.error("discardInternalJobAttachmentUpload failed", cleanupError);
+          }
+        }
+
         setError(e instanceof Error ? e.message : "Upload failed");
       }
     });

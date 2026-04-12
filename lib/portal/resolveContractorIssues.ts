@@ -214,7 +214,6 @@ export function resolveContractorIssues(
 ): ResolveContractorIssuesOutput {
   const opsStatus = normalize(input.job.ops_status);
   const pendingInfoReason = String(input.job.pending_info_reason ?? "").trim();
-  const nextActionNote = String(input.job.next_action_note ?? "").trim();
   const failureReasons = (input.failureReasons ?? []).map(String).map((s) => s.trim()).filter(Boolean);
   const hasOpenRetestChild = Boolean(input.chain?.hasOpenRetestChild);
   const retestSchedule = hasOpenRetestChild ? formatRetestSchedule(input.chain) : "";
@@ -232,7 +231,7 @@ export function resolveContractorIssues(
       group: "needs_info",
       headline: pendingInfoReason || "Details requested",
       explanation:
-        nextActionNote || "Please provide the requested information so work can continue.",
+        "Please provide the requested information so work can continue.",
       detailLines: pendingInfoReason ? [pendingInfoReason] : undefined,
       stage: "needs_info",
     };

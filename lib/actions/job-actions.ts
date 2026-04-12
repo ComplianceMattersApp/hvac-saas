@@ -14,14 +14,15 @@ import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
 import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions/job-event-meta";
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
-import { requireInternalUser } from "@/lib/auth/internal-user";
-import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { requireInternalRole, requireInternalUser } from "@/lib/auth/internal-user";
+import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { renderSystemEmailLayout, escapeHtml, resolveAppUrl } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { assertAssignableInternalUser } from "@/lib/staffing/human-layer";
 import { getThresholdRuleForTest } from "@/lib/ecc/rule-profiles";
 import type { JobStatus } from "@/lib/types/job";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { mapToCanonicalRole, sanitizeEquipmentFields } from "@/lib/utils/equipment-domain";
 
 export type { JobStatus } from "@/lib/types/job";
 
@@ -385,6 +386,7 @@ function buildContractorScheduledEmailHtml(args: {
   permitNumber: string | null;
   portalJobUrl: string | null;
   companyName: string | null;
+  supportDisplayName: string;
 }) {
   const details: string[] = [
     `<li><strong>Customer:</strong> ${escapeHtml(args.customerName)}</li>`,
@@ -418,7 +420,7 @@ function buildContractorScheduledEmailHtml(args: {
     : "";
 
   return renderSystemEmailLayout({
-    title: "Compliance Matters Schedule",
+    title: `${args.supportDisplayName} Schedule`,
     bodyHtml: `
       <p style="margin: 0 0 12px 0;">A job has been scheduled or updated.</p>
       <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
@@ -1031,15 +1033,13 @@ async function sendCustomerScheduledEmailForJob({
   const serviceType = serviceTypeRaw ? toTitleCase(serviceTypeRaw) : null;
   const companyName = String((scheduledJob as any)?.contractors?.name ?? "").trim() || null;
   const accountOwnerUserId = String((scheduledJob as any)?.contractors?.owner_user_id ?? "").trim();
-  const internalBusinessProfile = accountOwnerUserId
-    ? await getInternalBusinessProfileByAccountOwnerId({
-        supabase,
-        accountOwnerUserId,
-      })
-    : null;
-  const supportDisplayName = internalBusinessProfile?.display_name ?? "Compliance Matters";
-  const supportPhone = internalBusinessProfile?.support_phone ?? null;
-  const supportEmail = internalBusinessProfile?.support_email ?? null;
+  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    supabase,
+    accountOwnerUserId,
+  });
+  const supportDisplayName = internalBusinessIdentity.display_name;
+  const supportPhone = internalBusinessIdentity.support_phone;
+  const supportEmail = internalBusinessIdentity.support_email;
   const subjectDate = scheduledDateText && scheduledDateText !== "Not available"
     ? scheduledDateText
     : "Date TBD";
@@ -1142,7 +1142,7 @@ async function sendContractorScheduledEmailForJob({
       window_start,
       window_end,
       contractor_id,
-      contractors:contractor_id ( email, name ),
+      contractors:contractor_id ( email, name, owner_user_id ),
       locations:location_id (address_line1, address_line2, city, state, zip)
       `
     )
@@ -1188,10 +1188,16 @@ async function sendContractorScheduledEmailForJob({
   const serviceType = serviceTypeRaw ? toTitleCase(serviceTypeRaw) : null;
   const permitNumber = String(scheduledJob?.permit_number ?? "").trim() || null;
   const companyName = String((scheduledJob as any)?.contractors?.name ?? "").trim() || null;
+  const accountOwnerUserId = String((scheduledJob as any)?.contractors?.owner_user_id ?? "").trim();
+  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    supabase,
+    accountOwnerUserId,
+  });
+  const supportDisplayName = internalBusinessIdentity.display_name;
   const subjectDate = scheduledDateText && scheduledDateText !== "Not available"
     ? scheduledDateText
     : "Date TBD";
-  const subject = `Compliance Matters Schedule \u2013 ${customerName} \u2013 ${subjectDate}`;
+  const subject = `${supportDisplayName} Schedule \u2013 ${customerName} \u2013 ${subjectDate}`;
   const scheduleSignature = buildScheduleSignature({
     scheduledDate: scheduledJob?.scheduled_date,
     windowStart: scheduledJob?.window_start,
@@ -1242,6 +1248,7 @@ async function sendContractorScheduledEmailForJob({
         permitNumber,
         portalJobUrl,
         companyName,
+        supportDisplayName,
       }),
     });
 
@@ -1738,6 +1745,39 @@ function redirectToTests(opts: {
   redirect(qs ? `/jobs/${jobId}/tests?${qs}` : `/jobs/${jobId}/tests`);
 }
 
+function revalidateEccProjectionConsumers(jobId: string) {
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/tests`);
+  revalidatePath("/ops");
+  revalidatePath("/portal");
+  revalidatePath("/portal/jobs");
+  revalidatePath(`/portal/jobs/${jobId}`);
+}
+
+async function requireInternalEccTestsAccess(params: {
+  supabase: any;
+  jobId: string;
+}) {
+  const { supabase, jobId } = params;
+
+  await requireInternalUser({ supabase });
+
+  const { data: job, error } = await supabase
+    .from("jobs")
+    .select("id, job_type")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!job?.id) throw new Error("Job not found");
+
+  if (String(job.job_type ?? "").trim().toLowerCase() !== "ecc") {
+    redirect(`/jobs/${jobId}?tab=ops`);
+  }
+
+  return job;
+}
+
 /** ✅ Defensive resolver: if form is missing system_id, fall back to run.system_id */
 async function resolveSystemIdForRun(params: {
   supabase: any;
@@ -1878,8 +1918,9 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
-    .select("id, contractor_id, ops_status")
+    .select("id, contractor_id, ops_status, job_type")
     .eq("id", jobId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (jobErr) throw jobErr;
@@ -1887,6 +1928,11 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
 
   if (String(job.contractor_id ?? "") !== String(cu.contractor_id ?? "")) {
     throw new Error("You do not have access to this job.");
+  }
+
+  const jobType = String(job.job_type ?? "").trim().toLowerCase();
+  if (jobType !== "ecc") {
+    redirect(`/portal/jobs/${jobId}`);
   }
 
   if (String(job.ops_status ?? "").toLowerCase() !== "failed") {
@@ -1976,7 +2022,7 @@ export async function archiveJobFromForm(formData: FormData) {
   if (!actingUserId) redirect("/login");
 
   try {
-    await requireInternalUser({ supabase, userId: actingUserId });
+    await requireInternalRole("admin", { supabase, userId: actingUserId });
     console.error("ARCHIVE INTERNAL", {
       ok: true,
       uid: actingUserId,
@@ -2065,6 +2111,7 @@ export async function addJobEquipmentFromForm(formData: FormData) {
   const notes = String(formData.get("notes") || "").trim() || null;
 
   const supabase = await createClient();
+  await requireInternalUser({ supabase });
 
   // 1) Resolve/Create system for this job + location
   const { data: existingSystem, error: sysFindErr } = await supabase
@@ -2091,25 +2138,30 @@ export async function addJobEquipmentFromForm(formData: FormData) {
 
   if (!systemId) throw new Error("Unable to resolve system_id");
 
-  // 2) Insert equipment tied to system_id
-  const { error: eqErr } = await supabase.from("job_equipment").insert({
-    job_id: jobId,
-    system_id: systemId,
-    equipment_role: equipmentRole,
-    system_location: systemLocation,
+  // 2) Insert equipment tied to system_id — sanitize fields by canonical role
+  const eqFields = sanitizeEquipmentFields({
+    canonicalRole: equipmentRole,
     manufacturer,
     model,
     serial,
-    tonnage,
-    heating_capacity_kbtu: heatingCapacityKbtu,
-    heating_output_btu: heatingOutputBtu,
-    heating_efficiency_percent: heatingEfficiencyPercent,
-    refrigerant_type: refrigerantType,
     notes,
+    tonnage,
+    refrigerantType,
+    heatingCapacityKbtu,
+    heatingOutputBtu,
+    heatingEfficiencyPercent,
+  });
+
+  const { error: eqErr } = await supabase.from("job_equipment").insert({
+    job_id: jobId,
+    system_id: systemId,
+    system_location: systemLocation,
+    ...eqFields,
   });
 
   if (eqErr) throw eqErr;
 
+  revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/info`);
   revalidatePath(`/jobs/${jobId}/tests`);
   redirect(`/jobs/${jobId}/info?f=equipment`);
@@ -2152,27 +2204,76 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
   const notes = String(formData.get("notes") || "").trim() || null;
 
   const supabase = await createClient();
+  await requireInternalUser({ supabase });
+
+  const { data: existingEquipment, error: equipmentErr } = await supabase
+    .from("job_equipment")
+    .select("system_id")
+    .eq("id", equipmentId)
+    .eq("job_id", jobId)
+    .maybeSingle();
+
+  if (equipmentErr) throw equipmentErr;
+
+  const previousSystemId = String(existingEquipment?.system_id ?? "").trim();
+
+  let systemId: string | null = null;
+
+  if (systemLocation) {
+    const { data: existingSystem, error: sysFindErr } = await supabase
+      .from("job_systems")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("name", systemLocation)
+      .maybeSingle();
+
+    if (sysFindErr) throw sysFindErr;
+
+    systemId = existingSystem?.id ?? null;
+
+    if (!systemId) {
+      const { data: newSystem, error: sysCreateErr } = await supabase
+        .from("job_systems")
+        .insert({ job_id: jobId, name: systemLocation })
+        .select("id")
+        .single();
+
+      if (sysCreateErr) throw sysCreateErr;
+      systemId = String(newSystem?.id ?? "").trim() || null;
+    }
+  }
+
+  // Sanitize fields by canonical role before update
+  const eqFields = sanitizeEquipmentFields({
+    canonicalRole: equipmentRole ?? "",
+    manufacturer,
+    model,
+    serial,
+    notes,
+    tonnage,
+    refrigerantType,
+    heatingCapacityKbtu,
+    heatingOutputBtu,
+    heatingEfficiencyPercent,
+  });
 
   const { error } = await supabase
     .from("job_equipment")
     .update({
-      equipment_role: equipmentRole,
+      system_id: systemId,
       system_location: systemLocation,
-      manufacturer,
-      model,
-      serial,
-      tonnage,
-      heating_capacity_kbtu: heatingCapacityKbtu,
-      heating_output_btu: heatingOutputBtu,
-      heating_efficiency_percent: heatingEfficiencyPercent,
-      refrigerant_type: refrigerantType,
-      notes,
+      ...eqFields,
     })
     .eq("id", equipmentId)
     .eq("job_id", jobId);
 
   if (error) throw error;
 
+  if (previousSystemId && previousSystemId !== String(systemId ?? "").trim()) {
+    await cleanupOrphanSystem({ supabase, jobId, systemId: previousSystemId });
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/info`);
   revalidatePath(`/jobs/${jobId}/tests`);
   redirect(`/jobs/${jobId}/info?f=equipment`);
@@ -2186,6 +2287,7 @@ export async function deleteJobEquipmentFromForm(formData: FormData) {
   if (!equipmentId) throw new Error("Missing equipment_id");
 
   const supabase = await createClient();
+  await requireInternalUser({ supabase });
 
  const { data: deleted, error: delErr } = await supabase
   .from("job_equipment")
@@ -2201,6 +2303,7 @@ const systemId = String(deleted?.system_id ?? "").trim();
 await cleanupOrphanSystem({ supabase, jobId, systemId });
 
 revalidatePath(`/jobs/${jobId}`);
+revalidatePath(`/jobs/${jobId}/info`);
 revalidatePath(`/jobs/${jobId}/tests`);
 }
 
@@ -2426,6 +2529,7 @@ export async function addEccTestRunFromForm(formData: FormData) {
   if (!testType) throw new Error("Missing test_type");
 
   const supabase = await createClient();
+  await requireInternalEccTestsAccess({ supabase, jobId });
 
   // Attach to Visit #1 (create it if missing)
   const { data: visitExisting, error: visitFindErr } = await supabase
@@ -2505,6 +2609,7 @@ export async function deleteEccTestRunFromForm(formData: FormData) {
   if (!testRunId) throw new Error("Missing test_run_id");
 
   const supabase = await createClient();
+  await requireInternalEccTestsAccess({ supabase, jobId });
 
 const { data: deletedRun, error: delRunErr } = await supabase
   .from("ecc_test_runs")
@@ -2519,8 +2624,9 @@ if (delRunErr) throw delRunErr;
 const systemId = String(deletedRun?.system_id ?? "").trim();
 await cleanupOrphanSystem({ supabase, jobId, systemId });
 
-revalidatePath(`/jobs/${jobId}/tests`);
-revalidatePath(`/jobs/${jobId}`);
+await evaluateEccOpsStatus(jobId);
+
+revalidateEccProjectionConsumers(jobId);
 }
 
 export async function createContractorFromForm(formData: FormData) {
@@ -3086,6 +3192,7 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   };
 
   const supabase = await createClient();
+  await requireInternalEccTestsAccess({ supabase, jobId });
 
   // 1) Load existing data so we don't wipe fields
   const { data: existingRun, error: loadErr } = await supabase
@@ -3133,8 +3240,7 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   });
 
   await evaluateEccOpsStatus(jobId);
-  revalidatePath(`/jobs/${jobId}/tests`);
-  revalidatePath(`/jobs/${jobId}`);
+  revalidateEccProjectionConsumers(jobId);
   redirectToTests({ jobId, testType: "refrigerant_charge", systemId });
 }
 
@@ -3212,6 +3318,7 @@ export async function saveAirflowDataFromForm(formData: FormData) {
   };
 
   const supabase = await createClient();
+  await requireInternalEccTestsAccess({ supabase, jobId });
 
   const { error } = await supabase
     .from("ecc_test_runs")
@@ -3236,9 +3343,7 @@ export async function saveAirflowDataFromForm(formData: FormData) {
   });
 
   await evaluateEccOpsStatus(jobId);
-
-  revalidatePath(`/jobs/${jobId}/tests`);
-  revalidatePath(`/jobs/${jobId}`);
+  revalidateEccProjectionConsumers(jobId);
   redirectToTests({ jobId, testType: "airflow", systemId });
 }
 
@@ -3284,6 +3389,7 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
   const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
 
   const supabase = await createClient();
+  await requireInternalEccTestsAccess({ supabase, jobId });
 
   const { error } = await supabase
     .from("ecc_test_runs")
@@ -3308,9 +3414,7 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
   });
 
   await evaluateEccOpsStatus(jobId);
-
-  revalidatePath(`/jobs/${jobId}/tests`);
-  revalidatePath(`/jobs/${jobId}`);
+  revalidateEccProjectionConsumers(jobId);
   redirectToTests({ jobId, testType: "duct_leakage", systemId });
 }
 
@@ -3329,6 +3433,7 @@ export async function completeEccTestRunFromForm(formData: FormData) {
   if (!testRunId) throw new Error("Missing test_run_id");
 
   const supabase = await createClient();
+  await requireInternalEccTestsAccess({ supabase, jobId });
 
   // 1) Load the run we are completing (this is the one we must KEEP)
   const { data: run, error: runErr } = await supabase
@@ -3510,8 +3615,7 @@ if (parentJobId) {
 }
 
 
-  revalidatePath(`/jobs/${jobId}/tests`);
-  revalidatePath(`/jobs/${jobId}`);
+  revalidateEccProjectionConsumers(jobId);
   redirectToTests({ jobId, testType: run.test_type, systemId });
 }
 
@@ -3534,6 +3638,7 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
   const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
 
   const supabase = await createClient();
+  await requireInternalEccTestsAccess({ supabase, jobId });
 
   // Get system_id and visit_id
   const systemId = await resolveSystemIdForRun({
@@ -3583,8 +3688,7 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
   if (error) throw error;
 
   await evaluateEccOpsStatus(jobId);
-  revalidatePath(`/jobs/${jobId}/tests`);
-  revalidatePath(`/jobs/${jobId}`);
+  revalidateEccProjectionConsumers(jobId);
   redirectToTests({ jobId, testType: "duct_leakage", systemId });
 }
 
@@ -3659,6 +3763,7 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
   };
 
   const supabase = await createClient();
+  await requireInternalEccTestsAccess({ supabase, jobId });
 
   // Get system_id and visit_id
   const systemId = await resolveSystemIdForRun({
@@ -3708,8 +3813,7 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
   if (error) throw error;
 
   await evaluateEccOpsStatus(jobId);
-  revalidatePath(`/jobs/${jobId}/tests`);
-  revalidatePath(`/jobs/${jobId}`);
+  revalidateEccProjectionConsumers(jobId);
   redirectToTests({ jobId, testType: "airflow", systemId });
 }
 
@@ -3873,6 +3977,7 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
   };
 
   const supabase = await createClient();
+  await requireInternalEccTestsAccess({ supabase, jobId });
 
   // Get system_id and visit_id
   const systemId = await resolveSystemIdForRun({
@@ -3940,8 +4045,7 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
   if (error) throw error;
 
   await evaluateEccOpsStatus(jobId);
-  revalidatePath(`/jobs/${jobId}/tests`);
-  revalidatePath(`/jobs/${jobId}`);
+  revalidateEccProjectionConsumers(jobId);
   redirectToTests({ jobId, testType: "refrigerant_charge", systemId });
 }
 
@@ -4154,6 +4258,10 @@ const jobType = rawJobType;
   const title = String(formData.get("title") || "").trim();
   const postedCity = String(formData.get("city") || "").trim();
 
+  if (rawJobType === "service" && !title) {
+    throw new Error("Service jobs require a title.");
+  }
+
   const customerPhoneRaw = String(formData.get("customer_phone") || "").trim();
 
   const billing_recipient = String(formData.get("billing_recipient") || "").trim() as
@@ -4174,7 +4282,7 @@ const billing_city = String(formData.get("billing_city") || "").trim() || null;
 const billing_state = String(formData.get("billing_state") || "").trim() || null;
 const billing_zip = String(formData.get("billing_zip") || "").trim() || null;
 
-const { scheduled_date: derived_scheduled_date, window_start: derived_window_start, window_end: derived_window_end, ops_status } =
+const { scheduled_date: derived_scheduled_date, window_start: derived_window_start, window_end: derived_window_end, ops_status: derived_ops_status } =
   deriveScheduleAndOps(formData);
 
 const permitNumberRaw = String(formData.get("permit_number") || "").trim();
@@ -4191,7 +4299,8 @@ const jurisdiction = jobType === "service" ? null : (jurisdictionRaw || null);
 const permit_date = jobType === "service" ? null : (permitDateRaw || null);
 const permit_number = jobType === "service" ? null : (permitNumberRaw || null);
 
-const status = String(formData.get("status") || "open").trim() as JobStatus;
+// Intake create is always born open; lifecycle transitions happen later via dedicated flows.
+const status: JobStatus = "open";
 
 // ----- supabase + identity -----
 const supabase = await createClient();
@@ -4228,6 +4337,7 @@ if (userId) {
 const scheduled_date = isContractorUser ? null : derived_scheduled_date;
 const window_start = isContractorUser ? null : derived_window_start;
 const window_end = isContractorUser ? null : derived_window_end;
+const ops_status = isContractorUser ? "need_to_schedule" : derived_ops_status;
 
 const { canonicalOwnerUserId, canonicalWriteClient } =
   await resolveCanonicalOwner({
@@ -4235,6 +4345,10 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     defaultWriteClient: supabase,
     contractorId: isContractorUser ? contractorIdFinal : null,
   });
+
+  function redirectInvalidExistingPairing() {
+    redirect("/jobs/new?err=invalid_customer_location");
+  }
 
   function redirectToCreatedJob(jobId: string, banner: string) {
     const search = new URLSearchParams();
@@ -4365,6 +4479,42 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     email?: string | null;
     phone?: string | null;
   } | null = null;
+
+  if (existingCustomerId) {
+    const { data: ownedCustomer, error: ownedCustomerErr } = await canonicalWriteClient
+      .from("customers")
+      .select("id, owner_user_id")
+      .eq("id", existingCustomerId)
+      .maybeSingle();
+
+    if (ownedCustomerErr) throw ownedCustomerErr;
+
+    const ownerUserId = String((ownedCustomer as any)?.owner_user_id ?? "").trim();
+    if (!ownedCustomer?.id || ownerUserId !== String(canonicalOwnerUserId)) {
+      redirectInvalidExistingPairing();
+    }
+  }
+
+  if (existingLocationId) {
+    const { data: ownedLocation, error: ownedLocationErr } = await canonicalWriteClient
+      .from("locations")
+      .select("id, customer_id, owner_user_id")
+      .eq("id", existingLocationId)
+      .maybeSingle();
+
+    if (ownedLocationErr) throw ownedLocationErr;
+
+    const ownerUserId = String((ownedLocation as any)?.owner_user_id ?? "").trim();
+    const locationCustomerId = String((ownedLocation as any)?.customer_id ?? "").trim();
+
+    if (!ownedLocation?.id || ownerUserId !== String(canonicalOwnerUserId) || !locationCustomerId) {
+      redirectInvalidExistingPairing();
+    }
+
+    if (existingCustomerId && locationCustomerId !== existingCustomerId) {
+      redirectInvalidExistingPairing();
+    }
+  }
 
   if (existingCustomerId) {
     const { data: existingCustomerRow, error: existingCustomerErr } = await supabase
@@ -4605,53 +4755,35 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     if (!systemId) throw new Error("Unable to create system_id");
 
     for (const c of comps) {
-      const equipment_role = String(c?.type || "").trim();
-      if (!equipment_role) continue;
+      const rawType = String(c?.type || "").trim();
+      if (!rawType) continue;
 
-      const isFurnaceLike = equipment_role.toLowerCase().includes("furnace");
-
-      const manufacturer = c?.manufacturer ? String(c.manufacturer).trim() : null;
-      const model = c?.model ? String(c.model).trim() : null;
-      const serial = c?.serial ? String(c.serial).trim() : null;
-      const refrigerant_type = c?.refrigerant_type ? String(c.refrigerant_type).trim() : null;
-      const notes = c?.notes ? String(c.notes).trim() : null;
-
-      const tonnageRaw = c?.tonnage ? String(c.tonnage).trim() : "";
-      const heatingCapacityRaw = c?.heating_capacity_kbtu
-        ? String(c.heating_capacity_kbtu).trim()
-        : "";
-
-      const tonnage = !isFurnaceLike && tonnageRaw ? Number(tonnageRaw) : null;
-      const heating_capacity_kbtu = isFurnaceLike
-        ? (heatingCapacityRaw || tonnageRaw ? Number(heatingCapacityRaw || tonnageRaw) : null)
-        : null;
-
-      const heatingEffRaw = c?.heating_efficiency_percent
-        ? String(c.heating_efficiency_percent).trim()
-        : "";
-      const heating_efficiency_percent =
-        isFurnaceLike && heatingEffRaw ? Number(heatingEffRaw) : null;
-
-      const heatingOutRaw = c?.heating_output_btu
-        ? String(c.heating_output_btu).trim()
-        : "";
-      const heating_output_btu =
-        isFurnaceLike && heatingOutRaw ? Number(heatingOutRaw) : null;
+      const eq = sanitizeEquipmentFields({
+        canonicalRole: mapToCanonicalRole(rawType),
+        manufacturer: c?.manufacturer ? String(c.manufacturer).trim() : null,
+        model: c?.model ? String(c.model).trim() : null,
+        serial: c?.serial ? String(c.serial).trim() : null,
+        notes: c?.notes ? String(c.notes).trim() : null,
+        tonnage: c?.tonnage ? Number(String(c.tonnage).trim()) || null : null,
+        refrigerantType: c?.refrigerant_type ? String(c.refrigerant_type).trim() || null : null,
+        heatingCapacityKbtu: c?.heating_capacity_kbtu
+          ? Number(String(c.heating_capacity_kbtu).trim()) || null
+          : c?.tonnage && mapToCanonicalRole(rawType) === "furnace"
+          ? Number(String(c.tonnage).trim()) || null
+          : null,
+        heatingOutputBtu: c?.heating_output_btu
+          ? Number(String(c.heating_output_btu).trim()) || null
+          : null,
+        heatingEfficiencyPercent: c?.heating_efficiency_percent
+          ? Number(String(c.heating_efficiency_percent).trim()) || null
+          : null,
+      });
 
       const { error: eqErr } = await supabase.from("job_equipment").insert({
         job_id: jobId,
         system_id: systemId,
-        equipment_role,
         system_location: systemName,
-        manufacturer,
-        model,
-        serial,
-        tonnage,
-        heating_capacity_kbtu,
-        heating_output_btu,
-        heating_efficiency_percent,
-        refrigerant_type,
-        notes,
+        ...eq,
       });
 
       if (eqErr) {
@@ -5143,6 +5275,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   console.log("[ADVANCE_STATUS_ENTRY]", { jobId: id, ts: new Date().toISOString() });
 
   const supabase = await createClient();
+  const { userId: actingUserId } = await requireInternalUser({ supabase });
 
   // ✅ Read true current status from DB (source of truth)
   const { data: job, error: jobErr } = await supabase
@@ -5246,8 +5379,6 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     // PH2-D: resolve acting internal user before any DB write.
     // Fails fast with an auth error if the session is not an active internal user.
-    const { userId: actingUserId } = await requireInternalUser({ supabase });
-
     // PH2-D refinement: ensure staffing before status update so assignment
     // failures cannot leave the job advanced without attribution.
     const actingAssignment = await ensureActiveAssignmentForUser({
@@ -5737,6 +5868,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required");
 
   const supabase = await createClient();
+  await requireInternalUser({ supabase });
 
   // Read prior scheduling snapshot so we can log changes
   const { data: before, error: beforeErr } = await supabase
@@ -6011,21 +6143,14 @@ export async function addPublicNoteFromForm(formData: FormData) {
   }
 
   const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-
-  if (userErr) throw userErr;
-  if (!user) redirect("/login");
+  const { userId } = await requireInternalUser({ supabase });
 
   const { data: recentDuplicate, error: duplicateErr } = await supabase
     .from("job_events")
     .select("id")
     .eq("job_id", jobId)
     .eq("event_type", "public_note")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .contains("meta", { note })
     .gte("created_at", new Date(Date.now() - 15_000).toISOString())
     .maybeSingle();
@@ -6042,7 +6167,7 @@ export async function addPublicNoteFromForm(formData: FormData) {
     jobId,
     event_type: "public_note",
     meta: { note },
-    userId: user.id,
+    userId,
   });
 
   revalidatePath(`/jobs/${jobId}`);
@@ -6064,14 +6189,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
   }
 
   const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-
-  if (userErr) throw userErr;
-  if (!user) redirect("/login");
+  const { userId } = await requireInternalUser({ supabase });
 
   const hasContextFields = !!(context || anchorEventId || anchorEventType);
   const meta = hasContextFields
@@ -6093,7 +6211,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
     .select("id")
     .eq("job_id", jobId)
     .eq("event_type", "internal_note")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .contains("meta", duplicateMeta)
     .gte("created_at", new Date(Date.now() - 15_000).toISOString())
     .maybeSingle();
@@ -6117,7 +6235,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
     jobId,
     event_type: "internal_note",
     meta,
-    userId: user.id,
+    userId,
   });
 
   revalidatePath(`/jobs/${jobId}`);
@@ -6139,6 +6257,33 @@ export async function completeDataEntryFromForm(formData: FormData) {
 
   const supabase = await createClient();
   const { userId: actingUserId } = await requireInternalUser({ supabase });
+
+  async function recordPostDataEntryOpsProjectionChange(previousOpsStatus: unknown) {
+    const { data: refreshedJob, error: refreshedJobErr } = await supabase
+      .from("jobs")
+      .select("ops_status")
+      .eq("id", id)
+      .single();
+
+    if (refreshedJobErr) throw refreshedJobErr;
+
+    const finalOpsStatus = refreshedJob?.ops_status ?? null;
+
+    if (finalOpsStatus === (previousOpsStatus ?? null)) {
+      return;
+    }
+
+    await insertJobEvent({
+      supabase,
+      jobId: id,
+      event_type: "ops_update",
+      meta: {
+        source: "job_detail_data_entry_recompute",
+        changes: [{ field: "ops_status", from: previousOpsStatus ?? null, to: finalOpsStatus }],
+      },
+      userId: actingUserId,
+    });
+  }
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
@@ -6206,6 +6351,7 @@ if (jobType !== "ecc") {
 
   await evaluateJobOpsStatus(id);
   await healStalePaperworkOpsStatus(id);
+  await recordPostDataEntryOpsProjectionChange(job?.ops_status ?? null);
 
   redirect(`/jobs/${id}`);
 }
@@ -6238,6 +6384,7 @@ if (jobType !== "ecc") {
 
   await evaluateJobOpsStatus(id);
   await healStalePaperworkOpsStatus(id);
+  await recordPostDataEntryOpsProjectionChange(job?.ops_status ?? null);
 
   redirect(`/jobs/${id}`);
 }
@@ -6250,6 +6397,7 @@ export async function createRetestJobFromForm(formData: FormData) {
   if (!parentJobId) throw new Error("Missing parent_job_id");
 
   const supabase = await createClient();
+  await requireInternalUser({ supabase });
 
   // 1) Load parent job
   const { data: parentData, error: parentErr } = await supabase
@@ -6257,6 +6405,8 @@ export async function createRetestJobFromForm(formData: FormData) {
       .select(
       [
         "id",
+        "status",
+        "ops_status",
         "service_case_id",
         "job_type",
         "project_type",
@@ -6283,10 +6433,39 @@ export async function createRetestJobFromForm(formData: FormData) {
       ].join(",")
     )
     .eq("id", parentJobId)
+    .is("deleted_at", null)
     .single();
 
   if (parentErr) throw parentErr;
   const parent = parentData as any;
+
+  const parentJobType = String(parent?.job_type ?? "").trim().toLowerCase();
+  const parentOpsStatus = String(parent?.ops_status ?? "").trim().toLowerCase();
+
+  if (parentJobType !== "ecc") {
+    redirect(`/jobs/${parentJobId}?tab=ops&banner=retest_not_eligible`);
+  }
+
+  if (!["failed", "retest_needed", "pending_office_review"].includes(parentOpsStatus)) {
+    redirect(`/jobs/${parentJobId}?tab=ops&banner=retest_not_eligible`);
+  }
+
+  const { data: activeRetestChild, error: activeChildErr } = await supabase
+    .from("jobs")
+    .select("id")
+    .eq("parent_job_id", parentJobId)
+    .is("deleted_at", null)
+    .neq("ops_status", "closed")
+    .neq("status", "cancelled")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeChildErr) throw activeChildErr;
+
+  if (activeRetestChild?.id) {
+    redirect(`/jobs/${parentJobId}?tab=ops&banner=retest_already_exists`);
+  }
 
   // 2) Create retest job (unscheduled by default)
   const retestTitle = `Retest — ${parent?.title ?? "Job"}`;
@@ -6472,8 +6651,7 @@ export async function cancelJobFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required (job_id missing)");
 
   const supabase = await createClient();
-  const { data: { user }, error: userErr } = await supabase.auth.getUser();
-  if (!user || userErr) redirect("/login");
+  const { userId } = await requireInternalRole("admin", { supabase });
 
   // Read current job state
   const { data: job, error: jobErr } = await supabase
@@ -6509,9 +6687,9 @@ export async function cancelJobFromForm(formData: FormData) {
         from_status: previousStatus,
         from_ops_status: previousOpsStatus,
         cancelled_at: new Date().toISOString(),
-        user_id: user.id,
+        user_id: userId,
       },
-      user_id: user.id,
+      user_id: userId,
     });
 
   if (eventErr) throw eventErr;

@@ -24,8 +24,9 @@ export default async function CustomerEditPage({
 
   if (!user || userErr) redirect("/login");
 
+  let internalUser;
   try {
-    await requireInternalUser({ supabase, userId: user.id });
+    ({ internalUser } = await requireInternalUser({ supabase, userId: user.id }));
   } catch (error) {
     if (isInternalAccessError(error)) {
       redirect("/login");
@@ -34,20 +35,16 @@ export default async function CustomerEditPage({
     throw error;
   }
 
-  const { data: customer, error } = await supabase
+  const admin = createAdminClient();
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+
+  const { data: customer, error } = await admin
     .from("customers")
     .select(
       "id, first_name, last_name, phone, email, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip"
     )
     .eq("id", id)
-    .single();
-
-  const { data: location } = await supabase
-    .from("locations")
-    .select("id, address_line1, address_line2, city, state, zip")
-    .eq("customer_id", id)
-    .order("created_at", { ascending: true })
-    .limit(1)
+    .eq("owner_user_id", accountOwnerUserId)
     .maybeSingle();
 
   
@@ -58,7 +55,6 @@ export default async function CustomerEditPage({
     let adminRow: { id: string; owner_user_id: string | null; full_name: string | null } | null = null;
     let adminUnavailable = false;
     try {
-      const admin = createAdminClient();
       const { data } = await admin
         .from("customers")
         .select("id, owner_user_id, full_name")
@@ -72,7 +68,11 @@ export default async function CustomerEditPage({
     const claimAction = claimNullOwnerCustomer.bind(null, id);
 
     const isOrphaned = !adminUnavailable && adminRow !== null && adminRow.owner_user_id === null;
-    const isOwnedByOther = !adminUnavailable && adminRow !== null && adminRow.owner_user_id !== null && adminRow.owner_user_id !== user?.id;
+    const isOwnedByOther =
+      !adminUnavailable &&
+      adminRow !== null &&
+      adminRow.owner_user_id !== null &&
+      adminRow.owner_user_id !== accountOwnerUserId;
     const rowMissing = !adminUnavailable && adminRow === null;
 
     return (
@@ -273,49 +273,6 @@ export default async function CustomerEditPage({
                 name="billing_zip"
                 placeholder="ZIP"
                 defaultValue={customer.billing_zip ?? ""}
-                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-          <div>
-            <div className="text-base font-semibold text-slate-900">Service Address</div>
-            <div className="text-xs text-slate-500 mt-0.5">Edits the primary location for this customer.</div>
-          </div>
-
-          <div className="space-y-3">
-            <input
-              name="address_line1"
-              placeholder="Address line 1"
-              defaultValue={location?.address_line1 ?? ""}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
-            />
-            <input
-              name="address_line2"
-              placeholder="Address line 2"
-              defaultValue={location?.address_line2 ?? ""}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
-            />
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <input
-                name="city"
-                placeholder="City"
-                defaultValue={location?.city ?? ""}
-                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
-              />
-              <input
-                name="state"
-                placeholder="State"
-                defaultValue={location?.state ?? ""}
-                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
-              />
-              <input
-                name="zip"
-                placeholder="ZIP"
-                defaultValue={location?.zip ?? ""}
                 className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
               />
             </div>

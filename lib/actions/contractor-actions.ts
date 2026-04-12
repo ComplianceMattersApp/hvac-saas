@@ -93,7 +93,7 @@ export async function createContractorFromForm(formData: FormData) {
     email,
   });
 
-  revalidatePath("/contractors");
+  revalidatePath("/ops/admin/contractors");
   revalidatePath("/ops");
 
   redirect(withNotice(`/contractors/${data.id}/edit`, notice));
@@ -163,7 +163,7 @@ export async function updateContractorFromForm(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
-  revalidatePath("/contractors");
+  revalidatePath("/ops/admin/contractors");
   revalidatePath(`/contractors/${contractor_id}/edit`);
   revalidatePath("/ops");
   redirect(`/contractors/${contractor_id}/edit?saved=1`);

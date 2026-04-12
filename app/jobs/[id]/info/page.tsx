@@ -1,6 +1,10 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  isInternalAccessError,
+  requireInternalUser,
+} from "@/lib/auth/internal-user";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 
 import EquipmentEditCard from "../_components/EquipmentEditCard";
@@ -19,6 +23,33 @@ export default async function JobInfoPage({
 
   const supabase = await createClient();
 
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user ?? null;
+
+  if (!user) redirect("/login");
+
+  try {
+    await requireInternalUser({ supabase, userId: user.id });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      const { data: contractorUser, error: contractorUserErr } = await supabase
+        .from("contractor_users")
+        .select("contractor_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (contractorUserErr) throw contractorUserErr;
+
+      if (contractorUser?.contractor_id) {
+        redirect(`/portal/jobs/${id}`);
+      }
+
+      redirect("/login");
+    }
+
+    throw error;
+  }
+
 const { data: job, error } = await supabase
   .from("jobs")
   .select(
@@ -26,6 +57,7 @@ const { data: job, error } = await supabase
     id,
     title,
     city,
+    job_type,
     job_equipment (
       id,
       equipment_role,
@@ -85,12 +117,14 @@ if (!job) return notFound();
       >
         Equipment
       </Link>
-      <Link
-        href={`/jobs/${job.id}/tests`}
-        className="w-full inline-flex min-h-11 items-center justify-center px-4 py-3 rounded border border-gray-300 bg-white text-gray-900 text-center hover:bg-gray-50"
-      >
-        Go to Tests
-      </Link>
+      {String(job.job_type ?? "").trim().toLowerCase() === "ecc" ? (
+        <Link
+          href={`/jobs/${job.id}/tests`}
+          className="w-full inline-flex min-h-11 items-center justify-center px-4 py-3 rounded border border-gray-300 bg-white text-gray-900 text-center hover:bg-gray-50"
+        >
+          Go to Tests
+        </Link>
+      ) : null}
     </div>
   </div>
 ) : null}
@@ -102,15 +136,17 @@ if (!job) return notFound();
   Equipment
 </div>
 
-<div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-  <div>Next step after equipment capture: run or complete ECC tests for this job.</div>
-  <Link
-    href={`/jobs/${job.id}/tests`}
-    className="inline-flex min-h-11 items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
-  >
-    Go to Tests
-  </Link>
-</div>
+{String(job.job_type ?? "").trim().toLowerCase() === "ecc" ? (
+  <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div>Next step after equipment capture: run or complete ECC tests for this job.</div>
+    <Link
+      href={`/jobs/${job.id}/tests`}
+      className="inline-flex min-h-11 items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+    >
+      Go to Tests
+    </Link>
+  </div>
+) : null}
 
 {/* Existing Equipment */}
 <div className="space-y-3">

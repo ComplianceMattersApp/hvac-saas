@@ -16,6 +16,7 @@ import {
 } from "@/lib/portal/resolveContractorIssues";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isPortalVisibleJob } from "@/lib/visibility/portal";
+import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -56,6 +57,24 @@ function titleCaseFromSnake(value: string | null | undefined) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function contractorSafeStatusLabel(value: string | null | undefined) {
+  const v = String(value ?? "").trim().toLowerCase();
+  if (!v) return "-";
+
+  if (v === "pending_info") return "Pending information";
+  if (v === "on_hold") return "On hold";
+  if (v === "pending_office_review") return "Under review";
+  if (v === "paperwork_required") return "Final paperwork";
+  if (v === "invoice_required") return "Final processing";
+  if (v === "failed" || v === "retest_needed") return "Needs correction";
+  if (v === "closed") return "Passed";
+  if (v === "scheduled") return "Scheduled";
+  if (v === "on_the_way") return "On the way";
+  if (v === "in_process" || v === "in_progress") return "In progress";
+
+  return titleCaseFromSnake(v);
 }
 
 function formatTimeLocal(value: string | null | undefined) {
@@ -120,7 +139,7 @@ function formatPortalTimelineLabel(type?: string | null, meta?: any) {
   if (type === "customer_attempt") return "Contact attempt logged";
   if (type === "retest_ready_requested") return "Retest ready requested";
   if (type === "contractor_report_sent") return "Contractor report shared";
-  if (type === "status_changed") return `Status updated: ${titleCaseFromSnake(String(meta?.to ?? ""))}`;
+  if (type === "status_changed") return `Status updated: ${contractorSafeStatusLabel(String(meta?.to ?? ""))}`;
   if (type === "job_failed") return "Result recorded: Failed";
   if (type === "job_passed") return "Result recorded: Passed";
   if (type === "job_created") return "Job created";
@@ -272,13 +291,15 @@ export default async function PortalJobDetailPage({
       customer_id, customer_first_name, customer_last_name, customer_phone,
       created_at, follow_up_date, scheduled_date, window_start, window_end,
       permit_number, jurisdiction, permit_date, pending_info_reason, next_action_note,
-      parent_job_id, contractor_id,
+      parent_job_id, contractor_id, job_type,
+      contractors:contractor_id ( owner_user_id ),
       locations:location_id ( address_line1, address_line2, city, state, zip ),
       customers:customer_id ( id, full_name, first_name, last_name, phone )
       `
     )
     .eq("id", jobId)
     .eq("contractor_id", cu.contractor_id)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (jobErr) throw jobErr;
@@ -286,6 +307,13 @@ export default async function PortalJobDetailPage({
   if (!isPortalVisibleJob(job as any)) {
     redirect("/portal/jobs?banner=job_no_longer_active");
   }
+
+  const accountOwnerUserId = String((job as any)?.contractors?.owner_user_id ?? "").trim();
+  const supportIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    supabase,
+    accountOwnerUserId,
+  });
+  const supportLabel = [supportIdentity.support_phone, supportIdentity.support_email].filter(Boolean).join(" • ");
 
   const rootJobId = (job as any)?.parent_job_id ?? jobId;
 
@@ -440,8 +468,9 @@ export default async function PortalJobDetailPage({
     (testRuns ?? []).find((r: any) => r.is_completed && finalRunPass(r) === false) ?? null;
 
   const opsStatus = String((job as any)?.ops_status ?? "").toLowerCase();
+  const isEccJob = String((job as any)?.job_type ?? "").trim().toLowerCase() === "ecc";
   const isPortalFailed = ["failed", "pending_office_review", "retest_needed"].includes(opsStatus);
-  const canRequestRetestReady = opsStatus === "failed";
+  const canRequestRetestReady = isEccJob && opsStatus === "failed";
 
   const statusRun = isPortalFailed ? (latestFailedRun ?? latestCompletedRun) : latestCompletedRun;
   const topReasons = statusRun ? extractFailureReasons(statusRun) : [];
@@ -620,6 +649,7 @@ export default async function PortalJobDetailPage({
       .select("id")
       .eq("id", nextJobId)
       .eq("contractor_id", nextCu.contractor_id)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (jobCheckErr) {
@@ -1053,7 +1083,14 @@ export default async function PortalJobDetailPage({
       </section>
 
       <div className="rounded-[24px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.9),rgba(255,255,255,0.98))] px-6 py-4 text-center text-sm leading-6 text-slate-600 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.22)] dark:border-slate-800 dark:bg-slate-950/85 dark:text-slate-300">
-        If you need help, contact Compliance Matters: <b className="whitespace-nowrap text-slate-950 dark:text-slate-100">(209) 518-2383</b>
+        If you need help, contact {supportIdentity.display_name}
+        {supportLabel ? (
+          <>
+            : <b className="text-slate-950 dark:text-slate-100">{supportLabel}</b>
+          </>
+        ) : (
+          "."
+        )}
       </div>
     </div>
   );

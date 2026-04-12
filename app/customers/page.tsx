@@ -2,17 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-
-type SearchResult = {
-  customer_id: string;
-  full_name: string | null;
-  phone: string | null;
-  email: string | null;
-  locations_count: number;
-  sample_location_id: string | null;
-  sample_address: string | null;
-  sample_city: string | null;
-};
+import { searchScopedCustomers } from "@/lib/customers/visibility";
 
 export default async function CustomersPage(props: {
   searchParams: Promise<{ q?: string }>;
@@ -26,37 +16,17 @@ export default async function CustomersPage(props: {
   const sp = await props.searchParams;
   const q = (sp?.q ?? "").trim();
 
-  let results: SearchResult[] = [];
+  let results: Awaited<ReturnType<typeof searchScopedCustomers>>["results"] = [];
 
   if (q.length > 0) {
-    const { data, error } = await supabase.rpc("search_customers", {
-      search_text: q,
-      result_limit: 25,
+    const scoped = await searchScopedCustomers({
+      supabase,
+      userId: userData.user.id,
+      searchText: q,
+      resultLimit: 25,
     });
 
-    if (error) throw error;
-
-    const rawResults = (data ?? []) as SearchResult[];
-
-    // Guard against search RPC returning IDs the current user cannot read directly
-    // (e.g., ownership/RLS drift across environments).
-    const candidateIds = Array.from(
-      new Set(rawResults.map((r) => String(r.customer_id ?? "").trim()).filter(Boolean))
-    );
-
-    if (candidateIds.length > 0) {
-      const { data: readableRows, error: readableErr } = await supabase
-        .from("customers")
-        .select("id")
-        .in("id", candidateIds);
-
-      if (readableErr) throw readableErr;
-
-      const readableIds = new Set((readableRows ?? []).map((r: any) => String(r.id ?? "")));
-      results = rawResults.filter((r) => readableIds.has(String(r.customer_id ?? "")));
-    } else {
-      results = [];
-    }
+    results = scoped.results;
   }
 
   return (

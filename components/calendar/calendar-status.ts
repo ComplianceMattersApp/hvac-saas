@@ -9,6 +9,7 @@ const CALENDAR_STATUS_LABELS: Record<string, string> = {
   pending_information: 'Pending Info',
   on_hold: 'On Hold',
   on_my_way: 'On My Way',
+  in_process: 'In Progress',
   in_progress: 'In Progress',
   field_complete: 'Field Complete',
   completed: 'Completed',
@@ -32,6 +33,7 @@ const CALENDAR_STATUS_DOT_CLASSES: Record<string, string> = {
   pending_information: 'bg-amber-500',
   on_hold: 'bg-slate-400',
   on_my_way: 'bg-blue-700',
+  in_process: 'bg-indigo-600',
   in_progress: 'bg-indigo-600',
   field_complete: 'bg-amber-500',
   completed: 'bg-green-600',
@@ -49,7 +51,7 @@ const CALENDAR_STATUS_DOT_CLASSES: Record<string, string> = {
 export const CALENDAR_STATUS_LEGEND = [
   'scheduled',
   'on_my_way',
-  'in_progress',
+  'in_process',
   'field_complete',
   'failed',
   'closed',
@@ -60,8 +62,15 @@ export const CALENDAR_STATUS_LEGEND = [
   dot: CALENDAR_STATUS_DOT_CLASSES[key] ?? 'bg-gray-300',
 }));
 
-// Locked calendar display rule: operational state must reflect jobs.ops_status.
+// Locked hybrid calendar display rule:
+// - use jobs.status for lifecycle/historical markers (cancelled, on_the_way, in_process)
+// - otherwise use jobs.ops_status for operational projection
 export function getCalendarDisplayStatus(job: DispatchJob) {
+  const lifecycleStatus = String(job.status ?? '').trim().toLowerCase();
+  if (lifecycleStatus === 'cancelled') return 'cancelled';
+  if (lifecycleStatus === 'on_the_way') return 'on_my_way';
+  if (lifecycleStatus === 'in_process') return 'in_process';
+
   const opsStatus = String(job.ops_status ?? '').trim().toLowerCase();
   return opsStatus || 'scheduled';
 }

@@ -1013,7 +1013,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 router.back();
                 return;
               }
-              router.push("/ops");
+              router.push(myContractor?.id ? "/portal" : "/ops");
             }}
             disabled={isSubmitting}
             aria-disabled={isSubmitting}

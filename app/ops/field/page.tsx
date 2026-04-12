@@ -5,7 +5,7 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
-import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
@@ -156,7 +156,7 @@ export default async function OpsFieldPage() {
 
   if (!user) redirect("/login");
 
-  let internalBusinessDisplayName = "Compliance Matters";
+  let internalBusinessDisplayName = "";
 
   try {
     const internalAccess = await requireInternalUser({
@@ -164,11 +164,11 @@ export default async function OpsFieldPage() {
       userId: user.id,
     });
 
-    const internalBusinessProfile = await getInternalBusinessProfileByAccountOwnerId({
+    const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
       supabase,
       accountOwnerUserId: internalAccess.internalUser.account_owner_user_id,
     });
-    internalBusinessDisplayName = internalBusinessProfile?.display_name ?? internalBusinessDisplayName;
+    internalBusinessDisplayName = internalBusinessIdentity.display_name;
   } catch (error) {
     if (isInternalAccessError(error)) {
       const { data: cu, error: cuErr } = await supabase
