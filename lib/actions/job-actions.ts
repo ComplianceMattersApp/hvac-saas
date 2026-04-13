@@ -72,6 +72,87 @@ type CreateJobInput = {
   
   };
 
+type IntakeRelationshipJobSummary = {
+  id: string;
+  title: string | null;
+  job_type: string | null;
+  status: string | null;
+  ops_status: string | null;
+  scheduled_date: string | null;
+  window_start: string | null;
+  window_end: string | null;
+  created_at: string | null;
+};
+
+export type InternalIntakeRelationshipContext = {
+  activeJobs: IntakeRelationshipJobSummary[];
+  recentJobs: IntakeRelationshipJobSummary[];
+};
+
+function normalizeIntakeJobType(value: unknown): "ecc" | "service" | null {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "ecc" || normalized === "service" ? normalized : null;
+}
+
+function isActiveIntakeRelationshipJob(job: {
+  status?: string | null;
+  ops_status?: string | null;
+}) {
+  const lifecycleStatus = String(job.status ?? "").trim().toLowerCase();
+  if (lifecycleStatus === "cancelled") return false;
+
+  const opsStatus = String(job.ops_status ?? "").trim().toLowerCase();
+  return opsStatus !== "closed";
+}
+
+function mapIntakeRelationshipJobSummary(row: any): IntakeRelationshipJobSummary {
+  return {
+    id: String(row?.id ?? ""),
+    title: row?.title ? String(row.title) : null,
+    job_type: row?.job_type ? String(row.job_type) : null,
+    status: row?.status ? String(row.status) : null,
+    ops_status: row?.ops_status ? String(row.ops_status) : null,
+    scheduled_date: row?.scheduled_date ? String(row.scheduled_date) : null,
+    window_start: row?.window_start ? String(row.window_start) : null,
+    window_end: row?.window_end ? String(row.window_end) : null,
+    created_at: row?.created_at ? String(row.created_at) : null,
+  };
+}
+
+function isOpenActiveJobCandidate(row: {
+  status?: string | null;
+  ops_status?: string | null;
+}) {
+  const lifecycleStatus = String(row.status ?? "").trim().toLowerCase();
+  const opsStatus = String(row.ops_status ?? "").trim().toLowerCase();
+
+  if (lifecycleStatus === "on_the_way" || lifecycleStatus === "in_process" || lifecycleStatus === "in_progress") {
+    return true;
+  }
+
+  return opsStatus === "in_process" || opsStatus === "scheduled";
+}
+
+function intakeRelationshipCandidateSortValue(row: {
+  status?: string | null;
+  ops_status?: string | null;
+  created_at?: string | null;
+}) {
+  const lifecycleStatus = String(row.status ?? "").trim().toLowerCase();
+  const opsStatus = String(row.ops_status ?? "").trim().toLowerCase();
+  const isLive =
+    lifecycleStatus === "on_the_way" ||
+    lifecycleStatus === "in_process" ||
+    lifecycleStatus === "in_progress" ||
+    opsStatus === "in_process";
+  const createdAtMs = row.created_at ? new Date(String(row.created_at)).getTime() : 0;
+
+  return {
+    liveRank: isLive ? 1 : 0,
+    createdAtMs: Number.isFinite(createdAtMs) ? createdAtMs : 0,
+  };
+}
+
 async function cleanupOrphanSystem(opts: {
   supabase: any;
   jobId: string;
@@ -1953,6 +2034,108 @@ async function resolveServiceCaseIdForNewJob(params: {
       title,
     }),
   });
+}
+
+export async function getInternalIntakeRelationshipContext(input: {
+  customerId: string;
+  locationId: string;
+  jobType?: string;
+}): Promise<InternalIntakeRelationshipContext> {
+  const supabase = await createClient();
+  await requireInternalUser({ supabase });
+
+  const customerId = String(input.customerId ?? "").trim();
+  const locationId = String(input.locationId ?? "").trim();
+  const jobType = normalizeIntakeJobType(input.jobType);
+
+  if (!customerId || !locationId || !jobType) {
+    return { activeJobs: [], recentJobs: [] };
+  }
+
+  const selectColumns = [
+    "id",
+    "title",
+    "job_type",
+    "status",
+    "ops_status",
+    "service_case_id",
+    "parent_job_id",
+    "scheduled_date",
+    "window_start",
+    "window_end",
+    "created_at",
+  ].join(", ");
+
+  const [{ data: activeRows, error: activeErr }, { data: recentRows, error: recentErr }] =
+    await Promise.all([
+      supabase
+        .from("jobs")
+        .select(selectColumns)
+        .eq("customer_id", customerId)
+        .eq("location_id", locationId)
+        .eq("job_type", jobType)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .order("scheduled_date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .limit(24),
+      supabase
+        .from("jobs")
+        .select(selectColumns)
+        .eq("customer_id", customerId)
+        .eq("location_id", locationId)
+        .eq("job_type", jobType)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .order("created_at", { ascending: false })
+        .limit(8),
+    ]);
+
+  if (activeErr) throw activeErr;
+  if (recentErr) throw recentErr;
+
+  const activeParentIds = new Set(
+    (activeRows ?? [])
+      .map((row: any) => String(row?.parent_job_id ?? "").trim())
+      .filter(Boolean)
+  );
+
+  const activeJobs = (activeRows ?? [])
+    .filter((row: any) => isOpenActiveJobCandidate(row))
+    .filter((row: any) => !activeParentIds.has(String(row?.id ?? "").trim()))
+    .sort((left: any, right: any) => {
+      const leftSort = intakeRelationshipCandidateSortValue(left);
+      const rightSort = intakeRelationshipCandidateSortValue(right);
+
+      if (leftSort.liveRank !== rightSort.liveRank) {
+        return rightSort.liveRank - leftSort.liveRank;
+      }
+
+      return rightSort.createdAtMs - leftSort.createdAtMs;
+    })
+    .filter((() => {
+      const seenServiceCaseIds = new Set<string>();
+
+      return (row: any) => {
+        const serviceCaseId = String(row?.service_case_id ?? "").trim();
+        if (!serviceCaseId) return true;
+        if (seenServiceCaseIds.has(serviceCaseId)) return false;
+        seenServiceCaseIds.add(serviceCaseId);
+        return true;
+      };
+    })())
+    .slice(0, 6)
+    .map(mapIntakeRelationshipJobSummary);
+
+  const activeJobIds = new Set(activeJobs.map((job) => job.id));
+  const recentJobs = (recentRows ?? [])
+    .map(mapIntakeRelationshipJobSummary)
+    .filter((job) => !activeJobIds.has(job.id));
+
+  return {
+    activeJobs,
+    recentJobs,
+  };
 }
 
 function buildOpsChanges(before: OpsSnapshot, after: OpsSnapshot) {
@@ -4734,13 +4917,22 @@ export async function createJob(
  */
 export async function createJobFromForm(formData: FormData) {
   // ----- basic fields -----
-  const rawJobType = String(formData.get("job_type") || "").trim().toLowerCase();
+  const relationshipActionRaw = String(formData.get("relationship_action") || "").trim();
+  const relationshipJobId = String(formData.get("relationship_job_id") || "").trim();
+  const relationshipAction =
+    relationshipActionRaw === "open_active_job" ||
+    relationshipActionRaw === "create_follow_up"
+      ? relationshipActionRaw
+      : "new_case";
 
-  if (rawJobType !== "ecc" && rawJobType !== "service") {
+  const rawJobType = String(formData.get("job_type") || "").trim().toLowerCase();
+  const relationshipJobType = normalizeIntakeJobType(rawJobType);
+
+  if (!relationshipJobType) {
     throw new Error("Invalid job type");
   }
 
-const jobType = rawJobType;
+const jobType = relationshipJobType;
   const projectType = String(formData.get("project_type") || "alteration").trim();
 
   const contractorIdRaw = formData.get("contractor_id");
@@ -4752,7 +4944,7 @@ const jobType = rawJobType;
   const title = String(formData.get("title") || "").trim();
   const postedCity = String(formData.get("city") || "").trim();
 
-  if (rawJobType === "service" && !title) {
+  if (jobType === "service" && !title) {
     throw new Error("Service jobs require a title.");
   }
 
@@ -5019,6 +5211,30 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     }
   }
 
+  if (relationshipAction === "open_active_job") {
+    if (isContractorUser) {
+      throw new Error("Open Active Job is only available for internal intake.");
+    }
+
+    if (!existingCustomerId || !existingLocationId) {
+      throw new Error("Open Active Job requires a resolved customer and location.");
+    }
+
+    if (!relationshipJobId) {
+      throw new Error("Select an active job before continuing.");
+    }
+
+    const anchorJob = await loadRelationshipAnchorJob({
+      jobId: relationshipJobId,
+      customerId: existingCustomerId,
+      locationId: existingLocationId,
+      requireActive: true,
+      expectedJobType: relationshipJobType,
+    });
+
+    redirect(`/jobs/${String(anchorJob.id)}?banner=intake_existing_job_selected`);
+  }
+
   if (existingCustomerId) {
     const { data: existingCustomerRow, error: existingCustomerErr } = await supabase
       .from("customers")
@@ -5184,6 +5400,43 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
       job_address,
       city,
     };
+  }
+
+  async function loadRelationshipAnchorJob(params: {
+    jobId: string;
+    customerId: string;
+    locationId: string;
+    requireActive: boolean;
+    expectedJobType: "ecc" | "service" | null;
+  }) {
+    const { data: anchorJob, error: anchorErr } = await canonicalWriteClient
+      .from("jobs")
+      .select("id, customer_id, location_id, service_case_id, job_type, status, ops_status")
+      .eq("id", params.jobId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (anchorErr) throw anchorErr;
+    if (!anchorJob?.id) {
+      throw new Error("Selected related job was not found.");
+    }
+
+    if (
+      String(anchorJob.customer_id ?? "").trim() !== params.customerId ||
+      String(anchorJob.location_id ?? "").trim() !== params.locationId
+    ) {
+      throw new Error("Selected related job does not match the resolved customer and location.");
+    }
+
+    if (params.expectedJobType && normalizeIntakeJobType(anchorJob.job_type) !== params.expectedJobType) {
+      throw new Error("Selected related job does not match the chosen job type.");
+    }
+
+    if (params.requireActive && !isActiveIntakeRelationshipJob(anchorJob)) {
+      throw new Error("Selected active job is no longer active.");
+    }
+
+    return anchorJob;
   }
 
   // ----- equipment payload (optional) + server validation -----
@@ -5481,6 +5734,30 @@ const CONTRACTOR_SANDBOX_ALLOWED = new Set([
 function canContractorWriteEvent(event_type: string) {
   return CONTRACTOR_SANDBOX_ALLOWED.has(event_type);
 }
+
+  let followUpServiceCaseId: string | null = null;
+
+  if (!isContractorUser && existingCustomerId && existingLocationId && relationshipAction === "create_follow_up") {
+    if (!relationshipJobId) {
+      throw new Error("Select an existing job before continuing.");
+    }
+
+    const relationshipAnchorJob = await loadRelationshipAnchorJob({
+      jobId: relationshipJobId,
+      customerId: existingCustomerId,
+      locationId: existingLocationId,
+      requireActive: false,
+      expectedJobType: relationshipJobType,
+    });
+
+    followUpServiceCaseId = relationshipAnchorJob.service_case_id
+      ? String(relationshipAnchorJob.service_case_id)
+      : await ensureServiceCaseForJob({
+          supabase: canonicalWriteClient,
+          jobId: String(relationshipAnchorJob.id),
+        });
+  }
+
   // ---- Branch 1: existing customer + existing location ----
   if (existingCustomerId && existingLocationId) {
     const existingDuplicateId = await findExistingIntakeDuplicate({
@@ -5513,6 +5790,7 @@ function canContractorWriteEvent(event_type: string) {
 
     const created = await createJob({
       job_type: jobType,
+      service_case_id: followUpServiceCaseId,
       service_case_kind,
       service_visit_type,
       service_visit_reason,
@@ -5553,7 +5831,7 @@ function canContractorWriteEvent(event_type: string) {
       serviceCaseWriteClient: canonicalWriteClient,
     });
 
- await postCreate(created.id, "customer");
+ await postCreate(created.id, followUpServiceCaseId ? "customer_follow_up" : "customer");
  return;
   }
 
