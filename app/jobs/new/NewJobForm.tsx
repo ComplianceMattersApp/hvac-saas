@@ -88,6 +88,9 @@ type NewJobDraft = {
   scheduledDate?: string;
   contractorId?: string;
   jobType?: "ecc" | "service";
+  serviceCaseKind?: "reactive" | "callback" | "warranty" | "maintenance";
+  serviceVisitType?: "diagnostic" | "repair" | "return_visit" | "callback" | "maintenance";
+  serviceVisitOutcome?: "resolved" | "follow_up_required" | "no_issue_found";
   billingRecipient?: "contractor" | "customer" | "other";
   projectType?: "alteration" | "all_new" | "new_construction";
   billingName?: string;
@@ -235,6 +238,15 @@ export default function NewJobForm({
  const [contractorId, setContractorId] = useState<string>(() => myContractor?.id ?? "");
 
   const [jobType, setJobType] = useState<"ecc" | "service">("ecc");
+  const [serviceCaseKind, setServiceCaseKind] = useState<
+    "reactive" | "callback" | "warranty" | "maintenance"
+  >("reactive");
+  const [serviceVisitType, setServiceVisitType] = useState<
+    "diagnostic" | "repair" | "return_visit" | "callback" | "maintenance"
+  >("diagnostic");
+  const [serviceVisitOutcome, setServiceVisitOutcome] = useState<
+    "resolved" | "follow_up_required" | "no_issue_found"
+  >("follow_up_required");
 
 const [billingRecipient, setBillingRecipient] = useState<
     "contractor" | "customer" | "other"
@@ -552,6 +564,9 @@ const [billingRecipient, setBillingRecipient] = useState<
         scheduledDate,
         contractorId,
         jobType,
+        serviceCaseKind,
+        serviceVisitType,
+        serviceVisitOutcome,
         billingRecipient,
         projectType,
         billingName,
@@ -586,6 +601,9 @@ const [billingRecipient, setBillingRecipient] = useState<
     setScheduledDate(d.scheduledDate ?? "");
     setContractorId(d.contractorId ?? "");
     setJobType(d.jobType ?? "ecc");
+    setServiceCaseKind(d.serviceCaseKind ?? "reactive");
+    setServiceVisitType(d.serviceVisitType ?? "diagnostic");
+    setServiceVisitOutcome(d.serviceVisitOutcome ?? "follow_up_required");
     setBillingRecipient(d.billingRecipient ?? (myContractor?.id ? "contractor" : "customer"));
     setProjectType(d.projectType ?? "alteration");
 
@@ -872,7 +890,7 @@ const [billingRecipient, setBillingRecipient] = useState<
 
         {!isInternalMode ? (
         <section className="space-y-3">
-          <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Job Setup</h2>
+          <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Job Type</h2>
 
           {/* Job Type */}
           <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
@@ -932,6 +950,58 @@ const [billingRecipient, setBillingRecipient] = useState<
               </select>
             </div>
           )}
+
+          {jobType === "service" ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+              <label className="block text-sm font-medium text-slate-900">Service Details</label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
+                  <select
+                    name="service_case_kind"
+                    className="w-full rounded-md border border-slate-300 bg-white p-2"
+                    value={serviceCaseKind}
+                    onChange={(e) =>
+                      setServiceCaseKind(
+                        e.target.value as "reactive" | "callback" | "warranty" | "maintenance",
+                      )
+                    }
+                  >
+                    <option value="reactive">Standard Service</option>
+                    <option value="callback">Callback</option>
+                    <option value="warranty">Warranty</option>
+                    <option value="maintenance">Maintenance</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Visit Type</label>
+                  <select
+                    name="service_visit_type"
+                    className="w-full rounded-md border border-slate-300 bg-white p-2"
+                    value={serviceVisitType}
+                    onChange={(e) =>
+                      setServiceVisitType(
+                        e.target.value as
+                          | "diagnostic"
+                          | "repair"
+                          | "return_visit"
+                          | "callback"
+                          | "maintenance",
+                      )
+                    }
+                  >
+                    <option value="diagnostic">Diagnostic</option>
+                    <option value="repair">Repair</option>
+                    <option value="return_visit">Return Visit</option>
+                    <option value="callback">Callback</option>
+                    <option value="maintenance">Maintenance</option>
+                  </select>
+                </div>
+              </div>
+
+            </div>
+          ) : null}
         </section>
         ) : null}
 
@@ -1401,7 +1471,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 3</p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-900">Job setup</h2>
+                <h2 className="mt-1 text-lg font-semibold text-slate-900">Job type</h2>
                 <p className="mt-1 text-sm text-slate-500">Set the visit type first. ECC-only choices appear only when they matter.</p>
               </div>
 
@@ -1453,6 +1523,58 @@ const [billingRecipient, setBillingRecipient] = useState<
                     <option value="all_new">All New</option>
                     <option value="new_construction">New Construction</option>
                   </select>
+                </div>
+              ) : null}
+
+              {jobType === "service" ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                  <label className="block text-sm font-medium text-slate-900">Service Details</label>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
+                      <select
+                        name="service_case_kind"
+                        className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                        value={serviceCaseKind}
+                        onChange={(e) =>
+                          setServiceCaseKind(
+                            e.target.value as "reactive" | "callback" | "warranty" | "maintenance",
+                          )
+                        }
+                      >
+                        <option value="reactive">Standard Service</option>
+                        <option value="callback">Callback</option>
+                        <option value="warranty">Warranty</option>
+                        <option value="maintenance">Maintenance</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">Visit Type</label>
+                      <select
+                        name="service_visit_type"
+                        className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                        value={serviceVisitType}
+                        onChange={(e) =>
+                          setServiceVisitType(
+                            e.target.value as
+                              | "diagnostic"
+                              | "repair"
+                              | "return_visit"
+                              | "callback"
+                              | "maintenance",
+                          )
+                        }
+                      >
+                        <option value="diagnostic">Diagnostic</option>
+                        <option value="repair">Repair</option>
+                        <option value="return_visit">Return Visit</option>
+                        <option value="callback">Callback</option>
+                        <option value="maintenance">Maintenance</option>
+                      </select>
+                    </div>
+                  </div>
+
                 </div>
               ) : null}
             </div>

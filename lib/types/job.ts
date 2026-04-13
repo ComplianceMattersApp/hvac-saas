@@ -27,4 +27,7 @@ export type JobRow = {
   customer_last_name: string | null;
   customer_email: string | null;
   job_notes: string | null;
+  service_visit_type: string | null;
+  service_visit_reason: string | null;
+  service_visit_outcome: string | null;
 };

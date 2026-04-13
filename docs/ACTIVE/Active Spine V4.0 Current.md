@@ -285,6 +285,30 @@ Do not alter audit/history visibility.
 This same active-chain ownership principle should apply as service chains / linked visits expand further.
 Once a newer operative linked record exists, older linked ancestors must not remain as duplicate active queue items.
 
+8.6 Service Contract V1 (Locked)
+
+This first Service pass formalizes Service Case and Service Visit classification for later Billing/Reporting support.
+
+This pass does not start Billing workflows or Reporting workflows.
+
+Service Case v1 contract:
+service_cases own complaint continuity and case-level resolution ownership.
+Required case fields: problem_summary, case_kind (reactive|callback|warranty|maintenance), status, resolved_by_job_id, resolved_at, resolution_summary.
+
+Service Visit v1 contract:
+jobs remain the visit execution unit for Service.
+Required visit fields: service_visit_type (diagnostic|repair|return_visit|callback|maintenance), service_visit_reason, service_visit_outcome (resolved|follow_up_required|no_issue_found).
+
+Linkage guardrail:
+For linked visit chains, parent_job_id lineage must stay inside one service_case_id.
+Cross-case parent/child linkage is invalid.
+
+Truth-boundary guardrail:
+These classifications do not change source-of-truth ownership:
+job_events remains narrative truth.
+jobs.ops_status remains operational projection.
+ecc_test_runs remains ECC technical truth.
+
 9. Staffing / Assignment System (Locked)
 9.1 Source of truth
 

@@ -36,7 +36,11 @@ type CreateJobInput = {
   ops_status?: string | null;
   parent_job_id?: string | null;
   service_case_id?: string | null;
+  service_case_kind?: string | null;
   job_type?: string | null;
+  service_visit_type?: string | null;
+  service_visit_reason?: string | null;
+  service_visit_outcome?: string | null;
   customer_id?: string | null;
   location_id?: string | null;
   project_type?: string | null;
@@ -1750,6 +1754,62 @@ type OpsSnapshot = {
   action_required_by: string | null;
 };
 
+const SERVICE_CASE_KINDS = new Set([
+  "reactive",
+  "callback",
+  "warranty",
+  "maintenance",
+]);
+
+const SERVICE_VISIT_TYPES = new Set([
+  "diagnostic",
+  "repair",
+  "return_visit",
+  "callback",
+  "maintenance",
+]);
+
+const SERVICE_VISIT_OUTCOMES = new Set([
+  "resolved",
+  "follow_up_required",
+  "no_issue_found",
+]);
+
+function normalizeServiceCaseKind(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+  return SERVICE_CASE_KINDS.has(normalized) ? normalized : null;
+}
+
+function normalizeServiceVisitType(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+  return SERVICE_VISIT_TYPES.has(normalized) ? normalized : null;
+}
+
+function normalizeServiceVisitOutcome(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+  return SERVICE_VISIT_OUTCOMES.has(normalized) ? normalized : null;
+}
+
+function deriveInitialServiceVisitReason(input: {
+  serviceVisitReason?: string | null;
+  title?: string | null;
+  jobNotes?: string | null;
+}) {
+  const explicitReason = String(input.serviceVisitReason ?? "").trim();
+  if (explicitReason) return explicitReason;
+
+  const title = String(input.title ?? "").trim();
+  if (title) return title;
+
+  const notes = String(input.jobNotes ?? "").trim();
+  if (notes) return notes;
+
+  return "service visit";
+}
+
   function buildInitialProblemSummary(input: {
   job_notes?: string | null;
   title?: string | null;
@@ -1768,8 +1828,11 @@ async function createServiceCaseForRootJob(params: {
   customerId: string;
   locationId: string;
   problemSummary?: string | null;
+  caseKind?: string | null;
 }) {
-  const { supabase, customerId, locationId, problemSummary } = params;
+  const { supabase, customerId, locationId, problemSummary, caseKind } = params;
+
+  const normalizedCaseKind = normalizeServiceCaseKind(caseKind) ?? "reactive";
 
   const { data, error } = await supabase
     .from("service_cases")
@@ -1777,6 +1840,7 @@ async function createServiceCaseForRootJob(params: {
       customer_id: customerId,
       location_id: locationId,
       problem_summary: problemSummary ?? null,
+      case_kind: normalizedCaseKind,
       status: "open",
     })
     .select("id")
@@ -1838,6 +1902,7 @@ async function resolveServiceCaseIdForNewJob(params: {
   locationId?: string | null;
   title?: string | null;
   jobNotes?: string | null;
+  caseKind?: string | null;
 }) {
   const {
     supabase,
@@ -1846,6 +1911,7 @@ async function resolveServiceCaseIdForNewJob(params: {
     locationId,
     title,
     jobNotes,
+    caseKind,
   } = params;
 
   const parentId = String(parentJobId ?? "").trim();
@@ -1881,6 +1947,7 @@ async function resolveServiceCaseIdForNewJob(params: {
     supabase,
     customerId,
     locationId,
+    caseKind,
     problemSummary: buildInitialProblemSummary({
       job_notes: jobNotes,
       title,
@@ -1994,7 +2061,7 @@ export async function updateJobTypeFromForm(formData: FormData) {
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")
-    .select("job_type")
+    .select("job_type, title, job_notes, service_visit_type, service_visit_reason, service_visit_outcome")
     .eq("id", jobId)
     .single();
 
@@ -2005,12 +2072,26 @@ export async function updateJobTypeFromForm(formData: FormData) {
 
   const previousJobType = String(beforeJob?.job_type ?? "").trim().toLowerCase() || null;
 
+  const updatePayload: Record<string, any> = {
+    job_type: rawType,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (rawType === "service") {
+    updatePayload.service_visit_type =
+      normalizeServiceVisitType(beforeJob?.service_visit_type) ?? "diagnostic";
+    updatePayload.service_visit_reason = deriveInitialServiceVisitReason({
+      serviceVisitReason: beforeJob?.service_visit_reason,
+      title: beforeJob?.title,
+      jobNotes: beforeJob?.job_notes,
+    });
+    updatePayload.service_visit_outcome =
+      normalizeServiceVisitOutcome(beforeJob?.service_visit_outcome) ?? "follow_up_required";
+  }
+
   const { error } = await supabase
     .from("jobs")
-    .update({
-      job_type: rawType,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("id", jobId);
 
   if (error) {
@@ -2039,6 +2120,206 @@ export async function updateJobTypeFromForm(formData: FormData) {
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
+}
+
+export async function updateJobServiceContractFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { userId: actingUserId } = await requireInternalUser({ supabase });
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const tabRaw = String(formData.get("tab") || "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+
+  const { data: beforeJob, error: beforeErr } = await supabase
+    .from("jobs")
+    .select("job_type, service_case_id, service_visit_type, service_visit_reason, service_visit_outcome, title, job_notes")
+    .eq("id", jobId)
+    .single();
+
+  if (beforeErr) {
+    redirectToJobWithBanner({
+      jobId,
+      banner: "service_contract_update_failed",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  if (String(beforeJob?.job_type ?? "").toLowerCase() !== "service") {
+    redirectToJobWithBanner({
+      jobId,
+      banner: "service_contract_update_failed",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const normalizedVisitType =
+    normalizeServiceVisitType(String(formData.get("service_visit_type") || "").trim()) ??
+    normalizeServiceVisitType(beforeJob?.service_visit_type) ??
+    "diagnostic";
+
+  const normalizedVisitOutcome =
+    normalizeServiceVisitOutcome(String(formData.get("service_visit_outcome") || "").trim()) ??
+    normalizeServiceVisitOutcome(beforeJob?.service_visit_outcome) ??
+    "follow_up_required";
+
+  const normalizedVisitReason = deriveInitialServiceVisitReason({
+    serviceVisitReason: String(formData.get("service_visit_reason") || "").trim(),
+    title: beforeJob?.title,
+    jobNotes: beforeJob?.job_notes,
+  });
+
+  let serviceCaseId = String(beforeJob?.service_case_id ?? "").trim() || null;
+  if (!serviceCaseId) {
+    serviceCaseId = await ensureServiceCaseForJob({
+      supabase,
+      jobId,
+    });
+  }
+
+  const { data: beforeCase, error: beforeCaseErr } = await supabase
+    .from("service_cases")
+    .select("case_kind")
+    .eq("id", serviceCaseId)
+    .single();
+
+  if (beforeCaseErr) {
+    redirectToJobWithBanner({
+      jobId,
+      banner: "service_contract_update_failed",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const normalizedCaseKind =
+    normalizeServiceCaseKind(String(formData.get("service_case_kind") || "").trim()) ??
+    normalizeServiceCaseKind(beforeCase?.case_kind) ??
+    "reactive";
+
+  const beforeVisitType = normalizeServiceVisitType(beforeJob?.service_visit_type);
+  const beforeVisitReason = String(beforeJob?.service_visit_reason ?? "").trim() || null;
+  const beforeVisitOutcome = normalizeServiceVisitOutcome(beforeJob?.service_visit_outcome);
+  const beforeCaseKind = normalizeServiceCaseKind(beforeCase?.case_kind);
+
+  const isNoop =
+    beforeVisitType === normalizedVisitType &&
+    beforeVisitReason === normalizedVisitReason &&
+    beforeVisitOutcome === normalizedVisitOutcome &&
+    beforeCaseKind === normalizedCaseKind;
+
+  if (isNoop) {
+    revalidatePath(`/jobs/${jobId}`);
+    redirectToJobWithBanner({
+      jobId,
+      banner: "service_contract_already_saved",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const { error: jobUpdateErr } = await supabase
+    .from("jobs")
+    .update({
+      service_visit_type: normalizedVisitType,
+      service_visit_reason: normalizedVisitReason,
+      service_visit_outcome: normalizedVisitOutcome,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId);
+
+  if (jobUpdateErr) {
+    redirectToJobWithBanner({
+      jobId,
+      banner: "service_contract_update_failed",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const { error: caseUpdateErr } = await supabase
+    .from("service_cases")
+    .update({
+      case_kind: normalizedCaseKind,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", serviceCaseId);
+
+  if (caseUpdateErr) {
+    redirectToJobWithBanner({
+      jobId,
+      banner: "service_contract_update_failed",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const changes: Array<{ field: string; from: string | null; to: string | null }> = [];
+
+  if (beforeCaseKind !== normalizedCaseKind) {
+    changes.push({
+      field: "service_cases.case_kind",
+      from: beforeCaseKind,
+      to: normalizedCaseKind,
+    });
+  }
+
+  if (beforeVisitType !== normalizedVisitType) {
+    changes.push({
+      field: "jobs.service_visit_type",
+      from: beforeVisitType,
+      to: normalizedVisitType,
+    });
+  }
+
+  if (beforeVisitReason !== normalizedVisitReason) {
+    changes.push({
+      field: "jobs.service_visit_reason",
+      from: beforeVisitReason,
+      to: normalizedVisitReason,
+    });
+  }
+
+  if (beforeVisitOutcome !== normalizedVisitOutcome) {
+    changes.push({
+      field: "jobs.service_visit_outcome",
+      from: beforeVisitOutcome,
+      to: normalizedVisitOutcome,
+    });
+  }
+
+  if (changes.length > 0) {
+    await insertJobEvent({
+      supabase,
+      jobId,
+      event_type: "ops_update",
+      meta: {
+        source: "job_detail_service_contract",
+        changes,
+      },
+      userId: actingUserId,
+    });
+  }
+
+  revalidatePath(`/jobs/${jobId}`, "page");
+  revalidatePath("/jobs", "page");
+  revalidatePath("/ops", "page");
+  if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
+    const [pathOnly] = returnToRaw.split("?");
+    if (pathOnly) revalidatePath(pathOnly, "page");
+  }
+
+  refresh();
+  redirectToJobWithBanner({
+    jobId,
+    banner: "service_contract_saved",
+    tabRaw,
+    returnToRaw,
+    cacheBust: true,
+  });
 }
 
 export async function getContractors() {
@@ -4294,6 +4575,9 @@ export async function updateJob(input: {
   ops_status?: string | null;
   id: string;
   title?: string;
+  service_visit_type?: string | null;
+  service_visit_reason?: string | null;
+  service_visit_outcome?: string | null;
   city?: string;
   status?: JobStatus;
   scheduled_date?: string | null;
@@ -4331,11 +4615,46 @@ export async function createJob(
   const supabase = await createClient();
   const serviceCaseWriteClient = options?.serviceCaseWriteClient ?? supabase;
 
-  const payload = {
-    parent_job_id: input.parent_job_id ?? null,
-    service_case_id: input.service_case_id ?? null,
+  const normalizedJobType = String(input.job_type ?? "ecc").trim().toLowerCase();
+  const parentJobId = String(input.parent_job_id ?? "").trim() || null;
 
-    job_type: input.job_type ?? "ecc",
+  let resolvedServiceCaseId = String(input.service_case_id ?? "").trim() || null;
+
+  // Child jobs must carry the parent service_case_id to satisfy lineage guardrails.
+  if (parentJobId && !resolvedServiceCaseId) {
+    resolvedServiceCaseId = await resolveServiceCaseIdForNewJob({
+      supabase: serviceCaseWriteClient,
+      parentJobId,
+    });
+  }
+
+  const normalizedServiceVisitType =
+    normalizedJobType === "service"
+      ? normalizeServiceVisitType(input.service_visit_type) ?? "diagnostic"
+      : null;
+
+  const normalizedServiceVisitReason =
+    normalizedJobType === "service"
+      ? deriveInitialServiceVisitReason({
+          serviceVisitReason: input.service_visit_reason,
+          title: input.title,
+          jobNotes: input.job_notes,
+        })
+      : null;
+
+  const normalizedServiceVisitOutcome =
+    normalizedJobType === "service"
+      ? normalizeServiceVisitOutcome(input.service_visit_outcome) ?? "follow_up_required"
+      : null;
+
+  const payload = {
+    parent_job_id: parentJobId,
+    service_case_id: resolvedServiceCaseId,
+
+    job_type: normalizedJobType,
+    service_visit_type: normalizedServiceVisitType,
+    service_visit_reason: normalizedServiceVisitReason,
+    service_visit_outcome: normalizedServiceVisitOutcome,
     project_type: input.project_type ?? "alteration",
 
     title: input.title,
@@ -4392,6 +4711,7 @@ export async function createJob(
       locationId: String(data.location_id),
       title: data.title,
       jobNotes: data.job_notes,
+      caseKind: input.service_case_kind,
     });
 
     const { error: updErr } = await serviceCaseWriteClient
@@ -4468,6 +4788,15 @@ const customerLastNameRaw = String(formData.get("customer_last_name") || "").tri
 const customerEmailRaw = String(formData.get("customer_email") || "").trim();
 const jobNotesRaw = String(formData.get("job_notes") || "").trim();
 const jobAddressFormRaw = String(formData.get("job_address") || "").trim();
+const serviceCaseKindRaw = String(formData.get("service_case_kind") || "").trim();
+const serviceVisitTypeRaw = String(formData.get("service_visit_type") || "").trim();
+const serviceVisitReasonRaw = String(formData.get("service_visit_reason") || "").trim();
+const serviceVisitOutcomeRaw = String(formData.get("service_visit_outcome") || "").trim();
+
+const service_case_kind = normalizeServiceCaseKind(serviceCaseKindRaw);
+const service_visit_type = normalizeServiceVisitType(serviceVisitTypeRaw);
+const service_visit_reason = serviceVisitReasonRaw || null;
+const service_visit_outcome = normalizeServiceVisitOutcome(serviceVisitOutcomeRaw);
 
 const jurisdiction = jobType === "service" ? null : (jurisdictionRaw || null);
 const permit_date = jobType === "service" ? null : (permitDateRaw || null);
@@ -5184,6 +5513,10 @@ function canContractorWriteEvent(event_type: string) {
 
     const created = await createJob({
       job_type: jobType,
+      service_case_kind,
+      service_visit_type,
+      service_visit_reason,
+      service_visit_outcome,
       project_type: projectType,
       job_address: canonicalSnapshot.job_address,
       customer_id: existingCustomerId,
@@ -5381,6 +5714,10 @@ if (existingCustomerId && !existingLocationId) {
 
   const created = await createJob({
     job_type: jobType,
+    service_case_kind,
+    service_visit_type,
+    service_visit_reason,
+    service_visit_outcome,
     project_type: projectType,
     job_address: canonicalSnapshot.job_address,
     customer_id: existingCustomerId,
@@ -5486,6 +5823,10 @@ const canonicalSnapshot = await loadCanonicalJobSnapshot({
 
 const created = await createJob({
   job_type: jobType,
+  service_case_kind,
+  service_visit_type,
+  service_visit_reason,
+  service_visit_outcome,
   project_type: projectType,
   job_address: canonicalSnapshot.job_address,
   customer_id: customerId,

@@ -22,7 +22,7 @@ export async function markServiceComplete(jobId: string): Promise<void> {
 
   const { data: job, error } = await supabase
     .from("jobs")
-    .select("id, job_type, ops_status, status, field_complete")
+    .select("id, job_type, ops_status, status, field_complete, service_case_id, service_visit_outcome")
     .eq("id", jobId)
     .single();
 
@@ -59,6 +59,19 @@ export async function markServiceComplete(jobId: string): Promise<void> {
     data: { user },
   } = await supabase.auth.getUser();
   const actingUserId = user?.id ?? null;
+
+  if (job.service_case_id && String(job.service_visit_outcome ?? "").trim().toLowerCase() === "resolved") {
+    const { error: serviceCaseErr } = await supabase
+      .from("service_cases")
+      .update({
+        status: "resolved",
+        resolved_by_job_id: jobId,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq("id", String(job.service_case_id));
+
+    if (serviceCaseErr) throw new Error(serviceCaseErr.message);
+  }
 
   const eventMeta = buildMovementEventMeta({
     from: beforeStatus,
