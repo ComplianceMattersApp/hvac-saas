@@ -1888,6 +1888,13 @@ const renderTimelineItem = (e: any, key: string) => {
         />
       )}
 
+      {banner === "intake_existing_job_selected" && (
+        <FlashBanner
+          type="success"
+          message="Existing active job opened from intake. No new job was created."
+        />
+      )}
+
       {banner === "contractor_intake_finalized" && (
         <FlashBanner
           type="success"

@@ -2,9 +2,9 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { createJobFromForm } from "@/lib/actions";
+import { createJobFromForm, getInternalIntakeRelationshipContext } from "@/lib/actions";
 import JobCoreFields from "@/components/jobs/JobCoreFields";
 import ActionFeedback from "@/components/ui/ActionFeedback";
 
@@ -105,6 +105,25 @@ type NewJobDraft = {
   locationId?: string;
 };
 
+type RelationshipAction = "new_case" | "open_active_job" | "create_follow_up";
+
+type RelationshipJobSummary = {
+  id: string;
+  title: string | null;
+  job_type: string | null;
+  status: string | null;
+  ops_status: string | null;
+  scheduled_date: string | null;
+  window_start: string | null;
+  window_end: string | null;
+  created_at: string | null;
+};
+
+type RelationshipContext = {
+  activeJobs: RelationshipJobSummary[];
+  recentJobs: RelationshipJobSummary[];
+};
+
 function uid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
@@ -166,6 +185,53 @@ function formatLocationContext(location: LocationLookupRow | null | undefined) {
   const nickname = String(location.nickname ?? "").trim();
   const base = nickname ? `${nickname} - ${address}` : address;
   return cityStateZip ? `${base}, ${cityStateZip}` : base;
+}
+
+function relationshipJobTitle(job: RelationshipJobSummary) {
+  return String(job.title ?? "").trim() || `Job ${job.id.slice(0, 8)}`;
+}
+
+function relationshipOpsLabel(value?: string | null) {
+  const v = String(value ?? "").trim().toLowerCase();
+  if (v === "need_to_schedule") return "Need to Schedule";
+  if (v === "scheduled") return "Scheduled";
+  if (v === "pending_info") return "Pending Info";
+  if (v === "on_hold") return "On Hold";
+  if (v === "failed") return "Failed";
+  if (v === "pending_office_review") return "Pending Office Review";
+  if (v === "retest_needed") return "Retest Needed";
+  if (v === "paperwork_required") return "Paperwork Required";
+  if (v === "invoice_required") return "Invoice Required";
+  if (v === "closed") return "Closed";
+  return v ? v.replace(/_/g, " ") : "Unknown";
+}
+
+function relationshipOpsTone(value?: string | null) {
+  const v = String(value ?? "").trim().toLowerCase();
+  if (v === "need_to_schedule") return "border-blue-200 bg-blue-50 text-blue-800";
+  if (v === "scheduled") return "border-cyan-200 bg-cyan-50 text-cyan-800";
+  if (v === "pending_info") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (v === "on_hold") return "border-slate-300 bg-slate-100 text-slate-700";
+  if (v === "failed" || v === "retest_needed") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (v === "paperwork_required" || v === "invoice_required") return "border-purple-200 bg-purple-50 text-purple-800";
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function formatRelationshipDate(value?: string | null) {
+  if (!value) return "Unscheduled";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Unscheduled";
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatRelationshipWindow(job: RelationshipJobSummary) {
+  const start = String(job.window_start ?? "").trim();
+  const end = String(job.window_end ?? "").trim();
+  return start && end ? `${start}-${end}` : null;
 }
 
 function readValidDraft(): NewJobDraft | null {
@@ -269,7 +335,16 @@ const [billingRecipient, setBillingRecipient] = useState<
   // Optional equipment
   const [systems, setSystems] = useState<EquipmentSystem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [relationshipAction, setRelationshipAction] = useState<RelationshipAction>("new_case");
+  const [relationshipJobId, setRelationshipJobId] = useState("");
+  const [relationshipContext, setRelationshipContext] = useState<RelationshipContext>({
+    activeJobs: [],
+    recentJobs: [],
+  });
+  const [relationshipError, setRelationshipError] = useState<string | null>(null);
+  const [isRelationshipPending, startRelationshipTransition] = useTransition();
   const submitLockedRef = useRef(false);
+  const relationshipRequestRef = useRef(0);
   const createNewCustomerCardRef = useRef<HTMLDivElement | null>(null);
   const createNewCustomerFirstNameRef = useRef<HTMLInputElement | null>(null);
 
@@ -508,9 +583,33 @@ const [billingRecipient, setBillingRecipient] = useState<
     }).slice(0, 3);
   }, [isInternalMode, locationLookupRows, newLocationAddressLine1, newLocationCity, newLocationZip, selectedCustomerId, selectedCustomerLocations]);
 
-  const isSubmitReady = canSubmit && internalResolutionReady;
-  const canAdvancePastResolution = !isInternalMode || internalResolutionReady;
-  const showInternalSetupHint = isInternalMode && !internalResolutionReady;
+  const shouldShowRelationshipStep = Boolean(
+    isInternalMode && !createNewCustomer && selectedCustomerId && locationMode === "existing" && locationId,
+  );
+
+  const relationshipJobs = useMemo(() => {
+    return [...relationshipContext.activeJobs, ...relationshipContext.recentJobs];
+  }, [relationshipContext.activeJobs, relationshipContext.recentJobs]);
+
+  const selectedRelationshipJob = useMemo(
+    () => relationshipJobs.find((job) => job.id === relationshipJobId) ?? null,
+    [relationshipJobId, relationshipJobs],
+  );
+
+  const hasRelationshipChoices =
+    relationshipContext.activeJobs.length > 0 || relationshipContext.recentJobs.length > 0;
+
+  const relationshipDecisionReady =
+    !shouldShowRelationshipStep || relationshipAction === "new_case" || Boolean(relationshipJobId);
+
+  const isSubmitReady = canSubmit && internalResolutionReady && relationshipDecisionReady;
+  const canAdvancePastResolution =
+    !isInternalMode || (internalResolutionReady && relationshipDecisionReady && relationshipAction !== "open_active_job");
+  const showInternalSetupHint =
+    isInternalMode && (!internalResolutionReady || (shouldShowRelationshipStep && !relationshipDecisionReady));
+  const internalNextStepMessage = !internalResolutionReady
+    ? "Resolve customer and location to unlock relationship review, job setup, scheduling, billing, and optional enrichment."
+    : "Choose the job type and relationship path before continuing.";
   const billingRecipientLabel =
     billingRecipient === "contractor"
       ? "Contractor"
@@ -716,6 +815,46 @@ const [billingRecipient, setBillingRecipient] = useState<
     return () => window.cancelAnimationFrame(frame);
   }, [createNewCustomer]);
 
+  useEffect(() => {
+    setRelationshipAction("new_case");
+    setRelationshipJobId("");
+  }, [createNewCustomer, locationId, locationMode, selectedCustomerId]);
+
+  useEffect(() => {
+    if (!shouldShowRelationshipStep) {
+      setRelationshipContext({ activeJobs: [], recentJobs: [] });
+      setRelationshipError(null);
+      return;
+    }
+
+    const requestId = relationshipRequestRef.current + 1;
+    relationshipRequestRef.current = requestId;
+    setRelationshipError(null);
+
+    startRelationshipTransition(() => {
+      void getInternalIntakeRelationshipContext({
+        customerId: selectedCustomerId,
+        locationId,
+        jobType,
+      })
+        .then((nextContext) => {
+          if (relationshipRequestRef.current !== requestId) return;
+          setRelationshipContext(nextContext);
+        })
+        .catch(() => {
+          if (relationshipRequestRef.current !== requestId) return;
+          setRelationshipContext({ activeJobs: [], recentJobs: [] });
+          setRelationshipError("Could not load existing work context. You can still continue as a new case.");
+        });
+    });
+  }, [jobType, locationId, selectedCustomerId, shouldShowRelationshipStep, startRelationshipTransition]);
+
+  useEffect(() => {
+    if (relationshipJobId && !relationshipJobs.some((job) => job.id === relationshipJobId)) {
+      setRelationshipJobId("");
+    }
+  }, [relationshipJobId, relationshipJobs]);
+
   const secondaryButtonClass =
     "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition-all duration-150 hover:bg-slate-100 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60";
   const secondaryCompactButtonClass =
@@ -821,6 +960,8 @@ const [billingRecipient, setBillingRecipient] = useState<
       )}
 
       <form action={createJobFromForm} className="space-y-8" onSubmit={handleFormSubmit} aria-busy={isSubmitting}>
+        <input type="hidden" name="relationship_action" value={shouldShowRelationshipStep ? relationshipAction : "new_case"} />
+        <input type="hidden" name="relationship_job_id" value={relationshipJobId} />
         {isInternalMode ? (
           <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-5 py-5 text-white shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -1457,22 +1598,13 @@ const [billingRecipient, setBillingRecipient] = useState<
           )}
         </section>
 
-        {showInternalSetupHint ? (
-          <section className="space-y-3">
-            <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-white px-4 py-3 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Next</p>
-              <p className="mt-1 text-sm text-blue-900">Resolve customer and location to unlock job setup, scheduling, billing, and optional enrichment.</p>
-            </div>
-          </section>
-        ) : null}
-
-        {isInternalMode && canAdvancePastResolution ? (
+        {isInternalMode && internalResolutionReady ? (
           <section className="space-y-3">
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 3</p>
                 <h2 className="mt-1 text-lg font-semibold text-slate-900">Job type</h2>
-                <p className="mt-1 text-sm text-slate-500">Set the visit type first. ECC-only choices appear only when they matter.</p>
+                <p className="mt-1 text-sm text-slate-500">Set the visit type first so existing-work review stays inside the right intake lane.</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
@@ -1581,12 +1713,253 @@ const [billingRecipient, setBillingRecipient] = useState<
           </section>
         ) : null}
 
+        {shouldShowRelationshipStep ? (
+          <section className="space-y-3">
+            <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 4</p>
+                <h2 className="mt-1 text-lg font-semibold text-slate-900">Relationship check</h2>
+                <p className="mt-1 text-sm text-slate-500">Review existing {jobType === "service" ? "service" : "ECC"} work at this customer and location before creating another visit.</p>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRelationshipAction("open_active_job");
+                    if (!relationshipContext.activeJobs.some((job) => job.id === relationshipJobId)) {
+                      setRelationshipJobId("");
+                    }
+                  }}
+                  disabled={!relationshipContext.activeJobs.length && !isRelationshipPending}
+                  className={[
+                    "rounded-2xl border px-4 py-3 text-left shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-60",
+                    relationshipAction === "open_active_job"
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
+                  ].join(" ")}
+                >
+                  <div className="text-sm font-semibold">Open Active Job</div>
+                  <div className={relationshipAction === "open_active_job" ? "mt-1 text-xs text-slate-200" : "mt-1 text-xs text-slate-500"}>
+                    Route straight into work already in motion instead of creating anything new.
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRelationshipAction("create_follow_up")}
+                  disabled={!relationshipJobs.length && !isRelationshipPending}
+                  className={[
+                    "rounded-2xl border px-4 py-3 text-left shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-60",
+                    relationshipAction === "create_follow_up"
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
+                  ].join(" ")}
+                >
+                  <div className="text-sm font-semibold">Create Follow-Up Visit</div>
+                  <div className={relationshipAction === "create_follow_up" ? "mt-1 text-xs text-slate-200" : "mt-1 text-xs text-slate-500"}>
+                    Keep this intake flow, but anchor the new visit to existing work context first.
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRelationshipAction("new_case");
+                    setRelationshipJobId("");
+                  }}
+                  className={[
+                    "rounded-2xl border px-4 py-3 text-left shadow-sm transition-all",
+                    relationshipAction === "new_case"
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
+                  ].join(" ")}
+                >
+                  <div className="text-sm font-semibold">Continue as New Case</div>
+                  <div className={relationshipAction === "new_case" ? "mt-1 text-xs text-slate-200" : "mt-1 text-xs text-slate-500"}>
+                    Leave the current new-case intake path unchanged.
+                  </div>
+                </button>
+              </div>
+
+              {isRelationshipPending ? (
+                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+                  Loading existing work at this location...
+                </div>
+              ) : null}
+
+              {relationshipError ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
+                  {relationshipError}
+                </div>
+              ) : null}
+
+              {relationshipAction === "open_active_job" ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Choose the active job to open</p>
+                    <p className="mt-1 text-xs text-slate-500">Click one active job row to select it. Then submit to open that job directly. No new visit will be created.</p>
+                  </div>
+                  {relationshipContext.activeJobs.length > 0 ? (
+                    <div className="space-y-2">
+                      {relationshipContext.activeJobs.map((job) => (
+                        <button
+                          key={`open-${job.id}`}
+                          type="button"
+                          onClick={() => setRelationshipJobId(job.id)}
+                          className={[
+                            "w-full rounded-xl border px-3 py-3 text-left shadow-sm transition-all",
+                            relationshipJobId === job.id
+                              ? "border-slate-900 bg-slate-900 text-white"
+                              : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white",
+                          ].join(" ")}
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="text-sm font-semibold">{relationshipJobTitle(job)}</div>
+                            {relationshipJobId === job.id ? (
+                              <span className="rounded-full border border-white/20 px-2 py-0.5 text-[11px] font-medium text-slate-200">Selected</span>
+                            ) : null}
+                          </div>
+                          <div className={relationshipJobId === job.id ? "mt-1 text-xs text-slate-200" : "mt-1 text-xs text-slate-600"}>
+                            {relationshipOpsLabel(job.ops_status)} • {job.scheduled_date ? `Scheduled ${formatRelationshipDate(job.scheduled_date)}` : `Created ${formatRelationshipDate(job.created_at)}`}
+                            {formatRelationshipWindow(job) ? ` • ${formatRelationshipWindow(job)}` : ""}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+                      No active job is available to open right now.
+                    </div>
+                  )}
+                  {relationshipJobId && selectedRelationshipJob ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+                      Selected job will open on submit: {relationshipJobTitle(selectedRelationshipJob)}.
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {relationshipAction === "create_follow_up" ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Choose the job to anchor this follow-up</p>
+                    <p className="mt-1 text-xs text-slate-500">Select one existing job below. The new visit will stay in that work chain instead of creating a brand-new case.</p>
+                  </div>
+                  {relationshipJobs.length > 0 ? (
+                    <div className="space-y-4">
+                      {relationshipContext.activeJobs.length > 0 ? (
+                        <div className="space-y-2">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Active jobs</p>
+                            <p className="mt-1 text-xs text-slate-500">Best choice when the follow-up belongs to work already in motion.</p>
+                          </div>
+                          {relationshipContext.activeJobs.map((job) => (
+                            <button
+                              key={`follow-up-active-${job.id}`}
+                              type="button"
+                              onClick={() => setRelationshipJobId(job.id)}
+                              className={[
+                                "w-full rounded-xl border px-3 py-3 text-left shadow-sm transition-all",
+                                relationshipJobId === job.id
+                                  ? "border-slate-900 bg-slate-900 text-white"
+                                  : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white",
+                              ].join(" ")}
+                            >
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="text-sm font-semibold">{relationshipJobTitle(job)}</div>
+                                <span className={relationshipJobId === job.id ? "rounded-full border border-white/20 px-2 py-0.5 text-[11px] font-medium text-slate-200" : `rounded-full border px-2 py-0.5 text-[11px] font-medium ${relationshipOpsTone(job.ops_status)}`}>
+                                  {relationshipOpsLabel(job.ops_status)}
+                                </span>
+                                {relationshipJobId === job.id ? (
+                                  <span className="rounded-full border border-white/20 px-2 py-0.5 text-[11px] font-medium text-slate-200">Selected</span>
+                                ) : null}
+                              </div>
+                              <div className={relationshipJobId === job.id ? "mt-1 text-xs text-slate-200" : "mt-1 text-xs text-slate-600"}>
+                                {job.job_type ? `${job.job_type.toUpperCase()} • ` : ""}
+                                {job.scheduled_date ? `Scheduled ${formatRelationshipDate(job.scheduled_date)}` : `Created ${formatRelationshipDate(job.created_at)}`}
+                                {formatRelationshipWindow(job) ? ` • ${formatRelationshipWindow(job)}` : ""}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {relationshipContext.recentJobs.length > 0 ? (
+                        <div className="space-y-2">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent jobs</p>
+                            <p className="mt-1 text-xs text-slate-500">Use this only when the follow-up belongs to a recently completed or older visit.</p>
+                          </div>
+                          {relationshipContext.recentJobs.map((job) => (
+                            <button
+                              key={`follow-up-recent-${job.id}`}
+                              type="button"
+                              onClick={() => setRelationshipJobId(job.id)}
+                              className={[
+                                "w-full rounded-xl border px-3 py-3 text-left shadow-sm transition-all",
+                                relationshipJobId === job.id
+                                  ? "border-slate-900 bg-slate-900 text-white"
+                                  : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white",
+                              ].join(" ")}
+                            >
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="text-sm font-semibold">{relationshipJobTitle(job)}</div>
+                                <span className={relationshipJobId === job.id ? "rounded-full border border-white/20 px-2 py-0.5 text-[11px] font-medium text-slate-200" : `rounded-full border px-2 py-0.5 text-[11px] font-medium ${relationshipOpsTone(job.ops_status)}`}>
+                                  {relationshipOpsLabel(job.ops_status)}
+                                </span>
+                                {relationshipJobId === job.id ? (
+                                  <span className="rounded-full border border-white/20 px-2 py-0.5 text-[11px] font-medium text-slate-200">Selected</span>
+                                ) : null}
+                              </div>
+                              <div className={relationshipJobId === job.id ? "mt-1 text-xs text-slate-200" : "mt-1 text-xs text-slate-600"}>
+                                {job.job_type ? `${job.job_type.toUpperCase()} • ` : ""}
+                                {job.scheduled_date ? `Scheduled ${formatRelationshipDate(job.scheduled_date)}` : `Created ${formatRelationshipDate(job.created_at)}`}
+                                {formatRelationshipWindow(job) ? ` • ${formatRelationshipWindow(job)}` : ""}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+                      No existing work is available to anchor a follow-up here.
+                    </div>
+                  )}
+                  {selectedRelationshipJob ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+                      Follow-up anchor selected: {relationshipJobTitle(selectedRelationshipJob)}.
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {relationshipAction === "new_case" ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm">
+                  <p className="text-sm font-semibold text-emerald-900">Continuing as a new case</p>
+                  <p className="mt-1 text-xs text-emerald-800">Existing-work chooser panels are hidden. The normal intake flow continues below and will create a fresh case.</p>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {showInternalSetupHint ? (
+          <section className="space-y-3">
+            <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-white px-4 py-3 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Next</p>
+              <p className="mt-1 text-sm text-blue-900">{internalNextStepMessage}</p>
+            </div>
+          </section>
+        ) : null}
+
         {canAdvancePastResolution ? (
           <>
             <section className="space-y-3">
               {isInternalMode ? (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 4</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 5</p>
                   <h2 className="mt-1 text-lg font-semibold text-slate-900">Job details</h2>
                   <p className="mt-1 text-sm text-slate-500">Capture only the visit details needed to create a clean job record.</p>
                 </div>
@@ -1610,7 +1983,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               <section className="space-y-3">
                 {isInternalMode ? (
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 5</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 6</p>
                     <h2 className="mt-1 text-lg font-semibold text-slate-900">Scheduling and billing</h2>
                     <p className="mt-1 text-sm text-slate-500">Set timing and who should be billed, then leave the rest for later if needed.</p>
                   </div>
@@ -1792,7 +2165,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             <section className="space-y-3">
               {isInternalMode ? (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 6</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 7</p>
                   <h2 className="mt-1 text-lg font-semibold text-slate-900">Optional details</h2>
                   <p className="mt-1 text-sm text-slate-500">Add equipment, photos, and notes only when helpful.</p>
                 </div>
@@ -2020,7 +2393,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           </div>
         )}
 
-        {isInternalMode && internalResolutionReady ? (
+        {isInternalMode && internalResolutionReady && canAdvancePastResolution ? (
           <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white px-5 py-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Before you create</p>
             <p className="mt-1 text-sm text-slate-500">Quick final check before you create the job.</p>

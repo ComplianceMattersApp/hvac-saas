@@ -208,6 +208,33 @@ The confidence layer is intentional for internal intake, but must stay concise a
 
 This internal/admin guided-flow lock does not alter or reopen contractor intake proposal architecture; contractor intake boundaries in 7.7 remain in force.
 
+7.9 Internal/admin `/jobs/new` relationship-aware extension (V1)
+
+Internal/admin `/jobs/new` now includes a relationship-aware decision step after customer/location resolution and after internal Job Type selection.
+
+This is an extension of the existing guided intake model, not a replacement intake model.
+
+V1 relationship step options:
+- Open Active Job
+- Create Follow-Up Visit
+- Continue as New Case
+
+Locked V1 rules:
+- The relationship step is internal-only and does not alter contractor intake boundaries in 7.7.
+- Job Type must be selected before relationship review.
+- Relationship candidates must be scoped by selected `job_type`; ECC and Service must not be blended in actionable relationship decisions.
+- Existing customer + new location remains part of location resolution, not the relationship decision step.
+- Open Active Job must show only true active/current work candidates, not generic unresolved history.
+- `need_to_schedule` does not belong in Open Active Job.
+- Open Active Job candidate lists should suppress older chain ancestors in favor of the current operative record.
+- Create Follow-Up Visit in V1 anchors to an existing job and reuses/ensures `service_case_id` continuity.
+- V1 follow-up does not repurpose `parent_job_id`, because `parent_job_id` remains tied to direct visit lineage and existing retest-chain semantics elsewhere in the system.
+- Continue as New Case preserves the existing root-job create path.
+
+Implementation note:
+This V1 solves relationship-aware intake and service-case continuity.
+It does not yet establish full follow-up lineage semantics such as “this visit happened because of Job A” as a first-class generalized model beyond the selected anchor and shared service case.
+
 8. Service Case Container Model (Locked)
 8.1 Container rule
 
@@ -647,6 +674,36 @@ The platform is no longer waiting on a missing core system.
 It is now in:
 
 refinement, extension, and business-layer planning
+
+19.3 Current roadmap checkpoint
+
+Roadmap order remains:
+
+1. Service model buildout
+2. Billing / invoice workflow
+3. Reporting / analytics
+4. RLS completion / permission hardening
+5. Monthly usage / payment model
+6. Out-of-box readiness / business identity / settings packaging
+7. Smaller service-model revisions after the above
+
+Current position:
+Work remains inside roadmap item #1 (Service model buildout).
+
+Service model buildout completed in the current thread:
+- Service Contract V1 spine lock
+- Service Contract V1 schema/domain pass
+- Existing-flow wiring for service fields
+- Service intake vocabulary cleanup
+- Intake de-duplication of Job Title vs Visit Reason
+- Internal relationship-aware intake step V1
+- Open Active Job query tightening and mode cleanup
+- Job-type-aware relationship scoping (ECC vs Service separation)
+- Submit-side hardening for Open Active Job type enforcement
+
+Interpretation:
+Service model buildout has been materially advanced and now has a working V1 foundation.
+The roadmap has not yet moved into item #2 (Billing / invoice workflow).
 
 20. Usage Rule for Future Threads
 
