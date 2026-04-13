@@ -21,6 +21,7 @@ import {
   updateJobScheduleFromForm,
   advanceJobStatusFromForm,
   updateJobTypeFromForm,
+  updateJobServiceContractFromForm,
   completeDataEntryFromForm,
   type JobStatus,
   createRetestJobFromForm,
@@ -506,6 +507,9 @@ export default async function JobDetailPage({
       customer_id,
        service_case_id,
       job_type,
+      service_visit_type,
+      service_visit_reason,
+      service_visit_outcome,
       project_type,
       id,
       parent_job_id,
@@ -616,6 +620,16 @@ const retestRootId = parentJobId ?? jobId;
 
 // --- Service Chain (full case history) ---
 const serviceCaseId = (job as any).service_case_id as string | null;
+
+const { data: serviceCase, error: serviceCaseErr } = serviceCaseId
+  ? await supabase
+      .from("service_cases")
+      .select("id, case_kind")
+      .eq("id", serviceCaseId)
+      .maybeSingle()
+  : { data: null, error: null };
+
+if (serviceCaseErr) throw new Error(serviceCaseErr.message);
 
 const { data: serviceChainJobs, error: serviceChainErr } = serviceCaseId
   ? await supabase
@@ -1951,6 +1965,27 @@ const renderTimelineItem = (e: any, key: string) => {
         />
       )}
 
+      {banner === "service_contract_saved" && (
+        <FlashBanner
+          type="success"
+          message="Service contract fields saved."
+        />
+      )}
+
+      {banner === "service_contract_already_saved" && (
+        <FlashBanner
+          type="warning"
+          message="Service contract fields were already up to date."
+        />
+      )}
+
+      {banner === "service_contract_update_failed" && (
+        <FlashBanner
+          type="warning"
+          message="Unable to update service contract fields."
+        />
+      )}
+
       {banner === "note_added" && (
         <FlashBanner
           type="success"
@@ -2402,6 +2437,86 @@ const renderTimelineItem = (e: any, key: string) => {
                     </form>
                   </div>
                 </details>
+
+                {job.job_type === "service" ? (
+                  <details className="group w-full rounded-xl border border-slate-200/80 bg-white p-4 text-sm shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90">
+                    <summary className="cursor-pointer list-none">
+                      <CollapsibleHeader
+                        title="Service Details"
+                        subtitle="Edit service type and visit classification fields."
+                      />
+                    </summary>
+
+                    <form action={updateJobServiceContractFromForm} className="mt-3 space-y-3">
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="tab" value="info" />
+                      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=info`} />
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <label className={workspaceFieldLabelClass}>Service Type</label>
+                          <select
+                            name="service_case_kind"
+                            defaultValue={String((serviceCase as any)?.case_kind ?? "reactive")}
+                            className={workspaceInputClass}
+                          >
+                            <option value="reactive">Standard Service</option>
+                            <option value="callback">Callback</option>
+                            <option value="warranty">Warranty</option>
+                            <option value="maintenance">Maintenance</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className={workspaceFieldLabelClass}>Visit Type</label>
+                          <select
+                            name="service_visit_type"
+                            defaultValue={String(job.service_visit_type ?? "diagnostic")}
+                            className={workspaceInputClass}
+                          >
+                            <option value="diagnostic">Diagnostic</option>
+                            <option value="repair">Repair</option>
+                            <option value="return_visit">Return Visit</option>
+                            <option value="callback">Callback</option>
+                            <option value="maintenance">Maintenance</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className={workspaceFieldLabelClass}>Visit Reason</label>
+                        <textarea
+                          name="service_visit_reason"
+                          defaultValue={String(job.service_visit_reason ?? "")}
+                          rows={3}
+                          maxLength={500}
+                          className={workspaceInputClass}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className={workspaceFieldLabelClass}>Visit Outcome</label>
+                        <select
+                          name="service_visit_outcome"
+                          defaultValue={String(job.service_visit_outcome ?? "follow_up_required")}
+                          className={workspaceInputClass}
+                        >
+                          <option value="follow_up_required">Follow-up Required</option>
+                          <option value="resolved">Resolved</option>
+                          <option value="no_issue_found">No Issue Found</option>
+                        </select>
+                      </div>
+
+                      <SubmitButton
+                        loadingText="Saving..."
+                        className={secondaryButtonClass}
+                      >
+                        Save service contract
+                      </SubmitButton>
+                    </form>
+                  </details>
+                ) : null}
               </div>
 
               {isInternalAdmin ? (
