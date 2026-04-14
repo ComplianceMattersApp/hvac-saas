@@ -16,7 +16,7 @@ export function resolveAppUrl() {
 function resolveLogoUrl() {
   const appUrl = resolveAppUrl();
   if (!appUrl) return null;
-  return `${appUrl}/CM%20Logo-white.png`;
+  return `${appUrl}/cm-logo.png`;
 }
 
 export function renderSystemEmailLayout(args: { title?: string | null; bodyHtml: string }) {
@@ -24,7 +24,7 @@ export function renderSystemEmailLayout(args: { title?: string | null; bodyHtml:
   const logoUrl = resolveLogoUrl();
 
   const logoBlock = logoUrl
-    ? `<div style="margin-bottom: 16px;"><img src="${escapeHtml(logoUrl)}" alt="Compliance Matters" style="max-width: 220px; height: auto; display: block;" /></div>`
+    ? `<div style="margin-bottom: 16px;"><img src="${escapeHtml(logoUrl)}" alt="Compliance Matters logo" width="220" height="220" style="width: 220px; max-width: 100%; height: auto; display: block;" /></div>`
     : "";
 
   const titleBlock = title
