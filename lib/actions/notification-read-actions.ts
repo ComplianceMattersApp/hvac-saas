@@ -21,6 +21,81 @@ export type NotificationRowForUI = NotificationRow & {
   is_unread: boolean;
 };
 
+const DEFAULT_READ_RETENTION_DAYS = 30;
+
+function isProposalNotificationType(value: string): boolean {
+  return (
+    value === "contractor_intake_proposal_submitted" ||
+    value === "internal_contractor_intake_proposal_email"
+  );
+}
+
+function proposalSubmissionId(row: NotificationRow): string | null {
+  const payload = (row.payload ?? {}) as Record<string, unknown>;
+  const id = String(payload.contractor_intake_submission_id ?? "").trim();
+  return id || null;
+}
+
+function rankProposalVisibilityRow(row: NotificationRow): number {
+  const type = String(row.notification_type ?? "").trim().toLowerCase();
+  if (type === "contractor_intake_proposal_submitted") return 3;
+  if (type === "internal_contractor_intake_proposal_email") return 2;
+  return 1;
+}
+
+function dedupeProposalVisibilityRows(rows: NotificationRow[]): NotificationRow[] {
+  const preferredByProposalId = new Map<string, NotificationRow>();
+  const passthrough: NotificationRow[] = [];
+
+  for (const row of rows) {
+    const type = String(row.notification_type ?? "").trim().toLowerCase();
+    if (!isProposalNotificationType(type)) {
+      passthrough.push(row);
+      continue;
+    }
+
+    const proposalId = proposalSubmissionId(row);
+    if (!proposalId) {
+      passthrough.push(row);
+      continue;
+    }
+
+    const existing = preferredByProposalId.get(proposalId);
+    if (!existing) {
+      preferredByProposalId.set(proposalId, row);
+      continue;
+    }
+
+    const existingRank = rankProposalVisibilityRow(existing);
+    const candidateRank = rankProposalVisibilityRow(row);
+    if (candidateRank > existingRank) {
+      preferredByProposalId.set(proposalId, row);
+      continue;
+    }
+
+    if (candidateRank === existingRank) {
+      const existingUnread = existing.read_at === null;
+      const candidateUnread = row.read_at === null;
+      if (candidateUnread && !existingUnread) {
+        preferredByProposalId.set(proposalId, row);
+        continue;
+      }
+
+      if (candidateUnread === existingUnread) {
+        const existingCreatedAt = Date.parse(existing.created_at);
+        const candidateCreatedAt = Date.parse(row.created_at);
+        if (Number.isFinite(candidateCreatedAt) && Number.isFinite(existingCreatedAt) && candidateCreatedAt > existingCreatedAt) {
+          preferredByProposalId.set(proposalId, row);
+        }
+      }
+    }
+  }
+
+  const merged = [...passthrough, ...preferredByProposalId.values()];
+  merged.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return merged;
+}
+
 export async function listInternalNotifications(params: {
   limit?: number;
   onlyUnread?: boolean;
@@ -48,7 +123,19 @@ export async function listInternalNotifications(params: {
 
   if (error) throw error;
 
-  return (data ?? []).map(row => ({
+  const nowMs = Date.now();
+  const readRetentionCutoffMs = nowMs - DEFAULT_READ_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+  const retainedRows = (data ?? []).filter((row) => {
+    if (row.read_at === null) return true;
+    const readAtMs = Date.parse(String(row.read_at ?? ""));
+    if (!Number.isFinite(readAtMs)) return true;
+    return readAtMs >= readRetentionCutoffMs;
+  });
+
+  const visibilityRows = dedupeProposalVisibilityRows(retainedRows).slice(0, limit);
+
+  return visibilityRows.map(row => ({
     ...row,
     is_unread: row.read_at === null,
   }));
