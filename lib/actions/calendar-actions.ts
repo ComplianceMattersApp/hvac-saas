@@ -284,7 +284,7 @@ export async function getDispatchCalendarData(params: {
     return ops === 'on_hold' || status === 'on_hold';
   }
 
-  // Calendar is a scheduling record surface for runnable work only.
+  // Active queue semantics remain separate from calendar historical visibility.
   function isActive(job: JobDispatchRow) {
     const ops = String(job.ops_status ?? '').toLowerCase();
     const status = String(job.status ?? '').toLowerCase();
@@ -294,15 +294,12 @@ export async function getDispatchCalendarData(params: {
     return true;
   }
 
-  function isCancelledHistorical(job: JobDispatchRow) {
-    const ops = String(job.ops_status ?? '').toLowerCase();
-    const status = String(job.status ?? '').toLowerCase();
-    return ops === 'cancelled' || status === 'cancelled';
-  }
-
   function isCalendarScheduled(job: JobDispatchRow) {
     if (!job.scheduled_date) return false;
-    return isActive(job) || isCancelledHistorical(job);
+    // Calendar is a record-of-truth schedule surface; keep historical scheduled rows.
+    // On-hold rows remain excluded from calendar layout by existing dispatch behavior.
+    if (isOnHold(job)) return false;
+    return true;
   }
 
   // Type guard for JobDispatchRow
@@ -320,7 +317,7 @@ export async function getDispatchCalendarData(params: {
       .filter(Boolean)
   );
 
-  // Canonical scheduled calendar jobs exclude non-active historical rows from dispatch surfaces.
+  // Canonical scheduled calendar jobs include historical scheduled rows.
   const scheduledCalendarRows = validRows.filter((row) => isCalendarScheduled(row));
 
   // Canonical unscheduled active jobs

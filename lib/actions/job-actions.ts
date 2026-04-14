@@ -5849,6 +5849,14 @@ function canContractorWriteEvent(event_type: string) {
     }
 
     const proposalWriteClient = createAdminClient();
+    const uploadedProposalFiles = formData
+      .getAll("photos")
+      .filter((value): value is File => value instanceof File && value.size > 0);
+
+    function safeProposalFileName(raw: string) {
+      const cleaned = String(raw ?? "").trim().replace(/[^\w.\- ()]/g, "_");
+      return cleaned || "intake-upload";
+    }
 
     const { data: proposalRow, error: proposalErr } = await proposalWriteClient
       .from("contractor_intake_submissions")
@@ -5878,8 +5886,114 @@ function canContractorWriteEvent(event_type: string) {
     }
 
     const proposalId = String((proposalRow as any)?.id ?? "").trim();
+    if (!proposalId) {
+      redirect("/jobs/new?err=contractor_proposal_submit_failed");
+    }
 
     if (proposalId) {
+      const persistedAttachmentIds: string[] = [];
+      const persistedStoragePaths: string[] = [];
+
+      async function rollbackProposalOnAttachmentFailure() {
+        if (persistedAttachmentIds.length > 0) {
+          const { error: deleteAttachmentRowsErr } = await proposalWriteClient
+            .from("attachments")
+            .delete()
+            .eq("entity_type", "contractor_intake_submission")
+            .eq("entity_id", proposalId)
+            .in("id", persistedAttachmentIds);
+
+          if (deleteAttachmentRowsErr) {
+            console.error("proposal_attachment_row_rollback_failed", {
+              proposalId,
+              error:
+                deleteAttachmentRowsErr instanceof Error
+                  ? deleteAttachmentRowsErr.message
+                  : String((deleteAttachmentRowsErr as any)?.message ?? "Unknown rollback row delete error"),
+            });
+          }
+        }
+
+        if (persistedStoragePaths.length > 0) {
+          const uniquePaths = Array.from(new Set(persistedStoragePaths));
+          const { error: deleteStorageErr } = await proposalWriteClient.storage
+            .from("attachments")
+            .remove(uniquePaths);
+
+          if (deleteStorageErr) {
+            console.error("proposal_attachment_storage_rollback_failed", {
+              proposalId,
+              error:
+                deleteStorageErr instanceof Error
+                  ? deleteStorageErr.message
+                  : String((deleteStorageErr as any)?.message ?? "Unknown rollback storage delete error"),
+            });
+          }
+        }
+
+        const { error: deleteProposalErr } = await proposalWriteClient
+          .from("contractor_intake_submissions")
+          .delete()
+          .eq("id", proposalId)
+          .eq("review_status", "pending");
+
+        if (deleteProposalErr) {
+          console.error("proposal_row_rollback_failed", {
+            proposalId,
+            error:
+              deleteProposalErr instanceof Error
+                ? deleteProposalErr.message
+                : String((deleteProposalErr as any)?.message ?? "Unknown rollback proposal delete error"),
+          });
+        }
+      }
+
+      try {
+        for (const file of uploadedProposalFiles) {
+          const attachmentId = crypto.randomUUID();
+          const safeName = safeProposalFileName(file.name);
+          const storagePath = `contractor-intake/${proposalId}/${attachmentId}-${safeName}`;
+          const contentType = String(file.type ?? "").trim() || "application/octet-stream";
+
+          const buffer = Buffer.from(await file.arrayBuffer());
+          const { error: uploadErr } = await proposalWriteClient.storage
+            .from("attachments")
+            .upload(storagePath, buffer, {
+              contentType,
+              upsert: false,
+            });
+
+          if (uploadErr) throw uploadErr;
+
+          const { error: attachmentRowErr } = await proposalWriteClient.from("attachments").insert({
+            id: attachmentId,
+            entity_type: "contractor_intake_submission",
+            entity_id: proposalId,
+            bucket: "attachments",
+            storage_path: storagePath,
+            file_name: safeName,
+            content_type: contentType,
+            file_size: file.size,
+            caption: null,
+          });
+
+          if (attachmentRowErr) {
+            await proposalWriteClient.storage.from("attachments").remove([storagePath]);
+            throw attachmentRowErr;
+          }
+
+          persistedAttachmentIds.push(attachmentId);
+          persistedStoragePaths.push(storagePath);
+        }
+      } catch (error) {
+        console.error("proposal_attachment_persist_failed", {
+          proposalId,
+          error: error instanceof Error ? error.message : "Unknown proposal attachment persist error",
+        });
+        await rollbackProposalOnAttachmentFailure();
+        redirect("/jobs/new?err=contractor_proposal_submit_failed");
+      }
+
       try {
         await proposalWriteClient.from("notifications").insert({
           job_id: null,
@@ -5923,6 +6037,7 @@ function canContractorWriteEvent(event_type: string) {
     revalidatePath("/ops/admin");
     revalidatePath("/ops/admin/contractor-intake-submissions");
     revalidatePath("/portal");
+    revalidatePath("/portal/jobs");
     redirect("/jobs/new?err=contractor_proposal_submitted");
   }
 

@@ -405,6 +405,26 @@ This rule is presentation-only and does not change source-of-truth ownership:
 jobs.status remains lifecycle/historical truth
 jobs.ops_status remains operational projection
 
+10.7 Calendar historical visibility rule
+
+Calendar is a system-of-record scheduling surface, not an active-queue-only surface.
+
+Closed or cancelled jobs must remain visible on the calendar as historical records when they still belong to the scheduled calendar dataset.
+
+This historical visibility rule applies across all calendar views (day / week / month / list) because they consume the same canonical scheduled calendar dataset.
+
+These records must not disappear from calendar merely because lifecycle or ops state changed.
+
+Removal from calendar should happen only through true record-exclusion rules such as:
+- archival behavior that intentionally removes the record from active calendar visibility
+- deletion / soft-delete behavior where the record is no longer part of the visible calendar dataset
+- other explicitly approved full-record visibility rules
+
+Guardrail:
+Do not treat closed status alone as a reason to drop a job from calendar history.
+Do not treat cancelled status alone as a reason to drop a job from calendar history.
+Calendar may visually distinguish historical records, but should preserve them as record-of-truth scheduling history unless a stronger record-removal rule applies.
+
 11. Notifications / Signals (Locked v1)
 11.1 Current state
 
@@ -506,6 +526,25 @@ Contractor intake authority is now locked as follows:
   - new customer + new location
 - Internal intake remains permitted to create/link canonical customer/location records directly through shared intake rules.
 - Contractor intake boundaries do not grant contractors lifecycle or scheduling authority.
+
+13.5 Contractor proposal visibility / collaboration rule
+
+Contractor intake proposals that remain in proposal-state review must stay visible to the submitting contractor in the portal as plain-language **Under Review** until internal review/finalization resolves them.
+
+This visibility exists for continuity and trust only. It does not grant contractors scheduling authority, lifecycle control, or canonical record ownership.
+
+Locked proposal-state rules:
+- Proposal-state submissions may surface in contractor portal waiting/read models even before final canonical job finalization.
+- Proposal detail is a contractor-safe, read-only under-review surface for the original submission context.
+- The original submitted note remains immutable on the proposal record.
+- Contractors may append pending-only follow-up comments as additive proposal addenda while the proposal remains under review.
+- Proposal addenda do not overwrite the original submission.
+- Original proposal files are represented using proposal attachment persistence, but contractor-facing receipt semantics must depend only on successfully persisted proposal attachment rows.
+- Proposal attachment handling is authoritative: if proposal attachment persistence fails, proposal submission must fail safely rather than silently succeeding with partial file loss.
+
+Boundary rule:
+- Proposal-state portal visibility and collaboration are trust/continuity features only.
+- They do not expand contractor authority to edit canonical customer/location/job records, schedule work, or control lifecycle.
 
 14. Repo / Environment Guardrails (Locked)
 14.1 Project trees

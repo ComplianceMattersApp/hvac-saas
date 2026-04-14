@@ -19,6 +19,7 @@ import {
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isPortalVisibleJob } from "@/lib/visibility/portal";
+import { listPendingContractorIntakeProposalsForContractor } from "@/lib/portal/intake-proposal-read-model";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -75,6 +76,10 @@ export default async function PortalAllJobsPage({
     (cu as any)?.contractors?.name ?? (contractorId ? "Contractor" : null);
 
   if (!contractorId) redirect("/ops");
+
+  const pendingIntakeProposals = await listPendingContractorIntakeProposalsForContractor({
+    contractorId,
+  });
 
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
@@ -251,6 +256,19 @@ export default async function PortalAllJobsPage({
     .filter((row) => getPortalJobSection(row) === "waiting")
     .sort((a, b) => toDateMs(b.job.created_at) - toDateMs(a.job.created_at));
 
+  const waitingCards = [
+    ...pendingIntakeProposals.map((proposal) => ({
+      kind: "proposal" as const,
+      createdAtMs: toDateMs(proposal.created_at),
+      proposal,
+    })),
+    ...waitingJobs.map((row) => ({
+      kind: "job" as const,
+      createdAtMs: toDateMs(row.job.created_at),
+      row,
+    })),
+  ].sort((a, b) => b.createdAtMs - a.createdAtMs);
+
   const passedJobs = activeResolvedJobs
     .filter((row) => row.resolved.bucket === "passed")
     .sort((a, b) => {
@@ -282,6 +300,30 @@ export default async function PortalAllJobsPage({
       .filter(Boolean)
       .join(", ");
     return cityStateZip ? `${addr}, ${cityStateZip}` : addr;
+  }
+
+  function proposalCustomerName(proposal: {
+    proposed_customer_first_name: string | null;
+    proposed_customer_last_name: string | null;
+  }) {
+    return [
+      String(proposal.proposed_customer_first_name ?? "").trim(),
+      String(proposal.proposed_customer_last_name ?? "").trim(),
+    ]
+      .filter(Boolean)
+      .join(" ") || "Intake Submission";
+  }
+
+  function proposalAddress(proposal: {
+    proposed_address_line1: string | null;
+    proposed_city: string | null;
+    proposed_zip: string | null;
+  }) {
+    const line1 = String(proposal.proposed_address_line1 ?? "").trim() || "Address pending review";
+    const city = String(proposal.proposed_city ?? "").trim();
+    const zip = String(proposal.proposed_zip ?? "").trim();
+    const line2 = [city, zip].filter(Boolean).join(" ");
+    return line2 ? `${line1}, ${line2}` : line1;
   }
 
   return (
@@ -326,7 +368,7 @@ export default async function PortalAllJobsPage({
               {activeWorkJobs.length} active
             </div>
             <div className={`${portalMetricChipClass} border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200`}>
-              {waitingJobs.length} waiting
+              {waitingCards.length} waiting
             </div>
             <div className={`${portalMetricChipClass} border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300`}>
               {passedJobs.length} passed
@@ -502,7 +544,7 @@ export default async function PortalAllJobsPage({
               Waiting States
             </div>
           <h2 className="mt-0.5 text-[1.1rem] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">
-            {labelWithCount("Waiting", waitingJobs.length)}
+            {labelWithCount("Waiting", waitingCards.length)}
           </h2>
           </div>
           <div className="max-w-md text-sm leading-5 text-slate-600 dark:text-slate-300 sm:text-right">
@@ -512,7 +554,26 @@ export default async function PortalAllJobsPage({
 
         <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/96 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950/80">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
-            {waitingJobs.map(({ job: j, resolved }) => {
+            {waitingCards.map((card) => {
+              if (card.kind === "proposal") {
+                const proposal = card.proposal;
+                return (
+                  <PortalJobListItem
+                    key={`proposal-${proposal.id}`}
+                    href={`/portal/intake-submissions/${proposal.id}`}
+                    customerName={proposalCustomerName(proposal)}
+                    title={String(proposal.proposed_title ?? "").trim() || "Submitted intake"}
+                    address={proposalAddress(proposal)}
+                    statusLabel="Under review"
+                    statusToneClass="border-cyan-200 bg-cyan-50 text-cyan-800"
+                    detailLine="Your intake submission is under internal review."
+                    nextStep="Open this item to review the submission details."
+                    secondaryMeta="Waiting update"
+                  />
+                );
+              }
+
+              const { job: j, resolved } = card.row;
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = getPortalJobDetailLine({ job: j, resolved, openRetestChild });
               const statusMeta = getPortalJobStatusMeta({ job: j, resolved, openRetestChild });
@@ -532,7 +593,7 @@ export default async function PortalAllJobsPage({
               );
             })}
 
-            {waitingJobs.length === 0 && (
+            {waitingCards.length === 0 && (
               <div className="px-6 py-6 text-center">
                 <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   No waiting-state jobs.

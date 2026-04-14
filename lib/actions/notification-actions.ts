@@ -1,3 +1,5 @@
+import { createAdminClient } from "@/lib/supabase/server";
+
 export type NotificationTriggerEventType =
   | "contractor_report_sent"
   | "retest_ready_requested"
@@ -61,7 +63,7 @@ export async function insertInternalNotificationForEvent(
 
   if (actorUserId) payload.actor_user_id = actorUserId;
 
-  const { error } = await input.supabase.from("notifications").insert({
+  const row = {
     job_id: jobId,
     recipient_type: "internal",
     recipient_ref: null,
@@ -71,7 +73,18 @@ export async function insertInternalNotificationForEvent(
     body: EVENT_TO_BODY[input.eventType],
     payload,
     status: "queued",
-  });
+  };
+
+  const { error } = await input.supabase.from("notifications").insert(row);
+
+  // Contractor-scoped clients cannot satisfy internal-user notifications RLS.
+  // Fall back to service-role write while keeping caller auth checks in place.
+  if ((error as any)?.code === "42501") {
+    const admin = createAdminClient();
+    const { error: adminError } = await admin.from("notifications").insert(row);
+    if (adminError) throw adminError;
+    return;
+  }
 
   if (error) throw error;
 }

@@ -138,6 +138,15 @@ export default async function ContractorIntakeSubmissionDetailPage({
   const submission = data as any;
   const isPending = normalizeText(submission.review_status).toLowerCase() === "pending";
 
+  const { data: commentRows, error: commentErr } = await admin
+    .from("contractor_intake_submission_comments")
+    .select("id, author_role, comment_text, created_at")
+    .eq("submission_id", submission.id)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (commentErr) throw commentErr;
+
   const { data: customerRows, error: customerErr } = await admin
     .from("customers")
     .select("id, full_name, first_name, last_name, phone, email")
@@ -354,6 +363,27 @@ export default async function ContractorIntakeSubmissionDetailPage({
               {submission.reviewed_at ? ` · Reviewed ${formatDateTime(submission.reviewed_at)}` : ""}
             </span>
           </div>
+
+          <div className="my-5 border-t border-slate-100" />
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Contractor follow-up comments</h2>
+          {commentRows && commentRows.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {commentRows.map((row: any) => (
+                <div key={normalizeText(row.id)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <div className="text-[11px] text-slate-500">
+                    {normalizeText(row.author_role) || "contractor"} · {formatDateTime(normalizeText(row.created_at) || null)}
+                  </div>
+                  <div className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                    {normalizeText(row.comment_text) || "—"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+              No follow-up comments added.
+            </div>
+          )}
         </section>
 
         <section className="space-y-4">
