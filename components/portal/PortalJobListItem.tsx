@@ -38,9 +38,6 @@ export default function PortalJobListItem(props: PortalJobListItemProps) {
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <div className="inline-flex items-center rounded-full border border-slate-200/80 bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 shadow-[0_10px_20px_-26px_rgba(15,23,42,0.18)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-              {customerName}
-            </div>
             <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusToneClass}`}>
               {statusLabel}
             </span>
@@ -53,6 +50,11 @@ export default function PortalJobListItem(props: PortalJobListItemProps) {
           <div className="mt-1.5 text-[1rem] font-semibold tracking-[-0.018em] text-slate-950 dark:text-slate-100 lg:max-w-[48rem]">
             {title}
           </div>
+          {customerName ? (
+            <div className="mt-0.5 text-sm font-medium text-slate-700 dark:text-slate-200 lg:max-w-[50rem]">
+              {customerName}
+            </div>
+          ) : null}
           <div className="mt-0.5 text-sm leading-5 text-slate-600 dark:text-slate-300 lg:max-w-[50rem]">
             {address}
           </div>

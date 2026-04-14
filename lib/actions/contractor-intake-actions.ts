@@ -426,6 +426,9 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
   revalidatePath("/ops/admin/contractor-intake-submissions");
   revalidatePath(`/ops/admin/contractor-intake-submissions/${submission.id}`);
   revalidatePath(`/jobs/${created.id}`);
+  revalidatePath("/portal");
+  revalidatePath("/portal/jobs");
+  revalidatePath(`/portal/intake-submissions/${submission.id}`);
 
   redirect(`/jobs/${created.id}?banner=contractor_intake_finalized`);
 }
@@ -462,6 +465,9 @@ export async function rejectContractorIntakeSubmissionFromForm(formData: FormDat
   revalidatePath("/ops");
   revalidatePath("/ops/admin/contractor-intake-submissions");
   revalidatePath(`/ops/admin/contractor-intake-submissions/${submission.id}`);
+  revalidatePath("/portal");
+  revalidatePath("/portal/jobs");
+  revalidatePath(`/portal/intake-submissions/${submission.id}`);
 
   redirect(`/ops/admin/contractor-intake-submissions/${submission.id}?notice=rejected`);
 }
@@ -517,6 +523,9 @@ export async function markContractorIntakeSubmissionAsDuplicateFromForm(formData
   revalidatePath("/ops");
   revalidatePath("/ops/admin/contractor-intake-submissions");
   revalidatePath(`/ops/admin/contractor-intake-submissions/${submissionId}`);
+  revalidatePath("/portal");
+  revalidatePath("/portal/jobs");
+  revalidatePath(`/portal/intake-submissions/${submissionId}`);
 
   redirect(`/ops/admin/contractor-intake-submissions/${submissionId}?notice=duplicate`);
 }
