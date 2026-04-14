@@ -727,12 +727,6 @@ const eventsForCurrentJob = (timelineEvents ?? []).filter(
   (e: any) => String(e?.job_id ?? "") === String(job.id ?? "")
 );
 
-const latestContractorReportEvent = eventsForCurrentJob.find(
-  (e: any) => String(e?.event_type ?? "") === "contractor_report_sent"
-);
-
-const latestContractorReportEventId = String(latestContractorReportEvent?.id ?? "").trim();
-
 const contractorResponseTracking = resolveContractorResponseTracking(eventsForCurrentJob as any[]);
 
 const contractorResponseLabel = contractorResponseTracking.latestReportSentAt
@@ -827,23 +821,6 @@ const attachmentItems = await Promise.all(
   const internalNotes = (timelineEvents ?? []).filter(
     (e: any) => String(e?.event_type ?? "") === "internal_note"
   );
-
-  const reportFollowUpContextNotes = internalNotes.filter((e: any) => {
-    const meta = e && typeof e.meta === "object" && !Array.isArray(e.meta) ? e.meta : null;
-    return String(meta?.context ?? "") === "contractor_report_review";
-  });
-
-  const anchoredReportFollowUpNotes = latestContractorReportEventId
-    ? reportFollowUpContextNotes.filter((e: any) => {
-        const meta = e && typeof e.meta === "object" && !Array.isArray(e.meta) ? e.meta : null;
-        return String(meta?.anchor_event_id ?? "").trim() === latestContractorReportEventId;
-      })
-    : [];
-
-  const reportFollowUpNotes =
-    anchoredReportFollowUpNotes.length > 0
-      ? anchoredReportFollowUpNotes
-      : reportFollowUpContextNotes;
 
   const { data: customerAttempts, error: attemptsErr } = await supabase
     .from("job_events")
@@ -3100,72 +3077,6 @@ const renderTimelineItem = (e: any, key: string) => {
       contractorResponseLabel={contractorResponseLabel}
       contractorResponseSubLabel={contractorResponseSubLabel}
     />
-
-    <div className={`${workspacePanelClass} mb-5 p-4 text-gray-900`}>
-      <div className="mb-1 text-sm font-semibold text-slate-950">Internal Follow-Up Note</div>
-      <div className="mb-3 text-xs leading-5 text-slate-600">
-        Internal-only note tied to contractor report/review activity.
-      </div>
-
-      <form action={addInternalNoteFromForm} className="space-y-3">
-        <input type="hidden" name="job_id" value={job.id} />
-        <input type="hidden" name="tab" value={tab} />
-        <input type="hidden" name="context" value="contractor_report_review" />
-        <input type="hidden" name="anchor_event_type" value="contractor_report_sent" />
-        <input
-          type="hidden"
-          name="anchor_event_id"
-          value={latestContractorReportEventId}
-        />
-
-        <textarea
-          name="note"
-          rows={3}
-          placeholder="Add an internal follow-up note for this contractor report..."
-          className={workspaceTextareaClass}
-        />
-
-        <div className="flex justify-end">
-          <SubmitButton
-            loadingText="Adding note..."
-            className={secondaryButtonClass}
-          >
-            Save follow-up note
-          </SubmitButton>
-        </div>
-      </form>
-
-      <div className="mt-4 border-t border-slate-200 pt-3">
-        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-          Report Follow-Up Notes
-        </div>
-
-        {reportFollowUpNotes.length ? (
-          <div className="space-y-2">
-            {reportFollowUpNotes.map((e: any, idx: number) => {
-              const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "—";
-              const meta = e && typeof e.meta === "object" && !Array.isArray(e.meta) ? e.meta : null;
-              const noteText = getEventNoteText(meta);
-
-              return (
-                <div key={`report-follow-up-${String(e?.id ?? idx)}`} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3">
-                  <div className="text-xs text-slate-500">{when}</div>
-                  {noteText ? (
-                    <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
-                      {noteText}
-                    </div>
-                  ) : (
-                    <div className="mt-2 text-sm text-slate-500">(No note text)</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className={workspaceEmptyStateClass}>No report follow-up notes yet.</div>
-        )}
-      </div>
-    </div>
   </>
 ) : null}
 
