@@ -407,7 +407,7 @@ async function resolveContractorReportForJob(params: {
       ? [pendingReason]
       : ["Additional information is required to proceed."];
 
-  const nextStep = "Provide the requested information in the contractor portal.";
+  const nextStep = "Provide the missing information in the contractor portal.";
   const title = "INFORMATION NEEDED";
   const summary = buildContractorFailureSummaryV1({
     reportKind: "pending_info",

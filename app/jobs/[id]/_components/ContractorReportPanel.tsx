@@ -12,6 +12,29 @@ function contractorReportErrorMessage(action: "generate" | "send") {
   return action === "generate" ? "Could not prepare report." : "Could not send report.";
 }
 
+function contractorSummaryLabels(reportKind: string | null | undefined) {
+  const kind = String(reportKind ?? "").trim().toLowerCase();
+
+  if (kind === "pending_info") {
+    return {
+      explanationLabel: "What Is Missing",
+      detailListLabel: "Missing Information",
+    };
+  }
+
+  if (kind === "on_hold") {
+    return {
+      explanationLabel: "Why This Is On Hold",
+      detailListLabel: "Hold Details",
+    };
+  }
+
+  return {
+    explanationLabel: "What Failed",
+    detailListLabel: "What Needs Correction",
+  };
+}
+
 export default function ContractorReportPanel({
   jobId,
   contractorResponseLabel,
@@ -32,6 +55,7 @@ export default function ContractorReportPanel({
   const [isPending, startTransition] = useTransition();
 
   const canSend = !!preview && !isPending && !sent;
+  const summaryLabels = contractorSummaryLabels(preview?.contractor_failure_summary_v1?.report_kind);
 
   function onGenerate() {
     setError(null);
@@ -174,9 +198,9 @@ export default function ContractorReportPanel({
                 <div className="mt-2"><span className="font-medium">Next Step:</span> {preview.next_step}</div>
 
                 <div className="mt-3 rounded-xl border border-slate-200 bg-white/96 px-3 py-2.5 shadow-[0_10px_24px_-26px_rgba(15,23,42,0.18)]">
-                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Canonical Contractor Failure Summary (saved with report)</div>
-                  <div><span className="font-medium">What Failed:</span> {preview.contractor_failure_summary_v1.what_failed}</div>
-                  <div className="mt-1 font-medium">What Needs Correction</div>
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contractor Summary</div>
+                  <div><span className="font-medium">{summaryLabels.explanationLabel}:</span> {preview.contractor_failure_summary_v1.what_failed}</div>
+                  <div className="mt-1 font-medium">{summaryLabels.detailListLabel}</div>
                   <ul className="list-disc pl-5">
                     {preview.contractor_failure_summary_v1.what_needs_correction.map((line, idx) => (
                       <li key={`${line}-${idx}`}>{line}</li>
