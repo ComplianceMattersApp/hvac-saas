@@ -96,6 +96,51 @@ function dedupeProposalVisibilityRows(rows: NotificationRow[]): NotificationRow[
   return merged;
 }
 
+async function filterPendingProposalVisibilityRows(
+  supabase: any,
+  rows: NotificationRow[]
+): Promise<NotificationRow[]> {
+  const proposalIds = Array.from(
+    new Set(
+      rows
+        .map((row) => {
+          const type = String(row.notification_type ?? "").trim().toLowerCase();
+          if (!isProposalNotificationType(type)) return null;
+          return proposalSubmissionId(row);
+        })
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  if (!proposalIds.length) return rows;
+
+  const { data, error } = await supabase
+    .from("contractor_intake_submissions")
+    .select("id, review_status")
+    .in("id", proposalIds);
+
+  if (error) throw error;
+
+  const pendingIds = new Set(
+    (data ?? [])
+      .map((row: any) => {
+        const id = String(row?.id ?? "").trim();
+        const reviewStatus = String(row?.review_status ?? "").trim().toLowerCase();
+        if (!id) return null;
+        return reviewStatus === "pending" ? id : null;
+      })
+      .filter((id: string | null): id is string => Boolean(id))
+  );
+
+  return rows.filter((row) => {
+    const type = String(row.notification_type ?? "").trim().toLowerCase();
+    if (!isProposalNotificationType(type)) return true;
+    const proposalId = proposalSubmissionId(row);
+    if (!proposalId) return true;
+    return pendingIds.has(proposalId);
+  });
+}
+
 export async function listInternalNotifications(params: {
   limit?: number;
   onlyUnread?: boolean;
@@ -133,7 +178,12 @@ export async function listInternalNotifications(params: {
     return readAtMs >= readRetentionCutoffMs;
   });
 
-  const visibilityRows = dedupeProposalVisibilityRows(retainedRows).slice(0, limit);
+  const pendingProposalRows = await filterPendingProposalVisibilityRows(
+    supabase,
+    retainedRows
+  );
+
+  const visibilityRows = dedupeProposalVisibilityRows(pendingProposalRows).slice(0, limit);
 
   return visibilityRows.map(row => ({
     ...row,
@@ -181,12 +231,22 @@ export async function getInternalUnreadNotificationCount(): Promise<number> {
 
   const supabase = await createClient();
 
-  const { count, error } = await supabase
+  const { data, error } = await supabase
     .from("notifications")
-    .select("id", { count: "exact", head: true })
+    .select(
+      "id, job_id, recipient_type, channel, notification_type, subject, body, payload, status, read_at, created_at"
+    )
     .eq("recipient_type", "internal")
+    .order("created_at", { ascending: false })
     .is("read_at", null);
 
   if (error) throw error;
-  return count ?? 0;
+
+  const pendingProposalRows = await filterPendingProposalVisibilityRows(
+    supabase,
+    (data ?? []) as NotificationRow[]
+  );
+
+  const visibilityRows = dedupeProposalVisibilityRows(pendingProposalRows);
+  return visibilityRows.length;
 }
