@@ -436,7 +436,7 @@ export async function finalizePortalAttachmentSubmission(input: {
     await insertInternalNotificationForEvent({
       supabase: notificationAdmin,
       jobId: input.jobId,
-      eventType: "contractor_note",
+      eventType: "contractor_correction_submission",
       actorUserId: user.id,
     });
 

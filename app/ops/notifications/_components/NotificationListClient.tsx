@@ -16,6 +16,7 @@ function notificationTypeLabel(value?: string | null) {
     contractor_report_sent: "Contractor Report Sent",
     retest_ready_requested: "Retest Ready Requested",
     contractor_note: "Contractor Note",
+    contractor_correction_submission: "Correction Submission",
     contractor_schedule_updated: "Contractor Schedule Updated",
     contractor_intake_proposal_submitted: "Contractor Intake Proposal",
     contractor_report_email: "Contractor Report Email",

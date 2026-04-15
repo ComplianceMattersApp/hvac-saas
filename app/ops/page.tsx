@@ -20,9 +20,6 @@ import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/search-normalization";
-import {
-  listInternalNotifications,
-} from "@/lib/actions/notification-read-actions";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 
 
@@ -203,11 +200,6 @@ export default async function OpsPage({
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
   const internalBusinessDisplayName = internalBusinessIdentity.display_name;
-
-  const recentNotifications = await listInternalNotifications({
-    limit: 3,
-    onlyUnread: true,
-  });
 
   function digitsOnly(v?: string | null) {
   return String(v ?? "").replace(/\D/g, "");
@@ -931,10 +923,20 @@ function signalReason(j: any, opts?: { retestReady?: boolean; newContractorJob?:
   if (opts?.retestReady) return "Contractor says correction is complete and job is ready for retest review";
   if (opts?.newContractorJob) return "New job submitted by contractor and waiting for internal review";
   if (signal === "contractor_updates") {
-    const updateType = String(
-      latestUnreadContractorUpdateNotificationByJob.get(String(j?.id ?? ""))?.notification_type ?? ""
-    ).toLowerCase();
+    const latestAttentionEvent = latestContractorAttentionEventByJob.get(String(j?.id ?? ""));
+    const updateType = String(latestAttentionEvent?.event_type ?? "").toLowerCase();
+    const meta = ((latestAttentionEvent?.meta ?? {}) as Record<string, unknown>);
+    const attachmentCount = Array.isArray(meta.attachment_ids)
+      ? meta.attachment_ids.length
+      : Array.isArray(meta.file_names)
+      ? meta.file_names.length
+      : 0;
+    if (updateType === "contractor_correction_submission") return "Contractor submitted corrections for review";
     if (updateType === "contractor_schedule_updated") return "Contractor updated schedule details";
+    if (updateType === "attachment_added" && String(meta.source ?? "").trim().toLowerCase() === "contractor") {
+      return "Contractor uploaded attachments";
+    }
+    if (updateType === "contractor_note" && attachmentCount > 0) return "Contractor uploaded attachments";
     if (updateType === "contractor_note") return "Contractor added a note";
   }
   return queueReason(j, bucket);
@@ -1059,6 +1061,7 @@ if (signalErr) throw signalErr;
 
 const CONTRACTOR_UPDATE_NOTIFICATION_TYPES = [
   "contractor_note",
+  "contractor_correction_submission",
   "contractor_schedule_updated",
 ] as const;
 
@@ -1128,10 +1131,12 @@ for (const [jobId, run] of latestFailedRunByJob.entries()) {
 const latestRetestReadyByJob = new Map<string, any>();
 const latestContractorCreatedByJob = new Map<string, any>();
 const latestUnreadContractorUpdateNotificationByJob = new Map<string, any>();
+const latestContractorAttentionEventByJob = new Map<string, any>();
 
 for (const ev of signalEvents ?? []) {
   const jobId = String((ev as any).job_id ?? "");
   const type = String((ev as any).event_type ?? "");
+  const meta = ((ev as any).meta ?? {}) as Record<string, unknown>;
 
   if (type === "retest_ready_requested" && !latestRetestReadyByJob.has(jobId)) {
     latestRetestReadyByJob.set(jobId, ev);
@@ -1139,6 +1144,18 @@ for (const ev of signalEvents ?? []) {
 
   if (type === "contractor_job_created" && !latestContractorCreatedByJob.has(jobId)) {
     latestContractorCreatedByJob.set(jobId, ev);
+  }
+
+  if (
+    !latestContractorAttentionEventByJob.has(jobId) &&
+    (
+      type === "contractor_note" ||
+      type === "contractor_correction_submission" ||
+      type === "contractor_schedule_updated" ||
+      (type === "attachment_added" && String(meta.source ?? "").trim().toLowerCase() === "contractor")
+    )
+  ) {
+    latestContractorAttentionEventByJob.set(jobId, ev);
   }
 
 }
@@ -1332,12 +1349,8 @@ const sortedExceptionJobs = sortJobs(
   sort
 );
 
-function closeoutNeeds(j: any) {
-  return getCloseoutNeeds(j);
-}
-
 function closeoutLabel(j: any) {
-  const needs = closeoutNeeds(j);
+  const needs = getCloseoutNeeds(j);
   if (needs.needsInvoice && needs.needsCerts) return "Working closeout — invoice + certs required";
   if (needs.needsInvoice) return "Working closeout — invoice required";
   if (needs.needsCerts) return "Working closeout — certs required";
@@ -1889,68 +1902,6 @@ return (
           </div>
         </div>
       </div>
-    </section>
-
-    <section className="rounded-2xl border border-slate-300/75 bg-slate-50/75 p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-4">
-      <div className="mb-2.5 flex items-center justify-between gap-2">
-        <div>
-          <div className={`${opsUtilityLabelClass} text-slate-500`}>Internal</div>
-          <h2 className="text-sm font-semibold text-slate-900">Recent Notifications</h2>
-        </div>
-        <Link
-          href="/ops/notifications"
-          className={sectionActionLinkClass}
-        >
-          View all
-        </Link>
-      </div>
-
-      {recentNotifications.length === 0 ? (
-        <p className="text-sm text-slate-500">You're all caught up.</p>
-      ) : (
-        <div className="space-y-2">
-          {recentNotifications.map((n) => {
-            const payload = (n.payload ?? {}) as Record<string, unknown>;
-            const proposalId = String(payload.contractor_intake_submission_id ?? "").trim() || null;
-
-            return (
-            <div
-              key={n.id}
-              className="flex items-start justify-between gap-3 rounded-xl border border-slate-300/70 bg-white px-3 py-2 shadow-[0_10px_22px_-20px_rgba(15,23,42,0.24)]"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="truncate text-sm font-medium text-slate-800">
-                    {n.subject || n.notification_type}
-                  </p>
-                  {n.is_unread ? (
-                    <span className="inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true" />
-                  ) : null}
-                </div>
-                <p className="mt-0.5 line-clamp-1 text-[13px] leading-5 text-slate-600 sm:text-xs sm:leading-4">
-                  {n.body || "No additional details."}
-                </p>
-              </div>
-              {n.job_id ? (
-                <Link
-                  href={`/jobs/${n.job_id}`}
-                  className="inline-flex shrink-0 items-center rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[12px] font-medium text-blue-700 shadow-sm transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 sm:py-1 sm:text-xs"
-                >
-                  Job
-                </Link>
-              ) : proposalId ? (
-                <Link
-                  href={`/ops/admin/contractor-intake-submissions/${proposalId}`}
-                  className="inline-flex shrink-0 items-center rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[12px] font-medium text-blue-700 shadow-sm transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 sm:py-1 sm:text-xs"
-                >
-                  Proposal
-                </Link>
-              ) : null}
-            </div>
-            );
-          })}
-        </div>
-      )}
     </section>
 
     <section className="rounded-2xl border border-slate-300/75 bg-slate-50/80 p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-4">
