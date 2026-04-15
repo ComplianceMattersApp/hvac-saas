@@ -4,6 +4,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { setOpsStatusIfNotManual, forceSetOpsStatus } from "@/lib/actions/ops-status";
 import { resolveEccScenario } from "@/lib/ecc/scenario-resolver";
+import { resolveOpsStatus } from "@/lib/utils/ops-status";
 import type { EccTestType } from "@/lib/ecc/test-registry";
 
 /**
@@ -25,7 +26,7 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
 
   const { data: job, error: jobErr } = await supabase
   .from("jobs")
-  .select("id, job_type, project_type, field_complete, certs_complete, invoice_complete, ops_status")
+  .select("id, status, job_type, project_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end")
   .eq("id", jobId)
   .single();
 
@@ -174,6 +175,52 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
 
   if (anyRequiredFail) {
     const currentOps = job.ops_status ?? "";
+    const { data: correctionResolutionEvent, error: correctionResolutionErr } = await supabase
+      .from("job_events")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("event_type", "failure_resolved_by_correction_review")
+      .limit(1)
+      .maybeSingle();
+
+    if (correctionResolutionErr) throw new Error(correctionResolutionErr.message);
+
+    if (correctionResolutionEvent?.id) {
+      const resolvedNextStatus = resolveOpsStatus({
+        status: job.status ?? null,
+        job_type: job.job_type ?? null,
+        scheduled_date: (job as any).scheduled_date ?? null,
+        window_start: (job as any).window_start ?? null,
+        window_end: (job as any).window_end ?? null,
+        field_complete: Boolean((job as any)?.field_complete),
+        certs_complete: Boolean((job as any)?.certs_complete),
+        invoice_complete: Boolean((job as any)?.invoice_complete),
+        current_ops_status: "paperwork_required",
+      });
+
+      if (ECC_HARD_LOCKS.has(currentOps)) {
+        console.error("[ECC_EVAL]", {
+          jobId,
+          current_ops_status: currentOps,
+          computed_next_status: resolvedNextStatus,
+          reason: "required_test_failed_resolved_by_correction_review",
+          manual_lock_prevented: true,
+          final_ops_status: currentOps,
+        });
+      } else {
+        await forceSetOpsStatus(jobId, resolvedNextStatus);
+        console.error("[ECC_EVAL]", {
+          jobId,
+          current_ops_status: currentOps,
+          computed_next_status: resolvedNextStatus,
+          reason: "required_test_failed_resolved_by_correction_review",
+          manual_lock_prevented: false,
+          final_ops_status: resolvedNextStatus,
+        });
+      }
+      return;
+    }
+
     if (ECC_HARD_LOCKS.has(currentOps)) {
       console.error("[ECC_EVAL]", {
         jobId,
