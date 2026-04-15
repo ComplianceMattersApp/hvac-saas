@@ -2934,71 +2934,6 @@ const renderTimelineItem = (e: any, key: string) => {
       ) : null}
 </details>
 
-      {/* Section A: Follow Up (Active Edit Area) */}
-      <details className={workspaceDetailsClass}>
-        <summary className="cursor-pointer list-none">
-          <CollapsibleHeader
-            title="Follow Up"
-            subtitle={followUpSummaryText}
-          />
-        </summary>
-
-        <div className={workspaceDetailsDividerClass}>
-          <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4">
-
-          {hasFollowUpReminder ? (
-            <div className="mb-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2.5 text-xs leading-5 text-slate-600">
-              Follow Up stays separate from Pending Info. Use this area for reminder ownership, due date, and next-action notes.
-            </div>
-          ) : null}
-
-          <form action={updateJobOpsDetailsFromForm} className="grid gap-3">
-            <input type="hidden" name="job_id" value={job.id} />
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className={workspaceFieldLabelClass}>Action Required By</label>
-                <select
-                  name="action_required_by"
-                  defaultValue={job.action_required_by ?? ""}
-                  className={workspaceInputClass}
-                >
-                  <option value="">—</option>
-                  <option value="rater">Rater</option>
-                  <option value="contractor">Contractor</option>
-                  <option value="customer">Customer</option>
-                </select>
-              </div>
-
-              <div>
-                <label className={workspaceFieldLabelClass}>Follow-up Date</label>
-                <input
-                  type="date"
-                  name="follow_up_date"
-                  defaultValue={job.follow_up_date ? dateToDateInput(String(job.follow_up_date)) : ""}
-                  className={workspaceInputClass}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className={workspaceFieldLabelClass}>Next Action Note</label>
-              <textarea
-                name="next_action_note"
-                defaultValue={job.next_action_note ?? ""}
-                className={workspaceTextareaClass}
-                rows={4}
-              />
-            </div>
-
-            <SubmitButton loadingText="Saving..." className={`${darkButtonClass} w-fit`}>
-              Save Follow Up
-            </SubmitButton>
-          </form>
-        </div>
-      </div>
-      </details>
-
  </div>
 
     <section className="order-1 space-y-4 xl:order-5">
@@ -3006,7 +2941,7 @@ const renderTimelineItem = (e: any, key: string) => {
         {/* Shared Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} meta={`${sharedNotes.length} note${sharedNotes.length === 1 ? "" : "s"}`} metaTone="note-highlight" />
+            <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} meta={`${sharedNotes.length} note${sharedNotes.length === 1 ? "" : "s"}`} metaTone={sharedNotes.length > 0 ? "note-highlight" : "default"} />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -3084,7 +3019,7 @@ const renderTimelineItem = (e: any, key: string) => {
         {/* Internal Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} meta={`${internalNotes.length} note${internalNotes.length === 1 ? "" : "s"}`} metaTone="note-highlight" />
+            <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} meta={`${internalNotes.length} note${internalNotes.length === 1 ? "" : "s"}`} metaTone={internalNotes.length > 0 ? "note-highlight" : "default"} />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -3138,6 +3073,71 @@ const renderTimelineItem = (e: any, key: string) => {
     )}
   </div>
           </div>
+        </details>
+
+        {/* Section A: Follow Up (Active Edit Area) */}
+        <details className={workspaceDetailsClass}>
+          <summary className="cursor-pointer list-none">
+            <CollapsibleHeader
+              title="Follow Up"
+              subtitle={followUpSummaryText}
+            />
+          </summary>
+
+          <div className={workspaceDetailsDividerClass}>
+            <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4">
+
+            {hasFollowUpReminder ? (
+              <div className="mb-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2.5 text-xs leading-5 text-slate-600">
+                Follow Up stays separate from Pending Info. Use this area for reminder ownership, due date, and next-action notes.
+              </div>
+            ) : null}
+
+            <form action={updateJobOpsDetailsFromForm} className="grid gap-3">
+              <input type="hidden" name="job_id" value={job.id} />
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className={workspaceFieldLabelClass}>Action Required By</label>
+                  <select
+                    name="action_required_by"
+                    defaultValue={job.action_required_by ?? ""}
+                    className={workspaceInputClass}
+                  >
+                    <option value="">—</option>
+                    <option value="rater">Rater</option>
+                    <option value="contractor">Contractor</option>
+                    <option value="customer">Customer</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={workspaceFieldLabelClass}>Follow-up Date</label>
+                  <input
+                    type="date"
+                    name="follow_up_date"
+                    defaultValue={job.follow_up_date ? dateToDateInput(String(job.follow_up_date)) : ""}
+                    className={workspaceInputClass}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={workspaceFieldLabelClass}>Next Action Note</label>
+                <textarea
+                  name="next_action_note"
+                  defaultValue={job.next_action_note ?? ""}
+                  className={workspaceTextareaClass}
+                  rows={4}
+                />
+              </div>
+
+              <SubmitButton loadingText="Saving..." className={`${darkButtonClass} w-fit`}>
+                Save Follow Up
+              </SubmitButton>
+            </form>
+          </div>
+        </div>
         </details>
 
         {/* Timeline - Activity/History */}
