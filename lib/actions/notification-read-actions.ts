@@ -23,6 +23,10 @@ export type NotificationRowForUI = NotificationRow & {
 
 const DEFAULT_READ_RETENTION_DAYS = 30;
 
+function isHiddenInternalNotificationType(value: string): boolean {
+  return value === "contractor_report_sent";
+}
+
 function isProposalNotificationType(value: string): boolean {
   return (
     value === "contractor_intake_proposal_submitted" ||
@@ -178,9 +182,14 @@ export async function listInternalNotifications(params: {
     return readAtMs >= readRetentionCutoffMs;
   });
 
+  const awarenessRows = retainedRows.filter((row) => {
+    const type = String(row.notification_type ?? "").trim().toLowerCase();
+    return !isHiddenInternalNotificationType(type);
+  });
+
   const pendingProposalRows = await filterPendingProposalVisibilityRows(
     supabase,
-    retainedRows
+    awarenessRows
   );
 
   const visibilityRows = dedupeProposalVisibilityRows(pendingProposalRows).slice(0, limit);
@@ -242,9 +251,14 @@ export async function getInternalUnreadNotificationCount(): Promise<number> {
 
   if (error) throw error;
 
+  const awarenessRows = ((data ?? []) as NotificationRow[]).filter((row) => {
+    const type = String(row.notification_type ?? "").trim().toLowerCase();
+    return !isHiddenInternalNotificationType(type);
+  });
+
   const pendingProposalRows = await filterPendingProposalVisibilityRows(
     supabase,
-    (data ?? []) as NotificationRow[]
+    awarenessRows
   );
 
   const visibilityRows = dedupeProposalVisibilityRows(pendingProposalRows);

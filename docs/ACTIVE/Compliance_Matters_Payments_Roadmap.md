@@ -1,0 +1,291 @@
+# Compliance Matters Software — Payments Roadmap
+
+**Status:** ACTIVE IMPLEMENTATION DIRECTION  
+**Purpose:** Define the correct payment architecture now, while building only the payment-ready foundation and avoiding rework later.
+
+---
+
+## 1. Core decision
+
+Compliance Matters will **build payment architecture now**, but will **not yet enable live payment processing**.
+
+### Locked rule
+- the platform is **payment-ready by design**
+- the platform is **not yet payment-active**
+- payment execution comes later
+- architecture must support future payment acceptance without requiring backwards redesign
+
+---
+
+## 2. System boundary
+
+### Locked ownership model
+- **Compliance Matters** = operational source of truth for payment visibility and workflow state
+- **Stripe (future)** = payment rail for acceptance and money movement
+- **QBO (optional future)** = accounting integration seam only
+
+### Meaning
+The app must be built now so that:
+- payment tracking works without processor dependency
+- future Stripe integration can plug in cleanly
+- future QBO sync can remain optional
+- accounting adoption is never required for core usage
+
+---
+
+## 3. QBO rule (locked)
+
+QuickBooks Online must **not** be the required foundation for payment architecture.
+
+### QBO is:
+- optional
+- downstream
+- accounting-oriented
+- a future sync/integration seam
+
+### QBO is not:
+- the required merchant/payment setup
+- the core payment rail
+- the foundation for contractor payment acceptance
+- a prerequisite for core product use
+
+---
+
+## 4. Stripe rule (locked)
+
+Stripe is the preferred future payment rail.
+
+### Meaning
+When real payment acceptance is introduced later:
+- customer payment execution should be processor-led
+- processor-specific logic should fit a Stripe-first path
+- contractor payout/onboarding complexity should be handled at the payment-rail layer, not forced into accounting logic
+
+### Current implementation rule
+Do not build Stripe execution now.  
+Build the platform so Stripe can be introduced later without structural rework.
+
+---
+
+## 5. Current product truth
+
+### Live behavior right now
+Payments are **tracking-only**.
+
+Supported now:
+- payment status visibility
+- invoice/payment tracking fields
+- amount due / amount paid visibility
+- manual operational tracking of payment state
+- external reference storage where needed
+
+Not supported now:
+- live card collection
+- ACH collection
+- saved payment methods
+- refunds through processor
+- contractor payout onboarding
+- chargeback/dispute tooling
+- processor-driven customer checkout
+
+---
+
+## 6. Payment foundation requirements (build now)
+
+### 6.1 Data model rule
+Build the payment domain now, even if live payment execution is deferred.
+
+The payment layer must be able to support future:
+- online payment acceptance
+- partial payments
+- external transaction references
+- refunds / reversals
+- sync status
+- processor identification
+- accounting sync without QBO dependency
+
+### Minimum domain expectations
+The system should be able to represent:
+- payment status
+- amount due
+- amount paid
+- balance due
+- payment method type
+- processor reference
+- processor name
+- recorded/paid date
+- refund status
+- refund amount
+- failure/error note
+- sync state
+
+This does **not** require all live processor workflows now, but the architecture must anticipate them.
+
+### 6.2 Processor abstraction rule
+Payment tracking must not assume QBO objects or QBO-specific payment structure.
+
+The model should remain generic enough that:
+- Stripe can become the live processor later
+- QBO can optionally receive synced accounting/payment records later
+- manual/off-platform payment recording can still coexist
+
+### 6.3 Event rule
+Payment-related operational changes should be event-capable from the start.
+
+Examples:
+- `invoice_sent`
+- `payment_recorded`
+- `payment_partially_paid`
+- `payment_marked_paid`
+- `payment_marked_failed`
+- `refund_recorded`
+- `payment_sync_failed`
+
+**Locked rule:** If payment state materially affects operations, history, or accountability, it should be event-backed.
+
+### 6.4 UI rule
+Current UI must reflect tracking truth only.
+
+Allowed current language:
+- Payment Status
+- Amount Paid
+- Balance Due
+- Payment Recorded
+- External Payment Reference
+
+Disallowed current language unless real processing exists:
+- Pay Now
+- Collect Card
+- Charge Card
+- Process Refund
+- Card on File
+
+The UI must not imply live payment execution before it truly exists.
+
+---
+
+## 7. Platform fee rule (locked)
+
+Future Stripe-based payment acceptance should support a **small configurable platform fee**.
+
+### Meaning
+- the architecture should allow the platform to retain a modest fee later
+- the fee should help sustain the platform
+- the fee must be configurable, not hardcoded as a fixed aggressive monetization model
+
+### Current implementation rule
+- support the ability to add a platform fee later
+- keep it low by default
+- do not assume heavy fee extraction at launch
+- do not make payment monetization the centerpiece of the current build
+
+---
+
+## 8. Roadmap phases
+
+### Phase P0 — Tracking only (active)
+Current live state.
+
+Includes:
+- operational payment visibility
+- payment status tracking
+- balance/amount fields
+- manual recorded payment references
+- payment-aware invoice/closeout visibility
+
+### Phase P1 — Payment-ready foundation (build now)
+This is the current implementation phase.
+
+Includes:
+- payment domain model
+- payment-related fields
+- event-ready payment transitions
+- processor-agnostic architecture
+- optional external reference storage
+- clear ownership and UI wording boundaries
+- future Stripe seam
+- optional future QBO sync seam
+- support for a later configurable platform fee
+
+Does **not** include:
+- customer checkout
+- processor onboarding
+- contractor payouts
+- saved cards
+- refunds through processor
+
+### Phase P2 — Customer payment acceptance (later)
+First live processor phase.
+
+Recommended first scope:
+- customer pays invoice online
+- transaction outcome writes back to Compliance Matters
+- payment state updates automatically
+- minimal processor-led implementation
+- no contractor payout complexity unless explicitly required
+
+### Phase P3 — Contractor/platform payout layer (later)
+Only after customer payment acceptance is stable.
+
+Includes:
+- contractor payment onboarding
+- payout ownership model
+- payout visibility
+- refund/dispute responsibility rules
+- merchant-of-record / recipient logic
+- optional platform fee logic if desired
+
+### Phase P4 — Optional QBO sync (later)
+Accounting convenience only.
+
+Possible scope:
+- invoice sync
+- payment sync
+- reconciliation support
+- bookkeeping-friendly exports or mappings
+
+**Locked boundary:**
+- QBO sync must remain optional and downstream
+- this must never become required for core usage
+- this must never be the only path to payment acceptance
+
+---
+
+## 9. Product launch rule
+
+### Locked launch rule
+Lack of live payment acceptance does **not** block launch by itself.
+
+Why:
+- current product can still operate with payment tracking
+- invoice/payment status can still be managed operationally
+- payment acceptance is a convenience and revenue-collection expansion layer, not a core workflow backbone requirement
+
+---
+
+## 10. Strategic takeaway
+
+Compliance Matters should launch and grow as:
+
+**operations-first software with optional future accounting integration and later Stripe-based payment acceptance**
+
+Not as:
+- a QBO-dependent app
+- a bookkeeping-led platform
+- a payment-first system before operational maturity is in place
+
+---
+
+## 11. Non-negotiables
+
+- Do not require QBO for core product use
+- Do not couple payment acceptance to accounting adoption
+- Do not let payment features distort the operational source-of-truth model
+- Do not expand into payout complexity until customer payment acceptance is stable
+- Keep payments additive, not disruptive
+
+---
+
+## 12. One-line definition
+
+Compliance Matters is **payment-ready by design now, payment-active later**: operational payment truth lives in the platform, Stripe is the future payment rail, QBO remains optional accounting sync only, and a small configurable platform fee is supported for later rollout.
