@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { setOpsStatusIfNotManual, forceSetOpsStatus } from "@/lib/actions/ops-status";
 import { resolveEccScenario } from "@/lib/ecc/scenario-resolver";
 import { resolveOpsStatus } from "@/lib/utils/ops-status";
+import type { OpsStatus } from "@/lib/actions/ops-status";
 import type { EccTestType } from "@/lib/ecc/test-registry";
 
 /**
@@ -197,6 +198,15 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
         invoice_complete: Boolean((job as any)?.invoice_complete),
         current_ops_status: "paperwork_required",
       });
+      const allowedResolvedStatuses: ReadonlySet<OpsStatus> = new Set([
+        "paperwork_required",
+        "invoice_required",
+        "closed",
+      ]);
+
+      if (!allowedResolvedStatuses.has(resolvedNextStatus as OpsStatus)) {
+        throw new Error(`Unexpected resolved ECC status: ${resolvedNextStatus}`);
+      }
 
       if (ECC_HARD_LOCKS.has(currentOps)) {
         console.error("[ECC_EVAL]", {
@@ -208,7 +218,7 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
           final_ops_status: currentOps,
         });
       } else {
-        await forceSetOpsStatus(jobId, resolvedNextStatus);
+        await forceSetOpsStatus(jobId, resolvedNextStatus as OpsStatus);
         console.error("[ECC_EVAL]", {
           jobId,
           current_ops_status: currentOps,
