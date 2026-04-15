@@ -413,7 +413,7 @@ const compactUtilityButtonClass =
 const compactWorkspaceActionButtonClass =
   "inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200/90 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900 shadow-[0_10px_22px_-20px_rgba(37,99,235,0.35)] transition-[border-color,background-color,box-shadow,transform,color] hover:border-blue-300 hover:bg-blue-100 hover:text-blue-950 hover:shadow-[0_14px_26px_-20px_rgba(37,99,235,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
 const workspaceDetailsClass =
-  `${workspaceSectionClass} group border-emerald-200/90 ring-1 ring-emerald-200/80 text-gray-900 shadow-[0_20px_44px_-34px_rgba(16,185,129,0.16)] transition-[border-color,box-shadow,transform] duration-150 hover:border-emerald-300/90 hover:shadow-[0_24px_48px_-34px_rgba(16,185,129,0.2)] [&[open]_.disclosure-icon]:rotate-90`;
+  `${workspaceSectionClass} group border-emerald-200/90 text-gray-900 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.28)] transition-[border-color,box-shadow,transform] duration-150 hover:border-emerald-300/90 hover:shadow-[0_18px_38px_-30px_rgba(15,23,42,0.32)] [&[open]_.disclosure-icon]:rotate-90`;
 const workspaceDetailsDividerClass = "mt-3 border-t border-slate-200/90 pt-4";
 const workspaceSoftCardClass =
   "rounded-xl border border-slate-200/80 bg-slate-50/72 p-4";
