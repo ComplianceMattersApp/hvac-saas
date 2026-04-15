@@ -344,8 +344,13 @@ function CollapsibleHeader(props: {
   title: string;
   subtitle?: string;
   meta?: string;
+  metaTone?: "default" | "note-highlight";
 }) {
-  const { title, subtitle, meta } = props;
+  const { title, subtitle, meta, metaTone = "default" } = props;
+  const metaClassName =
+    metaTone === "note-highlight"
+      ? "mt-0.5 shrink-0 rounded-lg border border-amber-200/80 bg-amber-50/85 px-2.5 py-[0.3125rem] text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-800 shadow-[0_10px_24px_-24px_rgba(217,119,6,0.35)]"
+      : "mt-0.5 shrink-0 rounded-lg border border-slate-200/70 bg-slate-50/72 px-2.5 py-[0.3125rem] text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
   return (
     <div className="flex min-w-0 items-start justify-between gap-4 py-0.5">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -360,7 +365,7 @@ function CollapsibleHeader(props: {
           {subtitle ? <div className="mt-1 max-w-[42rem] text-[11.5px] leading-[1.45] text-slate-500">{subtitle}</div> : null}
         </div>
       </div>
-      {meta ? <div className="mt-0.5 shrink-0 rounded-lg border border-slate-200/70 bg-slate-50/72 px-2.5 py-[0.3125rem] text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{meta}</div> : null}
+      {meta ? <div className={metaClassName}>{meta}</div> : null}
     </div>
   );
 }
@@ -408,7 +413,7 @@ const compactUtilityButtonClass =
 const compactWorkspaceActionButtonClass =
   "inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200/90 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900 shadow-[0_10px_22px_-20px_rgba(37,99,235,0.35)] transition-[border-color,background-color,box-shadow,transform,color] hover:border-blue-300 hover:bg-blue-100 hover:text-blue-950 hover:shadow-[0_14px_26px_-20px_rgba(37,99,235,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
 const workspaceDetailsClass =
-  `${workspaceSectionClass} group text-gray-900 transition-shadow duration-150 hover:shadow-[0_18px_38px_-30px_rgba(15,23,42,0.32)] [&[open]_.disclosure-icon]:rotate-90`;
+  `${workspaceSectionClass} group border-emerald-200/90 ring-1 ring-emerald-200/80 text-gray-900 shadow-[0_20px_44px_-34px_rgba(16,185,129,0.16)] transition-[border-color,box-shadow,transform] duration-150 hover:border-emerald-300/90 hover:shadow-[0_24px_48px_-34px_rgba(16,185,129,0.2)] [&[open]_.disclosure-icon]:rotate-90`;
 const workspaceDetailsDividerClass = "mt-3 border-t border-slate-200/90 pt-4";
 const workspaceSoftCardClass =
   "rounded-xl border border-slate-200/80 bg-slate-50/72 p-4";
@@ -2575,7 +2580,7 @@ const renderTimelineItem = (e: any, key: string) => {
   <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.92fr)] xl:items-start">
   <div className="order-2 flex flex-col gap-5 xl:order-2">
     {/* Equipment */}
-  <details open={equipmentCount === 0} className={`${workspaceDetailsClass} xl:order-2`}>
+  <details className={`${workspaceDetailsClass} xl:order-2`}>
       <summary className="cursor-pointer list-none">
         <CollapsibleHeader
           title="Equipment"
@@ -2820,9 +2825,9 @@ const renderTimelineItem = (e: any, key: string) => {
       ) : null}
     </div>
 
-    <div className="order-1 space-y-6 xl:order-1">
+    <div className="order-1 flex flex-col gap-6 xl:order-1">
       {/* Unified operations workspace */}
-<div className="space-y-5">
+  <div className="order-1 space-y-5 xl:order-1">
           {/* Job Status (ops_status) */}
 <details className={workspaceDetailsClass}>
   <summary className="cursor-pointer list-none">
@@ -2996,96 +3001,12 @@ const renderTimelineItem = (e: any, key: string) => {
 
  </div>
 
-          {/* Failure Resolution */}
-{(showRetestSection || showCorrectionReviewResolution) ? (
-<details className={`${workspaceDetailsClass} mb-5`}>
-  <summary className="cursor-pointer list-none">
-    <CollapsibleHeader
-      title="Failure Resolution"
-      subtitle={failureResolutionSummaryText}
-      meta={`${failureResolutionPathCount} path${failureResolutionPathCount === 1 ? "" : "s"} available`}
-    />
-  </summary>
-
-  <div className={workspaceDetailsDividerClass}>
-  <div className={`grid gap-4${showRetestSection && showCorrectionReviewResolution ? " lg:grid-cols-2" : ""}`}>
-    {showRetestSection ? (
-      <div className={workspaceSoftCardClass}>
-        <div className="mb-2 text-sm font-semibold text-slate-950">Create Retest Job</div>
-        <div className="mb-3 text-sm leading-6 text-slate-600">
-          Create a new retest visit when this failure requires a physical return visit.
-        </div>
-
-        <form action={createRetestJobFromForm} className="space-y-3">
-          <input type="hidden" name="parent_job_id" value={job.id} />
-
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
-            Copy equipment from original
-          </label>
-
-          <button
-            type="submit"
-            className={darkButtonClass}
-          >
-            Create Retest Job
-          </button>
-        </form>
-      </div>
-    ) : null}
-
-    {showCorrectionReviewResolution ? (
-      <div className={workspaceSoftCardClass}>
-        <div className="mb-2 text-sm font-semibold text-slate-950">Resolve by Correction Review</div>
-        <div className="mb-3 text-sm leading-6 text-slate-600">
-          Use this only when submitted correction notes/photos are sufficient to resolve the failure without sending a technician back out for a physical retest.
-        </div>
-
-        <form action={resolveFailureByCorrectionReviewFromForm} className="space-y-3">
-          <input type="hidden" name="job_id" value={job.id} />
-
-          <div>
-            <label className={workspaceFieldLabelClass}>
-              Review Note (optional)
-            </label>
-            <textarea
-              name="review_note"
-              rows={3}
-              placeholder="Explain why the failure was resolved by correction review..."
-              className={workspaceTextareaClass}
-            />
-          </div>
-
-          <button
-            type="submit"
-            className={darkButtonClass}
-          >
-            Resolve Failure by Correction Review
-          </button>
-        </form>
-      </div>
-    ) : null}
-  </div>
-</div>
-</details>
-) : null}
-
-{isInternalUser && ["failed", "pending_info"].includes(String(job.ops_status ?? "")) ? (
-  <>
-    <ContractorReportPanel
-      jobId={job.id}
-      contractorResponseLabel={contractorResponseLabel}
-      contractorResponseSubLabel={contractorResponseSubLabel}
-    />
-  </>
-) : null}
-
-    <section className="mt-2 space-y-4">
+    <section className="order-1 space-y-4 xl:order-5">
       <div className="space-y-4">
         {/* Shared Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} meta={`${sharedNotes.length} note${sharedNotes.length === 1 ? "" : "s"}`} />
+            <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} meta={`${sharedNotes.length} note${sharedNotes.length === 1 ? "" : "s"}`} metaTone="note-highlight" />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -3163,7 +3084,7 @@ const renderTimelineItem = (e: any, key: string) => {
         {/* Internal Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} meta={`${internalNotes.length} note${internalNotes.length === 1 ? "" : "s"}`} />
+            <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} meta={`${internalNotes.length} note${internalNotes.length === 1 ? "" : "s"}`} metaTone="note-highlight" />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -3256,6 +3177,92 @@ const renderTimelineItem = (e: any, key: string) => {
         </details>
       </div>
     </section>
+
+          {/* Failure Resolution */}
+{(showRetestSection || showCorrectionReviewResolution) ? (
+<details className={`${workspaceDetailsClass} order-3 mb-5 xl:order-3`}>
+  <summary className="cursor-pointer list-none">
+    <CollapsibleHeader
+      title="Failure Resolution"
+      subtitle={failureResolutionSummaryText}
+      meta={`${failureResolutionPathCount} path${failureResolutionPathCount === 1 ? "" : "s"} available`}
+    />
+  </summary>
+
+  <div className={workspaceDetailsDividerClass}>
+  <div className={`grid gap-4${showRetestSection && showCorrectionReviewResolution ? " lg:grid-cols-2" : ""}`}>
+    {showRetestSection ? (
+      <div className={workspaceSoftCardClass}>
+        <div className="mb-2 text-sm font-semibold text-slate-950">Create Retest Job</div>
+        <div className="mb-3 text-sm leading-6 text-slate-600">
+          Create a new retest visit when this failure requires a physical return visit.
+        </div>
+
+        <form action={createRetestJobFromForm} className="space-y-3">
+          <input type="hidden" name="parent_job_id" value={job.id} />
+
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
+            Copy equipment from original
+          </label>
+
+          <button
+            type="submit"
+            className={darkButtonClass}
+          >
+            Create Retest Job
+          </button>
+        </form>
+      </div>
+    ) : null}
+
+    {showCorrectionReviewResolution ? (
+      <div className={workspaceSoftCardClass}>
+        <div className="mb-2 text-sm font-semibold text-slate-950">Resolve by Correction Review</div>
+        <div className="mb-3 text-sm leading-6 text-slate-600">
+          Use this only when submitted correction notes/photos are sufficient to resolve the failure without sending a technician back out for a physical retest.
+        </div>
+
+        <form action={resolveFailureByCorrectionReviewFromForm} className="space-y-3">
+          <input type="hidden" name="job_id" value={job.id} />
+
+          <div>
+            <label className={workspaceFieldLabelClass}>
+              Review Note (optional)
+            </label>
+            <textarea
+              name="review_note"
+              rows={3}
+              placeholder="Explain why the failure was resolved by correction review..."
+              className={workspaceTextareaClass}
+            />
+          </div>
+
+          <button
+            type="submit"
+            className={darkButtonClass}
+          >
+            Resolve Failure by Correction Review
+          </button>
+        </form>
+      </div>
+    ) : null}
+  </div>
+</div>
+</details>
+) : null}
+
+{isInternalUser && ["failed", "pending_info"].includes(String(job.ops_status ?? "")) ? (
+  <>
+    <div className="order-4 xl:order-4">
+      <ContractorReportPanel
+        jobId={job.id}
+        contractorResponseLabel={contractorResponseLabel}
+        contractorResponseSubLabel={contractorResponseSubLabel}
+      />
+    </div>
+  </>
+) : null}
     </div>
   </div>
   </div>
