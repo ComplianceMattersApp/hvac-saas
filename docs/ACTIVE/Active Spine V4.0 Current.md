@@ -449,6 +449,24 @@ Do not turn notifications into another queue or urgency stack.
 
 Notifications are awareness signals only and do not own ECC failed-job pending_office_review workflow decisions.
 
+11.5 Awareness-filter rule
+
+Internal notifications should surface awareness-worthy inbound or action-needed signals, not every event written to audit history.
+
+Examples of awareness-worthy internal notifications:
+- contractor notes/comments received
+- contractor attachments uploaded
+- correction submissions
+- retest-ready requests
+- new intake / new job alerts
+- other inbound signals that require review or response
+
+Outbound office-originated actions may remain canonical in `job_events` and other audit/history layers without appearing in the internal notifications awareness feed.
+
+Example:
+- `contractor_report_sent` remains part of audit truth/history
+- `contractor_report_sent` should not appear as an internal awareness notification
+
 12. Ops Workspace Principles (Locked)
 12.1 Page philosophy
 
