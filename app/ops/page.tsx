@@ -1523,9 +1523,33 @@ function displayOpsCardTitle(value: unknown) {
   return normalizeRetestLinkedJobTitle(value) || "Job";
 }
 
+function contractorResponseBadgeLabelForJob(jobId: string) {
+  const unreadNotification = latestUnreadContractorUpdateNotificationByJob.get(jobId);
+  const unreadType = String(unreadNotification?.notification_type ?? "").trim().toLowerCase();
+  if (!unreadType) return null;
+
+  if (unreadType === "contractor_note") {
+    const attentionEvent = latestContractorAttentionEventByJob.get(jobId);
+    const attentionType = String(attentionEvent?.event_type ?? "").trim().toLowerCase();
+    const meta = ((attentionEvent?.meta ?? {}) as Record<string, unknown>);
+    const attachmentCount = Array.isArray(meta.attachment_ids)
+      ? meta.attachment_ids.length
+      : Array.isArray(meta.file_names)
+      ? meta.file_names.length
+      : 0;
+
+    if (attentionType === "contractor_note" && attachmentCount === 0) {
+      return "New Note";
+    }
+  }
+
+  return "New Update";
+}
+
 function compactRow(j: any, showDate = false, note?: string, emphasize = false) {
   const jobId = String(j?.id ?? "");
   const displayTitle = displayOpsCardTitle(j?.title);
+  const contractorResponseBadgeLabel = contractorResponseBadgeLabelForJob(jobId);
   const assignmentSummary = assignmentSummaryForJob(jobId);
   const retestState = retestStateForJob(jobId);
   const scheduledRetestLabel = retestScheduleLabelForJob(jobId);
@@ -1677,12 +1701,19 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
       <div className="min-w-0">
         <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[minmax(10rem,0.75fr)_minmax(0,1.25fr)] sm:items-start sm:gap-3">
           <div className="min-w-0">
-            <Link
-              href={`/jobs/${j.id}?tab=ops`}
-              className="inline-block text-[14px] font-semibold leading-5 tracking-[-0.01em] text-blue-700 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1"
-            >
-              {displayTitle}
-            </Link>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Link
+                href={`/jobs/${j.id}?tab=ops`}
+                className="inline-block text-[14px] font-semibold leading-5 tracking-[-0.01em] text-blue-700 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1"
+              >
+                {displayTitle}
+              </Link>
+              {contractorResponseBadgeLabel ? (
+                <span className="inline-flex items-center rounded-full border border-indigo-200/90 bg-indigo-50/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-indigo-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+                  {contractorResponseBadgeLabel}
+                </span>
+              ) : null}
+            </div>
             <div className="mt-0.5 text-[13px] font-semibold leading-5 text-slate-950">{customerName}</div>
             <div className={`${opsSupportTextClass} text-slate-600`}>{addressLine(j)}</div>
             {customerPhone ? (
