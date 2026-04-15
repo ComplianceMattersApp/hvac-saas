@@ -612,13 +612,18 @@ These are not currently failures of the spine. They are future/business-layer mo
 
 advanced reporting / analytics layer
 price book / quoting
-invoicing automation beyond current workflow
 maintenance / agreement systems
 optional drag-and-drop dispatch UX
 deeper notification prioritization/escalation layers
 broader role model refinement
 future branding/settings/business-profile formalization
+
+Note:
+Payments are no longer treated as a purely deferred untouched module.
+The platform is now entering an active payment-foundation phase as defined in Section 19 below.
+
 18. Internal Business Identity vs Product Brand Identity (Locked)
+
 18.1 Internal Business Identity (tenant operational identity)
 
 Internal Business Identity is account-owner-scoped operational identity from internal_business_profiles.
@@ -667,7 +672,7 @@ role / permission semantics
 do not overload user profiles to represent company identity
 keep the initial implementation narrow and identity-focused only
 
-18.3 Equipment Domain — Canonical Role Vocabulary and Field Contract
+18.4 Equipment Domain — Canonical Role Vocabulary and Field Contract
 
 The job_equipment table uses equipment_role as the single canonical classification field.
 
@@ -699,14 +704,266 @@ The job_equipment table uses equipment_role as the single canonical classificati
 
 **Out of scope:** component_type column is not part of this contract. Mini-split full treatment is deferred.
 
-19. Current Product Assessment
-19.1 Honest state
+19. Payments Module (Active Implementation Direction)
+
+19.1 Current truth (locked)
+
+Payments are not complete.
+
+Any earlier assumption that payments could be treated as complete was for comparison/gap-analysis only and must not be treated as implementation truth.
+
+Current implementation truth:
+- payments are currently tracking-only
+- payment architecture is an active implementation phase
+- live processor-based payment acceptance is not yet enabled
+- this area must be built correctly now so future rollout is additive, not corrective
+
+19.2 Core payment direction (locked)
+
+Compliance Matters will build the payment foundation now without enabling full live payment execution yet.
+
+Locked rule:
+- the platform is payment-ready by design
+- the platform is not yet payment-active
+- architecture must support future live payments without forcing redesign later
+
+19.3 Ownership model (locked)
+
+- Compliance Matters = operational source of truth for payment visibility, payment-related workflow state, and operational tracking
+- Stripe (future) = preferred payment rail for payment acceptance and money movement
+- QBO (optional future) = accounting integration seam only
+
+Meaning:
+- operational payment state
+- accounting sync
+- payment execution
+
+are separate layers and must remain separate in the architecture.
+
+19.4 QBO rule (locked)
+
+QuickBooks Online must not be the required foundation for payment architecture.
+
+QBO is:
+- optional
+- downstream
+- accounting-oriented
+- a future sync/integration seam
+
+QBO is not:
+- the required basis for payment acceptance
+- the payment rail
+- the required merchant setup
+- a prerequisite for core product usage
+
+19.5 Stripe rule (locked)
+
+Stripe is the preferred future payment rail.
+
+Meaning:
+- future customer payment execution should follow a Stripe-first path
+- processor-backed payment handling must not depend on QBO adoption
+- future contractor payout/onboarding complexity should live at the payment-rail layer, not in accounting logic
+
+Current implementation rule:
+- do not build full Stripe execution yet
+- build the platform so Stripe can be introduced later without structural rework
+
+19.6 Current live behavior
+
+Supported now:
+- payment tracking
+- payment status visibility
+- amount due / amount paid visibility where implemented
+- manual/external payment reference tracking where needed
+- operational awareness of payment state
+
+Not yet supported:
+- live card acceptance
+- ACH acceptance
+- saved payment methods
+- processor-led refunds
+- dispute/chargeback handling
+- contractor payout onboarding
+- customer self-serve payment checkout
+
+19.7 Payment foundation requirements (build now)
+
+19.7.1 Data-model rule
+
+The payment domain must be built now so the system can support later payment acceptance without rework.
+
+The architecture should be able to represent:
+- payment status
+- amount due
+- amount paid
+- balance due
+- payment method type
+- processor name
+- processor reference
+- recorded/paid date
+- refund status
+- refund amount
+- failure/error note
+- sync status
+
+This does not require all execution flows to exist now, but the structure must anticipate them.
+
+19.7.2 Processor abstraction rule
+
+Payment tracking must remain processor-agnostic at the domain level.
+
+Locked rule:
+- do not hardcode payment logic around QBO-specific objects
+- do not hardcode accounting-only assumptions into payment flows
+- do not lock the model to one-off manual patterns that would block future Stripe rollout
+
+The payment layer must allow:
+- manual/off-platform recorded payments now
+- Stripe execution later
+- optional QBO sync later
+
+19.7.3 Event rule
+
+Payment-related operational changes should be event-capable from the start.
+
+Examples:
+- `invoice_sent`
+- `payment_recorded`
+- `payment_partially_paid`
+- `payment_marked_paid`
+- `payment_marked_failed`
+- `refund_recorded`
+- `payment_sync_failed`
+
+Locked rule:
+If payment state materially affects operations, history, or accountability, it should be event-backed.
+
+19.7.4 UI rule
+
+Current UI must reflect tracking truth only.
+
+Allowed current language:
+- Payment Status
+- Amount Paid
+- Balance Due
+- Payment Recorded
+- External Payment Reference
+
+Disallowed current language until live processing exists:
+- Pay Now
+- Collect Card
+- Charge Card
+- Process Refund
+- Card on File
+
+The UI must not imply live processor-backed payment functionality before it is actually implemented.
+
+19.8 Platform-fee rule (locked)
+
+Future Stripe-based payment acceptance should support a small configurable platform fee.
+
+Meaning:
+- the architecture should allow the platform to retain a modest fee later
+- the fee should help sustain the platform
+- the fee must be configurable, not hardcoded as an aggressive monetization model
+
+Current implementation rule:
+- support the ability to add a platform fee later
+- do not assume heavy fee extraction at launch
+- do not make payment monetization the centerpiece of the current build
+
+19.9 Roadmap phases
+
+Phase P0 — Tracking only (current live state)
+
+Includes:
+- payment visibility
+- payment status tracking
+- operational payment awareness
+- manual/external reference support
+
+Phase P1 — Payment-ready foundation (current active build phase)
+
+Includes:
+- payment domain model
+- payment-related fields
+- processor-agnostic architecture
+- event-ready payment transitions
+- UI wording boundaries
+- future Stripe seam
+- optional future QBO sync seam
+- support for a later configurable platform fee
+
+Does not include:
+- live customer checkout
+- contractor payout onboarding
+- saved cards
+- live refunds/disputes
+- processor-led payment execution
+
+Phase P2 — Customer payment acceptance (later)
+
+Recommended first live scope:
+- customer pays invoice online
+- transaction outcome writes back into Compliance Matters
+- payment state updates automatically
+- simple Stripe-first processor path
+- no payout complexity unless explicitly required
+
+Phase P3 — Contractor/platform payout layer (later)
+
+Only after customer payment acceptance is stable.
+
+Includes:
+- contractor onboarding
+- payout rules
+- recipient ownership logic
+- refund/dispute responsibility
+- optional platform fee activation if desired
+
+Phase P4 — Optional QBO sync (later)
+
+Accounting convenience only.
+
+Possible scope:
+- invoice sync
+- payment sync
+- reconciliation support
+- bookkeeping-friendly exports/mappings
+
+Locked boundary:
+- QBO sync must remain optional and downstream
+
+19.10 Launch rule (locked)
+
+Lack of live payment acceptance does not automatically block launch.
+
+Reason:
+- payment tracking still supports operations
+- the system can still manage invoice/payment visibility
+- payment execution is a later convenience/collection layer
+- current focus is building the architecture correctly so rollout later is clean
+
+19.11 Non-negotiables
+
+- do not require QBO for payment architecture
+- do not couple payment readiness to accounting adoption
+- do not imply live payment acceptance before it exists
+- do not hardcode around QBO-specific payment structures
+- do not overbuild payout complexity too early
+- do support a future small configurable platform fee
+- do keep payment execution additive to the operational core, not disruptive to it
+
+20. Current Product Assessment
+
+20.1 Honest state
 
 Compliance Matters is now a:
 
 stabilized, event-driven operational workflow system with working scheduling, staffing, contractor collaboration, and internal signals
 
-19.2 Most accurate summary
+20.2 Most accurate summary
 
 The platform is no longer waiting on a missing core system.
 
@@ -714,7 +971,7 @@ It is now in:
 
 refinement, extension, and business-layer planning
 
-19.3 Current roadmap checkpoint
+20.3 Current roadmap checkpoint
 
 Roadmap order remains:
 
@@ -727,7 +984,9 @@ Roadmap order remains:
 7. Smaller service-model revisions after the above
 
 Current position:
-Work remains inside roadmap item #1 (Service model buildout).
+- Service model buildout has been materially advanced and has a working V1 foundation.
+- Payment architecture/foundation is now also an active implementation area under the locked direction in Section 19.
+- This does not mean full payment acceptance is live; it means payment readiness is now being intentionally built to prevent later rework.
 
 Service model buildout completed in the current thread:
 - Service Contract V1 spine lock
@@ -740,26 +999,8 @@ Service model buildout completed in the current thread:
 - Job-type-aware relationship scoping (ECC vs Service separation)
 - Submit-side hardening for Open Active Job type enforcement
 
-Interpretation:
-Service model buildout has been materially advanced and now has a working V1 foundation.
-The roadmap has not yet moved into item #2 (Billing / invoice workflow).
+20.4 Current locked clarifications
 
-20. Usage Rule for Future Threads
-
-When starting future work:
-
-Use this spine as the current operational truth.
-Distinguish clearly between:
-core engine completeness
-UX polish
-deferred future modules
-unresolved model decisions
-Do not relabel a UX gap as a missing backend system.
-Do not introduce new source-of-truth layers without explicit approval.
-Preserve additive architecture and environment discipline.
-21. One-Line Definition
-
-UPDDATES:
 1. on_the_way rule
 
 on_the_way is a field lifecycle state only and must never be written to ops_status.
@@ -779,4 +1020,26 @@ Implementation rule:
 - Existing historical retest_needed rows may be read for compatibility during transition cleanup.
 - Active behavioral model should treat retest_needed as legacy compatibility-only, not a forward state.
 
-Compliance Matters Software is a stabilized, event-driven operational system for compliance and service workflows, with complete scheduling and staffing foundations, strong auditability, and future-ready business-layer expansion.
+21. Usage Rule for Future Threads
+
+When starting future work:
+
+Use this spine as the current operational truth.
+Distinguish clearly between:
+core engine completeness
+UX polish
+deferred future modules
+unresolved model decisions
+Do not relabel a UX gap as a missing backend system.
+Do not introduce new source-of-truth layers without explicit approval.
+Preserve additive architecture and environment discipline.
+
+22. One-Line Definition
+
+Compliance Matters Software is a stabilized, event-driven operational system for compliance and service workflows, with complete scheduling and staffing foundations, strong auditability, active payment-foundation planning, and future-ready business-layer expansion.
+
+23. Supporting document:
+For detailed payment implementation direction, use:
+`docs/ACTIVE/Compliance_Matters_Payments_Roadmap.md`
+
+This roadmap is subordinate to the Active Spine. If code or planning detail conflicts with the spine, the spine wins.

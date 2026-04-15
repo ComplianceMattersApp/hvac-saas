@@ -48,11 +48,16 @@ const EVENT_TO_BODY: Record<NotificationTriggerEventType, string> = {
   contractor_schedule_updated: "A contractor submitted scheduling data with a new job.",
 };
 
+function isInternalAwarenessEventType(value: NotificationTriggerEventType): boolean {
+  return value !== "contractor_report_sent";
+}
+
 export async function insertInternalNotificationForEvent(
   input: InsertInternalNotificationForEventInput
 ): Promise<void> {
   const jobId = String(input.jobId ?? "").trim();
   if (!jobId) return;
+  if (!isInternalAwarenessEventType(input.eventType)) return;
 
   const actorUserId = String(input.actorUserId ?? "").trim() || null;
 
