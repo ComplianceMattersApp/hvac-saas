@@ -467,6 +467,62 @@ Example:
 - `contractor_report_sent` remains part of audit truth/history
 - `contractor_report_sent` should not appear as an internal awareness notification
 
+11.6 Ops dashboard signal surface
+
+The `/ops` dashboard contains one signal surface only.
+
+Do not render separate internal/admin notice bars on `/ops`.
+
+The `/ops` signal surface must show only current office-attention signals that affect what Ops should review or act on next.
+
+Examples include:
+- contractor notes/comments
+- contractor attachment uploads
+- contractor correction submissions
+- retest-ready requests
+- new contractor-created jobs / review-needed jobs
+- contractor-provided schedule updates when they affect follow-up
+
+Do not surface on the `/ops` dashboard:
+- internal/admin notice feeds
+- email-delivery/bookkeeping notices
+- outbound office actions
+- audit/history-only events that do not require present attention
+
+Canonical audit/history may still exist in `job_events` and related ledgers without appearing in the `/ops` dashboard signal surface.
+
+During transitional implementation, contractor-response signal wording/classification may be resolved at the read/surface layer without requiring immediate write-path redesign, as long as the dashboard remains a single action-needed signal surface.
+
+11.7 Internal email awareness boundary
+
+Internal email alerts should represent new external/inbound awareness, not echoes of internal office actions.
+
+Rule:
+- Internal users should receive new-job alert emails for contractor-originated new job submissions.
+- Internal users should not receive new-job alert emails for jobs created internally by office/internal users.
+
+Meaning:
+- contractor-created intake/new-job activity may trigger internal awareness email
+- internal office-created jobs remain canonical operational history, but should not generate redundant internal alert email to the same office workflow by default
+
+Guardrail:
+Do not use internal email alerts as a mirror of all job creation activity.
+Use them only where the office is being informed of externally-originated work requiring awareness/review.
+
+11.8 Contractor response classification boundary
+
+Contractor response concepts must remain semantically distinct across narrative truth and internal awareness where safely implemented.
+
+Locked rules:
+- Plain contractor notes remain `contractor_note`.
+- Contractor correction/review submissions remain `contractor_correction_submission` in canonical event history and must not be flattened into generic contractor-note awareness.
+- Upload-only contractor submissions may remain on the transitional `contractor_note` path until downstream response-tracking and awareness readers are updated together to support a separate upload concept safely.
+
+Meaning:
+- correction submission is a distinct contractor response type
+- it should remain distinct in both `job_events` and internal awareness/notification handling
+- upload separation is deferred intentionally to avoid drifting downstream response behavior
+
 12. Ops Workspace Principles (Locked)
 12.1 Page philosophy
 
