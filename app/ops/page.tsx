@@ -2160,7 +2160,10 @@ return (
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="text-[15px] font-semibold tracking-tight text-slate-950">Exceptions (Still Open Past Scheduled Date)</div>
         <div className="flex items-center gap-3">
-          {sectionCountPill(sortedExceptionJobs.length, "danger")}
+          {sectionCountPill(
+            sortedExceptionJobs.length,
+            sortedExceptionJobs.length > 0 ? "danger" : "neutral"
+          )}
           {sortedExceptionJobs.length > EXCEPTION_PREVIEW_LIMIT ? (
             <Link
               href={`/ops${buildQueryString({
