@@ -1,6 +1,6 @@
 # Compliance Matters Software — Business Layer Expansion Spine v1.1
 
-**Status:** DRAFT SOURCE OF TRUTH  
+**Status:** DRAFT SUPPORTING PLANNING DOC
 **Purpose:** Define the business/commercial layer that expands the current operational platform without regressing the live workflow.
 
 ---
