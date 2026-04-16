@@ -6,6 +6,7 @@ import { requireInternalRole } from "@/lib/auth/internal-user";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
   buildInternalBusinessProfileLogoStorageRef,
+  normalizeBillingMode,
   parseInternalBusinessProfileLogoStorageRef,
 } from "@/lib/business/internal-business-profile";
 
@@ -46,6 +47,7 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
   const displayName = normalizeText(formData.get("display_name"));
   const supportEmail = normalizeNullableText(formData.get("support_email"));
   const supportPhone = normalizeNullableText(formData.get("support_phone"));
+  const billingMode = normalizeBillingMode(String(formData.get("billing_mode") ?? ""));
   const logoFileEntry = formData.get("logo_file");
   const removeLogo = String(formData.get("remove_logo") ?? "").trim() === "1";
 
@@ -113,6 +115,7 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
         support_email: supportEmail,
         support_phone: supportPhone,
         logo_url: nextLogoUrl,
+        billing_mode: billingMode,
       },
       {
         onConflict: "account_owner_user_id",
@@ -145,5 +148,6 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
   revalidatePath("/ops");
   revalidatePath("/ops/admin");
   revalidatePath("/ops/admin/company-profile");
+  revalidatePath("/jobs");
   redirect(withNotice("saved"));
 }

@@ -121,6 +121,19 @@ Current invoice-sent behavior remains the lightweight billing-action layer.
 
 Future internal invoicing is a richer optional module layered on top, not a replacement that invalidates the current workflow.
 
+### Implemented repo truth clarification
+Current implemented repo truth is still job-level closeout and lightweight invoice-action tracking, not a full internal invoice domain.
+
+For current live workflows:
+- `Invoice Sent` remains the lightweight billing-action path for external-billing companies
+- `jobs.invoice_complete` remains an operational closeout marker
+- neither `Invoice Sent` nor `jobs.invoice_complete` means that a full internal invoice record exists
+
+### Locked seam rule
+- jobs remain operational closeout truth
+- invoices become billed truth for internal-invoicing companies
+- payments remain later collected truth and must not become job billing truth
+
 ---
 
 ## 6. Company profile / business identity
@@ -342,12 +355,13 @@ The architecture must not assume that is the only possible future shape forever.
 ### v1 statuses
 - draft
 - issued
-- paid
 - void
 
 ### Locked rule
 Sourcing creates drafts.  
 Issuance makes the invoice real.
+
+For Internal Invoice V1, `issued` is the billing-satisfied boundary for operational closeout. `paid` belongs to later payment-tracking truth, not the initial invoice-closeout seam.
 
 ### Invoice line items
 Invoice line items are frozen billing snapshots.
@@ -366,6 +380,18 @@ Required line-item fields:
 
 ### Locked rule
 Once created, invoice line items do not live-sync back to estimate, job, or pricebook.
+
+### Closeout seam clarification
+Internal Invoice V1 must not create a second billing truth on jobs.
+
+For internal-invoicing companies:
+- the primary job-linked invoice is billed truth
+- `jobs.invoice_complete` remains an operational closeout projection
+- `jobs.invoice_complete` may be satisfied by invoice issuance, but it is not itself the invoice record
+
+For external-billing companies:
+- the current lightweight `Invoice Sent` / closeout behavior remains the billing-action path
+- no internal invoice record is required
 
 ---
 
@@ -535,6 +561,8 @@ Feature exposure must follow company billing mode.
 
 ### No mixed billing truth
 Do not let lightweight invoice-action tracking and internal invoice records compete inside one live company workflow.
+
+For internal-invoicing companies, do not let job-level `invoice_complete` compete with invoice record state as separate billing truth. Job closeout may project billing-satisfied state, but the invoice record owns billed truth.
 
 ### Historical integrity
 Do not fake-backfill historical invoice/payment records just to make reporting look complete.

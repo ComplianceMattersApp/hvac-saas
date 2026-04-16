@@ -1,5 +1,6 @@
 // app/jobs/[id]/_components/ServiceStatusActions.tsx
 
+import type { BillingMode } from "@/lib/business/internal-business-profile";
 import { markServiceComplete, markInvoiceSent } from "@/lib/actions/service-actions";
 import { createClient } from "@/lib/supabase/server";
 import SubmitButton from "@/components/SubmitButton";
@@ -21,7 +22,13 @@ function formatOpsStatusLabel(value?: string | null) {
   return labels[key] ?? "In Progress";
 }
 
-export default async function ServiceStatusActions({ jobId }: { jobId: string }) {
+export default async function ServiceStatusActions({
+  jobId,
+  billingMode,
+}: {
+  jobId: string;
+  billingMode: BillingMode;
+}) {
   const supabase = await createClient();
 
   // Read the job so we only show these controls for Service jobs
@@ -45,6 +52,7 @@ export default async function ServiceStatusActions({ jobId }: { jobId: string })
   // Bind server actions to this jobId (so the form submit passes the id)
   const completeAction = markServiceComplete.bind(null, jobId);
   const invoiceSentAction = markInvoiceSent.bind(null, jobId);
+  const isInternalInvoicing = billingMode === "internal_invoicing";
 
   return (
     <section className="rounded-xl border bg-white p-4">
@@ -60,7 +68,7 @@ export default async function ServiceStatusActions({ jobId }: { jobId: string })
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className={`mt-4 grid grid-cols-1 gap-2 ${isInternalInvoicing ? "" : "sm:grid-cols-2"}`}>
         <form action={completeAction}>
           <SubmitButton
             loadingText="Updating..."
@@ -70,15 +78,24 @@ export default async function ServiceStatusActions({ jobId }: { jobId: string })
           </SubmitButton>
         </form>
 
-        <form action={invoiceSentAction}>
-          <SubmitButton
-            loadingText="Updating..."
-            className="w-full rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
-          >
-            Mark Invoice Sent → Closed
-          </SubmitButton>
-        </form>
+        {!isInternalInvoicing ? (
+          <form action={invoiceSentAction}>
+            <SubmitButton
+              loadingText="Updating..."
+              className="w-full rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
+            >
+              Mark Invoice Sent → Closed
+            </SubmitButton>
+          </form>
+        ) : null}
       </div>
+
+      {isInternalInvoicing ? (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs leading-5 text-amber-900">
+          Internal invoicing mode is enabled for this company. The lightweight external billing action is hidden here
+          until the internal invoice workflow is implemented.
+        </div>
+      ) : null}
 
       <p className="mt-3 text-xs text-neutral-500">
         Note: manual locks (<b>pending_info</b>, <b>on_hold</b>) will prevent automation from overwriting.

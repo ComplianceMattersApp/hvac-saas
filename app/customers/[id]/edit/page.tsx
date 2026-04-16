@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { upsertCustomerProfileFromForm, claimNullOwnerCustomer } from "@/lib/actions/customer-actions";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
+import BillingAddressFields from "./_components/BillingAddressFields";
 
 export default async function CustomerEditPage({
   params,
@@ -46,6 +47,23 @@ export default async function CustomerEditPage({
     .eq("id", id)
     .eq("owner_user_id", accountOwnerUserId)
     .maybeSingle();
+
+  const { data: locations } = await admin
+    .from("locations")
+    .select("id, nickname, label, address_line1, address_line2, city, state, zip")
+    .eq("customer_id", id)
+    .order("created_at", { ascending: true });
+
+  const firstServiceLocationWithAddress = (locations ?? []).find((location) =>
+    [location.address_line1, location.address_line2, location.city, location.state, location.zip]
+      .some((value) => String(value ?? "").trim().length > 0)
+  ) ?? null;
+
+  const serviceAddressSourceLabel = firstServiceLocationWithAddress
+    ? String(firstServiceLocationWithAddress.nickname ?? "").trim() ||
+      String(firstServiceLocationWithAddress.label ?? "").trim() ||
+      "first service location"
+    : null;
 
   
 
@@ -242,41 +260,19 @@ export default async function CustomerEditPage({
 
           <div className="text-base font-semibold text-slate-900">Billing Address</div>
 
-          <div className="space-y-3">
-            <input
-              name="billing_address_line1"
-              placeholder="Address line 1"
-              defaultValue={customer.billing_address_line1 ?? ""}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
-            />
-            <input
-              name="billing_address_line2"
-              placeholder="Address line 2"
-              defaultValue={customer.billing_address_line2 ?? ""}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
-            />
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <input
-                name="billing_city"
-                placeholder="City"
-                defaultValue={customer.billing_city ?? ""}
-                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
-              />
-              <input
-                name="billing_state"
-                placeholder="State"
-                defaultValue={customer.billing_state ?? ""}
-                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
-              />
-              <input
-                name="billing_zip"
-                placeholder="ZIP"
-                defaultValue={customer.billing_zip ?? ""}
-                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
-              />
-            </div>
-          </div>
+          <BillingAddressFields
+            initialBillingAddressLine1={customer.billing_address_line1 ?? ""}
+            initialBillingAddressLine2={customer.billing_address_line2 ?? ""}
+            initialBillingCity={customer.billing_city ?? ""}
+            initialBillingState={customer.billing_state ?? ""}
+            initialBillingZip={customer.billing_zip ?? ""}
+            serviceAddressSourceLabel={serviceAddressSourceLabel}
+            serviceAddressLine1={firstServiceLocationWithAddress?.address_line1 ?? ""}
+            serviceAddressLine2={firstServiceLocationWithAddress?.address_line2 ?? ""}
+            serviceCity={firstServiceLocationWithAddress?.city ?? ""}
+            serviceState={firstServiceLocationWithAddress?.state ?? ""}
+            serviceZip={firstServiceLocationWithAddress?.zip ?? ""}
+          />
         </div>
 
         <button

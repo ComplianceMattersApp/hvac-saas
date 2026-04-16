@@ -132,6 +132,16 @@ function billingAddressLine(customer: CustomerRow) {
   return [top, bottom].filter(Boolean).join(" • ");
 }
 
+function describeServiceAddressFallback(loc: LocationRow | null) {
+  if (!loc) return null;
+
+  const address = locationAddressLine(loc);
+  if (!address) return null;
+
+  const label = String(loc.nickname ?? "").trim() || String(loc.label ?? "").trim() || "Service address";
+  return { label, address };
+}
+
 function makeMapsHref(address?: string | null) {
   const q = String(address ?? "").trim();
   if (!q) return null;
@@ -432,6 +442,8 @@ export default async function CustomerDetailPage(props: {
   }
 
   const locations = (locationsData ?? []) as LocationRow[];
+  const firstLocationWithAddress = locations.find((loc) => locationAddressLine(loc).trim().length > 0) ?? null;
+  const serviceAddressFallback = describeServiceAddressFallback(firstLocationWithAddress);
   const activeJobs = jobs.filter((job) => isOperationallyActiveJob(job));
 
   // Lightweight service-case awareness
@@ -521,6 +533,7 @@ export default async function CustomerDetailPage(props: {
 
   const callHref = makeTelHref(customer.phone);
   const smsHref = makeSmsHref(customer.phone);
+  const customerBillingAddress = billingAddressLine(customer);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -647,9 +660,20 @@ export default async function CustomerDetailPage(props: {
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
                   Billing Address
                 </div>
-                <div className="text-sm text-slate-900">
-                  {billingAddressLine(customer) || "—"}
-                </div>
+                {customerBillingAddress ? (
+                  <div className="text-sm text-slate-900">{customerBillingAddress}</div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="text-sm font-medium text-slate-700">No billing address set</div>
+                    {serviceAddressFallback ? (
+                      <div className="text-sm text-slate-500">
+                        Service address available from {serviceAddressFallback.label}: {serviceAddressFallback.address}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-slate-500">Add a billing address on the customer record to use it everywhere billing stays strict and canonical.</div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

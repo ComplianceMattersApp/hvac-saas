@@ -15,7 +15,10 @@ import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import { requireInternalRole, requireInternalUser } from "@/lib/auth/internal-user";
-import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import {
+  resolveBillingModeByAccountOwnerId,
+  resolveInternalBusinessIdentityByAccountOwnerId,
+} from "@/lib/business/internal-business-profile";
 import { renderSystemEmailLayout, escapeHtml, resolveAppUrl } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { assertAssignableInternalUser } from "@/lib/staffing/human-layer";
@@ -245,7 +248,7 @@ async function applyRetestResolution(params: {
   }
 }
 
-async function insertJobEvent(params: {
+export async function insertJobEvent(params: {
   supabase: any;
   jobId: string;
   event_type: string;
@@ -7104,7 +7107,15 @@ export async function completeDataEntryFromForm(formData: FormData) {
   const completedAt = new Date().toISOString();
 
   const supabase = await createClient();
-  const { userId: actingUserId } = await requireInternalUser({ supabase });
+  const { userId: actingUserId, internalUser } = await requireInternalUser({ supabase });
+  const billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  if (billingMode === "internal_invoicing") {
+    redirect(`/jobs/${id}?banner=internal_invoicing_billing_pending`);
+  }
 
   async function recordPostDataEntryOpsProjectionChange(previousOpsStatus: unknown) {
     const { data: refreshedJob, error: refreshedJobErr } = await supabase

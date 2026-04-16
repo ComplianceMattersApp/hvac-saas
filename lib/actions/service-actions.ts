@@ -1,9 +1,11 @@
 // lib/actions/service-actions.ts
 "use server";
 
+import { requireInternalUser } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
 import { setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
+import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -19,6 +21,7 @@ import { redirect } from "next/navigation";
 
 export async function markServiceComplete(jobId: string): Promise<void> {
   const supabase = await createClient();
+  await requireInternalUser({ supabase });
 
   const { data: job, error } = await supabase
     .from("jobs")
@@ -114,6 +117,16 @@ export async function markServiceComplete(jobId: string): Promise<void> {
 
 export async function markInvoiceSent(jobId: string): Promise<void> {
   const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+  const billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  if (billingMode === "internal_invoicing") {
+    revalidatePath(`/jobs/${jobId}`);
+    redirect(`/jobs/${jobId}?banner=internal_invoicing_billing_pending`);
+  }
 
   const { data: job, error } = await supabase
     .from("jobs")
