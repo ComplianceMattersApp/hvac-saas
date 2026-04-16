@@ -72,12 +72,20 @@ Build the platform so Stripe can be introduced later without structural rework.
 ### Live behavior right now
 Payments are **tracking-only**.
 
-Supported now:
-- payment status visibility
-- invoice/payment tracking fields
-- amount due / amount paid visibility
-- manual operational tracking of payment state
-- external reference storage where needed
+Current implemented repo truth is still limited and operationally oriented.
+
+Implemented now in repo:
+- job-level closeout fields such as invoice reference and invoice-complete markers
+- lightweight invoice-action tracking in closeout workflows
+- billing-recipient snapshot fields on jobs
+
+Not yet materially implemented in repo:
+- a real internal invoice domain
+- a real payment domain with invoice/payment records and fields such as payment status, amount paid, or balance due
+- live processor-backed payment execution
+
+Locked direction:
+- payment architecture should still be planned now so later invoice/payment truth can be added without rework
 
 Not supported now:
 - live card collection
@@ -187,14 +195,15 @@ Future Stripe-based payment acceptance should support a **small configurable pla
 Current live state.
 
 Includes:
-- operational payment visibility
-- payment status tracking
-- balance/amount fields
-- manual recorded payment references
-- payment-aware invoice/closeout visibility
+- operationally oriented job closeout and lightweight invoice-action tracking
+- job-level invoice reference / invoice-complete markers
+- billing-aware closeout visibility
 
 ### Phase P1 — Payment-ready foundation (build now)
 This is the current implementation phase.
+
+Clarification:
+P1 is the phase that introduces the real invoice/payment-domain seam. It should not be read as meaning that full invoice/payment domain tables or fields already exist in the current implemented repo baseline.
 
 Includes:
 - payment domain model

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { saveInternalBusinessProfileFromForm } from "@/lib/actions/internal-business-profile-actions";
 import {
+  DEFAULT_BILLING_MODE,
   getInternalBusinessProfileByAccountOwnerId,
   resolveInternalBusinessProfileLogoUrl,
 } from "@/lib/business/internal-business-profile";
@@ -75,6 +76,7 @@ export default async function AdminCompanyProfilePage({
   const companyName = String(profile?.display_name ?? "").trim() || "Your Company";
   const supportEmail = String(profile?.support_email ?? "").trim();
   const supportPhone = String(profile?.support_phone ?? "").trim();
+  const billingMode = profile?.billing_mode ?? DEFAULT_BILLING_MODE;
   const companyInitial = companyName.charAt(0).toUpperCase() || "C";
 
   return (
@@ -240,6 +242,29 @@ export default async function AdminCompanyProfilePage({
               {profile
                 ? "These details help your company look polished and familiar throughout the app."
                 : "Add your company details once, and we’ll use them anywhere your team expects to see them."}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <div className="space-y-1.5">
+                <label htmlFor="billing_mode" className="text-sm font-medium text-slate-700">
+                  Billing workflow mode
+                </label>
+                <select
+                  id="billing_mode"
+                  name="billing_mode"
+                  defaultValue={billingMode}
+                  className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-slate-200"
+                >
+                  <option value="external_billing">External billing</option>
+                  <option value="internal_invoicing">Internal invoicing</option>
+                </select>
+              </div>
+
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                External billing keeps today&apos;s lightweight invoice-sent and invoice-complete closeout flow.
+                Internal invoicing hides those external-only billing actions so future internal invoice workflow
+                exposure can replace them cleanly.
+              </p>
             </div>
 
             <div className="flex items-center justify-end">

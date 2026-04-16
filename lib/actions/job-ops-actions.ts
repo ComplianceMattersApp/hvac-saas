@@ -19,7 +19,10 @@ import {
   insertInternalNotificationForEvent,
   markContractorReportEmailDeliveryNotification,
 } from "@/lib/actions/notification-actions";
-import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import {
+  resolveBillingModeByAccountOwnerId,
+  resolveInternalBusinessIdentityByAccountOwnerId,
+} from "@/lib/business/internal-business-profile";
 import { resolveAppUrl, renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
@@ -82,7 +85,7 @@ async function requireInternalOpsAccessOrRedirect(
   jobId: string,
 ) {
   try {
-    await requireInternalUser({ supabase, userId });
+    return await requireInternalUser({ supabase, userId });
   } catch (error) {
     if (isInternalAccessError(error)) {
       redirect(`/jobs/${jobId}?notice=not_authorized`);
@@ -864,7 +867,15 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  const billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
+
+  if (billingMode === "internal_invoicing") {
+    redirect(`/jobs/${jobId}?banner=internal_invoicing_billing_pending`);
+  }
 
   // Read current job snapshot
   const { data: job, error: jobErr } = await supabase

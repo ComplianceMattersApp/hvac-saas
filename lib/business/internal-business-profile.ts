@@ -3,12 +3,17 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 const INTERNAL_BUSINESS_LOGO_STORAGE_PREFIX = "storage://attachments/";
 
+export type BillingMode = "external_billing" | "internal_invoicing";
+
+export const DEFAULT_BILLING_MODE: BillingMode = "external_billing";
+
 export type InternalBusinessProfile = {
   account_owner_user_id: string;
   display_name: string;
   support_email: string | null;
   support_phone: string | null;
   logo_url: string | null;
+  billing_mode: BillingMode;
   created_at: string;
   updated_at: string;
 };
@@ -21,6 +26,12 @@ export type ResolvedInternalBusinessIdentity = {
 };
 
 const DEFAULT_INTERNAL_BUSINESS_DISPLAY_NAME = "Compliance Matters";
+
+export function normalizeBillingMode(value: string | null | undefined): BillingMode {
+  return String(value ?? "").trim().toLowerCase() === "internal_invoicing"
+    ? "internal_invoicing"
+    : DEFAULT_BILLING_MODE;
+}
 
 export function buildInternalBusinessProfileLogoStorageRef(storagePath: string) {
   const normalizedPath = String(storagePath ?? "").trim().replace(/^\/+/, "");
@@ -79,6 +90,7 @@ function normalizeInternalBusinessProfileRow(row: any): InternalBusinessProfile 
     support_email: String(row?.support_email ?? "").trim() || null,
     support_phone: String(row?.support_phone ?? "").trim() || null,
     logo_url: String(row?.logo_url ?? "").trim() || null,
+    billing_mode: normalizeBillingMode(String(row?.billing_mode ?? "")),
     created_at: String(row?.created_at ?? "").trim(),
     updated_at: String(row?.updated_at ?? "").trim(),
   };
@@ -96,7 +108,7 @@ export async function getInternalBusinessProfileByAccountOwnerId(params: {
   const { data, error } = await supabase
     .from("internal_business_profiles")
     .select(
-      "account_owner_user_id, display_name, support_email, support_phone, logo_url, created_at, updated_at",
+      "account_owner_user_id, display_name, support_email, support_phone, logo_url, billing_mode, created_at, updated_at",
     )
     .eq("account_owner_user_id", accountOwnerUserId)
     .maybeSingle();
@@ -144,4 +156,22 @@ export async function resolveInternalBusinessIdentityByAccountOwnerId(params: {
     support_phone: profile?.support_phone ?? null,
     logo_url: profile?.logo_url ?? null,
   };
+}
+
+export async function resolveBillingModeByAccountOwnerId(params: {
+  accountOwnerUserId: string | null | undefined;
+  supabase?: any;
+}): Promise<BillingMode> {
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+
+  if (!accountOwnerUserId) {
+    return DEFAULT_BILLING_MODE;
+  }
+
+  const profile = await getInternalBusinessProfileByAccountOwnerId({
+    supabase: params.supabase,
+    accountOwnerUserId,
+  });
+
+  return profile?.billing_mode ?? DEFAULT_BILLING_MODE;
 }
