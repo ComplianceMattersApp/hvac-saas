@@ -29,39 +29,39 @@ export function sanitizeVisitScopeSummary(value: unknown): string | null {
 export function sanitizeVisitScopeItems(value: unknown): VisitScopeItem[] {
   if (!Array.isArray(value)) return [];
 
-  const items = value
-    .map((row) => {
-      const title = String((row as { title?: unknown })?.title ?? "")
-        .trim()
-        .replace(/\s+/g, " ")
-        .slice(0, VISIT_SCOPE_ITEM_TITLE_MAX);
-      const detailsValue = String((row as { details?: unknown })?.details ?? "")
-        .trim()
-        .replace(/\s+/g, " ")
-        .slice(0, VISIT_SCOPE_ITEM_DETAILS_MAX);
-      const promotedServiceJobId = String(
-        (row as { promoted_service_job_id?: unknown })?.promoted_service_job_id ?? "",
-      ).trim();
-      const promotedAt = String((row as { promoted_at?: unknown })?.promoted_at ?? "").trim();
-      const promotedByUserId = String(
-        (row as { promoted_by_user_id?: unknown })?.promoted_by_user_id ?? "",
-      ).trim();
+  const items: VisitScopeItem[] = [];
 
-      if (!title && !detailsValue) return null;
-      if (!title) {
-        throw new Error("Visit scope items require a title.");
-      }
+  for (const row of value) {
+    const title = String((row as { title?: unknown })?.title ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, VISIT_SCOPE_ITEM_TITLE_MAX);
+    const detailsValue = String((row as { details?: unknown })?.details ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, VISIT_SCOPE_ITEM_DETAILS_MAX);
+    const promotedServiceJobId = String(
+      (row as { promoted_service_job_id?: unknown })?.promoted_service_job_id ?? "",
+    ).trim();
+    const promotedAt = String((row as { promoted_at?: unknown })?.promoted_at ?? "").trim();
+    const promotedByUserId = String(
+      (row as { promoted_by_user_id?: unknown })?.promoted_by_user_id ?? "",
+    ).trim();
 
-      return {
-        title,
-        details: detailsValue || null,
-        kind: normalizeVisitScopeItemKind((row as { kind?: unknown })?.kind),
-        promoted_service_job_id: promotedServiceJobId || null,
-        promoted_at: promotedAt || null,
-        promoted_by_user_id: promotedByUserId || null,
-      } satisfies VisitScopeItem;
-    })
-    .filter((item): item is VisitScopeItem => Boolean(item));
+    if (!title && !detailsValue) continue;
+    if (!title) {
+      throw new Error("Visit scope items require a title.");
+    }
+
+    items.push({
+      title,
+      details: detailsValue || null,
+      kind: normalizeVisitScopeItemKind((row as { kind?: unknown })?.kind),
+      promoted_service_job_id: promotedServiceJobId || null,
+      promoted_at: promotedAt || null,
+      promoted_by_user_id: promotedByUserId || null,
+    });
+  }
 
   if (items.length > VISIT_SCOPE_ITEM_LIMIT) {
     throw new Error(`Visit scope is limited to ${VISIT_SCOPE_ITEM_LIMIT} items.`);

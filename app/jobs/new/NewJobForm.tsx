@@ -359,7 +359,7 @@ const [billingRecipient, setBillingRecipient] = useState<
   const relationshipRequestRef = useRef(0);
   const createNewCustomerCardRef = useRef<HTMLDivElement | null>(null);
   const createNewCustomerFirstNameRef = useRef<HTMLInputElement | null>(null);
-  const visitScopeSectionRef = useRef<HTMLElement | null>(null);
+  const visitScopeSectionRef = useRef<HTMLDivElement | null>(null);
 
   const guidedCustomers = useMemo(() => {
     if (!isInternalMode) return [];

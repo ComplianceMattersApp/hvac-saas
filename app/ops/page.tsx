@@ -22,6 +22,11 @@ import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/search-normalization";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildPromotedCompanionReadModel, buildVisitScopeReadModel } from "@/lib/jobs/visit-scope";
+import OperationalReportingSection from "./_components/OperationalReportingSection";
+import {
+  buildOperationalReportingReadModel,
+  type OperationalReportingJob,
+} from "@/lib/ops/operational-reporting";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -435,6 +440,12 @@ const attentionBusinessCutoffIso = subtractBusinessDays(now, 3).toISOString();
 const failedCutoffIso = new Date(
   now.getTime() - 14 * 24 * 60 * 60 * 1000
 ).toISOString();
+const recentThroughputCutoffIso = new Date(
+  now.getTime() - 7 * 24 * 60 * 60 * 1000
+).toISOString();
+const recentServiceWindowCutoffIso = new Date(
+  now.getTime() - 30 * 24 * 60 * 60 * 1000
+).toISOString();
 
 // 1) FIELD WORK (scheduled today in LA and not field-complete)
 let fieldWorkQ = supabase
@@ -566,6 +577,91 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
       (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
     );
     const attentionCount = attentionJobs.length;
+
+  let operationalReportingJobsQ = supabase
+    .from("jobs")
+    .select(
+      "id, parent_job_id, service_case_id, job_type, status, ops_status, created_at, scheduled_date, field_complete, field_complete_at, service_visit_outcome, invoice_complete, certs_complete"
+    )
+    .is("deleted_at", null)
+    .neq("status", "cancelled");
+
+  if (contractor) operationalReportingJobsQ = operationalReportingJobsQ.eq("contractor_id", contractor);
+
+  const { data: operationalReportingJobsRaw, error: operationalReportingJobsErr } = await operationalReportingJobsQ;
+  if (operationalReportingJobsErr) throw operationalReportingJobsErr;
+
+  const operationalReportingJobs = (operationalReportingJobsRaw ?? [])
+    .filter((job: any) => !shouldHideFailedParentJob(job)) as OperationalReportingJob[];
+
+  const reportingServiceCaseIds = Array.from(
+    new Set(
+      operationalReportingJobs
+        .map((job) => String(job.service_case_id ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  const { data: reportingServiceCases, error: reportingServiceCasesErr } = reportingServiceCaseIds.length
+    ? await supabase
+        .from("service_cases")
+        .select("id, status")
+        .in("id", reportingServiceCaseIds)
+    : { data: [], error: null };
+
+  if (reportingServiceCasesErr) throw reportingServiceCasesErr;
+
+  let throughputEventRows: Array<{ event_type: string | null }> = [];
+
+  if (!contractor || operationalReportingJobs.length > 0) {
+    let throughputEventsQ = supabase
+      .from("job_events")
+      .select("event_type")
+      .gte("created_at", recentThroughputCutoffIso)
+      .in("event_type", ["job_created", "job_completed", "scheduled", "schedule_updated", "contractor_schedule_updated"]);
+
+    if (contractor) {
+      throughputEventsQ = throughputEventsQ.in(
+        "job_id",
+        operationalReportingJobs.map((job) => job.id)
+      );
+    }
+
+    const { data: throughputEventsRaw, error: throughputEventsErr } = await throughputEventsQ;
+    if (throughputEventsErr) throw throughputEventsErr;
+    throughputEventRows = throughputEventsRaw ?? [];
+  }
+
+  const recentCreatedCount = throughputEventRows.filter(
+    (row) => String(row.event_type ?? "").toLowerCase() === "job_created"
+  ).length;
+  const recentCompletedCount = throughputEventRows.filter(
+    (row) => String(row.event_type ?? "").toLowerCase() === "job_completed"
+  ).length;
+  const recentScheduleTouchCount = throughputEventRows.filter((row) => {
+    const eventType = String(row.event_type ?? "").toLowerCase();
+    return (
+      eventType === "scheduled" ||
+      eventType === "schedule_updated" ||
+      eventType === "contractor_schedule_updated"
+    );
+  }).length;
+
+  const operationalReporting = buildOperationalReportingReadModel({
+    jobs: operationalReportingJobs,
+    attentionBusinessCutoffIso,
+    failedCutoffIso,
+    recentCreatedCount,
+    recentCompletedCount,
+    recentScheduleTouchCount,
+    openServiceCaseCount: (reportingServiceCases ?? []).filter(
+      (serviceCase: any) => String(serviceCase.status ?? "").toLowerCase() === "open"
+    ).length,
+    resolvedServiceCaseCount: (reportingServiceCases ?? []).filter(
+      (serviceCase: any) => String(serviceCase.status ?? "").toLowerCase() === "resolved"
+    ).length,
+    recentServiceWindowCutoffIso,
+  });
 
   // 7) BUCKET list (tabs)
     let bucketQ = supabase
@@ -2074,6 +2170,11 @@ return (
           </div>
         )}
     </section>
+
+    <OperationalReportingSection
+      reporting={operationalReporting}
+      scopeLabel={selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
+    />
 
     <section className="grid grid-cols-1 gap-2.5 lg:grid-cols-3">
       <div className={`rounded-2xl border ${callListVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>

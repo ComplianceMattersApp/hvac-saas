@@ -8,7 +8,10 @@ import {
   type VisitScopeItemKind,
 } from "@/lib/jobs/visit-scope";
 
-export type VisitScopeDraftItem = VisitScopeItem & { id: string };
+export type VisitScopeDraftItem = Omit<VisitScopeItem, "details"> & {
+  id: string;
+  details: string;
+};
 
 type Props = {
   initialSummary?: string | null;
@@ -25,8 +28,11 @@ function uid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
-function toDraftItems(items: VisitScopeItem[] | null | undefined, jobType: "ecc" | "service") {
-  const normalized = Array.isArray(items)
+function toDraftItems(
+  items: VisitScopeItem[] | null | undefined,
+  jobType: "ecc" | "service",
+): VisitScopeDraftItem[] {
+  const normalized: VisitScopeDraftItem[] = Array.isArray(items)
     ? items.map((item) => ({
         id: uid(),
         title: String(item.title ?? ""),
@@ -48,7 +54,7 @@ function toDraftItems(items: VisitScopeItem[] | null | undefined, jobType: "ecc"
       id: uid(),
       title: "",
       details: "",
-      kind: "primary" as VisitScopeItemKind,
+      kind: "primary",
     },
   ];
 }
