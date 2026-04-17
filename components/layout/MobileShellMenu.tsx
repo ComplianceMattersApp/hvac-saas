@@ -118,6 +118,15 @@ export default function MobileShellMenu({
               My Work
             </Link>
           ) : null}
+          {isInternalUser ? (
+            <Link
+              href="/reports"
+              onClick={() => setOpen(false)}
+              className={mobileMenuItemClass}
+            >
+              Reports
+            </Link>
+          ) : null}
           {isAdmin ? (
             <Link
               href="/ops/admin"

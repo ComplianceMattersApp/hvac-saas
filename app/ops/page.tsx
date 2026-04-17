@@ -2174,6 +2174,8 @@ return (
     <OperationalReportingSection
       reporting={operationalReporting}
       scopeLabel={selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
+      contractorId={contractor}
+      sort={sort}
     />
 
     <section className="grid grid-cols-1 gap-2.5 lg:grid-cols-3">
