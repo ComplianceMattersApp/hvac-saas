@@ -1253,6 +1253,9 @@ const visitScopeHeaderPreview = buildVisitScopeReadModel(visitScopeSummary, visi
   previewItemMaxLength: 34,
 });
 const promotedCompanionHeader = buildPromotedCompanionReadModel(visitScopeItems);
+const primaryVisitScopeItems = visitScopeItems.filter((item) => item.kind === "primary");
+const companionVisitScopeItems = visitScopeItems.filter((item) => item.kind === "companion_service");
+const visitScopeLeadText = visitScopeSummary || visitScopeHeaderPreview.lead;
 
 const internalInvoiceBillingAddress = internalInvoice
   ? formatBillingAddress({
@@ -3064,86 +3067,82 @@ const renderTimelineItem = (e: any, key: string) => {
 ) : null}
 
 {isInternalUser ? (
-  <div className="mt-6 rounded-2xl border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] p-5 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.28)]">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div>
+  <div className="mt-6 rounded-2xl border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)]">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit Scope</div>
-        <div className="mt-1 text-sm leading-6 text-slate-600">
-          Reason, trip scope, and done-before-leaving detail.
+
+        <details className="peer">
+          <summary className="cursor-pointer list-none text-sm font-medium text-slate-700 hover:text-slate-900">
+          {hasVisitScopeDefined ? "Edit Scope" : "Add Scope"}
+          </summary>
+        </details>
+      </div>
+
+      <div className="rounded-xl border border-slate-200/70 bg-white/92 px-4 py-3.5 shadow-[0_10px_20px_-30px_rgba(15,23,42,0.18)]">
+      <div className="space-y-3.5">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit reason</div>
+          <div className="mt-1 text-sm leading-6 text-slate-900">
+            {visitScopeLeadText || "No visit brief saved yet."}
+          </div>
         </div>
-      </div>
-      <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-        {hasVisitScopeDefined ? `${visitScopeCount} item${visitScopeCount === 1 ? "" : "s"}` : "Not started"}
-      </div>
-    </div>
 
-    <div className={`mt-4 grid gap-4 ${hasVisitScopeDefined ? "xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)]" : ""}`}>
-      <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.24)]">
-        <VisitScopeJobDetailForm
-          jobId={job.id}
-          jobType={job.job_type === "service" ? "service" : "ecc"}
-          tab={tab}
-          initialSummary={visitScopeSummary}
-          initialItems={visitScopeItems}
-          primaryButtonClass={primaryButtonClass}
-        />
-      </div>
-
-      {hasVisitScopeDefined ? (
-        <div className="space-y-3 rounded-xl border border-slate-200/80 bg-white/92 p-4 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.24)]">
-          {visitScopeSummary ? (
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Current Summary</div>
-              <div className="mt-1 text-sm leading-6 text-slate-700">
-                {visitScopeSummary}
-              </div>
+        {primaryVisitScopeItems.length > 0 ? (
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Scope for this visit</div>
+            <div className="mt-2 space-y-2.5">
+              {primaryVisitScopeItems.map((item, index) => (
+                <div key={`primary-${index}-${item.title}`} className="space-y-1 border-l-2 border-slate-200 pl-3">
+                  <div className="text-sm font-semibold leading-5 text-slate-900">{item.title}</div>
+                  {item.details ? (
+                    <div className="text-sm leading-6 text-slate-600">{item.details}</div>
+                  ) : null}
+                </div>
+              ))}
             </div>
-          ) : null}
+          </div>
+        ) : hasVisitScopeDefined ? (
+          <div className="text-sm text-slate-600">No primary trip items are listed yet.</div>
+        ) : null}
 
-          {visitScopeItems.length > 0 ? (
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Current Scope Items</div>
-              <div className="mt-2 space-y-2">
-                {visitScopeItems.map((item, index) => (
-                  <div key={`${item.kind}-${index}-${item.title}`} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="text-sm font-semibold text-slate-900">{item.title}</div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                          {formatVisitScopeItemKindLabel(item.kind)}
-                        </div>
-                        {isVisitScopeItemPromoted(item) ? (
-                          <div className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-700">
-                            Promoted
-                          </div>
-                        ) : null}
-                      </div>
+        {companionVisitScopeItems.length > 0 ? (
+          <div className="border-t border-slate-200 pt-3.5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Companion follow-up</div>
+            <div className="mt-2 space-y-2.5">
+              {companionVisitScopeItems.map((item, companionIndex) => {
+                const itemIndex = visitScopeItems.findIndex((candidate) => candidate === item);
+
+                return (
+                  <div key={`companion-${companionIndex}-${item.title}`} className="space-y-1 border-l-2 border-slate-200 pl-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-semibold leading-5 text-slate-900">{item.title}</div>
+                      <div className="text-xs text-slate-500">{formatVisitScopeItemKindLabel(item.kind)}</div>
+                      {isVisitScopeItemPromoted(item) ? (
+                        <div className="text-xs font-medium text-emerald-700">Promoted</div>
+                      ) : null}
                     </div>
                     {item.details ? (
-                      <div className="mt-1 text-sm leading-6 text-slate-600">{item.details}</div>
+                      <div className="text-sm leading-6 text-slate-600">{item.details}</div>
                     ) : null}
-                    {job.job_type === "ecc" && item.kind === "companion_service" ? (
-                      <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
+                    {job.job_type === "ecc" ? (
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
                         {isVisitScopeItemPromoted(item) && item.promoted_service_job_id ? (
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="text-sm text-slate-600">
-                              This companion scope now runs as its own Service job.
-                            </div>
+                          <>
+                            <span>This companion scope now runs as its own Service job.</span>
                             <Link
                               href={`/jobs/${String(item.promoted_service_job_id)}?tab=info`}
                               className={secondaryButtonClass}
                             >
                               Open Service Job
                             </Link>
-                          </div>
+                          </>
                         ) : (
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="text-sm text-slate-600">
-                              Promote when this companion work needs its own Service lifecycle.
-                            </div>
+                          <>
+                            <span>Promote when this companion work needs its own Service lifecycle.</span>
                             <form action={promoteCompanionScopeToServiceJobFromForm}>
                               <input type="hidden" name="job_id" value={job.id} />
-                              <input type="hidden" name="item_index" value={String(index)} />
+                              <input type="hidden" name="item_index" value={String(itemIndex)} />
                               <input type="hidden" name="tab" value={tab} />
                               <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}`} />
                               <SubmitButton
@@ -3153,17 +3152,29 @@ const renderTimelineItem = (e: any, key: string) => {
                                 Create Service Follow-Up
                               </SubmitButton>
                             </form>
-                          </div>
+                          </>
                         )}
                       </div>
                     ) : null}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          ) : null}
-        </div>
-      ) : null}
+          </div>
+        ) : null}
+      </div>
+      </div>
+
+      <div className="hidden pt-1 peer-open:block">
+        <VisitScopeJobDetailForm
+          jobId={job.id}
+          jobType={job.job_type === "service" ? "service" : "ecc"}
+          tab={tab}
+          initialSummary={visitScopeSummary}
+          initialItems={visitScopeItems}
+          primaryButtonClass={primaryButtonClass}
+        />
+      </div>
     </div>
   </div>
 ) : null}

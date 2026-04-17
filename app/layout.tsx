@@ -173,6 +173,14 @@ export default async function RootLayout({
                     )}
                     {isInternalUser && (
                       <Link
+                        href="/reports"
+                        className={shellUtilityLinkClass}
+                      >
+                        Reports
+                      </Link>
+                    )}
+                    {isInternalUser && (
+                      <Link
                         href="/notes"
                         className={shellUtilityLinkClass}
                       >

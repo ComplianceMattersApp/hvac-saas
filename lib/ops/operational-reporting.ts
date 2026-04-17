@@ -15,7 +15,36 @@ export type OperationalReportingJob = {
   certs_complete: boolean | null;
 };
 
+export type OperationalReportingMetricKey =
+  | "active_operational_jobs"
+  | "scheduled_visits"
+  | "need_to_schedule"
+  | "closeout_queue"
+  | "ops_need_to_schedule"
+  | "ops_scheduled"
+  | "ops_pending_info"
+  | "ops_on_hold"
+  | "ops_failed"
+  | "ops_pending_office_review"
+  | "ops_paperwork_required"
+  | "ops_invoice_required"
+  | "aging_scheduling_overdue"
+  | "aging_follow_up_overdue"
+  | "aging_failure_review_aged"
+  | "aging_closeout_overdue"
+  | "throughput_jobs_created_7d"
+  | "throughput_jobs_completed_7d"
+  | "throughput_schedule_touches_7d"
+  | "service_outcome_resolved"
+  | "service_outcome_follow_up_required"
+  | "service_outcome_no_issue_found"
+  | "continuity_open_service_cases"
+  | "continuity_resolved_service_cases"
+  | "continuity_active_service_jobs_with_case"
+  | "continuity_active_service_jobs_missing_case";
+
 export type OperationalReportingMetric = {
+  key: OperationalReportingMetricKey;
   label: string;
   value: number;
   note: string;
@@ -102,11 +131,13 @@ export function buildOperationalReportingReadModel({
 
   const workload: OperationalReportingMetric[] = [
     {
+      key: "active_operational_jobs",
       label: "Active operational jobs",
       value: activeJobs.length,
       note: "Open workload excluding closed and cancelled visits.",
     },
     {
+      key: "scheduled_visits",
       label: "Scheduled visits",
       value: countWhere(
         activeJobs,
@@ -117,6 +148,7 @@ export function buildOperationalReportingReadModel({
       note: "Current scheduled workload from jobs.ops_status.",
     },
     {
+      key: "need_to_schedule",
       label: "Need to schedule",
       value: countWhere(
         activeJobs,
@@ -127,6 +159,7 @@ export function buildOperationalReportingReadModel({
       note: "Unscheduled open visits waiting on dispatch.",
     },
     {
+      key: "closeout_queue",
       label: "Closeout queue",
       value: countWhere(activeJobs, (job) => isInCloseoutQueue(job)),
       note: "Field-complete visits still waiting on office closeout obligations.",
@@ -134,6 +167,22 @@ export function buildOperationalReportingReadModel({
   ];
 
   const opsBuckets = OPS_BUCKET_ORDER.map((bucket) => ({
+    key:
+      bucket === "need_to_schedule"
+        ? "ops_need_to_schedule"
+        : bucket === "scheduled"
+          ? "ops_scheduled"
+          : bucket === "pending_info"
+            ? "ops_pending_info"
+            : bucket === "on_hold"
+              ? "ops_on_hold"
+              : bucket === "failed"
+                ? "ops_failed"
+                : bucket === "pending_office_review"
+                  ? "ops_pending_office_review"
+                  : bucket === "paperwork_required"
+                    ? "ops_paperwork_required"
+                    : "ops_invoice_required",
     label: formatOpsLabel(bucket),
     value: countWhere(activeJobs, (job) => String(job.ops_status ?? "").toLowerCase() === bucket),
     note: bucket === "pending_office_review"
@@ -143,10 +192,11 @@ export function buildOperationalReportingReadModel({
         : bucket === "invoice_required"
           ? "Waiting on final processing closeout."
           : `Current jobs in ${formatOpsLabel(bucket).toLowerCase()}.`,
-  }));
+  } satisfies OperationalReportingMetric));
 
   const aging: OperationalReportingMetric[] = [
     {
+      key: "aging_scheduling_overdue",
       label: "Scheduling overdue",
       value: countWhere(
         activeJobs,
@@ -158,6 +208,7 @@ export function buildOperationalReportingReadModel({
       note: "Need-to-schedule visits older than 3 business days.",
     },
     {
+      key: "aging_follow_up_overdue",
       label: "Follow-up overdue",
       value: countWhere(
         activeJobs,
@@ -172,6 +223,7 @@ export function buildOperationalReportingReadModel({
       note: "Pending info or on-hold work older than 3 business days.",
     },
     {
+      key: "aging_failure_review_aged",
       label: "Failure review aged",
       value: countWhere(
         activeJobs,
@@ -186,6 +238,7 @@ export function buildOperationalReportingReadModel({
       note: "Failed or office-review work older than 14 calendar days.",
     },
     {
+      key: "aging_closeout_overdue",
       label: "Closeout overdue",
       value: countWhere(
         activeJobs,
@@ -197,16 +250,19 @@ export function buildOperationalReportingReadModel({
 
   const throughput: OperationalReportingMetric[] = [
     {
+      key: "throughput_jobs_created_7d",
       label: "Jobs created (7d)",
       value: recentCreatedCount,
       note: "Event-backed job creation activity.",
     },
     {
+      key: "throughput_jobs_completed_7d",
       label: "Jobs completed (7d)",
       value: recentCompletedCount,
       note: "Event-backed field completion activity.",
     },
     {
+      key: "throughput_schedule_touches_7d",
       label: "Schedule touches (7d)",
       value: recentScheduleTouchCount,
       note: "New schedules and schedule updates logged in job_events.",
@@ -214,6 +270,12 @@ export function buildOperationalReportingReadModel({
   ];
 
   const serviceOutcomes = SERVICE_OUTCOME_ORDER.map((outcome) => ({
+    key:
+      outcome === "resolved"
+        ? "service_outcome_resolved"
+        : outcome === "follow_up_required"
+          ? "service_outcome_follow_up_required"
+          : "service_outcome_no_issue_found",
     label: formatOpsLabel(outcome),
     value: countWhere(
       activeServiceJobs,
@@ -222,20 +284,23 @@ export function buildOperationalReportingReadModel({
         getTime(job.field_complete_at ?? job.created_at) >= recentServiceCutoff
     ),
     note: "Completed service visits in the last 30 days.",
-  }));
+  } satisfies OperationalReportingMetric));
 
   const continuity: OperationalReportingMetric[] = [
     {
+      key: "continuity_open_service_cases",
       label: "Open service cases",
       value: openServiceCaseCount,
       note: "Continuity truth from linked service_cases in scope.",
     },
     {
+      key: "continuity_resolved_service_cases",
       label: "Resolved service cases",
       value: resolvedServiceCaseCount,
       note: "Resolved service_cases already linked to scoped jobs.",
     },
     {
+      key: "continuity_active_service_jobs_with_case",
       label: "Active service jobs with case",
       value: countWhere(
         activeServiceJobs,
@@ -244,6 +309,7 @@ export function buildOperationalReportingReadModel({
       note: "Current service visits carrying continuity through service_case_id.",
     },
     {
+      key: "continuity_active_service_jobs_missing_case",
       label: "Active service jobs missing case",
       value: countWhere(
         activeServiceJobs,
