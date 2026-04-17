@@ -117,7 +117,7 @@ if (countsData) {
   let query = supabase
     .from("jobs")
     .select(
-      "id, title, status, scheduled_date, created_at, ops_status, follow_up_date, next_action_note, pending_info_reason, on_hold_reason, job_notes, customer_id, location_id, customer_first_name, customer_last_name, customer_phone, job_address, city, visit_scope_summary, visit_scope_items"
+      "id, title, job_type, status, scheduled_date, created_at, ops_status, follow_up_date, next_action_note, pending_info_reason, on_hold_reason, job_notes, customer_id, location_id, customer_first_name, customer_last_name, customer_phone, job_address, city, visit_scope_summary, visit_scope_items"
     )
     .is("deleted_at", null);
 
