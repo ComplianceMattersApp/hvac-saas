@@ -142,6 +142,8 @@ Payment-related operational changes should be event-capable from the start.
 
 Examples:
 - `invoice_sent`
+- `invoice_resent`
+- `invoice_delivery_failed`
 - `payment_recorded`
 - `payment_partially_paid`
 - `payment_marked_paid`
@@ -212,9 +214,17 @@ Includes:
 - processor-agnostic architecture
 - optional external reference storage
 - clear ownership and UI wording boundaries
+- invoice communication seam for Milestone 2 billing rollout, including draft-review clarity, issue/send, resend, and honest communication tracking/history
+- invoice-owned communication tracking fields such as sent, resent, failed, recipient, last sent at, and delivery/error note when available
+- truthful attempt tracking for invoice delivery without implying guaranteed delivery confirmation
 - future Stripe seam
 - optional future QBO sync seam
 - support for a later configurable platform fee
+
+Locked clarification:
+Invoice send/resend/tracking in this phase is allowed only as a billing communication seam attached to the invoice record. It is not live payment execution, not Stripe checkout, not card/ACH collection, not refund/dispute handling, not contractor payout flow, and not QBO-led billing.
+
+Invoice email content/design polish may continue later as refinement work, but that refinement does not change the payment-ready architecture or convert this seam into payment execution.
 
 Does **not** include:
 - customer checkout
