@@ -21,6 +21,7 @@ import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/search-normalization";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { buildPromotedCompanionReadModel, buildVisitScopeReadModel } from "@/lib/jobs/visit-scope";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -370,7 +371,7 @@ function shouldHideFailedParentJob(j: any) {
 
   // Common job select (keep lightweight)
  const baseSelect =
-   "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, permit_number, pending_info_reason, on_hold_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at";
+   "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, permit_number, pending_info_reason, on_hold_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at, visit_scope_summary, visit_scope_items";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -1583,6 +1584,12 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   const showOnHoldBanner = onHoldSignal && Boolean(onHoldContext);
   const customerName = customerNameOnly(j);
   const customerPhone = customerPhoneOnly(j);
+  const visitScope = buildVisitScopeReadModel(j?.visit_scope_summary, j?.visit_scope_items, {
+    leadMaxLength: 82,
+    previewItemCount: 1,
+    previewItemMaxLength: 34,
+  });
+  const promotedCompanion = buildPromotedCompanionReadModel(j?.visit_scope_items);
   const contractorName = contractorNameOnly(j);
   const phoneHref = telHref(customerPhone);
   const textHref = smsHref(customerPhone);
@@ -1713,9 +1720,33 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
                   {contractorResponseBadgeLabel}
                 </span>
               ) : null}
+              {String(j?.job_type ?? "").toLowerCase() === "ecc" && promotedCompanion.hasPromotedCompanion ? (
+                <span className="inline-flex items-center rounded-full border border-emerald-200/90 bg-emerald-50/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+                  {promotedCompanion.label}
+                </span>
+              ) : null}
             </div>
             <div className="mt-0.5 text-[13px] font-semibold leading-5 text-slate-950">{customerName}</div>
             <div className={`${opsSupportTextClass} text-slate-600`}>{addressLine(j)}</div>
+            {visitScope.hasContent ? (
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] leading-4 text-slate-600">
+                <span className="font-semibold uppercase tracking-[0.08em] text-slate-500">Visit</span>
+                <span className="min-w-0 font-medium text-slate-700">{visitScope.lead}</span>
+                {visitScope.itemCount > 0 ? (
+                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    {visitScope.itemCount} item{visitScope.itemCount === 1 ? "" : "s"}
+                  </span>
+                ) : null}
+                {visitScope.previewItems.map((item) => (
+                  <span
+                    key={`${jobId}-visit-preview-${item}`}
+                    className="inline-flex rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             {customerPhone ? (
               <div className={`mt-0.5 ${opsSupportTextClass} text-slate-600`}>
                 <span className="font-medium text-slate-500">Phone</span>{" "}

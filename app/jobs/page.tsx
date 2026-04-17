@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
+import { buildPromotedCompanionReadModel, buildVisitScopeReadModel } from "@/lib/jobs/visit-scope";
 
 
 const QUEUES = [
@@ -116,7 +117,7 @@ if (countsData) {
   let query = supabase
     .from("jobs")
     .select(
-      "id, title, status, scheduled_date, created_at, ops_status, follow_up_date, next_action_note, pending_info_reason, on_hold_reason, job_notes, customer_id, location_id, customer_first_name, customer_last_name, customer_phone, job_address, city"
+      "id, title, status, scheduled_date, created_at, ops_status, follow_up_date, next_action_note, pending_info_reason, on_hold_reason, job_notes, customer_id, location_id, customer_first_name, customer_last_name, customer_phone, job_address, city, visit_scope_summary, visit_scope_items"
     )
     .is("deleted_at", null);
 
@@ -262,6 +263,12 @@ const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.
     ["need_to_schedule", "pending_info", "retest_needed"].includes(
       job.ops_status ?? ""
     );
+  const visitScope = buildVisitScopeReadModel(job.visit_scope_summary, job.visit_scope_items, {
+    leadMaxLength: 86,
+    previewItemCount: 1,
+    previewItemMaxLength: 34,
+  });
+  const promotedCompanion = buildPromotedCompanionReadModel(job.visit_scope_items);
 
   return (
 
@@ -282,6 +289,25 @@ const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.
                     <span className="font-medium">{formatOpsStatusLabel(job.ops_status)}</span>
                     {job.follow_up_date ? <> • Follow-up: {job.follow_up_date}</> : null}
                   </div>
+
+                  {visitScope.hasContent ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
+                      <span className="font-semibold uppercase tracking-wide text-gray-500">Visit</span>
+                      <span className="font-medium text-gray-700">{visitScope.lead}</span>
+                      {visitScope.itemCount > 0 ? (
+                        <span className="rounded-full border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                          {visitScope.itemCount} item{visitScope.itemCount === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {String(job.job_type ?? "").toLowerCase() === "ecc" && promotedCompanion.hasPromotedCompanion ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-emerald-700">
+                      <span className="font-semibold uppercase tracking-wide text-emerald-600">Follow-up</span>
+                      <span className="font-medium">{promotedCompanion.label}</span>
+                    </div>
+                  ) : null}
 
                   {job.ops_status === "pending_info" ? (
                     <div className="text-xs text-gray-500 mt-1">

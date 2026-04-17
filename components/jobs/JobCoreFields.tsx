@@ -4,6 +4,7 @@
 type Props = {
   mode: "internal" | "external";
   titleRequired?: boolean;
+  showJobTitle?: boolean;
   hideCustomer?: boolean;
   hideServiceLocation?: boolean;
   jobType?: "ecc" | "service";
@@ -16,6 +17,7 @@ type Props = {
 export default function JobCoreFields({
   mode,
   titleRequired,
+  showJobTitle,
   hideCustomer,
   hideServiceLocation,
   jobType = "ecc",
@@ -26,7 +28,7 @@ export default function JobCoreFields({
 }: Props) {
   const titleIsRequired = Boolean(titleRequired);
   const showEccPermitFields = jobType !== "service";
-  const showJobTitle = jobType === "service";
+  const shouldShowJobTitle = showJobTitle ?? jobType === "service";
 
   return (
     <div className="space-y-4">
@@ -35,7 +37,7 @@ export default function JobCoreFields({
       <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
         <div className="text-sm font-semibold text-slate-900">Job Details</div>
 
-        {showJobTitle && (
+        {shouldShowJobTitle && (
           <div className="space-y-1">
             <label className="block text-sm font-medium text-slate-900">Job Title</label>
             <input
