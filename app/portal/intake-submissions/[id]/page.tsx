@@ -56,7 +56,7 @@ export default async function PortalIntakeSubmissionDetailPage({
   const { data: submission, error: submissionErr } = await admin
     .from("contractor_intake_submissions")
     .select(
-      "id, created_at, review_status, proposed_customer_first_name, proposed_customer_last_name, proposed_customer_phone, proposed_customer_email, proposed_address_line1, proposed_city, proposed_zip, proposed_job_type, proposed_project_type, proposed_title, proposed_job_notes, proposed_permit_number"
+      "id, created_at, review_status, proposed_customer_first_name, proposed_customer_last_name, proposed_customer_phone, proposed_customer_email, proposed_address_line1, proposed_city, proposed_zip, proposed_job_type, proposed_project_type, proposed_title, proposed_job_notes, proposed_permit_number, proposed_jurisdiction, proposed_permit_date"
     )
     .eq("id", submissionId)
     .eq("contractor_id", cu.contractor_id)
@@ -87,6 +87,8 @@ export default async function PortalIntakeSubmissionDetailPage({
   const proposedJobType = String((submission as any)?.proposed_job_type ?? "").trim();
   const proposedProjectType = String((submission as any)?.proposed_project_type ?? "").trim();
   const proposedPermit = String((submission as any)?.proposed_permit_number ?? "").trim();
+  const proposedJurisdiction = String((submission as any)?.proposed_jurisdiction ?? "").trim();
+  const proposedPermitDate = String((submission as any)?.proposed_permit_date ?? "").trim();
   const proposedNotes = String((submission as any)?.proposed_job_notes ?? "").trim();
 
   const { count: proposalAttachmentCount, error: attachmentCountErr } = await admin
@@ -232,6 +234,16 @@ export default async function PortalIntakeSubmissionDetailPage({
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Permit</div>
             <div className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{proposedPermit || "Not provided"}</div>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Jurisdiction</div>
+            <div className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{proposedJurisdiction || "Not provided"}</div>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Permit date</div>
+            <div className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{proposedPermitDate || "Not provided"}</div>
           </div>
         </div>
 

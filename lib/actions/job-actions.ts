@@ -5951,6 +5951,13 @@ async function postCreate(createdJobId: string, metaSource: string) {
     });
 
     await runBestEffortPostCreateStep("contractor_next_action_notification", async () => {
+      await insertInternalNotificationForEvent({
+        supabase,
+        jobId: createdJobId,
+        eventType: "contractor_job_created",
+        actorUserId: userId,
+      });
+
       await notifyInternalNextActionChanged({
         supabase,
         jobId: createdJobId,
@@ -6177,6 +6184,8 @@ function canContractorWriteEvent(event_type: string) {
         proposed_title: titleFinal || null,
         proposed_job_notes: jobNotesRaw || null,
         proposed_permit_number: permit_number || null,
+        proposed_jurisdiction: jurisdiction || null,
+        proposed_permit_date: permit_date || null,
       })
       .select("id")
       .single();

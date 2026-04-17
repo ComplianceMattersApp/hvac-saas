@@ -119,6 +119,9 @@ export default async function ContractorIntakeSubmissionDetailPage({
       proposed_project_type,
       proposed_title,
       proposed_job_notes,
+      proposed_permit_number,
+      proposed_jurisdiction,
+      proposed_permit_date,
       review_status,
       review_note,
       reviewed_by_user_id,
@@ -347,6 +350,18 @@ export default async function ContractorIntakeSubmissionDetailPage({
               <div>
                 <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Permit #</dt>
                 <dd className="mt-0.5 text-sm font-mono font-medium text-slate-900">{proposedPermitNum}</dd>
+              </div>
+            ) : null}
+            {proposedTypeIsEcc && normalizeText(submission.proposed_jurisdiction) ? (
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Jurisdiction</dt>
+                <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_jurisdiction)}</dd>
+              </div>
+            ) : null}
+            {proposedTypeIsEcc && normalizeText(submission.proposed_permit_date) ? (
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Permit date</dt>
+                <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_permit_date)}</dd>
               </div>
             ) : null}
           </dl>

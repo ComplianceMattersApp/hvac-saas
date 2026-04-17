@@ -455,6 +455,8 @@ export default async function JobTestsPage({
       job_type,
       project_type,
       permit_number,
+      jurisdiction,
+      permit_date,
       contractor_id,
       contractors (
         owner_user_id

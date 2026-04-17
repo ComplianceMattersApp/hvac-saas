@@ -28,6 +28,9 @@ type IntakeSubmissionRow = {
   proposed_project_type: string | null;
   proposed_title: string | null;
   proposed_job_notes: string | null;
+  proposed_permit_number: string | null;
+  proposed_jurisdiction: string | null;
+  proposed_permit_date: string | null;
   review_status: string;
 };
 
@@ -385,6 +388,9 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
       customer_email: customer.email,
       customer_phone: customer.phone,
       job_notes: submission.proposed_job_notes,
+      permit_number: normalizeText(submission.proposed_permit_number) || null,
+      jurisdiction: normalizeText(submission.proposed_jurisdiction) || null,
+      permit_date: normalizeText(submission.proposed_permit_date) || null,
       ops_status: "need_to_schedule",
       billing_recipient: "contractor",
     },
