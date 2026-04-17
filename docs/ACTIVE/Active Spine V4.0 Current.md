@@ -49,6 +49,14 @@ Portal = external collaboration surface only, never canonical truth
 Service Case = the problem
 Job = a visit
 
+Visit Scope = the operational scope for this visit under the job layer.
+It exists to define what work belongs to this trip without changing the locked container model:
+service_cases remain continuity truth,
+jobs remain visit execution truth,
+invoice line items remain downstream billed/commercial truth.
+
+Invoice line items must not become the primary operational work-definition surface.
+
 A service case may contain multiple jobs.
 A job may belong to a service case and may also reference a prior visit through parent_job_id.
 
@@ -318,6 +326,19 @@ This first Service pass formalizes Service Case and Service Visit classification
 
 This pass does not start Billing workflows or Reporting workflows.
 
+Milestone 1 closeout status:
+Service model buildout is now closed for milestone-1 scope.
+
+Milestone-1 Service model buildout includes:
+- Service Contract V1 baseline
+- relationship-aware internal intake V1
+- Visit Scope as the job-owned operational scope layer
+- ECC optional vs Service required Visit Scope behavior
+- ECC companion-scope promotion into real Service jobs
+- promoted-companion read-only visibility on internal scan surfaces
+- internal Job Title demotion with derived stored titles preserved
+- milestone-1 write-path reliability cleanup for the live `jobs.updated_at` mismatch
+
 Service Case v1 contract:
 service_cases own complaint continuity and case-level resolution ownership.
 Required case fields: problem_summary, case_kind (reactive|callback|warranty|maintenance), status, resolved_by_job_id, resolved_at, resolution_summary.
@@ -335,6 +356,15 @@ These classifications do not change source-of-truth ownership:
 job_events remains narrative truth.
 jobs.ops_status remains operational projection.
 ecc_test_runs remains ECC technical truth.
+
+Mixed-visit guardrail:
+ECC Test and Service remain the only top-level actionable workflow families.
+Do not create a hybrid third family.
+
+Approved mixed-visit direction:
+an ECC-first visit may carry same-visit companion service scope while the work remains part of the same trip,
+but companion scope must promote into a real Service job once it becomes its own lifecycle thread
+(for example: separate scheduling, separate assignment, return-trip work, or separate follow-up continuity).
 
 9. Staffing / Assignment System (Locked)
 9.1 Source of truth
@@ -1058,7 +1088,8 @@ Roadmap order remains:
 7. Smaller service-model revisions after the above
 
 Current position:
-- Service model buildout has been materially advanced and has a working V1 foundation.
+- Service model buildout is closed for milestone-1 scope.
+- Billing / invoice workflow is now the next active roadmap item.
 - Payment architecture/foundation is now also an active implementation area under the locked direction in Section 19.
 - This does not mean full payment acceptance is live; it means payment readiness is now being intentionally built to prevent later rework.
 
@@ -1072,6 +1103,12 @@ Service model buildout completed in the current thread:
 - Open Active Job query tightening and mode cleanup
 - Job-type-aware relationship scoping (ECC vs Service separation)
 - Submit-side hardening for Open Active Job type enforcement
+- Visit Scope as the job-owned operational scope layer
+- ECC optional vs Service required Visit Scope behavior
+- ECC companion-scope promotion into real Service jobs
+- promoted-companion read-only visibility on internal scan surfaces
+- internal Job Title demotion with derived stored titles preserved
+- milestone-1 write-path reliability cleanup for the live `jobs.updated_at` mismatch
 
 20.4 Current locked clarifications
 

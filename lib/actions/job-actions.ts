@@ -26,6 +26,14 @@ import { getThresholdRuleForTest } from "@/lib/ecc/rule-profiles";
 import type { JobStatus } from "@/lib/types/job";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { mapToCanonicalRole, sanitizeEquipmentFields } from "@/lib/utils/equipment-domain";
+import {
+  hasVisitScopeContent,
+  isVisitScopeItemPromoted,
+  parseVisitScopeItemsJson,
+  sanitizeVisitScopeItems,
+  sanitizeVisitScopeSummary,
+  type VisitScopeItem,
+} from "@/lib/jobs/visit-scope";
 
 export type { JobStatus } from "@/lib/types/job";
 
@@ -62,6 +70,8 @@ type CreateJobInput = {
   customer_last_name?: string | null;
   customer_email?: string | null;
   job_notes?: string | null;
+  visit_scope_summary?: string | null;
+  visit_scope_items?: VisitScopeItem[] | null;
   job_address?: string | null;
   billing_recipient?: "contractor" | "customer" | "other" | null;
   billing_name?: string | null;
@@ -1750,6 +1760,41 @@ function deriveInitialServiceVisitReason(input: {
   return "service visit";
 }
 
+function formatProjectTypeTitleFragment(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+
+  return normalized
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function deriveInternalIntakeJobTitle(input: {
+  jobType: "ecc" | "service";
+  projectType?: string | null;
+  serviceVisitReason?: string | null;
+  visitScopeSummary?: string | null;
+  visitScopeItems?: VisitScopeItem[] | null;
+}) {
+  if (input.jobType === "service") {
+    const explicitReason = String(input.serviceVisitReason ?? "").trim();
+    if (explicitReason) return explicitReason;
+
+    const summary = String(input.visitScopeSummary ?? "").trim();
+    if (summary) return summary;
+
+    const firstItemTitle = String(input.visitScopeItems?.find((item) => String(item?.title ?? "").trim())?.title ?? "").trim();
+    if (firstItemTitle) return firstItemTitle;
+
+    return "Service Visit";
+  }
+
+  const projectTypeLabel = formatProjectTypeTitleFragment(input.projectType);
+  return projectTypeLabel ? `ECC ${projectTypeLabel} Test` : "ECC Test";
+}
+
   function buildInitialProblemSummary(input: {
   job_notes?: string | null;
   title?: string | null;
@@ -2116,7 +2161,6 @@ export async function updateJobTypeFromForm(formData: FormData) {
 
   const updatePayload: Record<string, any> = {
     job_type: rawType,
-    updated_at: new Date().toISOString(),
   };
 
   if (rawType === "service") {
@@ -2269,7 +2313,6 @@ export async function updateJobServiceContractFromForm(formData: FormData) {
       service_visit_type: normalizedVisitType,
       service_visit_reason: normalizedVisitReason,
       service_visit_outcome: normalizedVisitOutcome,
-      updated_at: new Date().toISOString(),
     })
     .eq("id", jobId);
 
@@ -2362,6 +2405,384 @@ export async function updateJobServiceContractFromForm(formData: FormData) {
     returnToRaw,
     cacheBust: true,
   });
+}
+
+export async function updateJobVisitScopeFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { userId: actingUserId } = await requireInternalUser({ supabase });
+  const admin = createAdminClient();
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const tabRaw = String(formData.get("tab") || "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+
+  const { data: beforeJob, error: beforeErr } = await admin
+    .from("jobs")
+    .select("job_type, visit_scope_summary, visit_scope_items")
+    .eq("id", jobId)
+    .single();
+
+  if (beforeErr) {
+    console.error("updateJobVisitScopeFromForm: beforeJob read failed", {
+      jobId,
+      code: beforeErr.code,
+      message: beforeErr.message,
+      details: beforeErr.details,
+    });
+    redirectToJobWithBanner({
+      jobId,
+      banner: "visit_scope_job_read_failed",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const nextSummary = sanitizeVisitScopeSummary(formData.get("visit_scope_summary"));
+  const nextItemsRaw = String(formData.get("visit_scope_items_json") || "").trim();
+  const normalizedNextItemsRaw =
+    nextItemsRaw === "undefined" || nextItemsRaw === "null" ? "" : nextItemsRaw;
+
+  let nextItems: VisitScopeItem[] = [];
+  try {
+    nextItems = parseVisitScopeItemsJson(normalizedNextItemsRaw);
+  } catch (error) {
+    const canTreatAsBlankEccSave =
+      beforeJob?.job_type === "ecc" &&
+      !nextSummary &&
+      (!normalizedNextItemsRaw || normalizedNextItemsRaw === "[]");
+
+    if (canTreatAsBlankEccSave) {
+      nextItems = [];
+    } else {
+      console.error("updateJobVisitScopeFromForm: visit scope parse failed", {
+        jobId,
+        raw: normalizedNextItemsRaw,
+        jobType: beforeJob?.job_type ?? null,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      redirectToJobWithBanner({
+        jobId,
+        banner: "visit_scope_payload_invalid",
+        tabRaw,
+        returnToRaw,
+      });
+    }
+  }
+
+  if (beforeJob?.job_type === "service" && !hasVisitScopeContent(nextSummary, nextItems)) {
+    redirectToJobWithBanner({
+      jobId,
+      banner: "visit_scope_required",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const beforeSummary = sanitizeVisitScopeSummary(beforeJob?.visit_scope_summary);
+  let beforeItems: VisitScopeItem[] = [];
+  try {
+    beforeItems = sanitizeVisitScopeItems(beforeJob?.visit_scope_items ?? []);
+  } catch {
+    beforeItems = [];
+  }
+
+  const beforeItemsSerialized = JSON.stringify(beforeItems);
+  const nextItemsSerialized = JSON.stringify(nextItems);
+
+  if (beforeSummary === nextSummary && beforeItemsSerialized === nextItemsSerialized) {
+    revalidatePath(`/jobs/${jobId}`);
+    redirectToJobWithBanner({
+      jobId,
+      banner: "visit_scope_already_saved",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const { error: updateErr } = await admin
+    .from("jobs")
+    .update({
+      visit_scope_summary: nextSummary,
+      visit_scope_items: nextItems,
+    })
+    .eq("id", jobId);
+
+  if (updateErr) {
+    console.error("updateJobVisitScopeFromForm: jobs update failed", {
+      jobId,
+      jobType: beforeJob?.job_type ?? null,
+      code: updateErr.code,
+      message: updateErr.message,
+      details: updateErr.details,
+    });
+    redirectToJobWithBanner({
+      jobId,
+      banner: "visit_scope_job_update_failed",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const changes: Array<{ field: string; from: string | null; to: string | null }> = [];
+
+  if (beforeSummary !== nextSummary) {
+    changes.push({
+      field: "jobs.visit_scope_summary",
+      from: beforeSummary,
+      to: nextSummary,
+    });
+  }
+
+  if (beforeItemsSerialized !== nextItemsSerialized) {
+    changes.push({
+      field: "jobs.visit_scope_items",
+      from: `${beforeItems.length} item(s)`,
+      to: `${nextItems.length} item(s)`,
+    });
+  }
+
+  if (changes.length > 0) {
+    await insertJobEvent({
+      supabase,
+      jobId,
+      event_type: "ops_update",
+      meta: {
+        source: "job_detail_visit_scope",
+        changes,
+      },
+      userId: actingUserId,
+    });
+  }
+
+  revalidatePath(`/jobs/${jobId}`, "page");
+  revalidatePath("/jobs", "page");
+  revalidatePath("/ops", "page");
+  if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
+    const [pathOnly] = returnToRaw.split("?");
+    if (pathOnly) revalidatePath(pathOnly, "page");
+  }
+
+  refresh();
+  redirectToJobWithBanner({
+    jobId,
+    banner: "visit_scope_saved",
+    tabRaw,
+    returnToRaw,
+    cacheBust: true,
+  });
+}
+
+export async function promoteCompanionScopeToServiceJobFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { userId: actingUserId } = await requireInternalUser({ supabase });
+
+  const sourceJobId = String(formData.get("job_id") || "").trim();
+  const itemIndexRaw = String(formData.get("item_index") || "").trim();
+  const tabRaw = String(formData.get("tab") || "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+
+  if (!sourceJobId) throw new Error("Missing job_id");
+
+  const itemIndex = Number(itemIndexRaw);
+  if (!Number.isInteger(itemIndex) || itemIndex < 0) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "companion_scope_promotion_not_eligible",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const { data: sourceJob, error: sourceJobErr } = await supabase
+    .from("jobs")
+    .select(`
+      id,
+      job_type,
+      title,
+      job_notes,
+      customer_id,
+      location_id,
+      contractor_id,
+      customer_first_name,
+      customer_last_name,
+      customer_email,
+      customer_phone,
+      job_address,
+      city,
+      service_case_id,
+      visit_scope_summary,
+      visit_scope_items
+    `)
+    .eq("id", sourceJobId)
+    .maybeSingle();
+
+  if (sourceJobErr) throw sourceJobErr;
+  if (!sourceJob?.id) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "companion_scope_promotion_failed",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  if (String(sourceJob.job_type ?? "").trim().toLowerCase() !== "ecc") {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "companion_scope_promotion_not_eligible",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  let sourceItems: VisitScopeItem[] = [];
+  try {
+    sourceItems = sanitizeVisitScopeItems(sourceJob.visit_scope_items ?? []);
+  } catch {
+    sourceItems = [];
+  }
+
+  const sourceItem = sourceItems[itemIndex] ?? null;
+  if (!sourceItem || sourceItem.kind !== "companion_service") {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "companion_scope_promotion_not_eligible",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  if (isVisitScopeItemPromoted(sourceItem)) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "companion_scope_already_promoted",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  const customerId = String(sourceJob.customer_id ?? "").trim();
+  const locationId = String(sourceJob.location_id ?? "").trim();
+
+  if (!customerId || !locationId) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "companion_scope_promotion_failed",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  const serviceCaseId = String(sourceJob.service_case_id ?? "").trim() || await ensureServiceCaseForJob({
+    supabase,
+    jobId: sourceJobId,
+  });
+
+  const promotedAt = new Date().toISOString();
+  const serviceVisitReason = deriveInitialServiceVisitReason({
+    serviceVisitReason: sourceItem.title,
+    title: sourceItem.title,
+    jobNotes: sourceItem.details ?? sourceJob.job_notes,
+  });
+  const followUpNotes = [
+    `Promoted from ECC companion scope on job ${String(sourceJob.id).slice(0, 8)}.`,
+    sourceItem.details ? sourceItem.details : null,
+  ].filter(Boolean).join("\n\n");
+
+  const created = await createJob({
+    job_type: "service",
+    service_case_id: serviceCaseId,
+    service_case_kind: "reactive",
+    service_visit_type: "repair",
+    service_visit_reason: serviceVisitReason,
+    service_visit_outcome: "follow_up_required",
+    title: sourceItem.title,
+    city: String(sourceJob.city ?? "").trim() || "Unknown",
+    job_address: String(sourceJob.job_address ?? "").trim() || null,
+    scheduled_date: null,
+    status: "open",
+    contractor_id: String(sourceJob.contractor_id ?? "").trim() || null,
+    customer_id: customerId,
+    location_id: locationId,
+    customer_first_name: String(sourceJob.customer_first_name ?? "").trim() || null,
+    customer_last_name: String(sourceJob.customer_last_name ?? "").trim() || null,
+    customer_email: String(sourceJob.customer_email ?? "").trim() || null,
+    customer_phone: String(sourceJob.customer_phone ?? "").trim() || null,
+    job_notes: followUpNotes || null,
+    visit_scope_summary: sourceItem.title,
+    visit_scope_items: [
+      {
+        title: sourceItem.title,
+        details: sourceItem.details ?? null,
+        kind: "primary",
+      },
+    ],
+    ops_status: "need_to_schedule",
+  }, {
+    serviceCaseWriteClient: supabase,
+  });
+
+  const nextItems = sourceItems.map((item, index) =>
+    index === itemIndex
+      ? {
+          ...item,
+          promoted_service_job_id: created.id,
+          promoted_at: promotedAt,
+          promoted_by_user_id: actingUserId,
+        }
+      : item,
+  );
+
+  const { error: sourceUpdateErr } = await supabase
+    .from("jobs")
+    .update({
+      visit_scope_items: nextItems,
+    })
+    .eq("id", sourceJobId);
+
+  if (sourceUpdateErr) {
+    throw sourceUpdateErr;
+  }
+
+  await insertJobEvent({
+    supabase,
+    jobId: sourceJobId,
+    event_type: "companion_scope_promoted",
+    meta: {
+      promoted_service_job_id: created.id,
+      source_item_index: itemIndex,
+      source_item_title: sourceItem.title,
+      promoted_at: promotedAt,
+    },
+    userId: actingUserId,
+  });
+
+  await insertJobEvent({
+    supabase,
+    jobId: created.id,
+    event_type: "created_from_companion_scope",
+    meta: {
+      source_job_id: sourceJobId,
+      source_item_index: itemIndex,
+      source_item_title: sourceItem.title,
+      promoted_at: promotedAt,
+    },
+    userId: actingUserId,
+  });
+
+  revalidatePath(`/jobs/${sourceJobId}`, "page");
+  revalidatePath(`/jobs/${created.id}`, "page");
+  revalidatePath("/jobs", "page");
+  revalidatePath("/ops", "page");
+
+  redirect(`/jobs/${created.id}?banner=companion_scope_promoted`);
 }
 
 export async function getContractors() {
@@ -4678,11 +5099,14 @@ export async function createJob(
   const normalizedServiceVisitReason =
     normalizedJobType === "service"
       ? deriveInitialServiceVisitReason({
-          serviceVisitReason: input.service_visit_reason,
+          serviceVisitReason: input.service_visit_reason ?? input.visit_scope_summary,
           title: input.title,
           jobNotes: input.job_notes,
         })
       : null;
+
+  const normalizedVisitScopeSummary = sanitizeVisitScopeSummary(input.visit_scope_summary);
+  const normalizedVisitScopeItems = sanitizeVisitScopeItems(input.visit_scope_items ?? []);
 
   const normalizedServiceVisitOutcome =
     normalizedJobType === "service"
@@ -4717,6 +5141,8 @@ export async function createJob(
     customer_last_name: input.customer_last_name ?? null,
     customer_email: input.customer_email ?? null,
     job_notes: input.job_notes ?? null,
+    visit_scope_summary: normalizedVisitScopeSummary,
+    visit_scope_items: normalizedVisitScopeItems,
     ops_status: input.ops_status ?? null,
 
     billing_recipient: input.billing_recipient ?? null,
@@ -4803,10 +5229,6 @@ const jobType = relationshipJobType;
   const title = String(formData.get("title") || "").trim();
   const postedCity = String(formData.get("city") || "").trim();
 
-  if (jobType === "service" && !title) {
-    throw new Error("Service jobs require a title.");
-  }
-
   const customerPhoneRaw = String(formData.get("customer_phone") || "").trim();
 
   const billing_recipient = String(formData.get("billing_recipient") || "").trim() as
@@ -4838,6 +5260,8 @@ const customerFirstNameRaw = String(formData.get("customer_first_name") || "").t
 const customerLastNameRaw = String(formData.get("customer_last_name") || "").trim();
 const customerEmailRaw = String(formData.get("customer_email") || "").trim();
 const jobNotesRaw = String(formData.get("job_notes") || "").trim();
+const visitScopeSummaryRaw = String(formData.get("visit_scope_summary") || "").trim();
+const visitScopeItemsRaw = String(formData.get("visit_scope_items_json") || "").trim();
 const jobAddressFormRaw = String(formData.get("job_address") || "").trim();
 const serviceCaseKindRaw = String(formData.get("service_case_kind") || "").trim();
 const serviceVisitTypeRaw = String(formData.get("service_visit_type") || "").trim();
@@ -4892,6 +5316,20 @@ const scheduled_date = isContractorUser ? null : derived_scheduled_date;
 const window_start = isContractorUser ? null : derived_window_start;
 const window_end = isContractorUser ? null : derived_window_end;
 const ops_status = isContractorUser ? "need_to_schedule" : derived_ops_status;
+const visit_scope_summary = isContractorUser ? null : sanitizeVisitScopeSummary(visitScopeSummaryRaw);
+let visit_scope_items: VisitScopeItem[] = [];
+
+if (!isContractorUser) {
+  try {
+    visit_scope_items = parseVisitScopeItemsJson(visitScopeItemsRaw);
+  } catch {
+    redirect("/jobs/new?err=visit_scope_invalid");
+  }
+
+  if (jobType === "service" && !hasVisitScopeContent(visit_scope_summary, visit_scope_items)) {
+    redirect("/jobs/new?err=visit_scope_required");
+  }
+}
 
 const { canonicalOwnerUserId, canonicalWriteClient } =
   await resolveCanonicalOwner({
@@ -5142,9 +5580,17 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
 
   const titleFinal =
     title ||
-    (jobType === "ecc"
-      ? `ECC ${projectType.replaceAll("_", " ")} — ${city}`
-      : "");
+    (isContractorUser
+      ? (jobType === "ecc"
+          ? `ECC ${projectType.replaceAll("_", " ")} — ${city}`
+          : "")
+      : deriveInternalIntakeJobTitle({
+          jobType,
+          projectType,
+          serviceVisitReason: service_visit_reason,
+          visitScopeSummary: visit_scope_summary,
+          visitScopeItems: visit_scope_items,
+        }));
 
   if (!city) throw new Error("City is required");
 
@@ -5656,6 +6102,8 @@ function canContractorWriteEvent(event_type: string) {
       customer_last_name: canonicalSnapshot.customer_last_name,
       customer_email: canonicalSnapshot.customer_email,
       job_notes: jobNotesRaw || null,
+      visit_scope_summary,
+      visit_scope_items,
 
       title: titleFinal,
       city: canonicalSnapshot.city,
@@ -5972,6 +6420,8 @@ if (existingCustomerId && !existingLocationId) {
     customer_last_name: canonicalSnapshot.customer_last_name,
     customer_email: canonicalSnapshot.customer_email,
     job_notes: jobNotesRaw || null,
+    visit_scope_summary,
+    visit_scope_items,
 
     title: titleFinal,
     city: canonicalSnapshot.city,
@@ -6081,6 +6531,8 @@ const created = await createJob({
   customer_last_name: canonicalSnapshot.customer_last_name,
   customer_email: canonicalSnapshot.customer_email,
   job_notes: jobNotesRaw || null,
+  visit_scope_summary,
+  visit_scope_items,
 
   title: titleFinal,
   city: canonicalSnapshot.city,

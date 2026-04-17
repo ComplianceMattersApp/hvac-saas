@@ -25,6 +25,7 @@ import {
   completeDataEntryFromForm,
   type JobStatus,
   createRetestJobFromForm,
+  promoteCompanionScopeToServiceJobFromForm,
   addPublicNoteFromForm,
   addInternalNoteFromForm,
   getOnTheWayUndoEligibility,
@@ -81,6 +82,15 @@ import {
 
 import JobAttachmentsInternal from "./_components/JobAttachmentsInternal";
 import InternalInvoiceLineItemsTable from "./_components/InternalInvoiceLineItemsTable";
+import VisitScopeJobDetailForm from "@/components/jobs/VisitScopeJobDetailForm";
+import {
+  buildPromotedCompanionReadModel,
+  buildVisitScopeReadModel,
+  formatVisitScopeItemKindLabel,
+  isVisitScopeItemPromoted,
+  sanitizeVisitScopeItems,
+  sanitizeVisitScopeSummary,
+} from "@/lib/jobs/visit-scope";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -308,6 +318,16 @@ function formatTimelineDetail(type?: string | null, meta?: any, message?: string
     return [invoiceNumber, totalDisplay, voidReason].filter(Boolean).join(" - ");
   }
 
+  if (type === "companion_scope_promoted") {
+    const itemTitle = summarizePlainText(String(meta?.source_item_title ?? ""), 80);
+    return itemTitle ? `${itemTitle} - promoted into its own Service job` : "Companion scope promoted into its own Service job";
+  }
+
+  if (type === "created_from_companion_scope") {
+    const itemTitle = summarizePlainText(String(meta?.source_item_title ?? ""), 80);
+    return itemTitle ? `${itemTitle} - created from ECC companion scope` : "Created from ECC companion scope";
+  }
+
   return cleanMessage;
 }
 
@@ -367,6 +387,8 @@ function formatTimelineEvent(type?: string | null, meta?: any, message?: string 
   internal_invoice_drafted: "Internal invoice drafted",
   internal_invoice_issued: "Internal invoice issued",
   internal_invoice_voided: "Internal invoice voided",
+  companion_scope_promoted: "Companion scope promoted",
+  created_from_companion_scope: "Service job created from companion scope",
 };
 
 if (eventType === "ops_update") {
@@ -590,6 +612,8 @@ export default async function JobDetailPage({
       service_visit_type,
       service_visit_reason,
       service_visit_outcome,
+      visit_scope_summary,
+      visit_scope_items,
       project_type,
       id,
       parent_job_id,
@@ -1186,6 +1210,29 @@ const showInternalInvoicePanel =
   isInternalUser &&
   billingModeBlocksLightweightBilling;
 
+const visitScopeSummary = sanitizeVisitScopeSummary((job as any).visit_scope_summary);
+let visitScopeItems = [] as Array<{
+  title: string;
+  details: string | null;
+  kind: "primary" | "companion_service";
+  promoted_service_job_id?: string | null;
+  promoted_at?: string | null;
+  promoted_by_user_id?: string | null;
+}>;
+try {
+  visitScopeItems = sanitizeVisitScopeItems((job as any).visit_scope_items ?? []);
+} catch {
+  visitScopeItems = [];
+}
+const visitScopeCount = visitScopeItems.length;
+const hasVisitScopeDefined = Boolean(visitScopeSummary) || visitScopeCount > 0;
+const visitScopeHeaderPreview = buildVisitScopeReadModel(visitScopeSummary, visitScopeItems, {
+  leadMaxLength: 110,
+  previewItemCount: 1,
+  previewItemMaxLength: 34,
+});
+const promotedCompanionHeader = buildPromotedCompanionReadModel(visitScopeItems);
+
 const internalInvoiceBillingAddress = internalInvoice
   ? formatBillingAddress({
       billing_address_line1: internalInvoice.billing_address_line1,
@@ -1426,6 +1473,8 @@ const renderTimelineItem = (e: any, key: string) => {
     type === "internal_invoice_drafted" ? "🧾" :
     type === "internal_invoice_issued" ? "🧾" :
     type === "internal_invoice_voided" ? "⛔" :
+    type === "companion_scope_promoted" ? "🔀" :
+    type === "created_from_companion_scope" ? "🧰" :
     type === "failure_resolved_by_correction_review" ? "✅" :
     type === "contractor_correction_submission" ? "📎" :
     "📝";
@@ -1504,6 +1553,24 @@ const renderTimelineItem = (e: any, key: string) => {
           </Link>
         </div>
       ) : null}
+
+      {type === "companion_scope_promoted" && meta?.promoted_service_job_id ? (
+        <div className="mt-1 text-sm">
+          Service follow-up:{" "}
+          <Link className="underline" href={`/jobs/${String(meta.promoted_service_job_id)}?tab=info`}>
+            View service job
+          </Link>
+        </div>
+      ) : null}
+
+      {type === "created_from_companion_scope" && meta?.source_job_id ? (
+        <div className="mt-1 text-sm">
+          Source ECC job:{" "}
+          <Link className="underline" href={`/jobs/${String(meta.source_job_id)}?tab=info`}>
+            View source job
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 };
@@ -1529,6 +1596,23 @@ const renderTimelineItem = (e: any, key: string) => {
         <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-600">
           Single-job control center for scheduling, field progress, closeout, and record history.
         </p>
+        {visitScopeHeaderPreview.hasContent ? (
+          <div className="mt-2 flex max-w-2xl flex-wrap items-center gap-1.5 text-xs text-slate-600">
+            <span className="font-semibold uppercase tracking-[0.1em] text-slate-500">Visit</span>
+            <span className="font-medium text-slate-700">{visitScopeHeaderPreview.lead}</span>
+            {visitScopeHeaderPreview.itemCount > 0 ? (
+              <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                {visitScopeHeaderPreview.itemCount} item{visitScopeHeaderPreview.itemCount === 1 ? "" : "s"}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        {isInternalUser && String(job.job_type ?? "").toLowerCase() === "ecc" && promotedCompanionHeader.hasPromotedCompanion ? (
+          <div className="mt-2 flex max-w-2xl flex-wrap items-center gap-1.5 text-xs text-emerald-700">
+            <span className="font-semibold uppercase tracking-[0.1em] text-emerald-600">Follow-up</span>
+            <span className="font-medium">{promotedCompanionHeader.label}</span>
+          </div>
+        ) : null}
       </div>
       <div className="flex w-full flex-col gap-2.5 xl:w-auto xl:min-w-[24rem] xl:items-end">
         {!isFieldComplete ? (
@@ -2217,6 +2301,55 @@ const renderTimelineItem = (e: any, key: string) => {
         />
       )}
 
+      {banner === "visit_scope_saved" && (
+        <FlashBanner
+          type="success"
+          message="Visit Scope saved."
+        />
+      )}
+
+      {banner === "visit_scope_already_saved" && (
+        <FlashBanner
+          type="warning"
+          message="Visit Scope was already up to date."
+        />
+      )}
+
+      {banner === "visit_scope_required" && (
+        <FlashBanner
+          type="warning"
+          message="Service jobs require a Visit Scope reason or at least one Visit Scope item."
+        />
+      )}
+
+      {banner === "visit_scope_payload_invalid" && (
+        <FlashBanner
+          type="warning"
+          message="Visit Scope items could not be read from the form submission."
+        />
+      )}
+
+      {banner === "visit_scope_job_read_failed" && (
+        <FlashBanner
+          type="warning"
+          message="Could not load the job before saving Visit Scope."
+        />
+      )}
+
+      {banner === "visit_scope_job_update_failed" && (
+        <FlashBanner
+          type="warning"
+          message="Visit Scope could not be saved to the job record."
+        />
+      )}
+
+      {banner === "visit_scope_update_failed" && (
+        <FlashBanner
+          type="warning"
+          message="Visit Scope could not be saved."
+        />
+      )}
+
       {banner === "note_added" && (
         <FlashBanner
           type="success"
@@ -2326,6 +2459,34 @@ const renderTimelineItem = (e: any, key: string) => {
         <FlashBanner
           type="success"
           message="Team member assigned and set as primary."
+        />
+      )}
+
+      {banner === "companion_scope_promoted" && (
+        <FlashBanner
+          type="success"
+          message="Service follow-up created from the ECC companion scope item."
+        />
+      )}
+
+      {banner === "companion_scope_already_promoted" && (
+        <FlashBanner
+          type="warning"
+          message="That companion scope item already has a linked Service job."
+        />
+      )}
+
+      {banner === "companion_scope_promotion_not_eligible" && (
+        <FlashBanner
+          type="warning"
+          message="Only ECC companion-service scope items can be promoted from this workflow."
+        />
+      )}
+
+      {banner === "companion_scope_promotion_failed" && (
+        <FlashBanner
+          type="warning"
+          message="Unable to create the Service follow-up from that companion scope item. Please try again."
         />
       )}
 
@@ -2817,9 +2978,114 @@ const renderTimelineItem = (e: any, key: string) => {
   </div>
 ) : null}
 
+{isInternalUser ? (
+  <div className="mt-6 rounded-2xl border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] p-5 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.28)]">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit Scope</div>
+        <div className="mt-1 text-sm leading-6 text-slate-600">
+          Reason, trip scope, and done-before-leaving detail.
+        </div>
+      </div>
+      <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+        {hasVisitScopeDefined ? `${visitScopeCount} item${visitScopeCount === 1 ? "" : "s"}` : "Not started"}
+      </div>
+    </div>
+
+    <div className={`mt-4 grid gap-4 ${hasVisitScopeDefined ? "xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)]" : ""}`}>
+      <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.24)]">
+        <VisitScopeJobDetailForm
+          jobId={job.id}
+          jobType={job.job_type === "service" ? "service" : "ecc"}
+          tab={tab}
+          initialSummary={visitScopeSummary}
+          initialItems={visitScopeItems}
+          primaryButtonClass={primaryButtonClass}
+        />
+      </div>
+
+      {hasVisitScopeDefined ? (
+        <div className="space-y-3 rounded-xl border border-slate-200/80 bg-white/92 p-4 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.24)]">
+          {visitScopeSummary ? (
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Current Summary</div>
+              <div className="mt-1 text-sm leading-6 text-slate-700">
+                {visitScopeSummary}
+              </div>
+            </div>
+          ) : null}
+
+          {visitScopeItems.length > 0 ? (
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Current Scope Items</div>
+              <div className="mt-2 space-y-2">
+                {visitScopeItems.map((item, index) => (
+                  <div key={`${item.kind}-${index}-${item.title}`} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-semibold text-slate-900">{item.title}</div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                          {formatVisitScopeItemKindLabel(item.kind)}
+                        </div>
+                        {isVisitScopeItemPromoted(item) ? (
+                          <div className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-700">
+                            Promoted
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    {item.details ? (
+                      <div className="mt-1 text-sm leading-6 text-slate-600">{item.details}</div>
+                    ) : null}
+                    {job.job_type === "ecc" && item.kind === "companion_service" ? (
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
+                        {isVisitScopeItemPromoted(item) && item.promoted_service_job_id ? (
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-sm text-slate-600">
+                              This companion scope now runs as its own Service job.
+                            </div>
+                            <Link
+                              href={`/jobs/${String(item.promoted_service_job_id)}?tab=info`}
+                              className={secondaryButtonClass}
+                            >
+                              Open Service Job
+                            </Link>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-sm text-slate-600">
+                              Promote when this companion work needs its own Service lifecycle.
+                            </div>
+                            <form action={promoteCompanionScopeToServiceJobFromForm}>
+                              <input type="hidden" name="job_id" value={job.id} />
+                              <input type="hidden" name="item_index" value={String(index)} />
+                              <input type="hidden" name="tab" value={tab} />
+                              <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}`} />
+                              <SubmitButton
+                                loadingText="Creating..."
+                                className={secondaryButtonClass}
+                              >
+                                Create Service Follow-Up
+                              </SubmitButton>
+                            </form>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  </div>
+) : null}
+
 {showInternalInvoicePanel ? (
-  <div id="internal-invoice-panel" className="mt-6 scroll-mt-24 rounded-2xl border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] p-5 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.28)]">
-    <div className="rounded-xl border border-slate-200/80 bg-white/92 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.22)]">
+  <div id="internal-invoice-panel" className={`mt-6 scroll-mt-24 rounded-2xl p-5 ${hasVisitScopeDefined ? "border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_20px_40px_-30px_rgba(15,23,42,0.28)]" : "border border-slate-200/70 bg-slate-50/75 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.18)]"}`}>
+    <div className={`rounded-xl p-4 ${hasVisitScopeDefined ? "border border-slate-200/80 bg-white/92 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.22)]" : "border border-slate-200/70 bg-white/70"}`}>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice</div>
@@ -2861,14 +3127,16 @@ const renderTimelineItem = (e: any, key: string) => {
     </div>
 
     {!internalInvoice ? (
-      <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-4">
+      <div className={`mt-4 rounded-xl border border-dashed px-4 py-4 ${hasVisitScopeDefined ? "border-slate-300 bg-slate-50/80" : "border-slate-200 bg-white/65"}`}>
         <div className="text-sm leading-6 text-slate-700">
-          Start the work scope here. Create the draft invoice, then build it from line items on this page.
+          {hasVisitScopeDefined
+            ? "Create a draft invoice when the billed scope is ready."
+            : "Visit Scope comes first. Start an invoice later when billing is ready."}
         </div>
         <form action={createInternalInvoiceDraftFromForm} className="mt-3">
           <input type="hidden" name="job_id" value={job.id} />
           <input type="hidden" name="tab" value={tab} />
-          <SubmitButton loadingText="Creating..." className={primaryButtonClass}>
+          <SubmitButton loadingText="Creating..." className={hasVisitScopeDefined ? primaryButtonClass : secondaryButtonClass}>
             Create Draft Invoice
           </SubmitButton>
         </form>
@@ -2882,7 +3150,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Line Items</div>
-                    <div className="mt-1 text-sm leading-6 text-slate-600">Build the work scope here. Each line item carries both billable scope and the instruction detail for what gets done.</div>
+                    <div className="mt-1 text-sm leading-6 text-slate-600">Build billed scope here once billing is ready. Line items remain downstream commercial records rather than the visit-definition layer.</div>
                   </div>
                   <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                     {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}

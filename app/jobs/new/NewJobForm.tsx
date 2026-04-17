@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { createJobFromForm, getInternalIntakeRelationshipContext } from "@/lib/actions";
 import JobCoreFields from "@/components/jobs/JobCoreFields";
 import ActionFeedback from "@/components/ui/ActionFeedback";
+import VisitScopeBuilder, { type VisitScopeDraftItem } from "@/components/jobs/VisitScopeBuilder";
+import { hasVisitScopeContent } from "@/lib/jobs/visit-scope";
 
 type Contractor = { id: string; name: string };
 
@@ -103,6 +105,12 @@ type NewJobDraft = {
   billingZip?: string;
   systems?: EquipmentSystem[];
   locationId?: string;
+  visitScopeSummary?: string;
+  visitScopeItems?: Array<{
+    title: string;
+    details: string | null;
+    kind: "primary" | "companion_service";
+  }>;
 };
 
 type RelationshipAction = "new_case" | "open_active_job" | "create_follow_up";
@@ -334,6 +342,10 @@ const [billingRecipient, setBillingRecipient] = useState<
 
   // Optional equipment
   const [systems, setSystems] = useState<EquipmentSystem[]>([]);
+  const [visitScopeSummary, setVisitScopeSummary] = useState("");
+  const [visitScopeItems, setVisitScopeItems] = useState<VisitScopeDraftItem[]>([]);
+  const [visitScopeResetKey, setVisitScopeResetKey] = useState(0);
+  const [visitScopeError, setVisitScopeError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [relationshipAction, setRelationshipAction] = useState<RelationshipAction>("new_case");
   const [relationshipJobId, setRelationshipJobId] = useState("");
@@ -347,6 +359,7 @@ const [billingRecipient, setBillingRecipient] = useState<
   const relationshipRequestRef = useRef(0);
   const createNewCustomerCardRef = useRef<HTMLDivElement | null>(null);
   const createNewCustomerFirstNameRef = useRef<HTMLInputElement | null>(null);
+  const visitScopeSectionRef = useRef<HTMLElement | null>(null);
 
   const guidedCustomers = useMemo(() => {
     if (!isInternalMode) return [];
@@ -608,8 +621,8 @@ const [billingRecipient, setBillingRecipient] = useState<
   const showInternalSetupHint =
     isInternalMode && (!internalResolutionReady || (shouldShowRelationshipStep && !relationshipDecisionReady));
   const internalNextStepMessage = !internalResolutionReady
-    ? "Resolve customer and location to unlock relationship review, job setup, scheduling, billing, and optional enrichment."
-    : "Choose the job type and relationship path before continuing.";
+    ? "Resolve customer and location to unlock job family, relationship review, Visit Scope, scheduling, billing, and optional details."
+    : "Choose the job family and relationship path before defining the Visit Scope for this trip.";
   const billingRecipientLabel =
     billingRecipient === "contractor"
       ? "Contractor"
@@ -678,6 +691,12 @@ const [billingRecipient, setBillingRecipient] = useState<
         billingZip,
         systems,
         locationId,
+        visitScopeSummary,
+        visitScopeItems: visitScopeItems.map((item) => ({
+          title: item.title.trim(),
+          details: item.details.trim() || null,
+          kind: item.kind,
+        })),
       };
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
       setDraftFound(true);
@@ -716,6 +735,18 @@ const [billingRecipient, setBillingRecipient] = useState<
     setBillingZip(d.billingZip ?? "");
 
     setSystems(Array.isArray(d.systems) ? d.systems : []);
+    setVisitScopeSummary(d.visitScopeSummary ?? "");
+    setVisitScopeItems(
+      Array.isArray(d.visitScopeItems)
+        ? d.visitScopeItems.map((item) => ({
+            id: uid(),
+            title: String(item.title ?? ""),
+            details: String(item.details ?? ""),
+            kind: item.kind === "companion_service" ? "companion_service" : "primary",
+          }))
+        : [],
+    );
+    setVisitScopeResetKey((value) => value + 1);
     if (selectedCustomerId) setLocationId(d.locationId ?? locationId);
 
     setDraftMsg("Draft restored.");
@@ -797,7 +828,20 @@ const [billingRecipient, setBillingRecipient] = useState<
       return;
     }
 
+    if (isInternalMode && jobType === "service") {
+      const nonEmptyItems = visitScopeItems.filter((item) => item.title.trim() || item.details.trim());
+      if (!hasVisitScopeContent(visitScopeSummary.trim() || null, nonEmptyItems)) {
+        event.preventDefault();
+        setVisitScopeError("Add the trip reason or one Visit Scope item so the field team knows what this service visit should cover.");
+        window.requestAnimationFrame(() => {
+          visitScopeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+        return;
+      }
+    }
+
     submitLockedRef.current = true;
+    setVisitScopeError(null);
     setIsSubmitting(true);
   }
 
@@ -924,8 +968,18 @@ const [billingRecipient, setBillingRecipient] = useState<
             ? "Could not create job. Service address is required."
             : errorCode === "contractor_proposal_submit_failed"
             ? "Could not submit your job. Please try again, or contact us if the issue persists."
+            : errorCode === "visit_scope_required"
+            ? "Service jobs require a Visit Scope reason or at least one Visit Scope item."
+            : errorCode === "visit_scope_invalid"
+            ? "Visit Scope could not be read. Please review the Visit Scope section and try again."
             : null
         }
+        className="mb-5"
+      />
+
+      <ActionFeedback
+        type="warning"
+        message={visitScopeError}
         className="mb-5"
       />
 
@@ -969,7 +1023,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">Internal job creation</p>
                 <h2 className="mt-2 text-lg font-semibold text-white">Create with confidence, not form fatigue.</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-300">
-                  Resolve the customer and service location first. The rest of the page will narrow automatically.
+                  Resolve the customer and location first, choose the job family, confirm the relationship path, then define the Visit Scope before scheduling or billing.
                 </p>
               </div>
               <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[26rem]">
@@ -979,11 +1033,11 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">2</p>
-                  <p className="mt-1 text-sm font-medium text-white">Job setup and details</p>
+                  <p className="mt-1 text-sm font-medium text-white">Family and relationship</p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">3</p>
-                  <p className="mt-1 text-sm font-medium text-white">Schedule and finish</p>
+                  <p className="mt-1 text-sm font-medium text-white">Visit scope, schedule, finish</p>
                 </div>
               </div>
             </div>
@@ -1603,12 +1657,12 @@ const [billingRecipient, setBillingRecipient] = useState<
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 3</p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-900">Job type</h2>
-                <p className="mt-1 text-sm text-slate-500">Set the visit type first so existing-work review stays inside the right intake lane.</p>
+                <h2 className="mt-1 text-lg font-semibold text-slate-900">Job family</h2>
+                <p className="mt-1 text-sm text-slate-500">Choose ECC or Service first so any relationship review stays inside the right intake lane.</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-                <label className="block text-sm font-medium text-slate-900">Job Type</label>
+                <label className="block text-sm font-medium text-slate-900">Job Family</label>
                 <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
                   <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:bg-slate-100 sm:flex-1">
                     <input
@@ -1660,7 +1714,10 @@ const [billingRecipient, setBillingRecipient] = useState<
 
               {jobType === "service" ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-                  <label className="block text-sm font-medium text-slate-900">Service Details</label>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900">Service Details</label>
+                    <p className="mt-1 text-xs text-slate-500">Keep the structured Service fields here. Visit Scope comes next to clarify what this field trip covers.</p>
+                  </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
@@ -1718,7 +1775,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 4</p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-900">Relationship check</h2>
+                <h2 className="mt-1 text-lg font-semibold text-slate-900">Relationship path</h2>
                 <p className="mt-1 text-sm text-slate-500">Review existing {jobType === "service" ? "service" : "ECC"} work at this customer and location before creating another visit.</p>
               </div>
 
@@ -1958,17 +2015,60 @@ const [billingRecipient, setBillingRecipient] = useState<
           <>
             <section className="space-y-3">
               {isInternalMode ? (
-                <div>
+                <div ref={visitScopeSectionRef}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 5</p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Job details</h2>
-                  <p className="mt-1 text-sm text-slate-500">Capture only the visit details needed to create a clean job record.</p>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Visit scope and job details</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {jobType === "service"
+                      ? "Define why this service trip exists, what belongs to it, and the minimum job details needed to dispatch cleanly."
+                      : "Add any known context for the ECC trip, then capture only the minimum job details needed to dispatch cleanly."}
+                  </p>
                 </div>
               ) : (
                 <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Job Details</h2>
               )}
+              {isInternalMode ? (
+                <div className={`rounded-2xl border bg-white p-4 shadow-sm space-y-3 ${visitScopeError ? "border-red-300 ring-2 ring-red-100" : "border-slate-200"}`}>
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900">Visit Scope</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {jobType === "service"
+                        ? "Set the trip reason, what belongs to this service visit, and what the tech should finish before leaving."
+                        : "Optional for ECC intake. The inspection or test type already defines the trip; use Visit Scope only for extra context when it helps."}
+                    </p>
+                  </div>
+                  {jobType === "service" ? (
+                    <>
+                      <div className="flex flex-wrap gap-2 text-[11px] font-medium text-slate-600">
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
+                          Why this trip exists
+                        </span>
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
+                          What belongs to this trip
+                        </span>
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
+                          What gets done before leaving
+                        </span>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs text-slate-600">
+                        Service fields stay structured above. Use Visit Scope to clarify the field-facing trip plan.
+                      </div>
+                    </>
+                  ) : null}
+                  <VisitScopeBuilder
+                    initialSummary={visitScopeSummary}
+                    initialItems={visitScopeItems}
+                    jobType={jobType}
+                    resetKey={visitScopeResetKey}
+                    onSummaryChange={setVisitScopeSummary}
+                    onItemsChange={setVisitScopeItems}
+                  />
+                </div>
+              ) : null}
               <JobCoreFields
                 mode={myContractor?.id ? "external" : "internal"}
                 titleRequired={jobType === "service"}
+                showJobTitle={false}
                 hideCustomer
                 hideServiceLocation
                 jobType={jobType}
@@ -1985,7 +2085,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 6</p>
                     <h2 className="mt-1 text-lg font-semibold text-slate-900">Scheduling and billing</h2>
-                    <p className="mt-1 text-sm text-slate-500">Set timing and who should be billed, then leave the rest for later if needed.</p>
+                    <p className="mt-1 text-sm text-slate-500">Set timing for the visit and who gets billed later, then leave the rest for follow-up if needed.</p>
                   </div>
                 ) : (
                   <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Scheduling</h2>
@@ -2395,8 +2495,8 @@ const [billingRecipient, setBillingRecipient] = useState<
 
         {isInternalMode && internalResolutionReady && canAdvancePastResolution ? (
           <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Before you create</p>
-            <p className="mt-1 text-sm text-slate-500">Quick final check before you create the job.</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Final confidence</p>
+            <p className="mt-1 text-sm text-slate-500">Quick internal check before you create the visit.</p>
             <div className="mt-3 grid gap-3 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
               <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Job</p>
@@ -2427,6 +2527,15 @@ const [billingRecipient, setBillingRecipient] = useState<
               <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Billing</p>
                 <p className="mt-1 font-medium text-slate-900">{billingRecipientLabel}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Visit Scope</p>
+                <p className="mt-1 font-medium text-slate-900">
+                  {visitScopeSummary.trim() || visitScopeItems.find((item) => item.title.trim())?.title.trim() || "Needs review"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {visitScopeItems.filter((item) => item.title.trim() || item.details.trim()).length} item{visitScopeItems.filter((item) => item.title.trim() || item.details.trim()).length === 1 ? "" : "s"}
+                </p>
               </div>
             </div>
           </div>

@@ -38,6 +38,7 @@ It extends it.
 
 ### Locked relationship rules
 - **Job** = work / visit record
+- **Visit Scope** = operational work scope for a specific visit/job
 - **Service Case** = problem / continuity container
 - **Estimate** = proposed commercial scope
 - **Invoice** = billed commercial scope
@@ -45,6 +46,9 @@ It extends it.
 
 ### Locked rule
 Business-layer modules must not collapse, overwrite, or blur operational ownership boundaries.
+
+Visit Scope is an operational layer under the job/visit model, not a billing record.
+Invoice line items remain billed truth and must not be treated as the primary visit/work-definition layer.
 
 ---
 
@@ -201,11 +205,23 @@ Inactive items remain visible historically where already used, but cannot be new
 
 Service Contract V1 is already implemented and remains subordinate to the active spine.
 
+Milestone-1 closeout status:
+Service model buildout is now closed as prerequisite foundation.
+
 The current baseline for Service is:
 - `service_cases.case_kind` is structured case classification
 - `jobs.service_visit_type`, `jobs.service_visit_reason`, and `jobs.service_visit_outcome` are the current visit-level Service fields
 - follow-up continuity is carried through shared `service_case_id`
 - parent/child lineage must remain inside one service case
+
+Closed milestone-1 baseline also includes:
+- relationship-aware internal intake V1
+- Visit Scope as the job-owned operational scope layer
+- ECC optional vs Service required Visit Scope behavior
+- ECC companion-scope promotion into real Service jobs
+- promoted-companion read-only visibility on internal scan surfaces
+- internal Job Title demotion with derived stored titles preserved
+- milestone-1 write-path reliability cleanup for the live `jobs.updated_at` mismatch
 
 ### ECC rule
 ECC / Title 24 intake may remain defaulted/standardized as its own structured workflow family.
@@ -214,6 +230,8 @@ ECC / Title 24 intake may remain defaulted/standardized as its own structured wo
 This roadmap does not reopen Service Contract V1 design.
 
 Future business-layer planning in this document must build on the existing Service baseline for commercial workflows, reporting, and consistency.
+
+The next active roadmap item after this closed foundation is Billing / invoice workflow, followed by later business-layer modules in this document.
 
 Older archived Service planning docs are historical only and remain subordinate to the active spine and this active roadmap.
 
@@ -299,14 +317,17 @@ Approved estimate → service case/business scope first, then jobs/visits under 
 ### Core rule
 Invoice line items must come from a defined source, then become frozen billing records.
 
+When invoice sourcing comes from job execution, the operational source is completed visit scope.
+Internal invoicing remains downstream of visit execution and must not define visit scope itself.
+
 ### Allowed source paths
 - approved estimate scope
-- completed job scope
+- completed visit scope
 - manual office-created billing scope
 
 ### Default sourcing hierarchy
 1. approved estimate scope, if present
-2. completed job scope, if no approved estimate exists
+2. completed visit scope, if no approved estimate exists
 3. manual office creation, if neither applies or override is needed
 
 ### Non-estimated additions
@@ -319,6 +340,8 @@ Estimate = proposed scope.
 Invoice = billed scope.
 
 They may overlap heavily, but they are not the same record.
+
+Completed visit scope may feed invoice creation later, but invoice line items remain frozen billed snapshots rather than the primary operational work-definition layer.
 
 ---
 
