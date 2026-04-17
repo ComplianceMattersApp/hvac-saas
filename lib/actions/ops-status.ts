@@ -21,7 +21,6 @@ const MANUAL_STATUSES: OpsStatus[] = [
   "on_hold",
   "retest_needed",
   "paperwork_required",
-  "invoice_required",
 ];
 
 export type SetOpsStatusResult = {

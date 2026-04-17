@@ -231,7 +231,18 @@ This roadmap does not reopen Service Contract V1 design.
 
 Future business-layer planning in this document must build on the existing Service baseline for commercial workflows, reporting, and consistency.
 
-The next active roadmap item after this closed foundation is Billing / invoice workflow, followed by later business-layer modules in this document.
+Billing / invoice workflow is now complete enough to move forward for the current milestone-2 scope.
+
+That achieved milestone-2 baseline includes:
+- job-linked internal invoice workflow
+- reviewable draft invoice behavior
+- issue/send invoice behavior
+- resend as a communication action on the same invoice record
+- operator-facing invoice communication tracking/history
+
+Bare-bones invoice email content/presentation is acceptable for this milestone boundary; email formatting/content polish remains deferred refinement work.
+
+The next active roadmap item after this achieved milestone-2 baseline is Reporting / analytics, followed by later business-layer modules in this document.
 
 Older archived Service planning docs are historical only and remain subordinate to the active spine and this active roadmap.
 
@@ -375,16 +386,56 @@ The architecture must not assume that is the only possible future shape forever.
 - voided_at optional
 - void_reason optional
 
+### V1 workflow scope
+Internal Invoice V1 explicitly includes:
+- job-linked invoice first
+- reviewable draft invoice before issuance
+- job/customer/location prefill into the draft invoice
+- issue/send invoice from the job-linked invoice record
+- resend as a communication action, not a second invoice
+- invoice communication tracking/history owned by the invoice workflow
+- source-path compatibility for approved estimate scope, completed job/visit scope, and manual office-created billing scope
+- paid-state planning in the invoice roadmap, without implying live processor execution in this phase
+
+### Current milestone-2 baseline status
+This invoice/billing workflow is now complete enough to move forward for the current milestone-2 scope.
+
+Achieved baseline at this milestone includes:
+- invoice review before issuance
+- invoice issue/send behavior
+- resend behavior as a communication action
+- invoice communication tracking/history at the job-linked invoice layer
+- closeout alignment around billed truth for internal-invoicing mode
+
+Deferred refinement still remaining:
+- invoice email content/design polish
+- broader presentation refinements that do not change billed truth, closeout ownership, or payment boundaries
+
+### Invoice communication seam
+Invoice communication tracking is an invoice-owned communication seam, not payment execution.
+
+It should support at least:
+- sent
+- resent
+- failed
+- recipient
+- last sent at
+- delivery/error note if available
+- honest attempt tracking rather than fake guaranteed-delivery claims
+
+This seam must not be read as introducing Stripe checkout, live card/ACH collection, refunds/disputes, contractor payouts, QBO sync, or any other live payment-execution behavior.
+
 ### v1 statuses
 - draft
 - issued
 - void
+- paid (planned later under payment tracking, not the initial invoice-closeout seam)
 
 ### Locked rule
 Sourcing creates drafts.  
 Issuance makes the invoice real.
 
-For Internal Invoice V1, `issued` is the billing-satisfied boundary for operational closeout. `paid` belongs to later payment-tracking truth, not the initial invoice-closeout seam.
+For Internal Invoice V1, `issued` is the billing-satisfied boundary for operational closeout. `paid` remains part of invoice-state planning, but belongs to later payment-tracking truth rather than the initial invoice-closeout seam.
 
 ### Invoice line items
 Invoice line items are frozen billing snapshots.
@@ -403,6 +454,8 @@ Required line-item fields:
 
 ### Locked rule
 Once created, invoice line items do not live-sync back to estimate, job, or pricebook.
+
+Pricebook-backed items are the preferred/default future path for invoice creation, but invoice line items remain frozen billed snapshots once created.
 
 ### Closeout seam clarification
 Internal Invoice V1 must not create a second billing truth on jobs.

@@ -1089,7 +1089,10 @@ Roadmap order remains:
 
 Current position:
 - Service model buildout is closed for milestone-1 scope.
-- Billing / invoice workflow is now the next active roadmap item.
+- Billing / invoice workflow is complete enough to move forward for milestone-2 scope.
+- The current milestone-2 billing seam now includes invoice review, issue/send, resend, and operator-facing communication tracking/history at the job-linked invoice layer.
+- Invoice email content/design polish remains deferred refinement work and is not part of milestone-2 closeout.
+- Reporting / analytics is now the next active roadmap item.
 - Payment architecture/foundation is now also an active implementation area under the locked direction in Section 19.
 - This does not mean full payment acceptance is live; it means payment readiness is now being intentionally built to prevent later rework.
 

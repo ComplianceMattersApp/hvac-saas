@@ -64,7 +64,11 @@ import {
   resolveBillingModeByAccountOwnerId,
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
-import { resolveJobBillingSource } from "@/lib/business/job-billing-source";
+import { buildJobBillingStateReadModel } from "@/lib/business/job-billing-state";
+import {
+  resolveInternalInvoiceEmailDeliveries,
+  type InternalInvoiceEmailDeliveryRecord,
+} from "@/lib/business/internal-invoice-delivery";
 import {
   type InternalInvoiceItemType,
   resolveInternalInvoiceByJobId,
@@ -76,6 +80,7 @@ import {
   issueInternalInvoiceFromForm,
   removeInternalInvoiceLineItemFromForm,
   saveInternalInvoiceDraftFromForm,
+  sendInternalInvoiceEmailFromForm,
   updateInternalInvoiceLineItemFromForm,
   voidInternalInvoiceFromForm,
 } from "@/lib/actions/internal-invoice-actions";
@@ -318,6 +323,13 @@ function formatTimelineDetail(type?: string | null, meta?: any, message?: string
     return [invoiceNumber, totalDisplay, voidReason].filter(Boolean).join(" - ");
   }
 
+  if (["internal_invoice_email_sent", "internal_invoice_email_resent", "internal_invoice_email_failed"].includes(String(type ?? ""))) {
+    const invoiceNumber = summarizePlainText(String(meta?.invoice_number ?? ""), 48);
+    const recipientEmail = summarizePlainText(String(meta?.recipient_email ?? ""), 72);
+    const errorDetail = summarizePlainText(String(meta?.error_detail ?? ""), 120);
+    return [invoiceNumber, recipientEmail, errorDetail].filter(Boolean).join(" - ");
+  }
+
   if (type === "companion_scope_promoted") {
     const itemTitle = summarizePlainText(String(meta?.source_item_title ?? ""), 80);
     return itemTitle ? `${itemTitle} - promoted into its own Service job` : "Companion scope promoted into its own Service job";
@@ -387,6 +399,9 @@ function formatTimelineEvent(type?: string | null, meta?: any, message?: string 
   internal_invoice_drafted: "Internal invoice drafted",
   internal_invoice_issued: "Internal invoice issued",
   internal_invoice_voided: "Internal invoice voided",
+  internal_invoice_email_sent: "Internal invoice emailed",
+  internal_invoice_email_resent: "Internal invoice emailed again",
+  internal_invoice_email_failed: "Internal invoice email failed",
   companion_scope_promoted: "Companion scope promoted",
   created_from_companion_scope: "Service job created from companion scope",
 };
@@ -700,6 +715,15 @@ export default async function JobDetailPage({
     isInternalUser && billingMode === "internal_invoicing"
       ? await resolveInternalInvoiceByJobId({ supabase, jobId })
       : null;
+
+  const internalInvoiceEmailDeliveries: InternalInvoiceEmailDeliveryRecord[] =
+    isInternalUser && internalInvoice
+      ? await resolveInternalInvoiceEmailDeliveries({
+          supabase,
+          jobId,
+          invoiceId: internalInvoice.id,
+        })
+      : [];
 
   const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
     supabase,
@@ -1140,34 +1164,31 @@ function formatBillingAddress(a: {
   return parts;
 }
 
-const recipient = (job.billing_recipient ?? "").trim();
-const { billingSourceLabel, billing } = resolveJobBillingSource({
-  billingRecipient: recipient,
-  customerBilling,
-  contractorBilling,
-  jobBilling: {
-    billing_name: job.billing_name ?? null,
-    billing_email: job.billing_email ?? null,
-    billing_phone: job.billing_phone ?? null,
-    billing_address_line1: job.billing_address_line1 ?? null,
-    billing_address_line2: job.billing_address_line2 ?? null,
-    billing_city: job.billing_city ?? null,
-    billing_state: job.billing_state ?? null,
-    billing_zip: job.billing_zip ?? null,
-  },
-});
-
 const isFieldComplete = !!job.field_complete;
 
 const isFailedUnresolved =
   ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
 
-const isAdminComplete =
-  (job.job_type === "service" && job.invoice_complete) ||
-  (job.job_type === "ecc" && job.invoice_complete && job.certs_complete);
+const billingState = buildJobBillingStateReadModel({
+  billingMode,
+  invoiceComplete: job.invoice_complete,
+  internalInvoice,
+});
 
-const closeoutNeeds = getCloseoutNeeds(job);
-const isCloseoutPending = isInCloseoutQueue(job);
+const closeoutProjectionJob = {
+  field_complete: job.field_complete,
+  job_type: job.job_type,
+  ops_status: job.ops_status,
+  invoice_complete: billingState.billedTruthSatisfied,
+  certs_complete: job.certs_complete,
+};
+
+const isAdminComplete =
+  (job.job_type === "service" && billingState.billedTruthSatisfied) ||
+  (job.job_type === "ecc" && billingState.billedTruthSatisfied && job.certs_complete);
+
+const closeoutNeeds = getCloseoutNeeds(closeoutProjectionJob);
+const isCloseoutPending = isInCloseoutQueue(closeoutProjectionJob);
 
 const canShowCertsButton =
   job.job_type === "ecc" &&
@@ -1176,16 +1197,16 @@ const canShowCertsButton =
 
 const canShowInvoiceButton =
   job.job_type === "ecc" &&
-  !job.invoice_complete &&
-  billingMode === "external_billing" &&
+  !billingState.billedTruthSatisfied &&
+  billingState.lightweightBillingAllowed &&
   String(job.ops_status ?? "") !== "closed";
 
-const billingModeBlocksLightweightBilling = billingMode === "internal_invoicing";
+const billingModeBlocksLightweightBilling = !billingState.lightweightBillingAllowed;
 
 const showInternalInvoicingPlaceholder =
   isInternalUser &&
   billingModeBlocksLightweightBilling &&
-  !job.invoice_complete &&
+  !billingState.billedTruthSatisfied &&
   (
     job.job_type === "service" ||
     (job.job_type === "ecc" && String(job.ops_status ?? "").toLowerCase() !== "closed")
@@ -1203,12 +1224,12 @@ const showCloseoutRow =
   );
 
 const showExternalDataEntryPrompt =
-  !billingModeBlocksLightweightBilling &&
+  billingState.lightweightBillingAllowed &&
   ["data_entry", "invoice_required"].includes(String(job.ops_status ?? "").toLowerCase());
 
 const showInternalInvoicePanel =
   isInternalUser &&
-  billingModeBlocksLightweightBilling;
+  billingState.internalInvoicePanelEnabled;
 
 const visitScopeSummary = sanitizeVisitScopeSummary((job as any).visit_scope_summary);
 let visitScopeItems = [] as Array<{
@@ -1250,6 +1271,16 @@ const internalInvoiceRecipientContact = [
   String(internalInvoice?.billing_phone ?? "").trim(),
 ].filter(Boolean);
 const internalInvoiceHasNotes = String(internalInvoice?.notes ?? "").trim().length > 0;
+const latestInternalInvoiceEmailDelivery = internalInvoiceEmailDeliveries[0] ?? null;
+const latestSuccessfulInternalInvoiceEmailDelivery =
+  internalInvoiceEmailDeliveries.find((delivery) => delivery.status === "sent") ?? null;
+const lastInternalInvoiceSentLabel = latestSuccessfulInternalInvoiceEmailDelivery?.sentAt
+  ? formatDateTimeLAFromIso(String(latestSuccessfulInternalInvoiceEmailDelivery.sentAt))
+  : "";
+const internalInvoiceEmailButtonLabel = latestSuccessfulInternalInvoiceEmailDelivery ? "Send Again" : "Send Invoice Email";
+const internalInvoiceSendTargetDefault =
+  String(latestInternalInvoiceEmailDelivery?.recipientEmail ?? internalInvoice?.billing_email ?? "").trim();
+const internalInvoiceSendTargetMissing = internalInvoiceSendTargetDefault.length === 0;
 
 const internalInvoiceReadyToIssue =
   internalInvoice != null &&
@@ -1259,6 +1290,22 @@ const internalInvoiceReadyToIssue =
   internalInvoiceLineItemCount > 0 &&
   String(internalInvoice.billing_name ?? "").trim().length > 0 &&
   Number(internalInvoice.total_cents ?? 0) > 0;
+
+const internalInvoiceStatusChipClass =
+  billingState.statusTone === "emerald"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+    : billingState.statusTone === "rose"
+      ? "border-rose-200 bg-rose-50 text-rose-700"
+      : billingState.statusTone === "amber"
+        ? "border-amber-200 bg-amber-50 text-amber-800"
+        : "border-slate-200 bg-slate-50 text-slate-700";
+
+const issuedInvoiceStatusMessage =
+  internalInvoice?.status === "issued"
+    ? job.job_type === "ecc" && !job.certs_complete
+      ? `Issued ${internalInvoice.issued_at ? displayDateLA(internalInvoice.issued_at) : ""}. Billing is satisfied, but certs are still open before this job can fully close.`
+      : `Issued ${internalInvoice.issued_at ? displayDateLA(internalInvoice.issued_at) : ""}. The job's billing-closeout requirement is currently satisfied.`
+    : "";
 
 const canShowReleaseAndReevaluate = [
   "pending_info",
@@ -1473,6 +1520,9 @@ const renderTimelineItem = (e: any, key: string) => {
     type === "internal_invoice_drafted" ? "🧾" :
     type === "internal_invoice_issued" ? "🧾" :
     type === "internal_invoice_voided" ? "⛔" :
+    type === "internal_invoice_email_sent" ? "✉️" :
+    type === "internal_invoice_email_resent" ? "📨" :
+    type === "internal_invoice_email_failed" ? "⚠️" :
     type === "companion_scope_promoted" ? "🔀" :
     type === "created_from_companion_scope" ? "🧰" :
     type === "failure_resolved_by_correction_review" ? "✅" :
@@ -2203,6 +2253,41 @@ const renderTimelineItem = (e: any, key: string) => {
         />
       )}
 
+      {banner === "internal_invoice_email_sent" && (
+        <FlashBanner
+          type="success"
+          message="Invoice email sent."
+        />
+      )}
+
+      {banner === "internal_invoice_email_resent" && (
+        <FlashBanner
+          type="success"
+          message="Invoice email sent again."
+        />
+      )}
+
+      {banner === "internal_invoice_email_failed" && (
+        <FlashBanner
+          type="warning"
+          message="Invoice email send failed. Review the delivery note and try again."
+        />
+      )}
+
+      {banner === "internal_invoice_send_recipient_required" && (
+        <FlashBanner
+          type="warning"
+          message="Add a recipient email before sending this invoice."
+        />
+      )}
+
+      {banner === "internal_invoice_send_requires_issued" && (
+        <FlashBanner
+          type="warning"
+          message="Issue the invoice before sending it. Resends are communication actions on the issued invoice record."
+        />
+      )}
+
       {banner === "internal_invoice_already_issued" && (
         <FlashBanner
           type="warning"
@@ -2543,8 +2628,8 @@ const renderTimelineItem = (e: any, key: string) => {
       const ops = job.ops_status;
 
     const meta =
-      ((job.job_type === "service" && job.invoice_complete) ||
-        (job.job_type === "ecc" && job.invoice_complete && job.certs_complete))
+      ((job.job_type === "service" && billingState.billedTruthSatisfied) ||
+        (job.job_type === "ecc" && billingState.billedTruthSatisfied && job.certs_complete))
         ? {
             title: "Admin Complete",
             body: "Field work, paperwork, and billing are complete for this job.",
@@ -3104,8 +3189,8 @@ const renderTimelineItem = (e: any, key: string) => {
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Status</div>
           <div className="mt-1">
-            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] ${internalInvoice?.status === "issued" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : internalInvoice?.status === "void" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
-              {internalInvoice ? formatInternalInvoiceStatus(internalInvoice.status) : "Draft"}
+            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] ${internalInvoiceStatusChipClass}`}>
+              {internalInvoice ? formatInternalInvoiceStatus(internalInvoice.status) : billingState.statusLabel}
             </span>
           </div>
         </div>
@@ -3295,7 +3380,14 @@ const renderTimelineItem = (e: any, key: string) => {
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Actions</div>
             {internalInvoice.status === "draft" ? (
               <>
-                <div className="mt-2 text-sm leading-6 text-slate-600">Issue when the scope is final and ready to become the billed record for this job.</div>
+                <div className="mt-2 text-sm leading-6 text-slate-600">Review the recipient, line items, and total here. Issue when the billed record is final. Sending happens after issue and does not create a second invoice.</div>
+
+                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
+                  <div><span className="font-semibold text-slate-900">Review recipient:</span> {internalInvoiceRecipientName}</div>
+                  <div className="mt-1"><span className="font-semibold text-slate-900">Review email:</span> {String(internalInvoice.billing_email ?? "").trim() || "Not set"}</div>
+                  <div className="mt-1"><span className="font-semibold text-slate-900">Review total:</span> {formatCurrencyFromCents(internalInvoice.total_cents)}</div>
+                  <div className="mt-1"><span className="font-semibold text-slate-900">Review scope:</span> {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}</div>
+                </div>
 
                 <form action={issueInternalInvoiceFromForm} className="mt-3">
                   <input type="hidden" name="job_id" value={job.id} />
@@ -3316,9 +3408,49 @@ const renderTimelineItem = (e: any, key: string) => {
                 ) : null}
               </>
             ) : internalInvoice.status === "issued" ? (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50/75 px-3.5 py-3 text-sm leading-6 text-emerald-900">
-                Issued {internalInvoice.issued_at ? displayDateLA(internalInvoice.issued_at) : ""}. The job's billing-closeout requirement is currently satisfied.
-              </div>
+              <>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/75 px-3.5 py-3 text-sm leading-6 text-emerald-900">
+                  {issuedInvoiceStatusMessage}
+                </div>
+
+                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
+                  <div className="font-semibold text-slate-900">Send / Resend</div>
+                  <div className="mt-1 leading-6">Use this to send the issued invoice record to the billing recipient. Sending again is a communication action only; it does not create or alter billed truth.</div>
+
+                  <form action={sendInternalInvoiceEmailFromForm} className="mt-3 space-y-3">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="tab" value={tab} />
+
+                    <div>
+                      <label className={workspaceFieldLabelClass}>Send To</label>
+                      <input
+                        type="email"
+                        name="recipient_email"
+                        defaultValue={internalInvoiceSendTargetDefault}
+                        placeholder="billing@example.com"
+                        className={workspaceInputClass}
+                      />
+                    </div>
+
+                    <SubmitButton
+                      loadingText="Sending..."
+                      className={darkButtonClass}
+                    >
+                      {internalInvoiceEmailButtonLabel}
+                    </SubmitButton>
+                  </form>
+
+                  {internalInvoiceSendTargetMissing ? (
+                    <div className="mt-2 text-xs leading-5 text-amber-700">
+                      Add a billing email to the invoice before sending it.
+                    </div>
+                  ) : lastInternalInvoiceSentLabel ? (
+                    <div className="mt-2 text-xs leading-5 text-slate-500">
+                      Last sent {lastInternalInvoiceSentLabel} to {latestSuccessfulInternalInvoiceEmailDelivery?.recipientEmail ?? internalInvoiceSendTargetDefault}.
+                    </div>
+                  ) : null}
+                </div>
+              </>
             ) : (
               <div className="rounded-lg border border-rose-200 bg-rose-50/75 px-3.5 py-3 text-sm leading-6 text-rose-800">
                 This invoice is void and no longer satisfies billing closeout.
@@ -3342,6 +3474,42 @@ const renderTimelineItem = (e: any, key: string) => {
               </form>
             ) : null}
           </div>
+
+          {internalInvoiceEmailDeliveries.length > 0 ? (
+            <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.24)]">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Delivery History</div>
+                  <div className="mt-1 text-sm leading-6 text-slate-600">Operator-facing send attempts for this invoice.</div>
+                </div>
+                <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  {internalInvoiceEmailDeliveries.length} attempt{internalInvoiceEmailDeliveries.length === 1 ? "" : "s"}
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {internalInvoiceEmailDeliveries.map((delivery) => (
+                  <div key={delivery.id} className="rounded-lg border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-700">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-semibold text-slate-900">
+                        {delivery.attemptKind === "resent" ? "Resent" : "Sent"} attempt #{delivery.attemptNumber}
+                      </div>
+                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${delivery.status === "sent" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : delivery.status === "failed" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+                        {delivery.status}
+                      </span>
+                    </div>
+                    <div className="mt-1">Recipient: {delivery.recipientEmail || "Not recorded"}</div>
+                    <div className="mt-1">Recorded: {delivery.sentAt ? formatDateTimeLAFromIso(delivery.sentAt) : delivery.createdAt ? formatDateTimeLAFromIso(delivery.createdAt) : "—"}</div>
+                    {delivery.errorDetail ? (
+                      <div className="mt-1 text-rose-700">Delivery note: {delivery.errorDetail}</div>
+                    ) : delivery.note ? (
+                      <div className="mt-1 text-slate-500">{delivery.note}</div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {internalInvoice.status === "draft" ? (
             <details className="group rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.24)] [&[open]_.disclosure-icon]:rotate-90">

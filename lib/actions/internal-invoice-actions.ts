@@ -4,7 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { requireInternalUser } from '@/lib/auth/internal-user';
-import { resolveBillingModeByAccountOwnerId } from '@/lib/business/internal-business-profile';
+import {
+  resolveBillingModeByAccountOwnerId,
+  resolveInternalBusinessIdentityByAccountOwnerId,
+} from '@/lib/business/internal-business-profile';
+import { INTERNAL_INVOICE_EMAIL_NOTIFICATION_TYPE } from '@/lib/business/internal-invoice-delivery';
 import { resolveJobBillingSource } from '@/lib/business/job-billing-source';
 import {
   normalizeInternalInvoiceItemType,
@@ -13,6 +17,8 @@ import {
 } from '@/lib/business/internal-invoice';
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from '@/lib/actions/job-evaluator';
 import { insertJobEvent } from '@/lib/actions/job-actions';
+import { renderSystemEmailLayout, escapeHtml } from '@/lib/email/layout';
+import { sendEmail } from '@/lib/email/sendEmail';
 
 function getTrimmedString(value: FormDataEntryValue | null | undefined) {
   return String(value ?? '').trim();
@@ -38,6 +44,13 @@ function buildInternalInvoiceNumber() {
 
 function formatMoneyForMeta(cents: number) {
   return (cents / 100).toFixed(2);
+}
+
+function formatCurrencyFromCents(cents: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format((Number(cents ?? 0) || 0) / 100);
 }
 
 function formatScaledInt(value: number, scale: number) {
@@ -122,13 +135,19 @@ async function loadCanonicalDraftBillingSources(params: {
   if (billingRecipient === 'customer' && customerId) {
     const { data, error } = await adminSupabase
       .from('customers')
-      .select('owner_user_id, full_name, first_name, last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip')
+      .select('owner_user_id, full_name, first_name, last_name, billing_name, email, phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip')
       .eq('id', customerId)
       .eq('owner_user_id', params.internalUser.account_owner_user_id)
       .maybeSingle();
 
     if (error) throw error;
-    customerBilling = data ?? null;
+    customerBilling = data
+      ? {
+          ...data,
+          billing_email: data.email ?? null,
+          billing_phone: data.phone ?? null,
+        }
+      : null;
   }
 
   if (billingRecipient === 'contractor' && contractorId) {
@@ -278,6 +297,176 @@ async function loadInternalInvoiceContext(formData: FormData) {
   };
 }
 
+type InternalInvoiceEmailDeliveryStatus = 'queued' | 'sent' | 'failed';
+type InternalInvoiceEmailAttemptKind = 'sent' | 'resent';
+
+function buildInternalInvoiceEmailBody(args: {
+  businessName: string;
+  supportEmail: string | null;
+  supportPhone: string | null;
+  invoice: InternalInvoiceRecord;
+  jobTitle: string | null;
+}) {
+  const lineItemsHtml = (args.invoice.line_items ?? [])
+    .map((lineItem) => {
+      const name = escapeHtml(String(lineItem.item_name_snapshot ?? '').trim() || 'Line item');
+      const description = escapeHtml(String(lineItem.description_snapshot ?? '').trim());
+      const quantity = escapeHtml(String(lineItem.quantity ?? '0'));
+      const subtotal = escapeHtml(formatCurrencyFromCents(Math.round(Number(lineItem.line_subtotal ?? 0) * 100)));
+
+      return `
+        <tr>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
+            <div style="font-weight: 600; color: #111827;">${name}</div>
+            ${description ? `<div style="margin-top: 4px; color: #4b5563; font-size: 13px;">${description}</div>` : ''}
+          </td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #111827; text-align: right; white-space: nowrap;">${quantity}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #111827; text-align: right; white-space: nowrap;">${subtotal}</td>
+        </tr>`;
+    })
+    .join('');
+
+  const invoiceNumber = escapeHtml(String(args.invoice.invoice_number ?? '').trim());
+  const invoiceDate = escapeHtml(String(args.invoice.invoice_date ?? '').trim());
+  const recipientName = escapeHtml(String(args.invoice.billing_name ?? '').trim() || 'Customer');
+  const jobTitle = escapeHtml(String(args.jobTitle ?? '').trim() || 'Service visit');
+  const total = escapeHtml(formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0)));
+  const supportLine = [args.supportEmail, args.supportPhone].filter(Boolean).map((value) => escapeHtml(String(value))).join(' • ');
+  const notes = escapeHtml(String(args.invoice.notes ?? '').trim());
+
+  return renderSystemEmailLayout({
+    title: `Invoice ${invoiceNumber}`,
+    bodyHtml: `
+      <p style="margin: 0 0 12px 0;">Hello ${recipientName},</p>
+      <p style="margin: 0 0 16px 0;">Your invoice for ${jobTitle} is ready.</p>
+      <div style="margin: 0 0 18px 0; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px 16px; background: #f8fafc;">
+        <div style="font-size: 13px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;">Invoice Summary</div>
+        <div style="margin-top: 10px; color: #111827;"><strong>Invoice #:</strong> ${invoiceNumber}</div>
+        <div style="margin-top: 6px; color: #111827;"><strong>Invoice Date:</strong> ${invoiceDate}</div>
+        <div style="margin-top: 6px; color: #111827;"><strong>Total:</strong> ${total}</div>
+      </div>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin: 0 0 18px 0; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+        <thead>
+          <tr style="background: #f8fafc;">
+            <th align="left" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Line Item</th>
+            <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Qty</th>
+            <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lineItemsHtml || `<tr><td colspan="3" style="padding: 12px; color: #475569;">No billed line items were recorded.</td></tr>`}
+        </tbody>
+      </table>
+      ${notes ? `<div style="margin: 0 0 16px 0;"><strong>Notes:</strong><br />${notes.replace(/\n/g, '<br />')}</div>` : ''}
+      ${supportLine ? `<p style="margin: 0; color: #4b5563;">Questions? Contact ${escapeHtml(args.businessName)} at ${supportLine}.</p>` : ''}
+    `,
+  });
+}
+
+async function listInternalInvoiceEmailNotifications(params: {
+  supabase: any;
+  jobId: string;
+  invoiceId: string;
+}) {
+  const { data, error } = await params.supabase
+    .from('notifications')
+    .select('id, payload, status, sent_at, created_at')
+    .eq('job_id', params.jobId)
+    .eq('channel', 'email')
+    .eq('notification_type', INTERNAL_INVOICE_EMAIL_NOTIFICATION_TYPE)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data ?? []).filter((row: any) => String(row?.payload?.invoice_id ?? '').trim() === params.invoiceId);
+}
+
+async function insertInternalInvoiceEmailNotification(params: {
+  supabase: any;
+  jobId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  recipientEmail: string;
+  subject: string;
+  body: string;
+  attemptKind: InternalInvoiceEmailAttemptKind;
+  attemptNumber: number;
+  status: InternalInvoiceEmailDeliveryStatus;
+  errorDetail?: string | null;
+}) {
+  const payload: Record<string, unknown> = {
+    source: 'internal_invoice_email',
+    invoice_id: params.invoiceId,
+    invoice_number: params.invoiceNumber,
+    recipient_email: params.recipientEmail,
+    attempt_kind: params.attemptKind,
+    attempt_number: params.attemptNumber,
+  };
+
+  const errorDetail = String(params.errorDetail ?? '').trim();
+  if (errorDetail) payload.error_detail = errorDetail;
+
+  const { data, error } = await params.supabase
+    .from('notifications')
+    .insert({
+      job_id: params.jobId,
+      recipient_type: 'customer',
+      recipient_ref: null,
+      channel: 'email',
+      notification_type: INTERNAL_INVOICE_EMAIL_NOTIFICATION_TYPE,
+      subject: params.subject,
+      body: params.body,
+      payload,
+      status: params.status,
+      sent_at: params.status === 'sent' ? new Date().toISOString() : null,
+    })
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  if (!data?.id) throw new Error('Failed to create invoice email notification row');
+  return { id: String(data.id) };
+}
+
+async function markInternalInvoiceEmailNotification(params: {
+  supabase: any;
+  notificationId: string;
+  status: 'sent' | 'failed';
+  errorDetail?: string | null;
+}) {
+  const { data: existingNotification, error: existingNotificationErr } = await params.supabase
+    .from('notifications')
+    .select('payload')
+    .eq('id', params.notificationId)
+    .maybeSingle();
+
+  if (existingNotificationErr) throw existingNotificationErr;
+
+  const patch: Record<string, unknown> = {
+    status: params.status,
+  };
+
+  if (params.status === 'sent') {
+    patch.sent_at = new Date().toISOString();
+  }
+
+  const errorDetail = String(params.errorDetail ?? '').trim();
+  if (params.status === 'failed' && errorDetail) {
+    patch.body = `Invoice email delivery failed: ${errorDetail}`;
+    patch.payload = {
+      ...(existingNotification?.payload ?? {}),
+      error_detail: errorDetail,
+    };
+  }
+
+  const { error } = await params.supabase
+    .from('notifications')
+    .update(patch)
+    .eq('id', params.notificationId);
+
+  if (error) throw error;
+}
+
 async function requireDraftInvoiceContext(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
@@ -296,8 +485,15 @@ async function logInvoiceEvent(params: {
   supabase: any;
   userId: string;
   jobId: string;
-  eventType: 'internal_invoice_drafted' | 'internal_invoice_issued' | 'internal_invoice_voided';
+  eventType:
+    | 'internal_invoice_drafted'
+    | 'internal_invoice_issued'
+    | 'internal_invoice_voided'
+    | 'internal_invoice_email_sent'
+    | 'internal_invoice_email_resent'
+    | 'internal_invoice_email_failed';
   invoice: InternalInvoiceRecord | { id: string; invoice_number: string; status: string; total_cents: number; void_reason?: string | null };
+  extraMeta?: Record<string, unknown>;
 }) {
   const meta: Record<string, unknown> = {
     invoice_id: params.invoice.id,
@@ -309,6 +505,10 @@ async function logInvoiceEvent(params: {
 
   if (params.eventType === 'internal_invoice_voided') {
     meta.void_reason = params.invoice.void_reason ?? null;
+  }
+
+  if (params.extraMeta) {
+    Object.assign(meta, params.extraMeta);
   }
 
   await insertJobEvent({
@@ -706,4 +906,118 @@ export async function removeInternalInvoiceLineItemFromForm(formData: FormData) 
   revalidatePath('/jobs');
   revalidatePath('/ops');
   redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_line_item_removed'));
+}
+
+export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
+  const context = await loadInternalInvoiceContext(formData);
+
+  if (!context.invoice) {
+    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_missing'));
+  }
+
+  if (context.invoice.status !== 'issued') {
+    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_send_requires_issued'));
+  }
+
+  const recipientEmail = getTrimmedString(formData.get('recipient_email')).toLowerCase() || getTrimmedString(context.invoice.billing_email).toLowerCase();
+
+  if (!recipientEmail) {
+    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_send_recipient_required'));
+  }
+
+  const sendHistory = await listInternalInvoiceEmailNotifications({
+    supabase: context.supabase,
+    jobId: context.jobId,
+    invoiceId: context.invoice.id,
+  });
+  const successfulSendExists = sendHistory.some((row: any) => String(row?.status ?? '').trim().toLowerCase() === 'sent');
+  const attemptKind: InternalInvoiceEmailAttemptKind = successfulSendExists ? 'resent' : 'sent';
+  const attemptNumber = sendHistory.length + 1;
+
+  const businessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    supabase: context.supabase,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+  });
+
+  const subject = `${businessIdentity.display_name} invoice ${context.invoice.invoice_number}`;
+  const body = buildInternalInvoiceEmailBody({
+    businessName: businessIdentity.display_name,
+    supportEmail: businessIdentity.support_email,
+    supportPhone: businessIdentity.support_phone,
+    invoice: context.invoice,
+    jobTitle: context.job.title ?? null,
+  });
+
+  const queuedDelivery = await insertInternalInvoiceEmailNotification({
+    supabase: context.supabase,
+    jobId: context.jobId,
+    invoiceId: context.invoice.id,
+    invoiceNumber: context.invoice.invoice_number,
+    recipientEmail,
+    subject,
+    body: attemptKind === 'resent' ? 'Internal invoice resend queued.' : 'Internal invoice email queued.',
+    attemptKind,
+    attemptNumber,
+    status: 'queued',
+  });
+
+  try {
+    await sendEmail({
+      to: recipientEmail,
+      subject,
+      html: body,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown send error';
+
+    await markInternalInvoiceEmailNotification({
+      supabase: context.supabase,
+      notificationId: queuedDelivery.id,
+      status: 'failed',
+      errorDetail: errorMessage,
+    });
+
+    await logInvoiceEvent({
+      supabase: context.supabase,
+      userId: context.userId,
+      jobId: context.jobId,
+      eventType: 'internal_invoice_email_failed',
+      invoice: context.invoice,
+      extraMeta: {
+        recipient_email: recipientEmail,
+        attempt_kind: attemptKind,
+        attempt_number: attemptNumber,
+        error_detail: errorMessage,
+      },
+    });
+
+    revalidatePath(`/jobs/${context.jobId}`);
+    revalidatePath('/jobs');
+    revalidatePath('/ops');
+    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_email_failed'));
+  }
+
+  await markInternalInvoiceEmailNotification({
+    supabase: context.supabase,
+    notificationId: queuedDelivery.id,
+    status: 'sent',
+  });
+
+  await logInvoiceEvent({
+    supabase: context.supabase,
+    userId: context.userId,
+    jobId: context.jobId,
+    eventType: attemptKind === 'resent' ? 'internal_invoice_email_resent' : 'internal_invoice_email_sent',
+    invoice: context.invoice,
+    extraMeta: {
+      recipient_email: recipientEmail,
+      attempt_kind: attemptKind,
+      attempt_number: attemptNumber,
+    },
+  });
+
+  revalidatePath(`/jobs/${context.jobId}`);
+  revalidatePath('/jobs');
+  revalidatePath('/ops');
+  redirect(buildJobDetailHref(context.jobId, context.tab, attemptKind === 'resent' ? 'internal_invoice_email_resent' : 'internal_invoice_email_sent'));
 }
