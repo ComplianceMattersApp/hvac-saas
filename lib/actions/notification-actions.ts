@@ -1,8 +1,10 @@
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 
 export type NotificationTriggerEventType =
   | "contractor_report_sent"
   | "retest_ready_requested"
+  | "contractor_job_created"
   | "contractor_note"
   | "contractor_correction_submission"
   | "contractor_schedule_updated";
@@ -38,6 +40,7 @@ type FindExistingContractorReportEmailDeliveryInput = {
 const EVENT_TO_SUBJECT: Record<NotificationTriggerEventType, string> = {
   contractor_report_sent: "Contractor report sent",
   retest_ready_requested: "Retest ready requested",
+  contractor_job_created: "Contractor job submitted",
   contractor_note: "Contractor note received",
   contractor_correction_submission: "Contractor correction submission received",
   contractor_schedule_updated: "Contractor provided scheduling",
@@ -46,6 +49,7 @@ const EVENT_TO_SUBJECT: Record<NotificationTriggerEventType, string> = {
 const EVENT_TO_BODY: Record<NotificationTriggerEventType, string> = {
   contractor_report_sent: "A contractor report was sent to the portal.",
   retest_ready_requested: "Contractor requested retest readiness review.",
+  contractor_job_created: "A contractor submitted a new job that needs internal review and scheduling.",
   contractor_note: "A contractor added a note.",
   contractor_correction_submission: "A contractor submitted corrections for review.",
   contractor_schedule_updated: "A contractor submitted scheduling data with a new job.",
@@ -91,10 +95,13 @@ export async function insertInternalNotificationForEvent(
     const admin = createAdminClient();
     const { error: adminError } = await admin.from("notifications").insert(row);
     if (adminError) throw adminError;
+    revalidatePath("/", "layout");
     return;
   }
 
   if (error) throw error;
+
+  revalidatePath("/", "layout");
 }
 
 export async function findExistingContractorReportEmailDelivery(

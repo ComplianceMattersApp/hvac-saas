@@ -15,6 +15,7 @@ function notificationTypeLabel(value?: string | null) {
   const labels: Record<string, string> = {
     contractor_report_sent: "Contractor Report Sent",
     retest_ready_requested: "Retest Ready Requested",
+    contractor_job_created: "Contractor Job Submitted",
     contractor_note: "Contractor Note",
     contractor_correction_submission: "Correction Submission",
     contractor_schedule_updated: "Contractor Schedule Updated",
