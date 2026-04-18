@@ -41,6 +41,18 @@ type LocationLookupRow = {
   nickname: string | null;
 };
 
+type ContractorMembershipRow = {
+  contractor_id: string | null;
+  contractors:
+    | {
+        name: string | null;
+      }
+    | Array<{
+        name: string | null;
+      }>
+    | null;
+};
+
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
@@ -55,37 +67,37 @@ export default async function NewJobPage(props: {
   
   const user = userData.user;
 
-  
-
   // Identify contractor user (multi-user per contractor)
   let myContractor: { id: string; name: string } | null = null;
 
   const { data: cu, error: cuErr } = await supabase
     .from("contractor_users")
-    .select("contractor_id")
+    .select("contractor_id, contractors ( name )")
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (cuErr) throw new Error(cuErr.message);
 
   if (cu?.contractor_id) {
-    const { data: cRow, error: cErr } = await supabase
-      .from("contractors")
-      .select("id, name")
-      .eq("id", cu.contractor_id)
-      .maybeSingle();
-
-    if (cErr) throw new Error(cErr.message);
-    if (cRow?.id) myContractor = { id: cRow.id, name: cRow.name };
+    const contractorMembership = cu as ContractorMembershipRow;
+    const contractorRelation = contractorMembership.contractors;
+    const contractorNameSource = Array.isArray(contractorRelation)
+      ? contractorRelation[0]?.name
+      : contractorRelation?.name;
+    const contractorName = String(contractorNameSource ?? "").trim() || "Contractor";
+    myContractor = { id: cu.contractor_id, name: contractorName };
   }
 
-  // Still fetch contractors list for internal/admin use
-  const { data: contractors, error } = await supabase
-    .from("contractors")
-    .select("id, name")
-    .order("name", { ascending: true });
+  let contractors: Array<{ id: string; name: string }> = [];
+  if (!myContractor?.id) {
+    const { data: contractorRows, error } = await supabase
+      .from("contractors")
+      .select("id, name")
+      .order("name", { ascending: true });
 
-  if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
+    contractors = contractorRows ?? [];
+  }
 
   const sp = props.searchParams ? await props.searchParams : undefined;
   const customerId = String(sp?.customer_id ?? "").trim();
@@ -146,7 +158,7 @@ export default async function NewJobPage(props: {
 
   return (
     <NewJobForm
-      contractors={contractors ?? []}
+      contractors={contractors}
       existingCustomer={existingCustomer}
       locations={customerLocations}
       customerLookupRows={customerLookupRows}
