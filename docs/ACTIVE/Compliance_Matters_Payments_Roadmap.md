@@ -72,20 +72,23 @@ Build the platform so Stripe can be introduced later without structural rework.
 ### Live behavior right now
 Payments are **tracking-only**.
 
-Current implemented repo truth is still limited and operationally oriented.
-
-Implemented now in repo:
-- job-level closeout fields such as invoice reference and invoice-complete markers
-- lightweight invoice-action tracking in closeout workflows
-- billing-recipient snapshot fields on jobs
+Current implemented repo truth now includes:
+- a real internal invoice domain for internal-invoicing mode
+- job-linked invoice workflow and billed-truth invoice records
+- invoice communication tracking/history
+- billed-truth invoice reporting through the internal Report Center
+- job-level closeout and invoice-action tracking still used where appropriate for operational follow-up
+- dashboard invoice visibility and invoice-report drill paths where honest
 
 Not yet materially implemented in repo:
-- a real internal invoice domain
-- a real payment domain with invoice/payment records and fields such as payment status, amount paid, or balance due
+- a mature payment/collection reporting domain with real collected-truth ownership
 - live processor-backed payment execution
+- customer checkout / saved payment methods / refunds / disputes / payout workflows
 
 Locked direction:
-- payment architecture should still be planned now so later invoice/payment truth can be added without rework
+- billed truth and payment/collection truth remain separate
+- invoice reporting does not imply live payment execution
+- payment architecture should still be built so later payment truth can be added without rework
 
 Not supported now:
 - live card collection

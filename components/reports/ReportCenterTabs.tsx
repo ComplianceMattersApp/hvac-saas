@@ -1,64 +1,64 @@
 import Link from "next/link";
 
 type Props = {
-  current: "jobs" | "service-cases" | "closeout" | "dashboard" | "kpis";
+  current: "jobs" | "service-cases" | "closeout" | "invoices" | "dashboard" | "kpis";
 };
 
 const baseClass =
-  "inline-flex items-center rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
+  "inline-flex items-center rounded-xl border px-3.5 py-2 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
 
 export default function ReportCenterTabs({ current }: Props) {
   return (
-    <div className="flex flex-wrap gap-2">
-      <Link
-        href="/reports"
-        className={`${baseClass} ${
-          current === "jobs"
-            ? "border-slate-900 bg-slate-900 text-white"
-            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-        }`}
-      >
-        Job / Visit Ledger
-      </Link>
-      <Link
-        href="/reports/service-cases"
-        className={`${baseClass} ${
-          current === "service-cases"
-            ? "border-slate-900 bg-slate-900 text-white"
-            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-        }`}
-      >
-        Service Case Continuity
-      </Link>
-      <Link
-        href="/reports/closeout"
-        className={`${baseClass} ${
-          current === "closeout"
-            ? "border-slate-900 bg-slate-900 text-white"
-            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-        }`}
-      >
-        Closeout / Follow-up
-      </Link>
+    <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-1.5 shadow-[0_14px_28px_-30px_rgba(15,23,42,0.3)]">
       <Link
         href="/reports/dashboard"
         className={`${baseClass} ${
           current === "dashboard"
-            ? "border-slate-900 bg-slate-900 text-white"
-            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            ? "border-slate-900 bg-slate-900 text-white shadow-[0_10px_20px_-16px_rgba(15,23,42,0.45)]"
+            : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900"
         }`}
       >
         Dashboard
       </Link>
       <Link
-        href="/reports/kpis"
+        href="/reports/jobs"
         className={`${baseClass} ${
-          current === "kpis"
-            ? "border-slate-900 bg-slate-900 text-white"
-            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+          current === "jobs"
+            ? "border-slate-900 bg-slate-900 text-white shadow-[0_10px_20px_-16px_rgba(15,23,42,0.45)]"
+            : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900"
         }`}
       >
-        KPI Validation
+        Jobs Report
+      </Link>
+      <Link
+        href="/reports/service-cases"
+        className={`${baseClass} ${
+          current === "service-cases"
+            ? "border-slate-900 bg-slate-900 text-white shadow-[0_10px_20px_-16px_rgba(15,23,42,0.45)]"
+            : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900"
+        }`}
+      >
+        Service Cases Report
+      </Link>
+      <Link
+        href="/reports/closeout"
+        className={`${baseClass} ${
+          current === "closeout"
+            ? "border-slate-900 bg-slate-900 text-white shadow-[0_10px_20px_-16px_rgba(15,23,42,0.45)]"
+            : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900"
+        }`}
+      >
+        Closeout Report
+      </Link>
+      <Link
+        href="/reports/invoices"
+        className={`${baseClass} ${
+          current === "invoices"
+            ? "border-slate-900 bg-slate-900 text-white shadow-[0_10px_20px_-16px_rgba(15,23,42,0.45)]"
+            : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900"
+        }`}
+      >
+        Invoices Report
       </Link>
     </div>
   );

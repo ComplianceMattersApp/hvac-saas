@@ -21,8 +21,8 @@ const DASHBOARD_SECTION_OPTIONS = [
   { value: "top-line", label: "Top line" },
   { value: "operations", label: "Operations" },
   { value: "closeout", label: "Closeout / Admin" },
-  { value: "continuity", label: "Service continuity" },
-  { value: "invoice", label: "Invoice visibility" },
+  { value: "continuity", label: "Service Cases" },
+  { value: "invoice", label: "Invoices" },
   { value: "tech-workload", label: "Tech workload" },
 ] as const;
 
@@ -109,7 +109,7 @@ function buildRangeParams(filters: ReportCenterKpiFilters) {
 function buildOperationsLedgerHref(filters: ReportCenterKpiFilters) {
   const params = buildRangeParams(filters);
   params.set("scope", "all");
-  return `/reports?${params.toString()}`;
+  return `/reports/jobs?${params.toString()}`;
 }
 
 function buildOperationsExportHref(filters: ReportCenterKpiFilters) {
@@ -155,9 +155,9 @@ function densityClasses(density: DashboardDensity) {
 
   return {
     card: "p-4",
-    section: "p-4",
-    topCard: "p-5",
-    sectionGap: "space-y-6",
+      section: "p-5",
+      topCard: "p-5",
+      sectionGap: "space-y-5",
   };
 }
 
@@ -187,12 +187,12 @@ function SummaryCard({
   const classes = densityClasses(density);
 
   return (
-    <article className={`rounded-2xl border ${classes.topCard} shadow-[0_16px_36px_-30px_rgba(15,23,42,0.22)] ${toneClass(tone)}`}>
+    <article className={`rounded-[24px] border ${classes.topCard} shadow-[0_18px_32px_-30px_rgba(15,23,42,0.26)] ${toneClass(tone)}`}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div>
-      <div className="mt-4 text-4xl font-semibold tracking-tight text-slate-950">{value}</div>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{helperText}</p>
+      <div className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">{value}</div>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{helperText}</p>
       {href ? (
-        <div className="mt-4 border-t border-slate-200 pt-4 text-sm">
+        <div className="mt-4 border-t border-slate-200/80 pt-4 text-sm">
           <Link href={href} className="font-semibold text-blue-700 transition-colors hover:text-blue-800">
             View report
           </Link>
@@ -218,14 +218,16 @@ function SectionMetricCard({
   const classes = densityClasses(density);
 
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white ${classes.card}`}>
+    <div className={`rounded-[20px] border border-slate-200 bg-white ${classes.card} shadow-[0_14px_28px_-30px_rgba(15,23,42,0.24)]`}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">{label}</div>
-      <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</div>
+      <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{value}</div>
       <p className="mt-2 text-sm leading-6 text-slate-600">{helperText}</p>
       {href ? (
-        <Link href={href} className="mt-4 inline-flex text-sm font-semibold text-blue-700 transition-colors hover:text-blue-800">
-          Open report
-        </Link>
+        <div className="mt-4 border-t border-slate-200/80 pt-3">
+          <Link href={href} className="inline-flex text-sm font-semibold text-blue-700 transition-colors hover:text-blue-800">
+            Open report
+          </Link>
+        </div>
       ) : null}
     </div>
   );
@@ -254,7 +256,7 @@ function TrendBars({
   );
 
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white ${classes.card}`}>
+    <div className={`rounded-[20px] border border-slate-200 bg-white ${classes.card} shadow-[0_14px_28px_-30px_rgba(15,23,42,0.2)]`}>
       <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
         <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-slate-400" />{primaryLabel}</span>
         <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" />{secondaryLabel}</span>
@@ -355,7 +357,7 @@ function TechWorkloadRows({
   const maxAssigned = Math.max(...rows.map((row) => row.assignedOpenVisits), 0);
 
   return (
-    <section className={`rounded-2xl border border-slate-300/80 bg-white ${classes.section} shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]`}>
+    <section className={`rounded-[24px] border border-slate-200/90 bg-white ${classes.section} shadow-[0_18px_32px_-30px_rgba(15,23,42,0.3)]`}>
       <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold tracking-tight text-slate-950">Tech workload</h2>
@@ -372,7 +374,7 @@ function TechWorkloadRows({
         {rows.map((row) => {
           const width = maxAssigned > 0 ? `${Math.max(10, Math.round((row.assignedOpenVisits / maxAssigned) * 100))}%` : "10%";
           return (
-            <div key={row.userId} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <div key={row.userId} className="rounded-[20px] border border-slate-200 bg-slate-50/70 p-3.5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="font-semibold text-slate-950">{row.techName}</div>
@@ -389,7 +391,7 @@ function TechWorkloadRows({
         })}
       </div>
 
-      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm text-slate-700">
+      <div className="mt-4 rounded-[20px] border border-amber-200 bg-amber-50/70 p-4 text-sm text-slate-700">
         <div className="font-semibold text-slate-950">Unassigned open visits: {unassignedOpenVisits}</div>
         <p className="mt-1 leading-6">{note}</p>
       </div>
@@ -450,24 +452,24 @@ export default async function ReportCenterDashboardPage({
   const classes = densityClasses(viewState.density);
 
   return (
-    <div className={`mx-auto max-w-[1680px] ${classes.sectionGap} px-1 py-2 text-slate-900`}>
-      <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
+    <div className={`mx-auto max-w-[1680px] ${classes.sectionGap} px-2 py-3 text-slate-900`}>
+      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-1">
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
             {internalBusinessIdentity.display_name}
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Report Center Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-600">Jobs, workload, closeout, service continuity, and honest billed visibility.</p>
+          <p className="mt-1 text-sm text-slate-600">Jobs, workload, closeout, service cases, and billed activity.</p>
         </div>
-        <div className="max-w-[38rem] text-sm leading-6 text-slate-600">
-          Built from the current report-center ledgers, validated KPI priorities, and honest billed truth already on file. Operational, continuity, and invoice layers stay separate.
+        <div className="max-w-[34rem] text-sm leading-6 text-slate-600 md:text-right">
+          Built from the current report surfaces and billed truth already on file. Operations, service cases, and invoices stay separate.
         </div>
       </header>
 
       <ReportCenterTabs current="dashboard" />
 
-      <section className={`rounded-2xl border border-slate-300/80 bg-white ${classes.section} shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]`}>
-        <form action="/reports/dashboard" method="get" className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <section className={`rounded-[24px] border border-slate-200/90 bg-slate-50/80 ${classes.section} shadow-[0_18px_32px_-30px_rgba(15,23,42,0.3)]`}>
+        <form action="/reports/dashboard" method="get" className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="grid gap-3 md:grid-cols-3 lg:min-w-[46rem]">
             <label className="grid gap-1 text-sm text-slate-700">
               <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Granularity</span>
@@ -489,23 +491,20 @@ export default async function ReportCenterDashboardPage({
             </label>
           </div>
 
-          <div className="flex flex-wrap items-end gap-2">
-            <button type="submit" className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+          <div className="flex flex-wrap items-end gap-2 lg:justify-end">
+            <button type="submit" className="inline-flex min-h-10 items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
               Apply range
             </button>
-            <Link href="/reports/dashboard" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <Link href="/reports/dashboard" className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
               Reset
             </Link>
-            <Link href={shareHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <Link href={shareHref} className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
               Copyable URL
-            </Link>
-            <Link href={`/reports/kpis?${buildReportCenterKpiSearchParams(filters).toString()}`} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
-              KPI Validation
             </Link>
           </div>
 
           <div className="w-full lg:max-w-[34rem]">
-            <details className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <details className="rounded-[20px] border border-slate-200 bg-white/80 p-3.5">
               <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
                 View controls
               </summary>
@@ -534,6 +533,12 @@ export default async function ReportCenterDashboardPage({
                     ))}
                   </div>
                 </fieldset>
+                <div className="border-t border-slate-200 pt-3 text-xs leading-5 text-slate-500">
+                  Internal reference only. {" "}
+                  <Link href={`/reports/kpis?${buildReportCenterKpiSearchParams(filters).toString()}`} className="font-semibold text-slate-700 underline underline-offset-2 transition-colors hover:text-slate-900">
+                    Open KPI Reference
+                  </Link>
+                </div>
               </div>
             </details>
           </div>
@@ -544,7 +549,7 @@ export default async function ReportCenterDashboardPage({
         <section className="space-y-3">
           <header>
             <h2 className="text-lg font-semibold tracking-tight text-slate-950">Top line</h2>
-            <p className="mt-1 text-sm text-slate-600">The fastest read on current workload, closeout pressure, service continuity, and billed activity in the selected range.</p>
+            <p className="mt-1 text-sm text-slate-600">A quick read on workload, closeout pressure, service cases, and billed activity in the selected range.</p>
           </header>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {dashboard.topCards.map((card) => (
@@ -556,18 +561,18 @@ export default async function ReportCenterDashboardPage({
 
       {hasVisibleSection(viewState, "operations") ? (
         <div className="grid gap-6 xl:grid-cols-[1.55fr_1fr]">
-          <section className={`rounded-2xl border border-slate-300/80 bg-white ${classes.section} shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]`}>
+          <section className={`rounded-[24px] border border-slate-200/90 bg-white ${classes.section} shadow-[0_18px_32px_-30px_rgba(15,23,42,0.3)]`}>
             <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="flex flex-col gap-1">
                 <h2 className="text-lg font-semibold tracking-tight text-slate-950">Operations</h2>
                 <p className="text-sm text-slate-600">Current workload, scheduling pressure, and visit throughput for the selected period.</p>
               </div>
               <div className="flex flex-wrap gap-2 text-sm">
-                <Link href={operationsLedgerHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-                  Open jobs ledger
+                <Link href={operationsLedgerHref} className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3.5 py-2 font-semibold text-slate-700 transition-colors hover:bg-slate-100">
+                    Open jobs report
                 </Link>
-                <Link href={operationsExportHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-                  Export jobs CSV
+                <Link href={operationsExportHref} className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3.5 py-2 font-semibold text-slate-700 transition-colors hover:bg-slate-100">
+                    Export jobs report CSV
                 </Link>
               </div>
             </header>
@@ -582,7 +587,7 @@ export default async function ReportCenterDashboardPage({
             </div>
           </section>
 
-          <section className={`rounded-2xl border border-slate-300/80 bg-white ${classes.section} shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]`}>
+          <section className={`rounded-[24px] border border-slate-200/90 bg-white ${classes.section} shadow-[0_18px_32px_-30px_rgba(15,23,42,0.3)]`}>
             <header className="flex flex-col gap-1">
               <h2 className="text-lg font-semibold tracking-tight text-slate-950">Job mix</h2>
               <p className="text-sm text-slate-600">How current open work and completed work are splitting across job types.</p>
@@ -597,18 +602,18 @@ export default async function ReportCenterDashboardPage({
       {(hasVisibleSection(viewState, "closeout") || hasVisibleSection(viewState, "continuity")) ? (
         <div className="grid gap-6 xl:grid-cols-2">
           {hasVisibleSection(viewState, "closeout") ? (
-            <section className={`rounded-2xl border border-slate-300/80 bg-white ${classes.section} shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]`}>
+            <section className={`rounded-[24px] border border-slate-200/90 bg-white ${classes.section} shadow-[0_18px_32px_-30px_rgba(15,23,42,0.3)]`}>
               <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="flex flex-col gap-1">
                   <h2 className="text-lg font-semibold tracking-tight text-slate-950">Closeout / Admin</h2>
                   <p className="text-sm text-slate-600">Office follow-up sitting between field completion and operational close.</p>
                 </div>
                 <div className="flex flex-wrap gap-2 text-sm">
-                  <Link href={closeoutLedgerHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-                    Open closeout ledger
+                  <Link href={closeoutLedgerHref} className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3.5 py-2 font-semibold text-slate-700 transition-colors hover:bg-slate-100">
+                    Open closeout report
                   </Link>
-                  <Link href={closeoutExportHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-                    Export closeout CSV
+                  <Link href={closeoutExportHref} className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3.5 py-2 font-semibold text-slate-700 transition-colors hover:bg-slate-100">
+                    Export closeout report CSV
                   </Link>
                 </div>
               </header>
@@ -621,18 +626,18 @@ export default async function ReportCenterDashboardPage({
           ) : null}
 
           {hasVisibleSection(viewState, "continuity") ? (
-            <section className={`rounded-2xl border border-slate-300/80 bg-white ${classes.section} shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]`}>
+            <section className={`rounded-[24px] border border-slate-200/90 bg-white ${classes.section} shadow-[0_18px_32px_-30px_rgba(15,23,42,0.3)]`}>
               <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="flex flex-col gap-1">
-                  <h2 className="text-lg font-semibold tracking-tight text-slate-950">Service continuity</h2>
+                  <h2 className="text-lg font-semibold tracking-tight text-slate-950">Service Cases</h2>
                   <p className="text-sm text-slate-600">Open case pressure, repeat-visit risk, and resolution flow across the selected period.</p>
                 </div>
                 <div className="flex flex-wrap gap-2 text-sm">
-                  <Link href={continuityLedgerHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-                    Open continuity ledger
+                  <Link href={continuityLedgerHref} className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3.5 py-2 font-semibold text-slate-700 transition-colors hover:bg-slate-100">
+                    Open service cases report
                   </Link>
-                  <Link href={continuityExportHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-                    Export continuity CSV
+                  <Link href={continuityExportHref} className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3.5 py-2 font-semibold text-slate-700 transition-colors hover:bg-slate-100">
+                    Export service cases CSV
                   </Link>
                 </div>
               </header>
@@ -653,9 +658,9 @@ export default async function ReportCenterDashboardPage({
       {(hasVisibleSection(viewState, "invoice") || hasVisibleSection(viewState, "tech-workload")) ? (
         <div className="grid gap-6 xl:grid-cols-[1fr_1.15fr]">
           {hasVisibleSection(viewState, "invoice") ? (
-            <section className={`rounded-2xl border border-slate-300/80 bg-white ${classes.section} shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]`}>
+            <section className={`rounded-[24px] border border-slate-200/90 bg-white ${classes.section} shadow-[0_18px_32px_-30px_rgba(15,23,42,0.3)]`}>
               <header className="flex flex-col gap-1">
-                <h2 className="text-lg font-semibold tracking-tight text-slate-950">Invoice visibility</h2>
+                <h2 className="text-lg font-semibold tracking-tight text-slate-950">Invoices</h2>
                 <p className="text-sm text-slate-600">Billed truth only where internal invoices already support it honestly.</p>
               </header>
               <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -663,8 +668,8 @@ export default async function ReportCenterDashboardPage({
                   <SectionMetricCard key={card.label} {...card} density={viewState.density} />
                 ))}
               </div>
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-slate-600">
-                {dashboard.invoiceVisibility.note} Export stays deferred here until there is a dedicated invoice report surface behind these numbers.
+              <div className="mt-4 rounded-[20px] border border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-slate-600">
+                {dashboard.invoiceVisibility.note} Use the dedicated invoice report for drill and export.
               </div>
             </section>
           ) : null}

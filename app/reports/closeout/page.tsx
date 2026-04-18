@@ -18,8 +18,8 @@ import {
 } from "@/lib/reports/closeout-follow-up-ledger";
 
 export const metadata = {
-  title: "Closeout / Follow-up Ledger",
-  description: "Internal closeout and follow-up ledger",
+  title: "Closeout Report",
+  description: "Internal closeout report",
 };
 
 function booleanPill(value: boolean, trueLabel: string) {
@@ -82,16 +82,16 @@ export default async function CloseoutFollowUpLedgerPage({
   const exportHref = `/reports/closeout/export?${buildCloseoutFollowUpLedgerSearchParams(filters).toString()}`;
 
   return (
-    <div className="mx-auto max-w-[1680px] space-y-4 px-1 py-2 text-slate-900">
-      <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
+    <div className="mx-auto max-w-[1680px] space-y-5 px-2 py-3 text-slate-900">
+      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-1">
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
             {internalBusinessIdentity.display_name}
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Report Center</h1>
-          <p className="mt-1 text-sm text-slate-600">Closeout / Follow-up Ledger</p>
+          <p className="mt-1 text-sm text-slate-600">Closeout Report</p>
         </div>
-        <div className="text-sm text-slate-600">
+        <div className="max-w-[24rem] text-sm text-slate-600 md:text-right">
           <div>Showing {ledger.rows.length} of {ledger.totalCount} visit rows</div>
           {ledger.truncated ? (
             <div className="text-xs text-slate-500">Page view is capped at {CLOSEOUT_FOLLOW_UP_LEDGER_PAGE_LIMIT} rows. Export includes up to {CLOSEOUT_FOLLOW_UP_LEDGER_EXPORT_LIMIT} rows.</div>
@@ -101,9 +101,9 @@ export default async function CloseoutFollowUpLedgerPage({
 
       <ReportCenterTabs current="closeout" />
 
-      <section className="rounded-2xl border border-slate-300/80 bg-white p-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]">
+      <section className="rounded-[24px] border border-slate-200/90 bg-slate-50/80 p-5 shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
         <form action="/reports/closeout" method="get" className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[auto_auto_auto_1fr_0.9fr_0.9fr_0.9fr]">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[auto_auto_auto_1fr_0.9fr_0.9fr_0.9fr]">
             <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 xl:mt-6">
               <input type="checkbox" name="closeout_only" value="1" defaultChecked={filters.closeoutOnly} className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300" />
               <span>Closeout queue only</span>
@@ -149,7 +149,7 @@ export default async function CloseoutFollowUpLedgerPage({
             </label>
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-slate-200 pt-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-4 border-t border-slate-200/80 pt-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 xl:min-w-[60rem]">
               <label className="grid gap-1 text-sm text-slate-700">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Contractor</span>
@@ -190,14 +190,14 @@ export default async function CloseoutFollowUpLedgerPage({
               </label>
             </div>
 
-            <div className="flex flex-wrap items-end gap-2">
-              <button type="submit" className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <div className="flex flex-wrap items-end gap-2 lg:justify-end">
+              <button type="submit" className="inline-flex min-h-10 items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
                 Apply filters
               </button>
-              <Link href="/reports/closeout" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+              <Link href="/reports/closeout" className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
                 Reset
               </Link>
-              <Link href={exportHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+              <Link href={exportHref} className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
                 Export CSV
               </Link>
             </div>
@@ -205,10 +205,10 @@ export default async function CloseoutFollowUpLedgerPage({
         </form>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-300/80 bg-white shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]">
+      <section className="overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-50">
+            <thead className="bg-slate-50/90">
               <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
                 <th className="px-3 py-3">Job Ref</th>
                 <th className="px-3 py-3">Visit</th>
@@ -232,13 +232,16 @@ export default async function CloseoutFollowUpLedgerPage({
             <tbody>
               {ledger.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={17} className="px-4 py-10 text-center text-sm text-slate-500">
-                    No closeout visit rows match the current filters.
+                  <td colSpan={17} className="px-4 py-12 text-center text-sm text-slate-500">
+                    <div className="mx-auto max-w-md space-y-2">
+                      <div className="font-semibold text-slate-700">No closeout rows match the current filters</div>
+                      <div className="text-xs leading-5 text-slate-500">Try widening the date range or clearing one of the closeout filters.</div>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 ledger.rows.map((row) => (
-                  <tr key={row.jobId} className="border-b border-slate-200/80 align-top last:border-b-0">
+                  <tr key={row.jobId} className="border-b border-slate-200/80 align-top transition-colors hover:bg-slate-50/60 last:border-b-0">
                     <td className="px-3 py-3">
                       <Link href={row.jobHref} className="font-medium text-blue-700 hover:underline" title={row.jobId}>
                         <span className="font-mono text-xs">{row.jobReference}</span>

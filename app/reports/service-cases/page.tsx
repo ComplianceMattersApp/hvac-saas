@@ -18,8 +18,8 @@ import {
 } from "@/lib/reports/service-case-continuity";
 
 export const metadata = {
-  title: "Service Case Continuity",
-  description: "Internal service case continuity ledger",
+  title: "Service Cases Report",
+  description: "Internal service cases report",
 };
 
 export default async function ServiceCaseContinuityPage({
@@ -69,16 +69,16 @@ export default async function ServiceCaseContinuityPage({
   const exportHref = `/reports/service-cases/export?${buildServiceCaseContinuitySearchParams(filters).toString()}`;
 
   return (
-    <div className="mx-auto max-w-[1600px] space-y-4 px-1 py-2 text-slate-900">
-      <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
+    <div className="mx-auto max-w-[1600px] space-y-5 px-2 py-3 text-slate-900">
+      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-1">
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
             {internalBusinessIdentity.display_name}
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Report Center</h1>
-          <p className="mt-1 text-sm text-slate-600">Service Case Continuity Ledger</p>
+          <p className="mt-1 text-sm text-slate-600">Service Cases Report</p>
         </div>
-        <div className="text-sm text-slate-600">
+        <div className="max-w-[24rem] text-sm text-slate-600 md:text-right">
           <div>Showing {ledger.rows.length} of {ledger.totalCount} service cases</div>
           {ledger.truncated ? (
             <div className="text-xs text-slate-500">Page view is capped at {SERVICE_CASE_CONTINUITY_PAGE_LIMIT} rows. Export includes up to {SERVICE_CASE_CONTINUITY_EXPORT_LIMIT} rows.</div>
@@ -88,9 +88,9 @@ export default async function ServiceCaseContinuityPage({
 
       <ReportCenterTabs current="service-cases" />
 
-      <section className="rounded-2xl border border-slate-300/80 bg-white p-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]">
+      <section className="rounded-[24px] border border-slate-200/90 bg-slate-50/80 p-5 shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
         <form action="/reports/service-cases" method="get" className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_0.85fr_0.9fr_0.9fr_auto]">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_0.85fr_0.9fr_0.9fr_auto]">
             <label className="grid gap-1 text-sm text-slate-700">
               <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Case status</span>
               <select name="case_status" defaultValue={filters.caseStatus} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
@@ -136,7 +136,7 @@ export default async function ServiceCaseContinuityPage({
             </label>
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-slate-200 pt-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-4 border-t border-slate-200/80 pt-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="grid gap-3 md:grid-cols-2 lg:min-w-[32rem] lg:grid-cols-[1.2fr_0.9fr]">
               <label className="grid gap-1 text-sm text-slate-700">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Contractor</span>
@@ -158,14 +158,14 @@ export default async function ServiceCaseContinuityPage({
               </label>
             </div>
 
-            <div className="flex flex-wrap items-end gap-2">
-            <button type="submit" className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <div className="flex flex-wrap items-end gap-2 lg:justify-end">
+            <button type="submit" className="inline-flex min-h-10 items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
               Apply filters
             </button>
-            <Link href="/reports/service-cases" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <Link href="/reports/service-cases" className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
               Reset
             </Link>
-            <Link href={exportHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <Link href={exportHref} className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
               Export CSV
             </Link>
           </div>
@@ -173,10 +173,10 @@ export default async function ServiceCaseContinuityPage({
         </form>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-300/80 bg-white shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]">
+      <section className="overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-50">
+            <thead className="bg-slate-50/90">
               <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
                 <th className="px-3 py-3">Case Ref</th>
                 <th className="px-3 py-3">Problem Summary</th>
@@ -198,13 +198,16 @@ export default async function ServiceCaseContinuityPage({
             <tbody>
               {ledger.rows.length === 0 ? (
                 <tr>
-                  <td colSpan={15} className="px-4 py-10 text-center text-sm text-slate-500">
-                    No service cases match the current filters.
+                  <td colSpan={15} className="px-4 py-12 text-center text-sm text-slate-500">
+                    <div className="mx-auto max-w-md space-y-2">
+                      <div className="font-semibold text-slate-700">No service cases match the current filters</div>
+                      <div className="text-xs leading-5 text-slate-500">Try widening the date range or clearing one of the case filters.</div>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 ledger.rows.map((row) => (
-                  <tr key={row.serviceCaseId} className="border-b border-slate-200/80 align-top last:border-b-0">
+                  <tr key={row.serviceCaseId} className="border-b border-slate-200/80 align-top transition-colors hover:bg-slate-50/60 last:border-b-0">
                     <td className="px-3 py-3">
                       <Link href={row.serviceCaseHref} className="font-medium text-blue-700 hover:underline" title={row.serviceCaseId}>
                         <span className="font-mono text-xs">{row.serviceCaseReference}</span>

@@ -714,7 +714,6 @@ The core operational platform is complete enough to be considered a real working
 
 These are not currently failures of the spine. They are future/business-layer modules.
 
-advanced reporting / analytics layer
 price book / quoting
 maintenance / agreement systems
 optional drag-and-drop dispatch UX
@@ -1090,28 +1089,29 @@ Roadmap order remains:
 Current position:
 - Service model buildout is closed for milestone-1 scope.
 - Billing / invoice workflow is complete enough to move forward for milestone-2 scope.
-- The current milestone-2 billing seam now includes invoice review, issue/send, resend, and operator-facing communication tracking/history at the job-linked invoice layer.
-- Invoice email content/design polish remains deferred refinement work and is not part of milestone-2 closeout.
-- Reporting / analytics is now the next active roadmap item.
-- Payment architecture/foundation is now also an active implementation area under the locked direction in Section 19.
-- This does not mean full payment acceptance is live; it means payment readiness is now being intentionally built to prevent later rework.
+- Reporting / analytics is now substantially complete for the current milestone-3 scope.
+- Payment architecture/foundation remains an active implementation area under the locked direction in Section 19.
+- This does not mean full payment acceptance is live; it means payment readiness is being intentionally built to prevent later rework.
 
-Service model buildout completed in the current thread:
-- Service Contract V1 spine lock
-- Service Contract V1 schema/domain pass
-- Existing-flow wiring for service fields
-- Service intake vocabulary cleanup
-- Intake de-duplication of Job Title vs Visit Reason
-- Internal relationship-aware intake step V1
-- Open Active Job query tightening and mode cleanup
-- Job-type-aware relationship scoping (ECC vs Service separation)
-- Submit-side hardening for Open Active Job type enforcement
-- Visit Scope as the job-owned operational scope layer
-- ECC optional vs Service required Visit Scope behavior
-- ECC companion-scope promotion into real Service jobs
-- promoted-companion read-only visibility on internal scan surfaces
-- internal Job Title demotion with derived stored titles preserved
-- milestone-1 write-path reliability cleanup for the live `jobs.updated_at` mismatch
+Reporting / analytics milestone baseline now includes:
+- Report Center as the internal reporting home
+- Dashboard as the default Report Center landing surface
+- Jobs Report as the visit-level operational ledger
+- Service Cases Report as the continuity/service-case ledger
+- Closeout Report as the visit-owned closeout/follow-up ledger
+- Invoices Report as the billed-truth invoice ledger
+- export support through report-family ledgers, with dashboard export following honest underlying report surfaces
+- lightweight dashboard view controls
+- KPI foundation and KPI reference/validation support retained as internal scaffolding
+- KPI Reference removed from normal Report Center navigation while remaining accessible by direct URL
+- `/reports` routing to Dashboard by default, with Jobs Report moved to `/reports/jobs` and compatibility handling preserved for prior filtered jobs-report links
+
+Remaining closeout for milestone-3 is limited to live-usage validation and minor polish/hardening, not missing major report families.
+
+If roadmap order remains unchanged, the next active major roadmap item after Reporting / analytics is:
+- RLS completion / permission hardening
+
+This stays aligned to the current roadmap order already in the spine while accurately marking reporting as no longer the active incomplete milestone.
 
 20.4 Current locked clarifications
 

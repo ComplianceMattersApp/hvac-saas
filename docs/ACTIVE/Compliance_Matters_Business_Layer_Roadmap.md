@@ -596,6 +596,26 @@ Do not combine these into one ambiguous metric:
 ### Snapshot rule
 Historical reporting must read frozen transactional snapshots, not today’s mutable pricebook definitions.
 
+### Current implemented reporting baseline (achieved)
+
+Reporting / analytics now has a real Report Center baseline and is no longer only planning-level direction.
+
+Current implemented baseline includes:
+- Dashboard as the default internal reporting entry
+- Jobs Report for visit-level operational reporting
+- Service Cases Report for continuity/service-quality reporting
+- Closeout Report for visit-owned closeout/follow-up backlog reporting
+- Invoices Report for billed-truth internal invoice reporting where internal invoicing mode is active
+- CSV export support on the report-family ledgers
+- dashboard drill/export behavior that reuses existing ledgers where that is the honest source
+- KPI Reference retained as lower-priority internal scaffolding rather than a primary product destination
+
+Locked boundary:
+- Reporting still must stay split by family and owner truth.
+- Operational truth, billed truth, and collected truth must not be collapsed into one ambiguous reporting surface.
+- Invoice reporting may surface billed truth where real internal invoice records exist.
+- Collection/payment reporting remains later and must not be implied before payment truth materially supports it.
+
 ---
 
 ## 17. Optional accounting sync seam (planning only)
