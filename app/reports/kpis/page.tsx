@@ -13,8 +13,8 @@ import {
 import { listReportCenterKpiFamilies } from "@/lib/reports/report-center-kpis";
 
 export const metadata = {
-  title: "KPI Metrics Validation",
-  description: "Internal KPI validation and ranking surface",
+  title: "KPI Reference",
+  description: "Internal KPI reference and definition surface",
 };
 
 const PRIORITY_ORDER = {
@@ -56,8 +56,8 @@ function FamilySection({ family }: { family: ReportCenterKpiFamilyReadModel }) {
   };
 
   return (
-    <section className="rounded-2xl border border-slate-300/80 bg-white p-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]">
-      <header className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+    <section className="rounded-[24px] border border-slate-200/90 bg-slate-50/50 p-5 shadow-[0_16px_30px_-32px_rgba(15,23,42,0.28)]">
+      <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-slate-950">{family.familyLabel}</h2>
           <p className="mt-1 text-sm text-slate-600">{family.familyDescription}</p>
@@ -71,7 +71,7 @@ function FamilySection({ family }: { family: ReportCenterKpiFamilyReadModel }) {
         <p className="max-w-[44rem] text-xs leading-5 text-slate-500">{family.sourceSummary}</p>
       </header>
 
-      <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+      <div className="mt-4 overflow-x-auto rounded-[20px] border border-slate-200/90 bg-white">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50">
             <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
@@ -85,7 +85,7 @@ function FamilySection({ family }: { family: ReportCenterKpiFamilyReadModel }) {
           </thead>
           <tbody>
             {metrics.map((metric) => (
-              <tr key={metric.key} className="border-b border-slate-200/80 align-top last:border-b-0">
+              <tr key={metric.key} className="border-b border-slate-200/80 align-top transition-colors hover:bg-slate-50/60 last:border-b-0">
                 <td className="px-3 py-3 text-slate-900">
                   <div className="font-medium">{metric.label}</div>
                 </td>
@@ -104,7 +104,7 @@ function FamilySection({ family }: { family: ReportCenterKpiFamilyReadModel }) {
                   <div className="max-w-[15rem] text-xs leading-5">{metric.dashboardRole}</div>
                 </td>
                 <td className="px-3 py-3 text-slate-700">
-                  <details className="min-w-[22rem] rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                  <details className="min-w-[22rem] rounded-xl border border-slate-200 bg-slate-50/70 p-3">
                     <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
                       View definition
                     </summary>
@@ -136,14 +136,14 @@ function FamilySection({ family }: { family: ReportCenterKpiFamilyReadModel }) {
         </table>
       </div>
 
-      <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+      <details className="mt-4 rounded-[20px] border border-slate-200 bg-white/80 p-4">
         <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
           Bucket checks
         </summary>
         <p className="mt-2 text-xs leading-5 text-slate-600">
           Family-level bucket values stay available for technical review, but are kept out of the default KPI triage view.
         </p>
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="mt-4 overflow-x-auto rounded-[18px] border border-slate-200 bg-white">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50">
               <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
@@ -155,7 +155,7 @@ function FamilySection({ family }: { family: ReportCenterKpiFamilyReadModel }) {
             </thead>
             <tbody>
               {family.bucketRows.map((row) => (
-                <tr key={row.bucketKey} className="border-b border-slate-200/80 last:border-b-0">
+                <tr key={row.bucketKey} className="border-b border-slate-200/80 transition-colors hover:bg-slate-50/50 last:border-b-0">
                   <td className="px-3 py-3 font-medium text-slate-900">{row.bucketLabel}</td>
                   {family.bucketColumns.map((column) => (
                     <td key={column.key} className="px-3 py-3 text-slate-700">{row.values[column.key]}</td>
@@ -215,21 +215,21 @@ export default async function ReportCenterKpiPage({
   const shareHref = `/reports/kpis?${buildReportCenterKpiSearchParams(filters).toString()}`;
 
   return (
-    <div className="mx-auto max-w-[1680px] space-y-4 px-1 py-2 text-slate-900">
-      <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
+    <div className="mx-auto max-w-[1680px] space-y-5 px-2 py-3 text-slate-900">
+      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-1">
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
             {internalBusinessIdentity.display_name}
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Report Center</h1>
-          <p className="mt-1 text-sm text-slate-600">KPI Metrics Validation</p>
+          <p className="mt-1 text-sm text-slate-600">KPI Reference</p>
         </div>
-        <div className="max-w-[36rem] text-sm leading-6 text-slate-600">
-          Technical review surface for KPI definitions, ranking, source mapping, and bucket behavior. This page stays explicit on purpose.
+        <div className="max-w-[34rem] text-sm leading-6 text-slate-500 md:text-right">
+          Reference surface for KPI definitions, ranking, source mapping, and bucket behavior. This page stays explicit on purpose.
         </div>
       </header>
 
-      <section className="rounded-2xl border border-slate-300/80 bg-slate-50/70 p-4 text-sm text-slate-700 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.12)]">
+      <section className="rounded-[24px] border border-slate-200/90 bg-slate-50/75 p-4 text-sm text-slate-700 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.2)]">
         <div className="flex flex-wrap gap-2 text-xs font-medium">
           <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">Primary = likely first dashboard row</span>
           <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-sky-700">Secondary = useful, but not top billing</span>
@@ -237,14 +237,14 @@ export default async function ReportCenterKpiPage({
           <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-700">Deferred = technically honest, not dashboard-prominent yet</span>
         </div>
           <p className="mt-3 text-xs leading-5 text-slate-600">
-            Use this page to inspect how a metric is calculated and whether it belongs on the dashboard. Use KPI Dashboard for the plain-language operational view.
+            Use this page to inspect how a metric is calculated and whether it belongs on the dashboard. Use the Dashboard for the plain-language operational view.
           </p>
       </section>
 
       <ReportCenterTabs current="kpis" />
 
-      <section className="rounded-2xl border border-slate-300/80 bg-white p-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)]">
-        <form action="/reports/kpis" method="get" className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <section className="rounded-[24px] border border-slate-200/90 bg-slate-50/80 p-5 shadow-[0_16px_30px_-32px_rgba(15,23,42,0.28)]">
+        <form action="/reports/kpis" method="get" className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="grid gap-3 md:grid-cols-3 lg:min-w-[46rem]">
             <label className="grid gap-1 text-sm text-slate-700">
               <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Granularity</span>
@@ -266,14 +266,14 @@ export default async function ReportCenterKpiPage({
             </label>
           </div>
 
-          <div className="flex flex-wrap items-end gap-2">
-            <button type="submit" className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+          <div className="flex flex-wrap items-end gap-2 lg:justify-end">
+            <button type="submit" className="inline-flex min-h-10 items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
               Apply range
             </button>
-            <Link href={resetHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <Link href={resetHref} className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
               Reset
             </Link>
-            <Link href={shareHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <Link href={shareHref} className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
               Copyable URL
             </Link>
           </div>

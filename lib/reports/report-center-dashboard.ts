@@ -180,8 +180,8 @@ function buildJobTypeSlices(params: {
         label: jobTypeLabel(key),
         openCount: countsForKey.openCount,
         completedCount: countsForKey.completedCount,
-        openHref: ledgerValue ? `/reports?${openParams.toString()}` : null,
-        completedHref: ledgerValue ? `/reports?${completedParams.toString()}` : null,
+        openHref: ledgerValue ? `/reports/jobs?${openParams.toString()}` : null,
+        completedHref: ledgerValue ? `/reports/jobs?${completedParams.toString()}` : null,
       };
     })
     .filter((row) => row.openCount > 0 || row.completedCount > 0);
@@ -205,7 +205,7 @@ function buildTechRows(params: {
         techName: assignment.display_name,
         assignedOpenVisits: 0,
         closeoutBacklog: 0,
-        openHref: `/reports?scope=active&assignee=${assignment.user_id}`,
+        openHref: `/reports/jobs?scope=active&assignee=${assignment.user_id}`,
         closeoutHref: `/reports/closeout?closeout_only=1&assignee=${assignment.user_id}`,
       };
 
@@ -226,6 +226,25 @@ function buildTechRows(params: {
       return left.techName.localeCompare(right.techName, undefined, { sensitivity: "base" });
     })
     .slice(0, 8);
+}
+
+function buildInvoiceReportHref(input?: {
+  status?: string | null;
+  dateField?: "created" | "invoice" | "issued";
+  filters?: ReportCenterKpiFilters;
+}) {
+  const params = new URLSearchParams();
+
+  if (input?.status) params.set("status", input.status);
+  if (input?.dateField && input.dateField !== "created") params.set("date_field", input.dateField);
+  if (input?.filters) {
+    for (const [key, value] of buildRangeParams(input.filters).entries()) {
+      params.set(key, value);
+    }
+  }
+
+  const query = params.toString();
+  return query ? `/reports/invoices?${query}` : "/reports/invoices";
 }
 
 export async function buildReportCenterDashboardReadModel(params: {
@@ -305,14 +324,14 @@ export async function buildReportCenterDashboardReadModel(params: {
         label: "Open visits",
         value: getMetricValue(metricMap, "active_open_visits"),
         helperText: "Current live workload across active visits.",
-        href: "/reports?scope=active",
+        href: "/reports/jobs?scope=active",
         tone: "slate",
       },
       {
         label: "Need to schedule",
         value: getMetricValue(metricMap, "need_to_schedule_backlog"),
         helperText: "Dispatch work waiting for office scheduling.",
-        href: "/reports?scope=active&ops_status=need_to_schedule",
+        href: "/reports/jobs?scope=active&ops_status=need_to_schedule",
         tone: "amber",
       },
       {
@@ -350,19 +369,19 @@ export async function buildReportCenterDashboardReadModel(params: {
           label: "Open visits",
           value: getMetricValue(metricMap, "active_open_visits"),
           helperText: "Active visits that are not cancelled and not operationally closed.",
-          href: "/reports?scope=active",
+          href: "/reports/jobs?scope=active",
         },
         {
           label: "Need to schedule",
           value: getMetricValue(metricMap, "need_to_schedule_backlog"),
           helperText: "Visits waiting for dispatch placement.",
-          href: "/reports?scope=active&ops_status=need_to_schedule",
+          href: "/reports/jobs?scope=active&ops_status=need_to_schedule",
         },
         {
           label: "Visits completed this period",
           value: getMetricValue(metricMap, "visits_completed"),
           helperText: "Field-complete visits inside the selected date range.",
-          href: `/reports?${new URLSearchParams({ ...Object.fromEntries(buildRangeParams(params.filters)), date_field: "completed" }).toString()}`,
+          href: `/reports/jobs?${new URLSearchParams({ ...Object.fromEntries(buildRangeParams(params.filters)), date_field: "completed" }).toString()}`,
         },
         {
           label: "Unassigned open visits",
@@ -438,25 +457,33 @@ export async function buildReportCenterDashboardReadModel(params: {
           label: "Issued this period",
           value: new Intl.NumberFormat("en-US").format(issuedThisPeriod.length),
           helperText: "Invoices marked issued inside the selected date range.",
-          href: null,
+          href: buildInvoiceReportHref({
+            status: "issued",
+            dateField: "issued",
+            filters: params.filters,
+          }),
         },
         {
           label: "Billed this period",
           value: formatCurrencyCents(billedThisPeriodCents),
           helperText: "Sum of issued invoice totals inside the selected range.",
-          href: null,
+          href: buildInvoiceReportHref({
+            status: "issued",
+            dateField: "issued",
+            filters: params.filters,
+          }),
         },
         {
           label: "Issued invoices on record",
           value: new Intl.NumberFormat("en-US").format(issuedInvoices.length),
           helperText: "Current billed truth on file, separate from payment collection.",
-          href: null,
+          href: buildInvoiceReportHref({ status: "issued" }),
         },
         {
           label: "Draft invoices",
           value: new Intl.NumberFormat("en-US").format(draftInvoices.length),
           helperText: "Prepared billing records not yet issued.",
-          href: null,
+          href: buildInvoiceReportHref({ status: "draft" }),
         },
       ],
       note: "Invoice visibility is limited to billed truth that already exists on internal invoices. Payment collection, cash performance, and payment mix are intentionally excluded.",
