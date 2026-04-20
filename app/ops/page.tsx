@@ -23,6 +23,7 @@ import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/sear
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import { buildPromotedCompanionReadModel, buildVisitScopeReadModel } from "@/lib/jobs/visit-scope";
+import { listInternalNotifications } from "@/lib/actions/notification-read-actions";
 import { CONTRACTOR_UPDATE_NOTIFICATION_TYPES } from "@/lib/notifications/internal-awareness";
 import OperationalReportingSection from "./_components/OperationalReportingSection";
 import {
@@ -1202,6 +1203,12 @@ const { data: unreadContractorUpdateNotifications, error: unreadContractorUpdate
 
 if (unreadContractorUpdateNotificationsErr) throw unreadContractorUpdateNotificationsErr;
 
+const unreadContractorAwarenessNotifications = await listInternalNotifications({
+  limit: 100,
+  onlyUnread: true,
+  filterKey: "contractor_updates",
+});
+
 const { data: failedRuns, error: failedRunsErr } = await supabase
   .from("ecc_test_runs")
   .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, updated_at, created_at")
@@ -1308,7 +1315,7 @@ const contractorCreatedCount = uniqueAllOpenOpsJobs.filter((j: any) => {
   return status === "need_to_schedule" && hasSignalEventForJob(latestContractorCreatedByJob, jobId);
 }).length;
 
-const contractorUpdatesCount = unreadContractorUpdateNotifications?.length ?? 0;
+const contractorUpdatesCount = unreadContractorAwarenessNotifications.length;
 
 let signalFilteredBucketJobs = [...(filteredBucketJobs ?? [])];
 

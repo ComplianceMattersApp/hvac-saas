@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { NotificationRowForUI } from "@/lib/actions/notification-read-actions";
+import { matchesInternalNotificationFilter } from "@/lib/notifications/internal-awareness";
 import { NotificationListClient } from "./NotificationListClient";
 
 type NotificationCategoryKey = "contractor_updates" | "new_job_notifications";
@@ -65,11 +66,7 @@ export function NotificationsPageClient({
       const type = String(notification.notification_type ?? "").trim().toLowerCase();
 
       if (categoryKey === "contractor_updates") {
-        return (
-          type === "contractor_note" ||
-          type === "contractor_correction_submission" ||
-          type === "contractor_schedule_updated"
-        );
+        return matchesInternalNotificationFilter(type, "contractor_updates");
       }
 
       return (

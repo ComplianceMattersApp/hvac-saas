@@ -71,6 +71,14 @@ type InsertInternalAwarenessNotificationInput = {
   payload?: Record<string, unknown>;
 };
 
+type CreateContractorIntakeProposalAwarenessNotificationInput = {
+  supabase: any;
+  contractorIntakeSubmissionId: string;
+  accountOwnerUserId: string;
+  actorUserId: string;
+  contractorId: string;
+};
+
 export async function insertInternalAwarenessNotification(
   input: InsertInternalAwarenessNotificationInput,
 ): Promise<string> {
@@ -110,6 +118,31 @@ export async function insertInternalAwarenessNotification(
 
   revalidatePath("/", "layout");
   return notificationId;
+}
+
+export async function createContractorIntakeProposalAwarenessNotification(
+  input: CreateContractorIntakeProposalAwarenessNotificationInput,
+): Promise<string> {
+  const contractorIntakeSubmissionId = String(input.contractorIntakeSubmissionId ?? "").trim();
+  const accountOwnerUserId = String(input.accountOwnerUserId ?? "").trim();
+  const actorUserId = String(input.actorUserId ?? "").trim();
+  const contractorId = String(input.contractorId ?? "").trim();
+
+  return insertInternalAwarenessNotification({
+    supabase: input.supabase,
+    contractorIntakeSubmissionId,
+    accountOwnerUserId,
+    actorUserId,
+    notificationType: "contractor_intake_proposal_submitted",
+    subject: "New Contractor Intake Proposal",
+    body: "A contractor submitted an intake proposal pending internal finalization.",
+    payload: {
+      source: "contractor_intake_submissions",
+      contractor_id: contractorId,
+      submitted_by_user_id: actorUserId,
+      account_owner_user_id: accountOwnerUserId,
+    },
+  });
 }
 
 export async function insertInternalNotificationForEvent(
