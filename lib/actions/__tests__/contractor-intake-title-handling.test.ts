@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  buildContractorProposalSubmissionFields,
+  resolveCreateJobTitle,
+} from "@/lib/utils/contractor-intake-title";
 
 const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
@@ -166,8 +170,6 @@ describe("contractor-originated ECC title handling", () => {
   });
 
   it("direct contractor ECC create uses the structured ECC title instead of freeform contractor title", async () => {
-    const { resolveCreateJobTitle } = await import("@/lib/actions/job-actions");
-
     expect(
       resolveCreateJobTitle({
         submittedTitle: "Ready for testing",
@@ -179,8 +181,6 @@ describe("contractor-originated ECC title handling", () => {
   });
 
   it("contractor service title behavior stays unchanged", async () => {
-    const { resolveCreateJobTitle } = await import("@/lib/actions/job-actions");
-
     expect(
       resolveCreateJobTitle({
         submittedTitle: "Check noisy condenser",
@@ -191,8 +191,6 @@ describe("contractor-originated ECC title handling", () => {
   });
 
   it("proposal submission preserves contractor comments in proposed_job_notes", async () => {
-    const { buildContractorProposalSubmissionFields } = await import("@/lib/actions/job-actions");
-
     expect(
       buildContractorProposalSubmissionFields({
         resolvedTitle: "ECC Alteration Test",

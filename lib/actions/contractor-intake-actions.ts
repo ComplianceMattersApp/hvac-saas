@@ -7,7 +7,11 @@ import {
   isInternalAccessError,
   requireInternalRole,
 } from "@/lib/auth/internal-user";
-import { createJob, deriveInternalIntakeJobTitle } from "@/lib/actions/job-actions";
+import { createJob } from "@/lib/actions/job-actions";
+import {
+  normalizeContractorIntakeProjectType,
+  resolveFinalizedContractorIntakeTitle,
+} from "@/lib/utils/contractor-intake-title";
 
 type FinalizationMode = "existing_existing" | "existing_new" | "new_new";
 
@@ -48,28 +52,7 @@ function resolveJobType(raw: unknown): "ecc" | "service" {
 }
 
 function resolveProjectType(raw: unknown) {
-  const value = normalizeText(raw).toLowerCase();
-  if (value === "all_new" || value === "new_construction" || value === "alteration") {
-    return value;
-  }
-
-  return "alteration";
-}
-
-export function resolveFinalizedContractorIntakeTitle(
-  submission: IntakeSubmissionRow,
-  jobType: "ecc" | "service",
-) {
-  if (jobType === "ecc") {
-    return deriveInternalIntakeJobTitle({
-      jobType: "ecc",
-      projectType: resolveProjectType(submission.proposed_project_type),
-    });
-  }
-
-  const proposed = normalizeText(submission.proposed_title);
-  if (proposed) return proposed;
-  return "Service Intake";
+  return normalizeContractorIntakeProjectType(raw);
 }
 
 async function requireInternalReviewer() {
@@ -384,7 +367,11 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
     {
       job_type: jobType,
       project_type: resolveProjectType(submission.proposed_project_type),
-      title: resolveFinalizedContractorIntakeTitle(submission, jobType),
+      title: resolveFinalizedContractorIntakeTitle({
+        proposedProjectType: submission.proposed_project_type,
+        proposedTitle: submission.proposed_title,
+        jobType,
+      }),
       city: jobCity,
       job_address: normalizeText(location.address_line1) || normalizeText(submission.proposed_address_line1) || null,
       scheduled_date: null,
