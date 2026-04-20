@@ -439,7 +439,11 @@ export default async function ReportCenterDashboardPage({
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
-  const dashboard = await buildReportCenterDashboardReadModel({ supabase, filters });
+  const dashboard = await buildReportCenterDashboardReadModel({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    filters,
+  });
   const dashboardSearchParams = buildDashboardSearchParams(filters, viewState);
   const shareHref = `/reports/dashboard?${dashboardSearchParams.toString()}`;
   const operationsLedgerHref = buildOperationsLedgerHref(filters);

@@ -483,6 +483,10 @@ Notifications are awareness signals only and do not own ECC failed-job pending_o
 
 Internal notifications should surface awareness-worthy inbound or action-needed signals, not every event written to audit history.
 
+Internal notification read boundaries remain internal-only.
+
+Contractors do not receive direct read access to internal notifications through this awareness layer.
+
 Examples of awareness-worthy internal notifications:
 - contractor notes/comments received
 - contractor attachments uploaded
@@ -1090,6 +1094,24 @@ Current position:
 - Service model buildout is closed for milestone-1 scope.
 - Billing / invoice workflow is complete enough to move forward for milestone-2 scope.
 - Reporting / analytics is now substantially complete for the current milestone-3 scope.
+- Completed RLS / permission hardening slices for the current stabilized baseline now include customer/location internal account-owner reconciliation and notifications internal-awareness write-path hardening:
+  - jobs and service_cases were already ahead on account-owner-aware internal scope
+  - customers and locations are now reconciled to that same internal account-owner model for internal same-account teammates
+  - validated passed for customer list, customer detail, internal `/jobs/new` guided lookup, and location detail for non-owner internal teammates
+  - customer/location visibility no longer depends primarily on admin/manual scope reconstruction for those internal reads
+  - contractor customer/location visibility remains constrained, read-only, and job-derived
+  - notifications remain account-owner-scoped for internal awareness
+  - the generic `42501 -> service-role` fallback was removed from the internal awareness notification write path
+  - contractor-originated or mixed-context internal awareness notifications now use one explicit, policy-aligned write contract
+  - internal notification read boundaries remain internal-only; contractors still do not get direct read access to internal notifications
+  - no role redesign, support-access model, payment work, billing work, or broader notifications UX/polish work was part of these slices
+- Completed billing hardening slices for the current stabilized baseline include:
+  - the external-billing split-brain closeout fix: the supported `Mark Invoice Sent -> Closed` path writes the lightweight billed-truth marker before supported closeout
+  - billing-truth read-side normalization: internal-invoicing closeout/report/dashboard/ops readers derive billed truth from the internal invoice domain, while external-billing readers preserve lightweight job-level invoice-action meaning
+  - invoice-required counter/label normalization: invoice-required metrics and messaging derive from billing-aware invoice-needed truth rather than raw `jobs.ops_status = invoice_required`
+  - external-billing secondary-field unification: `data_entry_completed_at` is aligned across supported lightweight external-billing completion paths, while `invoice_number` remains owned by the explicit data-entry path and is not invented by lightweight action buttons
+- These completed slices do not broaden payment execution, do not change internal-invoicing billed truth ownership, and do not change roadmap order.
+- This does not mean RLS completion / permission hardening is finished overall; it means additional core operational ownership slices are now closed while the broader hardening milestone remains active.
 - Payment architecture/foundation remains an active implementation area under the locked direction in Section 19.
 - This does not mean full payment acceptance is live; it means payment readiness is being intentionally built to prevent later rework.
 
@@ -1110,6 +1132,12 @@ Remaining closeout for milestone-3 is limited to live-usage validation and minor
 
 If roadmap order remains unchanged, the next active major roadmap item after Reporting / analytics is:
 - RLS completion / permission hardening
+
+Current clarification:
+- the broader RLS completion / permission hardening milestone remains the next active major roadmap item
+- customer/location internal account-owner reconciliation is complete inside that milestone
+- notifications internal-awareness write-path hardening is also complete inside that milestone
+- broader hardening work is not yet closed
 
 This stays aligned to the current roadmap order already in the spine while accurately marking reporting as no longer the active incomplete milestone.
 

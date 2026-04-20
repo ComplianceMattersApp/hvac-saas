@@ -69,6 +69,7 @@ export default async function CloseoutFollowUpLedgerPage({
   const [ledger, filterOptions] = await Promise.all([
     listCloseoutFollowUpLedgerRows({
       supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
       filters,
       internalBusinessDisplayName: internalBusinessIdentity.display_name,
       limit: CLOSEOUT_FOLLOW_UP_LEDGER_PAGE_LIMIT,

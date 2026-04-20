@@ -1,3 +1,4 @@
+import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import {
   getKpiRange,
@@ -189,6 +190,16 @@ function buildJobTypeSlices(params: {
 
 function buildTechRows(params: {
   activeJobs: DashboardJobRow[];
+  closeoutProjectionByJobId: Map<
+    string,
+    {
+      invoice_complete: boolean;
+      field_complete: boolean;
+      job_type: string | null;
+      ops_status: string | null;
+      certs_complete: boolean;
+    }
+  >;
   assignmentMap: Record<string, Array<{ user_id: string; display_name: string }>>;
 }) {
   const techMap = new Map<string, DashboardTechRow>();
@@ -210,7 +221,9 @@ function buildTechRows(params: {
       };
 
       existing.assignedOpenVisits += 1;
-      if (isInCloseoutQueue(job)) existing.closeoutBacklog += 1;
+      if (isInCloseoutQueue(params.closeoutProjectionByJobId.get(job.id) ?? job)) {
+        existing.closeoutBacklog += 1;
+      }
       techMap.set(assignment.user_id, existing);
     }
   }
@@ -249,6 +262,7 @@ function buildInvoiceReportHref(input?: {
 
 export async function buildReportCenterDashboardReadModel(params: {
   supabase: any;
+  accountOwnerUserId: string;
   filters: ReportCenterKpiFilters;
 }): Promise<ReportCenterDashboardReadModel> {
   const range = getKpiRange(params.filters);
@@ -268,6 +282,18 @@ export async function buildReportCenterDashboardReadModel(params: {
   if (invoiceResult.error) throw invoiceResult.error;
 
   const jobs = (jobsResult.data ?? []) as DashboardJobRow[];
+  const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
+    supabase: params.supabase,
+    accountOwnerUserId: params.accountOwnerUserId,
+    jobs: jobs.map((job) => ({
+      id: job.id,
+      field_complete: job.field_complete,
+      job_type: job.job_type,
+      ops_status: job.ops_status,
+      invoice_complete: job.invoice_complete,
+      certs_complete: job.certs_complete,
+    })),
+  });
   const invoices = (invoiceResult.data ?? []) as DashboardInvoiceRow[];
   const activeJobs = jobs.filter(
     (job) =>
@@ -305,7 +331,11 @@ export async function buildReportCenterDashboardReadModel(params: {
     rangeStartMs: range.startMs,
     rangeEndMs: range.endMs,
   });
-  const techRows = buildTechRows({ activeJobs, assignmentMap });
+  const techRows = buildTechRows({
+    activeJobs,
+    closeoutProjectionByJobId: projectionsByJobId,
+    assignmentMap,
+  });
 
   const operationalTrend = operational.bucketRows.map((row) => ({
     label: row.bucketLabel,
@@ -417,7 +447,7 @@ export async function buildReportCenterDashboardReadModel(params: {
         {
           label: "Invoice follow-up needed",
           value: getMetricValue(metricMap, "invoice_required_backlog"),
-          helperText: "Operational invoice follow-up only, not finance collection.",
+          helperText: "Billing-aware invoice follow-up only, not finance collection.",
           href: "/reports/closeout?invoice_only=1",
         },
       ],

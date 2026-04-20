@@ -12,7 +12,10 @@ import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from "@/lib/actions
 import { forceSetOpsStatus } from "@/lib/actions/ops-status";
 import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
 import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions/job-event-meta";
-import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
+import {
+  insertInternalAwarenessNotification,
+  insertInternalNotificationForEvent,
+} from "@/lib/actions/notification-actions";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import { requireInternalRole, requireInternalUser } from "@/lib/auth/internal-user";
 import {
@@ -6315,23 +6318,20 @@ function canContractorWriteEvent(event_type: string) {
       }
 
       try {
-        await proposalWriteClient.from("notifications").insert({
-          job_id: null,
-          account_owner_user_id: proposalOwnerUserId,
-          recipient_type: "internal",
-          recipient_ref: null,
-          channel: "in_app",
-          notification_type: "contractor_intake_proposal_submitted",
+        await insertInternalAwarenessNotification({
+          supabase,
+          contractorIntakeSubmissionId: proposalId,
+          accountOwnerUserId: proposalOwnerUserId,
+          actorUserId: submittingUserId,
+          notificationType: "contractor_intake_proposal_submitted",
           subject: "New Contractor Intake Proposal",
           body: "A contractor submitted an intake proposal pending internal finalization.",
           payload: {
             source: "contractor_intake_submissions",
-            contractor_intake_submission_id: proposalId,
             contractor_id: proposalContractorId,
             submitted_by_user_id: submittingUserId,
             account_owner_user_id: proposalOwnerUserId,
           },
-          status: "queued",
         });
       } catch (error) {
         console.error("proposal_internal_notification_insert_failed", {

@@ -9,6 +9,18 @@ import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-busi
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+const CLOSEOUT_MANUAL_LOCK_STATUSES = new Set([
+  "pending_info",
+  "pending_office_review",
+  "on_hold",
+  "retest_needed",
+  "paperwork_required",
+]);
+
+function hasManualCloseoutLock(value?: string | null) {
+  return CLOSEOUT_MANUAL_LOCK_STATUSES.has(String(value ?? "").trim().toLowerCase());
+}
+
 /**
  * Service jobs:
  * - When marked complete -> field_complete = true, status = completed,
@@ -117,7 +129,7 @@ export async function markServiceComplete(jobId: string): Promise<void> {
 
 export async function markInvoiceSent(jobId: string): Promise<void> {
   const supabase = await createClient();
-  const { internalUser } = await requireInternalUser({ supabase });
+  const { userId: actingUserId, internalUser } = await requireInternalUser({ supabase });
   const billingMode = await resolveBillingModeByAccountOwnerId({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
@@ -130,7 +142,7 @@ export async function markInvoiceSent(jobId: string): Promise<void> {
 
   const { data: job, error } = await supabase
     .from("jobs")
-    .select("id, job_type, ops_status")
+    .select("id, job_type, ops_status, invoice_complete, data_entry_completed_at")
     .eq("id", jobId)
     .single();
 
@@ -140,7 +152,79 @@ export async function markInvoiceSent(jobId: string): Promise<void> {
     throw new Error("markInvoiceSent can only be used for Service jobs.");
   }
 
+  if (hasManualCloseoutLock(job.ops_status)) {
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/ops`);
+    redirect(`/jobs/${jobId}?banner=service_closeout_locked`);
+  }
+
+  const completedAt = job.data_entry_completed_at ?? new Date().toISOString();
+  let invoiceCompleteChanged = false;
+  let dataEntryCompletedChanged = false;
+
+  if (!job.invoice_complete || !job.data_entry_completed_at) {
+    const updatePayload: { invoice_complete?: boolean; data_entry_completed_at?: string } = {};
+
+    if (!job.invoice_complete) {
+      updatePayload.invoice_complete = true;
+    }
+
+    if (!job.data_entry_completed_at) {
+      updatePayload.data_entry_completed_at = completedAt;
+    }
+
+    const { data: updatedJob, error: updateErr } = await supabase
+      .from("jobs")
+      .update(updatePayload)
+      .eq("id", jobId)
+      .select("id, invoice_complete, data_entry_completed_at")
+      .maybeSingle();
+
+    if (updateErr) throw new Error(updateErr.message);
+
+    if (!updatedJob?.id || updatedJob.invoice_complete !== true) {
+      throw new Error("Invoice complete update failed (no row updated).");
+    }
+
+    if (!job.data_entry_completed_at && updatedJob.data_entry_completed_at !== completedAt) {
+      throw new Error("Data entry completion update failed (timestamp missing).");
+    }
+
+    invoiceCompleteChanged = !job.invoice_complete;
+    dataEntryCompletedChanged = !job.data_entry_completed_at;
+  }
+
   const result = await setOpsStatusIfNotManual(jobId, "closed");
+
+  const changeSet = [] as Array<{ field: string; from: unknown; to: unknown }>;
+
+  if (invoiceCompleteChanged) {
+    changeSet.push({ field: "invoice_complete", from: !!job.invoice_complete, to: true });
+  }
+
+  if (dataEntryCompletedChanged) {
+    changeSet.push({ field: "data_entry_completed_at", from: job.data_entry_completed_at ?? null, to: completedAt });
+  }
+
+  if (result.updated) {
+    changeSet.push({ field: "ops_status", from: job.ops_status ?? null, to: "closed" });
+  }
+
+  if (changeSet.length > 0) {
+    const { error: eventErr } = await supabase.from("job_events").insert({
+      job_id: jobId,
+      event_type: "ops_update",
+      message: "Invoice marked sent",
+      meta: {
+        changes: changeSet,
+        source: "service_invoice_sent_action",
+        actor_user_id: actingUserId,
+      },
+      user_id: actingUserId,
+    });
+
+    if (eventErr) throw new Error(eventErr.message);
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
@@ -149,7 +233,7 @@ export async function markInvoiceSent(jobId: string): Promise<void> {
     redirect(`/jobs/${jobId}?banner=service_closeout_locked`);
   }
 
-  if (!result.updated) {
+  if (!result.updated && !invoiceCompleteChanged && !dataEntryCompletedChanged) {
     redirect(`/jobs/${jobId}?banner=service_closeout_already_saved`);
   }
 

@@ -133,6 +133,18 @@ For current live workflows:
 - `jobs.invoice_complete` remains an operational closeout marker
 - neither `Invoice Sent` nor `jobs.invoice_complete` means that a full internal invoice record exists
 
+Completed billing hardening slices for the current stabilized baseline:
+- the external-billing split-brain closeout seam was corrected narrowly
+- the supported `Mark Invoice Sent -> Closed` path now writes the lightweight billed-truth marker before supported closeout
+- billing-truth read-side normalization is complete for current closeout/report/dashboard/ops surfaces: internal-invoicing readers derive billed truth from the internal invoice domain, while external-billing readers preserve lightweight job-level invoice-action meaning
+- invoice-required counter/label normalization is complete for the current stabilized surfaces: invoice-required metrics and messaging now derive from billing-aware invoice-needed truth rather than raw `jobs.ops_status = invoice_required`
+- external-billing secondary-field unification is complete for the supported lightweight completion paths: `data_entry_completed_at` is aligned across those supported paths, while `invoice_number` remains intentionally owned by the explicit data-entry path rather than being invented by lightweight action buttons
+- internal-invoicing workflow and invoice-record truth ownership were intentionally left unchanged
+
+Intentionally deferred after these completed slices:
+- any broader dashboard/report expansion beyond the completed billing-aware normalization already shipped
+- any payment-execution behavior
+
 ### Locked seam rule
 - jobs remain operational closeout truth
 - invoices become billed truth for internal-invoicing companies
@@ -242,7 +254,31 @@ That achieved milestone-2 baseline includes:
 
 Bare-bones invoice email content/presentation is acceptable for this milestone boundary; email formatting/content polish remains deferred refinement work.
 
-The next active roadmap item after this achieved milestone-2 baseline is Reporting / analytics, followed by later business-layer modules in this document.
+Reporting / analytics is no longer the active incomplete milestone.
+
+The next active major roadmap item after this achieved milestone-2 baseline and reporting completion is RLS completion / permission hardening, followed later by business-layer modules in this document.
+
+Completed RLS / permission hardening slice for the current stabilized baseline:
+- customer/location internal account-owner reconciliation is complete
+- jobs and service_cases were already ahead on account-owner-aware internal scope; customers and locations have now been reconciled to that same internal account-owner model for internal same-account teammates
+- validated passed for customer list, customer detail, internal `/jobs/new` guided lookup, and location detail for non-owner internal teammates
+- customer/location visibility no longer depends primarily on admin/manual scope reconstruction for those internal reads
+- contractor customer/location visibility remains constrained, read-only, and job-derived
+- notifications internal-awareness write-path hardening is also complete
+- notifications remain account-owner-scoped for internal awareness
+- the generic `42501 -> service-role` fallback was removed from the internal awareness notification write path
+- contractor-originated or mixed-context internal awareness notifications now use one explicit, policy-aligned write contract
+- internal notification read boundaries remain internal-only; contractors still do not get direct read access to internal notifications
+- no role redesign, support-access model, payment work, billing work, or broader notifications UX/polish work was part of these slices
+
+What this completion does not mean:
+- it does not mean RLS completion / permission hardening is finished overall
+- it does not mean contractor notifications were introduced
+- it does not mean support-access modeling is complete
+- it does not mean role redesign was done
+- it does not mean payment/billing/security work outside this seam was done
+
+The next active major roadmap item remains RLS completion / permission hardening until the broader hardening milestone is actually closed.
 
 Older archived Service planning docs are historical only and remain subordinate to the active spine and this active roadmap.
 
@@ -651,6 +687,14 @@ Current live closeout behavior remains valid during rollout:
 - Invoice Sent
 - cert-complete behavior
 - existing job closeout logic
+
+Current implemented protection note:
+- for external-billing companies, the supported `Invoice Sent` / `Mark Invoice Sent -> Closed` path now satisfies the same lightweight `jobs.invoice_complete` projection required by external-billing closeout before the supported closed path is reached
+- for internal-invoicing companies, job-level `invoice_complete` remains only an operational closeout projection and must not compete with invoice-record billed truth
+- internal-invoicing closeout/report/dashboard/ops readers must derive billed truth from the invoice record domain, not from lightweight job-level invoice-action markers
+- external-billing readers must preserve the lightweight job-level invoice-action meaning and must not pretend an internal invoice record exists
+- invoice-required metrics and operator messaging must derive from billing-aware invoice-needed truth, not raw `jobs.ops_status = invoice_required`
+- supported lightweight external-billing completion paths now align `data_entry_completed_at`; `invoice_number` remains explicit data-entry-owned input rather than lightweight button-generated data
 
 ### Billing-mode-driven exposure
 Feature exposure must follow company billing mode.

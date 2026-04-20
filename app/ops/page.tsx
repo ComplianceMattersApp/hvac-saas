@@ -21,7 +21,9 @@ import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/search-normalization";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import { buildPromotedCompanionReadModel, buildVisitScopeReadModel } from "@/lib/jobs/visit-scope";
+import { CONTRACTOR_UPDATE_NOTIFICATION_TYPES } from "@/lib/notifications/internal-awareness";
 import OperationalReportingSection from "./_components/OperationalReportingSection";
 import {
   buildOperationalReportingReadModel,
@@ -647,8 +649,35 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
     );
   }).length;
 
+  const closeoutProjectionJobInputs = [
+    ...fieldWorkJobs,
+    ...upcomingJobs,
+    ...callListJobs,
+    ...closeoutSourceJobs,
+    ...stillOpenJobs,
+    ...attentionJobs,
+    ...operationalReportingJobs,
+  ].map((job: any) => ({
+    id: String(job?.id ?? "").trim(),
+    field_complete: job?.field_complete,
+    job_type: job?.job_type,
+    ops_status: job?.ops_status,
+    invoice_complete: job?.invoice_complete,
+    certs_complete: job?.certs_complete,
+  }));
+
+  const { projectionsByJobId: closeoutProjectionByJobId } = await buildBillingTruthCloseoutProjectionMap({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobs: closeoutProjectionJobInputs,
+  });
+
+  const getCloseoutProjection = (job: any) =>
+    closeoutProjectionByJobId.get(String(job?.id ?? "").trim()) ?? job;
+
   const operationalReporting = buildOperationalReportingReadModel({
     jobs: operationalReportingJobs,
+    closeoutProjectionByJobId,
     attentionBusinessCutoffIso,
     failedCutoffIso,
     recentCreatedCount,
@@ -733,7 +762,7 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
         }
       )
     : bucket === "closeout"
-      ? (bucketJobs ?? []).filter((j: any) => isInCloseoutQueue(j))
+      ? (bucketJobs ?? []).filter((j: any) => isInCloseoutQueue(getCloseoutProjection(j)))
       : (bucketJobs ?? []);
 
   // --- Customer/Location lookup maps (source-of-truth) ---
@@ -952,7 +981,7 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "paperwork_required" || status === "paperwork_required") {
-    const needs = getCloseoutNeeds(j);
+    const needs = getCloseoutNeeds(getCloseoutProjection(j));
     if (needs.needsCerts && needs.needsInvoice) return "Paperwork required — certs and invoice pending";
     if (needs.needsCerts) return "Paperwork required — certs pending";
     if (needs.needsInvoice) return "Paperwork required — invoice pending";
@@ -960,11 +989,13 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "invoice_required" || status === "invoice_required") {
-    return "Status bucket — invoice still needed";
+    const needs = getCloseoutNeeds(getCloseoutProjection(j));
+    if (needs.needsInvoice) return "Status bucket — invoice still needed";
+    return "Status bucket — invoice follow-up already satisfied";
   }
 
   if (activeBucket === "closeout") {
-    const needs = getCloseoutNeeds(j);
+    const needs = getCloseoutNeeds(getCloseoutProjection(j));
     if (needs.needsInvoice && needs.needsCerts) return "Closeout work queue — invoice and certs still needed";
     if (needs.needsCerts) return "Closeout work queue — certs still needed";
     if (needs.needsInvoice) return "Closeout work queue — invoice still needed";
@@ -986,7 +1017,7 @@ function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJo
   const status = String(j?.ops_status ?? "").toLowerCase();
   const lifecycle = String(j?.status ?? "").toLowerCase();
   const retestState = retestStateForJob(String(j?.id ?? ""));
-  const needs = getCloseoutNeeds(j);
+  const needs = getCloseoutNeeds(getCloseoutProjection(j));
   const isFieldComplete = Boolean(j?.field_complete);
 
   if (opts?.scheduledRetest) return "No Immediate Action";
@@ -1155,13 +1186,6 @@ const { data: signalEvents, error: signalErr } = await supabase
   .order("created_at", { ascending: false });
 
 if (signalErr) throw signalErr;
-
-const CONTRACTOR_UPDATE_NOTIFICATION_TYPES = [
-  "contractor_note",
-  "contractor_correction_submission",
-  "contractor_schedule_updated",
-] as const;
-
 const { data: unreadContractorUpdateNotifications, error: unreadContractorUpdateNotificationsErr } = await supabase
   .from("notifications")
   .select("job_id, notification_type, created_at")
@@ -1284,10 +1308,7 @@ const contractorCreatedCount = uniqueAllOpenOpsJobs.filter((j: any) => {
   return status === "need_to_schedule" && hasSignalEventForJob(latestContractorCreatedByJob, jobId);
 }).length;
 
-const contractorUpdatesCount = (filteredBucketJobs ?? []).filter((j: any) => {
-  const jobId = String(j?.id ?? "");
-  return hasSignalEventForJob(latestUnreadContractorUpdateNotificationByJob, jobId);
-}).length;
+const contractorUpdatesCount = unreadContractorUpdateNotifications?.length ?? 0;
 
 let signalFilteredBucketJobs = [...(filteredBucketJobs ?? [])];
 
@@ -1361,7 +1382,7 @@ const todayDayNumber = laDayNumberFromInstant(startTodayUtc) ?? 0;
 
 function closeoutNeedsForException(j: any) {
   const ops = String(j?.ops_status ?? "").toLowerCase();
-  const needs = getCloseoutNeeds(j);
+  const needs = getCloseoutNeeds(getCloseoutProjection(j));
   if (needs.isBlockedForCloseout) {
     return {
       needsInvoice: false,
@@ -1447,7 +1468,7 @@ const sortedExceptionJobs = sortJobs(
 );
 
 function closeoutLabel(j: any) {
-  const needs = getCloseoutNeeds(j);
+  const needs = getCloseoutNeeds(getCloseoutProjection(j));
   if (needs.needsInvoice && needs.needsCerts) return "Working closeout — invoice + certs required";
   if (needs.needsInvoice) return "Working closeout — invoice required";
   if (needs.needsCerts) return "Working closeout — certs required";
@@ -1456,7 +1477,7 @@ function closeoutLabel(j: any) {
 
 const closeoutJobs = sortJobs(
   (closeoutSourceJobs ?? []).filter((j: any) => {
-    return isInCloseoutQueue(j);
+    return isInCloseoutQueue(getCloseoutProjection(j));
   }),
   sort
 );
@@ -2127,17 +2148,21 @@ return (
       </div>
     </section>
 
-    <section className={`rounded-2xl border p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-3.5 ${hasActiveSystemAlerts || signal ? "border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))]" : "border-slate-300/75 bg-slate-50/75"}`}>
+    <section id="system-alerts" className={`rounded-2xl border p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-3.5 ${hasActiveSystemAlerts || signal ? "border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))]" : "border-slate-300/75 bg-slate-50/75"}`}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className={`${opsUtilityLabelClass} text-blue-700`}>Contractor-driven</div>
           <div className="text-[15px] font-semibold tracking-tight text-slate-950">System Alerts</div>
-        </div>
-        {!hasActiveSystemAlerts && !signal ? null : (
-          <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-blue-700 sm:text-[11px]">
-            Active alerts
+          <div className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">
+            Awareness routes to Notifications for acknowledgment. Ops queues remain the place to take action.
           </div>
-        )}
+        </div>
+        <Link
+          href="/ops/notifications?state=unread"
+          className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300"
+        >
+          Review notifications
+        </Link>
       </div>
       {visibleSignalCards.length === 0 && !signal
         ? quietSectionEmptyState("No active contractor-driven alerts right now.")
@@ -2145,25 +2170,29 @@ return (
           <div className="flex flex-wrap gap-1.5">
             {visibleSignalCards.map((card) => {
               const isActive = signal === card.key;
-              return (
-                <Link
-                  key={card.key}
-                  href={`/ops${buildQueryString({
+              const cardHref = card.key === "contractor_updates"
+                ? "/ops/notifications?view=contractor_updates&state=unread"
+                : `/ops${buildQueryString({
                     bucket: card.bucket,
                     contractor: contractor ?? "",
                     q: q ?? "",
                     sort: sort ?? "",
                     signal: card.key,
-                  })}#ops-queues`}
+                  })}#ops-queues`;
+              return (
+                <Link
+                  key={card.key}
+                  href={cardHref}
                   className={[
                     opsQueueChipClass,
-                    isActive
+                    card.key !== "contractor_updates" && isActive
                       ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
                       : `${signalToneClass(card.key)} hover:bg-white`,
                   ].join(" ")}
+                  title={card.key === "contractor_updates" ? "Open unread contractor-driven notifications" : undefined}
                 >
                   <span>{card.label}</span>
-                  <span className={`font-semibold tabular-nums ${isActive ? "text-slate-200" : "text-current/80"}`}>{card.count}</span>
+                  <span className={`font-semibold tabular-nums ${card.key !== "contractor_updates" && isActive ? "text-slate-200" : "text-current/80"}`}>{card.count}</span>
                 </Link>
               );
             })}

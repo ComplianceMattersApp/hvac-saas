@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import { NotificationRowForUI } from "@/lib/actions/notification-read-actions";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 
 type NotificationListClientProps = {
-  initialNotifications: NotificationRowForUI[];
-  onMarkAsRead: (input: { notificationId: string }) => Promise<void>;
+  notifications: NotificationRowForUI[];
+  pendingReadId?: string | null;
+  onMarkAsRead: (notificationId: string) => Promise<void>;
 };
 
 function notificationTypeLabel(value?: string | null) {
@@ -31,31 +31,10 @@ function notificationTypeLabel(value?: string | null) {
 }
 
 export function NotificationListClient({
-  initialNotifications,
+  notifications,
+  pendingReadId = null,
   onMarkAsRead,
 }: NotificationListClientProps) {
-  const [notifications, setNotifications] =
-    useState<NotificationRowForUI[]>(initialNotifications);
-  const [pendingReadId, setPendingReadId] = useState<string | null>(null);
-
-  const handleMarkAsRead = async (notificationId: string) => {
-    setPendingReadId(notificationId);
-    try {
-      await onMarkAsRead({ notificationId: notificationId });
-      setNotifications(prevNotifs =>
-        prevNotifs.map(n =>
-          n.id === notificationId
-            ? { ...n, read_at: new Date().toISOString(), is_unread: false }
-            : n
-        )
-      );
-    } catch (error) {
-      console.error("Failed to mark notification as read:", error);
-    } finally {
-      setPendingReadId(null);
-    }
-  };
-
   if (notifications.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
@@ -117,7 +96,7 @@ export function NotificationListClient({
             <div className="flex flex-shrink-0 items-center gap-2">
               {notif.is_unread && (
                 <button
-                  onClick={() => handleMarkAsRead(notif.id)}
+                  onClick={() => void onMarkAsRead(notif.id)}
                   disabled={pendingReadId === notif.id}
                   className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
                   title="Mark as read"

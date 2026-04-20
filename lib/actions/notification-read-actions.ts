@@ -1,7 +1,12 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireInternalUser } from "@/lib/auth/internal-user";
+import {
+  matchesInternalNotificationFilter,
+  type InternalNotificationFilterKey,
+} from "@/lib/notifications/internal-awareness";
 
 type NotificationRow = {
   id: string;
@@ -148,6 +153,7 @@ async function filterPendingProposalVisibilityRows(
 export async function listInternalNotifications(params: {
   limit?: number;
   onlyUnread?: boolean;
+  filterKey?: InternalNotificationFilterKey | null;
 } = {}): Promise<NotificationRowForUI[]> {
   // Ensure internal user access
   await requireInternalUser();
@@ -192,7 +198,11 @@ export async function listInternalNotifications(params: {
     awarenessRows
   );
 
-  const visibilityRows = dedupeProposalVisibilityRows(pendingProposalRows).slice(0, limit);
+  const filteredRows = pendingProposalRows.filter((row) =>
+    matchesInternalNotificationFilter(row.notification_type, params.filterKey)
+  );
+
+  const visibilityRows = dedupeProposalVisibilityRows(filteredRows).slice(0, limit);
 
   return visibilityRows.map(row => ({
     ...row,
@@ -217,6 +227,10 @@ export async function markNotificationAsRead(input: {
     .eq("recipient_type", "internal");
 
   if (error) throw error;
+
+  revalidatePath("/ops");
+  revalidatePath("/ops/notifications");
+  revalidatePath("/", "layout");
 }
 
 export async function markAllNotificationsAsRead(): Promise<void> {
@@ -232,6 +246,10 @@ export async function markAllNotificationsAsRead(): Promise<void> {
     .is("read_at", null);
 
   if (error) throw error;
+
+  revalidatePath("/ops");
+  revalidatePath("/ops/notifications");
+  revalidatePath("/", "layout");
 }
 
 export async function getInternalUnreadNotificationCount(): Promise<number> {

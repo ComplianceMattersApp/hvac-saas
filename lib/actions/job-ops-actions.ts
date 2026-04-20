@@ -748,7 +748,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
     .select(
-      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end"
+      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end, data_entry_completed_at"
     )
     .eq("id", jobId)
     .single();
@@ -881,7 +881,7 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
     .select(
-      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end"
+      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end, data_entry_completed_at"
     )
     .eq("id", jobId)
     .single();
@@ -892,18 +892,27 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
     redirect(`/jobs/${jobId}?notice=field_not_complete`);
   }
 
-// Mark invoice complete and verify update
+  const completedAt = job.data_entry_completed_at ?? new Date().toISOString();
+
+// Mark invoice complete and stamp closeout metadata consistently.
 const { data: updatedInvoiceRow, error: updErr } = await supabase
   .from("jobs")
-  .update({ invoice_complete: true })
+  .update({
+    invoice_complete: true,
+    ...(job.data_entry_completed_at ? {} : { data_entry_completed_at: completedAt }),
+  })
   .eq("id", jobId)
-  .select("id, invoice_complete")
+  .select("id, invoice_complete, data_entry_completed_at")
   .maybeSingle();
 
 if (updErr) throw updErr;
 
 if (!updatedInvoiceRow?.id || updatedInvoiceRow.invoice_complete !== true) {
   throw new Error("Invoice complete update failed (no row updated).");
+}
+
+if (!job.data_entry_completed_at && updatedInvoiceRow.data_entry_completed_at !== completedAt) {
+  throw new Error("Data entry completion update failed (timestamp missing).");
 }
 
   let nextOps = resolveOpsStatus({
@@ -961,6 +970,9 @@ if (!updatedInvoiceRow?.id || updatedInvoiceRow.invoice_complete !== true) {
     meta: {
       changes: [
         { field: "invoice_complete", from: !!job.invoice_complete, to: true },
+        ...(job.data_entry_completed_at
+          ? []
+          : [{ field: "data_entry_completed_at", from: job.data_entry_completed_at ?? null, to: completedAt }]),
         { field: "ops_status", from: job.ops_status ?? null, to: nextOps },
       ],
     },

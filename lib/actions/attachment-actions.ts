@@ -351,7 +351,6 @@ export async function finalizePortalAttachmentSubmission(input: {
   attachmentIds?: string[];
 }) {
   const supabase = await createClient();
-  const notificationAdmin = createAdminClient();
 
   const {
     data: { user },
@@ -434,7 +433,7 @@ export async function finalizePortalAttachmentSubmission(input: {
     }
 
     await insertInternalNotificationForEvent({
-      supabase: notificationAdmin,
+      supabase,
       jobId: input.jobId,
       eventType: "contractor_correction_submission",
       actorUserId: user.id,
@@ -458,7 +457,7 @@ export async function finalizePortalAttachmentSubmission(input: {
   if (noteErr) throw noteErr;
 
   await insertInternalNotificationForEvent({
-    supabase: notificationAdmin,
+    supabase,
     jobId: input.jobId,
     eventType: "contractor_note",
     actorUserId: user.id,
