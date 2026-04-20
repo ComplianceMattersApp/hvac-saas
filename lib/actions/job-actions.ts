@@ -21,6 +21,7 @@ import {
 } from "@/lib/business/internal-business-profile";
 import { renderSystemEmailLayout, escapeHtml, resolveAppUrl } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
+import { resolveNotificationAccountOwnerUserId } from "@/lib/notifications/account-owner";
 import { assertAssignableInternalUser } from "@/lib/staffing/human-layer";
 import { getThresholdRuleForTest } from "@/lib/ecc/rule-profiles";
 import type { JobStatus } from "@/lib/types/job";
@@ -626,6 +627,14 @@ async function insertOperationalEmailDeliveryNotification(input: {
   sentAt?: string | null;
   errorDetail?: string | null;
 }): Promise<{ id: string }> {
+  const accountOwnerUserId = await resolveNotificationAccountOwnerUserId({
+    jobId: input.jobId,
+  });
+
+  if (!accountOwnerUserId) {
+    throw new Error(`Unable to resolve notification account owner for job ${input.jobId}`);
+  }
+
   const payload: Record<string, unknown> = {
     source: "operational_email",
     dedupe_key: input.dedupeKey,
@@ -645,6 +654,7 @@ async function insertOperationalEmailDeliveryNotification(input: {
       recipient_ref: String(input.recipientRef ?? "").trim() || null,
       channel: "email",
       notification_type: input.notificationType,
+      account_owner_user_id: accountOwnerUserId,
       subject: input.subject,
       body: input.body,
       payload,
@@ -1056,6 +1066,7 @@ async function sendInternalContractorIntakeProposalAlertEmail(params: {
     .from("notifications")
     .insert({
       job_id: null,
+      account_owner_user_id: accountOwnerUserId,
       recipient_type: "internal",
       recipient_ref: null,
       channel: "email",
@@ -6306,6 +6317,7 @@ function canContractorWriteEvent(event_type: string) {
       try {
         await proposalWriteClient.from("notifications").insert({
           job_id: null,
+          account_owner_user_id: proposalOwnerUserId,
           recipient_type: "internal",
           recipient_ref: null,
           channel: "in_app",
