@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
+import { resolveNotificationAccountOwnerUserId } from "@/lib/notifications/account-owner";
 
 export type NotificationTriggerEventType =
   | "contractor_report_sent"
@@ -67,6 +68,13 @@ export async function insertInternalNotificationForEvent(
   if (!isInternalAwarenessEventType(input.eventType)) return;
 
   const actorUserId = String(input.actorUserId ?? "").trim() || null;
+  const accountOwnerUserId = await resolveNotificationAccountOwnerUserId({
+    jobId,
+  });
+
+  if (!accountOwnerUserId) {
+    throw new Error(`Unable to resolve notification account owner for job ${jobId}`);
+  }
 
   const payload: Record<string, unknown> = {
     event_type: input.eventType,
@@ -83,6 +91,7 @@ export async function insertInternalNotificationForEvent(
     notification_type: input.eventType,
     subject: EVENT_TO_SUBJECT[input.eventType],
     body: EVENT_TO_BODY[input.eventType],
+    account_owner_user_id: accountOwnerUserId,
     payload,
     status: "queued",
   };

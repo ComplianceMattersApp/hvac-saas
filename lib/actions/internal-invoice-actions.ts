@@ -19,6 +19,7 @@ import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from '@/lib/actions
 import { insertJobEvent } from '@/lib/actions/job-actions';
 import { renderSystemEmailLayout, escapeHtml } from '@/lib/email/layout';
 import { sendEmail } from '@/lib/email/sendEmail';
+import { resolveNotificationAccountOwnerUserId } from '@/lib/notifications/account-owner';
 
 function getTrimmedString(value: FormDataEntryValue | null | undefined) {
   return String(value ?? '').trim();
@@ -394,6 +395,14 @@ async function insertInternalInvoiceEmailNotification(params: {
   status: InternalInvoiceEmailDeliveryStatus;
   errorDetail?: string | null;
 }) {
+  const accountOwnerUserId = await resolveNotificationAccountOwnerUserId({
+    jobId: params.jobId,
+  });
+
+  if (!accountOwnerUserId) {
+    throw new Error(`Unable to resolve notification account owner for job ${params.jobId}`);
+  }
+
   const payload: Record<string, unknown> = {
     source: 'internal_invoice_email',
     invoice_id: params.invoiceId,
@@ -410,6 +419,7 @@ async function insertInternalInvoiceEmailNotification(params: {
     .from('notifications')
     .insert({
       job_id: params.jobId,
+      account_owner_user_id: accountOwnerUserId,
       recipient_type: 'customer',
       recipient_ref: null,
       channel: 'email',
