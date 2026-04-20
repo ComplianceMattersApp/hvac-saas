@@ -17,8 +17,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  let internalUser: Awaited<ReturnType<typeof requireInternalUser>>["internalUser"];
   try {
-    await requireInternalUser({ supabase, userId: user.id });
+    ({ internalUser } = await requireInternalUser({ supabase, userId: user.id }));
   } catch (error) {
     if (isInternalAccessError(error)) {
       const { data: contractorUser, error: contractorError } = await supabase
@@ -37,7 +38,11 @@ export async function GET(request: NextRequest) {
   }
 
   const filters = parseReportCenterKpiFilters(request.nextUrl.searchParams);
-  const dashboard = await buildReportCenterDashboardReadModel({ supabase, filters });
+  const dashboard = await buildReportCenterDashboardReadModel({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    filters,
+  });
   const today = new Date().toISOString().slice(0, 10);
   const csv = `\uFEFF${buildDashboardTechWorkloadCsv(dashboard.techWorkload.rows)}`;
 

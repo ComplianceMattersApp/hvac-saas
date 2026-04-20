@@ -209,7 +209,11 @@ export default async function ReportCenterKpiPage({
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
-  const [operational, continuity] = await listReportCenterKpiFamilies({ supabase, filters });
+  const [operational, continuity] = await listReportCenterKpiFamilies({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    filters,
+  });
 
   const resetHref = "/reports/kpis";
   const shareHref = `/reports/kpis?${buildReportCenterKpiSearchParams(filters).toString()}`;
