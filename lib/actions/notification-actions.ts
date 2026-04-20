@@ -1,5 +1,4 @@
 import { revalidatePath } from "next/cache";
-import { createAdminClient } from "@/lib/supabase/server";
 import { resolveNotificationAccountOwnerUserId } from "@/lib/notifications/account-owner";
 
 export type NotificationTriggerEventType =
@@ -60,6 +59,59 @@ function isInternalAwarenessEventType(value: NotificationTriggerEventType): bool
   return value !== "contractor_report_sent";
 }
 
+type InsertInternalAwarenessNotificationInput = {
+  supabase: any;
+  jobId?: string | null;
+  contractorIntakeSubmissionId?: string | null;
+  accountOwnerUserId: string;
+  actorUserId: string;
+  notificationType: string;
+  subject: string;
+  body: string;
+  payload?: Record<string, unknown>;
+};
+
+export async function insertInternalAwarenessNotification(
+  input: InsertInternalAwarenessNotificationInput,
+): Promise<string> {
+  const accountOwnerUserId = String(input.accountOwnerUserId ?? "").trim();
+  const actorUserId = String(input.actorUserId ?? "").trim();
+  const jobId = String(input.jobId ?? "").trim() || null;
+  const contractorIntakeSubmissionId =
+    String(input.contractorIntakeSubmissionId ?? "").trim() || null;
+  const notificationType = String(input.notificationType ?? "").trim();
+  const subject = String(input.subject ?? "").trim();
+  const body = String(input.body ?? "").trim();
+
+  if (!accountOwnerUserId) throw new Error("Missing accountOwnerUserId for internal notification");
+  if (!actorUserId) throw new Error("Missing actorUserId for internal notification");
+  if (!notificationType) throw new Error("Missing notificationType for internal notification");
+  if ((jobId && contractorIntakeSubmissionId) || (!jobId && !contractorIntakeSubmissionId)) {
+    throw new Error("Internal notification requires exactly one scope reference");
+  }
+
+  const { data, error } = await input.supabase.rpc("insert_internal_notification", {
+    p_job_id: jobId,
+    p_submission_id: contractorIntakeSubmissionId,
+    p_account_owner_user_id: accountOwnerUserId,
+    p_actor_user_id: actorUserId,
+    p_notification_type: notificationType,
+    p_subject: subject,
+    p_body: body,
+    p_payload: input.payload ?? {},
+  });
+
+  if (error) throw error;
+
+  const notificationId = String(data ?? "").trim();
+  if (!notificationId) {
+    throw new Error("Failed to create internal notification row");
+  }
+
+  revalidatePath("/", "layout");
+  return notificationId;
+}
+
 export async function insertInternalNotificationForEvent(
   input: InsertInternalNotificationForEventInput
 ): Promise<void> {
@@ -68,6 +120,10 @@ export async function insertInternalNotificationForEvent(
   if (!isInternalAwarenessEventType(input.eventType)) return;
 
   const actorUserId = String(input.actorUserId ?? "").trim() || null;
+  if (!actorUserId) {
+    throw new Error(`Missing actor user for internal notification event ${input.eventType}`);
+  }
+
   const accountOwnerUserId = await resolveNotificationAccountOwnerUserId({
     jobId,
   });
@@ -83,34 +139,16 @@ export async function insertInternalNotificationForEvent(
 
   if (actorUserId) payload.actor_user_id = actorUserId;
 
-  const row = {
-    job_id: jobId,
-    recipient_type: "internal",
-    recipient_ref: null,
-    channel: "in_app",
-    notification_type: input.eventType,
+  await insertInternalAwarenessNotification({
+    supabase: input.supabase,
+    jobId,
+    accountOwnerUserId,
+    actorUserId,
+    notificationType: input.eventType,
     subject: EVENT_TO_SUBJECT[input.eventType],
     body: EVENT_TO_BODY[input.eventType],
-    account_owner_user_id: accountOwnerUserId,
     payload,
-    status: "queued",
-  };
-
-  const { error } = await input.supabase.from("notifications").insert(row);
-
-  // Contractor-scoped clients cannot satisfy internal-user notifications RLS.
-  // Fall back to service-role write while keeping caller auth checks in place.
-  if ((error as any)?.code === "42501") {
-    const admin = createAdminClient();
-    const { error: adminError } = await admin.from("notifications").insert(row);
-    if (adminError) throw adminError;
-    revalidatePath("/", "layout");
-    return;
-  }
-
-  if (error) throw error;
-
-  revalidatePath("/", "layout");
+  });
 }
 
 export async function findExistingContractorReportEmailDelivery(

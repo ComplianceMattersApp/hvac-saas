@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
   });
   const ledger = await listCloseoutFollowUpLedgerRows({
     supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
     filters,
     internalBusinessDisplayName: internalBusinessIdentity.display_name,
     limit: CLOSEOUT_FOLLOW_UP_LEDGER_EXPORT_LIMIT,

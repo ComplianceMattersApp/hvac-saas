@@ -1,4 +1,5 @@
-import { isInCloseoutQueue } from "@/lib/utils/closeout";
+import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
+import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import {
   type ReportCenterKpiBucket,
   type ReportCenterKpiFamilyReadModel,
@@ -36,6 +37,7 @@ function daysSince(value?: string | null) {
 
 export async function buildOperationalKpiReadModel(params: {
   supabase: any;
+  accountOwnerUserId: string;
   filters: ReportCenterKpiFilters;
   buckets: ReportCenterKpiBucket[];
 }): Promise<ReportCenterKpiFamilyReadModel> {
@@ -48,6 +50,18 @@ export async function buildOperationalKpiReadModel(params: {
   if (error) throw error;
 
   const jobs = (data ?? []) as OperationalKpiJob[];
+  const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
+    supabase: params.supabase,
+    accountOwnerUserId: params.accountOwnerUserId,
+    jobs: jobs.map((job) => ({
+      id: job.id,
+      field_complete: job.field_complete,
+      job_type: job.job_type,
+      ops_status: job.ops_status,
+      invoice_complete: job.invoice_complete,
+      certs_complete: job.certs_complete,
+    })),
+  });
   const activeJobs = jobs.filter(
     (job) =>
       String(job.status ?? "").trim().toLowerCase() !== "cancelled" &&
@@ -103,11 +117,11 @@ export async function buildOperationalKpiReadModel(params: {
     (job) => String(job.ops_status ?? "").trim().toLowerCase() === "paperwork_required",
   ).length;
   const invoiceRequiredBacklog = activeJobs.filter(
-    (job) => String(job.ops_status ?? "").trim().toLowerCase() === "invoice_required",
+    (job) => getCloseoutNeeds(projectionsByJobId.get(job.id) ?? job).needsInvoice,
   ).length;
-  const closeoutBacklog = activeJobs.filter((job) => isInCloseoutQueue(job)).length;
+  const closeoutBacklog = activeJobs.filter((job) => isInCloseoutQueue(projectionsByJobId.get(job.id) ?? job)).length;
   const closeoutAgedSevenPlus = activeJobs.filter((job) => {
-    if (!isInCloseoutQueue(job)) return false;
+    if (!isInCloseoutQueue(projectionsByJobId.get(job.id) ?? job)) return false;
     const ageDays = daysSince(job.field_complete_at);
     return ageDays != null && ageDays >= 7;
   }).length;
@@ -116,7 +130,7 @@ export async function buildOperationalKpiReadModel(params: {
     familyKey: "operational",
     familyLabel: "Operational KPIs",
     familyDescription: "Visit-owned workload and throughput summaries derived from current jobs truth and operational projection fields.",
-    sourceSummary: "Sources: jobs, jobs.ops_status, field_complete_at, invoice_complete, certs_complete, closeout projection helper.",
+    sourceSummary: "Sources: jobs, jobs.ops_status, field_complete_at, certs_complete, billing-mode closeout projection helper, and internal_invoices where internal invoicing is active.",
     metrics: [
       {
         key: "active_open_visits",
@@ -210,9 +224,9 @@ export async function buildOperationalKpiReadModel(params: {
         priority: "secondary",
         dashboardRole: "Operational closeout follow-up",
         priorityReason: "This is useful for office follow-up, but it should sit beneath the broader closeout queue to avoid over-weighting invoice language.",
-        source: "jobs.ops_status",
+        source: "jobs plus billing-mode closeout projection helper and internal_invoices where internal invoicing is active",
         bucketRule: "Current snapshot only.",
-        derivation: "Count active visits where jobs.ops_status = invoice_required. This remains operational projection only.",
+        derivation: "Count active visits where billing-aware getCloseoutNeeds(...) still requires invoice follow-up. External billing preserves the lightweight job projection; internal invoicing respects issued invoice billed truth.",
       },
     ],
     bucketColumns: OPERATIONAL_BUCKET_METRICS.map((metric) => ({ key: metric.key, label: metric.label })),

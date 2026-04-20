@@ -1,3 +1,4 @@
+import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import {
   getActiveJobAssignmentDisplayMap,
   getAssignableInternalUsers,
@@ -245,7 +246,13 @@ async function resolveAssignedJobIds(params: {
   );
 }
 
-function applyLedgerFilters(query: any, filters: CloseoutFollowUpLedgerFilters, assignedJobIds: string[] | null) {
+function applyLedgerFilters(
+  query: any,
+  filters: CloseoutFollowUpLedgerFilters,
+  assignedJobIds: string[] | null,
+  options?: { allowRawInvoiceProjectionFilters?: boolean },
+) {
+  const allowRawInvoiceProjectionFilters = options?.allowRawInvoiceProjectionFilters !== false;
   query = query.eq("field_complete", true);
 
   if (filters.scope === "active") {
@@ -273,11 +280,11 @@ function applyLedgerFilters(query: any, filters: CloseoutFollowUpLedgerFilters, 
       .not("ops_status", "in", CERT_BLOCKED_STATUSES);
   }
 
-  if (filters.invoiceOnly) {
+  if (filters.invoiceOnly && allowRawInvoiceProjectionFilters) {
     query = query.eq("invoice_complete", false);
   }
 
-  if (filters.closeoutOnly) {
+  if (filters.closeoutOnly && allowRawInvoiceProjectionFilters) {
     query = query
       .not("ops_status", "in", CLOSEOUT_EXCLUDED_STATUSES)
       .or("invoice_complete.eq.false,and(job_type.eq.ecc,certs_complete.eq.false)");
@@ -390,6 +397,7 @@ export async function getCloseoutFollowUpLedgerFilterOptions(params: {
 
 export async function listCloseoutFollowUpLedgerRows(params: {
   supabase: any;
+  accountOwnerUserId: string;
   filters: CloseoutFollowUpLedgerFilters;
   internalBusinessDisplayName: string;
   limit?: number;
@@ -405,20 +413,60 @@ export async function listCloseoutFollowUpLedgerRows(params: {
     return { rows: [], totalCount: 0, truncated: false };
   }
 
+  const { billingMode } = await buildBillingTruthCloseoutProjectionMap({
+    supabase: params.supabase,
+    accountOwnerUserId: params.accountOwnerUserId,
+    jobs: [],
+  });
+  const requiresNormalizedCloseoutFiltering =
+    billingMode === "internal_invoicing" &&
+    (params.filters.invoiceOnly || params.filters.closeoutOnly);
+
   let query = params.supabase
     .from("jobs")
     .select(JOB_BASE_SELECT, params.includeCount === false ? undefined : { count: "exact" })
     .is("deleted_at", null);
 
-  query = applyLedgerFilters(query, params.filters, assignedJobIds);
-  query = query.limit(limit);
+  query = applyLedgerFilters(query, params.filters, assignedJobIds, {
+    allowRawInvoiceProjectionFilters: !requiresNormalizedCloseoutFiltering,
+  });
+
+  if (!requiresNormalizedCloseoutFiltering) {
+    query = query.limit(limit);
+  }
 
   const { data, error, count } = await query;
   if (error) throw error;
 
   const jobs = data ?? [];
-  const customerIds = Array.from(new Set(jobs.map((job: any) => String(job?.customer_id ?? "").trim()).filter(Boolean)));
-  const locationIds = Array.from(new Set(jobs.map((job: any) => String(job?.location_id ?? "").trim()).filter(Boolean)));
+  const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
+    supabase: params.supabase,
+    accountOwnerUserId: params.accountOwnerUserId,
+    jobs: jobs.map((job: any) => ({
+      id: String(job?.id ?? "").trim(),
+      field_complete: job?.field_complete,
+      job_type: job?.job_type,
+      ops_status: job?.ops_status,
+      invoice_complete: job?.invoice_complete,
+      certs_complete: job?.certs_complete,
+    })),
+  });
+  const filteredJobs = jobs.filter((job: any) => {
+    const projection = projectionsByJobId.get(String(job?.id ?? "").trim()) ?? job;
+
+    if (params.filters.invoiceOnly && !getCloseoutNeeds(projection).needsInvoice) {
+      return false;
+    }
+
+    if (params.filters.closeoutOnly && !isInCloseoutQueue(projection)) {
+      return false;
+    }
+
+    return true;
+  });
+  const visibleJobs = requiresNormalizedCloseoutFiltering ? filteredJobs.slice(0, limit) : filteredJobs;
+  const customerIds = Array.from(new Set(visibleJobs.map((job: any) => String(job?.customer_id ?? "").trim()).filter(Boolean)));
+  const locationIds = Array.from(new Set(visibleJobs.map((job: any) => String(job?.location_id ?? "").trim()).filter(Boolean)));
 
   const [customerResult, locationResult, assignmentMap] = await Promise.all([
     customerIds.length
@@ -429,7 +477,7 @@ export async function listCloseoutFollowUpLedgerRows(params: {
       : Promise.resolve({ data: [] as any[], error: null }),
     getActiveJobAssignmentDisplayMap({
       supabase: params.supabase,
-      jobIds: jobs.map((job: any) => String(job?.id ?? "")).filter(Boolean),
+      jobIds: visibleJobs.map((job: any) => String(job?.id ?? "")).filter(Boolean),
     }),
   ]);
 
@@ -439,7 +487,7 @@ export async function listCloseoutFollowUpLedgerRows(params: {
   const customersById = new Map<string, LedgerCustomerRow>((customerResult.data ?? []).map((row: any) => [String(row?.id ?? ""), row as LedgerCustomerRow]));
   const locationsById = new Map<string, LedgerLocationRow>((locationResult.data ?? []).map((row: any) => [String(row?.id ?? ""), row as LedgerLocationRow]));
 
-  const rows: CloseoutFollowUpLedgerRow[] = jobs.map((job: any) => {
+  const rows: CloseoutFollowUpLedgerRow[] = visibleJobs.map((job: any) => {
     const jobId = String(job?.id ?? "");
     const customer = customersById.get(String(job?.customer_id ?? ""));
     const location = locationsById.get(String(job?.location_id ?? ""));
@@ -465,7 +513,8 @@ export async function listCloseoutFollowUpLedgerRows(params: {
         .join(" • ") || "-";
     const contractorDisplay = String(job?.contractors?.name ?? "").trim() || params.internalBusinessDisplayName;
     const primaryAssigneeDisplay = assignmentMap[jobId]?.[0]?.display_name ?? "-";
-    const closeoutNeeds = getCloseoutNeeds(job);
+    const closeoutProjection = projectionsByJobId.get(jobId) ?? job;
+    const closeoutNeeds = getCloseoutNeeds(closeoutProjection);
 
     return {
       jobId,
@@ -488,12 +537,16 @@ export async function listCloseoutFollowUpLedgerRows(params: {
       nextActionPreview: truncateText(job?.next_action_note) || "-",
       paperworkRequired: closeoutNeeds.needsCerts,
       invoiceRequired: closeoutNeeds.needsInvoice,
-      closeoutQueue: isInCloseoutQueue(job),
+      closeoutQueue: isInCloseoutQueue(closeoutProjection),
       agingDays: getAgingDays(job?.field_complete_at),
     };
   });
 
-  const totalCount = params.includeCount === false ? rows.length : Number(count ?? rows.length);
+  const totalCount = requiresNormalizedCloseoutFiltering
+    ? filteredJobs.length
+    : params.includeCount === false
+      ? rows.length
+      : Number(count ?? rows.length);
   return {
     rows,
     totalCount,

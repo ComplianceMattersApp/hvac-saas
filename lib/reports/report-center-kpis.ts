@@ -8,6 +8,7 @@ import { buildContinuityKpiReadModel } from "@/lib/reports/continuity-kpis";
 
 export async function listReportCenterKpiFamilies(params: {
   supabase: any;
+  accountOwnerUserId: string;
   filters: ReportCenterKpiFilters;
 }): Promise<ReportCenterKpiFamilyReadModel[]> {
   const buckets = buildReportCenterKpiBuckets(params.filters);
@@ -15,6 +16,7 @@ export async function listReportCenterKpiFamilies(params: {
   const [operational, continuity] = await Promise.all([
     buildOperationalKpiReadModel({
       supabase: params.supabase,
+      accountOwnerUserId: params.accountOwnerUserId,
       filters: params.filters,
       buckets,
     }),

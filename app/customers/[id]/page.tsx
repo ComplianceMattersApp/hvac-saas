@@ -1,7 +1,7 @@
 // app/customers/[id]/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import {
   resolveCustomerVisibilityScope,
 } from "@/lib/customers/visibility";
@@ -249,7 +249,6 @@ export default async function CustomerDetailPage(props: {
   searchParams?: Promise<{ err?: string }>;
 }) {
   const supabase = await createClient();
-  const admin = createAdminClient();
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
@@ -291,81 +290,40 @@ export default async function CustomerDetailPage(props: {
   let customerData: CustomerRow | null = null;
   let jobs: JobRow[] = [];
 
-  if (isInternalViewer) {
-    const { data, error: customerErr } = await admin
-      .from("customers")
-      .select(customerSelect)
-      .eq("id", customerId)
-      .eq("owner_user_id", visibilityScope.accountOwnerUserId)
-      .maybeSingle();
+  const { data, error: customerErr } = await supabase
+    .from("customers")
+    .select(customerSelect)
+    .eq("id", customerId)
+    .maybeSingle();
 
-    if (customerErr) throw customerErr;
-    customerData = (data as CustomerRow | null) ?? null;
+  if (customerErr) throw customerErr;
+  customerData = (data as CustomerRow | null) ?? null;
 
-    const { data: jobsData, error: jobsErr } = await admin
-      .from("jobs")
-      .select(
-        `
-        id,
-        title,
-        status,
-        job_address,
-        city,
-        scheduled_date,
-        created_at,
-        ops_status,
-        contractor_id,
-        service_case_id,
-        parent_job_id,
-        location_id,
-        deleted_at
-        `,
-      )
-      .eq("customer_id", customerId)
-      .order("scheduled_date", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false });
+  const { data: jobsData, error: jobsErr } = await supabase
+    .from("jobs")
+    .select(
+      `
+      id,
+      title,
+      status,
+      job_address,
+      city,
+      scheduled_date,
+      created_at,
+      ops_status,
+      contractor_id,
+      service_case_id,
+      parent_job_id,
+      location_id,
+      deleted_at
+      `,
+    )
+    .eq("customer_id", customerId)
+    .order("scheduled_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
 
-    if (jobsErr) throw jobsErr;
-    jobs = (jobsData ?? []) as JobRow[];
-  } else {
-    const { data: jobsData, error: jobsErr } = await admin
-      .from("jobs")
-      .select(
-        `
-        id,
-        title,
-        status,
-        job_address,
-        city,
-        scheduled_date,
-        created_at,
-        ops_status,
-        contractor_id,
-        service_case_id,
-        parent_job_id,
-        location_id,
-        deleted_at
-        `,
-      )
-      .eq("customer_id", customerId)
-      .eq("contractor_id", visibilityScope.contractorId)
-      .order("scheduled_date", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false });
-
-    if (jobsErr) throw jobsErr;
-    jobs = (jobsData ?? []) as JobRow[];
-
-    if (jobs.length > 0) {
-      const { data, error: customerErr } = await admin
-        .from("customers")
-        .select(customerSelect)
-        .eq("id", customerId)
-        .maybeSingle();
-
-      if (customerErr) throw customerErr;
-      customerData = (data as CustomerRow | null) ?? null;
-    }
-  }
+  if (jobsErr) throw jobsErr;
+  jobs = (jobsData ?? []) as JobRow[];
 
   if (!customerData) {
     return (
@@ -385,61 +343,27 @@ export default async function CustomerDetailPage(props: {
 
   let locationsData: LocationRow[] = [];
 
-  if (isInternalViewer) {
-    const { data, error: locationsErr } = await admin
-      .from("locations")
-      .select(
-        `
-        id,
-        customer_id,
-        nickname,
-        label,
-        address_line1,
-        address_line2,
-        city,
-        state,
-        zip,
-        postal_code
-      `,
-      )
-      .eq("customer_id", customerId)
-      .order("created_at", { ascending: true });
+  const { data: locationRows, error: locationsErr } = await supabase
+    .from("locations")
+    .select(
+      `
+      id,
+      customer_id,
+      nickname,
+      label,
+      address_line1,
+      address_line2,
+      city,
+      state,
+      zip,
+      postal_code
+    `,
+    )
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: true });
 
-    if (locationsErr) throw locationsErr;
-    locationsData = (data ?? []) as LocationRow[];
-  } else {
-    const visibleLocationIds = Array.from(
-      new Set(
-        jobs
-          .map((job) => String(job.location_id ?? "").trim())
-          .filter(Boolean),
-      ),
-    );
-
-    if (visibleLocationIds.length > 0) {
-      const { data, error: locationsErr } = await admin
-        .from("locations")
-        .select(
-          `
-          id,
-          customer_id,
-          nickname,
-          label,
-          address_line1,
-          address_line2,
-          city,
-          state,
-          zip,
-          postal_code
-        `,
-        )
-        .in("id", visibleLocationIds)
-        .order("created_at", { ascending: true });
-
-      if (locationsErr) throw locationsErr;
-      locationsData = (data ?? []) as LocationRow[];
-    }
-  }
+  if (locationsErr) throw locationsErr;
+  locationsData = (locationRows ?? []) as LocationRow[];
 
   const locations = (locationsData ?? []) as LocationRow[];
   const firstLocationWithAddress = locations.find((loc) => locationAddressLine(loc).trim().length > 0) ?? null;
@@ -457,16 +381,10 @@ export default async function CustomerDetailPage(props: {
 
   const serviceCaseVisitCounts = new Map<string, number>();
   if (serviceCaseIds.length > 0) {
-    let serviceCaseQuery = admin
+    const { data: serviceCaseJobs, error: scErr } = await supabase
       .from("jobs")
       .select("service_case_id")
       .in("service_case_id", serviceCaseIds);
-
-    if (!isInternalViewer) {
-      serviceCaseQuery = serviceCaseQuery.eq("contractor_id", visibilityScope.contractorId);
-    }
-
-    const { data: serviceCaseJobs, error: scErr } = await serviceCaseQuery;
 
     if (scErr) throw scErr;
 
@@ -484,18 +402,12 @@ export default async function CustomerDetailPage(props: {
 
   const resolvedRetestParentIds = new Set<string>();
   if (failedJobIds.length > 0) {
-    let retestQuery = admin
+    const { data: retestChildren, error: retestErr } = await supabase
       .from("jobs")
       .select("parent_job_id")
       .in("parent_job_id", failedJobIds)
       .in("ops_status", ["paperwork_required", "invoice_required", "closed"])
       .is("deleted_at", null);
-
-    if (!isInternalViewer) {
-      retestQuery = retestQuery.eq("contractor_id", visibilityScope.contractorId);
-    }
-
-    const { data: retestChildren, error: retestErr } = await retestQuery;
 
     if (retestErr) throw retestErr;
 

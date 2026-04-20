@@ -1,4 +1,4 @@
-import { isInCloseoutQueue } from "@/lib/utils/closeout";
+import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 
 export type OperationalReportingJob = {
   id: string;
@@ -61,6 +61,16 @@ export type OperationalReportingReadModel = {
 
 type BuildOperationalReportingReadModelArgs = {
   jobs: OperationalReportingJob[];
+  closeoutProjectionByJobId: Map<
+    string,
+    {
+      invoice_complete: boolean;
+      field_complete: boolean;
+      job_type: string | null;
+      ops_status: string | null;
+      certs_complete: boolean;
+    }
+  >;
   attentionBusinessCutoffIso: string;
   failedCutoffIso: string;
   recentCreatedCount: number;
@@ -109,8 +119,16 @@ function getTime(value: string | null | undefined) {
   return Number.isFinite(time) ? time : Number.NaN;
 }
 
+function needsInvoiceFollowUp(
+  job: OperationalReportingJob,
+  closeoutProjectionByJobId: BuildOperationalReportingReadModelArgs["closeoutProjectionByJobId"],
+) {
+  return getCloseoutNeeds(closeoutProjectionByJobId.get(job.id) ?? job).needsInvoice;
+}
+
 export function buildOperationalReportingReadModel({
   jobs,
+  closeoutProjectionByJobId,
   attentionBusinessCutoffIso,
   failedCutoffIso,
   recentCreatedCount,
@@ -161,7 +179,7 @@ export function buildOperationalReportingReadModel({
     {
       key: "closeout_queue",
       label: "Closeout queue",
-      value: countWhere(activeJobs, (job) => isInCloseoutQueue(job)),
+      value: countWhere(activeJobs, (job) => isInCloseoutQueue(closeoutProjectionByJobId.get(job.id) ?? job)),
       note: "Field-complete visits still waiting on office closeout obligations.",
     },
   ];
@@ -184,13 +202,16 @@ export function buildOperationalReportingReadModel({
                     ? "ops_paperwork_required"
                     : "ops_invoice_required",
     label: formatOpsLabel(bucket),
-    value: countWhere(activeJobs, (job) => String(job.ops_status ?? "").toLowerCase() === bucket),
+    value:
+      bucket === "invoice_required"
+        ? countWhere(activeJobs, (job) => needsInvoiceFollowUp(job, closeoutProjectionByJobId))
+        : countWhere(activeJobs, (job) => String(job.ops_status ?? "").toLowerCase() === bucket),
     note: bucket === "pending_office_review"
       ? "Office-owned review queue."
       : bucket === "paperwork_required"
         ? "Waiting on final paperwork completion."
         : bucket === "invoice_required"
-          ? "Waiting on final processing closeout."
+          ? "Waiting on billing-aware invoice follow-up."
           : `Current jobs in ${formatOpsLabel(bucket).toLowerCase()}.`,
   } satisfies OperationalReportingMetric));
 
@@ -242,7 +263,9 @@ export function buildOperationalReportingReadModel({
       label: "Closeout overdue",
       value: countWhere(
         activeJobs,
-        (job) => isInCloseoutQueue(job) && getTime(job.field_complete_at) <= Date.now() - 24 * 60 * 60 * 1000
+        (job) =>
+          isInCloseoutQueue(closeoutProjectionByJobId.get(job.id) ?? job) &&
+          getTime(job.field_complete_at) <= Date.now() - 24 * 60 * 60 * 1000
       ),
       note: "Closeout queue items still open at least one day after field completion.",
     },

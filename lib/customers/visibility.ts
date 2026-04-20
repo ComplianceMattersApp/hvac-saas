@@ -1,5 +1,4 @@
 import { getInternalUser } from "@/lib/auth/internal-user";
-import { createAdminClient } from "@/lib/supabase/server";
 
 export type CustomerVisibilityScope =
   | {
@@ -144,80 +143,31 @@ export async function searchScopedCustomers(params: {
     return { scope, results: [] };
   }
 
-  const admin = createAdminClient();
   const searchDigits = normalizePhoneDigits(q);
   const resultLimit = params.resultLimit ?? 25;
 
   let customers: CustomerRow[] = [];
   let locations: LocationRow[] = [];
 
-  if (scope.kind === "internal") {
-    const { data: customerRows, error: customerErr } = await admin
-      .from("customers")
-      .select("id, full_name, first_name, last_name, phone, email")
-      .eq("owner_user_id", scope.accountOwnerUserId);
+  const { data: customerRows, error: customerErr } = await params.supabase
+    .from("customers")
+    .select("id, full_name, first_name, last_name, phone, email");
 
-    if (customerErr) throw customerErr;
-    customers = (customerRows ?? []) as CustomerRow[];
+  if (customerErr) throw customerErr;
+  customers = (customerRows ?? []) as CustomerRow[];
 
-    const customerIds = customers
-      .map((row) => normalizeText(row.id))
-      .filter(Boolean);
+  const customerIds = customers
+    .map((row) => normalizeText(row.id))
+    .filter(Boolean);
 
-    if (customerIds.length > 0) {
-      const { data: locationRows, error: locationErr } = await admin
-        .from("locations")
-        .select("id, customer_id, address_line1, city")
-        .in("customer_id", customerIds);
+  if (customerIds.length > 0) {
+    const { data: locationRows, error: locationErr } = await params.supabase
+      .from("locations")
+      .select("id, customer_id, address_line1, city")
+      .in("customer_id", customerIds);
 
-      if (locationErr) throw locationErr;
-      locations = (locationRows ?? []) as LocationRow[];
-    }
-  } else {
-    const { data: scopedJobs, error: jobsErr } = await admin
-      .from("jobs")
-      .select("customer_id, location_id")
-      .eq("contractor_id", scope.contractorId);
-
-    if (jobsErr) throw jobsErr;
-
-    const customerIds = Array.from(
-      new Set(
-        (scopedJobs ?? [])
-          .map((row: any) => normalizeText(row?.customer_id))
-          .filter(Boolean),
-      ),
-    );
-
-    if (customerIds.length === 0) {
-      return { scope, results: [] };
-    }
-
-    const { data: customerRows, error: customerErr } = await admin
-      .from("customers")
-      .select("id, full_name, first_name, last_name, phone, email")
-      .in("id", customerIds);
-
-    if (customerErr) throw customerErr;
-    customers = (customerRows ?? []) as CustomerRow[];
-
-    const locationIds = Array.from(
-      new Set(
-        (scopedJobs ?? [])
-          .map((row: any) => normalizeText(row?.location_id))
-          .filter(Boolean),
-      ),
-    );
-
-    if (locationIds.length > 0) {
-      const { data: locationRows, error: locationErr } = await admin
-        .from("locations")
-        .select("id, customer_id, address_line1, city")
-        .in("id", locationIds);
-
-      if (locationErr) throw locationErr;
-      locations = (locationRows ?? []) as LocationRow[];
-    }
+    if (locationErr) throw locationErr;
+    locations = (locationRows ?? []) as LocationRow[];
   }
 
   const locationsByCustomerId = new Map<string, LocationRow[]>();
