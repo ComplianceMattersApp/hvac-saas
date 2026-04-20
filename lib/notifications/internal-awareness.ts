@@ -2,6 +2,7 @@ export const CONTRACTOR_UPDATE_NOTIFICATION_TYPES = [
   "contractor_note",
   "contractor_correction_submission",
   "contractor_schedule_updated",
+  "contractor_intake_proposal_submitted",
 ] as const;
 
 export type InternalNotificationFilterKey = "contractor_updates";

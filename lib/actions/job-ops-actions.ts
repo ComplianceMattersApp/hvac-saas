@@ -1211,6 +1211,7 @@ export async function releaseAndReevaluate(
     if (releaseErr) throw new Error(releaseErr.message);
 
     await evaluateEccOpsStatus(jobId);
+    await healStalePaperworkOpsStatus(jobId);
 
     const { data: afterEcc, error: afterEccErr } = await supabase
       .from("jobs")

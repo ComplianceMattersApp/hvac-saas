@@ -188,4 +188,39 @@ describe("evaluateEccOpsStatus", () => {
     expect(forceSetOpsStatusMock).toHaveBeenCalledTimes(1);
     expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
   });
+
+  it("advances ordinary all-passed ECC jobs to closed when certs and invoice are complete", async () => {
+    await runEvaluation({
+      job: {
+        id: "job-1",
+        status: "completed",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: true,
+        certs_complete: true,
+        invoice_complete: true,
+        ops_status: "paperwork_required",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+      },
+      runs: [
+        {
+          id: "run-1",
+          system_id: "sys-1",
+          test_type: "duct_leakage",
+          is_completed: true,
+          computed_pass: true,
+          override_pass: null,
+          data: {},
+          computed: {},
+        },
+      ],
+      correctionResolutionEvent: null,
+    });
+
+    expect(forceSetOpsStatusMock).toHaveBeenCalledWith("job-1", "closed");
+    expect(forceSetOpsStatusMock).toHaveBeenCalledTimes(1);
+    expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
+  });
 });

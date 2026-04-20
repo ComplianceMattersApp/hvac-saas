@@ -8,6 +8,78 @@ import { resolveOpsStatus } from "@/lib/utils/ops-status";
 import type { OpsStatus } from "@/lib/actions/ops-status";
 import type { EccTestType } from "@/lib/ecc/test-registry";
 
+const RESOLVED_ECC_CLOSEOUT_STATUSES: ReadonlySet<OpsStatus> = new Set([
+  "paperwork_required",
+  "invoice_required",
+  "closed",
+]);
+
+function resolveEccCloseoutStatus(job: any): OpsStatus {
+  const resolvedNextStatus = resolveOpsStatus({
+    status: job.status ?? null,
+    job_type: job.job_type ?? null,
+    scheduled_date: job.scheduled_date ?? null,
+    window_start: job.window_start ?? null,
+    window_end: job.window_end ?? null,
+    field_complete: Boolean(job.field_complete),
+    certs_complete: Boolean(job.certs_complete),
+    invoice_complete: Boolean(job.invoice_complete),
+    current_ops_status: "paperwork_required",
+  }) as OpsStatus;
+
+  if (!RESOLVED_ECC_CLOSEOUT_STATUSES.has(resolvedNextStatus)) {
+    throw new Error(`Unexpected resolved ECC status: ${resolvedNextStatus}`);
+  }
+
+  return resolvedNextStatus;
+}
+
+async function applyResolvedEccCloseoutStatus(params: {
+  jobId: string;
+  currentOps: string;
+  resolvedNextStatus: OpsStatus;
+  reason: string;
+}) {
+  const { jobId, currentOps, resolvedNextStatus, reason } = params;
+
+  if (ECC_HARD_LOCKS.has(currentOps)) {
+    console.error("[ECC_EVAL]", {
+      jobId,
+      current_ops_status: currentOps,
+      computed_next_status: resolvedNextStatus,
+      reason,
+      manual_lock_prevented: true,
+      final_ops_status: currentOps,
+    });
+    return;
+  }
+
+  if (resolvedNextStatus === "paperwork_required") {
+    const setResult = await setOpsStatusIfNotManual(jobId, resolvedNextStatus);
+    console.error("[ECC_EVAL]", {
+      jobId,
+      current_ops_status: currentOps,
+      computed_next_status: resolvedNextStatus,
+      reason,
+      manual_lock_prevented: setResult.manualLockPrevented,
+      final_ops_status: setResult.finalStatus,
+    });
+    return;
+  }
+
+  await forceSetOpsStatus(jobId, resolvedNextStatus);
+  console.error("[ECC_EVAL]", {
+    jobId,
+    current_ops_status: currentOps,
+    computed_next_status: resolvedNextStatus,
+    reason,
+    manual_lock_prevented: false,
+    final_ops_status: resolvedNextStatus,
+  });
+}
+
+const ECC_HARD_LOCKS = new Set<string>(["pending_info", "on_hold"]);
+
 /**
  * ECC Ops rules
  * - If ANY required ECC test FAILS -> ops_status = "failed"
@@ -114,14 +186,11 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
   const hasAnyRequiredTests = systemIds.some((sid) => (requiredBySystem[sid]?.length ?? 0) > 0);
   if (!hasAnyRequiredTests) {
     if (isFieldComplete) {
-      const setResult = await setOpsStatusIfNotManual(jobId, "paperwork_required");
-      console.error("[ECC_EVAL]", {
+      await applyResolvedEccCloseoutStatus({
         jobId,
-        current_ops_status: job.ops_status ?? null,
-        computed_next_status: "paperwork_required",
+        currentOps: String(job.ops_status ?? ""),
+        resolvedNextStatus: resolveEccCloseoutStatus(job),
         reason: "field_complete_no_required_tests",
-        manual_lock_prevented: setResult.manualLockPrevented,
-        final_ops_status: setResult.finalStatus,
       });
       return;
     }
@@ -169,11 +238,6 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
     (requiredBySystem[sid] ?? []).some((t) => matrix[sid]?.[t]?.anyFail)
   );
 
-  // True admin holds must never be overridden by ECC evaluation.
-  // Everything else (paperwork_required, retest_needed, invoice_required, closed, …)
-  // is an ECC-derived or workflow state that canonical failure MUST be able to override.
-  const ECC_HARD_LOCKS = new Set<string>(["pending_info", "on_hold"]);
-
   if (anyRequiredFail) {
     const currentOps = job.ops_status ?? "";
     const { data: correctionResolutionEvent, error: correctionResolutionErr } = await supabase
@@ -187,26 +251,7 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
     if (correctionResolutionErr) throw new Error(correctionResolutionErr.message);
 
     if (correctionResolutionEvent?.id) {
-      const resolvedNextStatus = resolveOpsStatus({
-        status: job.status ?? null,
-        job_type: job.job_type ?? null,
-        scheduled_date: (job as any).scheduled_date ?? null,
-        window_start: (job as any).window_start ?? null,
-        window_end: (job as any).window_end ?? null,
-        field_complete: Boolean((job as any)?.field_complete),
-        certs_complete: Boolean((job as any)?.certs_complete),
-        invoice_complete: Boolean((job as any)?.invoice_complete),
-        current_ops_status: "paperwork_required",
-      });
-      const allowedResolvedStatuses: ReadonlySet<OpsStatus> = new Set([
-        "paperwork_required",
-        "invoice_required",
-        "closed",
-      ]);
-
-      if (!allowedResolvedStatuses.has(resolvedNextStatus as OpsStatus)) {
-        throw new Error(`Unexpected resolved ECC status: ${resolvedNextStatus}`);
-      }
+      const resolvedNextStatus = resolveEccCloseoutStatus(job);
 
       if (ECC_HARD_LOCKS.has(currentOps)) {
         console.error("[ECC_EVAL]", {
@@ -264,14 +309,11 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
     });
 
   if (allRequiredPassed) {
-    const setResult = await setOpsStatusIfNotManual(jobId, "paperwork_required");
-    console.error("[ECC_EVAL]", {
+    await applyResolvedEccCloseoutStatus({
       jobId,
-      current_ops_status: job.ops_status ?? null,
-      computed_next_status: "paperwork_required",
+      currentOps: String(job.ops_status ?? ""),
+      resolvedNextStatus: resolveEccCloseoutStatus(job),
       reason: "all_required_passed",
-      manual_lock_prevented: setResult.manualLockPrevented,
-      final_ops_status: setResult.finalStatus,
     });
     return;
   }

@@ -13,7 +13,7 @@ import { forceSetOpsStatus } from "@/lib/actions/ops-status";
 import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
 import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions/job-event-meta";
 import {
-  insertInternalAwarenessNotification,
+  createContractorIntakeProposalAwarenessNotification,
   insertInternalNotificationForEvent,
 } from "@/lib/actions/notification-actions";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
@@ -1785,7 +1785,7 @@ function formatProjectTypeTitleFragment(value: string | null | undefined) {
     .join(" ");
 }
 
-function deriveInternalIntakeJobTitle(input: {
+export function deriveInternalIntakeJobTitle(input: {
   jobType: "ecc" | "service";
   projectType?: string | null;
   serviceVisitReason?: string | null;
@@ -1807,6 +1807,49 @@ function deriveInternalIntakeJobTitle(input: {
 
   const projectTypeLabel = formatProjectTypeTitleFragment(input.projectType);
   return projectTypeLabel ? `ECC ${projectTypeLabel} Test` : "ECC Test";
+}
+
+export function resolveCreateJobTitle(input: {
+  submittedTitle?: string | null;
+  isContractorUser: boolean;
+  jobType: "ecc" | "service";
+  projectType?: string | null;
+  serviceVisitReason?: string | null;
+  visitScopeSummary?: string | null;
+  visitScopeItems?: VisitScopeItem[] | null;
+}) {
+  const submittedTitle = String(input.submittedTitle ?? "").trim();
+
+  if (input.isContractorUser) {
+    if (input.jobType === "ecc") {
+      return deriveInternalIntakeJobTitle({
+        jobType: "ecc",
+        projectType: input.projectType,
+      });
+    }
+
+    return submittedTitle;
+  }
+
+  if (submittedTitle) return submittedTitle;
+
+  return deriveInternalIntakeJobTitle({
+    jobType: input.jobType,
+    projectType: input.projectType,
+    serviceVisitReason: input.serviceVisitReason,
+    visitScopeSummary: input.visitScopeSummary,
+    visitScopeItems: input.visitScopeItems,
+  });
+}
+
+export function buildContractorProposalSubmissionFields(input: {
+  resolvedTitle: string;
+  jobNotesRaw: string;
+}) {
+  return {
+    proposed_title: input.resolvedTitle || null,
+    proposed_job_notes: input.jobNotesRaw || null,
+  };
 }
 
   function buildInitialProblemSummary(input: {
@@ -5592,19 +5635,15 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
 
   const jobAddressRaw = address_line1;
 
-  const titleFinal =
-    title ||
-    (isContractorUser
-      ? (jobType === "ecc"
-          ? `ECC ${projectType.replaceAll("_", " ")} — ${city}`
-          : "")
-      : deriveInternalIntakeJobTitle({
-          jobType,
-          projectType,
-          serviceVisitReason: service_visit_reason,
-          visitScopeSummary: visit_scope_summary,
-          visitScopeItems: visit_scope_items,
-        }));
+  const titleFinal = resolveCreateJobTitle({
+    submittedTitle: title,
+    isContractorUser,
+    jobType,
+    projectType,
+    serviceVisitReason: service_visit_reason,
+    visitScopeSummary: visit_scope_summary,
+    visitScopeItems: visit_scope_items,
+  });
 
   if (!city) throw new Error("City is required");
 
@@ -6169,6 +6208,11 @@ function canContractorWriteEvent(event_type: string) {
       redirect("/jobs/new?err=contractor_proposal_submit_failed");
     }
 
+    const proposalFields = buildContractorProposalSubmissionFields({
+      resolvedTitle: titleFinal,
+      jobNotesRaw,
+    });
+
     const proposalWriteClient = createAdminClient();
     const uploadedProposalFiles = formData
       .getAll("photos")
@@ -6195,8 +6239,8 @@ function canContractorWriteEvent(event_type: string) {
         proposed_location_nickname: locationNickname || null,
         proposed_job_type: jobType || null,
         proposed_project_type: projectType || null,
-        proposed_title: titleFinal || null,
-        proposed_job_notes: jobNotesRaw || null,
+        proposed_title: proposalFields.proposed_title,
+        proposed_job_notes: proposalFields.proposed_job_notes,
         proposed_permit_number: permit_number || null,
         proposed_jurisdiction: jurisdiction || null,
         proposed_permit_date: permit_date || null,
@@ -6317,28 +6361,13 @@ function canContractorWriteEvent(event_type: string) {
         redirect("/jobs/new?err=contractor_proposal_submit_failed");
       }
 
-      try {
-        await insertInternalAwarenessNotification({
-          supabase,
-          contractorIntakeSubmissionId: proposalId,
-          accountOwnerUserId: proposalOwnerUserId,
-          actorUserId: submittingUserId,
-          notificationType: "contractor_intake_proposal_submitted",
-          subject: "New Contractor Intake Proposal",
-          body: "A contractor submitted an intake proposal pending internal finalization.",
-          payload: {
-            source: "contractor_intake_submissions",
-            contractor_id: proposalContractorId,
-            submitted_by_user_id: submittingUserId,
-            account_owner_user_id: proposalOwnerUserId,
-          },
-        });
-      } catch (error) {
-        console.error("proposal_internal_notification_insert_failed", {
-          proposalId,
-          error: error instanceof Error ? error.message : "Unknown notification insert error",
-        });
-      }
+      await createContractorIntakeProposalAwarenessNotification({
+        supabase,
+        contractorIntakeSubmissionId: proposalId,
+        accountOwnerUserId: proposalOwnerUserId,
+        actorUserId: submittingUserId,
+        contractorId: proposalContractorId,
+      });
 
       try {
         await sendInternalContractorIntakeProposalAlertEmail({
