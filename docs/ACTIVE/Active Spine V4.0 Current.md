@@ -1094,17 +1094,40 @@ Current position:
 - Service model buildout is closed for milestone-1 scope.
 - Billing / invoice workflow is complete enough to move forward for milestone-2 scope.
 - Reporting / analytics is now substantially complete for the current milestone-3 scope.
-- Completed RLS / permission hardening slices for the current stabilized baseline now include customer/location internal account-owner reconciliation and notifications internal-awareness write-path hardening:
-  - jobs and service_cases were already ahead on account-owner-aware internal scope
+- Completed RLS / permission hardening slices for the current stabilized baseline now include customer/location internal account-owner reconciliation, notifications internal-awareness write-path hardening, targeted internal same-account job/service-case mutation boundary hardening, internal job attachments / attachment-storage account-scope hardening, internal ECC test-run account-scope hardening, and internal job_equipment / job_systems account-scope hardening:
+  - jobs and service_cases were already ahead on account-owner-aware internal read scope
   - customers and locations are now reconciled to that same internal account-owner model for internal same-account teammates
   - validated passed for customer list, customer detail, internal `/jobs/new` guided lookup, and location detail for non-owner internal teammates
   - customer/location visibility no longer depends primarily on admin/manual scope reconstruction for those internal reads
+  - targeted internal job-detail mutation surfaces no longer rely on `user is internal` alone for the hardened paths
+  - same-account scope is now explicitly asserted before the targeted internal operational mutations proceed
+  - cross-account internal mutation is denied on the targeted hardened paths
+  - the completed targeted mutation-boundary slice covers visit scope mutation and service contract / linked service-case mutation
+  - targeted internal attachment flows no longer rely on broad internal access alone for the hardened paths
+  - same-account scope is now explicitly asserted before targeted internal attachment/storage mutations proceed
+  - cross-account internal attachment/storage access is denied on the targeted hardened paths
+  - the completed targeted attachment/account-scope slice covers upload-token issuance, finalize upload, discard upload, and share-to-contractor
+  - matching attachment/storage policy reconciliation was completed for this seam
+  - this was a targeted internal attachment/account-scope slice, not a full attachment subsystem rewrite
+  - targeted ECC test-run mutation paths no longer rely on broad internal access alone for the hardened paths
+  - same-account scope is now explicitly asserted before targeted ECC mutations proceed
+  - cross-account internal ECC mutation is denied on the targeted hardened paths
+  - the completed targeted ECC truth/account-scope slice covers override update, add test run, delete test run, and a representative ECC test-save path
+  - matching `ecc_test_runs` policy reconciliation was completed for this seam
+  - this was a targeted ECC truth/account-scope slice, not a full ECC subsystem rewrite or full ECC permission-model completion
+  - targeted internal equipment/system mutation paths no longer rely on broad internal access alone for the hardened paths
+  - same-account scope is now explicitly asserted before the targeted equipment/system mutations proceed
+  - cross-account internal equipment/system mutation is denied on the targeted hardened paths
+  - the completed targeted equipment/system account-scope slice covers add equipment, update equipment, delete equipment, and coupled system creation, reuse, and orphan delete behavior inside those flows
+  - matching `job_equipment` / `job_systems` policy reconciliation was completed for this seam
+  - this was a targeted equipment/system account-scope slice, not a full equipment/system domain rewrite or full equipment/system permission-model completion
+  - contractor authority was not expanded, and this was not a full jobs/service_cases RLS rewrite
   - contractor customer/location visibility remains constrained, read-only, and job-derived
   - notifications remain account-owner-scoped for internal awareness
   - the generic `42501 -> service-role` fallback was removed from the internal awareness notification write path
   - contractor-originated or mixed-context internal awareness notifications now use one explicit, policy-aligned write contract
   - internal notification read boundaries remain internal-only; contractors still do not get direct read access to internal notifications
-  - no role redesign, support-access model, payment work, billing work, or broader notifications UX/polish work was part of these slices
+  - no role redesign, support-access model, payment work, billing work, broader notifications UX/polish work, or broad portal/contractor authority expansion was part of these slices
 - Completed billing hardening slices for the current stabilized baseline include:
   - the external-billing split-brain closeout fix: the supported `Mark Invoice Sent -> Closed` path writes the lightweight billed-truth marker before supported closeout
   - billing-truth read-side normalization: internal-invoicing closeout/report/dashboard/ops readers derive billed truth from the internal invoice domain, while external-billing readers preserve lightweight job-level invoice-action meaning
@@ -1137,6 +1160,11 @@ Current clarification:
 - the broader RLS completion / permission hardening milestone remains the next active major roadmap item
 - customer/location internal account-owner reconciliation is complete inside that milestone
 - notifications internal-awareness write-path hardening is also complete inside that milestone
+- targeted internal same-account job/service-case mutation boundary hardening is also complete inside that milestone
+- internal job attachments / attachment-storage account-scope hardening is also complete inside that milestone
+- internal ECC test-run account-scope hardening is also complete inside that milestone
+- internal job_equipment / job_systems account-scope hardening is also complete inside that milestone
+- these completions are limited to targeted internal operational mutation, attachment/account-scope hardening, ECC truth/account-scope hardening, and equipment/system account-scope hardening, not a full jobs/service_cases, attachment, ECC, or equipment/system permission-model rewrite
 - broader hardening work is not yet closed
 
 This stays aligned to the current roadmap order already in the spine while accurately marking reporting as no longer the active incomplete milestone.

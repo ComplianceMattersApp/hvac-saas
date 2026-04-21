@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { requireInternalUser } from "@/lib/auth/internal-user";
+import {
+  loadScopedInternalAttachmentJobForMutation,
+  loadScopedInternalJobAttachmentForMutation,
+  loadScopedInternalJobAttachmentsForMutation,
+} from "@/lib/auth/internal-attachment-scope";
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 
 function safeFileName(name: string) {
@@ -45,17 +50,16 @@ async function assertJobAttachmentUploadAuthority(input: {
     return { actorType: "contractor" as const };
   }
 
-  await requireInternalUser({ supabase, userId });
+  const { internalUser } = await requireInternalUser({ supabase, userId });
 
-  const { data: job, error: jobErr } = await supabase
-    .from("jobs")
-    .select("id")
-    .eq("id", jobId)
-    .is("deleted_at", null)
-    .maybeSingle();
+  const scopedJob = await loadScopedInternalAttachmentJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+  });
 
-  if (jobErr) throw jobErr;
-  if (!job?.id) throw new Error("Job not found");
+  if (!scopedJob?.id) {
+    throw new Error("Not authorized to upload attachment for this job");
+  }
 
   return { actorType: "internal" as const };
 }
@@ -262,7 +266,17 @@ export async function discardInternalJobAttachmentUpload(input: {
   if (userErr) throw userErr;
   if (!user) throw new Error("Not authenticated");
 
-  await requireInternalUser({ supabase, userId: user.id });
+  const { internalUser } = await requireInternalUser({ supabase, userId: user.id });
+
+  const scopedAttachment = await loadScopedInternalJobAttachmentForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    attachmentId,
+  });
+
+  if (!scopedAttachment?.attachment) {
+    throw new Error("Not authorized to discard attachment for this job");
+  }
 
   await cleanupJobAttachmentRows({
     supabase,
@@ -294,13 +308,23 @@ export async function finalizeInternalJobAttachmentUpload(input: {
   if (userErr) throw userErr;
   if (!user) throw new Error("Not authenticated");
 
-  await requireInternalUser({ supabase, userId: user.id });
+  const { internalUser } = await requireInternalUser({ supabase, userId: user.id });
 
   const note = String(input.note ?? "").trim();
   const caption = String(input.caption ?? "").trim();
   const requestedAttachmentIds = Array.isArray(input.attachmentIds)
     ? input.attachmentIds.map((value) => String(value ?? "").trim()).filter(Boolean)
     : [];
+
+  const scopedAttachments = await loadScopedInternalJobAttachmentsForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    attachmentIds: requestedAttachmentIds,
+  });
+
+  if (!scopedAttachments?.job) {
+    throw new Error("Not authorized to finalize attachments for this job");
+  }
 
   const verifiedAttachments = await loadVerifiedJobAttachments({
     supabase,
@@ -486,23 +510,23 @@ export async function shareJobAttachmentToContractor(input: {
   if (userErr) throw userErr;
   if (!user) throw new Error("Not authenticated");
 
-  await requireInternalUser({ supabase, userId: user.id });
+  const { internalUser } = await requireInternalUser({ supabase, userId: user.id });
 
-  const { data: attachment, error: attErr } = await supabase
-    .from("attachments")
-    .select("id, entity_type, entity_id, file_name")
-    .eq("id", attachmentId)
-    .maybeSingle();
+  const scopedAttachment = await loadScopedInternalJobAttachmentForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    attachmentId,
+    attachmentSelect: "file_name",
+  });
 
-  if (attErr) throw attErr;
-  if (!attachment?.id) throw new Error("Attachment not found");
-
-  if (
-    String(attachment.entity_type ?? "") !== "job" ||
-    String(attachment.entity_id ?? "") !== jobId
-  ) {
-    throw new Error("Attachment is not linked to this job");
+  if (!scopedAttachment?.attachment) {
+    throw new Error("Not authorized to share attachment for this job");
   }
+
+  const attachment = scopedAttachment.attachment as {
+    id: string;
+    file_name?: string | null;
+  };
 
   const fallbackNote = `Shared file: ${String(attachment.file_name ?? "Attachment")}`;
 
