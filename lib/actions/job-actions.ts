@@ -17,6 +17,18 @@ import {
   insertInternalNotificationForEvent,
 } from "@/lib/actions/notification-actions";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
+import {
+  loadScopedInternalJobForMutation,
+  loadScopedInternalServiceCaseForMutation,
+} from "@/lib/auth/internal-job-scope";
+import {
+  loadScopedInternalEquipmentJobForMutation,
+  loadScopedInternalJobEquipmentForMutation,
+} from "@/lib/auth/internal-equipment-scope";
+import {
+  loadScopedInternalEccJobForMutation,
+  loadScopedInternalEccTestRunForMutation,
+} from "@/lib/auth/internal-ecc-scope";
 import { requireInternalRole, requireInternalUser } from "@/lib/auth/internal-user";
 import {
   resolveBillingModeByAccountOwnerId,
@@ -2069,25 +2081,76 @@ function revalidateEccProjectionConsumers(jobId: string) {
 async function requireInternalEccTestsAccess(params: {
   supabase: any;
   jobId: string;
+  testRunId?: string | null;
 }) {
   const { supabase, jobId } = params;
 
-  await requireInternalUser({ supabase });
+  const { internalUser } = await requireInternalUser({ supabase });
 
-  const { data: job, error } = await supabase
-    .from("jobs")
-    .select("id, job_type")
-    .eq("id", jobId)
-    .maybeSingle();
+  const testRunId = String(params.testRunId ?? "").trim();
 
-  if (error) throw error;
-  if (!job?.id) throw new Error("Job not found");
+  if (testRunId) {
+    const scopedRun = await loadScopedInternalEccTestRunForMutation({
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobId,
+      testRunId,
+      testRunSelect: "is_completed",
+    });
 
-  if (String(job.job_type ?? "").trim().toLowerCase() !== "ecc") {
-    redirect(`/jobs/${jobId}?tab=ops`);
+    if (!scopedRun?.job?.id || !scopedRun?.testRun?.id) {
+      redirect(`/jobs/${jobId}?notice=not_authorized`);
+    }
+
+    return scopedRun;
   }
 
-  return job;
+  const scopedJob = await loadScopedInternalEccJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+  });
+
+  if (!scopedJob?.id) {
+    redirect(`/jobs/${jobId}?notice=not_authorized`);
+  }
+
+  return { job: scopedJob, testRun: null };
+}
+
+async function requireInternalEquipmentMutationAccess(params: {
+  supabase: any;
+  jobId: string;
+  equipmentId?: string | null;
+}) {
+  const { supabase, jobId } = params;
+  const { internalUser } = await requireInternalUser({ supabase });
+
+  const equipmentId = String(params.equipmentId ?? "").trim();
+
+  if (equipmentId) {
+    const scopedEquipment = await loadScopedInternalJobEquipmentForMutation({
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobId,
+      equipmentId,
+      equipmentSelect: "system_id",
+    });
+
+    if (!scopedEquipment?.job?.id || !scopedEquipment?.equipment?.id) {
+      redirect(`/jobs/${jobId}?notice=not_authorized`);
+    }
+
+    return scopedEquipment;
+  }
+
+  const scopedJob = await loadScopedInternalEquipmentJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+  });
+
+  if (!scopedJob?.id) {
+    redirect(`/jobs/${jobId}?notice=not_authorized`);
+  }
+
+  return { job: scopedJob, equipment: null };
 }
 
 /** ✅ Defensive resolver: if form is missing system_id, fall back to run.system_id */
@@ -2194,7 +2257,10 @@ export async function updateJobTypeFromForm(formData: FormData) {
 
 export async function updateJobServiceContractFromForm(formData: FormData) {
   const supabase = await createClient();
-  const { userId: actingUserId } = await requireInternalUser({ supabase });
+  const {
+    userId: actingUserId,
+    internalUser,
+  } = await requireInternalUser({ supabase });
 
   const jobId = String(formData.get("job_id") || "").trim();
   const tabRaw = String(formData.get("tab") || "").trim();
@@ -2202,13 +2268,14 @@ export async function updateJobServiceContractFromForm(formData: FormData) {
 
   if (!jobId) throw new Error("Missing job_id");
 
-  const { data: beforeJob, error: beforeErr } = await supabase
-    .from("jobs")
-    .select("job_type, service_case_id, service_visit_type, service_visit_reason, service_visit_outcome, title, job_notes")
-    .eq("id", jobId)
-    .single();
+  const beforeJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    select:
+      "job_type, service_visit_type, service_visit_reason, service_visit_outcome, title, job_notes",
+  });
 
-  if (beforeErr) {
+  if (!beforeJob) {
     redirectToJobWithBanner({
       jobId,
       banner: "service_contract_update_failed",
@@ -2250,13 +2317,14 @@ export async function updateJobServiceContractFromForm(formData: FormData) {
     });
   }
 
-  const { data: beforeCase, error: beforeCaseErr } = await supabase
-    .from("service_cases")
-    .select("case_kind")
-    .eq("id", serviceCaseId)
-    .single();
+  const beforeCase = await loadScopedInternalServiceCaseForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    serviceCaseId,
+    expectedCustomerId: String(beforeJob?.customer_id ?? "").trim() || null,
+    select: "case_kind",
+  });
 
-  if (beforeCaseErr) {
+  if (!beforeCase) {
     redirectToJobWithBanner({
       jobId,
       banner: "service_contract_update_failed",
@@ -2393,8 +2461,10 @@ export async function updateJobServiceContractFromForm(formData: FormData) {
 
 export async function updateJobVisitScopeFromForm(formData: FormData) {
   const supabase = await createClient();
-  const { userId: actingUserId } = await requireInternalUser({ supabase });
-  const admin = createAdminClient();
+  const {
+    userId: actingUserId,
+    internalUser,
+  } = await requireInternalUser({ supabase });
 
   const jobId = String(formData.get("job_id") || "").trim();
   const tabRaw = String(formData.get("tab") || "").trim();
@@ -2402,19 +2472,13 @@ export async function updateJobVisitScopeFromForm(formData: FormData) {
 
   if (!jobId) throw new Error("Missing job_id");
 
-  const { data: beforeJob, error: beforeErr } = await admin
-    .from("jobs")
-    .select("job_type, visit_scope_summary, visit_scope_items")
-    .eq("id", jobId)
-    .single();
+  const beforeJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    select: "job_type, visit_scope_summary, visit_scope_items",
+  });
 
-  if (beforeErr) {
-    console.error("updateJobVisitScopeFromForm: beforeJob read failed", {
-      jobId,
-      code: beforeErr.code,
-      message: beforeErr.message,
-      details: beforeErr.details,
-    });
+  if (!beforeJob) {
     redirectToJobWithBanner({
       jobId,
       banner: "visit_scope_job_read_failed",
@@ -2485,7 +2549,7 @@ export async function updateJobVisitScopeFromForm(formData: FormData) {
     });
   }
 
-  const { error: updateErr } = await admin
+  const { error: updateErr } = await supabase
     .from("jobs")
     .update({
       visit_scope_summary: nextSummary,
@@ -3013,7 +3077,7 @@ export async function addJobEquipmentFromForm(formData: FormData) {
   const notes = String(formData.get("notes") || "").trim() || null;
 
   const supabase = await createClient();
-  await requireInternalUser({ supabase });
+  await requireInternalEquipmentMutationAccess({ supabase, jobId });
 
   // 1) Resolve/Create system for this job + location
   const { data: existingSystem, error: sysFindErr } = await supabase
@@ -3106,7 +3170,7 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
   const notes = String(formData.get("notes") || "").trim() || null;
 
   const supabase = await createClient();
-  await requireInternalUser({ supabase });
+  await requireInternalEquipmentMutationAccess({ supabase, jobId, equipmentId });
 
   const { data: existingEquipment, error: equipmentErr } = await supabase
     .from("job_equipment")
@@ -3189,7 +3253,7 @@ export async function deleteJobEquipmentFromForm(formData: FormData) {
   if (!equipmentId) throw new Error("Missing equipment_id");
 
   const supabase = await createClient();
-  await requireInternalUser({ supabase });
+  await requireInternalEquipmentMutationAccess({ supabase, jobId, equipmentId });
 
  const { data: deleted, error: delErr } = await supabase
   .from("job_equipment")
@@ -3229,6 +3293,7 @@ export async function saveEccTestOverrideFromForm(formData: FormData) {
   const testType = allowed.has(testTypeRaw) ? testTypeRaw : "";
 
   const supabase = await createClient();
+  await requireInternalEccTestsAccess({ supabase, jobId, testRunId });
 
   // Only update override fields, never touch data/computed
   const { data: updated, error } = await supabase
@@ -3511,7 +3576,7 @@ export async function deleteEccTestRunFromForm(formData: FormData) {
   if (!testRunId) throw new Error("Missing test_run_id");
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  await requireInternalEccTestsAccess({ supabase, jobId, testRunId });
 
 const { data: deletedRun, error: delRunErr } = await supabase
   .from("ecc_test_runs")
@@ -4291,7 +4356,7 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
   const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  await requireInternalEccTestsAccess({ supabase, jobId, testRunId });
 
   const { error } = await supabase
     .from("ecc_test_runs")
