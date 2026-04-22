@@ -3745,6 +3745,31 @@ function redirectToJobWithBanner(params: {
   redirect(`/jobs/${params.jobId}?${q.toString()}`);
 }
 
+async function requireInternalScopedJobAccessOrRedirect(params: {
+  supabase: any;
+  jobId: string;
+  onUnauthorized?: () => void;
+}) {
+  const jobId = String(params.jobId ?? "").trim();
+  const { userId, internalUser } = await requireInternalUser({
+    supabase: params.supabase,
+  });
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    select: "id",
+  });
+
+  if (!scopedJob?.id) {
+    if (params.onUnauthorized) {
+      params.onUnauthorized();
+    }
+    redirect(`/jobs/${jobId}?notice=not_authorized`);
+  }
+
+  return { userId, internalUser, scopedJob };
+}
+
 export async function assignJobAssigneeFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const userId = String(formData.get("user_id") || "").trim();
@@ -6620,7 +6645,10 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   console.log("[ADVANCE_STATUS_ENTRY]", { jobId: id, ts: new Date().toISOString() });
 
   const supabase = await createClient();
-  const { userId: actingUserId } = await requireInternalUser({ supabase });
+  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: id,
+  });
 
   // ✅ Read true current status from DB (source of truth)
   const { data: job, error: jobErr } = await supabase
@@ -7139,7 +7167,6 @@ export async function revertOnTheWayFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required");
 
   const supabase = await createClient();
-  const { userId: actingUserId } = await requireInternalUser({ supabase });
 
   const redirectToJob = (banner: string) => {
     const params = new URLSearchParams();
@@ -7147,6 +7174,12 @@ export async function revertOnTheWayFromForm(formData: FormData) {
     params.set("banner", banner);
     redirect(`/jobs/${id}?${params.toString()}`);
   };
+
+  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: id,
+    onUnauthorized: () => redirect(`/jobs/${id}?notice=not_authorized`),
+  });
 
   const eligibility = await getOnTheWayUndoEligibilityInternal({
     supabase,
@@ -7213,18 +7246,6 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required");
 
   const supabase = await createClient();
-  await requireInternalUser({ supabase });
-
-  // Read prior scheduling snapshot so we can log changes
-  const { data: before, error: beforeErr } = await supabase
-    .from("jobs")
-    .select(
-      "scheduled_date, window_start, window_end, ops_status, job_type, status, field_complete, permit_number, jurisdiction, permit_date, pending_info_reason, follow_up_date, next_action_note, action_required_by"
-    )
-    .eq("id", id)
-    .single();
-
-  if (beforeErr) throw beforeErr;
 
   const permitNumberRaw = String(formData.get("permit_number") || "").trim();
   const permitDateRaw = String(formData.get("permit_date") || "").trim();
@@ -7241,6 +7262,23 @@ export async function updateJobScheduleFromForm(formData: FormData) {
 
     redirect(`/jobs/${id}?banner=${banner}`);
   }
+
+  await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: id,
+    onUnauthorized: () => redirectToScheduleTarget("not_authorized"),
+  });
+
+  // Read prior scheduling snapshot so we can log changes
+  const { data: before, error: beforeErr } = await supabase
+    .from("jobs")
+    .select(
+      "scheduled_date, window_start, window_end, ops_status, job_type, status, field_complete, permit_number, jurisdiction, permit_date, pending_info_reason, follow_up_date, next_action_note, action_required_by"
+    )
+    .eq("id", id)
+    .single();
+
+  if (beforeErr) throw beforeErr;
 
   // Check for explicit unschedule BEFORE validation to avoid crash on invalid form values
   const unscheduleRequested = String(formData.get("unschedule") || "").trim() === "1";

@@ -3,7 +3,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireInternalUser } from "@/lib/auth/internal-user";
+import {
+  isInternalAccessError,
+  requireInternalUser,
+} from "@/lib/auth/internal-user";
+import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope";
 type AttemptMethod = "call" | "text";
 
 function addDays(dateYYYYMMDD: string, days: number) {
@@ -38,8 +42,6 @@ function nextFollowUpDate(attemptCountAfterInsert: number) {
 export async function logCustomerContactAttemptFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
 
-  const { userId: actorId } = await requireInternalUser({ supabase });
-
   const jobId = String(formData.get("job_id") || "").trim();
   const method = String(formData.get("method") || "").trim() as AttemptMethod;
   const result = String(formData.get("result") || "").trim() || "no_answer";
@@ -48,6 +50,33 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
 
   if (!jobId) throw new Error("Missing job_id");
   if (method !== "call" && method !== "text") throw new Error("Invalid method");
+
+  let actorId = "";
+  let accountOwnerUserId = "";
+
+  try {
+    const authz = await requireInternalUser({ supabase });
+    actorId = authz.userId;
+    accountOwnerUserId = String(authz.internalUser.account_owner_user_id ?? "").trim();
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      if (error.code === "AUTH_REQUIRED") {
+        redirect("/login");
+      }
+      redirect(`/jobs/${jobId}?notice=not_authorized`);
+    }
+    throw error;
+  }
+
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId,
+    jobId,
+    select: "id",
+  });
+
+  if (!scopedJob?.id) {
+    redirect(`/jobs/${jobId}?notice=not_authorized`);
+  }
 
   // 1) Get existing attempt count + first attempt date
   const { data: attemptEvents, error: attemptsErr } = await supabase
@@ -70,7 +99,7 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
   // 2) Insert the attempt event (CYA)
 const { error: insertErr } = await supabase.from("job_events").insert({
   job_id: jobId,
-  user_id: actorId,   // 👈 new
+  user_id: actorId,
   event_type: "customer_attempt",
   message: "Customer contact attempt logged",
   meta: {
