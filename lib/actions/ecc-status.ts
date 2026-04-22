@@ -14,6 +14,11 @@ const RESOLVED_ECC_CLOSEOUT_STATUSES: ReadonlySet<OpsStatus> = new Set([
   "closed",
 ]);
 
+const RESOLVED_ECC_PRE_FIELD_STATUSES: ReadonlySet<OpsStatus> = new Set([
+  "need_to_schedule",
+  "scheduled",
+]);
+
 function resolveEccCloseoutStatus(job: any): OpsStatus {
   const resolvedNextStatus = resolveOpsStatus({
     status: job.status ?? null,
@@ -27,7 +32,10 @@ function resolveEccCloseoutStatus(job: any): OpsStatus {
     current_ops_status: "paperwork_required",
   }) as OpsStatus;
 
-  if (!RESOLVED_ECC_CLOSEOUT_STATUSES.has(resolvedNextStatus)) {
+  if (
+    !RESOLVED_ECC_CLOSEOUT_STATUSES.has(resolvedNextStatus) &&
+    !RESOLVED_ECC_PRE_FIELD_STATUSES.has(resolvedNextStatus)
+  ) {
     throw new Error(`Unexpected resolved ECC status: ${resolvedNextStatus}`);
   }
 
@@ -50,6 +58,19 @@ async function applyResolvedEccCloseoutStatus(params: {
       reason,
       manual_lock_prevented: true,
       final_ops_status: currentOps,
+    });
+    return;
+  }
+
+  if (RESOLVED_ECC_PRE_FIELD_STATUSES.has(resolvedNextStatus)) {
+    console.error("[ECC_EVAL]", {
+      jobId,
+      current_ops_status: currentOps,
+      computed_next_status: resolvedNextStatus,
+      reason,
+      manual_lock_prevented: false,
+      final_ops_status: currentOps,
+      pre_field_status_noop: true,
     });
     return;
   }

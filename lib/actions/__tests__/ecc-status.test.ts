@@ -223,4 +223,38 @@ describe("evaluateEccOpsStatus", () => {
     expect(forceSetOpsStatusMock).toHaveBeenCalledTimes(1);
     expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
   });
+
+  it("does not throw or force a closeout status when required tests pass before field completion", async () => {
+    await runEvaluation({
+      job: {
+        id: "job-1",
+        status: "scheduled",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: false,
+        certs_complete: false,
+        invoice_complete: false,
+        ops_status: "scheduled",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+      },
+      runs: [
+        {
+          id: "run-1",
+          system_id: "sys-1",
+          test_type: "duct_leakage",
+          is_completed: true,
+          computed_pass: true,
+          override_pass: null,
+          data: {},
+          computed: {},
+        },
+      ],
+      correctionResolutionEvent: null,
+    });
+
+    expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
+    expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
+  });
 });

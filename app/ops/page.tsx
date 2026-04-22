@@ -24,7 +24,6 @@ import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import { buildPromotedCompanionReadModel, buildVisitScopeReadModel } from "@/lib/jobs/visit-scope";
 import { listInternalNotifications } from "@/lib/actions/notification-read-actions";
-import { CONTRACTOR_UPDATE_NOTIFICATION_TYPES } from "@/lib/notifications/internal-awareness";
 import OperationalReportingSection from "./_components/OperationalReportingSection";
 import {
   buildOperationalReportingReadModel,
@@ -1187,27 +1186,22 @@ const { data: signalEvents, error: signalErr } = await supabase
   .order("created_at", { ascending: false });
 
 if (signalErr) throw signalErr;
-const { data: unreadContractorUpdateNotifications, error: unreadContractorUpdateNotificationsErr } = await supabase
-  .from("notifications")
-  .select("job_id, notification_type, created_at")
-  .eq("recipient_type", "internal")
-  .is("read_at", null)
-  .in(
-    "job_id",
-    allOpenOpsJobIds.length
-      ? allOpenOpsJobIds
-      : ["00000000-0000-0000-0000-000000000000"]
-  )
-  .in("notification_type", [...CONTRACTOR_UPDATE_NOTIFICATION_TYPES])
-  .order("created_at", { ascending: false });
-
-if (unreadContractorUpdateNotificationsErr) throw unreadContractorUpdateNotificationsErr;
-
 const unreadContractorAwarenessNotifications = await listInternalNotifications({
   limit: 100,
   onlyUnread: true,
   filterKey: "contractor_updates",
 });
+
+const unreadContractorUpdateNotifications = unreadContractorAwarenessNotifications
+  .filter((notification) => {
+    const jobId = String(notification.job_id ?? "").trim();
+    return Boolean(jobId);
+  })
+  .map((notification) => ({
+    job_id: String(notification.job_id ?? "").trim(),
+    notification_type: String(notification.notification_type ?? "").trim(),
+    created_at: String(notification.created_at ?? "").trim(),
+  }));
 
 const { data: failedRuns, error: failedRunsErr } = await supabase
   .from("ecc_test_runs")
