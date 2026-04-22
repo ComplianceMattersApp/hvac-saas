@@ -911,7 +911,7 @@ if (!updatedInvoiceRow?.id || updatedInvoiceRow.invoice_complete !== true) {
   throw new Error("Invoice complete update failed (no row updated).");
 }
 
-if (!job.data_entry_completed_at && updatedInvoiceRow.data_entry_completed_at !== completedAt) {
+if (!job.data_entry_completed_at && !updatedInvoiceRow.data_entry_completed_at) {
   throw new Error("Data entry completion update failed (timestamp missing).");
 }
 

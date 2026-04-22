@@ -186,7 +186,7 @@ export async function markInvoiceSent(jobId: string): Promise<void> {
       throw new Error("Invoice complete update failed (no row updated).");
     }
 
-    if (!job.data_entry_completed_at && updatedJob.data_entry_completed_at !== completedAt) {
+    if (!job.data_entry_completed_at && !updatedJob.data_entry_completed_at) {
       throw new Error("Data entry completion update failed (timestamp missing).");
     }
 
