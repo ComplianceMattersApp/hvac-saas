@@ -267,6 +267,35 @@ Completed RLS / permission hardening slices for the current stabilized baseline:
 - the hardened internal operational mutation paths now explicitly assert same-account scope before proceeding instead of relying on `user is internal` alone
 - cross-account internal mutation is denied on the targeted hardened paths
 - the completed targeted mutation-boundary slice covers visit scope mutation and service contract / linked service-case mutation
+- internal same-account job-detail operational mutation boundary hardening is also complete
+- targeted internal `/jobs/[id]` ops-lane mutations no longer rely on internal-user membership alone for the hardened paths
+- same-account scope is now explicitly asserted before the targeted ops-lane mutations proceed
+- cross-account internal mutation is denied on the targeted ops-lane hardened paths
+- the completed targeted ops-lane mutation-boundary slice covers resolve failure by correction review, mark certs complete, mark invoice complete, update job ops details, update job ops state, mark field complete, and customer contact attempt logging
+- this was a targeted internal job-detail operational mutation-boundary slice, not a full jobs/service_cases/job_events permission-model rewrite
+- internal same-account pending-info release / re-evaluate mutation boundary hardening is also complete
+- targeted internal `/jobs/[id]` release / re-evaluate form entrypoints no longer rely on internal-user membership alone for the hardened paths
+- same-account scope is now explicitly asserted before the targeted release/re-evaluate mutations proceed
+- cross-account internal mutation is denied on the targeted release/re-evaluate hardened paths
+- the completed targeted release/re-evaluate mutation-boundary slice covers `releasePendingInfoAndRecomputeFromForm` and `releaseAndReevaluateFromForm`
+- this was a targeted release/re-evaluate ops-lane mutation-boundary slice, not a full jobs/job_events permission-model rewrite
+- internal same-account service closeout mutation boundary hardening is also complete
+- targeted internal `/jobs/[id]` service closeout actions no longer rely on internal-user membership alone for the hardened paths
+- same-account scope is now explicitly asserted before the targeted service closeout mutations proceed
+- cross-account internal mutation is denied on the targeted service closeout hardened paths
+- the completed targeted service closeout mutation-boundary slice covers `markServiceComplete` and `markInvoiceSent`
+- denied targeted service closeout paths do not write `jobs`, `service_cases`, or `job_events`
+- contractor authority was not expanded in this targeted service closeout slice
+- this was a targeted service closeout mutation-boundary slice, not a full jobs/service_cases/job_events permission-model rewrite
+- internal same-account contractor report preview/send boundary hardening is also complete
+- targeted internal contractor report preview/send paths no longer rely on internal-user membership alone for the hardened paths
+- same-account scope is now explicitly asserted before the targeted contractor report actions proceed
+- cross-account internal access is denied on the targeted contractor report paths
+- the completed targeted contractor-report boundary slice covers `generateContractorReportPreview` and `sendContractorReport`
+- denied targeted contractor-report paths do not write `jobs` or `job_events`
+- denied targeted contractor-report paths do not enqueue or send contractor-report notifications/emails
+- contractor authority was not expanded in this targeted contractor-report slice
+- this was a targeted contractor-report boundary hardening slice, not a full jobs/job_events permission-model rewrite
 - internal job attachments / attachment-storage account-scope hardening is also complete
 - the hardened internal attachment flows now explicitly assert same-account scope before proceeding instead of relying on broad internal access alone
 - cross-account internal attachment/storage access is denied on the targeted hardened paths
@@ -297,6 +326,7 @@ Completed RLS / permission hardening slices for the current stabilized baseline:
 What this completion does not mean:
 - it does not mean RLS completion / permission hardening is finished overall
 - it does not mean the full broader jobs/service-cases permission model is finished
+- it does not mean the full broader jobs/service_cases/job_events operational mutation model is finished across every path
 - it does not mean the full broader attachment permission model is finished
 - it does not mean the full broader ECC permission model is finished
 - it does not mean the full broader equipment/system permission model is finished

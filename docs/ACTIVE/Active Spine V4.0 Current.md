@@ -1094,7 +1094,7 @@ Current position:
 - Service model buildout is closed for milestone-1 scope.
 - Billing / invoice workflow is complete enough to move forward for milestone-2 scope.
 - Reporting / analytics is now substantially complete for the current milestone-3 scope.
-- Completed RLS / permission hardening slices for the current stabilized baseline now include customer/location internal account-owner reconciliation, notifications internal-awareness write-path hardening, targeted internal same-account job/service-case mutation boundary hardening, internal job attachments / attachment-storage account-scope hardening, internal ECC test-run account-scope hardening, and internal job_equipment / job_systems account-scope hardening:
+- Completed RLS / permission hardening slices for the current stabilized baseline now include customer/location internal account-owner reconciliation, notifications internal-awareness write-path hardening, targeted internal same-account job/service-case mutation boundary hardening, internal same-account job-detail operational mutation boundary hardening, internal same-account pending-info release / re-evaluate mutation boundary hardening, internal same-account service closeout mutation boundary hardening, internal same-account contractor report preview/send boundary hardening, internal job attachments / attachment-storage account-scope hardening, internal ECC test-run account-scope hardening, and internal job_equipment / job_systems account-scope hardening:
   - jobs and service_cases were already ahead on account-owner-aware internal read scope
   - customers and locations are now reconciled to that same internal account-owner model for internal same-account teammates
   - validated passed for customer list, customer detail, internal `/jobs/new` guided lookup, and location detail for non-owner internal teammates
@@ -1103,6 +1103,35 @@ Current position:
   - same-account scope is now explicitly asserted before the targeted internal operational mutations proceed
   - cross-account internal mutation is denied on the targeted hardened paths
   - the completed targeted mutation-boundary slice covers visit scope mutation and service contract / linked service-case mutation
+  - internal same-account job-detail operational mutation boundary hardening is also complete
+  - targeted internal `/jobs/[id]` ops-lane mutations no longer rely on `user is internal` alone for the hardened paths
+  - same-account scope is now explicitly asserted before the targeted ops-lane mutations proceed
+  - cross-account internal mutation is denied on the targeted ops-lane hardened paths
+  - the completed targeted ops-lane mutation-boundary slice covers resolve failure by correction review, mark certs complete, mark invoice complete, update job ops details, update job ops state, mark field complete, and customer contact attempt logging
+  - this was a targeted internal job-detail operational mutation-boundary slice, not a full jobs/service_cases/job_events permission-model rewrite
+  - internal same-account pending-info release / re-evaluate mutation boundary hardening is also complete
+  - targeted internal `/jobs/[id]` release / re-evaluate form entrypoints no longer rely on `user is internal` alone for the hardened paths
+  - same-account scope is now explicitly asserted before the targeted release/re-evaluate mutations proceed
+  - cross-account internal mutation is denied on the targeted release/re-evaluate hardened paths
+  - the completed targeted release/re-evaluate mutation-boundary slice covers `releasePendingInfoAndRecomputeFromForm` and `releaseAndReevaluateFromForm`
+  - this was a targeted release/re-evaluate ops-lane mutation-boundary slice, not a full jobs/job_events permission-model rewrite
+  - internal same-account service closeout mutation boundary hardening is also complete
+  - targeted internal `/jobs/[id]` service closeout actions no longer rely on internal-user membership alone for the hardened paths
+  - same-account scope is now explicitly asserted before the targeted service closeout mutations proceed
+  - cross-account internal mutation is denied on the targeted service closeout hardened paths
+  - the completed targeted service closeout mutation-boundary slice covers `markServiceComplete` and `markInvoiceSent`
+  - denied targeted service closeout paths do not write `jobs`, `service_cases`, or `job_events`
+  - contractor authority was not expanded in this targeted service closeout slice
+  - this was a targeted service closeout mutation-boundary slice, not a full jobs/service_cases/job_events permission-model rewrite
+  - internal same-account contractor report preview/send boundary hardening is also complete
+  - targeted internal contractor report preview/send paths no longer rely on internal-user membership alone for the hardened paths
+  - same-account scope is now explicitly asserted before the targeted contractor report actions proceed
+  - cross-account internal access is denied on the targeted contractor report paths
+  - the completed targeted contractor-report boundary slice covers `generateContractorReportPreview` and `sendContractorReport`
+  - denied targeted contractor-report paths do not write `jobs` or `job_events`
+  - denied targeted contractor-report paths do not enqueue or send contractor-report notifications/emails
+  - contractor authority was not expanded in this targeted contractor-report slice
+  - this was a targeted contractor-report boundary hardening slice, not a full jobs/job_events permission-model rewrite
   - targeted internal attachment flows no longer rely on broad internal access alone for the hardened paths
   - same-account scope is now explicitly asserted before targeted internal attachment/storage mutations proceed
   - cross-account internal attachment/storage access is denied on the targeted hardened paths
@@ -1161,10 +1190,14 @@ Current clarification:
 - customer/location internal account-owner reconciliation is complete inside that milestone
 - notifications internal-awareness write-path hardening is also complete inside that milestone
 - targeted internal same-account job/service-case mutation boundary hardening is also complete inside that milestone
+- internal same-account job-detail operational mutation boundary hardening is also complete inside that milestone
+- internal same-account pending-info release / re-evaluate mutation boundary hardening is also complete inside that milestone
+- internal same-account service closeout mutation boundary hardening is also complete inside that milestone
+- internal same-account contractor report preview/send boundary hardening is also complete inside that milestone
 - internal job attachments / attachment-storage account-scope hardening is also complete inside that milestone
 - internal ECC test-run account-scope hardening is also complete inside that milestone
 - internal job_equipment / job_systems account-scope hardening is also complete inside that milestone
-- these completions are limited to targeted internal operational mutation, attachment/account-scope hardening, ECC truth/account-scope hardening, and equipment/system account-scope hardening, not a full jobs/service_cases, attachment, ECC, or equipment/system permission-model rewrite
+- these completions are limited to targeted internal mutation-boundary slices (including the `/jobs/[id]` ops-lane job-detail slice, targeted release/re-evaluate slice, targeted service closeout slice, and targeted contractor-report preview/send slice), attachment/account-scope hardening, ECC truth/account-scope hardening, and equipment/system account-scope hardening, not a full jobs/service_cases/job_events, attachment, ECC, or equipment/system permission-model rewrite
 - broader hardening work is not yet closed
 
 This stays aligned to the current roadmap order already in the spine while accurately marking reporting as no longer the active incomplete milestone.

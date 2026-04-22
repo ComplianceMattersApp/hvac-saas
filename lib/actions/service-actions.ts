@@ -2,6 +2,8 @@
 "use server";
 
 import { requireInternalUser } from "@/lib/auth/internal-user";
+import { isInternalAccessError } from "@/lib/auth/internal-user";
+import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope";
 import { createClient } from "@/lib/supabase/server";
 import { setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
@@ -21,6 +23,55 @@ function hasManualCloseoutLock(value?: string | null) {
   return CLOSEOUT_MANUAL_LOCK_STATUSES.has(String(value ?? "").trim().toLowerCase());
 }
 
+type ScopedServiceCloseoutJob = {
+  id: string;
+  job_type: string | null;
+  ops_status: string | null;
+  status: string | null;
+  field_complete: boolean | null;
+  service_case_id: string | null;
+  service_visit_outcome: string | null;
+  invoice_complete: boolean | null;
+  data_entry_completed_at: string | null;
+};
+
+async function requireInternalScopedServiceCloseoutJob(params: {
+  supabase: any;
+  jobId: string;
+  select: string;
+}) {
+  const jobId = String(params.jobId ?? "").trim();
+
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    authz = await requireInternalUser({ supabase: params.supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      if (error.code === "AUTH_REQUIRED") {
+        redirect("/login");
+      }
+      redirect(`/jobs/${jobId}?notice=not_authorized`);
+    }
+    throw error;
+  }
+
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: String(authz.internalUser.account_owner_user_id ?? "").trim(),
+    jobId,
+    select: params.select,
+  });
+
+  if (!scopedJob?.id) {
+    redirect(`/jobs/${jobId}?notice=not_authorized`);
+  }
+
+  return {
+    userId: authz.userId,
+    internalUser: authz.internalUser,
+    job: scopedJob as ScopedServiceCloseoutJob,
+  };
+}
+
 /**
  * Service jobs:
  * - When marked complete -> field_complete = true, status = completed,
@@ -33,15 +84,12 @@ function hasManualCloseoutLock(value?: string | null) {
 
 export async function markServiceComplete(jobId: string): Promise<void> {
   const supabase = await createClient();
-  await requireInternalUser({ supabase });
-
-  const { data: job, error } = await supabase
-    .from("jobs")
-    .select("id, job_type, ops_status, status, field_complete, service_case_id, service_visit_outcome")
-    .eq("id", jobId)
-    .single();
-
-  if (error) throw new Error(error.message);
+  const { userId: actingUserId, job } = await requireInternalScopedServiceCloseoutJob({
+    supabase,
+    jobId,
+    select:
+      "job_type, ops_status, status, field_complete, service_case_id, service_visit_outcome",
+  });
 
   if (job.job_type !== "service") {
     throw new Error("markServiceComplete can only be used for Service jobs.");
@@ -69,11 +117,6 @@ export async function markServiceComplete(jobId: string): Promise<void> {
     .eq("id", jobId);
 
   if (updateErr) throw new Error(updateErr.message);
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const actingUserId = user?.id ?? null;
 
   if (job.service_case_id && String(job.service_visit_outcome ?? "").trim().toLowerCase() === "resolved") {
     const { error: serviceCaseErr } = await supabase
@@ -129,7 +172,12 @@ export async function markServiceComplete(jobId: string): Promise<void> {
 
 export async function markInvoiceSent(jobId: string): Promise<void> {
   const supabase = await createClient();
-  const { userId: actingUserId, internalUser } = await requireInternalUser({ supabase });
+  const { userId: actingUserId, internalUser, job } = await requireInternalScopedServiceCloseoutJob({
+    supabase,
+    jobId,
+    select: "job_type, ops_status, invoice_complete, data_entry_completed_at",
+  });
+
   const billingMode = await resolveBillingModeByAccountOwnerId({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
@@ -139,14 +187,6 @@ export async function markInvoiceSent(jobId: string): Promise<void> {
     revalidatePath(`/jobs/${jobId}`);
     redirect(`/jobs/${jobId}?banner=internal_invoicing_billing_pending`);
   }
-
-  const { data: job, error } = await supabase
-    .from("jobs")
-    .select("id, job_type, ops_status, invoice_complete, data_entry_completed_at")
-    .eq("id", jobId)
-    .single();
-
-  if (error) throw new Error(error.message);
 
   if (job.job_type !== "service") {
     throw new Error("markInvoiceSent can only be used for Service jobs.");

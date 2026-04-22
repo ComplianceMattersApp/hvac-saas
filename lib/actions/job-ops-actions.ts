@@ -13,6 +13,7 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
+import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope";
 import {
   findExistingContractorReportEmailDelivery,
   insertContractorReportEmailDeliveryNotification,
@@ -85,7 +86,18 @@ async function requireInternalOpsAccessOrRedirect(
   jobId: string,
 ) {
   try {
-    return await requireInternalUser({ supabase, userId });
+    const authz = await requireInternalUser({ supabase, userId });
+    const scopedJob = await loadScopedInternalJobForMutation({
+      accountOwnerUserId: authz.internalUser.account_owner_user_id,
+      jobId,
+      select: "id",
+    });
+
+    if (!scopedJob?.id) {
+      redirect(`/jobs/${jobId}?notice=not_authorized`);
+    }
+
+    return authz;
   } catch (error) {
     if (isInternalAccessError(error)) {
       redirect(`/jobs/${jobId}?notice=not_authorized`);
@@ -300,6 +312,22 @@ async function requireInternalUserOrThrow(supabase: any) {
   return user;
 }
 
+async function requireInternalScopedJobUserOrThrow(supabase: any, jobId: string) {
+  const user = await requireInternalUserOrThrow(supabase);
+  const authz = await requireInternalUser({ supabase, userId: user.id });
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+    jobId,
+    select: "id",
+  });
+
+  if (!scopedJob?.id) {
+    throw new Error("Not authorized");
+  }
+
+  return user;
+}
+
 async function resolveContractorReportForJob(params: {
   supabase: any;
   jobId: string;
@@ -454,7 +482,7 @@ export async function generateContractorReportPreview(input: {
   const jobId = String(input.jobId ?? "").trim();
   if (!jobId) throw new Error("Missing jobId");
 
-  await requireInternalUserOrThrow(supabase);
+  await requireInternalScopedJobUserOrThrow(supabase, jobId);
   const report = await resolveContractorReportForJob({ supabase, jobId });
 
   return {
@@ -479,7 +507,7 @@ export async function sendContractorReport(input: {
   const jobId = String(input.jobId ?? "").trim();
   if (!jobId) throw new Error("Missing jobId");
 
-  const user = await requireInternalUserOrThrow(supabase);
+  const user = await requireInternalScopedJobUserOrThrow(supabase, jobId);
   const report = await resolveContractorReportForJob({ supabase, jobId });
 
   const { data: job, error: jobErr } = await supabase
@@ -986,10 +1014,16 @@ if (!job.data_entry_completed_at && !updatedInvoiceRow.data_entry_completed_at) 
 }
 export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
-  await requireInternalUser({ supabase });
 
   const jobId = formData.get('job_id');
   if (typeof jobId !== 'string' || !jobId) throw new Error('Missing job_id');
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from('jobs')
@@ -1292,8 +1326,16 @@ export async function releaseAndReevaluate(
 }
 
 export async function releasePendingInfoAndRecomputeFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
   const jobId = String(formData.get("job_id") ?? "").trim();
   if (!jobId) throw new Error("Missing job_id");
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
 
   await releasePendingInfoAndRecompute(jobId, "manual_release_pending_info");
 
@@ -1305,8 +1347,16 @@ export async function releasePendingInfoAndRecomputeFromForm(formData: FormData)
 }
 
 export async function releaseAndReevaluateFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
   const jobId = String(formData.get("job_id") ?? "").trim();
   if (!jobId) throw new Error("Missing job_id");
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
 
   await releaseAndReevaluate(jobId, "manual_release_and_reevaluate");
 
@@ -1319,7 +1369,6 @@ export async function releaseAndReevaluateFromForm(formData: FormData): Promise<
 
 export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
-  await requireInternalUser({ supabase });
 
   const jobId = formData.get("job_id");
   const opsStatusRaw = formData.get("ops_status");
@@ -1328,6 +1377,13 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   if (typeof jobId !== "string" || !jobId) {
     throw new Error("Missing job_id");
   }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
 
   if (typeof opsStatusRaw !== "string" || !opsStatusRaw.trim()) {
     throw new Error("Missing ops_status");
@@ -1431,10 +1487,20 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
 
 export async function markJobFieldCompleteFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
-  const { userId: actingUserId } = await requireInternalUser({ supabase });
 
   const jobId = formData.get("job_id");
   if (typeof jobId !== "string" || !jobId) throw new Error("Missing job_id");
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+  const { userId: actingUserId } = await requireInternalOpsAccessOrRedirect(
+    supabase,
+    user.id,
+    jobId,
+  );
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")
