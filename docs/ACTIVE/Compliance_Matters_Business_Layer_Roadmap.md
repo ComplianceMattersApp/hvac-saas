@@ -314,6 +314,52 @@ Completed RLS / permission hardening slices for the current stabilized baseline:
 - the completed targeted equipment/system account-scope slice covers add equipment, update equipment, delete equipment, and coupled system creation, reuse, and orphan delete behavior inside those flows
 - matching `job_equipment` / `job_systems` policy reconciliation was completed for this seam
 - this was a targeted equipment/system account-scope slice, not a full equipment/system domain rewrite or full equipment/system permission-model completion
+- internal same-account lifecycle/scheduling mutation boundary hardening is also complete
+- targeted lifecycle/scheduling actions no longer rely on internal-user membership alone for the hardened paths
+- same-account scope is now explicitly asserted before targeted lifecycle/scheduling mutations proceed
+- cross-account internal mutation is denied on the targeted lifecycle/scheduling hardened paths
+- the completed targeted lifecycle/scheduling mutation-boundary slice covers `advanceJobStatusFromForm`, `revertOnTheWayFromForm`, and `updateJobScheduleFromForm`
+- denied targeted lifecycle/scheduling paths do not write `jobs` or `job_events`
+- denied targeted schedule paths do not enqueue or send customer/contractor scheduling emails
+- contractor authority was not expanded in this targeted lifecycle/scheduling slice
+- this was a targeted lifecycle/scheduling mutation-boundary slice, not a full jobs/job_events permission-model rewrite and not the end of broader RLS hardening
+- contractor CRUD mutation boundary hardening is also complete
+- targeted contractor mutation paths no longer rely on incomplete or inconsistent app-layer owner checks for the hardened paths
+- same-account internal scope is now explicitly asserted before targeted contractor mutations proceed
+- cross-account internal mutation is denied on the targeted contractor mutation paths
+- the completed targeted contractor CRUD mutation-boundary slice covers `updateContractorFromForm` and legacy `createContractorFromForm`
+- denied targeted contractor CRUD paths do not write contractor records
+- contractor authority was not expanded in this targeted contractor CRUD slice
+- this was a targeted contractor CRUD mutation-boundary slice, not a full contractor subsystem rewrite and not the end of broader RLS hardening
+- staffing / job assignment mutation boundary hardening is also complete
+- targeted staffing mutation paths no longer rely on internal-user membership plus plain job existence checks alone for the hardened paths
+- same-account internal scope is now explicitly asserted before targeted staffing mutations proceed
+- cross-account internal mutation is denied on the targeted staffing mutation paths
+- the completed targeted staffing / job assignment mutation-boundary slice covers `assignJobAssigneeFromForm`, `setPrimaryJobAssigneeFromForm`, and `removeJobAssigneeFromForm`
+- denied targeted staffing paths do not write `job_assignments`
+- denied targeted staffing paths do not write staffing-related `job_events`
+- assignable-user validation now runs inside actor account scope for the hardened staffing paths
+- matching `job_assignments` account-scope reconciliation was completed for this seam
+- contractor authority was not expanded in this targeted staffing slice
+- this was a targeted staffing / job assignment mutation-boundary slice, not a full staffing subsystem rewrite and not the end of broader RLS hardening
+- job contractor relink mutation boundary hardening is also complete
+- the targeted contractor relink path no longer relies on internal-user membership plus plain job read/update flow alone for the hardened path
+- same-account scope is now explicitly asserted before the targeted contractor relink mutation proceeds
+- cross-account internal mutation is denied on the targeted contractor relink path
+- the completed targeted job contractor relink mutation-boundary slice covers `updateJobContractorFromForm`
+- denied targeted contractor relink paths do not write `jobs`
+- denied targeted contractor relink paths do not write `job_events`
+- forged cross-account `contractor_id` targets are denied before write on the hardened path
+- contractor authority was not expanded in this targeted contractor relink slice
+- this was a targeted job contractor relink mutation-boundary slice, not a full jobs/job_events permission-model rewrite and not the end of broader RLS hardening
+- customer standalone mutation boundary hardening is also complete
+- targeted customer standalone mutation paths no longer rely on internal-membership checks plus direct row mutation alone for the hardened paths
+- same-account customer scope is now explicitly asserted before the targeted customer standalone mutations proceed
+- cross-account internal mutation is denied on the targeted customer standalone paths
+- the completed targeted customer standalone mutation-boundary slice covers `archiveCustomerFromForm` and `updateCustomerNotesFromForm`
+- denied targeted customer standalone paths do not write `customers`
+- contractor authority was not expanded in this targeted customer standalone slice
+- this was a targeted customer standalone mutation-boundary slice, not a full customer subsystem rewrite and not the end of broader RLS hardening
 - contractor authority was not expanded, and this was not a full jobs/service_cases RLS rewrite
 - contractor customer/location visibility remains constrained, read-only, and job-derived
 - notifications internal-awareness write-path hardening is also complete
@@ -327,6 +373,9 @@ What this completion does not mean:
 - it does not mean RLS completion / permission hardening is finished overall
 - it does not mean the full broader jobs/service-cases permission model is finished
 - it does not mean the full broader jobs/service_cases/job_events operational mutation model is finished across every path
+- it does not mean the full broader contractor permission model is finished across every possible path
+- it does not mean the full broader staffing permission model is finished across every possible path
+- it does not mean the full broader customer permission model is finished across every possible path
 - it does not mean the full broader attachment permission model is finished
 - it does not mean the full broader ECC permission model is finished
 - it does not mean the full broader equipment/system permission model is finished

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { requireInternalRole } from "@/lib/auth/internal-user";
+import { loadScopedInternalContractorForMutation } from "@/lib/auth/internal-contractor-scope";
 import { inviteContractor } from "@/lib/actions/contractor-invite-actions";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -105,6 +106,8 @@ export async function updateContractorFromForm(formData: FormData) {
   const { internalUser } = await requireInternalRole(["admin", "office"], {
     supabase,
   });
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  if (!accountOwnerUserId) throw new Error("Missing account owner scope");
 
   const contractor_id = String(formData.get("contractor_id") ?? "").trim();
   if (!contractor_id) throw new Error("Missing contractor_id");
@@ -124,23 +127,11 @@ export async function updateContractorFromForm(formData: FormData) {
   const billing_state = String(formData.get("billing_state") ?? "").trim() || null;
   const billing_zip = String(formData.get("billing_zip") ?? "").trim() || null;
 
-  const { data: existingContractor, error: existingContractorError } = await supabase
-    .from("contractors")
-    .select("id, owner_user_id")
-    .eq("id", contractor_id)
-    .maybeSingle();
-
-  if (existingContractorError) throw new Error(existingContractorError.message);
-  if (!existingContractor?.id) throw new Error("Contractor not found");
-
-  const owner_user_id =
-    String(existingContractor.owner_user_id ?? "").trim() ||
-    String(internalUser.account_owner_user_id ?? "").trim() ||
-    null;
-
-  if (!owner_user_id) {
-    throw new Error("Contractor must have owner_user_id");
-  }
+  const scopedContractor = await loadScopedInternalContractorForMutation({
+    accountOwnerUserId,
+    contractorId: contractor_id,
+  });
+  if (!scopedContractor?.id) throw new Error("Access denied");
 
   const { error } = await supabase
     .from("contractors")
@@ -157,7 +148,7 @@ export async function updateContractorFromForm(formData: FormData) {
       billing_city,
       billing_state,
       billing_zip,
-      owner_user_id,
+      owner_user_id: accountOwnerUserId,
     })
     .eq("id", contractor_id);
 

@@ -25,6 +25,7 @@ import {
   loadScopedInternalEquipmentJobForMutation,
   loadScopedInternalJobEquipmentForMutation,
 } from "@/lib/auth/internal-equipment-scope";
+import { loadScopedInternalContractorForMutation } from "@/lib/auth/internal-contractor-scope";
 import {
   loadScopedInternalEccJobForMutation,
   loadScopedInternalEccTestRunForMutation,
@@ -1483,13 +1484,15 @@ async function addJobAssignment(params: {
   jobId: string;
   userId: string;
   assignedBy: string;
+  accountOwnerUserId?: string | null;
   isPrimary?: boolean;
 }): Promise<JobAssignment> {
-  const { supabase, jobId, userId, assignedBy, isPrimary = false } = params;
+  const { supabase, jobId, userId, assignedBy, accountOwnerUserId = null, isPrimary = false } = params;
 
   await assertAssignableInternalUser({
     supabase,
     userId,
+    accountOwnerUserId,
   });
 
   const { data, error } = await supabase
@@ -1651,8 +1654,9 @@ async function ensureActiveAssignmentForUser(params: {
   jobId: string;
   userId: string;
   actorUserId: string;
+  accountOwnerUserId?: string | null;
 }): Promise<JobAssignment> {
-  const { supabase, jobId, userId, actorUserId } = params;
+  const { supabase, jobId, userId, actorUserId, accountOwnerUserId = null } = params;
 
   // Fast path: active row already exists
   const { data: existing, error: selectErr } = await supabase
@@ -1677,6 +1681,7 @@ async function ensureActiveAssignmentForUser(params: {
       jobId,
       userId,
       assignedBy: actorUserId,
+      accountOwnerUserId,
       isPrimary: false,
     });
   } catch (addErr: any) {
@@ -3597,19 +3602,34 @@ revalidateEccProjectionConsumers(jobId);
 }
 
 export async function createContractorFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalRole(["admin", "office"], {
+    supabase,
+  });
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  if (!accountOwnerUserId) throw new Error("Missing account owner scope");
+
   const name = String(formData.get("name") || "").trim();
   const phone = String(formData.get("phone") || "").trim() || null;
   const email = String(formData.get("email") || "").trim() || null;
   const notes = String(formData.get("notes") || "").trim() || null;
   const returnPath = String(formData.get("return_path") || "").trim();
+  const postedOwnerUserId = String(formData.get("owner_user_id") || "").trim();
 
   if (!name) throw new Error("Contractor name is required");
-
-  const supabase = await createClient();
+  if (postedOwnerUserId && postedOwnerUserId !== accountOwnerUserId) {
+    throw new Error("Access denied");
+  }
 
   const { data, error } = await supabase
     .from("contractors")
-    .insert({ name, phone, email, notes })
+    .insert({
+      name,
+      phone,
+      email,
+      notes,
+      owner_user_id: accountOwnerUserId,
+    })
     .select("id, name, phone, email")
     .single();
 
@@ -3624,7 +3644,6 @@ export async function createContractorFromForm(formData: FormData) {
 
 export async function updateJobContractorFromForm(formData: FormData) {
   const supabase = await createClient();
-  const { userId: actingUserId } = await requireInternalUser({ supabase });
 
   const jobId = String(formData.get("job_id") || "").trim();
   const contractorIdRaw = String(formData.get("contractor_id") || "").trim();
@@ -3635,6 +3654,46 @@ export async function updateJobContractorFromForm(formData: FormData) {
 
   // empty string means "clear"
   const contractor_id = contractorIdRaw ? contractorIdRaw : null;
+
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId,
+    onUnauthorized: () => {
+      redirectToJobWithBanner({
+        jobId,
+        banner: "not_authorized",
+        tabRaw,
+        returnToRaw,
+      });
+    },
+  });
+
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  if (!accountOwnerUserId) {
+    redirectToJobWithBanner({
+      jobId,
+      banner: "not_authorized",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  if (contractor_id) {
+    const scopedContractor = await loadScopedInternalContractorForMutation({
+      accountOwnerUserId,
+      contractorId: contractor_id,
+      select: "id",
+    });
+
+    if (!scopedContractor?.id) {
+      redirectToJobWithBanner({
+        jobId,
+        banner: "not_authorized",
+        tabRaw,
+        returnToRaw,
+      });
+    }
+  }
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")
@@ -3788,22 +3847,17 @@ export async function assignJobAssigneeFromForm(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { userId: actorUserId } = await requireInternalUser({ supabase });
-
-  const { data: jobExists, error: jobErr } = await supabase
-    .from("jobs")
-    .select("id")
-    .eq("id", jobId)
-    .maybeSingle();
-
-  if (jobErr) throw jobErr;
-  if (!jobExists?.id) throw new Error("Job not found");
+  const { userId: actorUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId,
+  });
 
   await ensureActiveAssignmentForUser({
     supabase,
     jobId,
     userId,
     actorUserId,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   if (makePrimary) {
@@ -3838,16 +3892,10 @@ export async function setPrimaryJobAssigneeFromForm(formData: FormData) {
   if (!userId) throw new Error("Missing user_id");
 
   const supabase = await createClient();
-  const { userId: actorUserId } = await requireInternalUser({ supabase });
-
-  const { data: jobExists, error: jobErr } = await supabase
-    .from("jobs")
-    .select("id")
-    .eq("id", jobId)
-    .maybeSingle();
-
-  if (jobErr) throw jobErr;
-  if (!jobExists?.id) throw new Error("Job not found");
+  const { userId: actorUserId } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId,
+  });
 
   await setPrimaryJobAssignment({
     supabase,
@@ -3879,16 +3927,10 @@ export async function removeJobAssigneeFromForm(formData: FormData) {
   if (!userId) throw new Error("Missing user_id");
 
   const supabase = await createClient();
-  const { userId: actorUserId } = await requireInternalUser({ supabase });
-
-  const { data: jobExists, error: jobErr } = await supabase
-    .from("jobs")
-    .select("id")
-    .eq("id", jobId)
-    .maybeSingle();
-
-  if (jobErr) throw jobErr;
-  if (!jobExists?.id) throw new Error("Job not found");
+  const { userId: actorUserId } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId,
+  });
 
   await softRemoveJobAssignment({
     supabase,
