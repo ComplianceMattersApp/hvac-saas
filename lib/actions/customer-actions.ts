@@ -15,6 +15,33 @@ function toFullName(first?: string | null, last?: string | null) {
   return [f, l].filter(Boolean).join(" ").trim();
 }
 
+async function requireInternalScopedCustomerForMutation(params: {
+  supabase: any;
+  customerId: string;
+}) {
+  const customerId = String(params.customerId ?? "").trim();
+  if (!customerId) throw new Error("Missing customer_id");
+
+  const { internalUser } = await requireInternalUser({ supabase: params.supabase });
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  if (!accountOwnerUserId) throw new Error("Missing account owner scope");
+
+  const admin = createAdminClient();
+  const { data: scopedCustomer, error: scopedCustomerErr } = await admin
+    .from("customers")
+    .select("id")
+    .eq("id", customerId)
+    .eq("owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (scopedCustomerErr) throw scopedCustomerErr;
+  if (!scopedCustomer?.id) {
+    throw new Error("Customer not found in internal account scope");
+  }
+
+  return { internalUser, accountOwnerUserId, customerId };
+}
+
 export async function upsertCustomerProfileFromForm(formData: FormData) {
   const supabase = await createClient();
   const admin = createAdminClient();
@@ -111,9 +138,13 @@ export async function upsertCustomerProfileFromForm(formData: FormData) {
 export async function archiveCustomerFromForm(formData: FormData) {
   "use server";
   const supabase = await createClient();
+  const customer_id = String(formData.get("customer_id") ?? "").trim();
 
   try {
-    await requireInternalUser({ supabase });
+    await requireInternalScopedCustomerForMutation({
+      supabase,
+      customerId: customer_id,
+    });
   } catch (error) {
     if (isInternalAccessError(error)) {
       redirect("/login");
@@ -121,9 +152,6 @@ export async function archiveCustomerFromForm(formData: FormData) {
 
     throw error;
   }
-
-  const customer_id = String(formData.get("customer_id") ?? "").trim();
-  if (!customer_id) throw new Error("Missing customer_id");
 
   // Safety: do not archive if customer has jobs
   const { count: jobsCount, error: jobsErr } = await supabase
@@ -154,9 +182,13 @@ export async function archiveCustomerFromForm(formData: FormData) {
 
 export async function updateCustomerNotesFromForm(formData: FormData) {
   const supabase = await createClient();
+  const customer_id = String(formData.get("customer_id") ?? "").trim();
 
   try {
-    await requireInternalUser({ supabase });
+    await requireInternalScopedCustomerForMutation({
+      supabase,
+      customerId: customer_id,
+    });
   } catch (error) {
     if (isInternalAccessError(error)) {
       redirect("/login");
@@ -164,9 +196,6 @@ export async function updateCustomerNotesFromForm(formData: FormData) {
 
     throw error;
   }
-
-  const customer_id = String(formData.get("customer_id") ?? "").trim();
-  if (!customer_id) throw new Error("Missing customer_id");
 
   const notesRaw = String(formData.get("notes") ?? "");
   const notes = notesRaw.trim();
@@ -195,6 +224,11 @@ export async function updateCustomerNotesFromForm(formData: FormData) {
  */
 export async function claimNullOwnerCustomer(customerId: string, _formData: FormData) {
   const supabase = await createClient();
+  const normalizedCustomerId = String(customerId ?? "").trim();
+  if (!normalizedCustomerId) {
+    redirect(`/customers/${customerId}/edit?claimError=missing_customer_id`);
+  }
+
   let internalUser;
   try {
     ({ internalUser } = await requireInternalUser({ supabase }));
@@ -213,28 +247,35 @@ export async function claimNullOwnerCustomer(customerId: string, _formData: Form
   const { data: row, error: rowErr } = await admin
     .from("customers")
     .select("id, owner_user_id")
-    .eq("id", customerId)
+    .eq("id", normalizedCustomerId)
     .maybeSingle();
 
   if (rowErr || !row) {
-    redirect(`/customers/${customerId}/edit?claimError=row_not_found`);
+    redirect(`/customers/${normalizedCustomerId}/edit?claimError=row_not_found`);
   }
 
   if (row.owner_user_id !== null) {
-    redirect(`/customers/${customerId}/edit?claimError=already_owned`);
+    redirect(`/customers/${normalizedCustomerId}/edit?claimError=already_owned`);
   }
 
-  const { error: updateErr } = await admin
+  const { data: claimedRow, error: updateErr } = await admin
     .from("customers")
     .update({ owner_user_id: accountOwnerUserId })
-    .eq("id", customerId)
-    .is("owner_user_id", null); // guard: only update if still null
+    .eq("id", normalizedCustomerId)
+    .is("owner_user_id", null) // guard: only update if still null
+    .select("id, owner_user_id")
+    .maybeSingle();
 
   if (updateErr) {
-    redirect(`/customers/${customerId}/edit?claimError=${encodeURIComponent(updateErr.message)}`);
+    redirect(`/customers/${normalizedCustomerId}/edit?claimError=${encodeURIComponent(updateErr.message)}`);
   }
 
-  revalidatePath(`/customers/${customerId}/edit`);
-  revalidatePath(`/customers/${customerId}`);
-  redirect(`/customers/${customerId}/edit`);
+  const claimedOwnerUserId = String(claimedRow?.owner_user_id ?? "").trim();
+  if (!claimedRow?.id || claimedOwnerUserId !== accountOwnerUserId) {
+    redirect(`/customers/${normalizedCustomerId}/edit?claimError=already_owned`);
+  }
+
+  revalidatePath(`/customers/${normalizedCustomerId}/edit`);
+  revalidatePath(`/customers/${normalizedCustomerId}`);
+  redirect(`/customers/${normalizedCustomerId}/edit`);
 }

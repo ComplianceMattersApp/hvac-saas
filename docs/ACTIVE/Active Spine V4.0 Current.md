@@ -1094,7 +1094,7 @@ Current position:
 - Service model buildout is closed for milestone-1 scope.
 - Billing / invoice workflow is complete enough to move forward for milestone-2 scope.
 - Reporting / analytics is now substantially complete for the current milestone-3 scope.
-- Completed RLS / permission hardening slices for the current stabilized baseline now include customer/location internal account-owner reconciliation, notifications internal-awareness write-path hardening, targeted internal same-account job/service-case mutation boundary hardening, internal same-account job-detail operational mutation boundary hardening, internal same-account pending-info release / re-evaluate mutation boundary hardening, internal same-account service closeout mutation boundary hardening, internal same-account contractor report preview/send boundary hardening, internal job attachments / attachment-storage account-scope hardening, internal ECC test-run account-scope hardening, and internal job_equipment / job_systems account-scope hardening:
+- Completed RLS / permission hardening slices for the current stabilized baseline now include customer/location internal account-owner reconciliation, notifications internal-awareness write-path hardening, targeted internal same-account job/service-case mutation boundary hardening, internal same-account job-detail operational mutation boundary hardening, internal same-account pending-info release / re-evaluate mutation boundary hardening, internal same-account service closeout mutation boundary hardening, internal same-account contractor report preview/send boundary hardening, internal job attachments / attachment-storage account-scope hardening, internal ECC test-run account-scope hardening, internal job_equipment / job_systems account-scope hardening, internal same-account lifecycle/scheduling mutation boundary hardening, contractor CRUD mutation boundary hardening, staffing / job assignment mutation boundary hardening, job contractor relink mutation boundary hardening, and customer standalone mutation boundary hardening:
   - jobs and service_cases were already ahead on account-owner-aware internal read scope
   - customers and locations are now reconciled to that same internal account-owner model for internal same-account teammates
   - validated passed for customer list, customer detail, internal `/jobs/new` guided lookup, and location detail for non-owner internal teammates
@@ -1150,6 +1150,52 @@ Current position:
   - the completed targeted equipment/system account-scope slice covers add equipment, update equipment, delete equipment, and coupled system creation, reuse, and orphan delete behavior inside those flows
   - matching `job_equipment` / `job_systems` policy reconciliation was completed for this seam
   - this was a targeted equipment/system account-scope slice, not a full equipment/system domain rewrite or full equipment/system permission-model completion
+  - internal same-account lifecycle/scheduling mutation boundary hardening is also complete
+  - targeted lifecycle/scheduling actions no longer rely on internal-user membership alone for the hardened paths
+  - same-account scope is now explicitly asserted before targeted lifecycle/scheduling mutations proceed
+  - cross-account internal mutation is denied on the targeted lifecycle/scheduling hardened paths
+  - the completed targeted lifecycle/scheduling mutation-boundary slice covers `advanceJobStatusFromForm`, `revertOnTheWayFromForm`, and `updateJobScheduleFromForm`
+  - denied targeted lifecycle/scheduling paths do not write `jobs` or `job_events`
+  - denied targeted schedule paths do not enqueue or send customer/contractor scheduling emails
+  - contractor authority was not expanded in this targeted lifecycle/scheduling slice
+  - this was a targeted lifecycle/scheduling mutation-boundary slice, not a full jobs/job_events permission-model rewrite and not the end of broader RLS hardening
+  - contractor CRUD mutation boundary hardening is also complete
+  - targeted contractor mutation paths no longer rely on incomplete or inconsistent app-layer owner checks for the hardened paths
+  - same-account internal scope is now explicitly asserted before targeted contractor mutations proceed
+  - cross-account internal mutation is denied on the targeted contractor mutation paths
+  - the completed targeted contractor CRUD mutation-boundary slice covers `updateContractorFromForm` and legacy `createContractorFromForm`
+  - denied targeted contractor CRUD paths do not write contractor records
+  - contractor authority was not expanded in this targeted contractor CRUD slice
+  - this was a targeted contractor CRUD mutation-boundary slice, not a full contractor subsystem rewrite and not the end of broader RLS hardening
+  - staffing / job assignment mutation boundary hardening is also complete
+  - targeted staffing mutation paths no longer rely on internal-user membership plus plain job existence checks alone for the hardened paths
+  - same-account internal scope is now explicitly asserted before targeted staffing mutations proceed
+  - cross-account internal mutation is denied on the targeted staffing mutation paths
+  - the completed targeted staffing / job assignment mutation-boundary slice covers `assignJobAssigneeFromForm`, `setPrimaryJobAssigneeFromForm`, and `removeJobAssigneeFromForm`
+  - denied targeted staffing paths do not write `job_assignments`
+  - denied targeted staffing paths do not write staffing-related `job_events`
+  - assignable-user validation now runs inside actor account scope for the hardened staffing paths
+  - matching `job_assignments` account-scope reconciliation was completed for this seam
+  - contractor authority was not expanded in this targeted staffing slice
+  - this was a targeted staffing / job assignment mutation-boundary slice, not a full staffing subsystem rewrite and not the end of broader RLS hardening
+  - job contractor relink mutation boundary hardening is also complete
+  - the targeted contractor relink path no longer relies on internal-user membership plus plain job read/update flow alone for the hardened path
+  - same-account scope is now explicitly asserted before the targeted contractor relink mutation proceeds
+  - cross-account internal mutation is denied on the targeted contractor relink path
+  - the completed targeted job contractor relink mutation-boundary slice covers `updateJobContractorFromForm`
+  - denied targeted contractor relink paths do not write `jobs`
+  - denied targeted contractor relink paths do not write `job_events`
+  - forged cross-account `contractor_id` targets are denied before write on the hardened path
+  - contractor authority was not expanded in this targeted contractor relink slice
+  - this was a targeted job contractor relink mutation-boundary slice, not a full jobs/job_events permission-model rewrite and not the end of broader RLS hardening
+  - customer standalone mutation boundary hardening is also complete
+  - targeted customer standalone mutation paths no longer rely on internal-membership checks plus direct row mutation alone for the hardened paths
+  - same-account customer scope is now explicitly asserted before the targeted customer standalone mutations proceed
+  - cross-account internal mutation is denied on the targeted customer standalone paths
+  - the completed targeted customer standalone mutation-boundary slice covers `archiveCustomerFromForm` and `updateCustomerNotesFromForm`
+  - denied targeted customer standalone paths do not write `customers`
+  - contractor authority was not expanded in this targeted customer standalone slice
+  - this was a targeted customer standalone mutation-boundary slice, not a full customer subsystem rewrite and not the end of broader RLS hardening
   - contractor authority was not expanded, and this was not a full jobs/service_cases RLS rewrite
   - contractor customer/location visibility remains constrained, read-only, and job-derived
   - notifications remain account-owner-scoped for internal awareness
@@ -1197,7 +1243,21 @@ Current clarification:
 - internal job attachments / attachment-storage account-scope hardening is also complete inside that milestone
 - internal ECC test-run account-scope hardening is also complete inside that milestone
 - internal job_equipment / job_systems account-scope hardening is also complete inside that milestone
+- internal same-account lifecycle/scheduling mutation boundary hardening is also complete inside that milestone
+- contractor CRUD mutation boundary hardening is also complete inside that milestone
+- staffing / job assignment mutation boundary hardening is also complete inside that milestone
+- job contractor relink mutation boundary hardening is also complete inside that milestone
+- customer standalone mutation boundary hardening is also complete inside that milestone
 - these completions are limited to targeted internal mutation-boundary slices (including the `/jobs/[id]` ops-lane job-detail slice, targeted release/re-evaluate slice, targeted service closeout slice, and targeted contractor-report preview/send slice), attachment/account-scope hardening, ECC truth/account-scope hardening, and equipment/system account-scope hardening, not a full jobs/service_cases/job_events, attachment, ECC, or equipment/system permission-model rewrite
+- targeted lifecycle/scheduling mutation-boundary hardening now also covers `advanceJobStatusFromForm`, `revertOnTheWayFromForm`, and `updateJobScheduleFromForm` with same-account assertion and cross-account denial before mutation
+- targeted contractor CRUD mutation-boundary hardening now also covers `updateContractorFromForm` and legacy `createContractorFromForm` with same-account assertion and cross-account denial before mutation
+- targeted staffing / job assignment mutation-boundary hardening now also covers `assignJobAssigneeFromForm`, `setPrimaryJobAssigneeFromForm`, and `removeJobAssigneeFromForm` with same-account assertion and cross-account denial before mutation
+- targeted job contractor relink mutation-boundary hardening now also covers `updateJobContractorFromForm` with same-account assertion, cross-account denial, and forged cross-account `contractor_id` denial before mutation
+- targeted customer standalone mutation-boundary hardening now also covers `archiveCustomerFromForm` and `updateCustomerNotesFromForm` with same-account customer assertion and cross-account denial before mutation
+- this completion does not mean the full broader jobs/job_events operational mutation model is finished across every path, and does not close the broader RLS completion milestone
+- this completion does not mean the full broader contractor permission model is finished across every possible path
+- this completion does not mean the full broader staffing permission model is finished across every possible path
+- this completion does not mean the full broader customer permission model is finished across every possible path
 - broader hardening work is not yet closed
 
 This stays aligned to the current roadmap order already in the spine while accurately marking reporting as no longer the active incomplete milestone.
