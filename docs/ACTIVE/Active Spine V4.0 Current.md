@@ -1094,7 +1094,7 @@ Current position:
 - Service model buildout is closed for milestone-1 scope.
 - Billing / invoice workflow is complete enough to move forward for milestone-2 scope.
 - Reporting / analytics is now substantially complete for the current milestone-3 scope.
-- Completed RLS / permission hardening slices for the current stabilized baseline now include customer/location internal account-owner reconciliation, notifications internal-awareness write-path hardening, targeted internal same-account job/service-case mutation boundary hardening, internal same-account job-detail operational mutation boundary hardening, internal same-account pending-info release / re-evaluate mutation boundary hardening, internal same-account service closeout mutation boundary hardening, internal same-account contractor report preview/send boundary hardening, internal job attachments / attachment-storage account-scope hardening, internal ECC test-run account-scope hardening, internal job_equipment / job_systems account-scope hardening, internal same-account lifecycle/scheduling mutation boundary hardening, contractor CRUD mutation boundary hardening, staffing / job assignment mutation boundary hardening, job contractor relink mutation boundary hardening, and customer standalone mutation boundary hardening:
+- Completed RLS / permission hardening slices for the current stabilized baseline now include customer/location internal account-owner reconciliation, notifications internal-awareness write-path hardening, targeted internal same-account job/service-case mutation boundary hardening, internal same-account job-detail operational mutation boundary hardening, internal same-account pending-info release / re-evaluate mutation boundary hardening, internal same-account service closeout mutation boundary hardening, internal same-account contractor report preview/send boundary hardening, internal job attachments / attachment-storage account-scope hardening, internal ECC test-run account-scope hardening, internal job_equipment / job_systems account-scope hardening, internal same-account lifecycle/scheduling mutation boundary hardening, contractor CRUD mutation boundary hardening, staffing / job assignment mutation boundary hardening, job contractor relink mutation boundary hardening, customer standalone mutation boundary hardening, legacy job-detail entrypoint mutation boundary hardening, internal invoice mutation boundary hardening, and internal notification read-state mutation boundary hardening:
   - jobs and service_cases were already ahead on account-owner-aware internal read scope
   - customers and locations are now reconciled to that same internal account-owner model for internal same-account teammates
   - validated passed for customer list, customer detail, internal `/jobs/new` guided lookup, and location detail for non-owner internal teammates
@@ -1248,13 +1248,31 @@ Current clarification:
 - staffing / job assignment mutation boundary hardening is also complete inside that milestone
 - job contractor relink mutation boundary hardening is also complete inside that milestone
 - customer standalone mutation boundary hardening is also complete inside that milestone
+- legacy job-detail entrypoint mutation boundary hardening is also complete inside that milestone
+- internal invoice mutation boundary hardening is also complete inside that milestone
+- internal notification read-state mutation boundary hardening is also complete inside that milestone
+- targeted legacy job-detail mutation entrypoints no longer rely on missing or incomplete server-side actor/scope enforcement on the hardened paths
+- same-account scope is now explicitly asserted before the targeted legacy job-detail mutations proceed
+- cross-account internal access is denied before write on the targeted legacy job-detail paths
+- non-internal access is denied before write on the targeted legacy job-detail paths
+- denied targeted legacy job-detail paths do not write `jobs` or `job_events`
+- the generic low-level `updateJob` helper was safely reduced to internal-only/non-exported usage
+- this was a targeted legacy job-detail mutation-boundary slice, not a full jobs/job_events permission-model rewrite and not the end of broader RLS hardening
 - these completions are limited to targeted internal mutation-boundary slices (including the `/jobs/[id]` ops-lane job-detail slice, targeted release/re-evaluate slice, targeted service closeout slice, and targeted contractor-report preview/send slice), attachment/account-scope hardening, ECC truth/account-scope hardening, and equipment/system account-scope hardening, not a full jobs/service_cases/job_events, attachment, ECC, or equipment/system permission-model rewrite
 - targeted lifecycle/scheduling mutation-boundary hardening now also covers `advanceJobStatusFromForm`, `revertOnTheWayFromForm`, and `updateJobScheduleFromForm` with same-account assertion and cross-account denial before mutation
 - targeted contractor CRUD mutation-boundary hardening now also covers `updateContractorFromForm` and legacy `createContractorFromForm` with same-account assertion and cross-account denial before mutation
 - targeted staffing / job assignment mutation-boundary hardening now also covers `assignJobAssigneeFromForm`, `setPrimaryJobAssigneeFromForm`, and `removeJobAssigneeFromForm` with same-account assertion and cross-account denial before mutation
 - targeted job contractor relink mutation-boundary hardening now also covers `updateJobContractorFromForm` with same-account assertion, cross-account denial, and forged cross-account `contractor_id` denial before mutation
 - targeted customer standalone mutation-boundary hardening now also covers `archiveCustomerFromForm` and `updateCustomerNotesFromForm` with same-account customer assertion and cross-account denial before mutation
+- targeted internal invoice mutation-boundary hardening now also covers `createInternalInvoiceDraftFromForm`, `saveInternalInvoiceDraftFromForm`, `issueInternalInvoiceFromForm`, `voidInternalInvoiceFromForm`, `addInternalInvoiceLineItemFromForm`, `updateInternalInvoiceLineItemFromForm`, `removeInternalInvoiceLineItemFromForm`, and `sendInternalInvoiceEmailFromForm` with same-account scoped-job preflight assertion and cross-account/non-internal denial before mutation or side effects
+- denied targeted internal invoice paths do not write `internal_invoices`, `internal_invoice_line_items`, `jobs`, `job_events`, or `notifications`, and do not send invoice email side effects
+- targeted internal notification read-state mutation-boundary hardening now also covers `listInternalNotifications`, `markNotificationAsRead`, `markAllNotificationsAsRead`, and `getInternalUnreadNotificationCount` with explicit same-account internal notification scope assertion and cross-account/non-internal denial/exclusion on targeted notification read-state paths
+- denied targeted notification read-state mark paths do not write `notifications` when access is denied
+- this completion does not mean payment execution is live, and does not mean checkout/processor behavior was added
+- this completion does not mean the full broader invoice/billing permission model is finished across every possible path
+- this completion does not mean the full broader notification/messaging permission model is finished across every possible path
 - this completion does not mean the full broader jobs/job_events operational mutation model is finished across every path, and does not close the broader RLS completion milestone
+- this completion does not mean the full broader jobs/job_events operational mutation model is finished across every possible path, and does not close the broader RLS completion milestone
 - this completion does not mean the full broader contractor permission model is finished across every possible path
 - this completion does not mean the full broader staffing permission model is finished across every possible path
 - this completion does not mean the full broader customer permission model is finished across every possible path

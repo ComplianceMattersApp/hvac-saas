@@ -17,6 +17,7 @@ vi.mock("next/cache", () => ({
 
 type NotificationRow = {
   id: string;
+  account_owner_user_id: string;
   job_id: string | null;
   recipient_type: string;
   channel: string;
@@ -101,7 +102,15 @@ describe("internal notification readers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    requireInternalUserMock.mockResolvedValue({ user_id: "internal-1" });
+    requireInternalUserMock.mockResolvedValue({
+      userId: "internal-1",
+      internalUser: {
+        user_id: "internal-1",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
   });
 
   it("keeps proposal notifications visible to internal readers", async () => {
@@ -110,6 +119,7 @@ describe("internal notification readers", () => {
         notifications: [
           {
             id: "notif-proposal",
+            account_owner_user_id: "owner-1",
             job_id: null,
             recipient_type: "internal",
             channel: "in_app",
@@ -123,6 +133,7 @@ describe("internal notification readers", () => {
           },
           {
             id: "notif-email",
+            account_owner_user_id: "owner-1",
             job_id: null,
             recipient_type: "internal",
             channel: "email",

@@ -97,6 +97,24 @@ async function assertOwnerScopedInternalTargetByEmail(params: {
   }
 }
 
+async function assertOwnerScopedContractorTarget(params: {
+  supabase: any;
+  contractorId: string;
+  accountOwnerUserId: string;
+}) {
+  const { data: scopedContractor, error: scopedContractorErr } = await params.supabase
+    .from("contractors")
+    .select("id")
+    .eq("id", params.contractorId)
+    .eq("owner_user_id", params.accountOwnerUserId)
+    .maybeSingle();
+
+  if (scopedContractorErr) throw scopedContractorErr;
+  if (!scopedContractor?.id) {
+    throw new Error("OUT_OF_SCOPE_TARGET");
+  }
+}
+
 function createPasswordRecoveryClient() {
   return createSupabaseJsClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -236,7 +254,7 @@ export async function sendPasswordResetFromForm(formData: FormData): Promise<voi
 
 export async function resendContractorInviteFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
-  await requireInternalRole("admin", { supabase });
+  const { internalUser } = await requireInternalRole("admin", { supabase });
 
   const returnTo = safeReturnTo(String(formData.get("return_to") ?? ""));
   const contractorId = String(formData.get("contractor_id") ?? "").trim();
@@ -244,6 +262,16 @@ export async function resendContractorInviteFromForm(formData: FormData): Promis
 
   if (!contractorId || !email || !email.includes("@")) {
     redirect(withNotice(returnTo, "invalid_invite_target"));
+  }
+
+  try {
+    await assertOwnerScopedContractorTarget({
+      supabase,
+      contractorId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } catch {
+    redirect(returnTo);
   }
 
   await inviteContractor({
@@ -256,7 +284,7 @@ export async function resendContractorInviteFromForm(formData: FormData): Promis
 
 export async function inviteContractorUserFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
-  await requireInternalRole("admin", { supabase });
+  const { internalUser } = await requireInternalRole("admin", { supabase });
 
   const returnTo = safeReturnTo(String(formData.get("return_to") ?? ""));
   const contractorId = String(formData.get("contractor_id") ?? "").trim();
@@ -264,6 +292,16 @@ export async function inviteContractorUserFromForm(formData: FormData): Promise<
 
   if (!contractorId || !email || !email.includes("@")) {
     redirect(withNotice(returnTo, "invalid_invite_target"));
+  }
+
+  try {
+    await assertOwnerScopedContractorTarget({
+      supabase,
+      contractorId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } catch {
+    redirect(returnTo);
   }
 
   await inviteContractor({
