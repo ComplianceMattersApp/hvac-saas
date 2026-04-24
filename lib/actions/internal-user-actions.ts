@@ -170,6 +170,21 @@ async function requireScopedTarget(
   return target;
 }
 
+async function assertTargetNotOwnedByDifferentAccount(params: {
+  admin: any;
+  accountOwnerUserId: string;
+  targetUserId: string;
+}) {
+  const existing = await getInternalUserRecord(params.admin, params.targetUserId);
+  if (!existing) return;
+
+  if (existing.account_owner_user_id !== params.accountOwnerUserId) {
+    throw new Error("TARGET_ACCOUNT_OWNER_MISMATCH");
+  }
+
+  throw new Error("INTERNAL_USER_ALREADY_EXISTS");
+}
+
 async function countActiveAdmins(admin: any, accountOwnerUserId: string) {
   const { count, error } = await admin
     .from("internal_users")
@@ -220,11 +235,11 @@ export async function createInternalUserFromForm(formData: FormData): Promise<vo
   }
 
   const role = parseInternalRole(formData.get("role"));
-
-  const existing = await getInternalUserRecord(admin, targetUserId);
-  if (existing) {
-    throw new Error("INTERNAL_USER_ALREADY_EXISTS");
-  }
+  await assertTargetNotOwnedByDifferentAccount({
+    admin,
+    accountOwnerUserId: actorInternalUser.account_owner_user_id,
+    targetUserId,
+  });
 
   const { error } = await admin
     .from("internal_users")
@@ -379,6 +394,17 @@ export async function inviteInternalUserFromForm(formData: FormData): Promise<vo
 
   let targetUserId: string | null = null;
   let inviteRequested = false;
+
+  const existingAuthUserId = await getAuthUserIdByEmail(admin, email);
+  if (existingAuthUserId) {
+    const existingAuthInternalUser = await getInternalUserRecord(admin, existingAuthUserId);
+    if (
+      existingAuthInternalUser &&
+      existingAuthInternalUser.account_owner_user_id !== actorInternalUser.account_owner_user_id
+    ) {
+      redirect("/ops/admin/internal-users?invite_status=already_internal_other_owner");
+    }
+  }
 
   const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo: resolveInviteRedirectTo(),

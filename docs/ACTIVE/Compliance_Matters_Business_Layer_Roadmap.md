@@ -360,6 +360,40 @@ Completed RLS / permission hardening slices for the current stabilized baseline:
 - denied targeted customer standalone paths do not write `customers`
 - contractor authority was not expanded in this targeted customer standalone slice
 - this was a targeted customer standalone mutation-boundary slice, not a full customer subsystem rewrite and not the end of broader RLS hardening
+- legacy job-detail entrypoint mutation boundary hardening is also complete
+- targeted legacy job-detail mutation entrypoints no longer rely on missing or incomplete server-side actor/scope enforcement on the hardened paths
+- same-account scope is now explicitly asserted before the targeted legacy job-detail mutations proceed
+- cross-account internal access is denied before write on the targeted legacy job-detail paths
+- non-internal access is denied before write on the targeted legacy job-detail paths
+- denied targeted legacy job-detail paths do not write `jobs` or `job_events`
+- the generic low-level `updateJob` helper was safely reduced to internal-only/non-exported usage
+- this was a targeted legacy job-detail mutation-boundary slice, not a full jobs/job_events permission-model rewrite and not the end of broader RLS hardening
+- internal invoice mutation boundary hardening is also complete
+- targeted internal invoice mutation entrypoints no longer rely on internal-user membership plus implicit RLS outcome alone for the hardened paths
+- explicit internal same-account scoped-job preflight is now asserted before targeted internal invoice mutation/side-effect flows proceed
+- cross-account internal access is denied before write on the targeted internal invoice paths
+- non-internal access is denied before write on the targeted internal invoice paths
+- the completed targeted internal invoice mutation-boundary slice covers `createInternalInvoiceDraftFromForm`, `saveInternalInvoiceDraftFromForm`, `issueInternalInvoiceFromForm`, `voidInternalInvoiceFromForm`, `addInternalInvoiceLineItemFromForm`, `updateInternalInvoiceLineItemFromForm`, `removeInternalInvoiceLineItemFromForm`, and `sendInternalInvoiceEmailFromForm`
+- denied targeted internal invoice paths do not write `internal_invoices`, `internal_invoice_line_items`, `jobs`, `job_events`, or `notifications`
+- denied targeted internal invoice paths do not send invoice email side effects
+- this was a targeted internal invoice mutation-boundary slice, not billing feature expansion, not payment execution work, and not the end of broader RLS hardening
+- internal notification read-state mutation boundary hardening is also complete
+- targeted internal notification read-state entrypoints no longer rely on internal membership plus `recipient_type` filtering alone for the hardened paths
+- explicit same-account internal notification scope is now asserted before targeted notification read-state flows proceed
+- cross-account internal access is denied/excluded on the targeted notification read-state paths
+- non-internal access is denied before targeted notification read-state flows proceed
+- the completed targeted internal notification read-state mutation-boundary slice covers `listInternalNotifications`, `markNotificationAsRead`, `markAllNotificationsAsRead`, and `getInternalUnreadNotificationCount`
+- denied targeted notification read-state mark paths do not write `notifications`
+- this was a targeted internal notification read-state mutation-boundary slice, not notification UX redesign, not messaging feature expansion, and not the end of broader RLS hardening
+- internal user/admin identity mutation boundary hardening is also complete
+- targeted internal identity/admin entrypoints no longer rely on internal-membership checks plus downstream mutation/side-effect behavior alone for the hardened paths
+- explicit same-account target preflight is now asserted before targeted internal identity/admin mutation or identity side-effect flows proceed
+- cross-account internal access is denied before targeted internal identity/admin writes and identity side effects
+- non-internal access is denied before targeted internal identity/admin mutation and invite/reset flows proceed
+- the completed targeted internal identity/admin mutation-boundary slice covers `createInternalUserFromForm`, `updateInternalUserRoleFromForm`, `activateInternalUserFromForm`, `deactivateInternalUserFromForm`, `inviteInternalUserFromForm`, `deleteInternalUserFromForm`, `updateInternalUserProfileFromForm`, `resendInternalInviteFromForm`, `sendPasswordResetFromForm`, `resendContractorInviteFromForm`, and `inviteContractorUserFromForm`
+- denied targeted internal identity/admin paths do not write `internal_users`
+- denied targeted internal identity/admin paths do not trigger `inviteUserByEmail`, `resetPasswordForEmail`, or `inviteContractor` side effects
+- this was a targeted internal identity/admin mutation-boundary slice, not role redesign, not support-access modeling, and not the end of broader RLS hardening
 - contractor authority was not expanded, and this was not a full jobs/service_cases RLS rewrite
 - contractor customer/location visibility remains constrained, read-only, and job-derived
 - notifications internal-awareness write-path hardening is also complete
@@ -379,10 +413,18 @@ What this completion does not mean:
 - it does not mean the full broader attachment permission model is finished
 - it does not mean the full broader ECC permission model is finished
 - it does not mean the full broader equipment/system permission model is finished
+- it does not mean payment execution is live
+- it does not mean checkout/processor behavior was added
+- it does not mean the full broader invoice/billing permission model is finished across every possible path
+- it does not mean the full broader notification/messaging permission model is finished across every possible path
+- it does not mean the full broader internal identity/admin permission model is finished across every possible path
+- it does not mean full auth/identity lifecycle redesign was done
 - it does not mean contractor notifications were introduced
 - it does not mean support-access modeling is complete
 - it does not mean role redesign was done
 - it does not mean payment/billing/security work outside this seam was done
+- no contractor authority expansion happened in this targeted invoice hardening slice
+- no notification UX redesign happened in this targeted internal notification read-state hardening slice
 
 The next active major roadmap item remains RLS completion / permission hardening until the broader hardening milestone is actually closed.
 

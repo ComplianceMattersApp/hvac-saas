@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { requireInternalUser } from '@/lib/auth/internal-user';
+import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
 import {
   resolveBillingModeByAccountOwnerId,
   resolveInternalBusinessIdentityByAccountOwnerId,
@@ -265,6 +266,15 @@ async function loadInternalInvoiceContext(formData: FormData) {
   const tab = getTrimmedString(formData.get('tab')) || 'info';
   const supabase = await createClient();
   const { userId, internalUser } = await requireInternalUser({ supabase });
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    select: 'id',
+  });
+
+  if (!scopedJob?.id) {
+    redirect(buildJobDetailHref(jobId, tab, 'not_authorized'));
+  }
 
   const billingMode = await resolveBillingModeByAccountOwnerId({
     supabase,

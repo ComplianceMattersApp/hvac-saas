@@ -2183,7 +2183,6 @@ async function resolveSystemIdForRun(params: {
 
 export async function updateJobTypeFromForm(formData: FormData) {
   const supabase = await createClient();
-  const { userId: actingUserId } = await requireInternalUser({ supabase });
 
   const jobId = String(formData.get("job_id") ?? "").trim();
   const rawType = String(formData.get("job_type") ?? "").trim().toLowerCase();
@@ -2191,6 +2190,11 @@ export async function updateJobTypeFromForm(formData: FormData) {
   if (!jobId) {
     throw new Error("Missing job_id");
   }
+
+  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId,
+  });
 
   const allowed = ["ecc", "service"];
 
@@ -2629,7 +2633,6 @@ export async function updateJobVisitScopeFromForm(formData: FormData) {
 
 export async function promoteCompanionScopeToServiceJobFromForm(formData: FormData) {
   const supabase = await createClient();
-  const { userId: actingUserId } = await requireInternalUser({ supabase });
 
   const sourceJobId = String(formData.get("job_id") || "").trim();
   const itemIndexRaw = String(formData.get("item_index") || "").trim();
@@ -2637,6 +2640,19 @@ export async function promoteCompanionScopeToServiceJobFromForm(formData: FormDa
   const returnToRaw = String(formData.get("return_to") || "").trim();
 
   if (!sourceJobId) throw new Error("Missing job_id");
+
+  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: sourceJobId,
+    onUnauthorized: () => {
+      redirectToJobWithBanner({
+        jobId: sourceJobId,
+        banner: "not_authorized",
+        tabRaw,
+        returnToRaw,
+      });
+    },
+  });
 
   const itemIndex = Number(itemIndexRaw);
   if (!Number.isInteger(itemIndex) || itemIndex < 0) {
@@ -5150,7 +5166,7 @@ export async function addAlterationCoreTestsFromForm(formData: FormData) {
   redirectToTests({ jobId, systemId });
 }
 
-export async function updateJob(input: {
+async function updateJob(input: {
   ops_status?: string | null;
   id: string;
   title?: string;
@@ -7525,6 +7541,12 @@ export async function markJobFailedFromForm(formData: FormData) {
 
   if (!id) throw new Error("Job ID is required");
 
+  const supabase = await createClient();
+  await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: id,
+  });
+
   await updateJob({ id, status: "failed" });
   redirect(`/jobs/${id}`);
 }
@@ -7537,6 +7559,12 @@ export async function updateJobCustomerFromForm(formData: FormData) {
     String(formData.get("id") || "").trim() ||
     String(formData.get("job_id") || "").trim();
   if (!id) throw new Error("Job ID is required");
+
+  const supabase = await createClient();
+  await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: id,
+  });
 
   const customer_first_name = String(formData.get("customer_first_name") || "").trim() || null;
   const customer_last_name = String(formData.get("customer_last_name") || "").trim() || null;
@@ -7568,7 +7596,10 @@ export async function addPublicNoteFromForm(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { userId } = await requireInternalUser({ supabase });
+  const { userId } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId,
+  });
 
   const { data: recentDuplicate, error: duplicateErr } = await supabase
     .from("job_events")
@@ -7614,7 +7645,10 @@ export async function addInternalNoteFromForm(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { userId } = await requireInternalUser({ supabase });
+  const { userId } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId,
+  });
 
   const hasContextFields = !!(context || anchorEventId || anchorEventType);
   const meta = hasContextFields
@@ -7681,7 +7715,10 @@ export async function completeDataEntryFromForm(formData: FormData) {
   const completedAt = new Date().toISOString();
 
   const supabase = await createClient();
-  const { userId: actingUserId, internalUser } = await requireInternalUser({ supabase });
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: id,
+  });
   const billingMode = await resolveBillingModeByAccountOwnerId({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
@@ -7830,7 +7867,10 @@ export async function createRetestJobFromForm(formData: FormData) {
   if (!parentJobId) throw new Error("Missing parent_job_id");
 
   const supabase = await createClient();
-  await requireInternalUser({ supabase });
+  await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: parentJobId,
+  });
 
   // 1) Load parent job
   const { data: parentData, error: parentErr } = await supabase
