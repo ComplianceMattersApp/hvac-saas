@@ -6,6 +6,7 @@ import {
   getInternalBusinessProfileByAccountOwnerId,
   resolveInternalBusinessProfileLogoUrl,
 } from "@/lib/business/internal-business-profile";
+import { resolveAccountEntitlement, type AccountEntitlementContext } from "@/lib/business/platform-entitlement";
 import {
   isInternalAccessError,
   requireInternalRole,
@@ -66,10 +67,13 @@ export default async function AdminCompanyProfilePage({
   const notice = NOTICE_TEXT[String(sp.notice ?? "").trim().toLowerCase()];
 
   const { supabase, internalUser } = await requireAdminOrRedirect();
-  const profile = await getInternalBusinessProfileByAccountOwnerId({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-  });
+  const [profile, entitlement] = await Promise.all([
+    getInternalBusinessProfileByAccountOwnerId({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    }),
+    resolveAccountEntitlement(internalUser.account_owner_user_id, supabase),
+  ]);
   const currentLogoUrl = await resolveInternalBusinessProfileLogoUrl({
     logoUrl: profile?.logo_url ?? null,
   });
@@ -278,6 +282,81 @@ export default async function AdminCompanyProfilePage({
           </form>
         </div>
       </div>
+
+      <PlatformAccountSection entitlement={entitlement} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Platform account display (read-only)
+// ---------------------------------------------------------------------------
+
+const PLAN_LABELS: Record<string, string> = {
+  starter: "Starter",
+  professional: "Professional",
+  enterprise: "Enterprise",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  trial: "Trial",
+  active: "Active",
+  grace: "Grace period",
+  suspended: "Suspended",
+  cancelled: "Cancelled",
+};
+
+function PlatformAccountSection({
+  entitlement,
+}: {
+  entitlement: AccountEntitlementContext;
+}) {
+  const planLabel = PLAN_LABELS[entitlement.planKey] ?? entitlement.planKey;
+  const statusLabel =
+    STATUS_LABELS[entitlement.entitlementStatus] ?? entitlement.entitlementStatus;
+  const userLimitLabel =
+    entitlement.seatLimit != null ? String(entitlement.seatLimit) : "Unlimited";
+
+  const trialEndsLabel =
+    entitlement.entitlementStatus === "trial" && entitlement.trialEndsAt
+      ? entitlement.trialEndsAt.toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
+      : null;
+
+  return (
+    <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
+      <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
+        <div className="text-sm font-semibold text-slate-950">Platform account</div>
+        <div className="mt-1 text-sm text-slate-600">
+          Current access level and usage for this account.
+        </div>
+      </div>
+      <dl className="grid grid-cols-2 gap-px bg-slate-100/70 sm:grid-cols-4">
+        <PlatformAccountField label="Plan" value={planLabel} />
+        <PlatformAccountField label="Account status" value={statusLabel} />
+        <PlatformAccountField label="Active users" value={String(entitlement.activeSeatCount)} />
+        <PlatformAccountField label="User limit" value={userLimitLabel} />
+      </dl>
+      {trialEndsLabel ? (
+        <div className="border-t border-slate-100 px-5 py-3 text-sm leading-6 text-slate-600">
+          Trial ends:{" "}
+          <span className="font-medium text-slate-900">{trialEndsLabel}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PlatformAccountField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-white px-5 py-4">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm font-medium text-slate-900">{value}</dd>
     </div>
   );
 }
