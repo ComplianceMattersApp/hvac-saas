@@ -234,12 +234,17 @@ export default async function InvoiceLedgerPage({
                     <th className="px-3 py-3">Subtotal</th>
                     <th className="px-3 py-3">Total</th>
                     <th className="px-3 py-3">Voided</th>
+                    <th className="px-3 py-3">Amount Paid</th>
+                    <th className="px-3 py-3">Balance Due</th>
+                    <th className="px-3 py-3">Payment Status</th>
+                    <th className="px-3 py-3">Last Payment</th>
+                    <th className="px-3 py-3">Payments</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ledger.rows.length === 0 ? (
                     <tr>
-                      <td colSpan={16} className="px-4 py-12 text-center text-sm text-slate-500">
+                      <td colSpan={21} className="px-4 py-12 text-center text-sm text-slate-500">
                         <div className="mx-auto max-w-md space-y-2">
                           <div className="font-semibold text-slate-700">No invoices match the current filters</div>
                           <div className="text-xs leading-5 text-slate-500">Try widening the date range or clearing one of the invoice filters.</div>
@@ -279,6 +284,11 @@ export default async function InvoiceLedgerPage({
                         <td className="px-3 py-3 text-slate-700">{row.subtotalDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.totalDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.voidedDateDisplay}</td>
+                        <td className="px-3 py-3 text-slate-700">{row.amountPaidDisplay}</td>
+                        <td className="px-3 py-3 text-slate-700">{row.balanceDueDisplay}</td>
+                        <td className="px-3 py-3 text-slate-700">{row.paymentStatusLabel}</td>
+                        <td className="px-3 py-3 text-slate-700">{row.lastPaymentDateDisplay}</td>
+                        <td className="px-3 py-3 text-slate-700">{row.paymentCountDisplay}</td>
                       </tr>
                     ))
                   )}

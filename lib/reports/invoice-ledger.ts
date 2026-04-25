@@ -78,6 +78,11 @@ export type InvoiceLedgerRow = {
   subtotalDisplay: string;
   totalDisplay: string;
   voidedDateDisplay: string;
+  amountPaidDisplay: string;
+  balanceDueDisplay: string;
+  paymentStatusLabel: string;
+  lastPaymentDateDisplay: string;
+  paymentCountDisplay: string;
 };
 
 export type InvoiceLedgerResult = {
@@ -187,9 +192,15 @@ function csvEscape(value: string) {
   return value;
 }
 
-function formatTimestampDisplay(value: string | null | undefined) {
+export function formatTimestampDisplay(value: string | null | undefined) {
   const normalized = String(value ?? "").trim();
   if (!normalized) return "-";
+
+  const ymdMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
+  if (ymdMatch?.[1]) {
+    return formatBusinessDateUS(ymdMatch[1]);
+  }
+
   return formatBusinessDateUS(normalized);
 }
 
@@ -417,6 +428,97 @@ export async function getInvoiceLedgerFilterOptions(params: {
   };
 }
 
+type InvoicePaymentSummary = {
+  amountPaidCents: number;
+  balanceDueCents: number;
+  paymentStatus: "unpaid" | "partial" | "paid";
+  lastPaymentDate: string | null;
+  paymentCount: number;
+};
+
+type PaymentRow = {
+  invoice_id: string;
+  amount_cents: number;
+  payment_status: string;
+  paid_at: string;
+};
+
+async function buildInvoicePaymentSummaryMap(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  invoiceIds: string[];
+  invoiceTotalsByCents: Map<string, number>;
+}): Promise<Map<string, InvoicePaymentSummary>> {
+  const summaryMap = new Map<string, InvoicePaymentSummary>();
+
+  if (params.invoiceIds.length === 0) {
+    return summaryMap;
+  }
+
+  const { data, error } = await params.supabase
+    .from("internal_invoice_payments")
+    .select("invoice_id, amount_cents, payment_status, paid_at")
+    .eq("account_owner_user_id", params.accountOwnerUserId)
+    .in("invoice_id", params.invoiceIds);
+
+  if (error) {
+    throw new Error(
+      `Failed to fetch invoice payment summaries: ${error.message ?? "unknown error"}`
+    );
+  }
+
+  const paymentsByInvoiceId = new Map<string, PaymentRow[]>();
+  for (const row of data ?? []) {
+    const invoiceId = String(row?.invoice_id ?? "").trim();
+    if (!invoiceId) continue;
+    if (!paymentsByInvoiceId.has(invoiceId)) {
+      paymentsByInvoiceId.set(invoiceId, []);
+    }
+    paymentsByInvoiceId.get(invoiceId)!.push(row as PaymentRow);
+  }
+
+  for (const invoiceId of params.invoiceIds) {
+    const invoiceTotalCents = params.invoiceTotalsByCents.get(invoiceId) ?? 0;
+    const payments = paymentsByInvoiceId.get(invoiceId) ?? [];
+
+    let amountPaidCents = 0;
+    let lastPaymentDate: string | null = null;
+    let recordedPaymentCount = 0;
+
+    for (const payment of payments) {
+      const status = String(payment.payment_status ?? "").trim().toLowerCase();
+      if (status === "recorded") {
+        const amountCents = Number(payment.amount_cents ?? 0) || 0;
+        amountPaidCents += amountCents;
+        recordedPaymentCount += 1;
+
+        const paidAt = String(payment.paid_at ?? "").trim();
+        if (paidAt && (!lastPaymentDate || paidAt > lastPaymentDate)) {
+          lastPaymentDate = paidAt;
+        }
+      }
+    }
+
+    const balanceDueCents = Math.max(0, invoiceTotalCents - amountPaidCents);
+    const paymentStatus =
+      amountPaidCents <= 0
+        ? "unpaid"
+        : amountPaidCents >= invoiceTotalCents
+          ? "paid"
+          : "partial";
+
+    summaryMap.set(invoiceId, {
+      amountPaidCents,
+      balanceDueCents,
+      paymentStatus,
+      lastPaymentDate,
+      paymentCount: recordedPaymentCount,
+    });
+  }
+
+  return summaryMap;
+}
+
 export async function listInvoiceLedgerRows(params: {
   supabase: any;
   accountOwnerUserId: string;
@@ -459,7 +561,13 @@ export async function listInvoiceLedgerRows(params: {
   const customerIds = Array.from(new Set(invoices.map((invoice) => String(invoice.customer_id ?? "").trim()).filter(Boolean)));
   const locationIds = Array.from(new Set(invoices.map((invoice) => String(invoice.location_id ?? "").trim()).filter(Boolean)));
 
-  const [jobsResult, customersResult, locationsResult, deliveriesResult] = await Promise.all([
+  const invoiceTotalsByCents = new Map<string, number>();
+  for (const invoice of invoices) {
+    const id = String(invoice.id ?? "").trim();
+    if (id) invoiceTotalsByCents.set(id, Number(invoice.total_cents ?? 0) || 0);
+  }
+
+  const [jobsResult, customersResult, locationsResult, deliveriesResult, paymentSummaryMap] = await Promise.all([
     params.supabase
       .from("jobs")
       .select("id, title, contractor_id, customer_first_name, customer_last_name, job_address, city, contractors(name)")
@@ -479,6 +587,12 @@ export async function listInvoiceLedgerRows(params: {
       .eq("notification_type", "internal_invoice_email")
       .in("job_id", jobIds.length ? jobIds : ["00000000-0000-0000-0000-000000000000"])
       .order("created_at", { ascending: false }),
+    buildInvoicePaymentSummaryMap({
+      supabase: params.supabase,
+      accountOwnerUserId: params.accountOwnerUserId,
+      invoiceIds,
+      invoiceTotalsByCents,
+    }),
   ]);
 
   if (jobsResult.error) throw jobsResult.error;
@@ -533,6 +647,7 @@ export async function listInvoiceLedgerRows(params: {
     const location = locationById.get(String(invoice.location_id ?? "").trim()) ?? null;
     const job = jobById.get(jobId) ?? null;
     const delivery = latestDeliveryByInvoiceId.get(invoiceId) ?? null;
+    const paymentSummary = paymentSummaryMap.get(invoiceId);
 
     const customerDisplay =
       buildCustomerName(customer) ||
@@ -548,6 +663,12 @@ export async function listInvoiceLedgerRows(params: {
       ].filter(Boolean).join(", ") ||
       [String(job?.job_address ?? "").trim(), String(job?.city ?? "").trim()].filter(Boolean).join(", ") ||
       "-";
+
+    const formatPaymentStatusLabel = (status: string) => {
+      if (status === "partial") return "Partial";
+      if (status === "paid") return "Paid";
+      return "Unpaid";
+    };
 
     return {
       invoiceId,
@@ -568,6 +689,11 @@ export async function listInvoiceLedgerRows(params: {
       subtotalDisplay: formatCurrencyCents(invoice.subtotal_cents),
       totalDisplay: formatCurrencyCents(invoice.total_cents),
       voidedDateDisplay: formatTimestampDisplay(invoice.voided_at),
+      amountPaidDisplay: formatCurrencyCents(paymentSummary?.amountPaidCents ?? 0),
+      balanceDueDisplay: formatCurrencyCents(paymentSummary?.balanceDueCents ?? 0),
+      paymentStatusLabel: formatPaymentStatusLabel(paymentSummary?.paymentStatus ?? "unpaid"),
+      lastPaymentDateDisplay: formatTimestampDisplay(paymentSummary?.lastPaymentDate ?? null),
+      paymentCountDisplay: paymentSummary && paymentSummary.paymentCount > 0 ? String(paymentSummary.paymentCount) : "-",
     } satisfies InvoiceLedgerRow;
   });
 
@@ -596,6 +722,11 @@ export function buildInvoiceLedgerCsv(rows: InvoiceLedgerRow[]) {
     "Subtotal",
     "Total",
     "Voided Date",
+    "Amount Paid",
+    "Balance Due",
+    "Payment Status",
+    "Last Payment Date",
+    "Payment Count",
   ];
 
   const lines = rows.map((row) => [
@@ -615,6 +746,11 @@ export function buildInvoiceLedgerCsv(rows: InvoiceLedgerRow[]) {
     row.subtotalDisplay,
     row.totalDisplay,
     row.voidedDateDisplay,
+    row.amountPaidDisplay,
+    row.balanceDueDisplay,
+    row.paymentStatusLabel,
+    row.lastPaymentDateDisplay,
+    row.paymentCountDisplay,
   ].map((value) => csvEscape(String(value ?? ""))).join(","));
 
   return [header.map(csvEscape).join(","), ...lines].join("\r\n");
