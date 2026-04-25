@@ -112,6 +112,10 @@ type CalendarEventRow = {
   event_type: string | null;
 };
 
+type CustomerScopeRow = {
+  id: string | null;
+};
+
 function laTodayYmd(now = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Los_Angeles',
@@ -232,12 +236,50 @@ function suppressRetestParentRows(rows: JobDispatchRow[], hiddenFailedParentIds:
   });
 }
 
+async function loadScopedDispatchJobRows(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  baseSelect: string;
+}): Promise<JobDispatchRow[]> {
+  const { supabase, accountOwnerUserId, baseSelect } = params;
+
+  const { data: customerRows, error: customerErr } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('owner_user_id', accountOwnerUserId);
+
+  if (customerErr) throw customerErr;
+
+  const scopedCustomerIds = (customerRows ?? [])
+    .map((row: CustomerScopeRow) => String(row?.id ?? '').trim())
+    .filter(Boolean);
+
+  if (!scopedCustomerIds.length) return [];
+
+  const { data: scopedRows, error: scopedErr } = await supabase
+    .from('jobs')
+    .select(baseSelect)
+    .in('customer_id', scopedCustomerIds)
+    .is('deleted_at', null)
+    .order('scheduled_date', { ascending: true })
+    .order('window_start', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  if (scopedErr) throw scopedErr;
+
+  return (scopedRows ?? []) as JobDispatchRow[];
+}
+
 export async function getDispatchCalendarData(params: {
   mode: DispatchViewMode;
   anchorDate?: string | null;
 }): Promise<DispatchCalendarData> {
   const supabase = await createClient();
   const { internalUser } = await requireInternalUser({ supabase });
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? '').trim();
+  if (!accountOwnerUserId) {
+    throw new Error('NOT_AUTHORIZED');
+  }
   const mode = params.mode === 'week' ? 'week' : 'day';
   const anchorDate = normalizeAnchorDate(params.anchorDate);
   const dispatchAttentionWindowStart = addDaysYmd(laTodayYmd(), -7);
@@ -268,15 +310,12 @@ export async function getDispatchCalendarData(params: {
     'deleted_at',
   ].join(', ');
 
-  // Fetch all jobs in the relevant window
-  const { data: allRows, error: allErr } = await supabase
-    .from('jobs')
-    .select(baseSelect)
-    .is('deleted_at', null)
-    .order('scheduled_date', { ascending: true })
-    .order('window_start', { ascending: true })
-    .order('created_at', { ascending: true });
-  if (allErr) throw allErr;
+  // Explicitly scope jobs to the actor's account-owner boundary before dataset assembly.
+  const allRows = await loadScopedDispatchJobRows({
+    supabase,
+    accountOwnerUserId,
+    baseSelect,
+  });
 
   function isOnHold(job: JobDispatchRow) {
     const ops = String(job.ops_status ?? '').toLowerCase();
@@ -333,20 +372,23 @@ export async function getDispatchCalendarData(params: {
     jobIds: allJobIds,
   });
 
-  const { data: eventRows, error: eventErr } = await supabase
-    .from('job_events')
-    .select('job_id, event_type, created_at')
-    .in('job_id', allJobIds.length ? allJobIds : ['00000000-0000-0000-0000-000000000000'])
-    .order('created_at', { ascending: false });
-  if (eventErr) throw eventErr;
   const latestEventByJob = new Map<string, { event_type: string | null; created_at: string | null }>();
-  for (const event of (eventRows ?? []) as JobEventRow[]) {
-    const jobId = String(event?.job_id ?? '').trim();
-    if (!jobId || latestEventByJob.has(jobId)) continue;
-    latestEventByJob.set(jobId, {
-      event_type: event?.event_type ? String(event.event_type) : null,
-      created_at: event?.created_at ? String(event.created_at) : null,
-    });
+  if (allJobIds.length) {
+    const { data: eventRows, error: eventErr } = await supabase
+      .from('job_events')
+      .select('job_id, event_type, created_at')
+      .in('job_id', allJobIds)
+      .order('created_at', { ascending: false });
+    if (eventErr) throw eventErr;
+
+    for (const event of (eventRows ?? []) as JobEventRow[]) {
+      const jobId = String(event?.job_id ?? '').trim();
+      if (!jobId || latestEventByJob.has(jobId)) continue;
+      latestEventByJob.set(jobId, {
+        event_type: event?.event_type ? String(event.event_type) : null,
+        created_at: event?.created_at ? String(event.created_at) : null,
+      });
+    }
   }
 
   // Canonical scheduled jobs (normalized)
@@ -375,7 +417,7 @@ export async function getDispatchCalendarData(params: {
 
   const assignableUsers = (await getAssignableInternalUsers({
     supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
+    accountOwnerUserId,
   })).map((user) => ({
     user_id: String(user.user_id),
     display_name: String(user.display_name),

@@ -40,9 +40,40 @@ function withNotice(notice: string) {
   return `/ops/admin/company-profile?notice=${encodeURIComponent(notice)}`;
 }
 
+async function requireScopedInternalBusinessProfileMutationContext(params: {
+  admin: any;
+  actorUserId: string;
+  accountOwnerUserId: string;
+}) {
+  const actorUserId = String(params.actorUserId ?? "").trim();
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+
+  if (!actorUserId || !accountOwnerUserId) {
+    throw new Error("BUSINESS_PROFILE_SCOPE_DENIED");
+  }
+
+  const { data: scopedActor, error: scopedActorErr } = await params.admin
+    .from("internal_users")
+    .select("user_id, role, is_active, account_owner_user_id")
+    .eq("user_id", actorUserId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (scopedActorErr) {
+    throw scopedActorErr;
+  }
+
+  const isActive = Boolean((scopedActor as any)?.is_active);
+  const role = String((scopedActor as any)?.role ?? "").trim().toLowerCase();
+
+  if (!scopedActor?.user_id || !isActive || role !== "admin") {
+    throw new Error("BUSINESS_PROFILE_SCOPE_DENIED");
+  }
+}
+
 export async function saveInternalBusinessProfileFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
-  const { internalUser } = await requireInternalRole("admin", { supabase });
+  const { userId, internalUser } = await requireInternalRole("admin", { supabase });
 
   const displayName = normalizeText(formData.get("display_name"));
   const supportEmail = normalizeNullableText(formData.get("support_email"));
@@ -70,6 +101,16 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
   }
 
   const admin = createAdminClient();
+  try {
+    await requireScopedInternalBusinessProfileMutationContext({
+      admin,
+      actorUserId: userId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } catch {
+    redirect("/forbidden");
+  }
+
   const { data: existingProfile, error: existingProfileError } = await admin
     .from("internal_business_profiles")
     .select("logo_url")

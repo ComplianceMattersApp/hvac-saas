@@ -109,6 +109,27 @@ async function loadScopedPendingSubmission(params: {
   return submission;
 }
 
+async function requireScopedPendingAdjudication(formData: FormData) {
+  const { userId, admin, accountOwnerUserId } = await requireInternalReviewer();
+  const submissionId = normalizeText(formData.get("submission_id"));
+
+  if (!isUuid(submissionId)) throw new Error("Invalid submission_id");
+
+  const submission = await loadScopedPendingSubmission({
+    admin,
+    submissionId,
+    accountOwnerUserId,
+  });
+
+  return {
+    userId,
+    admin,
+    accountOwnerUserId,
+    submissionId,
+    submission,
+  };
+}
+
 async function assertExistingCustomerOwned(params: {
   admin: ReturnType<typeof createAdminClient>;
   customerId: string;
@@ -238,23 +259,15 @@ async function createCustomerInScope(params: {
 }
 
 export async function finalizeContractorIntakeSubmissionFromForm(formData: FormData) {
-  const { admin, userId, accountOwnerUserId } = await requireInternalReviewer();
-
-  const submissionId = normalizeText(formData.get("submission_id"));
+  const { admin, userId, accountOwnerUserId, submission } = await requireScopedPendingAdjudication(formData);
   const modeRaw = normalizeText(formData.get("finalization_mode")).toLowerCase();
   const reviewNote = normalizeText(formData.get("review_note")) || null;
 
-  if (!isUuid(submissionId)) throw new Error("Invalid submission_id");
   if (!["existing_existing", "existing_new", "new_new"].includes(modeRaw)) {
     throw new Error("Invalid finalization mode");
   }
 
   const mode = modeRaw as FinalizationMode;
-  const submission = await loadScopedPendingSubmission({
-    admin,
-    submissionId,
-    accountOwnerUserId,
-  });
 
   let customer:
     | { id: string; first_name: string | null; last_name: string | null; email: string | null; phone: string | null }
@@ -436,18 +449,8 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
 }
 
 export async function rejectContractorIntakeSubmissionFromForm(formData: FormData) {
-  const { userId, admin, accountOwnerUserId } = await requireInternalReviewer();
-
-  const submissionId = normalizeText(formData.get("submission_id"));
+  const { userId, admin, submission } = await requireScopedPendingAdjudication(formData);
   const reviewNote = normalizeText(formData.get("review_note")) || null;
-
-  if (!isUuid(submissionId)) throw new Error("Invalid submission_id");
-
-  const submission = await loadScopedPendingSubmission({
-    admin,
-    submissionId,
-    accountOwnerUserId,
-  });
 
   const reviewedAtIso = new Date().toISOString();
   const { error } = await admin
@@ -475,13 +478,10 @@ export async function rejectContractorIntakeSubmissionFromForm(formData: FormDat
 }
 
 export async function markContractorIntakeSubmissionAsDuplicateFromForm(formData: FormData) {
-  const { userId, admin, accountOwnerUserId } = await requireInternalReviewer();
-
-  const submissionId = normalizeText(formData.get("submission_id"));
+  const { userId, admin, accountOwnerUserId, submissionId } = await requireScopedPendingAdjudication(formData);
   const duplicateJobId = normalizeText(formData.get("duplicate_job_id"));
   const reviewNote = normalizeText(formData.get("review_note")) || null;
 
-  if (!isUuid(submissionId)) throw new Error("Invalid submission_id");
   if (!isUuid(duplicateJobId)) throw new Error("Invalid duplicate_job_id");
 
   // Verify the referenced job is in this account's scope
@@ -502,9 +502,6 @@ export async function markContractorIntakeSubmissionAsDuplicateFromForm(formData
     .maybeSingle();
 
   if (!custRow?.id) throw new Error("Referenced job is not in account scope");
-
-  // Verify submission is still pending
-  await loadScopedPendingSubmission({ admin, submissionId, accountOwnerUserId });
 
   const reviewedAtIso = new Date().toISOString();
   const { error } = await admin

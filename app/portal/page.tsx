@@ -19,7 +19,10 @@ import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isPortalVisibleJob } from "@/lib/visibility/portal";
 import { matchesNormalizedSearch } from "@/lib/utils/search-normalization";
-import { listPendingContractorIntakeProposalsForContractor } from "@/lib/portal/intake-proposal-read-model";
+import {
+  listPendingContractorIntakeProposalsForContractor,
+  requireCurrentContractorPortalContext,
+} from "@/lib/portal/intake-proposal-read-model";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -66,22 +69,14 @@ export default async function PortalPage({
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
 
-  const { data: cu, error: cuErr } = await supabase
-    .from("contractor_users")
-    .select("contractor_id, contractors ( id, name )")
-    .eq("user_id", userData.user.id)
-    .maybeSingle();
-
-  if (cuErr) throw cuErr;
-
-  const contractorId = cu?.contractor_id ?? null;
+  const portalContext = await requireCurrentContractorPortalContext({ supabase });
+  const contractorId = portalContext.contractorId;
   const contractorName =
-    (cu as any)?.contractors?.name ?? (contractorId ? "Contractor" : null);
-
-  if (!contractorId) redirect("/ops");
+    portalContext.contractorName ?? (contractorId ? "Contractor" : null);
 
   const pendingIntakeProposals = await listPendingContractorIntakeProposalsForContractor({
     contractorId,
+    context: portalContext,
   });
 
   const today = new Intl.DateTimeFormat("en-CA", {
