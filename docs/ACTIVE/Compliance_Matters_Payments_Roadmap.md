@@ -224,6 +224,14 @@ Includes:
 - optional future QBO sync seam
 - support for a later configurable platform fee
 
+Completed P1 foundation work (V1):
+- Platform Account Entitlement / Usage Foundation is complete.
+- Implemented platform entitlement truth is account-owner-scoped and separate from:
+	- tenant billed truth (`internal_invoices` / `internal_invoice_line_items`)
+	- collected-payment truth (still not materially implemented)
+- This completed slice did not introduce a `payments` table.
+- This completed slice did not introduce live processor execution, checkout, card collection, refund/dispute handling, or QBO-dependent flows.
+
 Locked clarification:
 Invoice send/resend/tracking in this phase is allowed only as a billing communication seam attached to the invoice record. It is not live payment execution, not Stripe checkout, not card/ACH collection, not refund/dispute handling, not contractor payout flow, and not QBO-led billing.
 

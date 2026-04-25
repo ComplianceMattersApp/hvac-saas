@@ -621,6 +621,10 @@ What this completion does not mean:
 
 The next active major roadmap item is Monthly usage / payment model.
 
+Roadmap status note:
+- Monthly usage / payment model has now begun with a completed Platform Account Entitlement / Usage Foundation V1 slice.
+- This is a platform-account entitlement/usage foundation only; it does not mean live payment execution is enabled.
+
 Roadmap guardrail remains:
 - Payment architecture/foundation is already directionally defined.
 - Payments remain payment-ready by design, not payment-active.

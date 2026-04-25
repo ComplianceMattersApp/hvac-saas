@@ -1002,6 +1002,14 @@ Includes:
 - optional future QBO sync seam
 - support for a later configurable platform fee
 
+First completed slice in this phase:
+- Platform Account Entitlement / Usage Foundation V1 is complete.
+- Implemented as platform-account entitlement truth only (`public.platform_account_entitlements`) with account-owner scope, read-side resolver support, and read-only admin visibility in company profile.
+- This slice is intentionally separate from tenant billed truth (`internal_invoices` / `internal_invoice_line_items`) and from collected-payment truth (still not materially implemented).
+- Missing entitlement row resolves to safe default trial entitlement context; real DB/query errors do not silently grant access and must throw.
+- Active seat count is derived live from `internal_users` and is not stored on the entitlement row.
+- Stripe placeholder fields in this slice are inert schema scaffolding only.
+
 Does not include:
 - live customer checkout
 - contractor payout onboarding

@@ -71,6 +71,10 @@ import {
   type InternalInvoiceStatus,
 } from "@/lib/business/internal-invoice";
 import {
+  resolveInvoiceCollectedPaymentLedger,
+  type InternalInvoicePaymentRow,
+} from "@/lib/business/internal-invoice-payments";
+import {
   addInternalInvoiceLineItemFromForm,
   createInternalInvoiceDraftFromForm,
   issueInternalInvoiceFromForm,
@@ -80,6 +84,7 @@ import {
   updateInternalInvoiceLineItemFromForm,
   voidInternalInvoiceFromForm,
 } from "@/lib/actions/internal-invoice-actions";
+import { recordInternalInvoicePaymentFromForm } from "@/lib/actions/internal-invoice-payment-actions";
 import {
   loadScopedInternalJobDetailReadBoundary,
   resolveJobDetailActor,
@@ -331,6 +336,13 @@ function formatTimelineDetail(type?: string | null, meta?: any, message?: string
     return [invoiceNumber, recipientEmail, errorDetail].filter(Boolean).join(" - ");
   }
 
+  if (type === "payment_recorded") {
+    const amountDisplay = summarizePlainText(String(meta?.amount_display ?? ""), 24);
+    const paymentMethod = summarizePlainText(String(meta?.payment_method ?? "").replace(/_/g, " "), 48);
+    const invoiceNumber = summarizePlainText(String(meta?.invoice_number ?? ""), 48);
+    return [amountDisplay ? `$${amountDisplay}` : "", paymentMethod, invoiceNumber].filter(Boolean).join(" - ");
+  }
+
   if (type === "companion_scope_promoted") {
     const itemTitle = summarizePlainText(String(meta?.source_item_title ?? ""), 80);
     return itemTitle ? `${itemTitle} - promoted into its own Service job` : "Companion scope promoted into its own Service job";
@@ -403,6 +415,7 @@ function formatTimelineEvent(type?: string | null, meta?: any, message?: string 
   internal_invoice_email_sent: "Internal invoice emailed",
   internal_invoice_email_resent: "Internal invoice emailed again",
   internal_invoice_email_failed: "Internal invoice email failed",
+  payment_recorded: "Payment recorded",
   companion_scope_promoted: "Companion scope promoted",
   created_from_companion_scope: "Service job created from companion scope",
 };
@@ -726,6 +739,15 @@ export default async function JobDetailPage({
           invoiceId: internalInvoice.id,
         })
       : [];
+
+  const internalInvoicePaymentLedger =
+    isInternalUser && internalInvoice
+      ? await resolveInvoiceCollectedPaymentLedger(
+          internalUser.account_owner_user_id,
+          internalInvoice.id,
+          supabase,
+        )
+      : null;
 
   const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
     supabase,
@@ -1247,6 +1269,26 @@ const internalInvoiceEmailButtonLabel = latestSuccessfulInternalInvoiceEmailDeli
 const internalInvoiceSendTargetDefault =
   String(latestInternalInvoiceEmailDelivery?.recipientEmail ?? internalInvoice?.billing_email ?? "").trim();
 const internalInvoiceSendTargetMissing = internalInvoiceSendTargetDefault.length === 0;
+const internalInvoicePaymentRows: InternalInvoicePaymentRow[] = internalInvoicePaymentLedger?.rows ?? [];
+const internalInvoicePaymentSummary = internalInvoicePaymentLedger?.summary ?? {
+  invoiceId: String(internalInvoice?.id ?? ""),
+  invoiceTotalCents: Number(internalInvoice?.total_cents ?? 0) || 0,
+  amountPaidCents: 0,
+  balanceDueCents: Number(internalInvoice?.total_cents ?? 0) || 0,
+  paymentStatus: "unpaid" as const,
+};
+const internalInvoicePaymentStatusLabel =
+  internalInvoicePaymentSummary.paymentStatus === "paid"
+    ? "Paid"
+    : internalInvoicePaymentSummary.paymentStatus === "partial"
+      ? "Partially Paid"
+      : "Unpaid";
+const internalInvoicePaymentStatusChipClass =
+  internalInvoicePaymentSummary.paymentStatus === "paid"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+    : internalInvoicePaymentSummary.paymentStatus === "partial"
+      ? "border-amber-200 bg-amber-50 text-amber-800"
+      : "border-slate-200 bg-slate-50 text-slate-700";
 
 const internalInvoiceReadyToIssue =
   internalInvoice != null &&
@@ -1489,6 +1531,7 @@ const renderTimelineItem = (e: any, key: string) => {
     type === "internal_invoice_email_sent" ? "✉️" :
     type === "internal_invoice_email_resent" ? "📨" :
     type === "internal_invoice_email_failed" ? "⚠️" :
+    type === "payment_recorded" ? "💵" :
     type === "companion_scope_promoted" ? "🔀" :
     type === "created_from_companion_scope" ? "🧰" :
     type === "failure_resolved_by_correction_review" ? "✅" :
@@ -2251,6 +2294,41 @@ const renderTimelineItem = (e: any, key: string) => {
         <FlashBanner
           type="warning"
           message="Issue the invoice before sending it. Resends are communication actions on the issued invoice record."
+        />
+      )}
+
+      {banner === "internal_invoice_payment_recorded" && (
+        <FlashBanner
+          type="success"
+          message="Payment recorded."
+        />
+      )}
+
+      {banner === "internal_invoice_payment_requires_issued" && (
+        <FlashBanner
+          type="warning"
+          message="Only issued internal invoices can receive recorded payments."
+        />
+      )}
+
+      {banner === "internal_invoice_payment_invalid_amount" && (
+        <FlashBanner
+          type="warning"
+          message="Payment amount must be greater than $0.00."
+        />
+      )}
+
+      {banner === "internal_invoice_payment_method_required" && (
+        <FlashBanner
+          type="warning"
+          message="Select a payment method before recording this payment."
+        />
+      )}
+
+      {banner === "internal_invoice_payment_overpay_denied" && (
+        <FlashBanner
+          type="warning"
+          message="Payment amount cannot exceed the current balance due."
         />
       )}
 
@@ -3385,6 +3463,116 @@ const renderTimelineItem = (e: any, key: string) => {
               <>
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50/75 px-3.5 py-3 text-sm leading-6 text-emerald-900">
                   {issuedInvoiceStatusMessage}
+                </div>
+
+                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
+                  <div className="font-semibold text-slate-900">Payment Tracking</div>
+                  <div className="mt-1 leading-6">
+                    Manual/off-platform payment recording only. This tracks collected payment truth and does not change billed line items.
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Payment Status</div>
+                      <div className="mt-1">
+                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${internalInvoicePaymentStatusChipClass}`}>
+                          {internalInvoicePaymentStatusLabel}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Amount Paid</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">
+                        {formatCurrencyFromCents(internalInvoicePaymentSummary.amountPaidCents)}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Balance Due</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">
+                        {formatCurrencyFromCents(internalInvoicePaymentSummary.balanceDueCents)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <form action={recordInternalInvoicePaymentFromForm} className="mt-3 space-y-3">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="tab" value={tab} />
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className={workspaceFieldLabelClass}>Amount</label>
+                        <input
+                          name="payment_amount"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          className={workspaceInputClass}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className={workspaceFieldLabelClass}>Payment Method</label>
+                        <select name="payment_method" className={workspaceInputClass} defaultValue="" required>
+                          <option value="" disabled>
+                            Select method
+                          </option>
+                          <option value="cash">Cash</option>
+                          <option value="check">Check</option>
+                          <option value="ach_off_platform">ACH (Off-Platform)</option>
+                          <option value="card_off_platform">Card (Off-Platform)</option>
+                          <option value="bank_transfer">Bank Transfer</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className={workspaceFieldLabelClass}>Reference</label>
+                        <input
+                          name="received_reference"
+                          placeholder="Check # or confirmation"
+                          className={workspaceInputClass}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={workspaceFieldLabelClass}>Payment recorded note</label>
+                        <input
+                          name="notes"
+                          placeholder="Optional note"
+                          className={workspaceInputClass}
+                        />
+                      </div>
+                    </div>
+
+                    <SubmitButton
+                      loadingText="Recording..."
+                      className={darkButtonClass}
+                      disabled={internalInvoicePaymentSummary.balanceDueCents <= 0}
+                    >
+                      Record Payment
+                    </SubmitButton>
+                  </form>
+
+                  {internalInvoicePaymentRows.length > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      {internalInvoicePaymentRows.slice(0, 6).map((payment) => (
+                        <div key={payment.id} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5 text-sm text-slate-700">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="font-semibold text-slate-900">Payment recorded</div>
+                            <div className="text-xs text-slate-500">{formatDateTimeLAFromIso(payment.paid_at)}</div>
+                          </div>
+                          <div className="mt-1">
+                            {formatCurrencyFromCents(payment.amount_cents)} • {String(payment.payment_method).replace(/_/g, " ")}
+                          </div>
+                          {payment.received_reference ? (
+                            <div className="mt-1 text-xs text-slate-500">Reference: {payment.received_reference}</div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
