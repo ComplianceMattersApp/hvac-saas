@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import {
+  appendContractorIntakeProposalPortalComment,
+  getContractorIntakeProposalPortalDetail,
+  requireCurrentContractorPortalContext,
+} from "@/lib/portal/intake-proposal-read-model";
 
 function formatDateTimeLA(iso: string | null) {
   if (!iso) return "-";
@@ -43,27 +48,14 @@ export default async function PortalIntakeSubmissionDetailPage({
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
 
-  const { data: cu, error: cuErr } = await supabase
-    .from("contractor_users")
-    .select("contractor_id")
-    .eq("user_id", userData.user.id)
-    .maybeSingle();
+  const portalContext = await requireCurrentContractorPortalContext({ supabase });
+  const detail = await getContractorIntakeProposalPortalDetail({
+    context: portalContext,
+    submissionId,
+  });
+  if (!detail?.submission?.id) notFound();
 
-  if (cuErr) throw cuErr;
-  if (!cu?.contractor_id) redirect("/ops");
-
-  const admin = createAdminClient();
-  const { data: submission, error: submissionErr } = await admin
-    .from("contractor_intake_submissions")
-    .select(
-      "id, created_at, review_status, proposed_customer_first_name, proposed_customer_last_name, proposed_customer_phone, proposed_customer_email, proposed_address_line1, proposed_city, proposed_zip, proposed_job_type, proposed_project_type, proposed_title, proposed_job_notes, proposed_permit_number, proposed_jurisdiction, proposed_permit_date"
-    )
-    .eq("id", submissionId)
-    .eq("contractor_id", cu.contractor_id)
-    .maybeSingle();
-
-  if (submissionErr) throw submissionErr;
-  if (!submission?.id) notFound();
+  const submission = detail.submission as any;
 
   const reviewStatus = String((submission as any)?.review_status ?? "").trim().toLowerCase();
   if (reviewStatus !== "pending") {
@@ -90,25 +82,8 @@ export default async function PortalIntakeSubmissionDetailPage({
   const proposedJurisdiction = String((submission as any)?.proposed_jurisdiction ?? "").trim();
   const proposedPermitDate = String((submission as any)?.proposed_permit_date ?? "").trim();
   const proposedNotes = String((submission as any)?.proposed_job_notes ?? "").trim();
-
-  const { count: proposalAttachmentCount, error: attachmentCountErr } = await admin
-    .from("attachments")
-    .select("id", { count: "exact", head: true })
-    .eq("entity_type", "contractor_intake_submission")
-    .eq("entity_id", submissionId);
-
-  if (attachmentCountErr) throw attachmentCountErr;
-  const submittedFileCount = proposalAttachmentCount ?? 0;
-
-  const { data: addendumRows, error: addendumErr } = await admin
-    .from("contractor_intake_submission_comments")
-    .select("id, comment_text, created_at")
-    .eq("submission_id", submissionId)
-    .eq("author_role", "contractor")
-    .order("created_at", { ascending: false })
-    .limit(200);
-
-  if (addendumErr) throw addendumErr;
+  const submittedFileCount = detail.proposalAttachmentCount;
+  const addendumRows = detail.addendumRows;
 
   async function addProposalComment(formData: FormData) {
     "use server";
@@ -120,48 +95,27 @@ export default async function PortalIntakeSubmissionDetailPage({
     if (!commentText) redirect(`/portal/intake-submissions/${actionSubmissionId}?banner=comment_empty`);
 
     const supabase = await createClient();
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
-    if (userErr || !userData?.user) redirect("/login");
-
-    const { data: cu, error: cuErr } = await supabase
-      .from("contractor_users")
-      .select("contractor_id")
-      .eq("user_id", userData.user.id)
-      .maybeSingle();
-
-    if (cuErr || !cu?.contractor_id) redirect("/ops");
-
-    const admin = createAdminClient();
-    const { data: scopedSubmission, error: scopedSubmissionErr } = await admin
-      .from("contractor_intake_submissions")
-      .select("id, review_status")
-      .eq("id", actionSubmissionId)
-      .eq("contractor_id", cu.contractor_id)
-      .maybeSingle();
-
-    if (scopedSubmissionErr) throw scopedSubmissionErr;
-    if (!scopedSubmission?.id) notFound();
-
-    const reviewStatus = String((scopedSubmission as any)?.review_status ?? "").trim().toLowerCase();
-    if (reviewStatus !== "pending") {
-      redirect(`/portal/intake-submissions/${actionSubmissionId}`);
-    }
-
-    const trimmedComment = commentText.slice(0, 4000).trim();
-    if (!trimmedComment) {
-      redirect(`/portal/intake-submissions/${actionSubmissionId}?banner=comment_empty`);
-    }
-
-    const { error: insertErr } = await admin
-      .from("contractor_intake_submission_comments")
-      .insert({
-        submission_id: actionSubmissionId,
-        author_user_id: userData.user.id,
-        author_role: "contractor",
-        comment_text: trimmedComment,
+    try {
+      await appendContractorIntakeProposalPortalComment({
+        supabase,
+        submissionId: actionSubmissionId,
+        commentText,
       });
-
-    if (insertErr) throw insertErr;
+    } catch (error) {
+      if (error instanceof Error && error.message === "EMPTY_COMMENT") {
+        redirect(`/portal/intake-submissions/${actionSubmissionId}?banner=comment_empty`);
+      }
+      if (error instanceof Error && error.message === "NOT_FOUND") {
+        notFound();
+      }
+      if (error instanceof Error && error.message === "NOT_AUTHENTICATED") {
+        redirect("/login");
+      }
+      if (error instanceof Error && error.message === "NOT_CONTRACTOR") {
+        redirect("/ops");
+      }
+      throw error;
+    }
 
     revalidatePath(`/portal/intake-submissions/${actionSubmissionId}`);
     revalidatePath("/portal");

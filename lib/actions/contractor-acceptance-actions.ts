@@ -2,6 +2,165 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
+type PendingInviteRow = {
+  id: string;
+  contractor_id: string;
+  owner_user_id: string;
+  auth_user_id: string | null;
+  email: string | null;
+  status: string | null;
+  created_at: string | null;
+};
+
+type ScopedInviteResolution = {
+  invite: PendingInviteRow | null;
+  denied: boolean;
+  denialReason?: string;
+};
+
+function normalizeEmail(value: string | null | undefined) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function resolveDeterministicInviteScope(rows: PendingInviteRow[]): ScopedInviteResolution {
+  if (rows.length === 0) {
+    return { invite: null, denied: false };
+  }
+
+  const scopedRows = rows.filter((row) => {
+    const contractorId = String(row?.contractor_id ?? "").trim();
+    const ownerUserId = String(row?.owner_user_id ?? "").trim();
+    return Boolean(contractorId && ownerUserId);
+  });
+
+  if (scopedRows.length === 0) {
+    return {
+      invite: null,
+      denied: true,
+      denialReason: "INVITE_SCOPE_INVALID",
+    };
+  }
+
+  const uniqueScopes = new Set(
+    scopedRows.map((row) => `${String(row.owner_user_id)}::${String(row.contractor_id)}`),
+  );
+
+  if (uniqueScopes.size !== 1) {
+    return {
+      invite: null,
+      denied: true,
+      denialReason: "INVITE_SCOPE_AMBIGUOUS",
+    };
+  }
+
+  return {
+    invite: scopedRows[0],
+    denied: false,
+  };
+}
+
+async function assertScopedInviteContractorBoundary(params: {
+  admin: any;
+  invite: PendingInviteRow;
+}) {
+  const { admin, invite } = params;
+
+  const { data: contractor, error: contractorErr } = await admin
+    .from("contractors")
+    .select("id, owner_user_id")
+    .eq("id", invite.contractor_id)
+    .maybeSingle();
+
+  if (contractorErr) {
+    throw contractorErr;
+  }
+
+  const contractorOwnerUserId = String((contractor as any)?.owner_user_id ?? "").trim();
+  const inviteOwnerUserId = String(invite.owner_user_id ?? "").trim();
+
+  if (!contractor?.id || !contractorOwnerUserId || contractorOwnerUserId !== inviteOwnerUserId) {
+    throw new Error("INVITE_SCOPE_INVALID");
+  }
+}
+
+async function resolveScopedPendingInviteForAcceptance(params: {
+  admin: any;
+  userId: string;
+  email: string;
+}): Promise<ScopedInviteResolution> {
+  const { admin, userId, email } = params;
+
+  const normalizedEmail = normalizeEmail(email);
+
+  const { data: invitesByUserId, error: byUserIdErr } = await admin
+    .from("contractor_invites")
+    .select("id, contractor_id, owner_user_id, auth_user_id, email, status, created_at")
+    .eq("auth_user_id", userId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: true })
+    .limit(20);
+
+  if (byUserIdErr) {
+    throw byUserIdErr;
+  }
+
+  const userScopedRows = (invitesByUserId ?? []) as PendingInviteRow[];
+  const userScopedResolution = resolveDeterministicInviteScope(userScopedRows);
+
+  if (userScopedResolution.denied || userScopedResolution.invite) {
+    return userScopedResolution;
+  }
+
+  if (!normalizedEmail) {
+    return { invite: null, denied: false };
+  }
+
+  const { data: invitesByEmail, error: byEmailErr } = await admin
+    .from("contractor_invites")
+    .select("id, contractor_id, owner_user_id, auth_user_id, email, status, created_at")
+    .eq("status", "pending")
+    .ilike("email", normalizedEmail)
+    .order("created_at", { ascending: true })
+    .limit(20);
+
+  if (byEmailErr) {
+    throw byEmailErr;
+  }
+
+  const emailRows = ((invitesByEmail ?? []) as PendingInviteRow[]).filter((row) => {
+    return normalizeEmail(row.email) === normalizedEmail;
+  });
+
+  if (emailRows.length === 0) {
+    return { invite: null, denied: false };
+  }
+
+  const hasRowsBoundToOtherUsers = emailRows.some((row) => {
+    const rowAuthUserId = String(row.auth_user_id ?? "").trim();
+    return Boolean(rowAuthUserId && rowAuthUserId !== userId);
+  });
+
+  if (hasRowsBoundToOtherUsers) {
+    return {
+      invite: null,
+      denied: true,
+      denialReason: "INVITE_SCOPE_AMBIGUOUS",
+    };
+  }
+
+  const unboundEmailRows = emailRows.filter((row) => {
+    return !String(row.auth_user_id ?? "").trim();
+  });
+
+  const fallbackResolution = resolveDeterministicInviteScope(unboundEmailRows);
+
+  if (fallbackResolution.denied || !fallbackResolution.invite) {
+    return fallbackResolution;
+  }
+
+  return fallbackResolution;
+}
+
 /**
  * Called once immediately after a contractor successfully sets their password.
  *
@@ -30,37 +189,29 @@ export async function ensureContractorMembershipFromInvite(): Promise<{
 
   const admin = createAdminClient();
 
-  // Find the oldest pending invite linked to this auth user.
-  // .limit(1) ensures maybeSingle() never errors on multiple rows.
-  const { data: invitesByUserId, error: inviteErr } = await admin
-    .from("contractor_invites")
-    .select("id, contractor_id, status")
-    .eq("auth_user_id", user.id)
-    .eq("status", "pending")
-    .order("created_at", { ascending: true })
-    .limit(1);
+  let scopedInviteResolution: ScopedInviteResolution;
 
-  if (inviteErr) return { isContractor: false, error: inviteErr.message };
-
-  let invite = invitesByUserId?.[0] ?? null;
-
-  // Fallback for older/fragile invite rows where auth_user_id was not set.
-  if (!invite) {
-    const email = String(user.email ?? "").trim().toLowerCase();
-
-    if (email) {
-      const { data: invitesByEmail, error: byEmailErr } = await admin
-        .from("contractor_invites")
-        .select("id, contractor_id, status")
-        .eq("status", "pending")
-        .ilike("email", email)
-        .order("created_at", { ascending: true })
-        .limit(1);
-
-      if (byEmailErr) return { isContractor: false, error: byEmailErr.message };
-      invite = invitesByEmail?.[0] ?? null;
-    }
+  try {
+    scopedInviteResolution = await resolveScopedPendingInviteForAcceptance({
+      admin,
+      userId: user.id,
+      email: String(user.email ?? ""),
+    });
+  } catch (error) {
+    return {
+      isContractor: false,
+      error: error instanceof Error ? error.message : "INVITE_SCOPE_RESOLUTION_FAILED",
+    };
   }
+
+  if (scopedInviteResolution.denied) {
+    return {
+      isContractor: false,
+      error: scopedInviteResolution.denialReason ?? "INVITE_SCOPE_DENIED",
+    };
+  }
+
+  const invite = scopedInviteResolution.invite;
 
   if (!invite) {
     // No pending invite — check if this user already has a membership row.
@@ -72,6 +223,15 @@ export async function ensureContractorMembershipFromInvite(): Promise<{
       .maybeSingle();
 
     return { isContractor: !!existing?.contractor_id };
+  }
+
+  try {
+    await assertScopedInviteContractorBoundary({ admin, invite });
+  } catch {
+    return {
+      isContractor: false,
+      error: "INVITE_SCOPE_INVALID",
+    };
   }
 
   // Upsert contractor_users membership (idempotent via composite PK).
@@ -91,8 +251,10 @@ export async function ensureContractorMembershipFromInvite(): Promise<{
     .update({
       status: "accepted",
       accepted_at: new Date().toISOString(),
+      auth_user_id: user.id,
     })
-    .eq("id", invite.id);
+    .eq("id", invite.id)
+    .eq("status", "pending");
 
   return { isContractor: true, error: markErr?.message };
 }

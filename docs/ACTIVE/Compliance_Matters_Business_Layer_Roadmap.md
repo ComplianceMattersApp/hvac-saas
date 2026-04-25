@@ -302,6 +302,16 @@ Completed RLS / permission hardening slices for the current stabilized baseline:
 - the completed targeted attachment/account-scope slice covers upload-token issuance, finalize upload, discard upload, and share-to-contractor
 - matching attachment/storage policy reconciliation was completed for this seam
 - this was a targeted internal attachment/account-scope slice, not a full attachment subsystem rewrite
+- internal job attachments read/download account-scope boundary hardening is also complete
+- the internal attachments read/download page no longer relies on internal auth plus implicit row filtering alone
+- one explicit same-account internal scoped-job preflight is now asserted before any attachment row read proceeds on the targeted page
+- one explicit same-account internal scoped-job preflight is now asserted before signed URL generation proceeds on the targeted page
+- cross-account internal access is denied before attachment row read on the targeted read/download path
+- cross-account internal access is denied before signed URL generation on the targeted read/download path
+- non-internal access is denied before attachment row read and before signed URL generation on the targeted read/download path
+- the completed targeted internal attachment read/download boundary slice covers the `app/jobs/[id]/attachments/page.tsx` route
+- contractor redirect behavior to portal remains intact
+- this was a targeted internal attachment read/download route-boundary slice, not a full attachment subsystem rewrite and not the end of broader RLS hardening
 - internal ECC test-run account-scope hardening is also complete
 - the hardened targeted ECC mutation paths now explicitly assert same-account scope before proceeding instead of relying on broad internal access alone
 - cross-account internal ECC mutation is denied on the targeted hardened paths
@@ -394,6 +404,116 @@ Completed RLS / permission hardening slices for the current stabilized baseline:
 - denied targeted internal identity/admin paths do not write `internal_users`
 - denied targeted internal identity/admin paths do not trigger `inviteUserByEmail`, `resetPasswordForEmail`, or `inviteContractor` side effects
 - this was a targeted internal identity/admin mutation-boundary slice, not role redesign, not support-access modeling, and not the end of broader RLS hardening
+- dispatch calendar account-scope read boundary hardening is also complete
+- the hardened central dispatch calendar dataset path no longer relies on broad downstream reads alone
+- explicit same-account scope is now asserted before dispatch calendar dataset assembly proceeds
+- cross-account jobs are excluded from the returned dispatch calendar dataset
+- cross-account internal `job_events` are excluded from downstream dispatch event expansion
+- cross-account assignment expansion is excluded from downstream dispatch staffing expansion
+- non-internal access is denied before dispatch calendar dataset assembly proceeds
+- this was a targeted dispatch calendar read-boundary slice in `calendar-actions.ts`, not a calendar UI redesign, not a calendar block mutation pass, and not the end of broader RLS hardening
+- dispatch calendar block mutation boundary hardening is also complete
+- targeted calendar block mutation entrypoints no longer rely on incomplete or inconsistent mutation-path checks
+- one explicit same-account internal mutation boundary is now asserted before targeted calendar block writes proceed
+- cross-account internal access is denied before write on the targeted calendar block paths
+- non-internal access is denied before write on the targeted calendar block paths
+- the hardened targeted calendar block mutation-boundary slice covers `createCalendarBlockEventFromForm`, `updateCalendarBlockEventFromForm`, and `deleteCalendarBlockEventFromForm`
+- denied targeted calendar block mutation paths do not write `calendar_events`
+- this was a targeted calendar block mutation-boundary slice, not a calendar UI redesign, not a dispatch dataset rewrite, and not the end of broader RLS hardening
+- admin job terminal mutation boundary hardening is also complete
+- targeted admin terminal job mutation entrypoints no longer rely on admin gating plus direct row mutation alone
+- one explicit admin + same-account scoped-job preflight is now asserted before the targeted terminal job write phases proceed
+- cross-account admin access is denied before write on the targeted terminal job paths
+- non-admin internal access is denied before write on the targeted terminal job paths
+- non-internal access is denied before write on the targeted terminal job paths
+- the hardened targeted admin terminal job mutation-boundary slice covers `archiveJobFromForm` and `cancelJobFromForm`
+- denied targeted archive paths do not write `jobs`
+- denied targeted cancel paths do not write `jobs` or `job_events`
+- this was a targeted admin terminal job mutation-boundary slice, not a general jobs/job_events permission-model rewrite, and not the end of broader RLS hardening
+- contractor portal intake proposal visibility and collaboration boundary hardening is also complete
+- live contractor-facing proposal list/detail/comment paths no longer rely on page-local contractor filtering plus elevated admin reads/writes alone for the hardened paths
+- one explicit contractor-scoped proposal access boundary is now asserted before targeted elevated proposal visibility/collaboration flows proceed
+- cross-contractor access is denied before targeted elevated read/write on the hardened proposal paths
+- non-contractor access is denied before targeted elevated read/write on the hardened proposal paths
+- denied targeted proposal paths do not proceed into elevated proposal row reads
+- denied targeted proposal paths do not proceed into elevated proposal comment reads/writes
+- denied targeted proposal paths do not proceed into elevated proposal attachment reads
+- the hardened contractor portal proposal paths cover proposal list visibility, proposal detail visibility, and the contractor proposal addendum/comment collaboration path
+- this was a targeted contractor portal proposal visibility/collaboration boundary slice, not a contractor portal UX redesign, not a contractor intake adjudication redesign, and not the end of broader RLS hardening
+- customer profile upsert mutation boundary hardening is also complete
+- `upsertCustomerProfileFromForm` no longer relies on internal-only access plus downstream update flow alone for the hardened path
+- one explicit same-account customer mutation preflight is now asserted before canonical customer write or downstream job snapshot sync proceeds on the targeted upsert path
+- cross-account internal access is denied before write on the targeted upsert path
+- non-internal access is denied before write on the targeted upsert path
+- denied targeted upsert paths do not write `customers`
+- denied targeted upsert paths do not write downstream `jobs` snapshot fields
+- this was a targeted customer profile upsert mutation-boundary slice, not a broader customer subsystem rewrite, not a snapshot-model rewrite, and not the end of broader RLS hardening
+- contractor admin edge mutation boundary hardening is also complete
+- the remaining live contractor admin edge mutation entrypoints no longer rely on partial or incomplete admin/owner checks alone for the hardened paths
+- one explicit same-account contractor mutation preflight is now asserted before targeted contractor admin edge writes proceed
+- cross-account internal/admin access is denied before write on the targeted edge paths
+- non-internal access is denied before write on the targeted edge paths
+- denied targeted edge paths do not write contractor records
+- the hardened contractor admin edge entrypoints cover `updateContractorNameAndEmailFromForm` and `createQuickContractorFromForm`
+- this was a targeted contractor admin edge mutation-boundary slice, not a contractor subsystem rewrite, not a contractor invite redesign, and not the end of broader RLS hardening
+- contractor invite acceptance membership boundary hardening is also complete
+- the live contractor invite acceptance membership path no longer relies on elevated invite/membership reads-writes plus fallback-by-email behavior alone for the hardened path
+- one explicit scoped acceptance preflight is now asserted before contractor membership creation or invite-acceptance mutation proceeds on the targeted acceptance path
+- preferred acceptance resolution is auth-user-first where available
+- legacy fallback-by-email is now constrained to deterministic single-scope acceptance only
+- ambiguous invite scope is denied before write on the hardened acceptance path
+- invalid or unsafe cross-scope acceptance is denied before write on the hardened acceptance path
+- denied targeted acceptance paths do not write `contractor_users`
+- denied targeted acceptance paths do not write `contractor_invites`
+- the hardened targeted acceptance path covers `ensureContractorMembershipFromInvite` and the live set-password acceptance handoff behavior that uses that path
+- this was a targeted contractor invite acceptance membership-boundary slice, not a broader auth redesign, not a contractor invite issuance/resend redesign, and not the end of broader RLS hardening
+- internal business profile mutation boundary hardening is also complete
+- the live internal business profile save path no longer relies on elevated profile/storage mutation flow alone for the hardened path
+- one explicit scoped business-profile mutation preflight is now asserted before profile upsert or storage mutation proceeds on the targeted path
+- cross-account or invalid-scope access is denied before write on the targeted path
+- non-admin/non-internal access is denied before write on the targeted path
+- denied targeted business-profile paths do not write `internal_business_profiles`
+- denied targeted business-profile paths do not perform storage upload/remove mutations
+- the hardened targeted business-profile path covers `saveInternalBusinessProfileFromForm` and the live admin company-profile form path that uses it
+- this was a targeted internal business profile mutation-boundary slice, not a broader business-identity redesign, not tenant-settings expansion, and not the end of broader RLS hardening
+- internal intake create mutation boundary hardening is also complete
+- `createJobFromForm` no longer relies on broad downstream create flow alone for internal intake creation on the hardened path
+- one explicit owner-scoped internal intake create preflight is now asserted before canonical create/link mutation or downstream side effect proceeds on the targeted intake-create path
+- cross-account or invalid-scope internal access is denied before write on the targeted intake-create path
+- non-internal access is denied before write on the targeted intake-create path
+- contractor-authorized intake behavior was preserved without authority expansion
+- denied targeted intake-create paths do not write `customers`, `locations`, `jobs`, or `job_events`
+- denied targeted intake-create paths do not trigger downstream notifications/emails tied to the blocked create flow
+- this was a targeted internal intake create mutation-boundary slice, not a `/jobs/new` redesign, not a contractor intake redesign, and not the end of broader RLS hardening
+- internal job-detail customer / notes / data-entry mutation boundary confirmation hardening is also complete
+- the remaining live internal `/jobs/[id]` customer / notes / data-entry mutation entrypoints now have explicit seam-proof coverage on the hardened path
+- the targeted confirmed entrypoints are `updateJobCustomerFromForm`, `addPublicNoteFromForm`, `addInternalNoteFromForm`, and `completeDataEntryFromForm`
+- those targeted entrypoints were confirmed to already route through the shared same-account internal scoped-job boundary on the hardened path
+- same-account internal allow is now explicitly proven for that targeted cluster
+- cross-account internal deny is now explicitly proven for that targeted cluster
+- non-internal deny is now explicitly proven for that targeted cluster
+- denied targeted cluster paths do not write `jobs` or `job_events`
+- denied `completeDataEntryFromForm` paths do not advance downstream ops-projection-changing behavior on the blocked path
+- this was a targeted internal job-detail customer / notes / data-entry seam-proof confirmation slice, not a `/jobs/[id]` redesign, not an ECC redesign, and not the end of broader RLS hardening
+- internal ECC save / save-complete mutation boundary confirmation hardening is also complete
+- the remaining live internal `/jobs/[id]/tests` ECC save / save-complete mutation entrypoints now have explicit seam-proof coverage on the hardened path
+- the targeted confirmed entrypoints are `saveRefrigerantChargeDataFromForm`, `saveAirflowDataFromForm`, `completeEccTestRunFromForm`, `saveAndCompleteDuctLeakageFromForm`, `saveAndCompleteAirflowFromForm`, and `saveAndCompleteRefrigerantChargeFromForm`
+- those targeted entrypoints were confirmed to already route through the shared same-account internal ECC scoped boundary on the hardened path
+- same-account internal allow is now explicitly proven for that targeted ECC cluster
+- cross-account internal deny is now explicitly proven for that targeted ECC cluster
+- non-internal deny is now explicitly proven for that targeted ECC cluster
+- denied targeted ECC cluster paths do not write `ecc_test_runs`
+- denied `completeEccTestRunFromForm` paths do not advance downstream ops-projection-changing behavior on the blocked path
+- denied `completeEccTestRunFromForm` paths do not advance retest-resolution/job-event behavior where reachable on the blocked path
+- this was a targeted internal ECC save / save-complete seam-proof confirmation slice, not an ECC redesign, not a `/jobs/[id]/tests` redesign, and not the end of broader RLS hardening
+- contractor intake adjudication mutation boundary hardening is also complete
+- targeted contractor intake adjudication entrypoints no longer rely on partial/inconsistent owner checks across adjudication flows
+- one explicit same-account adjudication preflight is now asserted before the targeted adjudication write phases proceed
+- cross-account internal access is denied before write on the targeted adjudication paths
+- non-internal access is denied before write on the targeted adjudication paths
+- the completed targeted contractor intake adjudication mutation-boundary slice covers `finalizeContractorIntakeSubmissionFromForm`, `rejectContractorIntakeSubmissionFromForm`, and `markContractorIntakeSubmissionAsDuplicateFromForm`
+- denied targeted contractor intake adjudication paths do not write `contractor_intake_submissions`, `customers`, `locations`, `jobs`, or `job_events`
+- this was a targeted contractor intake adjudication mutation-boundary slice, not a contractor intake UX redesign, not a contractor portal redesign, and not the end of broader RLS hardening
 - contractor authority was not expanded, and this was not a full jobs/service_cases RLS rewrite
 - contractor customer/location visibility remains constrained, read-only, and job-derived
 - notifications internal-awareness write-path hardening is also complete
@@ -418,7 +538,25 @@ What this completion does not mean:
 - it does not mean the full broader invoice/billing permission model is finished across every possible path
 - it does not mean the full broader notification/messaging permission model is finished across every possible path
 - it does not mean the full broader internal identity/admin permission model is finished across every possible path
+- it does not mean the full broader calendar/dispatch permission model is finished across every possible path
+- it does not mean the full broader contractor intake/intake-review permission model is finished across every possible path
+- it does not mean contractor portal UX redesign was done
+- it does not mean contractor intake adjudication redesign was done
+- it does not mean contractor portal redesign was done
+- it does not mean contractor invite redesign was done
+- it does not mean contractor invite issuance/resend redesign was done
+- it does not mean customer/location redesign was done
+- it does not mean snapshot-model rewrite was done
 - it does not mean full auth/identity lifecycle redesign was done
+- it does not mean the full broader auth/identity lifecycle model is finished across every possible path
+- it does not mean business-identity redesign was done
+- it does not mean tenant-settings expansion was done
+- it does not mean the full broader intake permission model is finished across every possible path
+- it does not mean `/jobs/new` workflow redesign was done
+- it does not mean `/jobs/[id]` workflow redesign was done
+- it does not mean `/jobs/[id]/tests` workflow redesign was done
+- it does not mean ECC redesign was done
+- it does not mean the full broader ECC workflow/permission model is finished across every possible path
 - it does not mean contractor notifications were introduced
 - it does not mean support-access modeling is complete
 - it does not mean role redesign was done

@@ -4,7 +4,9 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
   isInternalAccessError,
   requireInternalUser,
+  getInternalUser,
 } from "@/lib/auth/internal-user";
+import { loadScopedInternalAttachmentJobForMutation } from "@/lib/auth/internal-attachment-scope";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 
 import JobAttachmentsInternal from "../_components/JobAttachmentsInternal";
@@ -96,36 +98,37 @@ export default async function JobAttachmentsPage({
 
   if (!user) redirect("/login");
 
-  try {
-    await requireInternalUser({ supabase, userId: user.id });
-  } catch (error) {
-    if (isInternalAccessError(error)) {
-      const { data: contractorUser, error: contractorError } = await supabase
-        .from("contractor_users")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+  const internalUserData = await getInternalUser({ supabase, userId: user.id });
 
-      if (contractorError) throw contractorError;
+  if (!internalUserData) {
+    const { data: contractorUser, error: contractorError } = await supabase
+      .from("contractor_users")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-      if (contractorUser) {
-        redirect(`/portal/jobs/${jobId}`);
-      }
+    if (contractorError) throw contractorError;
 
-      redirect("/login");
+    if (contractorUser) {
+      redirect(`/portal/jobs/${jobId}`);
     }
 
-    throw error;
+    redirect("/login");
   }
 
-  const { data: job, error: jobError } = await supabase
-    .from("jobs")
-    .select("id, title, city, job_address, customer_first_name, customer_last_name, scheduled_date, window_start, window_end, job_type, status, ops_status")
-    .eq("id", jobId)
-    .maybeSingle();
+  // Explicit same-account internal scoped-job preflight: deny before any attachment read or signed URL generation
+  const scopedJob = await loadScopedInternalAttachmentJobForMutation({
+    accountOwnerUserId: internalUserData.account_owner_user_id,
+    jobId,
+    select: "id, title, city, job_address, customer_first_name, customer_last_name, scheduled_date, window_start, window_end, job_type, status, ops_status",
+  });
 
-  if (jobError) throw jobError;
-  if (!job) return notFound();
+  if (!scopedJob?.id) {
+    // Cross-account or job not found: deny before any attachment row read or signed URL generation
+    return notFound();
+  }
+
+  const job = scopedJob;
 
   const { data: attachmentRows, error: attachmentErr } = await supabase
     .from("attachments")

@@ -2996,36 +2996,14 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
 export async function archiveJobFromForm(formData: FormData) {
   "use server";
 
-  const supabase = await createClient();
-
   const job_id = String(formData.get("job_id") ?? "").trim();
   if (!job_id) throw new Error("Missing job_id");
 
-  // Confirm we have an authenticated user
-  const { data: u, error: ue } = await supabase.auth.getUser();
-  const actingUserId = u?.user?.id ?? null;
-  console.error("ARCHIVE AUTH", { uid: actingUserId, err: ue?.message ?? null });
-  if (ue) throw ue;
-  if (!actingUserId) redirect("/login");
-
-  try {
-    await requireInternalRole("admin", { supabase, userId: actingUserId });
-    console.error("ARCHIVE INTERNAL", {
-      ok: true,
-      uid: actingUserId,
-      iuErr: null,
-    });
-  } catch (error) {
-    console.error("ARCHIVE INTERNAL", {
-      ok: false,
-      uid: actingUserId,
-      iuErr:
-        error instanceof Error
-          ? error.message
-          : "UNKNOWN_INTERNAL_ACCESS_ERROR",
-    });
-    throw error;
-  }
+  const supabase = await createClient();
+  await requireInternalAdminScopedJobAccessOrRedirect({
+    supabase,
+    jobId: job_id,
+  });
 
   // Do the archive and REQUIRE a returned row (proves success)
   const ts = new Date().toISOString();
@@ -3827,6 +3805,31 @@ async function requireInternalScopedJobAccessOrRedirect(params: {
 }) {
   const jobId = String(params.jobId ?? "").trim();
   const { userId, internalUser } = await requireInternalUser({
+    supabase: params.supabase,
+  });
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    select: "id",
+  });
+
+  if (!scopedJob?.id) {
+    if (params.onUnauthorized) {
+      params.onUnauthorized();
+    }
+    redirect(`/jobs/${jobId}?notice=not_authorized`);
+  }
+
+  return { userId, internalUser, scopedJob };
+}
+
+async function requireInternalAdminScopedJobAccessOrRedirect(params: {
+  supabase: any;
+  jobId: string;
+  onUnauthorized?: () => void;
+}) {
+  const jobId = String(params.jobId ?? "").trim();
+  const { userId, internalUser } = await requireInternalRole("admin", {
     supabase: params.supabase,
   });
   const scopedJob = await loadScopedInternalJobForMutation({
@@ -5329,6 +5332,41 @@ export async function createJob(
   };
 }
 
+async function requireOwnerScopedInternalIntakeCreateContext(params: {
+  supabase: any;
+  actorUserId: string | null;
+  isContractorUser: boolean;
+  canonicalOwnerUserId: string;
+}) {
+  if (params.isContractorUser) {
+    return null;
+  }
+
+  const actorUserId = String(params.actorUserId ?? "").trim();
+  if (!actorUserId) {
+    redirect("/forbidden");
+  }
+
+  let internalUser: Awaited<ReturnType<typeof requireInternalUser>>["internalUser"];
+  try {
+    ({ internalUser } = await requireInternalUser({
+      supabase: params.supabase,
+      userId: actorUserId,
+    }));
+  } catch {
+    redirect("/forbidden");
+  }
+
+  const actorOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  const canonicalOwnerUserId = String(params.canonicalOwnerUserId ?? "").trim();
+
+  if (!actorOwnerUserId || !canonicalOwnerUserId || actorOwnerUserId !== canonicalOwnerUserId) {
+    redirect("/forbidden");
+  }
+
+  return internalUser;
+}
+
 /**
  * CREATE: used by /jobs/new form
  */
@@ -5468,6 +5506,13 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     actorUserId: userId,
     defaultWriteClient: supabase,
     contractorId: isContractorUser ? contractorIdFinal : null,
+  });
+
+  await requireOwnerScopedInternalIntakeCreateContext({
+    supabase,
+    actorUserId: userId,
+    isContractorUser,
+    canonicalOwnerUserId: String(canonicalOwnerUserId ?? ""),
   });
 
   function redirectInvalidExistingPairing() {
@@ -8124,7 +8169,10 @@ export async function cancelJobFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required (job_id missing)");
 
   const supabase = await createClient();
-  const { userId } = await requireInternalRole("admin", { supabase });
+  const { userId } = await requireInternalAdminScopedJobAccessOrRedirect({
+    supabase,
+    jobId: id,
+  });
 
   // Read current job state
   const { data: job, error: jobErr } = await supabase

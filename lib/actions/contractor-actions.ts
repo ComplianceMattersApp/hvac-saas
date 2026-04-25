@@ -23,6 +23,51 @@ function normalizeInviteEmail(raw: string | null) {
   return value || null;
 }
 
+async function requireInternalAdminContractorMutationContext(params: {
+  supabase?: Awaited<ReturnType<typeof createClient>>;
+}) {
+  const supabase = params.supabase ?? (await createClient());
+  const { internalUser } = await requireInternalRole("admin", {
+    supabase,
+  });
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  if (!accountOwnerUserId) throw new Error("Missing account owner scope");
+
+  return {
+    supabase,
+    internalUser,
+    accountOwnerUserId,
+  };
+}
+
+async function requireScopedContractorEdgeMutation(params: {
+  accountOwnerUserId: string;
+  contractorId: string;
+}) {
+  const scopedContractor = await loadScopedInternalContractorForMutation({
+    accountOwnerUserId: params.accountOwnerUserId,
+    contractorId: params.contractorId,
+  });
+
+  if (!scopedContractor?.id) {
+    throw new Error("Access denied");
+  }
+
+  return scopedContractor;
+}
+
+function resolveScopedOwnerForCreate(params: {
+  accountOwnerUserId: string;
+  requestedOwnerUserId: string | null;
+}) {
+  const requestedOwnerUserId = String(params.requestedOwnerUserId ?? "").trim();
+  if (requestedOwnerUserId && requestedOwnerUserId !== params.accountOwnerUserId) {
+    throw new Error("Access denied");
+  }
+
+  return params.accountOwnerUserId;
+}
+
 async function getCreateNotice(params: {
   contractorId: string;
   email: string | null;
@@ -162,7 +207,7 @@ export async function updateContractorFromForm(formData: FormData) {
 
 export async function updateContractorNameAndEmailFromForm(formData: FormData) {
   const supabase = await createClient();
-  const { internalUser } = await requireInternalRole("admin", {
+  const { accountOwnerUserId } = await requireInternalAdminContractorMutationContext({
     supabase,
   });
 
@@ -174,18 +219,10 @@ export async function updateContractorNameAndEmailFromForm(formData: FormData) {
 
   const email = String(formData.get("email") ?? "").trim() || null;
 
-  const { data: existingContractor, error: existingContractorError } = await supabase
-    .from("contractors")
-    .select("id, owner_user_id")
-    .eq("id", contractor_id)
-    .maybeSingle();
-
-  if (existingContractorError) throw new Error(existingContractorError.message);
-  if (!existingContractor?.id) throw new Error("Contractor not found");
-
-  if (existingContractor.owner_user_id !== internalUser.account_owner_user_id) {
-    throw new Error("Access denied");
-  }
+  await requireScopedContractorEdgeMutation({
+    accountOwnerUserId,
+    contractorId: contractor_id,
+  });
 
   const { error } = await supabase
     .from("contractors")
@@ -202,7 +239,7 @@ export async function updateContractorNameAndEmailFromForm(formData: FormData) {
 
 export async function createQuickContractorFromForm(formData: FormData) {
   const supabase = await createClient();
-  const { internalUser } = await requireInternalRole("admin", {
+  const { accountOwnerUserId } = await requireInternalAdminContractorMutationContext({
     supabase,
   });
 
@@ -210,13 +247,17 @@ export async function createQuickContractorFromForm(formData: FormData) {
   if (!name) throw new Error("Contractor name is required.");
 
   const email = String(formData.get("email") ?? "").trim() || null;
+  const ownerUserId = resolveScopedOwnerForCreate({
+    accountOwnerUserId,
+    requestedOwnerUserId: String(formData.get("owner_user_id") ?? "").trim() || null,
+  });
 
   const { data, error } = await supabase
     .from("contractors")
     .insert({
       name,
       email,
-      owner_user_id: internalUser.account_owner_user_id,
+      owner_user_id: ownerUserId,
     })
     .select("id")
     .single();

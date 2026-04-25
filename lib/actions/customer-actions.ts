@@ -44,11 +44,12 @@ async function requireInternalScopedCustomerForMutation(params: {
 
 export async function upsertCustomerProfileFromForm(formData: FormData) {
   const supabase = await createClient();
-  const admin = createAdminClient();
-
-  let internalUser;
+  let scopedCustomer;
   try {
-    ({ internalUser } = await requireInternalUser({ supabase }));
+    scopedCustomer = await requireInternalScopedCustomerForMutation({
+      supabase,
+      customerId: String(formData.get("customer_id") ?? "").trim(),
+    });
   } catch (error) {
     if (isInternalAccessError(error)) {
       redirect("/login");
@@ -57,21 +58,8 @@ export async function upsertCustomerProfileFromForm(formData: FormData) {
     throw error;
   }
 
-  const customer_id = String(formData.get("customer_id") ?? "").trim();
-  if (!customer_id) throw new Error("Missing customer_id");
-
-  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
-  if (!accountOwnerUserId) throw new Error("Missing account owner scope");
-
-  const { data: scopedCustomer, error: scopedCustomerErr } = await admin
-    .from("customers")
-    .select("id")
-    .eq("id", customer_id)
-    .eq("owner_user_id", accountOwnerUserId)
-    .maybeSingle();
-
-  if (scopedCustomerErr) throw scopedCustomerErr;
-  if (!scopedCustomer?.id) throw new Error("Customer not found in internal account scope");
+  const customer_id = scopedCustomer.customerId;
+  const admin = createAdminClient();
 
   // Customer identity/contact
   const first_name = String(formData.get("first_name") ?? "").trim() || null;
