@@ -11,6 +11,10 @@ import {
   laDateToUtcMidnightIso,
 } from "@/lib/utils/schedule-la";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
+import {
+  accountScopeInList,
+  resolveReportAccountContractorIds,
+} from "@/lib/reports/report-account-scope";
 
 export const CLOSEOUT_FOLLOW_UP_LEDGER_PAGE_LIMIT = 300;
 export const CLOSEOUT_FOLLOW_UP_LEDGER_EXPORT_LIMIT = 5000;
@@ -404,10 +408,20 @@ export async function listCloseoutFollowUpLedgerRows(params: {
   includeCount?: boolean;
 }): Promise<CloseoutFollowUpLedgerResult> {
   const limit = params.limit ?? CLOSEOUT_FOLLOW_UP_LEDGER_PAGE_LIMIT;
-  const assignedJobIds = await resolveAssignedJobIds({
-    supabase: params.supabase,
-    assigneeUserId: params.filters.assigneeUserId,
-  });
+  const [contractorIds, assignedJobIds] = await Promise.all([
+    resolveReportAccountContractorIds({
+      supabase: params.supabase,
+      accountOwnerUserId: params.accountOwnerUserId,
+    }),
+    resolveAssignedJobIds({
+      supabase: params.supabase,
+      assigneeUserId: params.filters.assigneeUserId,
+    }),
+  ]);
+
+  if (contractorIds.length === 0) {
+    return { rows: [], totalCount: 0, truncated: false };
+  }
 
   if (assignedJobIds && assignedJobIds.length === 0) {
     return { rows: [], totalCount: 0, truncated: false };
@@ -425,7 +439,8 @@ export async function listCloseoutFollowUpLedgerRows(params: {
   let query = params.supabase
     .from("jobs")
     .select(JOB_BASE_SELECT, params.includeCount === false ? undefined : { count: "exact" })
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .in("contractor_id", accountScopeInList(contractorIds));
 
   query = applyLedgerFilters(query, params.filters, assignedJobIds, {
     allowRawInvoiceProjectionFilters: !requiresNormalizedCloseoutFiltering,

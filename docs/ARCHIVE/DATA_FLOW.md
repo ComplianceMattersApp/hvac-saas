@@ -162,8 +162,6 @@ Key Files:
 
 \- lib/actions/ecc-status.ts
 
-\- lib/actions/ecc-paperwork-actions.ts
-
 
 
 ---

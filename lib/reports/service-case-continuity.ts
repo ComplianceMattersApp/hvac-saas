@@ -1,5 +1,9 @@
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { displayDateLA, formatBusinessDateUS, laDateToUtcMidnightIso } from "@/lib/utils/schedule-la";
+import {
+  accountScopeInList,
+  resolveReportAccountCustomerIds,
+} from "@/lib/reports/report-account-scope";
 
 export const SERVICE_CASE_CONTINUITY_PAGE_LIMIT = 300;
 export const SERVICE_CASE_CONTINUITY_EXPORT_LIMIT = 5000;
@@ -342,12 +346,20 @@ export async function getServiceCaseContinuityFilterOptions(params: {
 
 export async function listServiceCaseContinuityRows(params: {
   supabase: any;
+  accountOwnerUserId: string;
   filters: ServiceCaseContinuityFilters;
   internalBusinessDisplayName: string;
   limit?: number;
   includeCount?: boolean;
 }): Promise<ServiceCaseContinuityResult> {
   const limit = params.limit ?? SERVICE_CASE_CONTINUITY_PAGE_LIMIT;
+  const accountCustomerIds = await resolveReportAccountCustomerIds({
+    supabase: params.supabase,
+    accountOwnerUserId: params.accountOwnerUserId,
+  });
+  if (accountCustomerIds.length === 0) {
+    return { rows: [], totalCount: 0, truncated: false };
+  }
   const [contractorCaseIds, repeatCaseIds] = await Promise.all([
     resolveCaseIdsForContractor({
       supabase: params.supabase,
@@ -368,7 +380,8 @@ export async function listServiceCaseContinuityRows(params: {
 
   let query = params.supabase
     .from("service_cases")
-    .select(SERVICE_CASE_BASE_SELECT, params.includeCount === false ? undefined : { count: "exact" });
+    .select(SERVICE_CASE_BASE_SELECT, params.includeCount === false ? undefined : { count: "exact" })
+    .in("customer_id", accountScopeInList(accountCustomerIds));
 
   query = applyCaseFilters(query, params.filters, eligibleCaseIds);
   query = query.limit(limit);

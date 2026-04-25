@@ -22,6 +22,7 @@ export async function listReportCenterKpiFamilies(params: {
     }),
     buildContinuityKpiReadModel({
       supabase: params.supabase,
+      accountOwnerUserId: params.accountOwnerUserId,
       filters: params.filters,
       buckets,
     }),

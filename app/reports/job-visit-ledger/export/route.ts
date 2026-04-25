@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
   });
   const ledger = await listJobVisitLedgerRows({
     supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
     filters,
     internalBusinessDisplayName: internalBusinessIdentity.display_name,
     limit: JOB_VISIT_LEDGER_EXPORT_LIMIT,

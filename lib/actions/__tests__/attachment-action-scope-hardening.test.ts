@@ -224,7 +224,7 @@ describe("internal attachment same-account hardening", () => {
   });
 
   it("allows same-account internal upload-token issuance", async () => {
-    const { supabase, insertedAttachments } = makeSessionClientFixture();
+    const { supabase, insertedAttachments } = makeSessionClientFixture({});
     createClientMock.mockResolvedValue(supabase);
     createAdminClientMock.mockReturnValue(
       makeAdminClientFixture({
@@ -255,7 +255,7 @@ describe("internal attachment same-account hardening", () => {
   });
 
   it("denies cross-account internal upload-token issuance before insert", async () => {
-    const { supabase, insertedAttachments } = makeSessionClientFixture();
+    const { supabase, insertedAttachments } = makeSessionClientFixture({});
     createClientMock.mockResolvedValue(supabase);
     createAdminClientMock.mockReturnValue(
       makeAdminClientFixture({

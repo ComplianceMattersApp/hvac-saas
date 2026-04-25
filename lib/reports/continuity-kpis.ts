@@ -7,6 +7,11 @@ import {
   incrementBucketValue,
   initializeBucketRows,
 } from "@/lib/reports/kpi-foundation";
+import {
+  accountScopeInList,
+  resolveReportAccountContractorIds,
+  resolveReportAccountCustomerIds,
+} from "@/lib/reports/report-account-scope";
 
 type ContinuityCaseRow = {
   id: string;
@@ -23,19 +28,32 @@ const CONTINUITY_BUCKET_METRICS = [
 
 export async function buildContinuityKpiReadModel(params: {
   supabase: any;
+  accountOwnerUserId: string;
   filters: ReportCenterKpiFilters;
   buckets: ReportCenterKpiBucket[];
 }): Promise<ReportCenterKpiFamilyReadModel> {
   const range = getKpiRange(params.filters);
+  const [customerIds, contractorIds] = await Promise.all([
+    resolveReportAccountCustomerIds({
+      supabase: params.supabase,
+      accountOwnerUserId: params.accountOwnerUserId,
+    }),
+    resolveReportAccountContractorIds({
+      supabase: params.supabase,
+      accountOwnerUserId: params.accountOwnerUserId,
+    }),
+  ]);
   const [{ data: serviceCaseData, error: serviceCaseError }, { data: linkedJobData, error: linkedJobError }] = await Promise.all([
     params.supabase
       .from("service_cases")
-      .select("id, status, created_at, resolved_at, resolved_by_job_id"),
+      .select("id, status, created_at, resolved_at, resolved_by_job_id")
+      .in("customer_id", accountScopeInList(customerIds)),
     params.supabase
       .from("jobs")
       .select("id, service_case_id")
       .is("deleted_at", null)
-      .not("service_case_id", "is", null),
+      .not("service_case_id", "is", null)
+      .in("contractor_id", accountScopeInList(contractorIds)),
   ]);
 
   if (serviceCaseError) throw serviceCaseError;

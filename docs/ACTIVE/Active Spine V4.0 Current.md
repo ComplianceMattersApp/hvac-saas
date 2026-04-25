@@ -1213,6 +1213,45 @@ Current position:
   - the generic `42501 -> service-role` fallback was removed from the internal awareness notification write path
   - contractor-originated or mixed-context internal awareness notifications now use one explicit, policy-aligned write contract
   - internal notification read boundaries remain internal-only; contractors still do not get direct read access to internal notifications
+  - Report Center account-scope read/export boundary hardening is also complete
+  - targeted Report Center read/export surfaces now assert explicit account-scoped data boundaries for the hardened report paths
+  - report jobs/KPI paths now scope job reads by account contractor IDs where applicable
+  - service case continuity report paths now scope service case reads by account customer IDs where applicable
+  - closeout follow-up report paths now apply the account-owner scope that was already accepted but not fully used
+  - dashboard report read model now scopes both jobs and internal invoice reads to the account boundary
+  - targeted CSV/export report paths were included in this Report Center boundary pass
+  - empty account-scope lists now use sentinel-safe behavior to prevent accidental fetch-all outcomes on hardened report reads
+  - focused seam coverage was added for same-account allow, cross-account exclusion/deny, empty scope behavior, and invoice billing-mode honesty
+  - targeted seam tests passed: 15/15
+  - full suite passed: 284/284
+  - TypeScript build passed with `npx tsc --noEmit`
+  - browser smoke test passed after implementation
+  - this was a targeted Report Center read/export boundary hardening slice, not a Report Center redesign, not a KPI logic redesign, not a billing expansion, not payment execution work, not QBO work, not a broad RLS rewrite, and not the end of broader RLS / permission hardening
+  - reporting truth boundaries remain locked: `jobs` / `jobs.ops_status` = operational truth/projection, `service_cases` = continuity truth, `job_events` = audit/activity truth, `internal_invoices` = billed truth for internal-invoicing mode, and `payments` = collected truth only when materially implemented
+  - external-billing companies must not be treated as if internal invoice/payment records exist
+  - reporting remains owner-family split and must not collapse operational, billed, and collected truth
+  - internal job-detail read boundary hardening for `app/jobs/[id]/page.tsx` is also complete
+  - the main internal job detail page now asserts an explicit same-account internal scoped-job preflight before main job-detail read assembly
+  - the main internal job detail page now asserts an explicit same-account internal scoped-job preflight before attachment signed URL generation performed from that page
+  - cross-account internal access is denied before job-detail read assembly on the targeted path
+  - cross-account internal access is denied before main-page attachment signed URL generation on the targeted path
+  - denied signed URL paths do not call signed URL generation
+  - contractor enumeration used by the internal job detail page is scoped to the current internal account owner
+  - existing contractor/login redirect behavior was preserved
+  - existing mutation behavior was not changed
+  - focused seam tests were added for same-account allow, cross-account deny, non-internal behavior preservation, signed URL deny-before-call behavior, and contractor enumeration scoping
+  - targeted seam tests passed: 7/7
+  - full suite passed: 291/291
+  - TypeScript build passed with `npx tsc --noEmit`
+  - browser smoke test passed after implementation
+  - this was a targeted internal job-detail read-boundary slice, not a `/jobs/[id]` UI redesign, not a job-detail mutation rewrite, not an attachment subsystem rewrite, not a Report Center change, not a billing expansion, not payment execution work, not QBO work, not a role redesign, not a support-access model, not a broad RLS rewrite, and not the end of broader RLS / permission hardening
+  - jobs / jobs.ops_status remain operational truth / operational projection
+  - service_cases remain continuity truth
+  - job_events remain audit/activity truth
+  - internal_invoices remain billed truth for internal-invoicing mode
+  - payments remain collected truth only when materially implemented
+  - contractor authority was not expanded
+  - reporting and billing boundaries remain unchanged
   - no role redesign, support-access model, payment work, billing work, broader notifications UX/polish work, or broad portal/contractor authority expansion was part of these slices
 - Completed billing hardening slices for the current stabilized baseline include:
   - the external-billing split-brain closeout fix: the supported `Mark Invoice Sent -> Closed` path writes the lightweight billed-truth marker before supported closeout
@@ -1220,7 +1259,15 @@ Current position:
   - invoice-required counter/label normalization: invoice-required metrics and messaging derive from billing-aware invoice-needed truth rather than raw `jobs.ops_status = invoice_required`
   - external-billing secondary-field unification: `data_entry_completed_at` is aligned across supported lightweight external-billing completion paths, while `invoice_number` remains owned by the explicit data-entry path and is not invented by lightweight action buttons
 - These completed slices do not broaden payment execution, do not change internal-invoicing billed truth ownership, and do not change roadmap order.
-- This does not mean RLS completion / permission hardening is finished overall; it means additional core operational ownership slices are now closed while the broader hardening milestone remains active.
+- Formal closeout review completed for the RLS / permission hardening milestone against live repo evidence and the active hardening ledger.
+- Required live access-surface families were reviewed across internal mutations, reads, attachments/signing, ECC flows, equipment/system, lifecycle/scheduling, contractor/customer/location surfaces, invoicing, report exports, notification read-state, identity/admin, dispatch/calendar, intake/adjudication/portal collaboration, server route handlers, and dormant app-local action cleanup.
+- Targeted seam hardening coverage is confirmed complete for the milestone-defined families.
+- App-local orphan cleanup is confirmed complete for the dormant job-detail action file removal.
+- No concrete remaining live permission seam was proven in the closeout review.
+- Broad global normalization of all admin-client/service-role usage remains intentionally deferred outside this milestone closeout scope.
+- Broad global completion of every notification/email side-effect path remains intentionally deferred outside this milestone closeout scope.
+- This milestone is now formally closed at the targeted seam-hardening level.
+- This closeout does not imply role redesign, support-access redesign, payment execution work, billing expansion, UI redesign, or a broad cross-domain RLS rewrite.
 - Payment architecture/foundation remains an active implementation area under the locked direction in Section 19.
 - This does not mean full payment acceptance is live; it means payment readiness is being intentionally built to prevent later rework.
 
@@ -1240,10 +1287,17 @@ Reporting / analytics milestone baseline now includes:
 Remaining closeout for milestone-3 is limited to live-usage validation and minor polish/hardening, not missing major report families.
 
 If roadmap order remains unchanged, the next active major roadmap item after Reporting / analytics is:
-- RLS completion / permission hardening
+- Monthly usage / payment model
+
+Roadmap guardrail for this next item:
+- Payment architecture/foundation is already directionally defined.
+- Payments remain payment-ready by design, not payment-active.
+- This does not imply live Stripe/payment execution start unless explicitly planned.
+- This does not imply QBO dependency.
 
 Current clarification:
-- the broader RLS completion / permission hardening milestone remains the next active major roadmap item
+- RLS / permission hardening milestone is formally closed at the targeted seam-hardening level
+- the next active major roadmap item is Monthly usage / payment model
 - customer/location internal account-owner reconciliation is complete inside that milestone
 - notifications internal-awareness write-path hardening is also complete inside that milestone
 - targeted internal same-account job/service-case mutation boundary hardening is also complete inside that milestone
