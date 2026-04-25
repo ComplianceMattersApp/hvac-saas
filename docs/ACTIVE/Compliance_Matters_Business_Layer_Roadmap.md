@@ -44,6 +44,14 @@ It extends it.
 - **Invoice** = billed commercial scope
 - **Payment** = money collected against an internal invoice, when payment capability exists
 
+### Current status note (reporting/truth separation)
+- Internal invoice ledger collected-payment visibility is now implemented for internal invoicing report surfaces (including CSV export) as reporting/tracking only.
+- Separation remains locked:
+	- invoices = billed truth (`internal_invoices` / `internal_invoice_line_items`)
+	- payments = collected truth (`internal_invoice_payments`)
+	- platform entitlement = platform account truth (`platform_account_entitlements`)
+- This status update does not introduce payment execution, Stripe checkout, QBO sync, or dashboard payment analytics expansion.
+
 ### Locked rule
 Business-layer modules must not collapse, overwrite, or blur operational ownership boundaries.
 
@@ -894,10 +902,11 @@ That direction is owned by:
 
 ### Business-layer meaning of payments
 For business-layer planning purposes:
-- payment = money collected against an internal invoice
+- payment = money collected against an internal invoice (manual/off-platform tracking now available for issued internal invoices; live processor execution remains later)
 - one invoice may have many payments
 - reporting must distinguish billed truth from collected truth
 - payment behavior must respect company billing mode
+- collected-payment truth is now materially implemented in `public.internal_invoice_payments` for internal-invoicing companies
 
 ### Locked rule
 Do not use this document to override:

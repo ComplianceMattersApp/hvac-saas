@@ -225,12 +225,44 @@ Includes:
 - support for a later configurable platform fee
 
 Completed P1 foundation work (V1):
-- Platform Account Entitlement / Usage Foundation is complete.
+
+**Platform Account Entitlement / Usage Foundation**
 - Implemented platform entitlement truth is account-owner-scoped and separate from:
 	- tenant billed truth (`internal_invoices` / `internal_invoice_line_items`)
-	- collected-payment truth (still not materially implemented)
+	- collected-payment truth (now materially implemented for issued internal invoices)
 - This completed slice did not introduce a `payments` table.
 - This completed slice did not introduce live processor execution, checkout, card collection, refund/dispute handling, or QBO-dependent flows.
+
+**Manual Payment Ledger V1**
+- Implemented collected-payment truth for manual/off-platform payment recording on issued internal invoices.
+- New `internal_invoice_payments` table with account-owner scope and RLS:
+	- Records manual payments (cash, check, ACH, bank transfer, card off-platform, other).
+	- One invoice may have multiple payment rows.
+	- Balance due derived from invoice total minus recorded payments.
+	- Payment status: recorded, pending, failed, reversed (only "recorded" counts toward collected total).
+	- Payment records are immutable.
+	- Stripe and QBO fields are inert schema scaffolding only.
+- New read-side resolver for collected payment summary and payment row queries.
+- New server action for manual payment recording with validation:
+	- Issued invoice requirement (draft and void invoices cannot receive payments).
+	- Overpayment prevention (server-side balance check).
+	- Account-scoped preflight and RLS verification.
+- Minimal internal job-detail UI integration:
+	- Payment status chips and historical payment ledger display.
+	- Payment recording form for authorized users.
+	- `payment_recorded` events written with full metadata to `job_events`.
+- Internal invoices remain billed truth; payment recording does not mutate invoice totals or line items.
+- No live processor execution exists. This implementation is manual/off-platform only.
+- Stripe and QBO remain optional future seams, not active in this phase.
+
+**Collected Payment Reporting / Invoice Ledger Visibility V1**
+- Implemented collected-payment visibility in the internal invoice ledger report and CSV export.
+- Internal invoice ledger now shows: Amount Paid, Balance Due, Payment Status, Last Payment, Payments.
+- CSV export now includes: Amount Paid, Balance Due, Payment Status, Last Payment Date, Payment Count.
+- Collected-payment truth is read from `internal_invoice_payments`; only `payment_status = recorded` contributes to collected totals.
+- Balance due remains read-side derived from invoice total minus recorded payments and does not mutate billed-truth invoice totals or line items.
+- Last Payment Date now renders as a clean report date (not a raw ISO timestamp).
+- This is reporting/visibility only and does not introduce payment execution, Stripe checkout, QBO sync, or portal payment UX.
 
 Locked clarification:
 Invoice send/resend/tracking in this phase is allowed only as a billing communication seam attached to the invoice record. It is not live payment execution, not Stripe checkout, not card/ACH collection, not refund/dispute handling, not contractor payout flow, and not QBO-led billing.
@@ -246,6 +278,10 @@ Does **not** include:
 
 ### Phase P2 — Customer payment acceptance (later)
 First live processor phase.
+
+Locked carry-forward clarification:
+- Dashboard payment/cash-performance analytics expansion remains deferred.
+- Customer payment acceptance remains a later P2 Stripe-first implementation.
 
 Recommended first scope:
 - customer pays invoice online

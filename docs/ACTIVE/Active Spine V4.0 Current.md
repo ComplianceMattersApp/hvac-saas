@@ -1002,13 +1002,36 @@ Includes:
 - optional future QBO sync seam
 - support for a later configurable platform fee
 
-First completed slice in this phase:
-- Platform Account Entitlement / Usage Foundation V1 is complete.
+Completed slices in this phase:
+
+1. Platform Account Entitlement / Usage Foundation V1
 - Implemented as platform-account entitlement truth only (`public.platform_account_entitlements`) with account-owner scope, read-side resolver support, and read-only admin visibility in company profile.
-- This slice is intentionally separate from tenant billed truth (`internal_invoices` / `internal_invoice_line_items`) and from collected-payment truth (still not materially implemented).
+- This slice is intentionally separate from tenant billed truth (`internal_invoices` / `internal_invoice_line_items`) and from collected-payment truth.
 - Missing entitlement row resolves to safe default trial entitlement context; real DB/query errors do not silently grant access and must throw.
 - Active seat count is derived live from `internal_users` and is not stored on the entitlement row.
 - Stripe placeholder fields in this slice are inert schema scaffolding only.
+
+2. Manual Payment Ledger V1
+- Implemented as manual/off-platform collected-payment truth only (`public.internal_invoice_payments`) with account-owner scope, read-side resolver support, and minimal internal job-detail UI integration.
+- Payment recording is for issued internal invoices only; draft and void invoices cannot receive payments.
+- One invoice may have multiple payment rows; balance due is derived from invoice total minus recorded payments.
+- Payment status values are: recorded, pending, failed, reversed. Only "recorded" status counts toward collected totals.
+- Payment records are immutable; no payment deletion or status mutation exists.
+- Internal invoices remain billed truth; payment recording does not mutate invoice totals or line items.
+- Payment recording writes `payment_recorded` events to `job_events` with full metadata for auditability.
+- Real DB/query errors throw; missing payment rows resolve to zero collected totals.
+- Stripe and QBO fields are inert schema scaffolding only; no processor execution exists.
+- This slice is intentionally separate from platform entitlement truth and remains payment-ready by design.
+
+3. Collected Payment Reporting / Invoice Ledger Visibility V1
+- Implemented as reporting/visibility only on the internal invoice ledger and CSV export surfaces.
+- Internal invoice ledger rows now expose collected-payment visibility fields: Amount Paid, Balance Due, Payment Status, Last Payment, and Payments.
+- CSV export now includes collected-payment columns: Amount Paid, Balance Due, Payment Status, Last Payment Date, and Payment Count.
+- Collected totals derive from `public.internal_invoice_payments`; only "recorded" status counts toward collected totals.
+- Balance due remains read-side derived from invoice total minus recorded payments; this does not mutate invoice totals or invoice line items.
+- Last Payment / Last Payment Date is rendered using clean report-date formatting (not raw ISO timestamp output).
+- External-billing behavior remains honest/non-fabricated and does not invent internal invoice/payment reporting.
+- This slice did not introduce payment execution, Stripe checkout, QBO sync, portal payment UX, dashboard payment analytics expansion, or refund/dispute execution.
 
 Does not include:
 - live customer checkout
