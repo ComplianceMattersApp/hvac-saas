@@ -59,6 +59,7 @@ export default async function ServiceCaseContinuityPage({
   const [ledger, filterOptions] = await Promise.all([
     listServiceCaseContinuityRows({
       supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
       filters,
       internalBusinessDisplayName: internalBusinessIdentity.display_name,
       limit: SERVICE_CASE_CONTINUITY_PAGE_LIMIT,

@@ -9,6 +9,10 @@ import {
   incrementBucketValue,
   initializeBucketRows,
 } from "@/lib/reports/kpi-foundation";
+import {
+  accountScopeInList,
+  resolveReportAccountContractorIds,
+} from "@/lib/reports/report-account-scope";
 
 type OperationalKpiJob = {
   id: string;
@@ -42,10 +46,15 @@ export async function buildOperationalKpiReadModel(params: {
   buckets: ReportCenterKpiBucket[];
 }): Promise<ReportCenterKpiFamilyReadModel> {
   const range = getKpiRange(params.filters);
+  const contractorIds = await resolveReportAccountContractorIds({
+    supabase: params.supabase,
+    accountOwnerUserId: params.accountOwnerUserId,
+  });
   const { data, error } = await params.supabase
     .from("jobs")
     .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, invoice_complete, certs_complete")
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .in("contractor_id", accountScopeInList(contractorIds));
 
   if (error) throw error;
 

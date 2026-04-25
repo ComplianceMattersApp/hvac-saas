@@ -1,11 +1,7 @@
 // app/jobs/[id]/page
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
-import {
-  isInternalAccessError,
-  requireInternalUser,
-} from "@/lib/auth/internal-user";
+import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import SubmitButton from "@/components/SubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
@@ -84,6 +80,11 @@ import {
   updateInternalInvoiceLineItemFromForm,
   voidInternalInvoiceFromForm,
 } from "@/lib/actions/internal-invoice-actions";
+import {
+  loadScopedInternalJobDetailReadBoundary,
+  resolveJobDetailActor,
+  signScopedInternalJobDetailAttachments,
+} from "@/lib/actions/internal-job-detail-read-boundary";
 
 import JobAttachmentsInternal from "./_components/JobAttachmentsInternal";
 import InternalInvoiceLineItemsTable from "./_components/InternalInvoiceLineItemsTable";
@@ -570,7 +571,6 @@ export default async function JobDetailPage({
   const showEccNotice = notice === "ecc_test_required";
 
   const supabase = await createClient();
-  const contractors = await getContractors();
 
   const {
     data: { user },
@@ -578,43 +578,45 @@ export default async function JobDetailPage({
 
   if (!user) redirect("/login");
 
-  let isInternalUser = false;
+  const actorResolution = await resolveJobDetailActor({
+    supabase,
+    userId: user.id,
+  });
+
+  if (actorResolution.kind === "contractor") {
+    redirect(`/portal/jobs/${jobId}`);
+  }
+
+  if (actorResolution.kind === "unauthorized") {
+    redirect("/login");
+  }
+
+  const internalUser = actorResolution.internalUser;
+  const contractors = await getContractors(internalUser.account_owner_user_id);
+
+  let isInternalUser = true;
   let isInternalAdmin = false;
   let internalBusinessDisplayName = "";
   let billingMode: BillingMode = "external_billing";
 
-  try {
-    const internalAccess = await requireInternalUser({ supabase, userId: user.id });
-    isInternalUser = true;
-    isInternalAdmin = internalAccess.internalUser.role === "admin";
+  isInternalAdmin = internalUser.role === "admin";
+  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+  internalBusinessDisplayName = internalBusinessIdentity.display_name;
+  billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
-    const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
-      supabase,
-      accountOwnerUserId: internalAccess.internalUser.account_owner_user_id,
-    });
-    internalBusinessDisplayName = internalBusinessIdentity.display_name;
-    billingMode = await resolveBillingModeByAccountOwnerId({
-      supabase,
-      accountOwnerUserId: internalAccess.internalUser.account_owner_user_id,
-    });
-  } catch (error) {
-    if (isInternalAccessError(error)) {
-      const { data: cu, error: cuErr } = await supabase
-        .from("contractor_users")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (cuErr) throw cuErr;
-
-      if (cu) {
-        redirect(`/portal/jobs/${jobId}`);
-      }
-
-      redirect("/login");
-    }
-
-    throw error;
+  // Explicit same-account internal scoped-job preflight: deny before main job-detail read assembly
+  const scopedReadJob = await loadScopedInternalJobDetailReadBoundary({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+  });
+  if (!scopedReadJob?.id) {
+    return notFound();
   }
 
   const { data: job, error: jobError } = await supabase
@@ -895,55 +897,16 @@ const { data: attachmentRows, error: attachmentErr } = await supabase
 
 if (attachmentErr) throw new Error(attachmentErr.message);
 
-const attachmentAdmin = createAdminClient();
-
-const attachmentItems = await Promise.all(
-  (attachmentRows ?? []).map(async (a: any) => {
-    const bucket = String(a?.bucket ?? "").trim();
-    const storagePath = String(a?.storage_path ?? "").trim().replace(/^\/+/, "");
-    const contentType =
-      typeof a?.content_type === "string" && a.content_type.trim().length > 0
-        ? a.content_type.trim()
-        : null;
-
-    let signedUrl: string | null = null;
-
-    if (!bucket || !storagePath) {
-      console.warn("Job attachment row missing bucket/storage_path", {
-        jobId,
-        attachmentId: String(a?.id ?? "").trim() || null,
-        bucket: bucket || null,
-        storagePath: storagePath || null,
-        contentType,
-      });
-    } else {
-      const { data, error: signErr } = await attachmentAdmin.storage
-        .from(bucket)
-        .createSignedUrl(storagePath, 60 * 60);
-
-      if (signErr || !data?.signedUrl) {
-        console.warn("Job attachment signing failed", {
-          jobId,
-          attachmentId: String(a?.id ?? "").trim() || null,
-          bucket,
-          storagePath,
-          contentType,
-          error: signErr?.message ?? "missing_signed_url",
-        });
-      } else {
-        signedUrl = data.signedUrl;
-      }
-    }
-
-    return {
-      ...a,
-      bucket,
-      storage_path: storagePath,
-      content_type: contentType,
-      signedUrl,
-    };
-  })
-);
+  // Explicit same-account internal scoped-job preflight: deny before any admin signed URL generation
+  const signedAttachmentResult = await signScopedInternalJobDetailAttachments({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    attachmentRows: attachmentRows ?? [],
+  });
+  if (!signedAttachmentResult.authorized) {
+    return notFound();
+  }
+  const attachmentItems = signedAttachmentResult.items;
 
   const sharedNotes = (timelineEvents ?? []).filter((e: any) =>
     ["contractor_note", "public_note", "contractor_correction_submission"].includes(

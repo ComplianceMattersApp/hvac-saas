@@ -7,6 +7,10 @@ import {
 } from "@/lib/reports/kpi-foundation";
 import { listReportCenterKpiFamilies } from "@/lib/reports/report-center-kpis";
 import { isInCloseoutQueue } from "@/lib/utils/closeout";
+import {
+  accountScopeInList,
+  resolveReportAccountContractorIds,
+} from "@/lib/reports/report-account-scope";
 
 type DashboardJobRow = {
   id: string;
@@ -266,16 +270,22 @@ export async function buildReportCenterDashboardReadModel(params: {
   filters: ReportCenterKpiFilters;
 }): Promise<ReportCenterDashboardReadModel> {
   const range = getKpiRange(params.filters);
+  const contractorIds = await resolveReportAccountContractorIds({
+    supabase: params.supabase,
+    accountOwnerUserId: params.accountOwnerUserId,
+  });
 
   const [families, jobsResult, invoiceResult] = await Promise.all([
     listReportCenterKpiFamilies(params),
     params.supabase
       .from("jobs")
       .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, invoice_complete, certs_complete")
-      .is("deleted_at", null),
+      .is("deleted_at", null)
+      .in("contractor_id", accountScopeInList(contractorIds)),
     params.supabase
       .from("internal_invoices")
-      .select("id, job_id, status, issued_at, total_cents"),
+      .select("id, job_id, status, issued_at, total_cents")
+      .eq("account_owner_user_id", params.accountOwnerUserId),
   ]);
 
   if (jobsResult.error) throw jobsResult.error;

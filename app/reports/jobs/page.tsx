@@ -78,6 +78,7 @@ export default async function JobsReportPage({
   const [ledger, filterOptions] = await Promise.all([
     listJobVisitLedgerRows({
       supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
       filters,
       internalBusinessDisplayName: internalBusinessIdentity.display_name,
       limit: JOB_VISIT_LEDGER_PAGE_LIMIT,

@@ -56,6 +56,7 @@ import {
   sanitizeVisitScopeSummary,
   type VisitScopeItem,
 } from "@/lib/jobs/visit-scope";
+import { listScopedContractorsForJobDetail } from "@/lib/actions/internal-job-detail-read-boundary";
 
 export type { JobStatus } from "@/lib/types/job";
 
@@ -2854,16 +2855,12 @@ export async function promoteCompanionScopeToServiceJobFromForm(formData: FormDa
   redirect(`/jobs/${created.id}?banner=companion_scope_promoted`);
 }
 
-export async function getContractors() {
+export async function getContractors(accountOwnerUserId?: string | null) {
   const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("contractors")
-    .select("id, name, phone, email")
-    .order("name", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+  return listScopedContractorsForJobDetail({
+    supabase,
+    accountOwnerUserId,
+  });
 }
 
 async function notifyInternalNextActionChanged(params: {

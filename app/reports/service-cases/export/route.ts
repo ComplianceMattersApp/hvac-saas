@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
   });
   const ledger = await listServiceCaseContinuityRows({
     supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
     filters,
     internalBusinessDisplayName: internalBusinessIdentity.display_name,
     limit: SERVICE_CASE_CONTINUITY_EXPORT_LIMIT,

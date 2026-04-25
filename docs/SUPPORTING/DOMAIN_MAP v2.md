@@ -100,7 +100,6 @@ Ownership: technical validation + pass/fail logic
 
 **Actions (owner)**
 - lib/actions/ecc-status.ts
-- lib/actions/ecc-paperwork-actions.ts
 
 **DB**
 - ecc_test_runs
