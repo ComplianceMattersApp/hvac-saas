@@ -779,16 +779,26 @@ role / permission semantics
 do not overload user profiles to represent company identity
 keep the initial implementation narrow and identity-focused only
 
-18.3.1 First Owner Onboarding / Account Provisioning V1 (Locked)
+18.3.1 First Owner Onboarding / Account Provisioning V1 (Implemented — Complete)
 
-For V1 launch readiness, first company/account onboarding is invite-only and platform-admin provisioned.
+For V1 launch readiness, first company/account onboarding is invite-only and platform-admin provisioned. This is controlled operator provisioning, not public signup or auth redesign.
 
-Locked V1 sequence:
-- platform/admin provisions company/account shell
+**Implementation status: V1 complete.** Implemented across four slices:
+- `lib/business/first-owner-provisioning.ts` — idempotent provisioning helper; dry-run / apply modes
+- `scripts/provision-first-owner.ts` — operator script; requires explicit allow flags for apply mode
+- `lib/auth/first-owner-routing.ts` — first-owner marker detection and `/ops/admin` routing seam
+- `app/set-password/page.tsx` — updated to route first-owner acceptance to `/ops/admin`
+
+Confirmed V1 sequence:
+- operator runs provisioning script (dry-run first, then apply with explicit allow flags)
+- provisioning confirms/creates: auth user, profile, owner-anchored `internal_users` row, `internal_business_profiles`, `platform_account_entitlements`
+- first-owner marker is durably written to user metadata before invite send
 - first owner receives invite
-- first owner accepts invite and sets password
-- system establishes/confirms auth user, internal user membership, account owner relationship, internal business profile, platform entitlement row, default billing mode, and readiness checklist state
-- first owner lands in Admin Center readiness setup flow
+- first owner accepts invite and sets password via `/set-password?mode=invite`
+- routing seam detects first-owner marker; fails closed if DB anchor rows are missing
+- first owner lands in Admin Center readiness setup flow at `/ops/admin`
+
+Operator flag note: because hosted Supabase projects use `.supabase.co`, the provisioning script classifies them as production-like remote targets. `ALLOW_FIRST_OWNER_PROVISIONING=true` enables the tool; `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true` acts as the required explicit remote-target confirmation for hosted Supabase projects (including sandbox). Operators must verify the intended project before running apply. Dry-run should always be run first.
 
 Public self-signup is deferred to a later SaaS growth phase and is not part of V1 launch onboarding unless explicitly pulled forward.
 
@@ -1150,6 +1160,13 @@ Current position:
 - Service model buildout is closed for milestone-1 scope.
 - Billing / invoice workflow is complete enough to move forward for milestone-2 scope.
 - Reporting / analytics is now substantially complete for the current milestone-3 scope.
+- Out-of-box readiness / business identity / settings packaging now has Admin Readiness / Setup Checklist V1 complete at the current baseline:
+  - readiness is a read-only derived packaging layer over existing tenant/account data (no new truth table)
+  - required readiness criteria currently include company name, support email, support phone, billing mode, and at least one active internal user
+  - optional readiness criteria currently include company logo, contractor directory, and platform account status visibility
+  - this does not introduce a broad tenant settings system and does not alter onboarding implementation boundaries
+  - closeout status: this roadmap area is complete enough to close at the current baseline with Admin Readiness V1 and First Owner Provisioning V1 implemented
+  - public self-signup and platform subscription billing execution remain intentionally deferred
 - Completed RLS / permission hardening slices for the current stabilized baseline now include customer/location internal account-owner reconciliation, notifications internal-awareness write-path hardening, targeted internal same-account job/service-case mutation boundary hardening, internal same-account job-detail operational mutation boundary hardening, internal same-account pending-info release / re-evaluate mutation boundary hardening, internal same-account service closeout mutation boundary hardening, internal same-account contractor report preview/send boundary hardening, internal job attachments / attachment-storage account-scope hardening, internal job attachments read/download account-scope boundary hardening, internal ECC test-run account-scope hardening, internal job_equipment / job_systems account-scope hardening, internal same-account lifecycle/scheduling mutation boundary hardening, contractor CRUD mutation boundary hardening, staffing / job assignment mutation boundary hardening, job contractor relink mutation boundary hardening, customer standalone mutation boundary hardening, legacy job-detail entrypoint mutation boundary hardening, internal invoice mutation boundary hardening, internal notification read-state mutation boundary hardening, internal user/admin identity mutation boundary hardening, dispatch calendar account-scope read boundary hardening, contractor intake adjudication mutation boundary hardening, dispatch calendar block mutation boundary hardening, admin job terminal mutation boundary hardening, contractor portal intake proposal visibility and collaboration boundary hardening, customer profile upsert mutation boundary hardening, contractor admin edge mutation boundary hardening, contractor invite acceptance membership boundary hardening, and internal business profile mutation boundary hardening:
   - jobs and service_cases were already ahead on account-owner-aware internal read scope
   - customers and locations are now reconciled to that same internal account-owner model for internal same-account teammates

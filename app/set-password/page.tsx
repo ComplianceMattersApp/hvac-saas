@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ensureContractorMembershipFromInvite } from "@/lib/actions/contractor-acceptance-actions";
+import { resolveSetPasswordDestinationWithFirstOwnerGate } from "@/lib/auth/first-owner-routing";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -11,7 +12,7 @@ function sleep(ms: number) {
 
 async function handoffRedirectAfterPasswordSet(
   supabase: ReturnType<typeof createClient>,
-  target: "/portal" | "/ops"
+  target: "/portal" | "/ops" | "/ops/admin"
 ) {
   // After updateUser(), session persistence can lag a moment. Wait briefly so
   // the destination SSR route sees the committed session on first load.
@@ -25,30 +26,6 @@ async function handoffRedirectAfterPasswordSet(
   }
 
   window.location.replace(target);
-}
-
-async function resolveSetPasswordDestination(
-  supabase: ReturnType<typeof createClient>,
-  userId: string,
-  isContractor: boolean,
-) {
-  if (isContractor) {
-    return "/portal" as const;
-  }
-
-  const { data: internalUser, error: internalUserError } = await supabase
-    .from("internal_users")
-    .select("user_id, is_active")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (internalUserError) throw internalUserError;
-
-  if (internalUser?.user_id && internalUser.is_active) {
-    return "/ops" as const;
-  }
-
-  return null;
 }
 
 export default function SetPasswordPage() {
@@ -147,11 +124,24 @@ export default function SetPasswordPage() {
       return;
     }
 
-    const target = await resolveSetPasswordDestination(supabase, user.id, isContractor);
+    const destinationDecision = await resolveSetPasswordDestinationWithFirstOwnerGate({
+      supabase,
+      userId: user.id,
+      userMetadata: user.user_metadata ?? {},
+      isContractor,
+    });
+
+    const target = destinationDecision.target;
 
     if (!target) {
       setLoading(false);
       setSuccessMsg(null);
+      if (destinationDecision.reason === "FIRST_OWNER_SETUP_INCOMPLETE") {
+        setErrorMsg(
+          "Password updated, but first-owner setup is incomplete. Please contact support before continuing.",
+        );
+        return;
+      }
       setErrorMsg("This account is not configured for portal or internal access.");
       return;
     }
