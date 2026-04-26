@@ -113,6 +113,7 @@ export default async function ContractorIntakeSubmissionDetailPage({
       proposed_customer_email,
       proposed_address_line1,
       proposed_city,
+      proposed_state,
       proposed_zip,
       proposed_location_nickname,
       proposed_job_type,
@@ -318,6 +319,10 @@ export default async function ContractorIntakeSubmissionDetailPage({
               <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_city) || "—"}</dd>
             </div>
             <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">State</dt>
+              <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_state) || "—"}</dd>
+            </div>
+            <div>
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">ZIP</dt>
               <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_zip) || "—"}</dd>
             </div>
@@ -417,6 +422,7 @@ export default async function ContractorIntakeSubmissionDetailPage({
               customerEmail: normalizeText(submission.proposed_customer_email),
               addressLine1: normalizeText(submission.proposed_address_line1),
               city: normalizeText(submission.proposed_city),
+              state: normalizeText(submission.proposed_state) || "CA",
               zip: normalizeText(submission.proposed_zip),
               locationNickname: normalizeText(submission.proposed_location_nickname),
             }}

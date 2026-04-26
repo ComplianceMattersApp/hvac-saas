@@ -120,7 +120,7 @@ export default function InternalInvoiceLineItemsTable({
                       onClick={() => setExpandedAdditionalRowId(lineItem.id)}
                       className="inline-flex min-h-9 items-center justify-center rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_-14px_rgba(2,132,199,0.65)] transition-[background-color,box-shadow,transform] hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
                     >
-                      Expand
+                      Edit Details
                     </button>
                   </div>
                 </div>
@@ -138,7 +138,7 @@ export default function InternalInvoiceLineItemsTable({
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Line {index + 1}</div>
-                    <div className="mt-1 text-xs text-slate-500">{isPrimaryRow ? 'Primary working row' : 'Expanded for inline editing'}</div>
+                    <div className="mt-1 text-xs text-slate-500">{isPrimaryRow ? 'Main line item' : 'Editing details'}</div>
                   </div>
                   <div className="flex items-center gap-2">
                     {!isPrimaryRow ? (
@@ -147,7 +147,7 @@ export default function InternalInvoiceLineItemsTable({
                         onClick={() => setExpandedAdditionalRowId(null)}
                         className="inline-flex min-h-9 items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 transition-[background-color,border-color,transform] hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
                       >
-                        Collapse
+                        Hide Details
                       </button>
                     ) : null}
                     <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 md:hidden">

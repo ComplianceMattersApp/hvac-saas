@@ -31,6 +31,14 @@ function getOptionalText(value: FormDataEntryValue | string | null | undefined) 
   return trimmed ? trimmed : null;
 }
 
+function firstNonEmpty(...values: Array<unknown>) {
+  for (const value of values) {
+    const normalized = getOptionalText(value as any);
+    if (normalized) return normalized;
+  }
+  return null;
+}
+
 const INTERNAL_INVOICE_PANEL_HASH = 'internal-invoice-panel';
 
 function buildJobDetailHref(jobId: string, tab: string, banner: string) {
@@ -129,12 +137,13 @@ async function loadCanonicalDraftBillingSources(params: {
   const adminSupabase = createAdminClient();
   const customerId = String(params.job?.customer_id ?? '').trim();
   const contractorId = String(params.job?.contractor_id ?? '').trim();
-  const billingRecipient = String(params.job?.billing_recipient ?? '').trim().toLowerCase();
+  const locationId = String(params.job?.location_id ?? '').trim();
 
   let customerBilling: any = null;
   let contractorBilling: any = null;
+  let locationBilling: any = null;
 
-  if (billingRecipient === 'customer' && customerId) {
+  if (customerId) {
     const { data, error } = await adminSupabase
       .from('customers')
       .select('owner_user_id, full_name, first_name, last_name, billing_name, email, phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip')
@@ -152,7 +161,7 @@ async function loadCanonicalDraftBillingSources(params: {
       : null;
   }
 
-  if (billingRecipient === 'contractor' && contractorId) {
+  if (contractorId) {
     const { data, error } = await adminSupabase
       .from('contractors')
       .select('owner_user_id, name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip')
@@ -164,7 +173,19 @@ async function loadCanonicalDraftBillingSources(params: {
     contractorBilling = data ?? null;
   }
 
-  return { customerBilling, contractorBilling };
+  if (locationId) {
+    const { data, error } = await adminSupabase
+      .from('locations')
+      .select('owner_user_id, address_line1, address_line2, city, state, zip, postal_code')
+      .eq('id', locationId)
+      .eq('owner_user_id', params.internalUser.account_owner_user_id)
+      .maybeSingle();
+
+    if (error) throw error;
+    locationBilling = data ?? null;
+  }
+
+  return { customerBilling, contractorBilling, locationBilling };
 }
 
 async function recomputeOpsAfterInvoiceMutation(params: {
@@ -547,17 +568,83 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
     redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_draft_exists'));
   }
 
-  const { customerBilling, contractorBilling } = await loadCanonicalDraftBillingSources({
+  const { customerBilling, contractorBilling, locationBilling } = await loadCanonicalDraftBillingSources({
     internalUser: context.internalUser,
     job: context.job,
   });
+
+  const jobBilling = buildJobOverrideBillingSnapshot(context.job);
 
   const { billing } = resolveJobBillingSource({
     billingRecipient: context.job.billing_recipient,
     customerBilling,
     contractorBilling,
-    jobBilling: buildJobOverrideBillingSnapshot(context.job),
+    jobBilling,
   });
+
+  const customerFallbackName = firstNonEmpty(
+    customerBilling?.billing_name,
+    customerBilling?.full_name,
+    [customerBilling?.first_name, customerBilling?.last_name].filter(Boolean).join(' '),
+  );
+
+  const draftBilling = {
+    billing_name: firstNonEmpty(
+      billing.billing_name,
+      customerFallbackName,
+      contractorBilling?.billing_name,
+      contractorBilling?.name,
+      jobBilling.billing_name,
+    ),
+    billing_email: firstNonEmpty(
+      billing.billing_email,
+      customerBilling?.billing_email,
+      contractorBilling?.billing_email,
+      jobBilling.billing_email,
+    ),
+    billing_phone: firstNonEmpty(
+      billing.billing_phone,
+      customerBilling?.billing_phone,
+      contractorBilling?.billing_phone,
+      jobBilling.billing_phone,
+    ),
+    billing_address_line1: firstNonEmpty(
+      billing.billing_address_line1,
+      jobBilling.billing_address_line1,
+      customerBilling?.billing_address_line1,
+      contractorBilling?.billing_address_line1,
+      locationBilling?.address_line1,
+    ),
+    billing_address_line2: firstNonEmpty(
+      billing.billing_address_line2,
+      jobBilling.billing_address_line2,
+      customerBilling?.billing_address_line2,
+      contractorBilling?.billing_address_line2,
+      locationBilling?.address_line2,
+    ),
+    billing_city: firstNonEmpty(
+      billing.billing_city,
+      jobBilling.billing_city,
+      customerBilling?.billing_city,
+      contractorBilling?.billing_city,
+      locationBilling?.city,
+    ),
+    billing_state: firstNonEmpty(
+      billing.billing_state,
+      jobBilling.billing_state,
+      customerBilling?.billing_state,
+      contractorBilling?.billing_state,
+      locationBilling?.state,
+    ),
+    billing_zip: firstNonEmpty(
+      billing.billing_zip,
+      jobBilling.billing_zip,
+      customerBilling?.billing_zip,
+      contractorBilling?.billing_zip,
+      locationBilling?.zip,
+      locationBilling?.postal_code,
+    ),
+  };
 
   const draftPayload = {
     account_owner_user_id: context.internalUser.account_owner_user_id,
@@ -572,7 +659,7 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
     subtotal_cents: 0,
     total_cents: 0,
     notes: null,
-    ...billing,
+    ...draftBilling,
     created_by_user_id: context.userId,
     updated_by_user_id: context.userId,
   };

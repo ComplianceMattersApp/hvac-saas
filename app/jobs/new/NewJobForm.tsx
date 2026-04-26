@@ -316,6 +316,7 @@ export default function NewJobForm({
   const [newLocationNickname, setNewLocationNickname] = useState("");
   const [newLocationAddressLine1, setNewLocationAddressLine1] = useState("");
   const [newLocationCity, setNewLocationCity] = useState("");
+  const [newLocationState, setNewLocationState] = useState("CA");
   const [newLocationZip, setNewLocationZip] = useState("");
   const [newCustomerFirstName, setNewCustomerFirstName] = useState("");
   const [newCustomerLastName, setNewCustomerLastName] = useState("");
@@ -590,7 +591,10 @@ const [billingRecipient, setBillingRecipient] = useState<
 
   const internalResolutionReady = useMemo(() => {
     const hasContextNewLocationDetails = Boolean(
-      newLocationAddressLine1.trim() && newLocationCity.trim() && newLocationZip.trim(),
+      newLocationAddressLine1.trim() &&
+        newLocationCity.trim() &&
+        newLocationState.trim() &&
+        newLocationZip.trim(),
     );
 
     if (!isInternalMode) return true;
@@ -612,13 +616,17 @@ const [billingRecipient, setBillingRecipient] = useState<
     locationMode,
     newLocationAddressLine1,
     newLocationCity,
+    newLocationState,
     newLocationZip,
     selectedCustomerId,
   ]);
 
   const internalResolutionLabel = useMemo(() => {
     const hasNewLocationDetails = Boolean(
-      newLocationAddressLine1.trim() && newLocationCity.trim() && newLocationZip.trim(),
+      newLocationAddressLine1.trim() &&
+        newLocationCity.trim() &&
+        newLocationState.trim() &&
+        newLocationZip.trim(),
     );
     const hasNewCustomerDetails = Boolean(
       newCustomerFirstName.trim() ||
@@ -658,6 +666,7 @@ const [billingRecipient, setBillingRecipient] = useState<
     newCustomerPhone,
     newLocationAddressLine1,
     newLocationCity,
+    newLocationState,
     newLocationZip,
     selectedCustomerId,
   ]);
@@ -1575,6 +1584,16 @@ const [billingRecipient, setBillingRecipient] = useState<
                           />
                           <input
                             className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                            name="state"
+                            placeholder="State"
+                            required
+                            value={newLocationState}
+                            onChange={(e) => setNewLocationState(e.target.value)}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
                             name="zip"
                             placeholder="ZIP"
                             required
@@ -1678,6 +1697,16 @@ const [billingRecipient, setBillingRecipient] = useState<
                     />
                     <input
                       className="w-full rounded-md border border-slate-300 bg-white p-2"
+                      name="state"
+                      placeholder="State"
+                      required
+                      value={newLocationState}
+                      onChange={(e) => setNewLocationState(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      className="w-full rounded-md border border-slate-300 bg-white p-2"
                       name="zip"
                       placeholder="ZIP"
                       required
@@ -1765,6 +1794,15 @@ const [billingRecipient, setBillingRecipient] = useState<
                         placeholder="City"
                         required
                       />
+                      <input
+                        className="w-full rounded-md border border-slate-300 bg-white p-2"
+                        name="state"
+                        placeholder="State"
+                        defaultValue="CA"
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
                       <input
                         className="w-full rounded-md border border-slate-300 bg-white p-2"
                         name="zip"
