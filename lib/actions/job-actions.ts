@@ -25,7 +25,10 @@ import {
   loadScopedInternalEquipmentJobForMutation,
   loadScopedInternalJobEquipmentForMutation,
 } from "@/lib/auth/internal-equipment-scope";
-import { loadScopedInternalContractorForMutation } from "@/lib/auth/internal-contractor-scope";
+import {
+  loadScopedActiveInternalContractorForMutation,
+  loadScopedInternalContractorForMutation,
+} from "@/lib/auth/internal-contractor-scope";
 import {
   loadScopedInternalEccJobForMutation,
   loadScopedInternalEccTestRunForMutation,
@@ -1780,6 +1783,18 @@ function normalizeServiceVisitOutcome(value: string | null | undefined) {
   return SERVICE_VISIT_OUTCOMES.has(normalized) ? normalized : null;
 }
 
+/**
+ * DERIVE SERVICE VISIT REASON (Step 5 Clean-Up):
+ *
+ * service_visit_reason is now derived explicitly from:
+ * 1. explicit serviceVisitReason (if provided) - override
+ * 2. title (the Job Title field) - primary source after Step 5 clean-up
+ * 3. jobNotes (fallback)
+ * 4. "service visit" (default)
+ *
+ * Previously, service_visit_reason had fuzzy sourcing from visit_scope_summary.
+ * Now it derives explicitly from the title layer, making semantics clear.
+ */
 function deriveInitialServiceVisitReason(input: {
   serviceVisitReason?: string | null;
   title?: string | null;
@@ -3670,7 +3685,7 @@ export async function updateJobContractorFromForm(formData: FormData) {
   }
 
   if (contractor_id) {
-    const scopedContractor = await loadScopedInternalContractorForMutation({
+    const scopedContractor = await loadScopedActiveInternalContractorForMutation({
       accountOwnerUserId,
       contractorId: contractor_id,
       select: "id",
@@ -5228,10 +5243,19 @@ export async function createJob(
       ? normalizeServiceVisitType(input.service_visit_type) ?? "diagnostic"
       : null;
 
+  // SERVICE VISIT REASON DERIVATION (Step 5 Clean-Up):
+  // With explicit Job Title / Visit Title model, derive service_visit_reason from:
+  // 1. explicit serviceVisitReason (if provided)
+  // 2. title (the new explicit title field, previously visit_scope_summary)
+  // 3. job_notes (fallback)
+  // 4. "service visit" (default)
+  //
+  // This removes the fuzzy fallback to visit_scope_summary and ties reason
+  // explicitly to the job title layer.
   const normalizedServiceVisitReason =
     normalizedJobType === "service"
       ? deriveInitialServiceVisitReason({
-          serviceVisitReason: input.service_visit_reason ?? input.visit_scope_summary,
+          serviceVisitReason: input.service_visit_reason,
           title: input.title,
           jobNotes: input.job_notes,
         })
@@ -5439,6 +5463,8 @@ const service_case_kind = normalizeServiceCaseKind(serviceCaseKindRaw);
 const service_visit_type = normalizeServiceVisitType(serviceVisitTypeRaw);
 const service_visit_reason = serviceVisitReasonRaw || null;
 const service_visit_outcome = normalizeServiceVisitOutcome(serviceVisitOutcomeRaw);
+const intakeSource = String(formData.get("intake_source") || "").trim().toLowerCase();
+const isCustomerContextIntake = intakeSource === "customer";
 
 const jurisdiction = jobType === "service" ? null : (jurisdictionRaw || null);
 const permit_date = jobType === "service" ? null : (permitDateRaw || null);
@@ -5511,6 +5537,18 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     isContractorUser,
     canonicalOwnerUserId: String(canonicalOwnerUserId ?? ""),
   });
+
+  if (contractorIdFinal) {
+    const activeContractor = await loadScopedActiveInternalContractorForMutation({
+      accountOwnerUserId: String(canonicalOwnerUserId ?? ""),
+      contractorId: contractorIdFinal,
+      select: "id",
+    });
+
+    if (!activeContractor?.id) {
+      redirect("/jobs/new?err=contractor_inactive");
+    }
+  }
 
   function redirectInvalidExistingPairing() {
     redirect("/jobs/new?err=invalid_customer_location");
@@ -5639,6 +5677,10 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
   // ----- canonical service address input -----
   const existingCustomerId = String(formData.get("customer_id") || "").trim();
   const existingLocationId = String(formData.get("location_id") || "").trim();
+  if (isCustomerContextIntake && !existingCustomerId) {
+    redirectInvalidExistingPairing();
+  }
+
   let existingCustomerSnapshot: {
     first_name?: string | null;
     last_name?: string | null;

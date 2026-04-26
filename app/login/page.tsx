@@ -1,20 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import { createClient } from "../../lib/supabase/client";
 
 async function resolveLoginDestination(supabase: ReturnType<typeof createClient>, userId: string) {
   const { data: contractorUser, error: contractorError } = await supabase
     .from("contractor_users")
-    .select("contractor_id")
+    .select("contractor_id, contractors ( lifecycle_state )")
     .eq("user_id", userId)
     .maybeSingle();
 
   if (contractorError) throw contractorError;
 
-  if (contractorUser?.contractor_id) {
+  const contractorLifecycleState = String((contractorUser as any)?.contractors?.lifecycle_state ?? "active")
+    .trim()
+    .toLowerCase();
+
+  if (contractorUser?.contractor_id && contractorLifecycleState === "active") {
     return "/portal";
   }
 
@@ -67,6 +71,7 @@ function createPasswordRecoveryClient() {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const supabase = createClient();
 
@@ -76,6 +81,11 @@ export default function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const archivedContractorNotice =
+    String(searchParams.get("err") ?? "").trim().toLowerCase() === "contractor_archived"
+      ? "Contractor portal access has been archived. Contact your administrator for reactivation."
+      : null;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -191,6 +201,9 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {archivedContractorNotice ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">{archivedContractorNotice}</div>
+        ) : null}
         {errorMsg ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">{errorMsg}</div>
         ) : null}

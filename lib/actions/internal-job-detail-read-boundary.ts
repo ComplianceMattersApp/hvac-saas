@@ -132,6 +132,7 @@ export async function signScopedInternalJobDetailAttachments(params: {
 export async function listScopedContractorsForJobDetail(params: {
   supabase: any;
   accountOwnerUserId?: string | null;
+  includeArchived?: boolean;
 }) {
   const scopedOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
 
@@ -141,6 +142,10 @@ export async function listScopedContractorsForJobDetail(params: {
 
   if (scopedOwnerUserId) {
     query = query.eq("owner_user_id", scopedOwnerUserId);
+  }
+
+  if (!params.includeArchived) {
+    query = query.eq("lifecycle_state", "active");
   }
 
   const { data, error } = await query.order("name", { ascending: true });

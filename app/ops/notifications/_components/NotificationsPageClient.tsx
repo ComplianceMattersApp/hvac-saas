@@ -69,12 +69,7 @@ export function NotificationsPageClient({
         return matchesInternalNotificationFilter(type, "contractor_updates");
       }
 
-      return (
-        type === "contractor_job_created" ||
-        type === "contractor_intake_proposal_submitted" ||
-        type === "internal_contractor_job_intake_email" ||
-        type === "internal_contractor_intake_proposal_email"
-      );
+      return matchesInternalNotificationFilter(type, "new_job_notifications");
     });
   }, [categoryKey, notifications, onlyUnread]);
 

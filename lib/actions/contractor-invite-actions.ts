@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { sendInviteEmail } from "@/lib/email/smtp";
 import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
 import { requireInternalRole } from "@/lib/auth/internal-user";
+import { loadScopedActiveInternalContractorForMutation } from "@/lib/auth/internal-contractor-scope";
 
 // Mirrors the isAlreadyExistsAuthError helper used in internal-user-actions.ts
 function isAlreadyExistsError(err: any): boolean {
@@ -114,15 +115,16 @@ export async function inviteContractor(args: {
     if (cErr) throw new Error(cErr.message);
     contractorId = created.id;
   } else {
-    // Ensure this contractor belongs to current owner (RLS will enforce too)
-    const { error: vErr } = await supabase
-      .from("contractors")
-      .select("id")
-      .eq("id", contractorId)
-      .eq("owner_user_id", ownerUserId)
-      .single();
+    // Ensure this contractor belongs to current owner and is active.
+    const scopedContractor = await loadScopedActiveInternalContractorForMutation({
+      accountOwnerUserId: ownerUserId,
+      contractorId,
+      select: "id",
+    });
 
-    if (vErr) throw new Error(vErr.message);
+    if (!scopedContractor?.id) {
+      throw new Error("Contractor is not active or not in account scope");
+    }
   }
 
   const { data: existingInvite, error: existingInviteErr } = await supabase

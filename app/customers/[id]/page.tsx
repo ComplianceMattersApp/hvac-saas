@@ -503,7 +503,7 @@ export default async function CustomerDetailPage(props: {
                 </Link>
 
                 <Link
-                  href={`/jobs/new?customer_id=${customerId}`}
+                  href={`/jobs/new?customer_id=${customerId}&source=customer`}
                   className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
                 >
                   New Job for Customer

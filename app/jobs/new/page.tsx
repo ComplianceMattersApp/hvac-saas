@@ -58,7 +58,7 @@ function isUuid(v: string) {
 }
 
 export default async function NewJobPage(props: {
-  searchParams?: Promise<{ customer_id?: string; err?: string }>;
+  searchParams?: Promise<{ customer_id?: string; source?: string; err?: string }>;
 }) {
   const supabase = await createClient();
 
@@ -93,6 +93,7 @@ export default async function NewJobPage(props: {
     const { data: contractorRows, error } = await supabase
       .from("contractors")
       .select("id, name")
+      .eq("lifecycle_state", "active")
       .order("name", { ascending: true });
 
     if (error) throw new Error(error.message);
@@ -101,17 +102,45 @@ export default async function NewJobPage(props: {
 
   const sp = props.searchParams ? await props.searchParams : undefined;
   const customerId = String(sp?.customer_id ?? "").trim();
+  const source = String(sp?.source ?? "").trim().toLowerCase();
   const errorCode = String(sp?.err ?? "").trim() || null;
+  const requestedCustomerContext = source === "customer";
 
   // Optional: existing customer mode
   let existingCustomer: ExistingCustomerRow | null = null;
   let customerLocations: LocationRow[] = [];
+  let customerContextMode = false;
 
   // Internal guided mode lookup data
   let customerLookupRows: CustomerLookupRow[] = [];
   let locationLookupRows: LocationLookupRow[] = [];
 
-  if (!myContractor?.id) {
+  if (customerId && isUuid(customerId)) {
+    const { data: cRow, error: cErr } = await supabase
+      .from("customers")
+      .select("id, first_name, last_name, phone, email")
+      .eq("id", customerId)
+      .maybeSingle();
+
+    if (cErr) throw cErr;
+    existingCustomer = cRow;
+
+    const { data: locs, error: locErr } = await supabase
+      .from("locations")
+      .select("id, address_line1, city, state, zip, nickname")
+      .eq("customer_id", customerId)
+      .order("created_at", { ascending: false });
+
+    if (locErr) throw locErr;
+    customerLocations = locs ?? [];
+  }
+
+  customerContextMode =
+    !myContractor?.id &&
+    requestedCustomerContext &&
+    Boolean(existingCustomer?.id);
+
+  if (!myContractor?.id && !customerContextMode) {
     const { data: lookupCustomers, error: lookupCustomerErr } = await supabase
       .from("customers")
       .select("id, full_name, first_name, last_name, phone, email")
@@ -136,26 +165,6 @@ export default async function NewJobPage(props: {
     }
   }
 
-  if (customerId && isUuid(customerId)) {
-    const { data: cRow, error: cErr } = await supabase
-      .from("customers")
-      .select("id, first_name, last_name, phone, email")
-      .eq("id", customerId)
-      .maybeSingle();
-
-    if (cErr) throw cErr;
-    existingCustomer = cRow;
-
-    const { data: locs, error: locErr } = await supabase
-      .from("locations")
-      .select("id, address_line1, city, state, zip, nickname")
-      .eq("customer_id", customerId)
-      .order("created_at", { ascending: false });
-
-    if (locErr) throw locErr;
-    customerLocations = locs ?? [];
-  }
-
   return (
     <NewJobForm
       contractors={contractors}
@@ -165,6 +174,8 @@ export default async function NewJobPage(props: {
       locationLookupRows={locationLookupRows}
       myContractor={myContractor}
       errorCode={errorCode}
+      customerContextMode={customerContextMode}
+      customerContextSource={customerContextMode ? "customer" : null}
     />
   );
 }

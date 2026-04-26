@@ -194,11 +194,15 @@ async function routeByRole(
 
   const { data: contractorData } = await supabase
     .from("contractor_users")
-    .select("contractor_id")
+    .select("contractor_id, contractors ( lifecycle_state )")
     .eq("user_id", userData.user.id)
     .maybeSingle();
 
-  if (contractorData?.contractor_id) {
+  const contractorLifecycleState = String((contractorData as any)?.contractors?.lifecycle_state ?? "active")
+    .trim()
+    .toLowerCase();
+
+  if (contractorData?.contractor_id && contractorLifecycleState === "active") {
     setStatus("Redirecting...");
     router.push("/portal");
   } else {

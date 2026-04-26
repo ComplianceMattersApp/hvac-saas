@@ -69,7 +69,17 @@ export default async function PortalPage({
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
 
-  const portalContext = await requireCurrentContractorPortalContext({ supabase });
+  const portalContext = await (async () => {
+    try {
+      return await requireCurrentContractorPortalContext({ supabase });
+    } catch (error) {
+      const code = String((error as Error)?.message ?? "").trim().toUpperCase();
+      if (code === "CONTRACTOR_ARCHIVED") {
+        redirect("/login?err=contractor_archived");
+      }
+      throw error;
+    }
+  })();
   const contractorId = portalContext.contractorId;
   const contractorName =
     portalContext.contractorName ?? (contractorId ? "Contractor" : null);

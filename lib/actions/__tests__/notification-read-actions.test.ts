@@ -33,6 +33,7 @@ type NotificationRow = {
 function makeSupabase(fixture: {
   notifications: NotificationRow[];
   submissions: Array<{ id: string; review_status: string }>;
+  contractors?: Array<{ id: string; name: string }>;
 }) {
   return {
     from(table: string) {
@@ -59,6 +60,19 @@ function makeSupabase(fixture: {
 
         if (table === "contractor_intake_submissions") {
           let rows = [...fixture.submissions];
+
+          for (const filter of filters) {
+            if (filter.kind === "in") {
+              const values = Array.isArray(filter.value) ? filter.value : [];
+              rows = rows.filter((row: any) => values.includes(row?.[filter.column]));
+            }
+          }
+
+          return { data: rows, error: null };
+        }
+
+        if (table === "contractors") {
+          let rows = [...(fixture.contractors ?? [])];
 
           for (const filter of filters) {
             if (filter.kind === "in") {
@@ -155,11 +169,51 @@ describe("internal notification readers", () => {
     const notifications = await listInternalNotifications({
       limit: 20,
       onlyUnread: true,
-      filterKey: "contractor_updates",
+      filterKey: "new_job_notifications",
     });
     const unreadCount = await getInternalUnreadNotificationCount();
 
     expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.notification_type).toBe("contractor_intake_proposal_submitted");
+    expect(notifications[0]?.is_unread).toBe(true);
+    expect(unreadCount).toBe(1);
+  });
+
+  it("does not drop proposal notifications when proposal status rows are not visible", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-proposal-rls",
+            account_owner_user_id: "owner-1",
+            job_id: null,
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_intake_proposal_submitted",
+            subject: "New Contractor Intake Proposal",
+            body: "A contractor submitted an intake proposal pending internal finalization.",
+            payload: { contractor_intake_submission_id: "proposal-rls-hidden" },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-21T12:00:00.000Z",
+          },
+        ],
+        // Simulates sessions where proposal rows are not readable via RLS.
+        submissions: [],
+      }),
+    );
+
+    const { listInternalNotifications, getInternalUnreadNotificationCount } = await import("@/lib/actions/notification-read-actions");
+
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+      filterKey: "new_job_notifications",
+    });
+    const unreadCount = await getInternalUnreadNotificationCount();
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.id).toBe("notif-proposal-rls");
     expect(notifications[0]?.notification_type).toBe("contractor_intake_proposal_submitted");
     expect(notifications[0]?.is_unread).toBe(true);
     expect(unreadCount).toBe(1);

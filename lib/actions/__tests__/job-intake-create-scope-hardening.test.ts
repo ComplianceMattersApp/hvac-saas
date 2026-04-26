@@ -65,6 +65,15 @@ function buildIntakeFormData() {
   return formData;
 }
 
+function buildCustomerContextFormDataWithoutCustomer() {
+  const formData = new FormData();
+  formData.set("job_type", "ecc");
+  formData.set("title", "Context Guard Job");
+  formData.set("intake_source", "customer");
+  formData.set("location_id", "loc-1");
+  return formData;
+}
+
 function buildSupabaseFixture(options: FixtureOptions = {}) {
   const writeCalls: WriteCall[] = [];
 
@@ -325,5 +334,26 @@ describe("job intake create same-account hardening", () => {
     expect(createContractorIntakeProposalAwarenessNotificationMock).not.toHaveBeenCalled();
     expect(insertInternalNotificationForEventMock).not.toHaveBeenCalled();
     expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects customer-context intake when customer_id is missing before canonical writes", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: false });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(createJobFromForm(buildCustomerContextFormDataWithoutCustomer())).rejects.toThrow(
+      "REDIRECT:/jobs/new?err=invalid_customer_location",
+    );
+
+    expect(
+      fixture.writeCalls.filter((call) => ["customers", "locations", "jobs", "job_events"].includes(call.table)),
+    ).toHaveLength(0);
   });
 });

@@ -35,3 +35,24 @@ export async function loadScopedInternalContractorForMutation(
 
   return contractor;
 }
+
+function normalizeLifecycleState(value: unknown) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized || "active";
+}
+
+export async function loadScopedActiveInternalContractorForMutation(
+  params: ScopedInternalContractorLookupParams,
+) {
+  const contractor = await loadScopedInternalContractorForMutation({
+    ...params,
+    select: buildSelectClause(["lifecycle_state"], params.select),
+  });
+
+  if (!contractor?.id) return null;
+
+  const lifecycleState = normalizeLifecycleState((contractor as any).lifecycle_state);
+  if (lifecycleState !== "active") return null;
+
+  return contractor;
+}

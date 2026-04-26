@@ -107,6 +107,12 @@ export default function SetPasswordPage() {
     if (membershipError) {
       setLoading(false);
       setSuccessMsg(null);
+      if (membershipError === "INVITE_CONTRACTOR_ARCHIVED") {
+        setErrorMsg(
+          "Password updated, but this contractor account is archived and portal access is disabled. Contact your administrator for reactivation.",
+        );
+        return;
+      }
       setErrorMsg(
         "Password updated, but we could not finish contractor access setup. Please try again in a moment or contact support.",
       );

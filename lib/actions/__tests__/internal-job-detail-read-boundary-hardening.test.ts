@@ -228,7 +228,8 @@ describe("internal job-detail read boundary hardening", () => {
 
     expect(rows).toEqual([{ id: "contractor-1" }]);
     expect(query.eq).toHaveBeenCalledWith("owner_user_id", "owner-1");
-    expect(eqMock).toHaveBeenCalledTimes(1);
+    expect(query.eq).toHaveBeenCalledWith("lifecycle_state", "active");
+    expect(eqMock).toHaveBeenCalledTimes(2);
     expect(orderMock).toHaveBeenCalledWith("name", { ascending: true });
   });
 });
