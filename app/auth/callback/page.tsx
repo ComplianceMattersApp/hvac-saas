@@ -108,8 +108,12 @@ export default function AuthCallbackPage() {
           const {
             data: { user },
           } = await supabase.auth.getUser();
+          // Treat both "recovery" and "invite" queryType as set-password handoff signals.
+          // PKCE invite flows from Supabase include type=invite in the callback URL;
+          // without this guard the contractor bypasses /set-password and hits routeByRole
+          // before contractor_users membership exists, landing erroneously at /ops.
           const sawRecoverySignal =
-            queryType === "recovery" || handledRecovery || (await waitForRecoverySignal(() => handledRecovery));
+            queryType === "recovery" || queryType === "invite" || handledRecovery || (await waitForRecoverySignal(() => handledRecovery));
 
           if (sawRecoverySignal) {
             setStatus("Redirecting to set password...");

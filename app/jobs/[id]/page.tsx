@@ -2086,6 +2086,10 @@ const renderTimelineItem = (e: any, key: string) => {
       </div>
     </div>
 
+    <div className="mt-2 text-xs leading-5 text-slate-600">
+      Scope first: confirm the work for this visit, then complete closeout and billing.
+    </div>
+
     {showInternalInvoicingPlaceholder && String(job.ops_status ?? "").toLowerCase() !== "closed" ? (
       <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs leading-5 text-amber-900">
         Internal invoicing mode is enabled for this company. Lightweight invoice-complete controls are hidden so

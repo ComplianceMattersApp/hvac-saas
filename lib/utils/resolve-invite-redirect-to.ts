@@ -3,6 +3,10 @@ export function resolveInviteRedirectTo(): string {
     String(process.env.APP_URL ?? "").trim(),
     String(process.env.NEXT_PUBLIC_APP_URL ?? "").trim(),
     String(process.env.SITE_URL ?? "").trim(),
+    // VERCEL_URL is auto-set by Vercel to the deployment hostname (no protocol prefix).
+    // This ensures invite redirect links are correct on Vercel deployments even when
+    // APP_URL / NEXT_PUBLIC_APP_URL / SITE_URL are not explicitly configured.
+    process.env.VERCEL_URL ? `https://${String(process.env.VERCEL_URL).trim()}` : "",
   ].filter(Boolean);
 
   for (const raw of candidates) {

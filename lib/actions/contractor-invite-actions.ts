@@ -156,33 +156,38 @@ export async function inviteContractor(args: {
 
   if (upErr) throw new Error(upErr.message);
 
-  // 3) Create / invite the auth user.
-  //    We use inviteUserByEmail (POST /auth/v1/invite) — the same endpoint used
-  //    by the proven internal-user invite flow — NOT generateLink("invite") which
-  //    calls POST /auth/v1/admin/generate_link, a different GoTrue code path that
-  //    fails with "Database error saving new user" for this project's setup.
+  // 3) Create the auth user without sending a Supabase system email.
+  //    admin.createUser (not inviteUserByEmail) avoids the Supabase-auto-sent
+  //    invite email, which creates a conflicting first-time CTA for the contractor.
+  //    The Supabase system invite email and our branded SMTP email both arriving
+  //    creates a token-collision hazard: the contractor may click the system email
+  //    first (which, in PKCE mode, bypasses /set-password), while the recovery
+  //    token from step 4 may have superseded the invite token.
   //
-  //    inviteUserByEmail also triggers Supabase's own invite email automatically.
-  //    Our branded SMTP email is sent below via the recovery link (step 5).
+  //    email_confirm:true marks the email as confirmed so generateLink("recovery")
+  //    works immediately. The branded SMTP email below (step 5) is the sole
+  //    first-time contractor onboarding CTA. For already-existing users (resend
+  //    path), we fall through to the existing-user recovery path unchanged.
   const admin = createAdminClient();
   const redirectTo = resolveInviteRedirectTo();
 
   let authUserId: string | undefined;
 
-  const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo,
+  const { data: createData, error: createErr } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
   });
 
-  if (!inviteErr) {
-    // Fresh user created successfully.
-    authUserId = inviteData?.user?.id ? String(inviteData.user.id) : undefined;
-  } else if (isAlreadyExistsError(inviteErr)) {
+  if (!createErr) {
+    // Fresh user created successfully — no Supabase system email was sent.
+    authUserId = createData?.user?.id ? String(createData.user.id) : undefined;
+  } else if (isAlreadyExistsError(createErr)) {
     // User already exists in auth.users — look up their id for the recovery path.
     const found = await getAuthUserIdByEmail(admin, email);
     authUserId = found ?? undefined;
   } else {
     // Genuine unexpected failure — surface the real message.
-    throw new Error(`Auth invite failed: ${inviteErr.message}`);
+    throw new Error(`User creation failed: ${createErr.message}`);
   }
 
   // 4) Generate a recovery link for our custom branded email.
