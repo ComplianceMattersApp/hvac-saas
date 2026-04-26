@@ -760,8 +760,9 @@ broader role model refinement
 future branding/settings/business-profile formalization
 
 Note:
-Payments are no longer treated as a purely deferred untouched module.
-The platform is now entering an active payment-foundation phase as defined in Section 19 below.
+Payment P1 foundation is closed at the current baseline.
+Payment execution and live Stripe/checkout remain deferred.
+See Section 19 for current payment-ready status.
 
 18. Internal Business Identity vs Product Brand Identity (Locked)
 
@@ -872,28 +873,29 @@ The job_equipment table uses equipment_role as the single canonical classificati
 
 **Out of scope:** component_type column is not part of this contract. Mini-split full treatment is deferred.
 
-19. Payments Module (Active Implementation Direction)
+19. Payments Module (P1 Foundation Complete — Payment-Ready Status)
 
 19.1 Current truth (locked)
 
-Payments are not complete.
+Payment P1 foundation is complete.
 
-Any earlier assumption that payments could be treated as complete was for comparison/gap-analysis only and must not be treated as implementation truth.
+Payment execution remains deferred to a later phase.
 
 Current implementation truth:
 - payments are currently tracking-only
-- payment architecture is an active implementation phase
+- payment P1 foundation is closed at the current baseline
 - live processor-based payment acceptance is not yet enabled
-- this area must be built correctly now so future rollout is additive, not corrective
+- the platform is payment-ready by design but not yet payment-active
 
 19.2 Core payment direction (locked)
 
-Compliance Matters will build the payment foundation now without enabling full live payment execution yet.
+Payment P1 foundation is now complete.
+Future payment execution will follow the direction defined in this section, without forcing redesign of the current architecture.
 
 Locked rule:
 - the platform is payment-ready by design
 - the platform is not yet payment-active
-- architecture must support future live payments without forcing redesign later
+- architecture supports future live payments without requiring redesign
 
 19.3 Ownership model (locked)
 
@@ -1376,8 +1378,8 @@ Current position:
 - Broad global completion of every notification/email side-effect path remains intentionally deferred outside this milestone closeout scope.
 - This milestone is now formally closed at the targeted seam-hardening level.
 - This closeout does not imply role redesign, support-access redesign, payment execution work, billing expansion, UI redesign, or a broad cross-domain RLS rewrite.
-- Payment architecture/foundation remains an active implementation area under the locked direction in Section 19.
-- This does not mean full payment acceptance is live; it means payment readiness is being intentionally built to prevent later rework.
+- Payment P1 foundation is closed at the current baseline under the locked direction in Section 19.
+- Payment execution remains deferred; payment readiness is by design to support future adoption without forced redesign.
 
 Reporting / analytics milestone baseline now includes:
 - Report Center as the internal reporting home
@@ -1392,9 +1394,9 @@ Reporting / analytics milestone baseline now includes:
 - KPI Reference removed from normal Report Center navigation while remaining accessible by direct URL
 - `/reports` routing to Dashboard by default, with Jobs Report moved to `/reports/jobs` and compatibility handling preserved for prior filtered jobs-report links
 
-Remaining closeout for milestone-3 is limited to live-usage validation and minor polish/hardening, not missing major report families.
+Reporting / analytics baseline is complete enough for the current milestone; remaining work is minor polish/hardening only.
 
-If roadmap order remains unchanged, the next natural roadmap area after Reporting / analytics is:
+The next natural roadmap area is:
 - Smaller service-model revisions / service workflow refinement
 
 Roadmap guardrail for this next area:
@@ -1573,12 +1575,15 @@ Current clarification:
 - this completion does not mean `/jobs/[id]/tests` workflow redesign was done
 - this completion does not mean ECC redesign was done
 - this completion does not mean the full broader ECC workflow/permission model is finished across every possible path
-- this completion does not mean the full broader jobs/job_events operational mutation model is finished across every path, and does not close the broader RLS completion milestone
-- this completion does not mean the full broader jobs/job_events operational mutation model is finished across every possible path, and does not close the broader RLS completion milestone
+- this completion does not mean every possible future jobs/job_events operational mutation hardening item is complete; broader/global security normalization remains deferred future work outside the closed targeted RLS / permission hardening milestone
+- the targeted RLS / permission hardening milestone is formally closed at the seam-hardening level; broader/global security normalization remains deferred future work
+- this completion does not mean every possible future jobs/job_events operational mutation hardening item is complete; broader/global security normalization remains deferred future work outside the closed targeted RLS / permission hardening milestone
+- the targeted RLS / permission hardening milestone is formally closed at the seam-hardening level; broader/global security normalization remains deferred future work
 - this completion does not mean the full broader contractor permission model is finished across every possible path
 - this completion does not mean the full broader staffing permission model is finished across every possible path
 - this completion does not mean the full broader customer permission model is finished across every possible path
-- broader hardening work is not yet closed
+- this completion does not mean every possible future jobs/job_events operational mutation hardening item is complete; broader/global security normalization remains deferred future work outside the closed targeted RLS / permission hardening milestone
+- the targeted RLS / permission hardening milestone is formally closed at the seam-hardening level; broader/global security normalization remains deferred future work
 
 This stays aligned to the current roadmap order already in the spine while accurately marking reporting as no longer the active incomplete milestone.
 
@@ -1619,7 +1624,7 @@ Preserve additive architecture and environment discipline.
 
 22. One-Line Definition
 
-Compliance Matters Software is a stabilized, event-driven operational system for compliance and service workflows, with complete scheduling and staffing foundations, strong auditability, active payment-foundation planning, and future-ready business-layer expansion.
+Compliance Matters Software is a stabilized, event-driven operational system for compliance and service workflows, with complete scheduling and staffing foundations, strong auditability, completed payment-ready foundation, deferred live payment execution, and future-ready business-layer expansion.
 
 23. Supporting document:
 For detailed payment implementation direction, use:
