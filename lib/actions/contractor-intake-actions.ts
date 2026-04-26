@@ -26,6 +26,7 @@ type IntakeSubmissionRow = {
   proposed_customer_email: string | null;
   proposed_address_line1: string | null;
   proposed_city: string | null;
+  proposed_state: string | null;
   proposed_zip: string | null;
   proposed_location_nickname: string | null;
   proposed_job_type: string | null;
@@ -169,7 +170,7 @@ async function assertExistingLocationOwned(params: {
 
   const { data, error } = await admin
     .from("locations")
-    .select("id, owner_user_id, customer_id, address_line1, city")
+    .select("id, owner_user_id, customer_id, address_line1, city, state")
     .eq("id", locationId)
     .maybeSingle();
 
@@ -185,6 +186,7 @@ async function assertExistingLocationOwned(params: {
     id: String((data as any).id),
     address_line1: (data as any).address_line1 ?? null,
     city: (data as any).city ?? null,
+    state: (data as any).state ?? null,
   };
 }
 
@@ -195,9 +197,10 @@ async function createLocationForCustomer(params: {
   nickname: string | null;
   address_line1: string;
   city: string;
+  state: string | null;
   zip: string;
 }) {
-  const { admin, customerId, accountOwnerUserId, nickname, address_line1, city, zip } = params;
+  const { admin, customerId, accountOwnerUserId, nickname, address_line1, city, state, zip } = params;
 
   const { data, error } = await admin
     .from("locations")
@@ -207,10 +210,11 @@ async function createLocationForCustomer(params: {
       nickname: nickname || null,
       address_line1,
       city,
+      state,
       zip,
       postal_code: zip,
     })
-    .select("id, address_line1, city")
+    .select("id, address_line1, city, state")
     .single();
 
   if (error) throw error;
@@ -219,6 +223,7 @@ async function createLocationForCustomer(params: {
     id: String((data as any).id),
     address_line1: (data as any).address_line1 ?? null,
     city: (data as any).city ?? null,
+    state: (data as any).state ?? null,
   };
 }
 
@@ -273,7 +278,7 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
     | { id: string; first_name: string | null; last_name: string | null; email: string | null; phone: string | null }
     | null = null;
   let location:
-    | { id: string; address_line1: string | null; city: string | null }
+    | { id: string; address_line1: string | null; city: string | null; state: string | null }
     | null = null;
 
   if (mode === "existing_existing") {
@@ -302,6 +307,7 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
     const existingCustomerId = normalizeText(formData.get("existing_customer_id"));
     const newAddressLine1 = normalizeText(formData.get("new_address_line1"));
     const newCity = normalizeText(formData.get("new_city"));
+    const newState = normalizeText(formData.get("new_state")) || "CA";
     const newZip = normalizeText(formData.get("new_zip"));
     const newNickname = normalizeText(formData.get("new_location_nickname")) || null;
 
@@ -326,6 +332,7 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
       nickname: newNickname,
       address_line1: newAddressLine1,
       city: newCity,
+      state: newState,
       zip: newZip,
     });
   }
@@ -338,6 +345,10 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
 
     const addressLine1 = normalizeText(formData.get("new_address_line1")) || normalizeText(submission.proposed_address_line1);
     const city = normalizeText(formData.get("new_city")) || normalizeText(submission.proposed_city);
+    const state =
+      normalizeText(formData.get("new_state")) ||
+      normalizeText(submission.proposed_state) ||
+      "CA";
     const zip = normalizeText(formData.get("new_zip")) || normalizeText(submission.proposed_zip);
     const nickname = normalizeText(formData.get("new_location_nickname")) || normalizeText(submission.proposed_location_nickname) || null;
 
@@ -361,6 +372,7 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
       nickname,
       address_line1: addressLine1,
       city,
+      state,
       zip,
     });
   }

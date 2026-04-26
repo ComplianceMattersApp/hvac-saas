@@ -2079,7 +2079,7 @@ const renderTimelineItem = (e: any, key: string) => {
               loadingText="Saving..."
               className={darkButtonClass}
             >
-              ✓ Invoice Complete
+              ✓ Mark Invoice Sent
             </SubmitButton>
           </form>
         )}
@@ -3099,14 +3099,18 @@ const renderTimelineItem = (e: any, key: string) => {
 {showExternalDataEntryPrompt ? (
   <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-amber-950 shadow-[0_12px_24px_-22px_rgba(180,83,9,0.35)]">
     <div className="mb-2 font-semibold">
-      Data Entry Required
+      Invoice sent tracking
+    </div>
+
+    <div className="mb-3 text-sm leading-6 text-amber-900">
+      Record external invoice details for closeout tracking. This does not create an internal billed-truth invoice record.
     </div>
 
     <form action={completeDataEntryFromForm} className="flex flex-wrap gap-2 items-end">
       <input type="hidden" name="job_id" value={job.id} />
 
       <div className="flex flex-col">
-        <label className="mb-1 text-sm font-medium text-amber-900">Invoice # (optional)</label>
+        <label className="mb-1 text-sm font-medium text-amber-900">External Invoice # (optional)</label>
         <input
           name="invoice_number"
           defaultValue={String(job.invoice_number ?? "")}
@@ -3118,7 +3122,7 @@ const renderTimelineItem = (e: any, key: string) => {
         loadingText="Saving..."
         className={darkButtonClass}
       >
-        Mark Data Entry Complete
+        Mark Invoice Sent
       </SubmitButton>
     </form>
   </div>
@@ -3452,9 +3456,13 @@ const renderTimelineItem = (e: any, key: string) => {
 
           <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.24)]">
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Actions</div>
+            <div className="mt-2 rounded-lg border border-blue-200/80 bg-blue-50/70 px-3.5 py-3 text-sm leading-6 text-blue-900">
+              This invoice records billed work for this job. Payment entries are tracking-only and do not charge a card.
+            </div>
             {internalInvoice.status === "draft" ? (
               <>
-                <div className="mt-2 text-sm leading-6 text-slate-600">Review the recipient, line items, and total here. Issue when the billed record is final. Sending happens after issue and does not create a second invoice.</div>
+                  <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Issue Invoice</div>
+                  <div className="mt-1 text-sm leading-6 text-slate-600">Review recipient, line items, and total. Issue only when this billed invoice record is final. Sending happens after issue and is communication only.</div>
 
                 <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
                   <div><span className="font-semibold text-slate-900">Review recipient:</span> {internalInvoiceRecipientName}</div>
@@ -3477,12 +3485,13 @@ const renderTimelineItem = (e: any, key: string) => {
 
                 {!internalInvoiceReadyToIssue ? (
                   <div className="mt-2 text-xs leading-5 text-slate-500">
-                    Requires completed job, field complete, billing name, and at least one saved line item with a total greater than $0.00.
+                    Cannot issue yet. Complete all of the following: job marked completed, field complete, billing name filled in, and at least one saved line item with total above $0.00.
                   </div>
                 ) : null}
               </>
             ) : internalInvoice.status === "issued" ? (
               <>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Issue Invoice</div>
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50/75 px-3.5 py-3 text-sm leading-6 text-emerald-900">
                   {issuedInvoiceStatusMessage}
                 </div>
@@ -3490,7 +3499,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
                   <div className="font-semibold text-slate-900">Payment Tracking</div>
                   <div className="mt-1 leading-6">
-                    Manual/off-platform payment recording only. This tracks collected payment truth and does not change billed line items.
+                    Off-platform payment recording only. This tracks collected payment history and does not charge a card or change billed line items.
                   </div>
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -3599,7 +3608,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
                 <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
                   <div className="font-semibold text-slate-900">Send / Resend</div>
-                  <div className="mt-1 leading-6">Use this to send the issued invoice record to the billing recipient. Sending again is a communication action only; it does not create or alter billed truth.</div>
+                  <div className="mt-1 leading-6">Send the already-issued invoice to the billing recipient. Resending is communication only and does not create a second invoice or alter billed truth.</div>
 
                   <form action={sendInternalInvoiceEmailFromForm} className="mt-3 space-y-3">
                     <input type="hidden" name="job_id" value={job.id} />
@@ -3626,7 +3635,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
                   {internalInvoiceSendTargetMissing ? (
                     <div className="mt-2 text-xs leading-5 text-amber-700">
-                      Add a billing email to the invoice before sending it.
+                      Add a billing email first. Sending is available only after issue and with a recipient email.
                     </div>
                   ) : lastInternalInvoiceSentLabel ? (
                     <div className="mt-2 text-xs leading-5 text-slate-500">
@@ -3643,6 +3652,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
             {internalInvoice.status !== "void" ? (
               <form action={voidInternalInvoiceFromForm} className="mt-4 space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Void Invoice</div>
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="tab" value={tab} />
                 <div>

@@ -1032,6 +1032,7 @@ async function sendInternalContractorIntakeProposalAlertEmail(params: {
       proposed_customer_last_name,
       proposed_address_line1,
       proposed_city,
+      proposed_state,
       proposed_zip,
       proposed_job_type,
       proposed_project_type,
@@ -1056,6 +1057,7 @@ async function sendInternalContractorIntakeProposalAlertEmail(params: {
   const proposedAddress = [
     String((proposal as any)?.proposed_address_line1 ?? "").trim(),
     String((proposal as any)?.proposed_city ?? "").trim(),
+    String((proposal as any)?.proposed_state ?? "").trim(),
     String((proposal as any)?.proposed_zip ?? "").trim(),
   ]
     .filter(Boolean)
@@ -5419,6 +5421,7 @@ const jobType = relationshipJobType;
 
   const title = String(formData.get("title") || "").trim();
   const postedCity = String(formData.get("city") || "").trim();
+  const postedState = String(formData.get("state") || "").trim();
 
   const customerPhoneRaw = String(formData.get("customer_phone") || "").trim();
 
@@ -5771,13 +5774,14 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
   let existingLocationSnapshot: {
     address_line1?: string | null;
     city?: string | null;
+    state?: string | null;
     zip?: string | null;
   } | null = null;
 
   if (existingLocationId) {
     const { data: existingLocation, error: existingLocationErr } = await supabase
       .from("locations")
-      .select("id, address_line1, city, zip")
+      .select("id, address_line1, city, state, zip")
       .eq("id", existingLocationId)
       .maybeSingle();
 
@@ -5791,6 +5795,7 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     String(existingLocationSnapshot?.address_line1 ?? "").trim();
 
   const city = postedCity || String(existingLocationSnapshot?.city ?? "").trim();
+  const state = postedState || String(existingLocationSnapshot?.state ?? "").trim() || null;
 
   const jobAddressRaw = address_line1;
 
@@ -5825,6 +5830,7 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
 
   const normalizedAddressLine1 = normalizeAddressPart(address_line1);
   const normalizedCity = normalizeAddressPart(city);
+  const normalizedState = normalizeAddressPart(state);
   const normalizedZip = normalizeAddressPart(zip);
 
   async function findReusableLocation(customerId: string) {
@@ -5832,7 +5838,7 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
 
   const { data: existingLocations, error } = await supabase
     .from("locations")
-    .select("id, address_line1, city, zip, postal_code")
+    .select("id, address_line1, city, state, zip, postal_code")
     .eq("customer_id", customerId);
 
   if (error) throw error;
@@ -5840,6 +5846,7 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
   const match = (existingLocations || []).find((loc) => {
     const locAddress = normalizeAddressPart(loc.address_line1);
     const locCity = normalizeAddressPart(loc.city);
+    const locState = normalizeAddressPart((loc as any).state);
     const locZip = normalizeAddressPart((loc as any).zip ?? (loc as any).postal_code);
 
     const sameAddress = locAddress === normalizedAddressLine1;
@@ -5847,8 +5854,10 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
 
     const zipProvided = !!normalizedZip;
     const sameZip = !zipProvided || locZip === normalizedZip;
+    const stateProvided = !!normalizedState;
+    const sameState = !stateProvided || !locState || locState === normalizedState;
 
-    return sameAddress && sameCity && sameZip;
+    return sameAddress && sameCity && sameState && sameZip;
   });
 
   return match ?? null;
@@ -6394,6 +6403,7 @@ function canContractorWriteEvent(event_type: string) {
         proposed_customer_email: customerEmailRaw || null,
         proposed_address_line1: address_line1 || null,
         proposed_city: city || null,
+        proposed_state: state || null,
         proposed_zip: zip || null,
         proposed_location_nickname: locationNickname || null,
         proposed_job_type: jobType || null,
@@ -6575,6 +6585,7 @@ if (existingCustomerId && !existingLocationId) {
         nickname: locationNickname,
         address_line1,
         city,
+        state,
         zip,
         postal_code: zip,
         owner_user_id: canonicalOwnerUserId,
@@ -6686,6 +6697,7 @@ if (reusableLocation?.id) {
       nickname: locationNickname,
       address_line1,
       city,
+      state,
       zip,
       postal_code: zip,
       owner_user_id: canonicalOwnerUserId,
