@@ -230,7 +230,7 @@ export default async function InvoiceLedgerPage({
                     <th className="px-3 py-3">Issued</th>
                     <th className="px-3 py-3">Last Communication</th>
                     <th className="px-3 py-3">Recipient</th>
-                    <th className="px-3 py-3">Comm State</th>
+                    <th className="px-3 py-3">Send Status</th>
                     <th className="px-3 py-3">Subtotal</th>
                     <th className="px-3 py-3">Total</th>
                     <th className="px-3 py-3">Voided</th>
@@ -238,7 +238,7 @@ export default async function InvoiceLedgerPage({
                     <th className="px-3 py-3">Balance Due</th>
                     <th className="px-3 py-3">Payment Status</th>
                     <th className="px-3 py-3">Last Payment</th>
-                    <th className="px-3 py-3">Payments</th>
+                    <th className="px-3 py-3">Payment Count</th>
                   </tr>
                 </thead>
                 <tbody>
