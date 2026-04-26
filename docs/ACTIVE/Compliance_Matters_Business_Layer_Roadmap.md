@@ -360,11 +360,14 @@ Bare-bones invoice email content/presentation is acceptable for this milestone b
 
 Reporting / analytics is no longer the active incomplete milestone.
 
-The next active major roadmap item after this achieved milestone-2 baseline and reporting completion is Monthly usage / payment model, followed later by business-layer modules in this document.
+Payment P1 foundation is closed at the current baseline.
+Out-of-box readiness / business identity / settings packaging is also closed at the current baseline.
+The next natural roadmap area is smaller service-model revisions / service workflow refinement.
 
-Roadmap guardrail for this next item:
-- Payment architecture/foundation is already directionally defined.
-- Payments remain payment-ready by design, not payment-active.
+Roadmap guardrail:
+- Payment P1 foundation is complete and closed.
+- Payment execution remains deferred.
+- Stripe/customer checkout and platform subscription billing are future tracks unless explicitly pulled forward.
 - This does not imply live Stripe/payment execution start unless explicitly planned.
 - This does not imply QBO dependency.
 
@@ -723,15 +726,18 @@ What this completion does not mean:
 - no contractor authority expansion happened in this targeted invoice hardening slice
 - no notification UX redesign happened in this targeted internal notification read-state hardening slice
 
-The next active major roadmap item is Monthly usage / payment model.
+Closed milestones:
+- Payment P1 foundation is closed at the current baseline.
+- Out-of-box readiness / business identity / settings packaging is closed at the current baseline.
+- First Owner Provisioning V1 and runbook are complete.
 
-Roadmap status note:
-- Monthly usage / payment model has now begun with a completed Platform Account Entitlement / Usage Foundation V1 slice.
-- This is a platform-account entitlement/usage foundation only; it does not mean live payment execution is enabled.
+Next natural roadmap area:
+- Smaller service-model revisions / service workflow refinement.
 
-Roadmap guardrail remains:
-- Payment architecture/foundation is already directionally defined.
-- Payments remain payment-ready by design, not payment-active.
+Roadmap guardrail:
+- Payment P1 foundation is complete and closed.
+- Payment execution remains deferred.
+- Stripe/customer checkout and platform subscription billing are future tracks unless explicitly pulled forward.
 - This does not imply live Stripe/payment execution start unless explicitly planned.
 - This does not imply QBO dependency.
 
@@ -847,7 +853,7 @@ Completed visit scope may feed invoice creation later, but invoice line items re
 
 ---
 
-## 12. Internal invoice v1 (planned)
+## 12. Internal Invoice V1 — implemented baseline and planned refinements
 
 ### Purpose
 Invoice is the internal commercial billing record when a company is in internal invoicing mode.
