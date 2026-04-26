@@ -3,7 +3,7 @@
 // Domain: platform account entitlement truth
 // This is separate from:
 //   - tenant billed truth (internal_invoices / internal_invoice_line_items)
-//   - collected payment truth (not yet implemented)
+//   - collected payment truth (internal_invoice_payments)
 //
 // Stripe placeholder fields (stripe_customer_id, stripe_subscription_id,
 // stripe_price_id) exist in the DB schema but are intentionally excluded from

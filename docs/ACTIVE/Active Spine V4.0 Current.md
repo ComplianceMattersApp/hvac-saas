@@ -779,6 +779,23 @@ role / permission semantics
 do not overload user profiles to represent company identity
 keep the initial implementation narrow and identity-focused only
 
+18.3.1 First Owner Onboarding / Account Provisioning V1 (Locked)
+
+For V1 launch readiness, first company/account onboarding is invite-only and platform-admin provisioned.
+
+Locked V1 sequence:
+- platform/admin provisions company/account shell
+- first owner receives invite
+- first owner accepts invite and sets password
+- system establishes/confirms auth user, internal user membership, account owner relationship, internal business profile, platform entitlement row, default billing mode, and readiness checklist state
+- first owner lands in Admin Center readiness setup flow
+
+Public self-signup is deferred to a later SaaS growth phase and is not part of V1 launch onboarding unless explicitly pulled forward.
+
+This direction preserves controlled onboarding quality, protects `account_owner_user_id` tenant boundaries, and keeps tenant operational identity separate from global product brand identity.
+
+If Compliance Matters is later packaged as an app, login still uses the same server-side account provisioning/auth model; app shell packaging does not replace tenant onboarding or account ownership setup.
+
 18.4 Equipment Domain — Canonical Role Vocabulary and Field Contract
 
 The job_equipment table uses equipment_role as the single canonical classification field.
@@ -990,7 +1007,7 @@ Includes:
 - operational payment awareness
 - manual/external reference support
 
-Phase P1 — Payment-ready foundation (current active build phase)
+Phase P1 — Payment-ready foundation (closed; complete enough at current baseline)
 
 Includes:
 - payment domain model
@@ -1033,6 +1050,11 @@ Completed slices in this phase:
 - External-billing behavior remains honest/non-fabricated and does not invent internal invoice/payment reporting.
 - This slice did not introduce payment execution, Stripe checkout, QBO sync, portal payment UX, dashboard payment analytics expansion, or refund/dispute execution.
 
+4. Final Closeout-Quality Test Fidelity Polish
+- Collected-payment report tests now assert production report read-model outputs directly (`listInvoiceLedgerRows` and `buildInvoiceLedgerCsv`) instead of duplicated local aggregation logic.
+- Coverage confirms production payment-column mapping (Amount Paid, Balance Due, Payment Status, Last Payment Date, Payment Count), recorded-only counting behavior, and CSV column order/value projection.
+- This closeout polish did not change payment runtime behavior; it improved closeout confidence against regression in production mapping paths.
+
 Does not include:
 - live customer checkout
 - contractor payout onboarding
@@ -1040,7 +1062,7 @@ Does not include:
 - live refunds/disputes
 - processor-led payment execution
 
-Phase P2 — Customer payment acceptance (later)
+Phase P2 — Customer payment acceptance (later planning phase; not immediate implementation)
 
 Recommended first live scope:
 - customer pays invoice online
@@ -1048,6 +1070,9 @@ Recommended first live scope:
 - payment state updates automatically
 - simple Stripe-first processor path
 - no payout complexity unless explicitly required
+
+Separate future track (not part of tenant invoice/payment tracking phases above):
+- Platform subscription billing execution remains a platform-billing roadmap item and must not be conflated with tenant internal invoice billed/collected tracking truth.
 
 Phase P3 — Contractor/platform payout layer (later)
 

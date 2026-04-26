@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { resolveAccountReadiness } from "@/lib/business/account-readiness";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,7 +13,8 @@ async function requireAdminOrRedirect() {
   if (!user) redirect("/login");
 
   try {
-    await requireInternalRole("admin", { supabase, userId: user.id });
+    const authz = await requireInternalRole("admin", { supabase, userId: user.id });
+    return { supabase, internalUser: authz.internalUser };
   } catch (error) {
     if (isInternalAccessError(error)) {
       const { data: cu, error: cuErr } = await supabase
@@ -41,7 +43,11 @@ type AdminCard = {
 };
 
 export default async function OpsAdminPage() {
-  await requireAdminOrRedirect();
+  const { supabase, internalUser } = await requireAdminOrRedirect();
+  const readiness = await resolveAccountReadiness(internalUser.account_owner_user_id, supabase);
+  const requiredItems = readiness.items.filter((item) => item.status !== "optional");
+  const incompleteRequiredItems = requiredItems.filter((item) => item.status === "incomplete");
+  const optionalItems = readiness.items.filter((item) => item.status === "optional");
 
   const cards: AdminCard[] = [
     {
@@ -117,6 +123,62 @@ export default async function OpsAdminPage() {
           </Link>
         </div>
       </div>
+
+      <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Account setup</p>
+            <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">
+              {readiness.isOperationallyReady ? "Ready for operations" : "Needs setup"}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Required: {readiness.completedRequiredCount} of {readiness.totalRequiredCount} complete
+            </p>
+          </div>
+        </div>
+
+        {incompleteRequiredItems.length > 0 ? (
+          <div className="mt-4 space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-900">Required</p>
+            {incompleteRequiredItems.map((item) => (
+              <div key={item.key} className="flex flex-wrap items-center justify-between gap-2 text-sm text-amber-900">
+                <div>
+                  <span className="font-semibold">Missing</span>: {item.label}
+                </div>
+                {item.href ? (
+                  <Link
+                    href={item.href}
+                    className="inline-flex items-center rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                  >
+                    Open
+                  </Link>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
+            Complete
+          </div>
+        )}
+
+        <div className="mt-4 space-y-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Optional</p>
+          {optionalItems.map((item) => (
+            <div key={item.key} className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-700">
+              <div>{item.label}</div>
+              {item.href ? (
+                <Link
+                  href={item.href}
+                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-900 hover:bg-slate-100"
+                >
+                  Open
+                </Link>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div>
