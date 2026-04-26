@@ -137,6 +137,7 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
     const { data, error } = await params.supabase
       .from("internal_invoices")
       .select("job_id, status, invoice_number, issued_at")
+      .neq("status", "void")
       .in("job_id", jobIds);
 
     if (error) throw error;

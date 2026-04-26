@@ -166,6 +166,41 @@ export async function resolveInternalInvoiceByJobId(params: {
     .from("internal_invoices")
     .select(INTERNAL_INVOICE_SELECT)
     .eq("job_id", jobId)
+    .neq("status", "void")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const lineItems = await listInternalInvoiceLineItems({
+    supabase: params.supabase,
+    invoiceId: String(data.id ?? ""),
+  });
+
+  return {
+    ...data,
+    status: normalizeInternalInvoiceStatus(data.status),
+    subtotal_cents: Number(data.subtotal_cents ?? 0) || 0,
+    total_cents: Number(data.total_cents ?? 0) || 0,
+    line_items: lineItems,
+  } as InternalInvoiceRecord;
+}
+
+export async function resolveLatestVoidedInternalInvoiceByJobId(params: {
+  supabase: any;
+  jobId: string;
+}): Promise<InternalInvoiceRecord | null> {
+  const jobId = String(params.jobId ?? "").trim();
+  if (!jobId) return null;
+
+  const { data, error } = await params.supabase
+    .from("internal_invoices")
+    .select(INTERNAL_INVOICE_SELECT)
+    .eq("job_id", jobId)
+    .eq("status", "void")
+    .order("voided_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (error) throw error;

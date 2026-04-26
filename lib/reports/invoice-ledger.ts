@@ -718,7 +718,7 @@ export function buildInvoiceLedgerCsv(rows: InvoiceLedgerRow[]) {
     "Issued Date",
     "Last Communication",
     "Recipient",
-    "Communication State",
+    "Send Status",
     "Subtotal",
     "Total",
     "Voided Date",

@@ -67,6 +67,7 @@ import {
 } from "@/lib/business/internal-invoice-delivery";
 import {
   type InternalInvoiceItemType,
+  resolveLatestVoidedInternalInvoiceByJobId,
   resolveInternalInvoiceByJobId,
   type InternalInvoiceStatus,
 } from "@/lib/business/internal-invoice";
@@ -731,6 +732,11 @@ export default async function JobDetailPage({
       ? await resolveInternalInvoiceByJobId({ supabase, jobId })
       : null;
 
+  const latestVoidedInternalInvoice =
+    isInternalUser && billingMode === "internal_invoicing" && !internalInvoice
+      ? await resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId })
+      : null;
+
   const internalInvoiceEmailDeliveries: InternalInvoiceEmailDeliveryRecord[] =
     isInternalUser && internalInvoice
       ? await resolveInternalInvoiceEmailDeliveries({
@@ -1215,6 +1221,11 @@ const showExternalDataEntryPrompt =
 const showInternalInvoicePanel =
   isInternalUser &&
   billingState.internalInvoicePanelEnabled;
+
+const showReplacementInvoicePrompt =
+  showInternalInvoicePanel &&
+  !internalInvoice &&
+  !!latestVoidedInternalInvoice;
 
 const visitScopeSummary = sanitizeVisitScopeSummary((job as any).visit_scope_summary);
 let visitScopeItems = [] as Array<{
@@ -3291,8 +3302,19 @@ const renderTimelineItem = (e: any, key: string) => {
 
     {!internalInvoice ? (
       <div className={`mt-4 rounded-xl border border-dashed px-4 py-4 ${hasVisitScopeDefined ? "border-slate-300 bg-slate-50/80" : "border-slate-200 bg-white/65"}`}>
+        {showReplacementInvoicePrompt ? (
+          <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50/80 px-3.5 py-3 text-sm leading-6 text-rose-800">
+            <div className="font-semibold text-rose-900">Create Replacement Invoice</div>
+            <div className="mt-1">
+              The voided invoice remains in history. A replacement draft creates a new active invoice for this job.
+            </div>
+          </div>
+        ) : null}
+
         <div className="text-sm leading-6 text-slate-700">
-          {hasVisitScopeDefined
+          {showReplacementInvoicePrompt
+            ? "A previous invoice was voided. Start a replacement draft when the corrected billed scope is ready."
+            : hasVisitScopeDefined
             ? "Create a draft invoice when the billed scope is ready."
             : "Visit Scope comes first. Start an invoice later when billing is ready."}
         </div>
@@ -3300,7 +3322,7 @@ const renderTimelineItem = (e: any, key: string) => {
           <input type="hidden" name="job_id" value={job.id} />
           <input type="hidden" name="tab" value={tab} />
           <SubmitButton loadingText="Creating..." className={hasVisitScopeDefined ? primaryButtonClass : secondaryButtonClass}>
-            Create Draft Invoice
+            {showReplacementInvoicePrompt ? "Create Replacement Invoice" : "Create Draft Invoice"}
           </SubmitButton>
         </form>
       </div>
