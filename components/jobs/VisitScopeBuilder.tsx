@@ -161,7 +161,7 @@ export default function VisitScopeBuilder({
         />
         <p className="text-xs text-slate-500">
           {jobType === "service"
-            ? "Enter a job title, or leave it blank to use the first work item below."
+            ? "Add a short job title, or leave it blank and the first work item can be used as the visit headline."
             : "Optional. Use this for helpful field context, not to replace the inspection or test type."}
         </p>
         {shouldShowFallbackPreview && fallbackPreviewTitle ? (
