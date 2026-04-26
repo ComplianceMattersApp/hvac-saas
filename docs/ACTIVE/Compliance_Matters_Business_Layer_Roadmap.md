@@ -179,16 +179,33 @@ may rely on company context as the business-facing identity foundation.
 ### Locked rule
 Company profile is not the next unresolved model decision in this roadmap.
 
-### 6.1 First owner onboarding / account provisioning V1 (planning direction)
+### 6.1 First owner onboarding / account provisioning V1 (implemented — complete)
 
-For V1 launch readiness, onboarding direction is invite-only / platform-admin provisioned for first company/account ownership setup.
+**Status: V1 complete.**
 
-V1 direction:
-- platform/admin provisions the company/account shell
-- first owner is invited
+For V1 launch readiness, onboarding is invite-only / platform-admin provisioned for first company/account ownership setup. This is controlled operator provisioning, not public signup or auth redesign.
+
+Implemented files:
+- `lib/business/first-owner-provisioning.ts` — idempotent provisioning helper; resolves/creates auth user → profile → `internal_users` → `internal_business_profiles` → `platform_account_entitlements`; dry-run / apply modes
+- `scripts/provision-first-owner.ts` — operator script wrapper; defaults to dry-run; apply requires explicit env allow flags
+- `lib/auth/first-owner-routing.ts` — first-owner marker detection; routes to `/ops/admin` when all anchor rows confirmed; fails closed if any row is missing
+- `app/set-password/page.tsx` — updated to call routing seam; routes first-owner to `/ops/admin`, normal internal to `/ops`, contractor to `/portal`
+
+Tenant identity boundaries (unchanged):
+- `internal_users` / `account_owner_user_id` = tenant/account anchor; owner row self-anchors (user_id = account_owner_user_id)
+- `internal_business_profiles` = tenant operational identity
+- `platform_account_entitlements` = platform account status context
+- readiness = derived setup state; not a new source-of-truth table
+
+V1 confirmed sequence:
+- operator runs provisioning script (dry-run first, then apply with explicit allow flags)
+- provisioning confirms/creates all required tenant rows
+- first-owner marker is durably written to user metadata before invite send
 - first owner accepts invite and sets password
-- system confirms auth + internal membership + owner relationship + business profile + entitlement + default billing mode + readiness setup state
+- routing seam confirms all anchor rows before routing to `/ops/admin`; fails closed otherwise
 - first owner lands in Admin Center readiness setup flow
+
+Operator flag note: hosted Supabase projects use `.supabase.co` and are classified as production-like remote targets by the provisioning script. `ALLOW_FIRST_OWNER_PROVISIONING=true` enables the tool. `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true` is also required for any hosted Supabase project (including sandbox) as explicit remote-target confirmation. Operators must verify the intended project before running apply. Dry-run should always be run first.
 
 Why this direction:
 - avoids orphaned tenant/company records
@@ -209,6 +226,32 @@ Deferred-later public-signup capability may include:
 
 Packaged-app note:
 - if Compliance Matters is later packaged as an app, authentication still relies on the same server-side account provisioning/auth model; app shell packaging does not replace tenant onboarding or ownership setup.
+
+### 6.2 Admin readiness / setup checklist V1 (completed)
+
+Admin Readiness / Setup Checklist V1 is complete as a read-only packaging layer on current admin surfaces.
+
+Boundary clarification:
+- tenant operational identity remains sourced from `internal_business_profiles`
+- platform account entitlement/status remains sourced from `platform_account_entitlements`
+- readiness is derived state for setup packaging/visibility only, not a new source-of-truth table
+
+This completion does not introduce a new tenant settings system and does not alter onboarding implementation boundaries.
+
+### 6.3 Closeout status for this roadmap area (current baseline)
+
+Out-of-box readiness / business identity / settings packaging is complete enough to close at the current baseline with:
+- Admin Readiness / Setup Checklist V1 complete as a read-only derived packaging layer
+- First owner onboarding/account provisioning V1 complete as invite-only platform-admin/operator provisioning
+- first-owner runbook documented and referenced for pre-launch operations
+
+Boundaries remain unchanged:
+- `internal_business_profiles` remains tenant operational identity
+- `platform_account_entitlements` remains platform entitlement/status context
+- readiness remains derived packaging state, not a new source-of-truth table
+- public self-signup remains deferred
+- platform subscription billing execution remains deferred
+- live Stripe/customer checkout remains deferred
 
 ---
 

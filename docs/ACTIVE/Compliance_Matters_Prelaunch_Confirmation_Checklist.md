@@ -34,10 +34,22 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirm Stripe-first future direction and QBO-optional boundary remain intact.
 
 ### 2.4 First owner onboarding/provisioning readiness
-- Confirm V1 first company/account onboarding remains invite-only and platform-admin provisioned.
-- Confirm public self-signup remains intentionally deferred for a later SaaS growth phase.
-- Confirm first-owner acceptance flow establishes/validates auth user, internal membership, account owner relationship, internal business profile, entitlement row, default billing mode, and readiness setup handoff.
-- Confirm first owner lands in Admin Center/setup-readiness flow rather than an undefined post-auth destination.
+- **V1 implemented and browser-smoked.** Invite-only, platform-admin/operator provisioned. Not public signup.
+- Confirmed: provisioning script (`scripts/provision-first-owner.ts`) requires explicit allow flags for apply mode; defaults to dry-run.
+- Confirmed: provisioning confirms/creates auth user, profile, owner-anchored `internal_users` row, `internal_business_profiles`, `platform_account_entitlements`.
+- Confirmed: first-owner marker is durably written to user metadata before invite send.
+- Confirmed: first-owner routing seam (`lib/auth/first-owner-routing.ts`) detects marker and confirms all anchor rows before routing; fails closed if any row is missing.
+- Confirmed: first owner acceptance (`/set-password?mode=invite`) routes to `/ops/admin`; Admin Center + Account Setup readiness card renders.
+- Confirmed: normal internal user routing (`/ops`) and contractor routing (`/portal`) branches are preserved.
+- Confirmed: public self-signup remains intentionally deferred for a later SaaS growth phase.
+- **Pre-launch operator runbook item:** before onboarding the first real production account, operator must run dry-run first, verify the intended Supabase project, then run apply with both `ALLOW_FIRST_OWNER_PROVISIONING=true` and `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true`. Note: the production-flag is also required for any hosted Supabase project (including sandbox) because `.supabase.co` URLs are classified as production-like remote targets.
+- Runbook reference: `docs/ACTIVE/First_Owner_Provisioning_Runbook.md`.
+
+### 2.5 Admin readiness checklist confirmation
+- Confirm Admin Readiness / Setup Checklist V1 is present and working on `/ops/admin` and contextually visible on `/ops/admin/company-profile`.
+- Confirm readiness packaging remains read-only derived state from existing tenant/account sources (no new readiness truth table).
+- Confirm required criteria and optional criteria render separately with clear setup guidance.
+- Closeout clarification: this roadmap area is closed at the current baseline, but readiness and first-owner provisioning remain required pre-launch verification/runbook checks.
 
 ---
 
