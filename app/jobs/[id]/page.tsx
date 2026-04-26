@@ -2977,6 +2977,10 @@ const renderTimelineItem = (e: any, key: string) => {
                       <input type="hidden" name="tab" value="info" />
                       <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=info`} />
 
+                      <div className="rounded-lg border border-blue-200/80 bg-blue-50/70 px-3 py-2 text-xs leading-5 text-blue-900">
+                        Service details classify the visit. Visit Scope tells the tech what work belongs to this trip.
+                      </div>
+
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1">
                           <label className={workspaceFieldLabelClass}>Service Type</label>
@@ -3005,6 +3009,9 @@ const renderTimelineItem = (e: any, key: string) => {
                             <option value="callback">Callback</option>
                             <option value="maintenance">Maintenance</option>
                           </select>
+                          <p className="text-[11px] leading-5 text-slate-500">
+                            Category of visit, such as diagnostic, repair, return visit, callback, or maintenance.
+                          </p>
                         </div>
                       </div>
 
@@ -3018,6 +3025,9 @@ const renderTimelineItem = (e: any, key: string) => {
                           className={workspaceInputClass}
                           required
                         />
+                        <p className="text-[11px] leading-5 text-slate-500">
+                          Short reason this visit is needed.
+                        </p>
                       </div>
 
                       <div className="space-y-1">
@@ -3031,6 +3041,9 @@ const renderTimelineItem = (e: any, key: string) => {
                           <option value="resolved">Resolved</option>
                           <option value="no_issue_found">No Issue Found</option>
                         </select>
+                        <p className="text-[11px] leading-5 text-slate-500">
+                          Current expected outcome or closeout direction.
+                        </p>
                       </div>
 
                       <SubmitButton
@@ -3116,6 +3129,11 @@ const renderTimelineItem = (e: any, key: string) => {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit Scope</div>
+        {job.job_type === "service" ? (
+          <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+            {visitScopeCount > 0 ? "Scope set" : "No scope items yet"}
+          </span>
+        ) : null}
 
         <details className="peer">
           <summary className="cursor-pointer list-none text-sm font-medium text-slate-700 hover:text-slate-900">
