@@ -26,7 +26,11 @@ export type ProposalEnrichment = {
   contractor_name: string | null;
   customer_name: string | null;
   address_summary: string | null;
+  location_nickname: string | null;
   job_type_label: string | null;
+  project_type_label: string | null;
+  has_permit_details: boolean;
+  has_notes: boolean;
   notes_preview: string | null;
 };
 
@@ -67,7 +71,7 @@ async function buildProposalEnrichmentMap(
   const { data: submissions } = await supabase
     .from("contractor_intake_submissions")
     .select(
-      "id, proposed_customer_first_name, proposed_customer_last_name, proposed_address_line1, proposed_city, proposed_job_type, proposed_job_notes"
+      "id, proposed_customer_first_name, proposed_customer_last_name, proposed_address_line1, proposed_city, proposed_zip, proposed_location_nickname, proposed_job_type, proposed_project_type, proposed_job_notes, proposed_permit_number, proposed_jurisdiction, proposed_permit_date"
     )
     .in("id", uniqueSubmissionIds);
 
@@ -105,7 +109,10 @@ async function buildProposalEnrichmentMap(
 
     const addressLine = String(sub?.proposed_address_line1 ?? "").trim();
     const city = String(sub?.proposed_city ?? "").trim();
-    const addressSummary = [addressLine, city].filter(Boolean).join(", ") || null;
+    const zip = String(sub?.proposed_zip ?? "").trim();
+    const addressSummary = [addressLine, city, zip].filter(Boolean).join(", ") || null;
+
+    const locationNickname = String(sub?.proposed_location_nickname ?? "").trim() || null;
 
     const rawJobType = String(sub?.proposed_job_type ?? "").trim().toLowerCase();
     const jobTypeLabel =
@@ -113,16 +120,35 @@ async function buildProposalEnrichmentMap(
       rawJobType === "service" ? "Service" :
       rawJobType || null;
 
+    const rawProjectType = String(sub?.proposed_project_type ?? "").trim().toLowerCase();
+    const projectTypeLabel = rawProjectType
+      ? rawProjectType
+          .split(/[_\s]+/)
+          .filter(Boolean)
+          .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+          .join(" ")
+      : null;
+
     const rawNotes = String(sub?.proposed_job_notes ?? "").trim();
     const notesPreview = rawNotes
       ? rawNotes.length > 100 ? rawNotes.slice(0, 100) + "\u2026" : rawNotes
       : null;
 
+    const hasPermitDetails = Boolean(
+      String(sub?.proposed_permit_number ?? "").trim() ||
+      String(sub?.proposed_jurisdiction ?? "").trim() ||
+      String(sub?.proposed_permit_date ?? "").trim()
+    );
+
     enrichmentMap.set(submissionId, {
       contractor_name: contractorName,
       customer_name: customerName,
       address_summary: addressSummary,
+      location_nickname: locationNickname,
       job_type_label: jobTypeLabel,
+      project_type_label: projectTypeLabel,
+      has_permit_details: hasPermitDetails,
+      has_notes: Boolean(rawNotes),
       notes_preview: notesPreview,
     });
   }
