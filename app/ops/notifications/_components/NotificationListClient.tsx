@@ -3,9 +3,8 @@
 import type { NotificationRowForUI, ProposalEnrichment } from "@/lib/actions/notification-read-actions";
 import {
   isContractorUpdateNotificationType,
-  isNewJobNotificationType,
 } from "@/lib/notifications/internal-awareness";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 
 type NotificationListClientProps = {
@@ -15,7 +14,17 @@ type NotificationListClientProps = {
 };
 
 function isProposalNotificationType(value: string | null | undefined): boolean {
-  return isNewJobNotificationType(value);
+  const type = String(value ?? "").trim().toLowerCase();
+  return (
+    type === "contractor_intake_proposal_submitted" ||
+    type === "internal_contractor_intake_proposal_email"
+  );
+}
+
+function formatSubmittedAt(value: string) {
+  const submittedAt = new Date(value);
+  if (!Number.isFinite(submittedAt.getTime())) return null;
+  return format(submittedAt, "MMM d, yyyy h:mm a");
 }
 
 const CONTRACTOR_UPDATE_EVENT_HEADLINES: Record<string, string> = {
@@ -164,7 +173,12 @@ function ProposalCard({
     ? `New Proposal from ${enrichment.contractor_name}`
     : "New Contractor Intake Proposal";
 
-  const hasDetails = !!(enrichment?.customer_name || enrichment?.address_summary);
+  const hasDetails = !!(
+    enrichment?.customer_name ||
+    enrichment?.location_nickname ||
+    enrichment?.address_summary
+  );
+  const submittedAtLabel = formatSubmittedAt(notif.created_at);
 
   return (
     <div
@@ -205,6 +219,14 @@ function ProposalCard({
                   <span className="font-medium">{enrichment.customer_name}</span>
                 </p>
               )}
+              {enrichment?.location_nickname && (
+                <p className="flex items-baseline gap-1.5 text-sm text-slate-700">
+                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    Location
+                  </span>
+                  <span>{enrichment.location_nickname}</span>
+                </p>
+              )}
               {enrichment?.address_summary && (
                 <p className="flex items-baseline gap-1.5 text-sm text-slate-700">
                   <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -230,11 +252,23 @@ function ProposalCard({
                 {enrichment.job_type_label}
               </span>
             )}
+            {enrichment?.project_type_label && (
+              <span className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                {enrichment.project_type_label}
+              </span>
+            )}
             <span className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
               Intake Proposal
             </span>
+            {enrichment?.has_permit_details && (
+              <span className="text-[11px] text-slate-400">Permit provided</span>
+            )}
+            {enrichment?.has_notes && (
+              <span className="text-[11px] text-slate-400">Notes included</span>
+            )}
             <span className="text-[12px] text-slate-400">
               {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true })}
+              {submittedAtLabel ? ` · ${submittedAtLabel}` : ""}
             </span>
           </div>
         </div>
