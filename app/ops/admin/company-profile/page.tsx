@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { saveInternalBusinessProfileFromForm } from "@/lib/actions/internal-business-profile-actions";
+import { resolveAccountReadiness } from "@/lib/business/account-readiness";
 import {
   DEFAULT_BILLING_MODE,
   getInternalBusinessProfileByAccountOwnerId,
@@ -74,6 +75,8 @@ export default async function AdminCompanyProfilePage({
     }),
     resolveAccountEntitlement(internalUser.account_owner_user_id, supabase),
   ]);
+  const readiness = await resolveAccountReadiness(internalUser.account_owner_user_id, supabase);
+  const incompleteRequiredItems = readiness.items.filter((item) => item.status === "incomplete");
   const currentLogoUrl = await resolveInternalBusinessProfileLogoUrl({
     logoUrl: profile?.logo_url ?? null,
   });
@@ -114,6 +117,32 @@ export default async function AdminCompanyProfilePage({
           {notice.message}
         </div>
       ) : null}
+
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="font-semibold text-slate-900">Account setup</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+            {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required complete
+          </div>
+        </div>
+        {readiness.isOperationallyReady ? (
+          <div className="mt-1 font-medium text-emerald-700">Ready for operations</div>
+        ) : (
+          <div className="mt-2 space-y-1">
+            <div className="font-medium text-amber-700">Needs setup</div>
+            {incompleteRequiredItems.map((item) => (
+              <div key={item.key} className="flex flex-wrap items-center gap-2 text-slate-700">
+                <span>Missing: {item.label}</span>
+                {item.href ? (
+                  <Link href={item.href} className="text-xs font-semibold text-slate-900 underline-offset-2 hover:underline">
+                    Open
+                  </Link>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">

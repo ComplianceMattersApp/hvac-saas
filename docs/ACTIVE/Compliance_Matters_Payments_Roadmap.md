@@ -204,8 +204,8 @@ Includes:
 - job-level invoice reference / invoice-complete markers
 - billing-aware closeout visibility
 
-### Phase P1 — Payment-ready foundation (build now)
-This is the current implementation phase.
+### Phase P1 — Payment-ready foundation (closed)
+This phase is complete enough to close at the current stabilized baseline.
 
 Clarification:
 P1 is the phase that introduces the real invoice/payment-domain seam. It should not be read as meaning that full invoice/payment domain tables or fields already exist in the current implemented repo baseline.
@@ -264,6 +264,10 @@ Completed P1 foundation work (V1):
 - Last Payment Date now renders as a clean report date (not a raw ISO timestamp).
 - This is reporting/visibility only and does not introduce payment execution, Stripe checkout, QBO sync, or portal payment UX.
 
+**Final closeout-quality test fidelity polish**
+- Collected-payment report tests now validate production report read-model behavior directly (`listInvoiceLedgerRows` and `buildInvoiceLedgerCsv`) instead of duplicated local aggregation logic.
+- Closeout test coverage now directly guards production payment-column mapping and CSV projection behavior.
+
 Locked clarification:
 Invoice send/resend/tracking in this phase is allowed only as a billing communication seam attached to the invoice record. It is not live payment execution, not Stripe checkout, not card/ACH collection, not refund/dispute handling, not contractor payout flow, and not QBO-led billing.
 
@@ -277,11 +281,12 @@ Does **not** include:
 - refunds through processor
 
 ### Phase P2 — Customer payment acceptance (later)
-First live processor phase.
+First live processor phase, currently a planning target rather than immediate implementation.
 
 Locked carry-forward clarification:
 - Dashboard payment/cash-performance analytics expansion remains deferred.
 - Customer payment acceptance remains a later P2 Stripe-first implementation.
+- Platform subscription billing execution remains a separate future platform-billing track and is not part of tenant internal invoice collected-payment tracking rollout.
 
 Recommended first scope:
 - customer pays invoice online

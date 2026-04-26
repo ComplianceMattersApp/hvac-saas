@@ -29,8 +29,15 @@ If any item here conflicts with the active spine, the spine wins.
 
 ### 2.3 Payment/live enablement readiness
 - Confirm launch posture remains `payment-ready by design, payment-active later` unless explicitly changed.
+- Confirm Phase P1 payment-ready foundation is complete, while live processor-backed payment execution remains later/pre-launch enablement work.
 - Verify no UI implies live processor-backed payment collection before it truly exists.
 - Confirm Stripe-first future direction and QBO-optional boundary remain intact.
+
+### 2.4 First owner onboarding/provisioning readiness
+- Confirm V1 first company/account onboarding remains invite-only and platform-admin provisioned.
+- Confirm public self-signup remains intentionally deferred for a later SaaS growth phase.
+- Confirm first-owner acceptance flow establishes/validates auth user, internal membership, account owner relationship, internal business profile, entitlement row, default billing mode, and readiness setup handoff.
+- Confirm first owner lands in Admin Center/setup-readiness flow rather than an undefined post-auth destination.
 
 ---
 

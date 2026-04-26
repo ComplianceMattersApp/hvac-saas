@@ -52,6 +52,9 @@ It extends it.
 	- platform entitlement = platform account truth (`platform_account_entitlements`)
 - This status update does not introduce payment execution, Stripe checkout, QBO sync, or dashboard payment analytics expansion.
 
+P1 closeout note:
+- Phase P1 payment-ready foundation is now complete enough to close at the current baseline, with final closeout-quality test fidelity polish completed on collected-payment report projections.
+
 ### Locked rule
 Business-layer modules must not collapse, overwrite, or blur operational ownership boundaries.
 
@@ -175,6 +178,37 @@ may rely on company context as the business-facing identity foundation.
 
 ### Locked rule
 Company profile is not the next unresolved model decision in this roadmap.
+
+### 6.1 First owner onboarding / account provisioning V1 (planning direction)
+
+For V1 launch readiness, onboarding direction is invite-only / platform-admin provisioned for first company/account ownership setup.
+
+V1 direction:
+- platform/admin provisions the company/account shell
+- first owner is invited
+- first owner accepts invite and sets password
+- system confirms auth + internal membership + owner relationship + business profile + entitlement + default billing mode + readiness setup state
+- first owner lands in Admin Center readiness setup flow
+
+Why this direction:
+- avoids orphaned tenant/company records
+- prevents uncontrolled public-signup clutter during early launch
+- keeps account-owner boundaries controlled around `account_owner_user_id`
+- keeps support/onboarding quality intentional
+
+Public self-signup is explicitly deferred to a later SaaS growth phase.
+
+Deferred-later public-signup capability may include:
+- start trial
+- email verification
+- company profile creation
+- owner account creation
+- platform entitlement creation
+- readiness-checklist onboarding
+- optional Stripe subscription connection only if separately enabled later
+
+Packaged-app note:
+- if Compliance Matters is later packaged as an app, authentication still relies on the same server-side account provisioning/auth model; app shell packaging does not replace tenant onboarding or ownership setup.
 
 ---
 
