@@ -12,7 +12,7 @@ export default function SystemLocationPicker({ systems }: { systems: SystemRow[]
   return (
     <div className="grid gap-1">
       <label className="text-sm font-medium text-gray-900" htmlFor="system_location">
-        System Location (required)
+        System Label (required)
       </label>
 
       {systems && systems.length > 0 ? (

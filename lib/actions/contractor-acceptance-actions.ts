@@ -67,7 +67,7 @@ async function assertScopedInviteContractorBoundary(params: {
 
   const { data: contractor, error: contractorErr } = await admin
     .from("contractors")
-    .select("id, owner_user_id")
+    .select("id, owner_user_id, lifecycle_state")
     .eq("id", invite.contractor_id)
     .maybeSingle();
 
@@ -77,9 +77,16 @@ async function assertScopedInviteContractorBoundary(params: {
 
   const contractorOwnerUserId = String((contractor as any)?.owner_user_id ?? "").trim();
   const inviteOwnerUserId = String(invite.owner_user_id ?? "").trim();
+  const lifecycleState = String((contractor as any)?.lifecycle_state ?? "active")
+    .trim()
+    .toLowerCase();
 
   if (!contractor?.id || !contractorOwnerUserId || contractorOwnerUserId !== inviteOwnerUserId) {
     throw new Error("INVITE_SCOPE_INVALID");
+  }
+
+  if (lifecycleState !== "active") {
+    throw new Error("INVITE_CONTRACTOR_ARCHIVED");
   }
 }
 
@@ -217,20 +224,33 @@ export async function ensureContractorMembershipFromInvite(): Promise<{
     // No pending invite — check if this user already has a membership row.
     const { data: existing } = await admin
       .from("contractor_users")
-      .select("contractor_id")
+      .select("contractor_id, contractors ( lifecycle_state )")
       .eq("user_id", user.id)
       .limit(1)
       .maybeSingle();
 
-    return { isContractor: !!existing?.contractor_id };
+    const lifecycleState = String((existing as any)?.contractors?.lifecycle_state ?? "active")
+      .trim()
+      .toLowerCase();
+
+    return {
+      isContractor: !!existing?.contractor_id && lifecycleState === "active",
+      error:
+        existing?.contractor_id && lifecycleState !== "active"
+          ? "INVITE_CONTRACTOR_ARCHIVED"
+          : undefined,
+    };
   }
 
   try {
     await assertScopedInviteContractorBoundary({ admin, invite });
-  } catch {
+  } catch (error) {
     return {
       isContractor: false,
-      error: "INVITE_SCOPE_INVALID",
+      error:
+        error instanceof Error && error.message === "INVITE_CONTRACTOR_ARCHIVED"
+          ? "INVITE_CONTRACTOR_ARCHIVED"
+          : "INVITE_SCOPE_INVALID",
     };
   }
 

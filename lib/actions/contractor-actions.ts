@@ -272,3 +272,87 @@ export async function createQuickContractorFromForm(formData: FormData) {
   revalidatePath("/ops/admin/contractors");
   redirect(withNotice("/ops/admin/contractors", notice));
 }
+
+export async function archiveContractorFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { accountOwnerUserId, internalUser } = await requireInternalAdminContractorMutationContext({
+    supabase,
+  });
+
+  const contractor_id = String(formData.get("contractor_id") ?? "").trim();
+  if (!contractor_id) throw new Error("Missing contractor_id");
+
+  const archivedReason = String(formData.get("archived_reason") ?? "").trim() || null;
+
+  await requireScopedContractorEdgeMutation({
+    accountOwnerUserId,
+    contractorId: contractor_id,
+  });
+
+  const { error } = await supabase
+    .from("contractors")
+    .update({
+      lifecycle_state: "archived",
+      archived_at: new Date().toISOString(),
+      archived_by_user_id: internalUser.user_id,
+      archived_reason: archivedReason,
+    })
+    .eq("id", contractor_id)
+    .eq("owner_user_id", accountOwnerUserId);
+
+  if (error) throw new Error(error.message);
+
+  // Revoke open invites without deleting invite history.
+  const { error: inviteErr } = await supabase
+    .from("contractor_invites")
+    .update({ status: "revoked" })
+    .eq("owner_user_id", accountOwnerUserId)
+    .eq("contractor_id", contractor_id)
+    .eq("status", "pending");
+
+  if (inviteErr) throw new Error(inviteErr.message);
+
+  revalidatePath("/ops/admin/contractors");
+  revalidatePath(`/contractors/${contractor_id}/edit`);
+  revalidatePath("/ops");
+  revalidatePath("/jobs");
+  revalidatePath("/portal");
+
+  redirect(`/contractors/${contractor_id}/edit?saved=1&notice=contractor_archived`);
+}
+
+export async function unarchiveContractorFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { accountOwnerUserId } = await requireInternalAdminContractorMutationContext({
+    supabase,
+  });
+
+  const contractor_id = String(formData.get("contractor_id") ?? "").trim();
+  if (!contractor_id) throw new Error("Missing contractor_id");
+
+  await requireScopedContractorEdgeMutation({
+    accountOwnerUserId,
+    contractorId: contractor_id,
+  });
+
+  const { error } = await supabase
+    .from("contractors")
+    .update({
+      lifecycle_state: "active",
+      archived_at: null,
+      archived_by_user_id: null,
+      archived_reason: null,
+    })
+    .eq("id", contractor_id)
+    .eq("owner_user_id", accountOwnerUserId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/ops/admin/contractors");
+  revalidatePath(`/contractors/${contractor_id}/edit`);
+  revalidatePath("/ops");
+  revalidatePath("/jobs");
+  revalidatePath("/portal");
+
+  redirect(`/contractors/${contractor_id}/edit?saved=1&notice=contractor_unarchived`);
+}

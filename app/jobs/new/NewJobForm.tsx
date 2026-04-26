@@ -276,6 +276,8 @@ export default function NewJobForm({
   locationLookupRows = [],
   myContractor,
   errorCode,
+  customerContextMode = false,
+  customerContextSource = null,
 }: {
   contractors: Contractor[];
   existingCustomer?: ExistingCustomer | null;
@@ -284,12 +286,16 @@ export default function NewJobForm({
   locationLookupRows?: LocationLookupRow[];
   myContractor?: MyContractor;
   errorCode?: string | null;
+  customerContextMode?: boolean;
+  customerContextSource?: string | null;
 }) {
 
   const isContractorMode = Boolean(myContractor?.id);
   const router = useRouter();
   const isInternalMode = !isContractorMode;
   const hasSeededCustomer = Boolean(existingCustomer?.id);
+  const isCustomerContextInternalMode =
+    isInternalMode && customerContextMode && Boolean(existingCustomer?.id);
 
   const [guidedCustomerQuery, setGuidedCustomerQuery] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
@@ -297,9 +303,16 @@ export default function NewJobForm({
   );
   const [createNewCustomer, setCreateNewCustomer] = useState<boolean>(false);
   const [locationMode, setLocationMode] = useState<"existing" | "new" | null>(
-    hasSeededCustomer ? (locations.length > 0 ? "existing" : "new") : null,
+    hasSeededCustomer
+      ? (locations.length > 0 ? "existing" : "new")
+      : null,
   );
-  const [locationId, setLocationId] = useState<string>(locations.length ? locations[0].id : "");
+  const [locationId, setLocationId] = useState<string>(() => {
+    if (isCustomerContextInternalMode) {
+      return locations.length === 1 ? locations[0].id : "";
+    }
+    return locations.length ? locations[0].id : "";
+  });
   const [newLocationNickname, setNewLocationNickname] = useState("");
   const [newLocationAddressLine1, setNewLocationAddressLine1] = useState("");
   const [newLocationCity, setNewLocationCity] = useState("");
@@ -388,13 +401,42 @@ const [billingRecipient, setBillingRecipient] = useState<
   }, [isInternalMode, customerLookupRows, existingCustomer]);
 
   const customerPrimaryLocationMap = useMemo(() => {
+    const seededLocationsForContext: LocationLookupRow[] =
+      existingCustomer?.id && isCustomerContextInternalMode
+        ? locations.map((l) => ({
+            id: l.id,
+            customer_id: existingCustomer.id,
+            nickname: l.nickname,
+            address_line1: l.address_line1,
+            city: l.city,
+            state: l.state,
+            zip: l.zip,
+            postal_code: l.zip,
+          }))
+        : [];
+
     const map = new Map<string, LocationLookupRow>();
-    for (const l of locationLookupRows) {
+    for (const l of [...locationLookupRows, ...seededLocationsForContext]) {
       if (!l.customer_id || map.has(l.customer_id)) continue;
       map.set(l.customer_id, l);
     }
     return map;
-  }, [locationLookupRows]);
+  }, [existingCustomer?.id, isCustomerContextInternalMode, locationLookupRows, locations]);
+
+  const locationRowsForResolution = useMemo(() => {
+    if (!isCustomerContextInternalMode || !existingCustomer?.id) return locationLookupRows;
+
+    return locations.map((l) => ({
+      id: l.id,
+      customer_id: existingCustomer.id,
+      nickname: l.nickname,
+      address_line1: l.address_line1,
+      city: l.city,
+      state: l.state,
+      zip: l.zip,
+      postal_code: l.zip,
+    }));
+  }, [existingCustomer?.id, isCustomerContextInternalMode, locationLookupRows, locations]);
 
   const filteredGuidedCustomers = useMemo(() => {
     const q = guidedCustomerQuery.trim().toLowerCase();
@@ -483,8 +525,8 @@ const [billingRecipient, setBillingRecipient] = useState<
 
   const selectedCustomerLocations = useMemo(() => {
     if (!selectedCustomerId) return [];
-    return locationLookupRows.filter((l) => l.customer_id === selectedCustomerId);
-  }, [locationLookupRows, selectedCustomerId]);
+    return locationRowsForResolution.filter((l) => l.customer_id === selectedCustomerId);
+  }, [locationRowsForResolution, selectedCustomerId]);
 
   const selectedLocation = useMemo(
     () => selectedCustomerLocations.find((l) => l.id === locationId) ?? null,
@@ -498,6 +540,33 @@ const [billingRecipient, setBillingRecipient] = useState<
 
   const isNewLocation =
     isInternalMode && selectedCustomerId && !createNewCustomer && locationMode === "new";
+
+  const hasContextSingleLocation = isCustomerContextInternalMode && selectedCustomerLocations.length === 1;
+  const hasContextMultipleLocations = isCustomerContextInternalMode && selectedCustomerLocations.length > 1;
+  const hasContextNoLocations = isCustomerContextInternalMode && selectedCustomerLocations.length === 0;
+
+  useEffect(() => {
+    if (!isCustomerContextInternalMode) return;
+    if (selectedCustomerLocations.length === 1) {
+      const onlyLocationId = selectedCustomerLocations[0]?.id ?? "";
+      if (onlyLocationId) {
+        setLocationMode("existing");
+        setLocationId(onlyLocationId);
+      }
+      return;
+    }
+    if (selectedCustomerLocations.length === 0) {
+      setLocationMode("new");
+      setLocationId("");
+      return;
+    }
+
+    setLocationMode("existing");
+    setLocationId((current) => {
+      if (!current) return "";
+      return selectedCustomerLocations.some((location) => location.id === current) ? current : "";
+    });
+  }, [isCustomerContextInternalMode, selectedCustomerLocations]);
 
   function onQuickWindowChange(value: string) {
     if (!value) return;
@@ -520,13 +589,32 @@ const [billingRecipient, setBillingRecipient] = useState<
   const canSubmit = systemsNeedingName.length === 0;
 
   const internalResolutionReady = useMemo(() => {
+    const hasContextNewLocationDetails = Boolean(
+      newLocationAddressLine1.trim() && newLocationCity.trim() && newLocationZip.trim(),
+    );
+
     if (!isInternalMode) return true;
     if (createNewCustomer) return true;
     if (!selectedCustomerId) return false;
     if (locationMode === "existing") return Boolean(locationId);
-    if (locationMode === "new") return true;
+    if (locationMode === "new") {
+      if (isCustomerContextInternalMode) {
+        return hasContextNewLocationDetails;
+      }
+      return true;
+    }
     return false;
-  }, [createNewCustomer, isInternalMode, locationId, locationMode, selectedCustomerId]);
+  }, [
+    createNewCustomer,
+    isCustomerContextInternalMode,
+    isInternalMode,
+    locationId,
+    locationMode,
+    newLocationAddressLine1,
+    newLocationCity,
+    newLocationZip,
+    selectedCustomerId,
+  ]);
 
   const internalResolutionLabel = useMemo(() => {
     const hasNewLocationDetails = Boolean(
@@ -828,7 +916,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       const nonEmptyItems = visitScopeItems.filter((item) => item.title.trim() || item.details.trim());
       if (!hasVisitScopeContent(visitScopeSummary.trim() || null, nonEmptyItems)) {
         event.preventDefault();
-        setVisitScopeError("Add the trip reason or one Visit Scope item so the field team knows what this service visit should cover.");
+        setVisitScopeError("Add a Visit Summary or one Visit Scope item so the field team knows what this service visit should cover.");
         window.requestAnimationFrame(() => {
           visitScopeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         });
@@ -932,7 +1020,7 @@ const [billingRecipient, setBillingRecipient] = useState<
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="rounded-3xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/35 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.35)] sm:p-6">
       <h1 className="text-2xl font-semibold text-slate-900 mb-1">
         {isContractorMode ? "Intake Form" : "New Job"}
       </h1>
@@ -950,7 +1038,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             : errorCode === "contractor_proposal_submit_failed"
             ? "Could not submit your job. Please try again, or contact us if the issue persists."
             : errorCode === "visit_scope_required"
-            ? "Service jobs require a Visit Scope reason or at least one Visit Scope item."
+            ? "Service jobs require a Visit Summary or at least one Visit Scope item."
             : errorCode === "visit_scope_invalid"
             ? "Visit Scope could not be read. Please review the Visit Scope section and try again."
             : null
@@ -975,7 +1063,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       />
 
       {draftFound && (
-        <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+        <div className="mb-5 rounded-xl border border-slate-200/80 bg-white/85 p-4 space-y-3">
           <div>
             <div className="text-sm font-semibold text-slate-900">Saved draft found</div>
             <div className="mt-0.5 text-xs text-slate-500">A draft was saved on this device from a previous session.</div>
@@ -997,6 +1085,9 @@ const [billingRecipient, setBillingRecipient] = useState<
       <form action={createJobFromForm} className="space-y-8" onSubmit={handleFormSubmit} aria-busy={isSubmitting}>
         <input type="hidden" name="relationship_action" value={shouldShowRelationshipStep ? relationshipAction : "new_case"} />
         <input type="hidden" name="relationship_job_id" value={selectedRelationshipJob?.id ?? ""} />
+        {isCustomerContextInternalMode && customerContextSource ? (
+          <input type="hidden" name="intake_source" value={customerContextSource} />
+        ) : null}
         {isInternalMode ? (
           <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-5 py-5 text-white shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -1038,7 +1129,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             <input type="hidden" name="contractor_id" value={myContractor.id} />
           </>
         ) : (
-          <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+          <div className="rounded-xl border border-slate-200/80 bg-white p-4 space-y-2">
             <label className="block text-sm font-medium text-slate-900">Contractor (optional)</label>
             <select
               name="contractor_id"
@@ -1195,8 +1286,8 @@ const [billingRecipient, setBillingRecipient] = useState<
 
           {isInternalMode ? (
             <>
-              {!createNewCustomer ? (
-                <div className="rounded-[1.5rem] border border-blue-200 bg-gradient-to-b from-blue-50 via-white to-slate-50 p-5 shadow-sm ring-1 ring-blue-100/70 space-y-4">
+              {!isCustomerContextInternalMode && !createNewCustomer ? (
+                <div className="rounded-[1.5rem] border border-blue-200/85 bg-gradient-to-b from-blue-50 via-white to-slate-50 p-5 shadow-[0_16px_35px_-30px_rgba(37,99,235,0.45)] ring-1 ring-blue-100/70 space-y-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Step 1</p>
@@ -1210,7 +1301,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-blue-200 bg-white p-3 shadow-sm">
+                  <div className="rounded-xl bg-white/85 p-3 ring-1 ring-blue-200/80">
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <label htmlFor="internal_customer_finder" className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Customer Finder
@@ -1320,23 +1411,29 @@ const [billingRecipient, setBillingRecipient] = useState<
                           {formatLocationContext(selectedCustomerPrimaryLocation)}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          resetRelationshipDecision();
-                          setSelectedCustomerId("");
-                          setLocationMode(null);
-                          setLocationId("");
-                        }}
-                        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900"
-                      >
-                        Change customer
-                      </button>
+                      {!isCustomerContextInternalMode ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            resetRelationshipDecision();
+                            setSelectedCustomerId("");
+                            setLocationMode(null);
+                            setLocationId("");
+                          }}
+                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900"
+                        >
+                          Change customer
+                        </button>
+                      ) : (
+                        <span className="rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                          Locked
+                        </span>
+                      )}
                     </div>
                     <input type="hidden" name="customer_id" value={selectedCustomerId} />
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                  <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.4)] space-y-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 2</p>
                       <p className="mt-1 text-base font-semibold text-slate-900">Choose service location</p>
@@ -1345,69 +1442,113 @@ const [billingRecipient, setBillingRecipient] = useState<
                       </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          resetRelationshipDecision();
-                          setLocationMode("existing");
-                        }}
-                        className={[
-                          "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-all",
-                          locationMode === "existing"
-                            ? "border-slate-900 bg-slate-900 text-white"
-                            : "border-slate-300 bg-white text-slate-700",
-                        ].join(" ")}
-                      >
-                        Use existing location
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          resetRelationshipDecision();
-                          setLocationMode("new");
-                        }}
-                        className={[
-                          "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-all",
-                          locationMode === "new"
-                            ? "border-slate-900 bg-slate-900 text-white"
-                            : "border-slate-300 bg-white text-slate-700",
-                        ].join(" ")}
-                      >
-                        Create new location
-                      </button>
-                    </div>
+                    {isCustomerContextInternalMode ? (
+                      <>
+                        {hasContextSingleLocation ? (
+                          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-900">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Using saved location</p>
+                            <p className="mt-1 font-medium text-slate-900">{formatLocationContext(selectedCustomerLocations[0])}</p>
+                            {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
+                          </div>
+                        ) : null}
 
-                    {locationMode === "existing" ? (
-                      selectedCustomerLocations.length > 0 ? (
-                        <>
-                          <select
-                            className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
-                            value={locationId}
-                            onChange={(e) => {
+                        {hasContextMultipleLocations ? (
+                          <>
+                            <select
+                              className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
+                              value={locationId}
+                              onChange={(e) => {
+                                resetRelationshipDecision();
+                                setLocationId(e.target.value);
+                              }}
+                            >
+                              <option value="">Select saved location...</option>
+                              {selectedCustomerLocations.map((l) => (
+                                <option key={l.id} value={l.id}>
+                                  {(l.nickname ? `${l.nickname} - ` : "") +
+                                    (l.address_line1 ?? "Address") +
+                                    ", " +
+                                    [l.city, l.state, l.zip || l.postal_code].filter(Boolean).join(" ")}
+                                </option>
+                              ))}
+                            </select>
+                            {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
+                          </>
+                        ) : null}
+
+                        {hasContextNoLocations ? (
+                          <div className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-3 text-sm text-blue-900">
+                            No saved locations found. Add the first service location to continue.
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
                               resetRelationshipDecision();
-                              setLocationId(e.target.value);
+                              setLocationMode("existing");
                             }}
+                            className={[
+                              "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-all",
+                              locationMode === "existing"
+                                ? "border-slate-900 bg-slate-900 text-white"
+                                : "border-slate-300 bg-white text-slate-700",
+                            ].join(" ")}
                           >
-                            <option value="">Select existing location...</option>
-                            {selectedCustomerLocations.map((l) => (
-                              <option key={l.id} value={l.id}>
-                                {(l.nickname ? `${l.nickname} - ` : "") +
-                                  (l.address_line1 ?? "Address") +
-                                  ", " +
-                                  [l.city, l.state, l.zip || l.postal_code].filter(Boolean).join(" ")}
-                              </option>
-                            ))}
-                          </select>
-                          {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
-                        </>
-                      ) : (
-                        <p className="text-xs text-slate-500">No saved locations for this customer. Choose Create new location.</p>
-                      )
-                    ) : null}
+                            Use existing location
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              resetRelationshipDecision();
+                              setLocationMode("new");
+                            }}
+                            className={[
+                              "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-all",
+                              locationMode === "new"
+                                ? "border-slate-900 bg-slate-900 text-white"
+                                : "border-slate-300 bg-white text-slate-700",
+                            ].join(" ")}
+                          >
+                            Create new location
+                          </button>
+                        </div>
+
+                        {locationMode === "existing" ? (
+                          selectedCustomerLocations.length > 0 ? (
+                            <>
+                              <select
+                                className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
+                                value={locationId}
+                                onChange={(e) => {
+                                  resetRelationshipDecision();
+                                  setLocationId(e.target.value);
+                                }}
+                              >
+                                <option value="">Select existing location...</option>
+                                {selectedCustomerLocations.map((l) => (
+                                  <option key={l.id} value={l.id}>
+                                    {(l.nickname ? `${l.nickname} - ` : "") +
+                                      (l.address_line1 ?? "Address") +
+                                      ", " +
+                                      [l.city, l.state, l.zip || l.postal_code].filter(Boolean).join(" ")}
+                                  </option>
+                                ))}
+                              </select>
+                              {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
+                            </>
+                          ) : (
+                            <p className="text-xs text-slate-500">No saved locations for this customer. Choose Create new location.</p>
+                          )
+                        ) : null}
+                      </>
+                    )}
 
                     {isNewLocation ? (
-                      <div className="mt-1 space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="mt-1 space-y-2 rounded-xl bg-slate-50/70 p-3 ring-1 ring-slate-200/80">
                         <input
                           className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
                           name="location_nickname"
@@ -1455,10 +1596,10 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </div>
               ) : null}
 
-              {createNewCustomer ? (
+              {!isCustomerContextInternalMode && createNewCustomer ? (
                 <div
                   ref={createNewCustomerCardRef}
-                  className="rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-white p-4 shadow-sm space-y-3 scroll-mt-6"
+                  className="rounded-2xl border border-amber-200/85 bg-gradient-to-b from-amber-50 to-white p-4 shadow-[0_14px_28px_-28px_rgba(217,119,6,0.5)] space-y-3 scroll-mt-6"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -1650,14 +1791,14 @@ const [billingRecipient, setBillingRecipient] = useState<
 
         {isInternalMode && internalResolutionReady ? (
           <section className="space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 3</p>
                 <h2 className="mt-1 text-lg font-semibold text-slate-900">Job family</h2>
                 <p className="mt-1 text-sm text-slate-500">Choose ECC or Service first so any relationship review stays inside the right intake lane.</p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+              <div className="space-y-3">
                 <label className="block text-sm font-medium text-slate-900">Job Family</label>
                 <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
                   <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:bg-slate-100 sm:flex-1">
@@ -1693,7 +1834,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               </div>
 
               {jobType !== "service" ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-2">
+                <div className="border-t border-slate-200/80 pt-4 space-y-2">
                   <label className="block text-sm font-medium text-slate-900">Project Type (ECC)</label>
                   <select
                     name="project_type"
@@ -1709,14 +1850,17 @@ const [billingRecipient, setBillingRecipient] = useState<
               ) : null}
 
               {jobType === "service" ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                <div className="border-t border-slate-200/80 pt-4 space-y-3">
                   <div>
                     <label className="block text-sm font-medium text-slate-900">Service Details</label>
-                    <p className="mt-1 text-xs text-slate-500">Keep the structured Service fields here. Visit Scope comes next to clarify what this field trip covers.</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Service Type sets the broader service context. Visit Type sets this trip purpose. Visit Scope below defines the exact work on site.
+                    </p>
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
+                      <p className="mb-1.5 text-[11px] leading-5 text-slate-500">Case/business context for this service relationship.</p>
                       <select
                         name="service_case_kind"
                         className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
@@ -1736,6 +1880,7 @@ const [billingRecipient, setBillingRecipient] = useState<
 
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-700">Visit Type</label>
+                      <p className="mb-1.5 text-[11px] leading-5 text-slate-500">Trip purpose for this specific field visit.</p>
                       <select
                         name="service_visit_type"
                         className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
@@ -1751,11 +1896,11 @@ const [billingRecipient, setBillingRecipient] = useState<
                           )
                         }
                       >
-                        <option value="diagnostic">Diagnostic</option>
-                        <option value="repair">Repair</option>
+                        <option value="diagnostic">Initial / Diagnostic Visit</option>
+                        <option value="repair">Service Work Visit</option>
                         <option value="return_visit">Return Visit</option>
-                        <option value="callback">Callback</option>
-                        <option value="maintenance">Maintenance</option>
+                        <option value="callback">Callback Visit</option>
+                        <option value="maintenance">Maintenance Visit</option>
                       </select>
                     </div>
                   </div>
@@ -1768,7 +1913,7 @@ const [billingRecipient, setBillingRecipient] = useState<
 
         {shouldShowRelationshipStep ? (
           <section className="space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 4</p>
                 <h2 className="mt-1 text-lg font-semibold text-slate-900">Relationship path</h2>
@@ -1786,7 +1931,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   }}
                   disabled={!relationshipContext.activeJobs.length && !isRelationshipPending}
                   className={[
-                    "rounded-2xl border px-4 py-3 text-left shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-60",
+                    "rounded-2xl border px-4 py-3 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60",
                     relationshipAction === "open_active_job"
                       ? "border-slate-900 bg-slate-900 text-white"
                       : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
@@ -1803,7 +1948,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   onClick={() => setRelationshipAction("create_follow_up")}
                   disabled={!relationshipJobs.length && !isRelationshipPending}
                   className={[
-                    "rounded-2xl border px-4 py-3 text-left shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-60",
+                    "rounded-2xl border px-4 py-3 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60",
                     relationshipAction === "create_follow_up"
                       ? "border-slate-900 bg-slate-900 text-white"
                       : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
@@ -1822,7 +1967,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                     setRelationshipJobId("");
                   }}
                   className={[
-                    "rounded-2xl border px-4 py-3 text-left shadow-sm transition-all",
+                    "rounded-2xl border px-4 py-3 text-left transition-all",
                     relationshipAction === "new_case"
                       ? "border-slate-900 bg-slate-900 text-white"
                       : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
@@ -1836,19 +1981,19 @@ const [billingRecipient, setBillingRecipient] = useState<
               </div>
 
               {isRelationshipPending ? (
-                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+                <div className="rounded-xl border border-slate-200/80 bg-white/90 px-4 py-3 text-sm text-slate-600">
                   Loading existing work at this location...
                 </div>
               ) : null}
 
               {relationshipError ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                   {relationshipError}
                 </div>
               ) : null}
 
               {relationshipAction === "open_active_job" ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                <div className="rounded-xl bg-white/80 p-4 ring-1 ring-slate-200/85 space-y-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">Choose the active job to open</p>
                     <p className="mt-1 text-xs text-slate-500">Click one active job row to select it. Then submit to open that job directly. No new visit will be created.</p>
@@ -1861,7 +2006,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                           type="button"
                           onClick={() => setRelationshipJobId(job.id)}
                           className={[
-                            "w-full rounded-xl border px-3 py-3 text-left shadow-sm transition-all",
+                            "w-full rounded-xl border px-3 py-3 text-left transition-all",
                             relationshipJobId === job.id
                               ? "border-slate-900 bg-slate-900 text-white"
                               : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white",
@@ -1894,7 +2039,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               ) : null}
 
               {relationshipAction === "create_follow_up" ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                <div className="rounded-xl bg-white/80 p-4 ring-1 ring-slate-200/85 space-y-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">Choose the job to anchor this follow-up</p>
                     <p className="mt-1 text-xs text-slate-500">Select one existing job below. The new visit will stay in that work chain instead of creating a brand-new case.</p>
@@ -1913,7 +2058,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                               type="button"
                               onClick={() => setRelationshipJobId(job.id)}
                               className={[
-                                "w-full rounded-xl border px-3 py-3 text-left shadow-sm transition-all",
+                                "w-full rounded-xl border px-3 py-3 text-left transition-all",
                                 relationshipJobId === job.id
                                   ? "border-slate-900 bg-slate-900 text-white"
                                   : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white",
@@ -1950,7 +2095,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                               type="button"
                               onClick={() => setRelationshipJobId(job.id)}
                               className={[
-                                "w-full rounded-xl border px-3 py-3 text-left shadow-sm transition-all",
+                                "w-full rounded-xl border px-3 py-3 text-left transition-all",
                                 relationshipJobId === job.id
                                   ? "border-slate-900 bg-slate-900 text-white"
                                   : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white",
@@ -2016,7 +2161,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <h2 className="mt-1 text-lg font-semibold text-slate-900">Visit scope and job details</h2>
                   <p className="mt-1 text-sm text-slate-500">
                     {jobType === "service"
-                      ? "Define why this service trip exists, what belongs to it, and the minimum job details needed to dispatch cleanly."
+                      ? "Capture a short trip summary, then list what belongs in this visit."
                       : "Add any known context for the ECC trip, then capture only the minimum job details needed to dispatch cleanly."}
                   </p>
                 </div>
@@ -2027,33 +2172,15 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </div>
               )}
               {isInternalMode ? (
-                <div className={`rounded-2xl border bg-white p-4 shadow-sm space-y-3 ${visitScopeError ? "border-red-300 ring-2 ring-red-100" : "border-slate-200"}`}>
+                <div className={`rounded-2xl border bg-white p-4 shadow-sm space-y-3 ${visitScopeError ? "border-red-300 ring-2 ring-red-100" : "border-slate-200/85"}`}>
                   <div>
                     <h3 className="text-base font-semibold text-slate-900">Visit Scope</h3>
                     <p className="mt-1 text-sm text-slate-500">
                       {jobType === "service"
-                        ? "Set the trip reason, what belongs to this service visit, and what the tech should finish before leaving."
+                        ? "Add a short summary and the scope items that define this trip."
                         : "Optional for ECC intake. The inspection or test type already defines the trip; use Visit Scope only for extra context when it helps."}
                     </p>
                   </div>
-                  {jobType === "service" ? (
-                    <>
-                      <div className="flex flex-wrap gap-2 text-[11px] font-medium text-slate-600">
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
-                          Why this trip exists
-                        </span>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
-                          What belongs to this trip
-                        </span>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
-                          What gets done before leaving
-                        </span>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs text-slate-600">
-                        Service fields stay structured above. Use Visit Scope to clarify the field-facing trip plan.
-                      </div>
-                    </>
-                  ) : null}
                   <VisitScopeBuilder
                     initialSummary={visitScopeSummary}
                     initialItems={visitScopeItems}
@@ -2092,6 +2219,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 hideCustomer
                 hideServiceLocation
                 jobType={jobType}
+                showJobDetails={jobType !== "service"}
                 showCustomerSection={false}
                 showServiceLocationSection={false}
                 showNotesSection={false}
@@ -2111,7 +2239,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Scheduling</h2>
                 )}
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                <div className="rounded-2xl border border-slate-200/85 bg-white p-4 shadow-sm space-y-3">
                   <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Scheduled Date</label>
                   <input
                     type="date"
@@ -2168,11 +2296,11 @@ const [billingRecipient, setBillingRecipient] = useState<
             {/* Billing Recipient */}
             <section className="space-y-3">
               {isInternalMode ? null : <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Billing</h2>}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 shadow-sm space-y-3">
+              <div className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm space-y-3">
                 <label className="block text-sm font-medium text-slate-900">Billing Recipient</label>
 
             <div className="flex flex-col gap-2">
-              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                 <input
                   type="radio"
                   name="_billingRecipientUi"
@@ -2187,7 +2315,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 )}
               </label>
 
-              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                 <input
                   type="radio"
                   name="_billingRecipientUi"
@@ -2198,7 +2326,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 Customer / Homeowner
               </label>
 
-              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                 <input
                   type="radio"
                   name="_billingRecipientUi"
@@ -2213,7 +2341,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             <input type="hidden" name="billing_recipient" value={billingRecipient} />
 
             {billingRecipient === "other" && (
-              <div className="mt-2 space-y-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="mt-2 space-y-2 rounded-xl bg-white p-3 ring-1 ring-slate-200/80">
                 <div className="text-xs text-slate-600">
                   If billing is Other, please enter billing name + address.
                 </div>
@@ -2293,7 +2421,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               ) : (
                 <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Equipment (optional)</h2>
               )}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 shadow-sm space-y-3">
+              <div className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-slate-600">Add systems if needed. Use a clear label, such as Upstairs or Downstairs.</p>
             <button
@@ -2314,7 +2442,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             const showNameError = nameRequired && !sys.name.trim();
 
             return (
-              <div key={sys.id} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-3">
+              <div key={sys.id} className="rounded-lg border border-slate-200/80 bg-slate-50/45 p-3 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium text-slate-900">System {idx + 1}</div>
                   <button
@@ -2375,7 +2503,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 ) : (
                   <div className="space-y-3">
                     {sys.components.map((c) => (
-                      <div key={c.id} className="rounded border border-slate-200 bg-white p-2 space-y-2">
+                      <div key={c.id} className="rounded border border-slate-200/80 bg-white p-2 space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="text-sm font-medium text-slate-900">{componentLabel(c.type)}</div>
                           <button
@@ -2475,7 +2603,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             ) : null}
 
             <section className="space-y-3">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-2xl border border-slate-200/85 bg-white p-4 shadow-sm">
                 <div>
                 <h2 className="text-base font-semibold text-slate-900">Photos (optional)</h2>
                 <p className="mt-0.5 text-xs text-slate-500">Equipment photos, permit copies, or site images. JPG, PNG, or PDF.</p>
@@ -2491,7 +2619,7 @@ const [billingRecipient, setBillingRecipient] = useState<
 
             {isInternalMode ? (
             <section className="space-y-3">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-2xl border border-slate-200/85 bg-white p-4 shadow-sm">
                 <div>
                   <h2 className="text-base font-semibold text-slate-900">Additional Comments (optional)</h2>
                   {isContractorMode ? (
@@ -2522,11 +2650,11 @@ const [billingRecipient, setBillingRecipient] = useState<
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Final confidence</p>
             <p className="mt-1 text-sm text-slate-500">Quick internal check before you create the visit.</p>
             <div className="mt-3 grid gap-3 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+              <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Job</p>
                 <p className="mt-1 font-medium text-slate-900">{jobType === "service" ? "Service" : `ECC (${projectType.replaceAll("_", " ")})`}</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+              <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Customer</p>
                 <p className="mt-1 font-medium text-slate-900">
                   {createNewCustomer
@@ -2534,7 +2662,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                     : (selectedCustomer ? customerDisplayName(selectedCustomer) : "Not selected")}
                 </p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+              <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Location</p>
                 <p className="mt-1 font-medium text-slate-900">
                   {createNewCustomer || locationMode === "new"
@@ -2542,17 +2670,17 @@ const [billingRecipient, setBillingRecipient] = useState<
                     : (selectedLocation?.address_line1 || "Existing location")}
                 </p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+              <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Schedule</p>
                 <p className="mt-1 font-medium text-slate-900">
                   {scheduledDate ? `${scheduledDate}${windowStart && windowEnd ? ` ${windowStart}-${windowEnd}` : ""}` : "Unscheduled"}
                 </p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+              <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Billing</p>
                 <p className="mt-1 font-medium text-slate-900">{billingRecipientLabel}</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+              <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Visit Scope</p>
                 <p className="mt-1 font-medium text-slate-900">
                   {visitScopeSummary.trim() || visitScopeItems.find((item) => item.title.trim())?.title.trim() || "Needs review"}
@@ -2569,7 +2697,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           {isSubmitting ? "Creating job. Please wait." : ""}
         </div>
 
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm">
+        <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white/80 p-4">
           {draftMsg && !draftFound ? (
             <p className="text-right text-xs text-slate-500">{draftMsg}</p>
           ) : null}

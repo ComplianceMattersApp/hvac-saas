@@ -48,7 +48,7 @@ export async function requireCurrentContractorPortalContext(input?: {
 
   const { data: contractorUser, error: contractorErr } = await supabase
     .from("contractor_users")
-    .select("contractor_id, contractors ( id, name )")
+    .select("contractor_id, contractors ( id, name, lifecycle_state )")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -56,6 +56,11 @@ export async function requireCurrentContractorPortalContext(input?: {
 
   const contractorId = normalizeText(contractorUser?.contractor_id);
   if (!contractorId) throw resolvePortalAccessError("NOT_CONTRACTOR");
+
+  const lifecycleState = normalizeText((contractorUser as any)?.contractors?.lifecycle_state).toLowerCase();
+  if (lifecycleState && lifecycleState !== "active") {
+    throw resolvePortalAccessError("CONTRACTOR_ARCHIVED");
+  }
 
   return {
     contractorId,

@@ -80,8 +80,11 @@ Current implemented repo truth now includes:
 - job-level closeout and invoice-action tracking still used where appropriate for operational follow-up
 - dashboard invoice visibility and invoice-report drill paths where honest
 
-Not yet materially implemented in repo:
-- a mature payment/collection reporting domain with real collected-truth ownership
+Collected-payment truth is now materially implemented in repo for issued internal invoices:
+- collected-payment rows are owned by `internal_invoice_payments`
+- collected-payment visibility is implemented in the internal invoice ledger and CSV export
+
+Still not implemented/live:
 - live processor-backed payment execution
 - customer checkout / saved payment methods / refunds / disputes / payout workflows
 
@@ -208,7 +211,7 @@ Includes:
 This phase is complete enough to close at the current stabilized baseline.
 
 Clarification:
-P1 is the phase that introduces the real invoice/payment-domain seam. It should not be read as meaning that full invoice/payment domain tables or fields already exist in the current implemented repo baseline.
+P1 is the phase that introduced the real invoice/payment-domain seam and has now shipped its baseline foundation work, including manual collected-payment truth for issued internal invoices.
 
 Includes:
 - payment domain model

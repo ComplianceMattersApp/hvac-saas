@@ -68,10 +68,13 @@ function sortBySchedule(a: any, b: any) {
   const windowDiff = String(a?.window_start ?? "").localeCompare(String(b?.window_start ?? ""));
   if (windowDiff !== 0) return windowDiff;
 
-  return String(a?.title ?? "").localeCompare(String(b?.title ?? ""), undefined, {
+  const titleDiff = String(a?.title ?? "").localeCompare(String(b?.title ?? ""), undefined, {
     sensitivity: "base",
     numeric: true,
   });
+  if (titleDiff !== 0) return titleDiff;
+
+  return String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
 }
 
 function isLifecycleComplete(job: any) {
@@ -248,38 +251,55 @@ export default async function OpsFieldPage() {
       const scheduledDate = String(job?.scheduled_date ?? "").trim();
       return !!scheduledDate && scheduledDate < today;
     })
-    .sort(sortBySchedule);
+    .sort(sortBySchedule)
+    .reverse();
 
-  const upcomingJobs = activeJobs
+  const upcomingScheduledJobs = activeJobs
     .filter((job: any) => {
       const jobId = String(job?.id ?? "");
       if (inProgressIds.has(jobId)) return false;
 
       const scheduledDate = String(job?.scheduled_date ?? "").trim();
-      return !scheduledDate || scheduledDate > today;
+      return !!scheduledDate && scheduledDate > today;
+    })
+    .sort(sortBySchedule);
+
+  const unscheduledJobs = activeJobs
+    .filter((job: any) => {
+      const jobId = String(job?.id ?? "");
+      if (inProgressIds.has(jobId)) return false;
+      if (String(job?.scheduled_date ?? "") === today) return false;
+
+      const scheduledDate = String(job?.scheduled_date ?? "").trim();
+      return !scheduledDate;
     })
     .sort(sortBySchedule);
 
   const sections = [
-    {
-      title: "Today",
-      subtitle: "Assigned visits scheduled for today.",
-      jobs: todayJobs,
-    },
     {
       title: "In Progress",
       subtitle: "Assigned jobs already underway.",
       jobs: inProgressJobs,
     },
     {
+      title: "Today",
+      subtitle: "Assigned visits scheduled for today.",
+      jobs: todayJobs,
+    },
+    {
       title: "Overdue",
-      subtitle: "Assigned visits scheduled before today and not yet in progress.",
+      subtitle: "Assigned visits scheduled before today and not yet in progress (most recent overdue first).",
       jobs: overdueJobs,
     },
     {
       title: "Upcoming",
-      subtitle: "Assigned work scheduled after today or awaiting schedule.",
-      jobs: upcomingJobs,
+      subtitle: "Assigned upcoming scheduled work in chronological order.",
+      jobs: upcomingScheduledJobs,
+    },
+    {
+      title: "Unscheduled",
+      subtitle: "Assigned work awaiting a scheduled date.",
+      jobs: unscheduledJobs,
     },
   ];
 

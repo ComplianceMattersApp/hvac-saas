@@ -137,12 +137,17 @@ Current invoice-sent behavior remains the lightweight billing-action layer.
 Future internal invoicing is a richer optional module layered on top, not a replacement that invalidates the current workflow.
 
 ### Implemented repo truth clarification
-Current implemented repo truth is still job-level closeout and lightweight invoice-action tracking, not a full internal invoice domain.
+Current implemented repo truth includes both billing-mode paths:
+- external-billing companies still use job-level closeout and lightweight invoice-action tracking
+- internal-invoicing companies now use the internal invoice domain as billed truth
+- manual collected-payment truth exists for issued internal invoices through `internal_invoice_payments`
+- collected-payment reporting/visibility exists in the internal invoice ledger and CSV export
+- live payment execution still does not exist
 
 For current live workflows:
 - `Invoice Sent` remains the lightweight billing-action path for external-billing companies
 - `jobs.invoice_complete` remains an operational closeout marker
-- neither `Invoice Sent` nor `jobs.invoice_complete` means that a full internal invoice record exists
+- neither `Invoice Sent` nor `jobs.invoice_complete` should be treated as internal-invoice-domain truth for internal-invoicing companies
 
 Completed billing hardening slices for the current stabilized baseline:
 - the external-billing split-brain closeout seam was corrected narrowly
@@ -159,7 +164,7 @@ Intentionally deferred after these completed slices:
 ### Locked seam rule
 - jobs remain operational closeout truth
 - invoices become billed truth for internal-invoicing companies
-- payments remain later collected truth and must not become job billing truth
+- payments are collected truth (materially implemented for issued internal invoices) and must not become job billing truth
 
 ---
 
@@ -187,7 +192,7 @@ For V1 launch readiness, onboarding is invite-only / platform-admin provisioned 
 
 Implemented files:
 - `lib/business/first-owner-provisioning.ts` — idempotent provisioning helper; resolves/creates auth user → profile → `internal_users` → `internal_business_profiles` → `platform_account_entitlements`; dry-run / apply modes
-- `scripts/provision-first-owner.ts` — operator script wrapper; defaults to dry-run; apply requires explicit env allow flags
+- `scripts/provision-first-owner.ts` — operator script wrapper; defaults to dry-run; hosted `.supabase.co` targets require both allow flags for dry-run and apply as explicit remote-target confirmation
 - `lib/auth/first-owner-routing.ts` — first-owner marker detection; routes to `/ops/admin` when all anchor rows confirmed; fails closed if any row is missing
 - `app/set-password/page.tsx` — updated to call routing seam; routes first-owner to `/ops/admin`, normal internal to `/ops`, contractor to `/portal`
 
@@ -317,7 +322,21 @@ Closed milestone-1 baseline also includes:
 - ECC optional vs Service required Visit Scope behavior
 - ECC companion-scope promotion into real Service jobs
 - promoted-companion read-only visibility on internal scan surfaces
-- internal Job Title demotion with derived stored titles preserved
+- Service intake title ownership clarified:
+  - Service visit creation now treats **Job Title** as the explicit short human-facing headline for the visit.
+  - Visit Scope remains the operational work-definition layer under the job/visit model.
+  - If Job Title is blank and exactly one work item exists, the first work item may provide the derived title fallback to reduce duplicate entry.
+  - `service_visit_reason` should align to the title layer rather than a separate fuzzy summary layer.
+  - This preserves the locked business-layer distinction:
+    - Job / visit title = visit headline
+    - Visit Scope = operational work performed on the visit
+    - invoice line items = downstream billed/commercial truth
+- Practical intake rule:
+  - Service intake should not force duplicate typing when one work item already clearly expresses the visit.
+  - Preferred behavior is:
+    - user-entered Job Title when provided
+    - first-work-item-derived fallback when title is blank and one work item exists
+    - Visit Scope work items remain the detailed execution layer either way
 - milestone-1 write-path reliability cleanup for the live `jobs.updated_at` mismatch
 
 ### ECC rule

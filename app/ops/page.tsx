@@ -374,6 +374,7 @@ function shouldHideFailedParentJob(j: any) {
   const { data: contractors } = await supabase
     .from("contractors")
     .select("id, name")
+    .eq("lifecycle_state", "active")
     .order("name", { ascending: true });
 
   // Common job select (keep lightweight)

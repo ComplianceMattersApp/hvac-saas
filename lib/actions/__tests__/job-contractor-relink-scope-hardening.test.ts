@@ -4,6 +4,7 @@ const createClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 const loadScopedInternalJobForMutationMock = vi.fn();
 const loadScopedInternalContractorForMutationMock = vi.fn();
+const loadScopedActiveInternalContractorForMutationMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const refreshMock = vi.fn();
 
@@ -37,6 +38,8 @@ vi.mock("@/lib/auth/internal-job-scope", () => ({
 vi.mock("@/lib/auth/internal-contractor-scope", () => ({
   loadScopedInternalContractorForMutation: (...args: unknown[]) =>
     loadScopedInternalContractorForMutationMock(...args),
+  loadScopedActiveInternalContractorForMutation: (...args: unknown[]) =>
+    loadScopedActiveInternalContractorForMutationMock(...args),
 }));
 
 vi.mock("@/lib/actions/job-evaluator", () => ({
@@ -131,6 +134,7 @@ describe("job contractor relink same-account hardening", () => {
     });
 
     loadScopedInternalContractorForMutationMock.mockResolvedValue({ id: "contractor-2" });
+    loadScopedActiveInternalContractorForMutationMock.mockResolvedValue({ id: "contractor-2" });
   });
 
   it("denies cross-account internal updateJobContractorFromForm before jobs/job_events writes", async () => {
@@ -152,7 +156,7 @@ describe("job contractor relink same-account hardening", () => {
     const { supabase, jobsWrites, jobEventWrites } = makeWriteTrackingSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
-    loadScopedInternalContractorForMutationMock.mockResolvedValue(null);
+    loadScopedActiveInternalContractorForMutationMock.mockResolvedValue(null);
 
     const { updateJobContractorFromForm } = await import("@/lib/actions/job-actions");
 
@@ -172,7 +176,7 @@ describe("job contractor relink same-account hardening", () => {
     const { supabase, jobsWrites, jobEventWrites } = makeWriteTrackingSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
-    loadScopedInternalContractorForMutationMock.mockResolvedValue({ id: "contractor-2" });
+    loadScopedActiveInternalContractorForMutationMock.mockResolvedValue({ id: "contractor-2" });
 
     const { updateJobContractorFromForm } = await import("@/lib/actions/job-actions");
 
@@ -183,7 +187,7 @@ describe("job contractor relink same-account hardening", () => {
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
     );
-    expect(loadScopedInternalContractorForMutationMock).toHaveBeenCalledWith(
+    expect(loadScopedActiveInternalContractorForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", contractorId: "contractor-2" }),
     );
     expect(jobsWrites).toHaveLength(1);

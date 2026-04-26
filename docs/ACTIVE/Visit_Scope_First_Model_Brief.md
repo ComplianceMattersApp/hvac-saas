@@ -1,3 +1,10 @@
+Current status note (baseline):
+
+- Job detail is already mostly Visit Scope-first.
+- A helper line was added to reinforce workflow priority: "Scope first: confirm the work for this visit, then complete closeout and billing."
+- Invoice remains downstream billed/commercial truth and no billing/payment behavior changed in this note.
+- Future service-model work should focus on workflow refinement, not a model rebuild.
+
 tech do, and what scope belongs to this trip. Invoice should remain real and structured, but it should be a downstream commercial layer, not the first thing the tech sees. This fits your existing spine, which keeps jobs as the visit execution unit, service_cases as continuity, and explicitly says ECC and Service must stay separated in actionable relationship decisions.
 
 2. What we learned from HCP and competitors

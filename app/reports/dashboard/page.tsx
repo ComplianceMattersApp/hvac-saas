@@ -6,7 +6,6 @@ import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import {
   REPORT_CENTER_KPI_GRANULARITY_OPTIONS,
-  buildReportCenterKpiSearchParams,
   parseReportCenterKpiFilters,
   type ReportCenterKpiFilters,
 } from "@/lib/reports/kpi-foundation";
@@ -71,28 +70,6 @@ function parseDashboardViewState(
     visibleSections,
     density: String(densityValue ?? "").trim().toLowerCase() === "compact" ? "compact" : "comfortable",
   };
-}
-
-function buildDashboardSearchParams(filters: ReportCenterKpiFilters, viewState: DashboardViewState) {
-  const params = buildReportCenterKpiSearchParams(filters);
-
-  if (viewState.density === "compact") {
-    params.set("density", "compact");
-  }
-
-  const defaultSections = DASHBOARD_SECTION_OPTIONS.map((option) => option.value);
-  const normalizedSections = Array.from(new Set(viewState.visibleSections));
-  const usesDefaultSections =
-    normalizedSections.length === defaultSections.length &&
-    defaultSections.every((section) => normalizedSections.includes(section));
-
-  if (!usesDefaultSections) {
-    for (const section of normalizedSections) {
-      params.append("section", section);
-    }
-  }
-
-  return params;
 }
 
 function hasVisibleSection(viewState: DashboardViewState, section: DashboardSectionKey) {
@@ -444,8 +421,6 @@ export default async function ReportCenterDashboardPage({
     accountOwnerUserId: internalUser.account_owner_user_id,
     filters,
   });
-  const dashboardSearchParams = buildDashboardSearchParams(filters, viewState);
-  const shareHref = `/reports/dashboard?${dashboardSearchParams.toString()}`;
   const operationsLedgerHref = buildOperationsLedgerHref(filters);
   const operationsExportHref = buildOperationsExportHref(filters);
   const closeoutLedgerHref = buildCloseoutLedgerHref(filters);
@@ -473,79 +448,70 @@ export default async function ReportCenterDashboardPage({
       <ReportCenterTabs current="dashboard" />
 
       <section className={`rounded-[24px] border border-slate-200/90 bg-slate-50/80 ${classes.section} shadow-[0_18px_32px_-30px_rgba(15,23,42,0.3)]`}>
-        <form action="/reports/dashboard" method="get" className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="grid gap-3 md:grid-cols-3 lg:min-w-[46rem]">
-            <label className="grid gap-1 text-sm text-slate-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Granularity</span>
-              <select name="granularity" defaultValue={filters.granularity} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
-                {REPORT_CENTER_KPI_GRANULARITY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
+        <form action="/reports/dashboard" method="get" className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+            <div className="grid gap-3 sm:grid-cols-3 xl:flex-1 xl:min-w-[44rem]">
+              <label className="grid gap-1 text-sm text-slate-700">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Granularity</span>
+                <select name="granularity" defaultValue={filters.granularity} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                  {REPORT_CENTER_KPI_GRANULARITY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
 
-            <label className="grid gap-1 text-sm text-slate-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">From</span>
-              <input name="from" type="date" defaultValue={filters.fromDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
-            </label>
+              <label className="grid gap-1 text-sm text-slate-700">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">From</span>
+                <input name="from" type="date" defaultValue={filters.fromDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              </label>
 
-            <label className="grid gap-1 text-sm text-slate-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">To</span>
-              <input name="to" type="date" defaultValue={filters.toDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
-            </label>
+              <label className="grid gap-1 text-sm text-slate-700">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">To</span>
+                <input name="to" type="date" defaultValue={filters.toDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-end gap-2 xl:justify-end">
+              <button type="submit" className="inline-flex min-h-10 items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+                Apply range
+              </button>
+              <Link href="/reports/dashboard" className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+                Reset
+              </Link>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-end gap-2 lg:justify-end">
-            <button type="submit" className="inline-flex min-h-10 items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
-              Apply range
-            </button>
-            <Link href="/reports/dashboard" className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
-              Reset
-            </Link>
-            <Link href={shareHref} className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
-              Copyable URL
-            </Link>
-          </div>
-
-          <div className="w-full lg:max-w-[34rem]">
-            <details className="rounded-[20px] border border-slate-200 bg-white/80 p-3.5">
-              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
-                View controls
-              </summary>
-              <div className="mt-3 space-y-3">
-                <label className="grid gap-1 text-sm text-slate-700 md:max-w-[12rem]">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Density</span>
-                  <select name="density" defaultValue={viewState.density} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
-                    <option value="comfortable">Comfortable</option>
-                    <option value="compact">Compact</option>
-                  </select>
-                </label>
-                <fieldset className="space-y-2">
-                  <legend className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Visible sections</legend>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {DASHBOARD_SECTION_OPTIONS.map((option) => (
-                      <label key={option.value} className="inline-flex items-center gap-2 text-sm text-slate-700">
-                        <input
-                          type="checkbox"
-                          name="section"
-                          value={option.value}
-                          defaultChecked={hasVisibleSection(viewState, option.value)}
-                          className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300"
-                        />
-                        <span>{option.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                <div className="border-t border-slate-200 pt-3 text-xs leading-5 text-slate-500">
-                  Internal reference only. {" "}
-                  <Link href={`/reports/kpis?${buildReportCenterKpiSearchParams(filters).toString()}`} className="font-semibold text-slate-700 underline underline-offset-2 transition-colors hover:text-slate-900">
-                    Open KPI Reference
-                  </Link>
+          <details className="rounded-xl border border-slate-200 bg-white/90">
+            <summary className="cursor-pointer list-none px-3 py-2.5 text-sm font-semibold text-slate-900">
+              View controls
+            </summary>
+            <div className="grid gap-3 border-t border-slate-200 px-3 py-3 lg:grid-cols-[minmax(11rem,13rem)_minmax(0,1fr)] lg:items-start">
+              <label className="grid gap-1 text-sm text-slate-700">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Density</span>
+                <select name="density" defaultValue={viewState.density} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                  <option value="comfortable">Comfortable</option>
+                  <option value="compact">Compact</option>
+                </select>
+              </label>
+              <fieldset className="space-y-2">
+                <legend className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Visible sections</legend>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {DASHBOARD_SECTION_OPTIONS.map((option) => (
+                    <label key={option.value} className="inline-flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        name="section"
+                        value={option.value}
+                        defaultChecked={hasVisibleSection(viewState, option.value)}
+                        className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300"
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
                 </div>
-              </div>
-            </details>
-          </div>
+              </fieldset>
+            </div>
+          </details>
         </form>
       </section>
 

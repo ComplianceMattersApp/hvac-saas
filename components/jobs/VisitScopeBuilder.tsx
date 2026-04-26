@@ -85,6 +85,20 @@ export default function VisitScopeBuilder({
     onItemsChange?.(items);
   }, [items, onItemsChange]);
 
+  // TITLE FALLBACK VISIBILITY:
+  // When title is blank and exactly one scope item exists, show a live preview
+  // so the operator understands the first scope item will become the title on create.
+  const titleIsBlank = summary.trim() === "";
+  const nonEmptyScopeItems = items.filter(
+    (item) => item.title.trim() || item.details.trim()
+  );
+  const hasExactlyOneItem = nonEmptyScopeItems.length === 1;
+  const shouldShowFallbackPreview =
+    jobType === "service" && titleIsBlank && hasExactlyOneItem;
+  const fallbackPreviewTitle = shouldShowFallbackPreview
+    ? nonEmptyScopeItems[0]?.title.trim()
+    : null;
+
   const serializedItems = useMemo(() => {
     const payload = items
       .map((item) => ({
@@ -134,7 +148,7 @@ export default function VisitScopeBuilder({
     <div className="space-y-3">
       <div className="space-y-1">
         <label className="block text-sm font-medium text-slate-900">
-          {jobType === "service" ? "Why this visit exists" : "Known trip context"}
+          {jobType === "service" ? "Job Title" : "Known trip context"}
         </label>
         <textarea
           name={summaryName}
@@ -143,13 +157,18 @@ export default function VisitScopeBuilder({
           rows={2}
           maxLength={600}
           className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-          placeholder={jobType === "service" ? "Why is the tech going out for this service visit?" : "Optional: add any known context for this ECC trip."}
+          placeholder={jobType === "service" ? "The headline for this visit (e.g., 'Diagnose no cooling in upstairs system' or 'Replace refrigerant leak')" : "Optional: add any known context for this ECC trip."}
         />
         <p className="text-xs text-slate-500">
           {jobType === "service"
-            ? "Keep it short and field-facing."
+            ? "Enter a job title, or leave it blank to use the first work item below."
             : "Optional. Use this for helpful field context, not to replace the inspection or test type."}
         </p>
+        {shouldShowFallbackPreview && fallbackPreviewTitle ? (
+          <p className="mt-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-900 border border-emerald-200">
+            <span className="font-medium">Title will use:</span> {fallbackPreviewTitle}
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-2.5">
@@ -189,10 +208,10 @@ export default function VisitScopeBuilder({
               </button>
             </div>
 
-            <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_13rem] lg:items-start">
+            <div className={jobType === "ecc" ? "grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_13rem] lg:items-start" : "space-y-2.5"}>
               <div className="space-y-1">
                 <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                  Scope item
+                  Work Item
                 </label>
                 <input
                   type="text"
@@ -204,11 +223,11 @@ export default function VisitScopeBuilder({
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                  Type
-                </label>
-                {jobType === "ecc" ? (
+              {jobType === "ecc" ? (
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                    Type
+                  </label>
                   <select
                     value={item.kind}
                     onChange={(event) =>
@@ -221,16 +240,12 @@ export default function VisitScopeBuilder({
                     <option value="primary">Primary</option>
                     <option value="companion_service">Companion Service</option>
                   </select>
-                ) : (
-                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm">
-                    Primary
-                  </div>
-                )}
-              </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-2.5 space-y-1">
-              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Field note</label>
+              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Work Description</label>
               <textarea
                 value={item.details}
                 onChange={(event) => patchItem(item.id, { details: event.target.value })}

@@ -22,11 +22,113 @@ type NotificationRow = {
   created_at: string;
 };
 
+export type ProposalEnrichment = {
+  contractor_name: string | null;
+  customer_name: string | null;
+  address_summary: string | null;
+  job_type_label: string | null;
+  notes_preview: string | null;
+};
+
 export type NotificationRowForUI = NotificationRow & {
   is_unread: boolean;
+  proposal_enrichment?: ProposalEnrichment | null;
 };
 
 const DEFAULT_READ_RETENTION_DAYS = 30;
+
+async function buildProposalEnrichmentMap(
+  supabase: any,
+  rows: NotificationRow[]
+): Promise<Map<string, ProposalEnrichment>> {
+  const enrichmentMap = new Map<string, ProposalEnrichment>();
+
+  const proposalRowSubset = rows.filter((row) =>
+    isProposalNotificationType(String(row.notification_type ?? "").trim().toLowerCase())
+  );
+
+  if (!proposalRowSubset.length) return enrichmentMap;
+
+  // Collect submission IDs and contractor IDs already in the payload
+  const submissionIds: string[] = [];
+  const contractorIdBySubmissionId = new Map<string, string>();
+
+  for (const row of proposalRowSubset) {
+    const submissionId = proposalSubmissionId(row);
+    if (!submissionId) continue;
+    const contractorId = String((row.payload ?? {}).contractor_id ?? "").trim();
+    submissionIds.push(submissionId);
+    if (contractorId) contractorIdBySubmissionId.set(submissionId, contractorId);
+  }
+
+  const uniqueSubmissionIds = Array.from(new Set(submissionIds));
+  if (!uniqueSubmissionIds.length) return enrichmentMap;
+
+  const { data: submissions } = await supabase
+    .from("contractor_intake_submissions")
+    .select(
+      "id, proposed_customer_first_name, proposed_customer_last_name, proposed_address_line1, proposed_city, proposed_job_type, proposed_job_notes"
+    )
+    .in("id", uniqueSubmissionIds);
+
+  const submissionById = new Map<string, Record<string, unknown>>();
+  for (const sub of (submissions ?? []) as Record<string, unknown>[]) {
+    const id = String(sub.id ?? "").trim();
+    if (id) submissionById.set(id, sub);
+  }
+
+  // Batch-fetch contractor names
+  const uniqueContractorIds = Array.from(
+    new Set(Array.from(contractorIdBySubmissionId.values()).filter(Boolean))
+  );
+  const contractorNameById = new Map<string, string>();
+  if (uniqueContractorIds.length) {
+    const { data: contractors } = await supabase
+      .from("contractors")
+      .select("id, name")
+      .in("id", uniqueContractorIds);
+    for (const c of (contractors ?? []) as Record<string, unknown>[]) {
+      const id = String(c.id ?? "").trim();
+      const name = String(c.name ?? "").trim();
+      if (id && name) contractorNameById.set(id, name);
+    }
+  }
+
+  for (const submissionId of uniqueSubmissionIds) {
+    const sub = submissionById.get(submissionId);
+    const contractorId = contractorIdBySubmissionId.get(submissionId) ?? "";
+    const contractorName = contractorNameById.get(contractorId) || null;
+
+    const firstName = String(sub?.proposed_customer_first_name ?? "").trim();
+    const lastName = String(sub?.proposed_customer_last_name ?? "").trim();
+    const customerName = [firstName, lastName].filter(Boolean).join(" ") || null;
+
+    const addressLine = String(sub?.proposed_address_line1 ?? "").trim();
+    const city = String(sub?.proposed_city ?? "").trim();
+    const addressSummary = [addressLine, city].filter(Boolean).join(", ") || null;
+
+    const rawJobType = String(sub?.proposed_job_type ?? "").trim().toLowerCase();
+    const jobTypeLabel =
+      rawJobType === "ecc" ? "ECC" :
+      rawJobType === "service" ? "Service" :
+      rawJobType || null;
+
+    const rawNotes = String(sub?.proposed_job_notes ?? "").trim();
+    const notesPreview = rawNotes
+      ? rawNotes.length > 100 ? rawNotes.slice(0, 100) + "\u2026" : rawNotes
+      : null;
+
+    enrichmentMap.set(submissionId, {
+      contractor_name: contractorName,
+      customer_name: customerName,
+      address_summary: addressSummary,
+      job_type_label: jobTypeLabel,
+      notes_preview: notesPreview,
+    });
+  }
+
+  return enrichmentMap;
+}
 
 async function requireScopedInternalNotificationContext() {
   const supabase = await createClient();
@@ -142,23 +244,28 @@ async function filterPendingProposalVisibilityRows(
 
   if (error) throw error;
 
-  const pendingIds = new Set(
-    (data ?? [])
-      .map((row: any) => {
-        const id = String(row?.id ?? "").trim();
-        const reviewStatus = String(row?.review_status ?? "").trim().toLowerCase();
-        if (!id) return null;
-        return reviewStatus === "pending" ? id : null;
-      })
-      .filter((id: string | null): id is string => Boolean(id))
-  );
+  const statusByProposalId = new Map<string, string>();
+  for (const row of data ?? []) {
+    const id = String((row as any)?.id ?? "").trim();
+    if (!id) continue;
+    const reviewStatus = String((row as any)?.review_status ?? "").trim().toLowerCase();
+    statusByProposalId.set(id, reviewStatus);
+  }
 
   return rows.filter((row) => {
     const type = String(row.notification_type ?? "").trim().toLowerCase();
     if (!isProposalNotificationType(type)) return true;
+
     const proposalId = proposalSubmissionId(row);
     if (!proposalId) return true;
-    return pendingIds.has(proposalId);
+
+    // If the proposal row cannot be read in this session (for example, due to
+    // tighter RLS on contractor_intake_submissions), keep the visibility signal
+    // instead of silently dropping it from ribbon/feed unread surfaces.
+    const reviewStatus = statusByProposalId.get(proposalId);
+    if (!reviewStatus) return true;
+
+    return reviewStatus === "pending";
   });
 }
 
@@ -214,10 +321,17 @@ export async function listInternalNotifications(params: {
 
   const visibilityRows = dedupeProposalVisibilityRows(filteredRows).slice(0, limit);
 
-  return visibilityRows.map(row => ({
-    ...row,
-    is_unread: row.read_at === null,
-  }));
+  const proposalEnrichmentMap = await buildProposalEnrichmentMap(supabase, visibilityRows);
+
+  return visibilityRows.map(row => {
+    const submissionId = proposalSubmissionId(row);
+    const enrichment = (submissionId && proposalEnrichmentMap.get(submissionId)) || null;
+    return {
+      ...row,
+      is_unread: row.read_at === null,
+      proposal_enrichment: enrichment,
+    };
+  });
 }
 
 export async function markNotificationAsRead(input: {

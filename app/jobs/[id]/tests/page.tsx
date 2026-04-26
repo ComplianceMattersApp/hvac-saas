@@ -202,6 +202,31 @@ function fallbackText(value: unknown) {
   return rendered || "—";
 }
 
+function firstNonBlank(...values: unknown[]) {
+  for (const value of values) {
+    const rendered = String(value ?? "").trim();
+    if (rendered) return rendered;
+  }
+  return "";
+}
+
+function formatBusinessDateTimeUS(value?: string | null) {
+  if (!value) return "";
+  const raw = String(value).trim();
+  if (!raw) return "";
+  const parsed = new Date(raw);
+  if (!Number.isFinite(parsed.getTime())) return "";
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed);
+}
+
 function equipmentSummaryLine(eq: any) {
   const rawType = String(eq?.equipment_role ?? eq?.component_type ?? "").trim();
   const equipmentType = rawType ? equipmentRoleLabel(rawType) : "—";
@@ -548,13 +573,19 @@ export default async function JobTestsPage({
 
   const reportBusinessLabel = contractorId ? "Contractor Attached To" : "Internal Business";
   const reportBusinessName = contractorId ? contractorName : internalBusinessDisplayName;
-  const reportTestedDates = aggregateField(
-    (job.ecc_test_runs ?? []).filter((run: any) => run?.is_completed === true),
-    (run: any) => {
-      const timestamp = String(run?.updated_at ?? run?.created_at ?? "").trim();
-      return timestamp ? formatBusinessDateUS(timestamp) : "";
-    }
-  );
+  const reportTestedDate = (() => {
+    const latestCompletedRun = (job.ecc_test_runs ?? [])
+      .filter((run: any) => run?.is_completed === true)
+      .map((run: any) => {
+        const timestamp = String(run?.updated_at ?? run?.created_at ?? "").trim();
+        const ts = timestamp ? new Date(timestamp).getTime() : Number.NaN;
+        return { timestamp, ts };
+      })
+      .filter((row: any) => Number.isFinite(row.ts))
+      .sort((a: any, b: any) => b.ts - a.ts)[0];
+
+    return formatBusinessDateTimeUS(latestCompletedRun?.timestamp ?? "");
+  })();
 
   const customerName =
     [job.customer_first_name, job.customer_last_name]
@@ -623,6 +654,9 @@ export default async function JobTestsPage({
             `
             id,
             title,
+            permit_number,
+            jurisdiction,
+            permit_date,
             job_systems (
               id,
               name,
@@ -670,6 +704,11 @@ export default async function JobTestsPage({
   const parentRunDL = pickParentRunForSelectedSystem("duct_leakage");
   const parentRunAF = pickParentRunForSelectedSystem("airflow");
   const parentRunRC = pickParentRunForSelectedSystem("refrigerant_charge");
+
+  const reportPermitNumber = firstNonBlank(job.permit_number, parentJob?.permit_number);
+  const reportPermitJurisdiction = firstNonBlank((job as any).jurisdiction, parentJob?.jurisdiction);
+  const reportPermitDateRaw = firstNonBlank((job as any).permit_date, parentJob?.permit_date);
+  const reportPermitDate = reportPermitDateRaw ? formatBusinessDateUS(reportPermitDateRaw) : "";
 
   const runDL = selectedSystemId ? pickRunForSystem(job, "duct_leakage", selectedSystemId) : null;
   const runAF = selectedSystemId ? pickRunForSystem(job, "airflow", selectedSystemId) : null;
@@ -955,7 +994,7 @@ const defaultHeatingOutputBtu =
   });
 
     return (
-      <div className="w-full min-w-0 max-w-3xl overflow-x-hidden rounded-xl border border-gray-200 bg-slate-50 p-6 shadow-sm space-y-6 print:max-w-none print:rounded-none print:border-0 print:bg-white print:p-0 print:shadow-none">
+      <div className="mx-auto w-full min-w-0 max-w-4xl overflow-x-hidden rounded-2xl border border-gray-200/80 bg-white/80 p-4 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.3)] space-y-6 sm:p-6 print:max-w-none print:rounded-none print:border-0 print:bg-white print:p-0 print:shadow-none">
           {notice === "rc_exempt_reason_required" && (
       <div className="mb-4 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         Select <span className="font-semibold">Package unit</span> or{" "}
@@ -965,24 +1004,24 @@ const defaultHeatingOutputBtu =
     )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between print:hidden">
         <div className="min-w-0">
-          <div className="text-sm text-slate-700">Job Tests</div>
-          <h1 className="text-xl font-semibold">{normalizeRetestLinkedJobTitle(job.title) || "Job"}</h1>
-          <div className="text-sm text-slate-700">{job.city ?? "—"}</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">ECC Workspace</div>
+          <h1 className="mt-1 text-2xl font-bold tracking-[-0.02em] text-slate-950">{normalizeRetestLinkedJobTitle(job.title) || "Job"}</h1>
+          <div className="mt-1 text-sm text-slate-600">{job.city ?? "—"}</div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="completion-report-toggle" className="cursor-pointer px-3 py-2 rounded border text-sm font-medium bg-white hover:bg-gray-50">
+        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+          <label htmlFor="completion-report-toggle" className="inline-flex w-full cursor-pointer items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-center text-sm font-medium text-slate-800 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto">
             View Completion Report
           </label>
-          <PrintButton className="px-3 py-2 rounded border text-sm font-medium bg-white hover:bg-gray-50" />
-          <Link href={`/jobs/${job.id}`} className="px-3 py-2 rounded border text-sm">
+          <PrintButton className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto" />
+          <Link href={`/jobs/${job.id}`} className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-center text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto">
             ← Back to Job
           </Link>
         </div>
       </div>
 
       <input id="completion-report-toggle" type="checkbox" className="peer sr-only" />
-      <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 print:hidden">
+      <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700 print:hidden">
         Completion report is collapsed by default to keep test entry focused.
         <label htmlFor="completion-report-toggle" className="ml-1 cursor-pointer font-medium text-slate-900 underline">
           Expand report
@@ -1030,15 +1069,15 @@ const defaultHeatingOutputBtu =
             </div>
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Permit Number</div>
-              <div className="text-sm font-medium text-slate-950">{fallbackText(job.permit_number)}</div>
+              <div className="text-sm font-medium text-slate-950">{fallbackText(reportPermitNumber)}</div>
             </div>
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Jurisdiction</div>
-              <div className="text-sm font-medium text-slate-950">{fallbackText((job as any).jurisdiction)}</div>
+              <div className="text-sm font-medium text-slate-950">{fallbackText(reportPermitJurisdiction)}</div>
             </div>
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Permit Date</div>
-              <div className="text-sm font-medium text-slate-950">{fallbackText((job as any).permit_date ? formatBusinessDateUS((job as any).permit_date) : null)}</div>
+              <div className="text-sm font-medium text-slate-950">{fallbackText(reportPermitDate || null)}</div>
             </div>
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Project Type</div>
@@ -1046,7 +1085,7 @@ const defaultHeatingOutputBtu =
             </div>
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Date Tested</div>
-              <div className="text-sm font-medium text-slate-950">{reportTestedDates}</div>
+              <div className="text-sm font-medium text-slate-950">{fallbackText(reportTestedDate || null)}</div>
             </div>
           </div>
         </div>
@@ -1102,10 +1141,10 @@ const defaultHeatingOutputBtu =
                             </>
                           ) : (
                             <>
-                              <div className="font-semibold text-slate-900">Condenser</div>
-                              {sys.outdoorEquipment.length > 0 ? (
-                                sys.outdoorEquipment.map((eq: any, index: number) => (
-                                  <div key={String(eq?.id ?? `outdoor-${sys.systemId}-${index}`)}>
+                              <div className="font-semibold text-slate-900">Indoor Equipment</div>
+                              {sys.indoorEquipment.length > 0 ? (
+                                sys.indoorEquipment.map((eq: any, index: number) => (
+                                  <div key={String(eq?.id ?? `indoor-${sys.systemId}-${index}`)}>
                                     {index + 1}. {equipmentSummaryLine(eq)}
                                   </div>
                                 ))
@@ -1113,10 +1152,10 @@ const defaultHeatingOutputBtu =
                                 <div>—</div>
                               )}
 
-                              <div className="font-semibold text-slate-900 pt-1 print:pt-0.5">Indoor Equipment</div>
-                              {sys.indoorEquipment.length > 0 ? (
-                                sys.indoorEquipment.map((eq: any, index: number) => (
-                                  <div key={String(eq?.id ?? `indoor-${sys.systemId}-${index}`)}>
+                              <div className="font-semibold text-slate-900 pt-1 print:pt-0.5">Condenser</div>
+                              {sys.outdoorEquipment.length > 0 ? (
+                                sys.outdoorEquipment.map((eq: any, index: number) => (
+                                  <div key={String(eq?.id ?? `outdoor-${sys.systemId}-${index}`)}>
                                     {index + 1}. {equipmentSummaryLine(eq)}
                                   </div>
                                 ))
@@ -1220,33 +1259,37 @@ const defaultHeatingOutputBtu =
 
       </div>
 
-      <section className="min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-5 print:hidden">
+      <section className="min-w-0 rounded-2xl border border-gray-200/80 bg-white p-4 shadow-[0_20px_40px_-34px_rgba(15,23,42,0.28)] space-y-5 sm:p-5 print:hidden">
         <div>
-          <h2 className="text-lg font-semibold">ECC Tests</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-950">ECC Tests</h2>
+          <p className="text-sm text-slate-600">
             Capture tests in any order. “Save” stores readings; “Complete” locks the test for the visit workflow.
           </p>
         </div>
 
         {/* System selector */}
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
-          <div className="text-sm font-semibold mb-1 text-gray-900">Select Location</div>
+        <div className="rounded-xl border border-gray-200/80 bg-slate-50/40 p-3 space-y-3 sm:p-4">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Select Location</div>
 
-          <div className="flex flex-wrap gap-2 pt-1">
-            {systems.map((sys: any) => {
-              const isActive = String(sys.id) === String(selectedSystemId);
-              return (
-                <Link
-                  key={sys.id}
-                  href={withS(focusedType || undefined, String(sys.id))}
-                  className={`rounded-full border px-3 py-2 text-sm ${
-                    isActive ? "bg-gray-900 text-white" : "bg-white text-gray-900 hover:bg-gray-50"
-                  }`}
-                >
-                  {sys.name}
-                </Link>
-              );
-            })}
+          <div className="-mx-1 overflow-x-auto pb-1 sm:mx-0 sm:overflow-visible sm:pb-0">
+            <div className="flex w-max min-w-full gap-2 px-1 sm:w-auto sm:min-w-0 sm:flex-wrap sm:px-0">
+              {systems.map((sys: any) => {
+                const isActive = String(sys.id) === String(selectedSystemId);
+                return (
+                  <Link
+                    key={sys.id}
+                    href={withS(focusedType || undefined, String(sys.id))}
+                    className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium transition-colors ${
+                      isActive
+                        ? "border-slate-900 bg-slate-900 text-white"
+                        : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+                    }`}
+                  >
+                    {sys.name}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
 
           {!systems.length ? (
@@ -1310,10 +1353,10 @@ const defaultHeatingOutputBtu =
 )}
 
                 {selectedSystemId ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+          <div className="rounded-xl border border-gray-200/80 bg-white p-4 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold">Required and active tests</div>
+                <div className="text-sm font-semibold text-slate-900">Required and active tests</div>
                 <div className="text-xs text-muted-foreground">
                   Unified lifecycle list for this system:{" "}
                   <span className="font-medium">
@@ -1361,9 +1404,9 @@ const defaultHeatingOutputBtu =
   const isRequired = requiredTests.includes(testType);
 
   return (
-    <div
+      <div
       key={testType}
-      className="flex min-w-0 flex-col gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm transition-all duration-150 hover:bg-gray-50 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
+      className="flex min-w-0 flex-col gap-3 rounded-lg border border-gray-200 bg-white px-3 py-3 shadow-sm transition-all duration-150 hover:bg-gray-50 hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:px-4"
     >
       <div className="min-w-0">
         <div className="font-medium">
@@ -1403,9 +1446,9 @@ const defaultHeatingOutputBtu =
         </div>
       </div>
 
-      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
         {carriedForward ? (
-          <span className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+          <span className="inline-flex w-full items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 sm:w-auto">
             No retest needed
           </span>
         ) : status.state === "required" ? (
@@ -1413,14 +1456,14 @@ const defaultHeatingOutputBtu =
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="system_id" value={selectedSystemId} />
             <input type="hidden" name="test_type" value={testType} />
-            <SubmitButton loadingText="Starting..." className="rounded-md border px-3 py-1.5 text-xs font-medium bg-white hover:bg-gray-50">
+            <SubmitButton loadingText="Starting..." className="inline-flex w-full items-center justify-center rounded-md border px-3 py-1.5 text-xs font-medium bg-white hover:bg-gray-50 sm:w-auto">
               Start Test
             </SubmitButton>
           </form>
         ) : (
           <Link
             href={testHref}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 shadow-sm transition-colors hover:bg-slate-100"
+            className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 shadow-sm transition-colors hover:bg-slate-100 sm:w-auto"
           >
             Open Workspace
           </Link>
@@ -1478,7 +1521,7 @@ const defaultHeatingOutputBtu =
         ) : null}
 
         {selectedSystemId ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+            <div className="rounded-xl border border-gray-200/80 bg-slate-50/40 p-3 space-y-3 sm:p-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Equipment Reference</div>
             <div className="text-sm font-medium text-slate-900">System: {selectedSystemName}</div>
             {equipmentReferenceItems.length > 0 ? (
@@ -1511,7 +1554,7 @@ const defaultHeatingOutputBtu =
 
         {/* Add Test panel */}
         {selectedSystemId && focusedType === "custom" ? (
-          <div className="rounded-lg border bg-white p-4 space-y-3">
+          <div className="rounded-xl border border-gray-200/80 bg-white p-3 space-y-3 sm:p-4">
             <div className="text-sm font-semibold">Add Test</div>
 
             <form action={addEccTestRunFromForm} className="grid gap-3">
@@ -1557,7 +1600,7 @@ const defaultHeatingOutputBtu =
                   required
                 >
                   <option value="" disabled>
-                    Select a test
+                    Select test type…
                   </option>
 
                   {manualAddTestsForSystem.map((test) => (
@@ -1566,6 +1609,7 @@ const defaultHeatingOutputBtu =
                     </option>
                   ))}
                 </select>
+
                 {manualAddTestsForSystem.length === 0 ? (
                   <div className="text-xs text-muted-foreground">
                     No additional test types apply to this heat-only system.
@@ -1573,7 +1617,7 @@ const defaultHeatingOutputBtu =
                 ) : null}
               </div>
 
-              <SubmitButton loadingText="Adding..." className="w-fit rounded-md bg-black px-4 py-2 text-white">
+              <SubmitButton loadingText="Adding..." className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 sm:w-fit">
                 Add Test
               </SubmitButton>
             </form>
@@ -1584,10 +1628,10 @@ const defaultHeatingOutputBtu =
         {selectedSystemId ? (
           <Link
             href={focusedType === "custom" ? withS(undefined) : withS("custom")}
-            className={`w-full rounded px-4 py-3 flex items-center justify-between border ${
+            className={`w-full rounded-md px-4 py-3 flex items-center justify-between border transition-colors ${
               focusedType === "custom"
-                ? "bg-gray-900 text-white"
-                : "bg-white text-gray-900 hover:bg-gray-50"
+                ? "border-slate-900 bg-slate-900 text-white"
+                : "border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
             }`}
           >
             <div className="font-medium">Add Test</div>

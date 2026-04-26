@@ -336,7 +336,14 @@ Milestone-1 Service model buildout includes:
 - ECC optional vs Service required Visit Scope behavior
 - ECC companion-scope promotion into real Service jobs
 - promoted-companion read-only visibility on internal scan surfaces
-- internal Job Title demotion with derived stored titles preserved
+- Service intake title ownership clarified:
+  - Service Step 5 now uses an explicit **Job Title** concept for the visit headline.
+  - Visit Scope remains the detailed operational work layer for the trip.
+  - If Job Title is left blank and exactly one work item exists, the first work item may provide the derived title fallback.
+  - `service_visit_reason` aligns to the title layer rather than relying on an older fuzzy summary concept.
+  - This preserves the locked distinction:
+    - Job Title = short visit headline
+    - Visit Scope / work items = exact work on this trip
 - milestone-1 write-path reliability cleanup for the live `jobs.updated_at` mismatch
 
 Service Case v1 contract:
@@ -500,6 +507,33 @@ Outbound office-originated actions may remain canonical in `job_events` and othe
 Example:
 - `contractor_report_sent` remains part of audit truth/history
 - `contractor_report_sent` should not appear as an internal awareness notification
+
+### 11.5.1 Notification family classification lock
+
+Internal notification families must keep **new job/proposal arrival** distinct from **contractor follow-up updates**.
+
+Locked rules:
+
+- `contractor_intake_proposal_submitted` belongs to **New job notifications**, not **Contractor updates**.
+- New proposal / new contractor-submitted intake arrival is a **new work-awareness signal**, not a follow-up update signal.
+- **Contractor updates** are follow-up contractor-originated changes on an already-existing proposal/job context.
+
+Examples of Contractor updates:
+- contractor note added
+- contractor files/photos uploaded
+- contractor correction submission received
+- contractor scheduling update received
+- contractor addendum/comment added
+
+Notification copy rule:
+- Contractor update cards should use **event-type-driven wording** as the primary message.
+- Do not use raw note/comment text as the primary headline for contractor updates.
+- Raw submitted text, if shown at all, should remain secondary preview context only.
+
+Meaning:
+- New proposal arrival must read as a new-job/new-proposal awareness signal.
+- Contractor updates must read as change/update signals.
+- Notifications remain signals, not a second queue system.
 
 11.6 Ops dashboard signal surface
 
@@ -785,7 +819,7 @@ For V1 launch readiness, first company/account onboarding is invite-only and pla
 
 **Implementation status: V1 complete.** Implemented across four slices:
 - `lib/business/first-owner-provisioning.ts` — idempotent provisioning helper; dry-run / apply modes
-- `scripts/provision-first-owner.ts` — operator script; requires explicit allow flags for apply mode
+- `scripts/provision-first-owner.ts` — operator script; requires explicit allow flags, and hosted `.supabase.co` targets require both allow flags for dry-run and apply
 - `lib/auth/first-owner-routing.ts` — first-owner marker detection and `/ops/admin` routing seam
 - `app/set-password/page.tsx` — updated to route first-owner acceptance to `/ops/admin`
 
@@ -1152,14 +1186,15 @@ Roadmap order remains:
 2. Billing / invoice workflow
 3. Reporting / analytics
 4. RLS completion / permission hardening
-5. Monthly usage / payment model
-6. Out-of-box readiness / business identity / settings packaging
-7. Smaller service-model revisions after the above
+5. Payment P1 foundation closeout
+6. Out-of-box readiness / business identity / settings packaging closeout
+7. Smaller service-model revisions / service workflow refinement
 
 Current position:
 - Service model buildout is closed for milestone-1 scope.
 - Billing / invoice workflow is complete enough to move forward for milestone-2 scope.
 - Reporting / analytics is now substantially complete for the current milestone-3 scope.
+- Payment P1 foundation is closed at the current baseline.
 - Out-of-box readiness / business identity / settings packaging now has Admin Readiness / Setup Checklist V1 complete at the current baseline:
   - readiness is a read-only derived packaging layer over existing tenant/account data (no new truth table)
   - required readiness criteria currently include company name, support email, support phone, billing mode, and at least one active internal user
@@ -1359,18 +1394,20 @@ Reporting / analytics milestone baseline now includes:
 
 Remaining closeout for milestone-3 is limited to live-usage validation and minor polish/hardening, not missing major report families.
 
-If roadmap order remains unchanged, the next active major roadmap item after Reporting / analytics is:
-- Monthly usage / payment model
+If roadmap order remains unchanged, the next natural roadmap area after Reporting / analytics is:
+- Smaller service-model revisions / service workflow refinement
 
-Roadmap guardrail for this next item:
-- Payment architecture/foundation is already directionally defined.
+Roadmap guardrail for this next area:
+- Payment P1 foundation is already closed at the current baseline.
 - Payments remain payment-ready by design, not payment-active.
-- This does not imply live Stripe/payment execution start unless explicitly planned.
+- Stripe/customer checkout and platform subscription billing execution remain deferred unless explicitly pulled forward.
 - This does not imply QBO dependency.
 
 Current clarification:
 - RLS / permission hardening milestone is formally closed at the targeted seam-hardening level
-- the next active major roadmap item is Monthly usage / payment model
+- payment P1 foundation closeout is complete at the current baseline
+- out-of-box readiness / business identity / settings packaging closeout is complete at the current baseline
+- the next natural roadmap area is smaller service-model revisions / service workflow refinement
 - customer/location internal account-owner reconciliation is complete inside that milestone
 - notifications internal-awareness write-path hardening is also complete inside that milestone
 - targeted internal same-account job/service-case mutation boundary hardening is also complete inside that milestone
