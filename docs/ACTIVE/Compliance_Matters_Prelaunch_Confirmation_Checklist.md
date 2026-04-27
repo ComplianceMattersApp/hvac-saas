@@ -30,6 +30,8 @@ If any item here conflicts with the active spine, the spine wins.
 ### 2.3 Payment/live enablement readiness
 - Confirm launch posture remains `payment-ready by design, payment-active later` unless explicitly changed.
 - Confirm Phase P1 payment-ready foundation is complete, while live processor-backed payment execution remains later/pre-launch enablement work.
+- Confirm Stripe Platform Subscription V1 is implemented and locally smoke-tested in sandbox for platform account onboarding.
+- Confirm this Stripe work is separate from tenant customer invoice payment execution.
 - Verify no UI implies live processor-backed payment collection before it truly exists.
 - Confirm Stripe-first future direction and QBO-optional boundary remain intact.
 - Confirm recent invoice/payment wording polish remains honest:
@@ -56,8 +58,26 @@ If any item here conflicts with the active spine, the spine wins.
   - Payment Count replaces Payments
   - CSV header wording aligned where applicable
 
-### 2.3.2 Stripe platform onboarding pre-launch priority
-- Stripe enablement for new account users/platform onboarding is elevated as a pre-launch priority.
+### 2.3.2 Stripe platform onboarding status and live rollout readiness
+- Stripe Platform Subscription V1 is implemented and locally smoke-tested in sandbox.
+- Local sandbox smoke confirmed app-created Checkout, webhook 200 processing, billing customer link, subscription status sync, period-end display, and portal path availability.
+- Local webhook smoke requires Stripe CLI forwarding to `/api/stripe/webhook`.
+- Follow-up local hardening completed:
+  - `/api/stripe/webhook` bypasses session-auth proxy redirect (no Stripe 307 redirect loop)
+  - webhook signature verification remains enforced inside `app/api/stripe/webhook/route.ts`
+  - unmanaged/fixture `checkout.session.completed` events are safely ignored with 200
+  - period-end mapping uses `subscription.items.data[*].current_period_end` with legacy fallback to `subscription.current_period_end`
+- Live rollout still requires deployment configuration:
+  - live `STRIPE_SECRET_KEY`
+  - live `STRIPE_WEBHOOK_SECRET` from the deployed live webhook endpoint
+  - live `STRIPE_PRICE_ID`
+  - correct app URL configuration (`NEXT_PUBLIC_APP_URL` / app URL equivalent)
+  - live Stripe webhook endpoint targeting `/api/stripe/webhook`
+  - final live-mode smoke before launch
+- Sandbox/test Stripe values must never be committed.
+- `.env.local` remains local-only.
+- Hosted production env values (for example Vercel) must be configured separately.
+- Local Stripe CLI webhook secret is not the same as deployed/live webhook secret.
 - Keep this priority separate from tenant customer invoice payment execution.
 - Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
 - Live payment execution surfaces (Pay Now/Charge Card/checkout/refunds/disputes/payouts) remain deferred.

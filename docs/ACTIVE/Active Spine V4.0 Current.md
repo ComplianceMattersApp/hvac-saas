@@ -761,7 +761,8 @@ future branding/settings/business-profile formalization
 
 Note:
 Payment P1 foundation is closed at the current baseline.
-Payment execution and live Stripe/checkout remain deferred.
+Tenant customer invoice payment execution and live Pay Now/Charge Card flows remain deferred.
+Stripe Platform Subscription V1 is implemented and locally smoke-tested in sandbox for platform account onboarding.
 See Section 19 for current payment-ready status.
 
 18. Internal Business Identity vs Product Brand Identity (Locked)
@@ -873,19 +874,21 @@ The job_equipment table uses equipment_role as the single canonical classificati
 
 **Out of scope:** component_type column is not part of this contract. Mini-split full treatment is deferred.
 
-19. Payments Module (P1 Foundation Complete — Payment-Ready Status)
+19. Payments Module (P1 Foundation Complete + Platform Subscription V1 Local Validation)
 
 19.1 Current truth (locked)
 
 Payment P1 foundation is complete.
 
-Payment execution remains deferred to a later phase.
+Tenant customer invoice payment execution remains deferred to a later phase.
 
 Current implementation truth:
 - payments are currently tracking-only
 - payment P1 foundation is closed at the current baseline
-- live processor-based payment acceptance is not yet enabled
-- the platform is payment-ready by design but not yet payment-active
+- Stripe Platform Subscription V1 is implemented and locally smoke-tested in sandbox for platform account onboarding
+- platform subscription sync writes only to `platform_account_entitlements`
+- live processor-based tenant customer payment acceptance is not yet enabled
+- the platform remains payment-ready by design but not yet payment-active for tenant invoice execution
 
 19.2 Core payment direction (locked)
 
@@ -900,7 +903,9 @@ Locked rule:
 19.3 Ownership model (locked)
 
 - Compliance Matters = operational source of truth for payment visibility, payment-related workflow state, and operational tracking
-- Stripe (future) = preferred payment rail for payment acceptance and money movement
+- Stripe =
+  - implemented rail for platform account subscription onboarding (V1 local sandbox validation complete)
+  - future preferred rail for tenant customer payment acceptance and money movement
 - QBO (optional future) = accounting integration seam only
 
 Meaning:
@@ -936,8 +941,10 @@ Meaning:
 - future contractor payout/onboarding complexity should live at the payment-rail layer, not in accounting logic
 
 Current implementation rule:
-- do not build full Stripe execution yet
-- build the platform so Stripe can be introduced later without structural rework
+- platform subscription onboarding V1 is implemented (admin checkout, portal access, webhook entitlement sync)
+- do not treat this as tenant customer invoice payment execution
+- tenant Pay Now/Charge Card/invoice checkout/refunds/disputes/payout execution remains deferred
+- keep Stripe implementation additive so future tenant execution can be introduced without structural rework
 
 19.6 Current live behavior
 
@@ -1211,9 +1218,11 @@ Current position:
   - optional readiness criteria currently include company logo, contractor directory, and platform account status visibility
   - this does not introduce a broad tenant settings system and does not alter onboarding implementation boundaries
   - closeout status: this roadmap area is complete enough to close at the current baseline with Admin Readiness V1 and First Owner Provisioning V1 implemented
-  - public self-signup and platform subscription billing execution remain intentionally deferred
+  - public self-signup remains intentionally deferred
+  - Stripe Platform Subscription V1 for platform onboarding is implemented and locally smoke-tested in sandbox; live rollout remains a pre-launch environment/configuration track
 - Pre-launch priority ordering update:
-  - Stripe enablement for new account users/platform onboarding is elevated as a pre-launch priority track.
+  - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and locally smoke-tested in sandbox.
+  - This work is now in pre-launch live-environment readiness (live keys, live webhook endpoint, final live-mode smoke).
   - This priority remains separate from tenant customer invoice payment execution.
   - Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
   - Live Pay Now/Charge Card/checkout/refunds/disputes/payout execution remains deferred.
