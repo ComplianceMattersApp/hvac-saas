@@ -97,6 +97,15 @@ export default async function OpsAdminPage() {
       ctaLabel: "Open profile",
       enabled: true,
     },
+    {
+      section: "organization",
+      eyebrow: "Organization",
+      title: "Pricebook",
+      description: "Manage your reusable catalog of service, material, diagnostic, and adjustment items.",
+      href: "/ops/admin/pricebook",
+      ctaLabel: "Open pricebook",
+      enabled: true,
+    },
   ];
 
   const peopleCards = cards.filter((card) => card.section === "people");
