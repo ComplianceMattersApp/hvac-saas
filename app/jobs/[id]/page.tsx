@@ -4208,6 +4208,8 @@ const renderTimelineItem = (e: any, key: string) => {
         ) : null}
       </div>
 
+      <ServiceStatusActions jobId={job.id} billingMode={billingMode} />
+
       {job.job_notes ? (
         <div className={`${workspacePanelClass} p-4 text-gray-900`}>
           <div className="mb-2 text-sm font-semibold text-slate-950">Job Notes</div>
