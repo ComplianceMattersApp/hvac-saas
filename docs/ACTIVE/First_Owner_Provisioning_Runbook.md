@@ -237,6 +237,8 @@ Rollback requirement:
 First-owner provisioning behavior is unchanged by Stripe Platform Subscription V1.
 
 - Platform subscription onboarding is a separate pre-launch track from this provisioning runbook.
-- Before live launch, configure live deployment env values (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, app URL) and live webhook endpoint `/api/stripe/webhook`.
+- Live deployment env values and the live webhook endpoint `/api/stripe/webhook` are now configured for the platform account subscription slice.
+- Live smoke is confirmed for a normal non-owner platform subscription purchase; this does not change first-owner provisioning behavior.
+- Internal/comped owner accounts remain outside Stripe checkout and use the comped entitlement path documented above.
 - Do not commit sandbox/test Stripe values.
 - `.env.local` remains local-only; hosted deployment env values are configured separately.

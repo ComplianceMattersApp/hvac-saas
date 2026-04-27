@@ -762,7 +762,7 @@ future branding/settings/business-profile formalization
 Note:
 Payment P1 foundation is closed at the current baseline.
 Tenant customer invoice payment execution and live Pay Now/Charge Card flows remain deferred.
-Stripe Platform Subscription V1 is implemented and locally smoke-tested in sandbox for platform account onboarding.
+Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 See Section 19 for current payment-ready status.
 
 18. Internal Business Identity vs Product Brand Identity (Locked)
@@ -874,7 +874,7 @@ The job_equipment table uses equipment_role as the single canonical classificati
 
 **Out of scope:** component_type column is not part of this contract. Mini-split full treatment is deferred.
 
-19. Payments Module (P1 Foundation Complete + Platform Subscription V1 Local Validation)
+19. Payments Module (P1 Foundation Complete + Platform Subscription V1 Live Platform Smoke Confirmed)
 
 19.1 Current truth (locked)
 
@@ -885,7 +885,10 @@ Tenant customer invoice payment execution remains deferred to a later phase.
 Current implementation truth:
 - payments are currently tracking-only
 - payment P1 foundation is closed at the current baseline
-- Stripe Platform Subscription V1 is implemented and locally smoke-tested in sandbox for platform account onboarding
+- Stripe Platform Subscription V1 is implemented and live-smoke confirmed in production for platform account onboarding
+- live confirmation includes live Stripe Product/Price, deployed live env, live webhook processing at `/api/stripe/webhook`, successful non-owner checkout completion, billing-customer linkage, active subscription sync, populated period end, and billing portal availability
+- flat account subscription with unlimited users is the V1/live launch billing decision; active user count remains visible and per-seat enforcement is deferred
+- internal/comped owner protection is complete through comped-safe `platform_account_entitlements` rows (`internal_comped_v1`, no Stripe linkage, unlimited users)
 - platform subscription sync writes only to `platform_account_entitlements`
 - live processor-based tenant customer payment acceptance is not yet enabled
 - the platform remains payment-ready by design but not yet payment-active for tenant invoice execution
@@ -904,7 +907,7 @@ Locked rule:
 
 - Compliance Matters = operational source of truth for payment visibility, payment-related workflow state, and operational tracking
 - Stripe =
-  - implemented rail for platform account subscription onboarding (V1 local sandbox validation complete)
+  - implemented rail for platform account subscription onboarding (V1 live platform smoke complete)
   - future preferred rail for tenant customer payment acceptance and money movement
 - QBO (optional future) = accounting integration seam only
 
@@ -1214,15 +1217,18 @@ Current position:
   - These polish slices did not introduce payment execution, Stripe checkout, card charge flows, refunds/disputes, payouts, QBO sync, or RLS model changes.
 - Out-of-box readiness / business identity / settings packaging now has Admin Readiness / Setup Checklist V1 complete at the current baseline:
   - readiness is a read-only derived packaging layer over existing tenant/account data (no new truth table)
-  - required readiness criteria currently include company name, support email, support phone, billing mode, and at least one active internal user
+  - setup-progress completion is gated by user-reviewed timestamps on `internal_business_profiles.profile_reviewed_at` and `internal_business_profiles.team_reviewed_at`, not merely by provisioned foundation rows
+  - newly provisioned standard accounts now show `0 of 5 complete` on first login until admins review company profile and team setup
+  - required readiness criteria currently include company name, support email, support phone, billing mode, and at least one active internal user after the relevant review steps are completed
   - optional readiness criteria currently include company logo, contractor directory, and platform account status visibility
   - this does not introduce a broad tenant settings system and does not alter onboarding implementation boundaries
   - closeout status: this roadmap area is complete enough to close at the current baseline with Admin Readiness V1 and First Owner Provisioning V1 implemented
   - public self-signup remains intentionally deferred
-  - Stripe Platform Subscription V1 for platform onboarding is implemented and locally smoke-tested in sandbox; live rollout remains a pre-launch environment/configuration track
+  - `/ops/admin/internal-users` normal launch UI no longer exposes the Link existing auth user panel; Invite teammate, team setup confirmation, and team member management remain the normal admin surface
+  - Stripe Platform Subscription V1 for platform onboarding is implemented and live-smoke confirmed for the platform-account subscription slice
 - Pre-launch priority ordering update:
-  - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and locally smoke-tested in sandbox.
-  - This work is now in pre-launch live-environment readiness (live keys, live webhook endpoint, final live-mode smoke).
+  - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed for the platform-account subscription slice.
+  - Live rollout prerequisites for that slice are complete: live keys, live webhook endpoint, and final live-mode smoke.
   - This priority remains separate from tenant customer invoice payment execution.
   - Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
   - Live Pay Now/Charge Card/checkout/refunds/disputes/payout execution remains deferred.
@@ -1423,12 +1429,13 @@ The next natural roadmap area is:
 
 Pre-launch enablement priority track (separate from product-track sequencing):
 - Stripe enablement for new account users/platform onboarding is elevated for pre-launch readiness.
+- Live smoke is now confirmed complete for that platform-account subscription slice.
 - This does not move tenant customer invoice payment execution into current scope.
 
 Roadmap guardrail for this next area:
 - Payment P1 foundation is already closed at the current baseline.
 - Payments remain payment-ready by design, not payment-active.
-- Stripe/customer checkout and platform subscription billing execution remain deferred unless explicitly pulled forward.
+- Platform account subscription billing execution is live for the onboarding slice; tenant Stripe/customer payment execution remains deferred unless explicitly pulled forward.
 - This does not imply QBO dependency.
 
 Current clarification:
