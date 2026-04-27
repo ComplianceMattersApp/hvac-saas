@@ -30,6 +30,16 @@ type Store = {
       account_owner_user_id: string;
       plan_key: string | null;
       entitlement_status: string | null;
+      seat_limit: number | null;
+      trial_ends_at: string | null;
+      entitlement_valid_until: string | null;
+      stripe_customer_id: string | null;
+      stripe_subscription_id: string | null;
+      stripe_price_id: string | null;
+      stripe_subscription_status: string | null;
+      stripe_current_period_end: string | null;
+      stripe_cancel_at_period_end: boolean | null;
+      notes: string | null;
     }
   >;
   sequence: number;
@@ -110,6 +120,19 @@ function createMockClient(store: Store): FirstOwnerProvisioningClient {
         account_owner_user_id: input.account_owner_user_id,
         plan_key: input.plan_key,
         entitlement_status: input.entitlement_status,
+        seat_limit: input.seat_limit ?? null,
+        trial_ends_at: input.trial_ends_at ?? null,
+        entitlement_valid_until: input.entitlement_valid_until ?? null,
+        stripe_customer_id: input.stripe_customer_id ?? null,
+        stripe_subscription_id: input.stripe_subscription_id ?? null,
+        stripe_price_id: input.stripe_price_id ?? null,
+        stripe_subscription_status: input.stripe_subscription_status ?? null,
+        stripe_current_period_end: input.stripe_current_period_end ?? null,
+        stripe_cancel_at_period_end:
+          typeof input.stripe_cancel_at_period_end === "boolean"
+            ? input.stripe_cancel_at_period_end
+            : false,
+        notes: input.notes ?? null,
       };
       store.entitlementsByOwnerId[input.account_owner_user_id] = row;
       return row;
@@ -180,6 +203,16 @@ describe("provisionFirstOwnerAccount", () => {
           account_owner_user_id: ownerId,
           plan_key: "professional",
           entitlement_status: "active",
+          seat_limit: null,
+          trial_ends_at: null,
+          entitlement_valid_until: null,
+          stripe_customer_id: null,
+          stripe_subscription_id: null,
+          stripe_price_id: null,
+          stripe_subscription_status: null,
+          stripe_current_period_end: null,
+          stripe_cancel_at_period_end: false,
+          notes: null,
         },
       },
     });
@@ -230,6 +263,16 @@ describe("provisionFirstOwnerAccount", () => {
           account_owner_user_id: ownerId,
           plan_key: "starter",
           entitlement_status: "trial",
+          seat_limit: null,
+          trial_ends_at: null,
+          entitlement_valid_until: null,
+          stripe_customer_id: null,
+          stripe_subscription_id: null,
+          stripe_price_id: null,
+          stripe_subscription_status: null,
+          stripe_current_period_end: null,
+          stripe_cancel_at_period_end: false,
+          notes: null,
         },
       },
     });
@@ -352,6 +395,16 @@ describe("provisionFirstOwnerAccount", () => {
           account_owner_user_id: ownerId,
           plan_key: "starter",
           entitlement_status: "trial",
+          seat_limit: null,
+          trial_ends_at: null,
+          entitlement_valid_until: null,
+          stripe_customer_id: null,
+          stripe_subscription_id: null,
+          stripe_price_id: null,
+          stripe_subscription_status: null,
+          stripe_current_period_end: null,
+          stripe_cancel_at_period_end: false,
+          notes: null,
         },
       },
     });
@@ -407,6 +460,16 @@ describe("provisionFirstOwnerAccount", () => {
           account_owner_user_id: ownerId,
           plan_key: "enterprise",
           entitlement_status: "active",
+          seat_limit: null,
+          trial_ends_at: null,
+          entitlement_valid_until: null,
+          stripe_customer_id: null,
+          stripe_subscription_id: null,
+          stripe_price_id: null,
+          stripe_subscription_status: null,
+          stripe_current_period_end: null,
+          stripe_cancel_at_period_end: false,
+          notes: null,
         },
       },
     });
@@ -433,6 +496,16 @@ describe("provisionFirstOwnerAccount", () => {
       account_owner_user_id: "wrong-owner",
       plan_key: "starter",
       entitlement_status: "trial",
+      seat_limit: null,
+      trial_ends_at: null,
+      entitlement_valid_until: null,
+      stripe_customer_id: null,
+      stripe_subscription_id: null,
+      stripe_price_id: null,
+      stripe_subscription_status: null,
+      stripe_current_period_end: null,
+      stripe_cancel_at_period_end: false,
+      notes: null,
     });
 
     const result = await provisionFirstOwnerAccount({

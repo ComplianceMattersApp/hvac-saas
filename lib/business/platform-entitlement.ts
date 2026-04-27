@@ -22,6 +22,8 @@ export type AccountEntitlementContext = {
   planKey: PlatformPlanKey;
   entitlementStatus: EntitlementStatus;
   isEntitlementActive: boolean;
+  isInternalComped: boolean;
+  internalCompedSignal: "notes_marker" | "none";
   seatLimit: number | null;
   activeSeatCount: number;
   trialEndsAt: Date | null;
@@ -38,6 +40,8 @@ const ACTIVE_STATUSES: ReadonlySet<EntitlementStatus> = new Set([
   "active",
   "grace",
 ]);
+
+export const INTERNAL_COMPED_NOTES_MARKER = "internal_comped_v1";
 
 function isEntitlementStatusActive(status: EntitlementStatus): boolean {
   return ACTIVE_STATUSES.has(status);
@@ -57,6 +61,36 @@ function normalizeEntitlementStatus(value: unknown): EntitlementStatus {
   if (v === "suspended") return "suspended";
   if (v === "cancelled") return "cancelled";
   return "trial";
+}
+
+function hasInternalCompedNotesMarker(value: unknown): boolean {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return false;
+  return normalized.includes(INTERNAL_COMPED_NOTES_MARKER);
+}
+
+export function resolveInternalCompedState(params: {
+  entitlementStatus: EntitlementStatus;
+  seatLimit: number | null;
+  billingCustomerLinked: boolean;
+  billingSubscriptionLinked: boolean;
+  notes: unknown;
+}) {
+  const hasApprovedSignal = hasInternalCompedNotesMarker(params.notes);
+  const hasUnlimitedUsers = params.seatLimit == null;
+  const noStripeLinkage =
+    !params.billingCustomerLinked && !params.billingSubscriptionLinked;
+  const isActiveComped = params.entitlementStatus === "active";
+
+  const isInternalComped =
+    hasApprovedSignal && hasUnlimitedUsers && noStripeLinkage && isActiveComped;
+
+  return {
+    isInternalComped,
+    internalCompedSignal: isInternalComped
+      ? ("notes_marker" as const)
+      : ("none" as const),
+  };
 }
 
 async function deriveActiveSeatCount(params: {
@@ -114,6 +148,7 @@ export async function resolveAccountEntitlement(
         "seat_limit",
         "trial_ends_at",
         "entitlement_valid_until",
+        "notes",
         "stripe_customer_id",
         "stripe_subscription_id",
         "stripe_subscription_status",
@@ -154,11 +189,20 @@ export async function resolveAccountEntitlement(
     ? new Date(data.stripe_current_period_end)
     : null;
   const billingCancelAtPeriodEnd = Boolean(data.stripe_cancel_at_period_end);
+  const internalCompedState = resolveInternalCompedState({
+    entitlementStatus,
+    seatLimit,
+    billingCustomerLinked,
+    billingSubscriptionLinked,
+    notes: data.notes,
+  });
 
   return {
     planKey,
     entitlementStatus,
     isEntitlementActive: isEntitlementStatusActive(entitlementStatus),
+    isInternalComped: internalCompedState.isInternalComped,
+    internalCompedSignal: internalCompedState.internalCompedSignal,
     seatLimit,
     activeSeatCount,
     trialEndsAt,
@@ -176,6 +220,8 @@ function buildSafeDefault(activeSeatCount: number): AccountEntitlementContext {
     planKey: "starter",
     entitlementStatus: "trial",
     isEntitlementActive: true,
+    isInternalComped: false,
+    internalCompedSignal: "none",
     seatLimit: null,
     activeSeatCount,
     trialEndsAt: null,

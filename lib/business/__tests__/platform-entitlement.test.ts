@@ -37,6 +37,7 @@ function makeEntitlementRow(overrides: Partial<{
   stripe_subscription_status: string | null;
   stripe_current_period_end: string | null;
   stripe_cancel_at_period_end: boolean | null;
+  notes: string | null;
 }> = {}) {
   return {
     plan_key: "starter",
@@ -49,6 +50,7 @@ function makeEntitlementRow(overrides: Partial<{
     stripe_subscription_status: null,
     stripe_current_period_end: null,
     stripe_cancel_at_period_end: false,
+    notes: null,
     ...overrides,
   };
 }
@@ -132,6 +134,8 @@ describe("resolveAccountEntitlement", () => {
     expect(ctx.planKey).toBe("professional");
     expect(ctx.entitlementStatus).toBe("active");
     expect(ctx.isEntitlementActive).toBe(true);
+    expect(ctx.isInternalComped).toBe(false);
+    expect(ctx.internalCompedSignal).toBe("none");
     expect(ctx.seatLimit).toBe(10);
     expect(ctx.activeSeatCount).toBe(3);
     expect(ctx.trialEndsAt).toBeNull();
@@ -155,6 +159,8 @@ describe("resolveAccountEntitlement", () => {
     expect(ctx.planKey).toBe("starter");
     expect(ctx.entitlementStatus).toBe("trial");
     expect(ctx.isEntitlementActive).toBe(true);
+    expect(ctx.isInternalComped).toBe(false);
+    expect(ctx.internalCompedSignal).toBe("none");
     expect(ctx.seatLimit).toBeNull();
     expect(ctx.activeSeatCount).toBe(0);
     expect(ctx.trialEndsAt).toBeNull();
@@ -296,6 +302,8 @@ describe("resolveAccountEntitlement", () => {
     expect(ctx).toHaveProperty("planKey");
     expect(ctx).toHaveProperty("entitlementStatus");
     expect(ctx).toHaveProperty("isEntitlementActive");
+    expect(ctx).toHaveProperty("isInternalComped");
+    expect(ctx).toHaveProperty("internalCompedSignal");
     expect(ctx).toHaveProperty("seatLimit");
     expect(ctx).toHaveProperty("activeSeatCount");
     expect(ctx).toHaveProperty("trialEndsAt");
@@ -328,5 +336,43 @@ describe("resolveAccountEntitlement", () => {
     expect(ctx.billingCancelAtPeriodEnd).toBe(true);
     expect(ctx).not.toHaveProperty("stripe_customer_id");
     expect(ctx).not.toHaveProperty("stripe_subscription_id");
+  });
+
+  it("detects internal comped state only with explicit notes marker and comped-safe fields", async () => {
+    const supabase = makeSupabase({
+      entitlementRow: makeEntitlementRow({
+        plan_key: "starter",
+        entitlement_status: "active",
+        seat_limit: null,
+        stripe_customer_id: null,
+        stripe_subscription_id: null,
+        notes: "internal_comped_v1",
+      }),
+      internalUserCount: 1,
+    });
+
+    const ctx = await resolveAccountEntitlement(ACCOUNT_OWNER_A, supabase);
+
+    expect(ctx.isInternalComped).toBe(true);
+    expect(ctx.internalCompedSignal).toBe("notes_marker");
+  });
+
+  it("does not infer comped state without explicit marker", async () => {
+    const supabase = makeSupabase({
+      entitlementRow: makeEntitlementRow({
+        plan_key: "starter",
+        entitlement_status: "active",
+        seat_limit: null,
+        stripe_customer_id: null,
+        stripe_subscription_id: null,
+        notes: null,
+      }),
+      internalUserCount: 1,
+    });
+
+    const ctx = await resolveAccountEntitlement(ACCOUNT_OWNER_A, supabase);
+
+    expect(ctx.isInternalComped).toBe(false);
+    expect(ctx.internalCompedSignal).toBe("none");
   });
 });
