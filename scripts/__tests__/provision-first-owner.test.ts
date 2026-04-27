@@ -59,6 +59,8 @@ describe("parseProvisionFirstOwnerArgs", () => {
       "My Company",
       "--owner-display-name",
       "Owner Name",
+      "--entitlement-preset",
+      "internal_comped",
       "--resend-invite",
       "--apply",
     ]);
@@ -66,8 +68,33 @@ describe("parseProvisionFirstOwnerArgs", () => {
     expect(parsed.email).toBe("owner@example.com");
     expect(parsed.businessDisplayName).toBe("My Company");
     expect(parsed.ownerDisplayName).toBe("Owner Name");
+    expect(parsed.entitlementPreset).toBe("internal_comped");
     expect(parsed.resendInvite).toBe(true);
     expect(parsed.apply).toBe(true);
+  });
+
+  it("defaults entitlement preset to standard", () => {
+    const parsed = parseProvisionFirstOwnerArgs([
+      "--email",
+      "owner@example.com",
+      "--business-display-name",
+      "My Company",
+    ]);
+
+    expect(parsed.entitlementPreset).toBe("standard");
+  });
+
+  it("throws on invalid entitlement preset", () => {
+    expect(() =>
+      parseProvisionFirstOwnerArgs([
+        "--email",
+        "owner@example.com",
+        "--business-display-name",
+        "My Company",
+        "--entitlement-preset",
+        "invalid",
+      ]),
+    ).toThrow("Invalid --entitlement-preset (expected: standard|internal_comped)");
   });
 
   it("throws if required args are missing", () => {
@@ -81,6 +108,7 @@ describe("runProvisionFirstOwnerScript", () => {
   const baseArgs = {
     email: "owner@example.com",
     businessDisplayName: "My Company",
+    entitlementPreset: "standard" as const,
     resendInvite: false,
     apply: false,
   };
@@ -95,6 +123,7 @@ describe("runProvisionFirstOwnerScript", () => {
       expect.objectContaining({
         targetEmail: "owner@example.com",
         businessDisplayName: "My Company",
+        entitlementPreset: "standard",
         dryRun: true,
       }),
     );

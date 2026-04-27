@@ -1,6 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 import { provisionFirstOwnerAccount, type FirstOwnerProvisioningClient } from "@/lib/business/first-owner-provisioning";
 
+type EntitlementRow = {
+  account_owner_user_id: string;
+  plan_key: string | null;
+  entitlement_status: string | null;
+  seat_limit: number | null;
+  trial_ends_at: string | null;
+  entitlement_valid_until: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_price_id: string | null;
+  stripe_subscription_status: string | null;
+  stripe_current_period_end: string | null;
+  stripe_cancel_at_period_end: boolean | null;
+  notes: string | null;
+};
+
 type Store = {
   authUsersByEmail: Record<string, { id: string; email: string }>;
   profilesById: Record<string, { id: string; email: string | null; full_name: string | null }>;
@@ -24,16 +40,27 @@ type Store = {
       billing_mode: string | null;
     }
   >;
-  entitlementsByOwnerId: Record<
-    string,
-    {
-      account_owner_user_id: string;
-      plan_key: string | null;
-      entitlement_status: string | null;
-    }
-  >;
+  entitlementsByOwnerId: Record<string, EntitlementRow>;
   sequence: number;
 };
+
+function makeEntitlementRow(overrides: Partial<EntitlementRow>): EntitlementRow {
+  return {
+    account_owner_user_id: overrides.account_owner_user_id ?? "",
+    plan_key: overrides.plan_key ?? "starter",
+    entitlement_status: overrides.entitlement_status ?? "trial",
+    seat_limit: overrides.seat_limit ?? null,
+    trial_ends_at: overrides.trial_ends_at ?? null,
+    entitlement_valid_until: overrides.entitlement_valid_until ?? null,
+    stripe_customer_id: overrides.stripe_customer_id ?? null,
+    stripe_subscription_id: overrides.stripe_subscription_id ?? null,
+    stripe_price_id: overrides.stripe_price_id ?? null,
+    stripe_subscription_status: overrides.stripe_subscription_status ?? null,
+    stripe_current_period_end: overrides.stripe_current_period_end ?? null,
+    stripe_cancel_at_period_end: overrides.stripe_cancel_at_period_end ?? false,
+    notes: overrides.notes ?? null,
+  };
+}
 
 function createStore(seed?: Partial<Store>): Store {
   return {
@@ -52,7 +79,7 @@ function createMockClient(store: Store): FirstOwnerProvisioningClient {
       return store.authUsersByEmail[email] ?? null;
     }),
 
-    createAuthUser: vi.fn(async ({ email, displayName }) => {
+    createAuthUser: vi.fn(async ({ email }) => {
       const id = `user-${store.sequence++}`;
       const row = { id, email };
       store.authUsersByEmail[email] = row;
@@ -106,10 +133,28 @@ function createMockClient(store: Store): FirstOwnerProvisioningClient {
     }),
 
     upsertEntitlement: vi.fn(async (input) => {
-      const row = {
+      const row: EntitlementRow = {
         account_owner_user_id: input.account_owner_user_id,
         plan_key: input.plan_key,
         entitlement_status: input.entitlement_status,
+        seat_limit: "seat_limit" in input ? input.seat_limit ?? null : null,
+        trial_ends_at: "trial_ends_at" in input ? input.trial_ends_at ?? null : null,
+        entitlement_valid_until:
+          "entitlement_valid_until" in input ? input.entitlement_valid_until ?? null : null,
+        stripe_customer_id:
+          "stripe_customer_id" in input ? input.stripe_customer_id ?? null : null,
+        stripe_subscription_id:
+          "stripe_subscription_id" in input ? input.stripe_subscription_id ?? null : null,
+        stripe_price_id: "stripe_price_id" in input ? input.stripe_price_id ?? null : null,
+        stripe_subscription_status:
+          "stripe_subscription_status" in input ? input.stripe_subscription_status ?? null : null,
+        stripe_current_period_end:
+          "stripe_current_period_end" in input ? input.stripe_current_period_end ?? null : null,
+        stripe_cancel_at_period_end:
+          "stripe_cancel_at_period_end" in input
+            ? Boolean(input.stripe_cancel_at_period_end)
+            : false,
+        notes: "notes" in input ? input.notes ?? null : null,
       };
       store.entitlementsByOwnerId[input.account_owner_user_id] = row;
       return row;
@@ -176,11 +221,11 @@ describe("provisionFirstOwnerAccount", () => {
         },
       },
       entitlementsByOwnerId: {
-        [ownerId]: {
+        [ownerId]: makeEntitlementRow({
           account_owner_user_id: ownerId,
           plan_key: "professional",
           entitlement_status: "active",
-        },
+        }),
       },
     });
 
@@ -226,11 +271,11 @@ describe("provisionFirstOwnerAccount", () => {
         },
       },
       entitlementsByOwnerId: {
-        [ownerId]: {
+        [ownerId]: makeEntitlementRow({
           account_owner_user_id: ownerId,
           plan_key: "starter",
           entitlement_status: "trial",
-        },
+        }),
       },
     });
     const client = createMockClient(store);
@@ -287,6 +332,113 @@ describe("provisionFirstOwnerAccount", () => {
     expect(result.recordsCreated).toContain("platform_account_entitlements");
     expect(store.entitlementsByOwnerId[ownerId]?.plan_key).toBe("starter");
     expect(store.entitlementsByOwnerId[ownerId]?.entitlement_status).toBe("trial");
+  });
+
+  it("internal_comped preset creates entitlement with comped-safe values", async () => {
+    const ownerId = "user-200";
+    const store = createStore({
+      authUsersByEmail: {
+        "owner@example.com": { id: ownerId, email: "owner@example.com" },
+      },
+      profilesById: {
+        [ownerId]: { id: ownerId, email: "owner@example.com", full_name: "Owner" },
+      },
+      internalUsersByUserId: {
+        [ownerId]: {
+          user_id: ownerId,
+          account_owner_user_id: ownerId,
+          role: "admin",
+          is_active: true,
+          created_by: ownerId,
+        },
+      },
+      businessProfilesByOwnerId: {
+        [ownerId]: {
+          account_owner_user_id: ownerId,
+          display_name: "Existing",
+          support_email: null,
+          support_phone: null,
+          billing_mode: "external_billing",
+        },
+      },
+    });
+    const client = createMockClient(store);
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: { targetEmail: "owner@example.com", entitlementPreset: "internal_comped" },
+    });
+
+    expect(result.status).toBe("provisioned");
+    expect(store.entitlementsByOwnerId[ownerId]).toEqual(
+      expect.objectContaining({
+        plan_key: "starter",
+        entitlement_status: "active",
+        seat_limit: null,
+        stripe_customer_id: null,
+        stripe_subscription_id: null,
+        notes: "internal_comped_v1",
+      }),
+    );
+  });
+
+  it("internal_comped preset patches incompatible existing entitlement", async () => {
+    const ownerId = "user-201";
+    const store = createStore({
+      authUsersByEmail: {
+        "owner@example.com": { id: ownerId, email: "owner@example.com" },
+      },
+      profilesById: {
+        [ownerId]: { id: ownerId, email: "owner@example.com", full_name: "Owner" },
+      },
+      internalUsersByUserId: {
+        [ownerId]: {
+          user_id: ownerId,
+          account_owner_user_id: ownerId,
+          role: "admin",
+          is_active: true,
+          created_by: ownerId,
+        },
+      },
+      businessProfilesByOwnerId: {
+        [ownerId]: {
+          account_owner_user_id: ownerId,
+          display_name: "Configured",
+          support_email: null,
+          support_phone: null,
+          billing_mode: "external_billing",
+        },
+      },
+      entitlementsByOwnerId: {
+        [ownerId]: makeEntitlementRow({
+          account_owner_user_id: ownerId,
+          plan_key: "professional",
+          entitlement_status: "active",
+          seat_limit: 5,
+          stripe_customer_id: "cus_1",
+          notes: "legacy",
+        }),
+      },
+    });
+    const client = createMockClient(store);
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: { targetEmail: "owner@example.com", entitlementPreset: "internal_comped" },
+    });
+
+    expect(result.status).toBe("provisioned");
+    expect(result.recordsPatched).toContain("platform_account_entitlements");
+    expect(store.entitlementsByOwnerId[ownerId]).toEqual(
+      expect.objectContaining({
+        plan_key: "starter",
+        entitlement_status: "active",
+        seat_limit: null,
+        stripe_customer_id: null,
+        stripe_subscription_id: null,
+        notes: "internal_comped_v1",
+      }),
+    );
   });
 
   it("existing internal user anchored to different owner hard fails", async () => {
@@ -348,11 +500,11 @@ describe("provisionFirstOwnerAccount", () => {
         },
       },
       entitlementsByOwnerId: {
-        [ownerId]: {
+        [ownerId]: makeEntitlementRow({
           account_owner_user_id: ownerId,
           plan_key: "starter",
           entitlement_status: "trial",
-        },
+        }),
       },
     });
     const client = createMockClient(store);
@@ -403,11 +555,11 @@ describe("provisionFirstOwnerAccount", () => {
         },
       },
       entitlementsByOwnerId: {
-        [ownerId]: {
+        [ownerId]: makeEntitlementRow({
           account_owner_user_id: ownerId,
           plan_key: "enterprise",
           entitlement_status: "active",
-        },
+        }),
       },
     });
     const client = createMockClient(store);
@@ -460,7 +612,6 @@ describe("provisionFirstOwnerAccount", () => {
         reason: "ready_for_invite",
       }),
     );
-    // No invite sending behavior exists in the client contract for this helper.
     expect((client as any).sendInvite).toBeUndefined();
   });
 

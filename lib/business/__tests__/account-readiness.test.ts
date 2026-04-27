@@ -78,10 +78,17 @@ describe("resolveAccountReadiness", () => {
       planKey: "starter",
       entitlementStatus: "trial",
       isEntitlementActive: true,
+      isInternalComped: false,
+      internalCompedSignal: "none",
       seatLimit: null,
       activeSeatCount: 1,
       trialEndsAt: null,
       entitlementValidUntil: null,
+      billingCustomerLinked: false,
+      billingSubscriptionLinked: false,
+      billingSubscriptionStatus: null,
+      billingCurrentPeriodEnd: null,
+      billingCancelAtPeriodEnd: false,
     });
   });
 

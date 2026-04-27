@@ -2,6 +2,9 @@ import { normalizeBillingMode, type BillingMode } from "@/lib/business/internal-
 import type { EntitlementStatus, PlatformPlanKey } from "@/lib/business/platform-entitlement";
 
 export type FirstOwnerProvisioningStatus = "provisioned" | "confirmed" | "failed" | "dry_run";
+export type EntitlementPreset = "standard" | "internal_comped";
+
+const INTERNAL_COMPED_NOTES_MARKER = "internal_comped_v1";
 
 type RecordKey =
   | "auth_user"
@@ -55,6 +58,7 @@ export type FirstOwnerProvisioningInput = {
   supportEmail?: string | null;
   supportPhone?: string | null;
   defaultBillingMode?: BillingMode | string | null;
+  entitlementPreset?: EntitlementPreset | string | null;
   operatorMetadata?: FirstOwnerOperatorMetadata;
   dryRun?: boolean;
 };
@@ -90,6 +94,16 @@ export type ProvisioningEntitlementRow = {
   account_owner_user_id: string;
   plan_key: string | null;
   entitlement_status: string | null;
+  seat_limit: number | null;
+  trial_ends_at: string | null;
+  entitlement_valid_until: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_price_id: string | null;
+  stripe_subscription_status: string | null;
+  stripe_current_period_end: string | null;
+  stripe_cancel_at_period_end: boolean | null;
+  notes: string | null;
 };
 
 export type FirstOwnerProvisioningClient = {
@@ -130,6 +144,16 @@ export type FirstOwnerProvisioningClient = {
     account_owner_user_id: string;
     plan_key: PlatformPlanKey;
     entitlement_status: EntitlementStatus;
+    seat_limit?: number | null;
+    trial_ends_at?: string | null;
+    entitlement_valid_until?: string | null;
+    stripe_customer_id?: string | null;
+    stripe_subscription_id?: string | null;
+    stripe_price_id?: string | null;
+    stripe_subscription_status?: string | null;
+    stripe_current_period_end?: string | null;
+    stripe_cancel_at_period_end?: boolean;
+    notes?: string | null;
   }): Promise<ProvisioningEntitlementRow>;
 };
 
@@ -193,6 +217,36 @@ function normalizeEntitlementStatus(value: unknown): EntitlementStatus {
   return DEFAULT_ENTITLEMENT_STATUS;
 }
 
+function normalizeEntitlementPreset(value: unknown): EntitlementPreset {
+  return toCleanString(value).toLowerCase() === "internal_comped"
+    ? "internal_comped"
+    : "standard";
+}
+
+function buildEntitlementPresetValues(preset: EntitlementPreset) {
+  if (preset === "internal_comped") {
+    return {
+      plan_key: "starter" as PlatformPlanKey,
+      entitlement_status: "active" as EntitlementStatus,
+      seat_limit: null,
+      trial_ends_at: null,
+      entitlement_valid_until: null,
+      stripe_customer_id: null,
+      stripe_subscription_id: null,
+      stripe_price_id: null,
+      stripe_subscription_status: null,
+      stripe_current_period_end: null,
+      stripe_cancel_at_period_end: false,
+      notes: INTERNAL_COMPED_NOTES_MARKER,
+    };
+  }
+
+  return {
+    plan_key: DEFAULT_PLAN_KEY,
+    entitlement_status: DEFAULT_ENTITLEMENT_STATUS,
+  };
+}
+
 export async function provisionFirstOwnerAccount(params: {
   input: FirstOwnerProvisioningInput;
   client: FirstOwnerProvisioningClient;
@@ -215,6 +269,8 @@ export async function provisionFirstOwnerAccount(params: {
   const supportEmail = normalizeEmail(input.supportEmail);
   const supportPhone = toCleanString(input.supportPhone);
   const billingMode = normalizeBillingMode(input.defaultBillingMode);
+  const entitlementPreset = normalizeEntitlementPreset(input.entitlementPreset);
+  const entitlementPresetValues = buildEntitlementPresetValues(entitlementPreset);
 
   if (!email || !isValidEmail(email)) {
     return pushError(errors, {
@@ -398,7 +454,21 @@ export async function provisionFirstOwnerAccount(params: {
       }
 
       const needsPatch =
-        !toCleanString(entitlement.plan_key) || !toCleanString(entitlement.entitlement_status);
+        entitlementPreset === "internal_comped"
+          ? normalizePlanKey(entitlement.plan_key) !== entitlementPresetValues.plan_key ||
+            normalizeEntitlementStatus(entitlement.entitlement_status) !==
+              entitlementPresetValues.entitlement_status ||
+            entitlement.seat_limit != null ||
+            Boolean(toCleanString(entitlement.trial_ends_at)) ||
+            Boolean(toCleanString(entitlement.entitlement_valid_until)) ||
+            Boolean(toCleanString(entitlement.stripe_customer_id)) ||
+            Boolean(toCleanString(entitlement.stripe_subscription_id)) ||
+            Boolean(toCleanString(entitlement.stripe_price_id)) ||
+            Boolean(toCleanString(entitlement.stripe_subscription_status)) ||
+            Boolean(toCleanString(entitlement.stripe_current_period_end)) ||
+            Boolean(entitlement.stripe_cancel_at_period_end) ||
+            toCleanString(entitlement.notes).toLowerCase() !== INTERNAL_COMPED_NOTES_MARKER
+          : !toCleanString(entitlement.plan_key) || !toCleanString(entitlement.entitlement_status);
 
       if (needsPatch) {
         if (dryRun) {
@@ -406,8 +476,12 @@ export async function provisionFirstOwnerAccount(params: {
         } else {
           entitlement = await client.upsertEntitlement({
             account_owner_user_id: authUserId,
-            plan_key: normalizePlanKey(entitlement.plan_key),
-            entitlement_status: normalizeEntitlementStatus(entitlement.entitlement_status),
+            ...(entitlementPreset === "internal_comped"
+              ? entitlementPresetValues
+              : {
+                  plan_key: normalizePlanKey(entitlement.plan_key),
+                  entitlement_status: normalizeEntitlementStatus(entitlement.entitlement_status),
+                }),
           });
           recordsPatched.push("platform_account_entitlements");
         }
@@ -420,8 +494,7 @@ export async function provisionFirstOwnerAccount(params: {
       } else {
         entitlement = await client.upsertEntitlement({
           account_owner_user_id: authUserId,
-          plan_key: DEFAULT_PLAN_KEY,
-          entitlement_status: DEFAULT_ENTITLEMENT_STATUS,
+          ...entitlementPresetValues,
         });
         recordsCreated.push("platform_account_entitlements");
       }

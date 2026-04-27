@@ -20,8 +20,26 @@ Supported billing mode values for --default-billing-mode:
 - external_billing
 - internal_invoicing
 
+Supported entitlement preset values for --entitlement-preset:
+- standard (default)
+- internal_comped
+
 Default behavior:
 - If --default-billing-mode is omitted or invalid, billing mode normalizes to external_billing.
+- If --entitlement-preset is omitted, provisioning uses standard.
+
+Entitlement preset behavior:
+- standard
+  - keeps current baseline behavior (`plan_key=starter`, `entitlement_status=trial` for newly created entitlement rows)
+- internal_comped
+  - applies owner-safe comped entitlement values using existing schema:
+    - `plan_key=starter`
+    - `entitlement_status=active`
+    - `seat_limit=NULL`
+    - `trial_ends_at=NULL`
+    - `entitlement_valid_until=NULL`
+    - Stripe linkage fields remain NULL
+  - writes notes marker `internal_comped_v1` for explicit comped detection in admin UI/read model
 
 ## 3. Guardrails for hosted Supabase targets
 
@@ -50,6 +68,22 @@ npx tsx scripts/provision-first-owner.ts \
   --owner-display-name "Example Owner" \
   --support-email support@example.com \
   --support-phone "+1-555-555-0100" \
+  --entitlement-preset standard \
+  --default-billing-mode external_billing
+```
+
+Internal comped dry-run example:
+
+```bash
+ALLOW_FIRST_OWNER_PROVISIONING=true \
+ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true \
+npx tsx scripts/provision-first-owner.ts \
+  --email owner@example.com \
+  --business-display-name "Example HVAC" \
+  --owner-display-name "Example Owner" \
+  --support-email support@example.com \
+  --support-phone "+1-555-555-0100" \
+  --entitlement-preset internal_comped \
   --default-billing-mode external_billing
 ```
 
@@ -70,6 +104,7 @@ npx tsx scripts/provision-first-owner.ts \
   --owner-display-name "Example Owner" \
   --support-email support@example.com \
   --support-phone "+1-555-555-0100" \
+  --entitlement-preset standard \
   --default-billing-mode external_billing \
   --apply
 ```
@@ -85,9 +120,119 @@ Confirm the run completed and the owner invite path is valid:
 - platform_account_entitlements row exists
 - first-owner marker is written before invite send
 
+When `--entitlement-preset internal_comped` is used, also verify:
+- `plan_key = starter`
+- `entitlement_status = active`
+- `seat_limit IS NULL`
+- `trial_ends_at IS NULL`
+- `entitlement_valid_until IS NULL`
+- `stripe_customer_id IS NULL`
+- `stripe_subscription_id IS NULL`
+- `stripe_subscription_status IS NULL`
+- `notes` contains `internal_comped_v1`
+
 Then verify first-owner invite acceptance routes to /ops/admin after anchor checks.
 
-## 7. Pre-launch operator handoff note (small boundary reminder)
+## 7. Sandbox and production verification safety checklist
+
+Before any hosted dry-run or apply:
+- Verify intended Supabase project ref from `ENVIRONMENT_RULES.md`.
+  - sandbox ref: `kvpesjdukqwwlgpkzfjm`
+  - production ref: `ornrnvxtwwtulohqwxop`
+- Confirm current linked/target project matches intended environment.
+- Never assume local `.env.local` reflects production.
+
+Read-only entitlement verification query (safe for sandbox and production):
+
+```sql
+select
+  account_owner_user_id,
+  plan_key,
+  entitlement_status,
+  seat_limit,
+  trial_ends_at,
+  entitlement_valid_until,
+  stripe_subscription_status,
+  stripe_customer_id,
+  stripe_subscription_id,
+  notes
+from public.platform_account_entitlements
+where account_owner_user_id = 'OWNER_UUID_HERE';
+```
+
+## 8. Production-safe one-time comped update pattern (manual, future)
+
+Do not run this in the app runtime. Use manual SQL only after explicit production project-ref verification.
+
+Pre-check (read-only):
+
+```sql
+select
+  account_owner_user_id,
+  plan_key,
+  entitlement_status,
+  seat_limit,
+  trial_ends_at,
+  entitlement_valid_until,
+  stripe_customer_id,
+  stripe_subscription_id,
+  stripe_subscription_status,
+  stripe_current_period_end,
+  stripe_cancel_at_period_end,
+  notes
+from public.platform_account_entitlements
+where account_owner_user_id = 'OWNER_UUID_HERE';
+```
+
+Transactional update template (future/manual):
+
+```sql
+begin;
+
+update public.platform_account_entitlements
+set
+  plan_key = 'starter',
+  entitlement_status = 'active',
+  seat_limit = null,
+  trial_ends_at = null,
+  entitlement_valid_until = null,
+  stripe_customer_id = null,
+  stripe_subscription_id = null,
+  stripe_price_id = null,
+  stripe_subscription_status = null,
+  stripe_current_period_end = null,
+  stripe_cancel_at_period_end = false,
+  notes = 'internal_comped_v1',
+  updated_at = now()
+where account_owner_user_id = 'OWNER_UUID_HERE';
+
+commit;
+```
+
+Post-check (read-only):
+
+```sql
+select
+  account_owner_user_id,
+  plan_key,
+  entitlement_status,
+  seat_limit,
+  trial_ends_at,
+  entitlement_valid_until,
+  stripe_customer_id,
+  stripe_subscription_id,
+  stripe_subscription_status,
+  notes
+from public.platform_account_entitlements
+where account_owner_user_id = 'OWNER_UUID_HERE';
+```
+
+Rollback requirement:
+- Capture full before-state entitlement row before manual update.
+- Rollback uses that captured row as source-of-truth restore values.
+- Never perform production write operations without project-ref verification gate.
+
+## 9. Pre-launch operator handoff note (small boundary reminder)
 
 First-owner provisioning behavior is unchanged by Stripe Platform Subscription V1.
 

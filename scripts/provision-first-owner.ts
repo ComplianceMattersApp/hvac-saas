@@ -14,6 +14,7 @@ type ParsedArgs = {
   supportEmail?: string;
   supportPhone?: string;
   defaultBillingMode?: string;
+  entitlementPreset: "standard" | "internal_comped";
   resendInvite: boolean;
   apply: boolean;
 };
@@ -148,6 +149,7 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
   const supportEmail = toCleanString(parseArgValue(argv, "--support-email"));
   const supportPhone = toCleanString(parseArgValue(argv, "--support-phone"));
   const defaultBillingMode = toCleanString(parseArgValue(argv, "--default-billing-mode"));
+  const entitlementPresetRaw = toCleanString(parseArgValue(argv, "--entitlement-preset")).toLowerCase();
   const resendInvite = hasFlag(argv, "--resend-invite");
   const apply = hasFlag(argv, "--apply");
 
@@ -159,6 +161,15 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
     throw new Error("Missing required --business-display-name");
   }
 
+  const entitlementPreset =
+    entitlementPresetRaw === "internal_comped" || entitlementPresetRaw === "standard"
+      ? entitlementPresetRaw
+      : entitlementPresetRaw
+        ? (() => {
+            throw new Error("Invalid --entitlement-preset (expected: standard|internal_comped)");
+          })()
+        : "standard";
+
   return {
     email,
     businessDisplayName,
@@ -166,6 +177,7 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
     supportEmail: supportEmail || undefined,
     supportPhone: supportPhone || undefined,
     defaultBillingMode: defaultBillingMode || undefined,
+    entitlementPreset,
     resendInvite,
     apply,
   };
@@ -199,6 +211,7 @@ export async function runProvisionFirstOwnerScript(
     supportEmail: args.supportEmail,
     supportPhone: args.supportPhone,
     defaultBillingMode: args.defaultBillingMode,
+    entitlementPreset: args.entitlementPreset,
     dryRun: !args.apply,
     operatorMetadata: {
       requestedBy: toCleanString(deps.env.USER || deps.env.USERNAME) || null,
@@ -521,7 +534,23 @@ function createProvisioningClientFromAdmin(admin: any): FirstOwnerProvisioningCl
     async getEntitlementByOwnerId(ownerUserId) {
       const { data, error } = await admin
         .from("platform_account_entitlements")
-        .select("account_owner_user_id, plan_key, entitlement_status")
+        .select(
+          [
+            "account_owner_user_id",
+            "plan_key",
+            "entitlement_status",
+            "seat_limit",
+            "trial_ends_at",
+            "entitlement_valid_until",
+            "stripe_customer_id",
+            "stripe_subscription_id",
+            "stripe_price_id",
+            "stripe_subscription_status",
+            "stripe_current_period_end",
+            "stripe_cancel_at_period_end",
+            "notes",
+          ].join(", "),
+        )
         .eq("account_owner_user_id", ownerUserId)
         .maybeSingle();
       if (error) throw error;
@@ -530,27 +559,83 @@ function createProvisioningClientFromAdmin(admin: any): FirstOwnerProvisioningCl
         account_owner_user_id: String(data.account_owner_user_id),
         plan_key: toCleanString(data.plan_key) || null,
         entitlement_status: toCleanString(data.entitlement_status) || null,
+        seat_limit: Number.isInteger(Number(data.seat_limit)) ? Number(data.seat_limit) : null,
+        trial_ends_at: toCleanString(data.trial_ends_at) || null,
+        entitlement_valid_until: toCleanString(data.entitlement_valid_until) || null,
+        stripe_customer_id: toCleanString(data.stripe_customer_id) || null,
+        stripe_subscription_id: toCleanString(data.stripe_subscription_id) || null,
+        stripe_price_id: toCleanString(data.stripe_price_id) || null,
+        stripe_subscription_status: toCleanString(data.stripe_subscription_status) || null,
+        stripe_current_period_end: toCleanString(data.stripe_current_period_end) || null,
+        stripe_cancel_at_period_end: Boolean(data.stripe_cancel_at_period_end),
+        notes: toCleanString(data.notes) || null,
       };
     },
 
     async upsertEntitlement(input) {
+      const payload: Record<string, unknown> = {
+        account_owner_user_id: input.account_owner_user_id,
+        plan_key: input.plan_key,
+        entitlement_status: input.entitlement_status,
+      };
+
+      if ("seat_limit" in input) payload.seat_limit = input.seat_limit ?? null;
+      if ("trial_ends_at" in input) payload.trial_ends_at = input.trial_ends_at ?? null;
+      if ("entitlement_valid_until" in input) {
+        payload.entitlement_valid_until = input.entitlement_valid_until ?? null;
+      }
+      if ("stripe_customer_id" in input) payload.stripe_customer_id = input.stripe_customer_id ?? null;
+      if ("stripe_subscription_id" in input) {
+        payload.stripe_subscription_id = input.stripe_subscription_id ?? null;
+      }
+      if ("stripe_price_id" in input) payload.stripe_price_id = input.stripe_price_id ?? null;
+      if ("stripe_subscription_status" in input) {
+        payload.stripe_subscription_status = input.stripe_subscription_status ?? null;
+      }
+      if ("stripe_current_period_end" in input) {
+        payload.stripe_current_period_end = input.stripe_current_period_end ?? null;
+      }
+      if ("stripe_cancel_at_period_end" in input) {
+        payload.stripe_cancel_at_period_end = Boolean(input.stripe_cancel_at_period_end);
+      }
+      if ("notes" in input) payload.notes = input.notes ?? null;
+
       const { data, error } = await admin
         .from("platform_account_entitlements")
-        .upsert(
-          {
-            account_owner_user_id: input.account_owner_user_id,
-            plan_key: input.plan_key,
-            entitlement_status: input.entitlement_status,
-          },
-          { onConflict: "account_owner_user_id" },
+        .upsert(payload, { onConflict: "account_owner_user_id" })
+        .select(
+          [
+            "account_owner_user_id",
+            "plan_key",
+            "entitlement_status",
+            "seat_limit",
+            "trial_ends_at",
+            "entitlement_valid_until",
+            "stripe_customer_id",
+            "stripe_subscription_id",
+            "stripe_price_id",
+            "stripe_subscription_status",
+            "stripe_current_period_end",
+            "stripe_cancel_at_period_end",
+            "notes",
+          ].join(", "),
         )
-        .select("account_owner_user_id, plan_key, entitlement_status")
         .single();
       if (error) throw error;
       return {
         account_owner_user_id: String(data.account_owner_user_id),
         plan_key: toCleanString(data.plan_key) || null,
         entitlement_status: toCleanString(data.entitlement_status) || null,
+        seat_limit: Number.isInteger(Number(data.seat_limit)) ? Number(data.seat_limit) : null,
+        trial_ends_at: toCleanString(data.trial_ends_at) || null,
+        entitlement_valid_until: toCleanString(data.entitlement_valid_until) || null,
+        stripe_customer_id: toCleanString(data.stripe_customer_id) || null,
+        stripe_subscription_id: toCleanString(data.stripe_subscription_id) || null,
+        stripe_price_id: toCleanString(data.stripe_price_id) || null,
+        stripe_subscription_status: toCleanString(data.stripe_subscription_status) || null,
+        stripe_current_period_end: toCleanString(data.stripe_current_period_end) || null,
+        stripe_cancel_at_period_end: Boolean(data.stripe_cancel_at_period_end),
+        notes: toCleanString(data.notes) || null,
       };
     },
   };

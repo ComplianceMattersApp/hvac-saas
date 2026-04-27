@@ -347,9 +347,13 @@ function PlatformAccountSection({
   entitlement: AccountEntitlementContext;
   availability: ReturnType<typeof getPlatformBillingAvailability>;
 }) {
-  const planLabel = PLAN_LABELS[entitlement.planKey] ?? entitlement.planKey;
-  const statusLabel =
-    STATUS_LABELS[entitlement.entitlementStatus] ?? entitlement.entitlementStatus;
+  const isInternalComped = entitlement.isInternalComped;
+  const planLabel = isInternalComped
+    ? "Internal / Comped"
+    : PLAN_LABELS[entitlement.planKey] ?? entitlement.planKey;
+  const statusLabel = isInternalComped
+    ? "Active"
+    : STATUS_LABELS[entitlement.entitlementStatus] ?? entitlement.entitlementStatus;
   const userLimitLabel =
     entitlement.seatLimit != null ? String(entitlement.seatLimit) : "Unlimited";
 
@@ -369,6 +373,18 @@ function PlatformAccountSection({
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join(" ")
     : "Not connected";
+
+  const billingCustomerLabel = isInternalComped
+    ? "Not required"
+    : entitlement.billingCustomerLinked
+      ? "Linked"
+      : "Not linked";
+
+  const subscriptionLabel = isInternalComped
+    ? "Not required"
+    : entitlement.billingSubscriptionLinked
+      ? billingStatusLabel
+      : "Not connected";
 
   const billingPeriodEndLabel = entitlement.billingCurrentPeriodEnd
     ? entitlement.billingCurrentPeriodEnd.toLocaleDateString(undefined, {
@@ -395,11 +411,11 @@ function PlatformAccountSection({
       <dl className="grid grid-cols-1 gap-px border-t border-slate-100 bg-slate-100/70 sm:grid-cols-3">
         <PlatformAccountField
           label="Billing customer"
-          value={entitlement.billingCustomerLinked ? "Linked" : "Not linked"}
+          value={billingCustomerLabel}
         />
         <PlatformAccountField
           label="Subscription"
-          value={entitlement.billingSubscriptionLinked ? billingStatusLabel : "Not connected"}
+          value={subscriptionLabel}
         />
         <PlatformAccountField
           label="Period end"
@@ -412,13 +428,17 @@ function PlatformAccountSection({
           <span className="font-medium text-slate-900">{trialEndsLabel}</span>
         </div>
       ) : null}
-      {entitlement.billingCancelAtPeriodEnd ? (
+      {entitlement.billingCancelAtPeriodEnd && !isInternalComped ? (
         <div className="border-t border-amber-100 bg-amber-50/70 px-5 py-3 text-sm leading-6 text-amber-900">
           Subscription is set to cancel at the end of the current billing period.
         </div>
       ) : null}
       <div className="border-t border-slate-100 px-5 py-4">
-        {availability.checkoutAvailable || availability.portalAvailable ? (
+        {isInternalComped ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900">
+            This internal account is comped and does not require Stripe billing.
+          </div>
+        ) : availability.checkoutAvailable || availability.portalAvailable ? (
           <div className="flex flex-wrap gap-2">
             <form action="/api/stripe/checkout" method="post">
               <button
