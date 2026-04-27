@@ -315,14 +315,14 @@ Pricebook V1 is no longer fully deferred.
 
 Current baseline state is:
 - implemented in production from prior work: Pricebook admin surface, starter catalog rows, controlled Category/Unit Label options, and server-side validation of controlled Pricebook values
-- implemented in sandbox continuation for C1B/C1C and pending production promotion: invoice-line provenance/snapshot plumbing and draft internal invoice picker wiring
+- production-promoted for C1B/C1C: invoice-line provenance/snapshot plumbing and draft internal invoice picker wiring are now production-complete and production-smoke confirmed
 
 ### Purpose
 Pricebook is the reusable catalog of billable items.
 
 It feeds:
 - estimates
-- invoices (draft internal invoice flow baseline now exists on sandbox)
+- invoices (draft internal invoice Pricebook picker flow is production-promoted)
 - future reporting by item/category
 
 ### Pricebook item ownership
@@ -351,15 +351,16 @@ Each company must be able to:
 - deactivate items
 - customize its own working catalog over time
 
-### Sandbox-complete C1B/C1C continuation (pending production promotion)
-- nullable invoice-line provenance/snapshot fields added on sandbox: `source_kind`, `source_pricebook_item_id`, `category_snapshot`, `unit_label_snapshot`
+### Production-complete C1B/C1C closeout (production-promoted)
+- nullable invoice-line provenance/snapshot fields are production-migrated: `source_kind`, `source_pricebook_item_id`, `category_snapshot`, `unit_label_snapshot`
 - server-side Pricebook-to-invoice-line frozen snapshot mapping exists for draft internal invoice adds
-- draft internal invoice UI now includes an Add From Pricebook picker
+- draft internal invoice UI Add From Pricebook picker is production-promoted
 - manual invoice line flow remains intact alongside Pricebook-backed adds
 - issued/void invoice behavior remains immutable (no editable add controls)
 - inactive Pricebook items are not selectable
 - negative/default-credit items are blocked/deferred from picker selection
 - no payment, Stripe, QBO, Visit Scope, or service workflow behavior changed by C1B/C1C
+- production smoke is confirmed for C1B/C1C with no payment-execution language drift observed
 
 ### Historical integrity rule
 Changing pricebook later must not mutate historical estimates or invoices.
@@ -905,8 +906,8 @@ Invoice line items must come from a defined source, then become frozen billing r
 When invoice sourcing comes from job execution, the operational source is completed visit scope.
 Internal invoicing remains downstream of visit execution and must not define visit scope itself.
 
-### Current sandbox-valid sourcing extension (C1B/C1C)
-- Pricebook-backed draft internal invoice line creation now exists on sandbox and is pending production promotion
+### Current production-promoted sourcing extension (C1B/C1C)
+- Pricebook-backed draft internal invoice line creation is production-complete and production-smoke confirmed
 - manual and Pricebook-backed line creation coexist in the draft invoice workflow
 - Pricebook item remains a mutable reusable catalog definition
 - invoice line item remains a frozen billed snapshot once written
@@ -1040,7 +1041,7 @@ Required line-item fields:
 ### Locked rule
 Once created, invoice line items do not live-sync back to estimate, job, or pricebook.
 
-Pricebook-backed draft invoice adds now exist on sandbox as part of the active continuation path (pending production promotion), and invoice line items remain frozen billed snapshots once created.
+Pricebook-backed draft invoice adds are production-promoted as part of the active continuation path, and invoice line items remain frozen billed snapshots once created.
 
 Manual invoice lines and Pricebook-backed invoice lines are both valid paths and may coexist on the same draft invoice.
 

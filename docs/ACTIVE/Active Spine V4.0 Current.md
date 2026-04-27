@@ -1211,10 +1211,11 @@ Current position:
 - Pricebook V1 is no longer fully deferred and is the active product-track continuation area.
 - Current Pricebook baseline status:
   - production-complete baseline from prior work includes Pricebook admin surface, starter catalog rows, controlled Category/Unit Label values, and server-side controlled-value validation
-  - sandbox-complete continuation includes C1B/C1C on `sandbox-clean-start` (commits `2764338` and `f7229d9`) and remains pending production promotion
-  - C1B sandbox migration added nullable invoice-line provenance/snapshot fields: `source_kind`, `source_pricebook_item_id`, `category_snapshot`, `unit_label_snapshot`
-  - C1B/C1C sandbox-valid behavior includes server-side Pricebook-to-invoice-line frozen snapshot mapping and draft invoice picker wiring; manual line flow remains intact; issued/void invoice immutability remains intact
+  - production-promoted C1B/C1C is now complete on `main` (merge commit `e208555`) with production migration applied: `20260427153000_internal_invoice_line_items_pricebook_provenance_v1.sql`
+  - C1B/C1C production schema now includes nullable invoice-line provenance/snapshot fields: `source_kind`, `source_pricebook_item_id`, `category_snapshot`, `unit_label_snapshot`
+  - C1B/C1C production-promoted behavior includes server-side Pricebook-to-invoice-line frozen snapshot mapping and draft invoice picker wiring; manual line flow remains intact; issued/void invoice immutability remains intact
   - inactive and negative/default-credit items are blocked/deferred from new draft picker selection
+  - production smoke is confirmed for Pricebook C1B/C1C with no payment-execution language drift observed
 - Launch-readiness polish catch-up is complete for current scope:
   - Service/Visit Scope clarity pass is complete, including clearer Service Details vs Visit Scope guidance and clearer Job Title fallback copy.
   - Invoice job-detail TLC pass is complete, including scanability improvements and explicit truth language that payments are tracking-only entries (no card charge execution).
@@ -1433,7 +1434,7 @@ Reporting / analytics milestone baseline now includes:
 Reporting / analytics baseline is complete enough for the current milestone; remaining work is minor polish/hardening only.
 
 The next natural roadmap area is:
-- Pricebook V1 continuation and production promotion follow-through from the current sandbox-valid baseline
+- Pricebook V1 post-promotion refinement from the current production-complete C1B/C1C baseline
 - Estimates/quoting remains planned/deferred after Pricebook continuation
 
 Pre-launch enablement priority track (separate from product-track sequencing):
@@ -1451,7 +1452,7 @@ Current clarification:
 - RLS / permission hardening milestone is formally closed at the targeted seam-hardening level
 - payment P1 foundation closeout is complete at the current baseline
 - out-of-box readiness / business identity / settings packaging closeout is complete at the current baseline
-- the active product-track roadmap area is Pricebook V1 continuation (with C1B/C1C sandbox-valid and pending production promotion)
+- the active product-track roadmap area is Pricebook V1 continuation (with C1B/C1C production-complete, production-promoted, and production-smoke confirmed)
 - estimates/quoting remains planned/deferred
 - customer/location internal account-owner reconciliation is complete inside that milestone
 - notifications internal-awareness write-path hardening is also complete inside that milestone
