@@ -260,12 +260,29 @@ Completed P1 foundation work (V1):
 
 **Collected Payment Reporting / Invoice Ledger Visibility V1**
 - Implemented collected-payment visibility in the internal invoice ledger report and CSV export.
-- Internal invoice ledger now shows: Amount Paid, Balance Due, Payment Status, Last Payment, Payments.
+- Internal invoice ledger now shows: Amount Paid, Balance Due, Payment Status, Last Payment, Payment Count.
 - CSV export now includes: Amount Paid, Balance Due, Payment Status, Last Payment Date, Payment Count.
 - Collected-payment truth is read from `internal_invoice_payments`; only `payment_status = recorded` contributes to collected totals.
 - Balance due remains read-side derived from invoice total minus recorded payments and does not mutate billed-truth invoice totals or line items.
 - Last Payment Date now renders as a clean report date (not a raw ISO timestamp).
 - This is reporting/visibility only and does not introduce payment execution, Stripe checkout, QBO sync, or portal payment UX.
+- Report wording polish closeout is complete for current launch-readiness scope:
+	- Comm State label changed to Send Status
+	- Payments label changed to Payment Count
+	- CSV wording aligned where applicable
+	- no calculations or payment-state logic changed
+
+**Invoice workflow polish catch-up (completed, non-execution)**
+- Invoice job-detail TLC pass is complete:
+	- panel scanability and section wording improved
+	- invoice truth anchor clarified
+	- payment entries remain tracking-only, no card charge execution
+- Internal invoice draft prefill fallback hardening is complete where source fields exist, without overwriting existing drafts.
+- Internal invoice void recovery/replacement behavior is complete:
+	- voided invoices remain historical
+	- voided invoices do not satisfy billed-truth closeout
+	- replacement draft flow exists for same-job continuity
+	- no live payment execution was introduced
 
 **Final closeout-quality test fidelity polish**
 - Collected-payment report tests now validate production report read-model behavior directly (`listInvoiceLedgerRows` and `buildInvoiceLedgerCsv`) instead of duplicated local aggregation logic.
@@ -290,6 +307,12 @@ Locked carry-forward clarification:
 - Dashboard payment/cash-performance analytics expansion remains deferred.
 - Customer payment acceptance remains a later P2 Stripe-first implementation.
 - Platform subscription billing execution remains a separate future platform-billing track and is not part of tenant internal invoice collected-payment tracking rollout.
+
+Pre-launch ordering update:
+- Stripe enablement for new account users/platform onboarding is elevated as a pre-launch priority track.
+- This does not move tenant customer invoice payment execution into current scope.
+- Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
+- Live Pay Now/Charge Card/checkout/refunds/disputes/payout execution remains deferred.
 
 Recommended first scope:
 - customer pays invoice online

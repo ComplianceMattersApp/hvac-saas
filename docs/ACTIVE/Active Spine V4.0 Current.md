@@ -1088,7 +1088,7 @@ Completed slices in this phase:
 
 3. Collected Payment Reporting / Invoice Ledger Visibility V1
 - Implemented as reporting/visibility only on the internal invoice ledger and CSV export surfaces.
-- Internal invoice ledger rows now expose collected-payment visibility fields: Amount Paid, Balance Due, Payment Status, Last Payment, and Payments.
+- Internal invoice ledger rows now expose collected-payment visibility fields: Amount Paid, Balance Due, Payment Status, Last Payment, and Payment Count.
 - CSV export now includes collected-payment columns: Amount Paid, Balance Due, Payment Status, Last Payment Date, and Payment Count.
 - Collected totals derive from `public.internal_invoice_payments`; only "recorded" status counts toward collected totals.
 - Balance due remains read-side derived from invoice total minus recorded payments; this does not mutate invoice totals or invoice line items.
@@ -1197,6 +1197,14 @@ Current position:
 - Billing / invoice workflow is complete enough to move forward for milestone-2 scope.
 - Reporting / analytics is now substantially complete for the current milestone-3 scope.
 - Payment P1 foundation is closed at the current baseline.
+- Launch-readiness polish catch-up is complete for current scope:
+  - Service/Visit Scope clarity pass is complete, including clearer Service Details vs Visit Scope guidance and clearer Job Title fallback copy.
+  - Invoice job-detail TLC pass is complete, including scanability improvements and explicit truth language that payments are tracking-only entries (no card charge execution).
+  - Internal invoice draft prefill fallback hardening is complete where source fields exist, without overwriting existing drafts.
+  - Address state capture/wiring is complete on relevant intake/finalization paths, including contractor intake proposal state persistence and downstream billing-state prefill support where captured.
+  - Internal invoice void recovery/replacement behavior is complete: voided invoices remain historical, do not satisfy billed-truth closeout, and replacement draft flow exists as the active billing path.
+  - Invoice report wording polish is complete: Send Status and Payment Count labels are now the launch wording targets.
+  - These polish slices did not introduce payment execution, Stripe checkout, card charge flows, refunds/disputes, payouts, QBO sync, or RLS model changes.
 - Out-of-box readiness / business identity / settings packaging now has Admin Readiness / Setup Checklist V1 complete at the current baseline:
   - readiness is a read-only derived packaging layer over existing tenant/account data (no new truth table)
   - required readiness criteria currently include company name, support email, support phone, billing mode, and at least one active internal user
@@ -1204,6 +1212,11 @@ Current position:
   - this does not introduce a broad tenant settings system and does not alter onboarding implementation boundaries
   - closeout status: this roadmap area is complete enough to close at the current baseline with Admin Readiness V1 and First Owner Provisioning V1 implemented
   - public self-signup and platform subscription billing execution remain intentionally deferred
+- Pre-launch priority ordering update:
+  - Stripe enablement for new account users/platform onboarding is elevated as a pre-launch priority track.
+  - This priority remains separate from tenant customer invoice payment execution.
+  - Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
+  - Live Pay Now/Charge Card/checkout/refunds/disputes/payout execution remains deferred.
 - Completed RLS / permission hardening slices for the current stabilized baseline now include customer/location internal account-owner reconciliation, notifications internal-awareness write-path hardening, targeted internal same-account job/service-case mutation boundary hardening, internal same-account job-detail operational mutation boundary hardening, internal same-account pending-info release / re-evaluate mutation boundary hardening, internal same-account service closeout mutation boundary hardening, internal same-account contractor report preview/send boundary hardening, internal job attachments / attachment-storage account-scope hardening, internal job attachments read/download account-scope boundary hardening, internal ECC test-run account-scope hardening, internal job_equipment / job_systems account-scope hardening, internal same-account lifecycle/scheduling mutation boundary hardening, contractor CRUD mutation boundary hardening, staffing / job assignment mutation boundary hardening, job contractor relink mutation boundary hardening, customer standalone mutation boundary hardening, legacy job-detail entrypoint mutation boundary hardening, internal invoice mutation boundary hardening, internal notification read-state mutation boundary hardening, internal user/admin identity mutation boundary hardening, dispatch calendar account-scope read boundary hardening, contractor intake adjudication mutation boundary hardening, dispatch calendar block mutation boundary hardening, admin job terminal mutation boundary hardening, contractor portal intake proposal visibility and collaboration boundary hardening, customer profile upsert mutation boundary hardening, contractor admin edge mutation boundary hardening, contractor invite acceptance membership boundary hardening, and internal business profile mutation boundary hardening:
   - jobs and service_cases were already ahead on account-owner-aware internal read scope
   - customers and locations are now reconciled to that same internal account-owner model for internal same-account teammates
@@ -1398,6 +1411,10 @@ Reporting / analytics baseline is complete enough for the current milestone; rem
 
 The next natural roadmap area is:
 - Smaller service-model revisions / service workflow refinement
+
+Pre-launch enablement priority track (separate from product-track sequencing):
+- Stripe enablement for new account users/platform onboarding is elevated for pre-launch readiness.
+- This does not move tenant customer invoice payment execution into current scope.
 
 Roadmap guardrail for this next area:
 - Payment P1 foundation is already closed at the current baseline.

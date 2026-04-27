@@ -6,7 +6,15 @@
 
 - Job detail is already mostly Visit Scope-first.
 - A helper line was added to reinforce workflow priority: "Scope first: confirm the work for this visit, then complete closeout and billing."
-- Invoice remains downstream billed/commercial truth and no billing/payment behavior changed in this note.
+- Service / Visit Scope clarity pass is complete for launch-readiness scope:
+	- Service job detail now clearly distinguishes Service Details (visit classification) from Visit Scope (trip-owned work definition)
+	- Job Title fallback copy is clarified to reduce ambiguity
+	- no model, validation, billing, ECC, or RLS behavior changed in this pass
+- Invoice remains downstream billed/commercial truth and no billing/payment execution behavior changed in this note.
+- Adjacent completed invoice/report polish that preserves this model boundary:
+	- invoice panel wording now anchors invoice as billed truth while payment entries remain tracking-only
+	- internal invoice void recovery/replacement behavior is in place without changing Visit Scope ownership
+	- invoice report labels are clearer (Send Status, Payment Count) with no calculation changes
 - Future service-model work should focus on workflow refinement, not a model rebuild.
 
 ## 1. Model foundation

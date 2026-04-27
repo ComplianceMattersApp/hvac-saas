@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { resolveAccountReadiness } from "@/lib/business/account-readiness";
+import { getPlatformBillingAvailability } from "@/lib/business/platform-billing-stripe";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
 
@@ -45,6 +46,7 @@ type AdminCard = {
 export default async function OpsAdminPage() {
   const { supabase, internalUser } = await requireAdminOrRedirect();
   const readiness = await resolveAccountReadiness(internalUser.account_owner_user_id, supabase);
+  const platformBillingAvailability = getPlatformBillingAvailability();
   const requiredItems = readiness.items.filter((item) => item.status !== "optional");
   const incompleteRequiredItems = requiredItems.filter((item) => item.status === "incomplete");
   const optionalItems = readiness.items.filter((item) => item.status === "optional");
@@ -177,6 +179,17 @@ export default async function OpsAdminPage() {
               ) : null}
             </div>
           ))}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2 text-sm text-slate-700">
+            <div>
+              Platform billing setup {platformBillingAvailability.checkoutAvailable ? "is available." : "is not configured yet."}
+            </div>
+            <Link
+              href="/ops/admin/company-profile"
+              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-900 hover:bg-slate-100"
+            >
+              Open
+            </Link>
+          </div>
         </div>
       </section>
 
