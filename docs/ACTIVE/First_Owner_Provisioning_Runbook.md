@@ -86,3 +86,12 @@ Confirm the run completed and the owner invite path is valid:
 - first-owner marker is written before invite send
 
 Then verify first-owner invite acceptance routes to /ops/admin after anchor checks.
+
+## 7. Pre-launch operator handoff note (small boundary reminder)
+
+First-owner provisioning behavior is unchanged by Stripe Platform Subscription V1.
+
+- Platform subscription onboarding is a separate pre-launch track from this provisioning runbook.
+- Before live launch, configure live deployment env values (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, app URL) and live webhook endpoint `/api/stripe/webhook`.
+- Do not commit sandbox/test Stripe values.
+- `.env.local` remains local-only; hosted deployment env values are configured separately.

@@ -87,7 +87,8 @@ P1 closeout note:
   - no invoice/payment calculations were changed
 
 ### Priority ordering update (pre-launch)
-- Stripe enablement for new account users/platform onboarding is elevated as a pre-launch priority.
+- Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and locally smoke-tested in sandbox.
+- This work is now in pre-launch live-environment readiness (deployment env, live webhook endpoint, final live smoke).
 - This onboarding priority remains separate from tenant customer invoice payment execution.
 - Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
 - Live Pay Now/Charge Card/checkout/refunds/disputes/payout execution remains deferred.
@@ -293,7 +294,8 @@ Boundaries remain unchanged:
 - `platform_account_entitlements` remains platform entitlement/status context
 - readiness remains derived packaging state, not a new source-of-truth table
 - public self-signup remains deferred
-- platform subscription billing execution remains deferred
+- platform subscription billing for onboarding is implemented in local sandbox and is now a pre-launch live rollout track
+- tenant customer invoice payment execution remains deferred
 - live Stripe/customer checkout remains deferred
 
 ---
@@ -403,13 +405,15 @@ Out-of-box readiness / business identity / settings packaging is also closed at 
 The next natural roadmap area is smaller service-model revisions / service workflow refinement.
 
 Separate pre-launch enablement track:
-- Stripe enablement for new account users/platform onboarding is elevated as a pre-launch priority.
+- Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and locally smoke-tested in sandbox.
+- This work is now in pre-launch live-environment readiness (deployment env, live webhook endpoint, final live smoke).
 - This does not move tenant customer invoice payment execution into current scope.
 
 Roadmap guardrail:
 - Payment P1 foundation is complete and closed.
 - Payment execution remains deferred.
-- Stripe/customer checkout and platform subscription billing are future tracks unless explicitly pulled forward.
+- Stripe platform subscription billing for platform account onboarding is implemented and locally sandbox-validated.
+- Tenant customer invoice payment execution remains a deferred track unless explicitly pulled forward.
 - This does not imply live Stripe/payment execution start unless explicitly planned.
 - This does not imply QBO dependency.
 
@@ -777,13 +781,15 @@ Next natural roadmap area:
 - Smaller service-model revisions / service workflow refinement.
 
 Separate pre-launch enablement track:
-- Stripe enablement for new account users/platform onboarding is elevated as a pre-launch priority.
+- Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and locally smoke-tested in sandbox.
+- This work is now in pre-launch live-environment readiness (deployment env, live webhook endpoint, final live smoke).
 - This does not move tenant customer invoice payment execution into current scope.
 
 Roadmap guardrail:
 - Payment P1 foundation is complete and closed.
 - Payment execution remains deferred.
-- Stripe/customer checkout and platform subscription billing are future tracks unless explicitly pulled forward.
+- Stripe platform subscription billing for platform account onboarding is implemented and locally sandbox-validated.
+- Tenant customer invoice payment execution remains a deferred track unless explicitly pulled forward.
 - This does not imply live Stripe/payment execution start unless explicitly planned.
 - This does not imply QBO dependency.
 
