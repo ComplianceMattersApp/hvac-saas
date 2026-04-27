@@ -1293,9 +1293,17 @@ const defaultHeatingOutputBtu =
           </div>
 
           {!systems.length ? (
-            <div className="text-sm text-muted-foreground">
-              No systems/locations exist yet. Add equipment on the Job Info page first (systems are created from
-              locations).
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                No systems/locations exist yet. Add equipment on the Job Info page first. Systems are created from
+                saved equipment/locations.
+              </div>
+              <Link
+                href={`/jobs/${job.id}/info?f=equipment`}
+                className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 transition-[background-color,border-color,transform] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+              >
+                Add / View Equipment
+              </Link>
             </div>
           ) : null}
         </div>
