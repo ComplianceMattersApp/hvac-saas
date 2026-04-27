@@ -1200,13 +1200,21 @@ Roadmap order remains:
 4. RLS completion / permission hardening
 5. Payment P1 foundation closeout
 6. Out-of-box readiness / business identity / settings packaging closeout
-7. Smaller service-model revisions / service workflow refinement
+7. Pricebook V1 continuation (active product track)
+8. Smaller service-model revisions / service workflow refinement
 
 Current position:
 - Service model buildout is closed for milestone-1 scope.
 - Billing / invoice workflow is complete enough to move forward for milestone-2 scope.
 - Reporting / analytics is now substantially complete for the current milestone-3 scope.
 - Payment P1 foundation is closed at the current baseline.
+- Pricebook V1 is no longer fully deferred and is the active product-track continuation area.
+- Current Pricebook baseline status:
+  - production-complete baseline from prior work includes Pricebook admin surface, starter catalog rows, controlled Category/Unit Label values, and server-side controlled-value validation
+  - sandbox-complete continuation includes C1B/C1C on `sandbox-clean-start` (commits `2764338` and `f7229d9`) and remains pending production promotion
+  - C1B sandbox migration added nullable invoice-line provenance/snapshot fields: `source_kind`, `source_pricebook_item_id`, `category_snapshot`, `unit_label_snapshot`
+  - C1B/C1C sandbox-valid behavior includes server-side Pricebook-to-invoice-line frozen snapshot mapping and draft invoice picker wiring; manual line flow remains intact; issued/void invoice immutability remains intact
+  - inactive and negative/default-credit items are blocked/deferred from new draft picker selection
 - Launch-readiness polish catch-up is complete for current scope:
   - Service/Visit Scope clarity pass is complete, including clearer Service Details vs Visit Scope guidance and clearer Job Title fallback copy.
   - Invoice job-detail TLC pass is complete, including scanability improvements and explicit truth language that payments are tracking-only entries (no card charge execution).
@@ -1425,7 +1433,8 @@ Reporting / analytics milestone baseline now includes:
 Reporting / analytics baseline is complete enough for the current milestone; remaining work is minor polish/hardening only.
 
 The next natural roadmap area is:
-- Smaller service-model revisions / service workflow refinement
+- Pricebook V1 continuation and production promotion follow-through from the current sandbox-valid baseline
+- Estimates/quoting remains planned/deferred after Pricebook continuation
 
 Pre-launch enablement priority track (separate from product-track sequencing):
 - Stripe enablement for new account users/platform onboarding is elevated for pre-launch readiness.
@@ -1442,7 +1451,8 @@ Current clarification:
 - RLS / permission hardening milestone is formally closed at the targeted seam-hardening level
 - payment P1 foundation closeout is complete at the current baseline
 - out-of-box readiness / business identity / settings packaging closeout is complete at the current baseline
-- the next natural roadmap area is smaller service-model revisions / service workflow refinement
+- the active product-track roadmap area is Pricebook V1 continuation (with C1B/C1C sandbox-valid and pending production promotion)
+- estimates/quoting remains planned/deferred
 - customer/location internal account-owner reconciliation is complete inside that milestone
 - notifications internal-awareness write-path hardening is also complete inside that milestone
 - targeted internal same-account job/service-case mutation boundary hardening is also complete inside that milestone
