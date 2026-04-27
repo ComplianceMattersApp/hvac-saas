@@ -124,6 +124,21 @@ If any item here conflicts with the active spine, the spine wins.
 - Per-seat billing remains a desired later track, but is not enforced in V1/live launch.
 - Future per-seat work should include seat-limit enforcement, Stripe quantity sync, proration handling, and customer portal quantity rules.
 
+### 2.7 Pricebook invoice-line sourcing promotion confirmation (C1B/C1C)
+- Confirm sandbox-valid Pricebook invoice-line sourcing changes were promoted intentionally (not implied by unrelated releases).
+- Verify Add From Pricebook picker behavior on promoted environments:
+  - active nonnegative items are selectable
+  - inactive items are not selectable
+  - negative/default-credit items are blocked/deferred
+- Verify frozen invoice-line snapshot/provenance fields are writing as expected for Pricebook-backed adds:
+  - `source_kind`
+  - `source_pricebook_item_id`
+  - `category_snapshot`
+  - `unit_label_snapshot`
+- Verify manual invoice line add/edit/remove flow still works after Pricebook-backed adds.
+- Verify issued/void invoices remain non-editable for Pricebook add controls.
+- Verify wording remains honest and does not imply live payment execution.
+
 ---
 
 ## 3. Support / customer-operations readiness

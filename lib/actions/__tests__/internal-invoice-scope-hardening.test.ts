@@ -131,6 +131,7 @@ type InvoiceMutationEntrypoint =
   | 'issueInternalInvoiceFromForm'
   | 'voidInternalInvoiceFromForm'
   | 'addInternalInvoiceLineItemFromForm'
+  | 'addInternalInvoiceLineItemFromPricebookForm'
   | 'updateInternalInvoiceLineItemFromForm'
   | 'removeInternalInvoiceLineItemFromForm'
   | 'sendInternalInvoiceEmailFromForm';
@@ -141,6 +142,7 @@ const targetedEntrypoints: InvoiceMutationEntrypoint[] = [
   'issueInternalInvoiceFromForm',
   'voidInternalInvoiceFromForm',
   'addInternalInvoiceLineItemFromForm',
+  'addInternalInvoiceLineItemFromPricebookForm',
   'updateInternalInvoiceLineItemFromForm',
   'removeInternalInvoiceLineItemFromForm',
   'sendInternalInvoiceEmailFromForm',

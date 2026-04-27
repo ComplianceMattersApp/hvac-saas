@@ -308,14 +308,21 @@ Boundaries remain unchanged:
 
 ---
 
-## 7. Pricebook v1 (planned)
+## 7. Pricebook v1 (implemented baseline; active continuation)
+
+### Current status
+Pricebook V1 is no longer fully deferred.
+
+Current baseline state is:
+- implemented in production from prior work: Pricebook admin surface, starter catalog rows, controlled Category/Unit Label options, and server-side validation of controlled Pricebook values
+- implemented in sandbox continuation for C1B/C1C and pending production promotion: invoice-line provenance/snapshot plumbing and draft internal invoice picker wiring
 
 ### Purpose
 Pricebook is the reusable catalog of billable items.
 
 It feeds:
 - estimates
-- invoices later
+- invoices (draft internal invoice flow baseline now exists on sandbox)
 - future reporting by item/category
 
 ### Pricebook item ownership
@@ -343,6 +350,16 @@ Each company must be able to:
 - expand categories
 - deactivate items
 - customize its own working catalog over time
+
+### Sandbox-complete C1B/C1C continuation (pending production promotion)
+- nullable invoice-line provenance/snapshot fields added on sandbox: `source_kind`, `source_pricebook_item_id`, `category_snapshot`, `unit_label_snapshot`
+- server-side Pricebook-to-invoice-line frozen snapshot mapping exists for draft internal invoice adds
+- draft internal invoice UI now includes an Add From Pricebook picker
+- manual invoice line flow remains intact alongside Pricebook-backed adds
+- issued/void invoice behavior remains immutable (no editable add controls)
+- inactive Pricebook items are not selectable
+- negative/default-credit items are blocked/deferred from picker selection
+- no payment, Stripe, QBO, Visit Scope, or service workflow behavior changed by C1B/C1C
 
 ### Historical integrity rule
 Changing pricebook later must not mutate historical estimates or invoices.
@@ -880,13 +897,21 @@ Approved estimate → service case/business scope first, then jobs/visits under 
 
 ---
 
-## 11. Invoice sourcing rules (planned)
+## 11. Invoice sourcing rules (implemented baseline + planned expansion)
 
 ### Core rule
 Invoice line items must come from a defined source, then become frozen billing records.
 
 When invoice sourcing comes from job execution, the operational source is completed visit scope.
 Internal invoicing remains downstream of visit execution and must not define visit scope itself.
+
+### Current sandbox-valid sourcing extension (C1B/C1C)
+- Pricebook-backed draft internal invoice line creation now exists on sandbox and is pending production promotion
+- manual and Pricebook-backed line creation coexist in the draft invoice workflow
+- Pricebook item remains a mutable reusable catalog definition
+- invoice line item remains a frozen billed snapshot once written
+- editing/deactivating Pricebook items must not mutate existing invoice lines
+- current provenance/snapshot fields used for this seam are: `source_kind`, `source_pricebook_item_id`, `category_snapshot`, `unit_label_snapshot`
 
 ### Allowed source paths
 - approved estimate scope
@@ -1000,8 +1025,11 @@ Invoice line items are frozen billing snapshots.
 Required line-item fields:
 - invoice_id
 - sort_order
+- source_kind optional (`manual` | `pricebook`)
 - source_pricebook_item_id optional
 - source_estimate_line_item_id optional
+- category_snapshot optional
+- unit_label_snapshot optional
 - item_name_snapshot
 - description_snapshot
 - item_type_snapshot
@@ -1012,7 +1040,9 @@ Required line-item fields:
 ### Locked rule
 Once created, invoice line items do not live-sync back to estimate, job, or pricebook.
 
-Pricebook-backed items are the preferred/default future path for invoice creation, but invoice line items remain frozen billed snapshots once created.
+Pricebook-backed draft invoice adds now exist on sandbox as part of the active continuation path (pending production promotion), and invoice line items remain frozen billed snapshots once created.
+
+Manual invoice lines and Pricebook-backed invoice lines are both valid paths and may coexist on the same draft invoice.
 
 ### Closeout seam clarification
 Internal Invoice V1 must not create a second billing truth on jobs.
