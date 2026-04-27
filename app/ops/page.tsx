@@ -2066,21 +2066,13 @@ return (
     <section className="relative overflow-hidden rounded-2xl border border-slate-300/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_60%,rgba(239,246,255,0.75))] p-3 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/60 sm:p-3.5">
       <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-28 w-28 rounded-full bg-blue-100/50 blur-3xl" />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/90 bg-white shadow-[0_12px_24px_-18px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70">
-            <Image src="/icon.png" alt={`${internalBusinessDisplayName} logo`} width={22} height={22} className="h-5.5 w-5.5 rounded-sm" />
-          </div>
-          <div className="min-w-0">
-            <div className={`${opsUtilityLabelClass} truncate text-slate-500`}>{internalBusinessDisplayName}</div>
-            <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-[1.45rem]">Ops Dashboard</h1>
-            <div className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">Operational queues, field follow-up, and closeout work in one surface.</div>
-          </div>
+        <div className="min-w-0">
+          <div className={`${opsUtilityLabelClass} truncate text-slate-500`}>{internalBusinessDisplayName}</div>
+          <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-[1.45rem]">Ops Dashboard</h1>
+          <div className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">Operational queues, field follow-up, and closeout work in one surface.</div>
         </div>
-        <div className="text-right">
-          <div className={`${opsUtilityLabelClass} text-slate-500`}>Scope</div>
-          <div className={`text-[13px] font-medium leading-5 sm:text-[12px] sm:leading-4 ${selectedContractorName ? "text-blue-800" : "text-slate-700"}`}>
-            {selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
-          </div>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+          <Image src="/icon.png" alt={`${internalBusinessDisplayName} logo`} width={32} height={32} className="h-8 w-8 rounded-md shadow-[0_12px_24px_-18px_rgba(15,23,42,0.45)]" />
         </div>
       </div>
     </section>
