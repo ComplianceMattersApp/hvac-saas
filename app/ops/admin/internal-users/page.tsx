@@ -11,7 +11,6 @@ import DeleteInternalUserButton from "./_components/DeleteInternalUserButton";
 import { confirmTeamSetupFromForm } from "@/lib/actions/internal-business-profile-actions";
 import {
   activateInternalUserFromForm,
-  createInternalUserFromForm,
   deactivateInternalUserFromForm,
   deleteInternalUserFromForm,
   inviteInternalUserFromForm,
@@ -258,36 +257,6 @@ export default async function AdminInternalUsersPage({
             className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
           >
             Send invite
-          </button>
-        </form>
-      </div>
-
-      <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
-        <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Link existing auth user</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">
-          Attach internal access to an existing auth user when the account already exists.
-        </p>
-        <form action={createInternalUserFromForm} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
-          <input
-            name="user_id"
-            placeholder="Auth user UUID"
-            className="sm:col-span-2 rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-            required
-          />
-          <select
-            name="role"
-            defaultValue="office"
-            className="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-2 focus:ring-slate-200"
-          >
-            <option value="admin">admin</option>
-            <option value="office">office</option>
-            <option value="tech">tech</option>
-          </select>
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
-          >
-            Link user
           </button>
         </form>
       </div>
