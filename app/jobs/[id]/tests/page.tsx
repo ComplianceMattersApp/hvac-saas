@@ -1014,6 +1014,9 @@ const defaultHeatingOutputBtu =
             View Completion Report
           </label>
           <PrintButton className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto" />
+          <Link href={`/jobs/${job.id}/info?f=equipment`} className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-center text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto">
+            Add / View Equipment
+          </Link>
           <Link href={`/jobs/${job.id}`} className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-center text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto">
             ← Back to Job
           </Link>
