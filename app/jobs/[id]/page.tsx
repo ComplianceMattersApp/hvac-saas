@@ -1252,6 +1252,19 @@ const promotedCompanionHeader = buildPromotedCompanionReadModel(visitScopeItems)
 const primaryVisitScopeItems = visitScopeItems.filter((item) => item.kind === "primary");
 const companionVisitScopeItems = visitScopeItems.filter((item) => item.kind === "companion_service");
 const visitScopeLeadText = visitScopeSummary || visitScopeHeaderPreview.lead;
+const visitScopeBadgeItems = primaryVisitScopeItems.length > 0 ? primaryVisitScopeItems : visitScopeItems;
+const visitScopeBadgeItemCount = visitScopeBadgeItems.length;
+const visitScopeBadgeFirstTitle = visitScopeBadgeItems[0]?.title ?? "";
+const visitScopeBadgeMainText = visitScopeBadgeItemCount > 0
+  ? `${visitScopeBadgeItemCount} item${visitScopeBadgeItemCount === 1 ? "" : "s"} · ${visitScopeBadgeFirstTitle}${visitScopeBadgeItemCount > 1 ? ` + ${visitScopeBadgeItemCount - 1} more` : ""}`
+  : visitScopeSummary
+    ? "Summary added"
+    : "No scope details yet";
+const visitScopeBadgeSubtext = visitScopeBadgeItemCount > 0
+  ? visitScopeSummary
+    ? "Summary added"
+    : null
+  : visitScopeHeaderPreview.lead || null;
 
 const internalInvoiceBillingAddress = internalInvoice
   ? formatBillingAddress({
@@ -1786,6 +1799,29 @@ const renderTimelineItem = (e: any, key: string) => {
             <div className="mt-1 text-[15px] font-semibold tracking-[-0.01em] text-slate-800">{formatOpsStatusLabel(job.ops_status)}</div>
           </div>
         </div>
+
+        {job.job_type === "service" ? (
+          <div className="mt-3 border-t border-slate-200/80 pt-3">
+            <div className="rounded-xl border border-slate-200/80 bg-slate-50/78 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit Scope</div>
+                  <div className="mt-1 text-sm font-semibold leading-5 text-slate-900">{visitScopeBadgeMainText}</div>
+                  {visitScopeBadgeSubtext ? (
+                    <div className="mt-1 text-xs leading-5 text-slate-600">{visitScopeBadgeSubtext}</div>
+                  ) : null}
+                </div>
+
+                <a
+                  href="#visit-scope-section"
+                  className="shrink-0 text-xs font-semibold text-slate-600 underline-offset-2 transition-colors hover:text-slate-900 hover:underline"
+                >
+                  View scope
+                </a>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   </div>
@@ -3140,7 +3176,7 @@ const renderTimelineItem = (e: any, key: string) => {
 ) : null}
 
 {isInternalUser ? (
-  <div className="mt-6 rounded-2xl border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)]">
+  <div id="visit-scope-section" className="mt-6 rounded-2xl border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)]">
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit Scope</div>
