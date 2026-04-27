@@ -1,16 +1,33 @@
 export const PRICEBOOK_CATEGORY_OPTIONS = [
   "HVAC - General",
+  "HVAC - Diagnostics",
   "HVAC - Maintenance",
   "HVAC - Repair",
   "Compliance",
+  "ECC / Compliance Testing",
+  "Duct / Airflow",
   "Refrigerant",
+  "Refrigerant Services",
+  "Fees",
+  "Permits / Documentation",
+  "Controls",
   "Parts",
   "Labor",
   "Adjustments",
   "Other",
 ] as const;
 
-export const PRICEBOOK_UNIT_LABEL_OPTIONS = ["each", "hr", "lb"] as const;
+export const PRICEBOOK_UNIT_LABEL_OPTIONS = [
+  "each",
+  "hr",
+  "lb",
+  "visit",
+  "test",
+  "job",
+  "flat",
+  "system",
+  "cfm",
+] as const;
 
 const CATEGORY_OPTION_SET = new Set<string>(PRICEBOOK_CATEGORY_OPTIONS);
 const UNIT_LABEL_OPTION_SET = new Set<string>(PRICEBOOK_UNIT_LABEL_OPTIONS);
