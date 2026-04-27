@@ -999,6 +999,11 @@ export async function addInternalInvoiceLineItemFromPricebookForm(formData: Form
     redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_item_inactive');
   }
 
+  const normalizedItemType = getTrimmedString(pricebookItem.item_type).toLowerCase();
+  if (normalizedItemType === 'adjustment') {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_negative_price_deferred');
+  }
+
   let unitPriceCents = 0;
   try {
     unitPriceCents = parseNonNegativeMoneyNumberToCents(pricebookItem.default_unit_price, 'Unit price');

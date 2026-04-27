@@ -776,6 +776,7 @@ export default async function JobDetailPage({
       .select("id, item_name, item_type, category, default_description, default_unit_price, unit_label")
       .eq("account_owner_user_id", internalUser.account_owner_user_id)
       .eq("is_active", true)
+      .in("item_type", ["service", "material", "diagnostic"])
       .gte("default_unit_price", 0)
       .order("item_name", { ascending: true });
 

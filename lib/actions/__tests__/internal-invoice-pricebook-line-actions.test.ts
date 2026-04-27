@@ -395,6 +395,31 @@ describe('internal invoice line item pricebook plumbing', () => {
     expect(insertedLineItems).toHaveLength(0);
   });
 
+  it('denies adjustment pricebook item even when unit price is nonnegative', async () => {
+    const pricebookItem = {
+      id: 'pb-1',
+      account_owner_user_id: 'owner-1',
+      item_name: 'Adjustment Placeholder',
+      item_type: 'adjustment',
+      category: 'Adjustments',
+      default_description: 'Adjustment behavior deferred',
+      default_unit_price: 0,
+      unit_label: 'flat',
+      is_active: true,
+    };
+
+    const { supabase, insertedLineItems } = makeSupabaseFixture({ pricebookItem });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalInvoiceLineItemFromPricebookForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(addInternalInvoiceLineItemFromPricebookForm(pricebookLineFormData())).rejects.toThrow(
+      'banner=internal_invoice_pricebook_negative_price_deferred',
+    );
+
+    expect(insertedLineItems).toHaveLength(0);
+  });
+
   it('keeps frozen inserted snapshot unchanged when source pricebook row is later edited/deactivated', async () => {
     const pricebookItem: Record<string, unknown> = {
       id: 'pb-1',
