@@ -6,14 +6,26 @@ import type { InternalInvoiceItemType, InternalInvoiceLineItemRecord } from '@/l
 
 type ServerFormAction = (formData: FormData) => void | Promise<void>;
 
+type PricebookPickerItem = {
+  id: string;
+  item_name: string;
+  item_type: string;
+  category: string | null;
+  unit_label: string | null;
+  default_unit_price: number;
+  default_description: string | null;
+};
+
 type InternalInvoiceLineItemsTableProps = {
   jobId: string;
   tab: string;
   lineItems: InternalInvoiceLineItemRecord[];
   totalCents: number;
   addLineItemAction: ServerFormAction;
+  addPricebookLineItemAction: ServerFormAction;
   updateLineItemAction: ServerFormAction;
   removeLineItemAction: ServerFormAction;
+  pricebookPickerItems: PricebookPickerItem[];
   workspaceFieldLabelClass: string;
   workspaceInputClass: string;
   primaryButtonClass: string;
@@ -53,8 +65,10 @@ export default function InternalInvoiceLineItemsTable({
   lineItems,
   totalCents,
   addLineItemAction,
+  addPricebookLineItemAction,
   updateLineItemAction,
   removeLineItemAction,
+  pricebookPickerItems,
   workspaceFieldLabelClass,
   workspaceInputClass,
   primaryButtonClass,
@@ -62,6 +76,11 @@ export default function InternalInvoiceLineItemsTable({
 }: InternalInvoiceLineItemsTableProps) {
   const [expandedAdditionalRowId, setExpandedAdditionalRowId] = useState<string | null>(null);
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
+  const [selectedPricebookItemId, setSelectedPricebookItemId] = useState<string>(
+    pricebookPickerItems[0]?.id ?? '',
+  );
+  const selectedPricebookItem =
+    pricebookPickerItems.find((item) => item.id === selectedPricebookItemId) ?? null;
 
   return (
     <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50/72 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.28)]">
@@ -81,6 +100,72 @@ export default function InternalInvoiceLineItemsTable({
       ) : null}
 
       <div className="divide-y divide-slate-200/80">
+        <form action={addPricebookLineItemAction} className="bg-white/92 px-5 py-5">
+          <input type="hidden" name="job_id" value={jobId} />
+          <input type="hidden" name="tab" value={tab} />
+
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add From Pricebook</div>
+              <div className="mt-1 text-xs leading-5 text-slate-500">
+                Add an active catalog item as a frozen billed snapshot. Credits/negative adjustments are deferred.
+              </div>
+            </div>
+          </div>
+
+          {pricebookPickerItems.length > 0 ? (
+            <>
+              <div className="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(6.25rem,0.74fr)_auto] md:items-end">
+                <div>
+                  <label className={workspaceFieldLabelClass}>Pricebook Item</label>
+                  <select
+                    name="pricebook_item_id"
+                    value={selectedPricebookItemId}
+                    onChange={(event) => setSelectedPricebookItemId(event.target.value)}
+                    className={workspaceInputClass}
+                    required
+                  >
+                    {pricebookPickerItems.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.item_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={workspaceFieldLabelClass}>Quantity</label>
+                  <input name="quantity" inputMode="decimal" defaultValue="1.00" className={workspaceInputClass} required />
+                </div>
+
+                <SubmitButton loadingText="Adding..." className={primaryButtonClass}>
+                  Add Pricebook Item
+                </SubmitButton>
+              </div>
+
+              {selectedPricebookItem ? (
+                <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <span>{formatInternalInvoiceItemType(selectedPricebookItem.item_type)}</span>
+                    {selectedPricebookItem.category ? <span>• {selectedPricebookItem.category}</span> : null}
+                    {selectedPricebookItem.unit_label ? <span>• Unit: {selectedPricebookItem.unit_label}</span> : null}
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-slate-900">
+                    Default Unit Price: {formatCurrencyFromAmount(selectedPricebookItem.default_unit_price)}
+                  </div>
+                  {selectedPricebookItem.default_description ? (
+                    <div className="mt-1 text-sm leading-6 text-slate-600">{selectedPricebookItem.default_description}</div>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm leading-6 text-amber-900">
+              No active non-credit Pricebook items are available for draft invoice adds yet.
+            </div>
+          )}
+        </form>
+
         {lineItems.map((lineItem, index) => {
           const isPrimaryRow = index === 0;
           const isExpanded = isPrimaryRow || expandedAdditionalRowId === lineItem.id;

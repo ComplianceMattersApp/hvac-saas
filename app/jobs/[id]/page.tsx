@@ -77,6 +77,7 @@ import {
 } from "@/lib/business/internal-invoice-payments";
 import {
   addInternalInvoiceLineItemFromForm,
+  addInternalInvoiceLineItemFromPricebookForm,
   createInternalInvoiceDraftFromForm,
   issueInternalInvoiceFromForm,
   removeInternalInvoiceLineItemFromForm,
@@ -754,6 +755,42 @@ export default async function JobDetailPage({
           supabase,
         )
       : null;
+
+  let pricebookPickerItems: Array<{
+    id: string;
+    item_name: string;
+    item_type: string;
+    category: string | null;
+    default_description: string | null;
+    default_unit_price: number;
+    unit_label: string | null;
+  }> = [];
+
+  if (
+    isInternalUser &&
+    billingMode === "internal_invoicing" &&
+    internalInvoice?.status === "draft"
+  ) {
+    const { data: pricebookRows, error: pricebookRowsErr } = await supabase
+      .from("pricebook_items")
+      .select("id, item_name, item_type, category, default_description, default_unit_price, unit_label")
+      .eq("account_owner_user_id", internalUser.account_owner_user_id)
+      .eq("is_active", true)
+      .gte("default_unit_price", 0)
+      .order("item_name", { ascending: true });
+
+    if (pricebookRowsErr) throw pricebookRowsErr;
+
+    pricebookPickerItems = (pricebookRows ?? []).map((row: any) => ({
+      id: String(row?.id ?? "").trim(),
+      item_name: String(row?.item_name ?? "").trim(),
+      item_type: String(row?.item_type ?? "").trim(),
+      category: String(row?.category ?? "").trim() || null,
+      default_description: String(row?.default_description ?? "").trim() || null,
+      default_unit_price: Number(row?.default_unit_price ?? 0) || 0,
+      unit_label: String(row?.unit_label ?? "").trim() || null,
+    }));
+  }
 
   const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
     supabase,
@@ -2460,6 +2497,42 @@ const renderTimelineItem = (e: any, key: string) => {
         />
       )}
 
+      {banner === "internal_invoice_pricebook_line_item_added" && (
+        <FlashBanner
+          type="success"
+          message="Pricebook line item added to the draft invoice."
+        />
+      )}
+
+      {(banner === "internal_invoice_pricebook_item_missing" ||
+        banner === "internal_invoice_pricebook_item_not_found") && (
+        <FlashBanner
+          type="warning"
+          message="Select a valid Pricebook item from your active catalog."
+        />
+      )}
+
+      {banner === "internal_invoice_pricebook_quantity_invalid" && (
+        <FlashBanner
+          type="warning"
+          message="Pricebook quantity must be greater than zero."
+        />
+      )}
+
+      {banner === "internal_invoice_pricebook_item_inactive" && (
+        <FlashBanner
+          type="warning"
+          message="That Pricebook item is inactive and cannot be added to this draft invoice."
+        />
+      )}
+
+      {banner === "internal_invoice_pricebook_negative_price_deferred" && (
+        <FlashBanner
+          type="warning"
+          message="Credits/negative Pricebook items are deferred to a later adjustment policy pass and are not allowed in this add flow yet."
+        />
+      )}
+
       {banner === "service_contract_saved" && (
         <FlashBanner
           type="success"
@@ -3384,8 +3457,10 @@ const renderTimelineItem = (e: any, key: string) => {
                   lineItems={internalInvoice.line_items}
                   totalCents={internalInvoice.total_cents}
                   addLineItemAction={addInternalInvoiceLineItemFromForm}
+                  addPricebookLineItemAction={addInternalInvoiceLineItemFromPricebookForm}
                   updateLineItemAction={updateInternalInvoiceLineItemFromForm}
                   removeLineItemAction={removeInternalInvoiceLineItemFromForm}
+                  pricebookPickerItems={pricebookPickerItems}
                   workspaceFieldLabelClass={workspaceFieldLabelClass}
                   workspaceInputClass={workspaceInputClass}
                   primaryButtonClass={primaryButtonClass}
