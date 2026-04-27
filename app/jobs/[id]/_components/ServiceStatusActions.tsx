@@ -92,7 +92,12 @@ export default async function ServiceStatusActions({
 
       {isInternalInvoicing ? (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs leading-5 text-amber-900">
+<<<<<<< HEAD
           Internal invoicing is enabled. Complete billing closure using the <b>Internal Invoice panel</b> below: create or review the draft, then issue and send. Payment recording is optional tracking-only and does not charge cards.
+=======
+          Internal invoicing is enabled. Complete billing closure using the Internal Invoice panel below: create or
+          review the draft, then issue and send. Payment recording is optional tracking-only and does not charge cards.
+>>>>>>> sandbox-clean-start
         </div>
       ) : null}
 
