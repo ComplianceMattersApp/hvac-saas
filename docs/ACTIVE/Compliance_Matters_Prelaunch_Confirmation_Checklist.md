@@ -30,7 +30,7 @@ If any item here conflicts with the active spine, the spine wins.
 ### 2.3 Payment/live enablement readiness
 - Confirm launch posture remains `payment-ready by design, payment-active later` unless explicitly changed.
 - Confirm Phase P1 payment-ready foundation is complete, while live processor-backed payment execution remains later/pre-launch enablement work.
-- Confirm Stripe Platform Subscription V1 is implemented and locally smoke-tested in sandbox for platform account onboarding.
+- Confirm Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Confirm this Stripe work is separate from tenant customer invoice payment execution.
 - Verify no UI implies live processor-backed payment collection before it truly exists.
 - Confirm Stripe-first future direction and QBO-optional boundary remain intact.
@@ -58,25 +58,31 @@ If any item here conflicts with the active spine, the spine wins.
   - Payment Count replaces Payments
   - CSV header wording aligned where applicable
 
-### 2.3.2 Stripe platform onboarding status and live rollout readiness
-- Stripe Platform Subscription V1 is implemented and locally smoke-tested in sandbox.
-- Local sandbox smoke confirmed app-created Checkout, webhook 200 processing, billing customer link, subscription status sync, period-end display, and portal path availability.
-- Local webhook smoke requires Stripe CLI forwarding to `/api/stripe/webhook`.
-- Follow-up local hardening completed:
+### 2.3.2 Stripe platform onboarding status and live rollout confirmation
+- Stripe Platform Subscription V1 is implemented and has now passed live production smoke for platform account onboarding.
+- Live Stripe Product/Price is configured for the flat platform account subscription.
+- Vercel production env is configured with live Stripe values.
+- Live Stripe webhook endpoint is configured for:
+  - `checkout.session.completed`
+  - `customer.subscription.created`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
+- Production Checkout successfully opened live Stripe Checkout.
+- Live subscription completion succeeded on a normal non-owner test account.
+- Vercel logs confirmed `/api/stripe/webhook` returned `200`.
+- `platform_account_entitlements` synced correctly after live purchase:
+  - Billing Customer: Linked
+  - Subscription: Active
+  - Period End populated
+- Manage billing path remains available.
+- Local sandbox smoke and hardening also remain confirmed:
   - `/api/stripe/webhook` bypasses session-auth proxy redirect (no Stripe 307 redirect loop)
   - webhook signature verification remains enforced inside `app/api/stripe/webhook/route.ts`
   - unmanaged/fixture `checkout.session.completed` events are safely ignored with 200
   - period-end mapping uses `subscription.items.data[*].current_period_end` with legacy fallback to `subscription.current_period_end`
-- Live rollout still requires deployment configuration:
-  - live `STRIPE_SECRET_KEY`
-  - live `STRIPE_WEBHOOK_SECRET` from the deployed live webhook endpoint
-  - live `STRIPE_PRICE_ID`
-  - correct app URL configuration (`NEXT_PUBLIC_APP_URL` / app URL equivalent)
-  - live Stripe webhook endpoint targeting `/api/stripe/webhook`
-  - final live-mode smoke before launch
+- This remains platform account subscription billing only.
 - Sandbox/test Stripe values must never be committed.
 - `.env.local` remains local-only.
-- Hosted production env values (for example Vercel) must be configured separately.
 - Local Stripe CLI webhook secret is not the same as deployed/live webhook secret.
 - Keep this priority separate from tenant customer invoice payment execution.
 - Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
@@ -86,6 +92,11 @@ If any item here conflicts with the active spine, the spine wins.
 - **V1 implemented and browser-smoked.** Invite-only, platform-admin/operator provisioned. Not public signup.
 - Confirmed: provisioning script (`scripts/provision-first-owner.ts`) requires explicit allow flags for apply mode; defaults to dry-run.
 - Confirmed: provisioning confirms/creates auth user, profile, owner-anchored `internal_users` row, `internal_business_profiles`, `platform_account_entitlements`.
+- Confirmed: internal/comped entitlement support is complete for owner-safe accounts.
+- Confirmed: production owner account is protected with `entitlement_status = active`, `seat_limit = null`, `notes = internal_comped_v1`, and no Stripe customer/subscription linkage.
+- Confirmed: sandbox owner account is aligned to the same protected comped pattern.
+- Confirmed: production owner account and Terry are protected under the production account-owner entitlement.
+- Confirmed: owner/internal comped accounts are not pushed into Stripe Checkout.
 - Confirmed: first-owner marker is durably written to user metadata before invite send.
 - Confirmed: first-owner routing seam (`lib/auth/first-owner-routing.ts`) detects marker and confirms all anchor rows before routing; fails closed if any row is missing.
 - Confirmed: first owner acceptance (`/set-password?mode=invite`) routes to `/ops/admin`; Admin Center + Account Setup readiness card renders.
@@ -98,7 +109,20 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirm Admin Readiness / Setup Checklist V1 is present and working on `/ops/admin` and contextually visible on `/ops/admin/company-profile`.
 - Confirm readiness packaging remains read-only derived state from existing tenant/account sources (no new readiness truth table).
 - Confirm required criteria and optional criteria render separately with clear setup guidance.
+- Confirmed: setup-progress timestamps were added at `internal_business_profiles.profile_reviewed_at` and `internal_business_profiles.team_reviewed_at`, and applied in sandbox and production.
+- Confirmed: readiness now separates provisioning-created foundation rows from user-completed onboarding actions.
+- Confirmed: a newly provisioned standard account first login shows `0 of 5 complete`, not a misleading `5 of 5 complete`.
+- Confirmed: saving company profile marks the profile-related readiness steps complete.
+- Confirmed: confirming team setup marks the team step complete.
+- Confirmed: production browser verification showed the newest account at `0 of 5` on first login.
+- Confirmed: `/ops/admin/internal-users` launch cleanup removed/hid the `Link existing auth user` panel from the normal admin page while preserving Invite teammate, team setup confirmation, and the team member list.
 - Closeout clarification: this roadmap area is closed at the current baseline, but readiness and first-owner provisioning remain required pre-launch verification/runbook checks.
+
+### 2.6 Launch billing decision (confirmed)
+- V1/live launch uses a flat platform account subscription with unlimited users.
+- Active user count remains visible.
+- Per-seat billing remains a desired later track, but is not enforced in V1/live launch.
+- Future per-seat work should include seat-limit enforcement, Stripe quantity sync, proration handling, and customer portal quantity rules.
 
 ---
 
@@ -137,6 +161,7 @@ Before launch, confirm:
 - internal/admin critical paths still behave correctly
 - notifications and awareness surfaces are honest and current
 - billing/payment wording remains truthful
+- tenant customer invoice payment execution is still not live
 - pre-launch enablements above are either completed or intentionally deferred with explicit decision
 - no deferred hardening item has been silently forgotten
 

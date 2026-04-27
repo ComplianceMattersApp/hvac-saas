@@ -1,6 +1,6 @@
 # Compliance Matters Software — Payments Roadmap
 
-**Status:** ACTIVE IMPLEMENTATION DIRECTION (platform-subscription V1 local validation complete)  
+**Status:** ACTIVE IMPLEMENTATION DIRECTION (platform-subscription V1 live platform smoke complete)  
 **Purpose:** Define the correct payment architecture now, while building only the payment-ready foundation and avoiding rework later.
 
 ---
@@ -62,7 +62,7 @@ When real payment acceptance is introduced later:
 - contractor payout/onboarding complexity should be handled at the payment-rail layer, not forced into accounting logic
 
 ### Current implementation rule
-Platform subscription billing for account onboarding is implemented as Stripe Platform Subscription V1 and locally smoke-tested in sandbox.  
+Platform subscription billing for account onboarding is implemented as Stripe Platform Subscription V1 and has passed live production smoke for platform account subscriptions.  
 Tenant customer invoice payment execution remains deferred.  
 Build tenant payment architecture so later Stripe execution can be introduced without structural rework.
 
@@ -90,9 +90,12 @@ Still not implemented/live:
 - customer checkout / saved payment methods / refunds / disputes / payout workflows
 
 Platform subscription onboarding status (separate from tenant payment execution):
-- Stripe Platform Subscription V1 is implemented and locally smoke-tested in sandbox.
+- Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.
+- Live confirmation includes: live Stripe Product/Price, Vercel production env, deployed webhook endpoint, successful live checkout completion on a normal non-owner test account, webhook `200` handling, billing-customer linkage, active subscription sync, populated period end, and billing portal availability.
 - Sync target is limited to `platform_account_entitlements`.
+- Live launch billing decision is flat account subscription with unlimited users; active user count remains visible and per-seat enforcement is deferred.
+- Internal/comped owner protection is complete through `internal_comped_v1` detection and comped-safe entitlement rows with no Stripe linkage.
 - This does not introduce tenant invoice checkout, tenant customer payment links, Pay Now/Charge Card, refunds/disputes/payout execution, Connect, or QBO sync.
 
 Locked direction:
@@ -313,12 +316,12 @@ First live processor phase, currently a planning target rather than immediate im
 Locked carry-forward clarification:
 - Dashboard payment/cash-performance analytics expansion remains deferred.
 - Customer payment acceptance remains a later P2 Stripe-first implementation.
-- Platform subscription billing for account onboarding is implemented in V1 and locally smoke-tested in sandbox.
+- Platform subscription billing for account onboarding is implemented in V1 and live-smoke confirmed in production.
 - This platform-billing slice remains separate from tenant internal invoice collected-payment tracking rollout.
 
-Pre-launch ordering update:
-- Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and locally smoke-tested in sandbox.
-- This work is now in pre-launch live-environment readiness (production env + live webhook + final live smoke).
+Launch-status update:
+- Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed in production.
+- This work no longer sits in pending live-environment readiness; live keys, live webhook, and final smoke are complete for the platform-account subscription slice.
 - This does not move tenant customer invoice payment execution into current scope.
 - Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
 - Live Pay Now/Charge Card/checkout/refunds/disputes/payout execution remains deferred.
@@ -394,4 +397,4 @@ Not as:
 
 ## 12. One-line definition
 
-Compliance Matters is **payment-ready by design now, payment-active later for tenant invoice execution**: operational payment truth lives in the platform, Stripe Platform Subscription V1 is implemented and locally sandbox-validated for platform onboarding, Stripe remains the future tenant payment rail, QBO remains optional accounting sync only, and a small configurable platform fee is supported for later rollout.
+Compliance Matters is **payment-ready by design now, payment-active later for tenant invoice execution**: operational payment truth lives in the platform, Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding, Stripe remains the future tenant payment rail, QBO remains optional accounting sync only, and a small configurable platform fee is supported for later rollout.
