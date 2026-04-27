@@ -106,50 +106,51 @@ export default async function RootLayout({
               {/* Top Bar */}
               <header className="fixed top-0 inset-x-0 z-50 border-b border-slate-300/80 bg-white/88 px-4 py-3 backdrop-blur-md shadow-[0_14px_28px_-24px_rgba(15,23,42,0.4)] sm:px-6 print:hidden">
                 <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 sm:gap-4">
-                  <div className="min-w-0 flex flex-1 items-center gap-3 sm:gap-4">
-                    <div className="min-w-0 flex items-center gap-3">
-                      <Link
-                        href={homeHref}
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300/80 bg-white shadow-[0_12px_22px_-18px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                      >
-                        <Image src="/icon.png" alt="Compliance Matters logo" width={18} height={18} className="rounded-sm" />
-                      </Link>
-                      <Link
-                        href={homeHref}
-                        className="min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                      >
-                        <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Compliance Matters</span>
-                        <span className="block truncate text-sm font-semibold tracking-[-0.01em] text-slate-950 transition-colors hover:text-slate-700">Operations Software</span>
-                      </Link>
-                    </div>
-
-                    <div className="hidden h-8 w-px bg-slate-200/90 lg:block" />
-
-                    <div className="hidden flex-wrap items-center gap-1 sm:flex">
-                      <Link
-                        href="/jobs/new"
-                        className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_22px_-18px_rgba(37,99,235,0.58)] transition-all hover:-translate-y-px hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:translate-y-0"
-                      >
-                        + New Job
-                      </Link>
-                      {isInternalUser ? (
-                        <Link
-                          href="/calendar"
-                          className={shellSecondaryLinkClass}
-                        >
-                          View Calendar
-                        </Link>
-                      ) : null}
-                      <Link
-                        href="/customers"
-                        className={shellSecondaryLinkClass}
-                      >
-                        Search Customers
-                      </Link>
-                    </div>
+                  {/* Brand — fixed left */}
+                  <div className="shrink-0 flex items-center gap-3">
+                    <Link
+                      href={homeHref}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300/80 bg-white shadow-[0_12px_22px_-18px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                    >
+                      <Image src="/icon.png" alt="Compliance Matters logo" width={18} height={18} className="rounded-sm" />
+                    </Link>
+                    <Link
+                      href={homeHref}
+                      className="min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                    >
+                      <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Compliance Matters</span>
+                      <span className="block truncate text-sm font-semibold tracking-[-0.01em] text-slate-950 transition-colors hover:text-slate-700">Operations Software</span>
+                    </Link>
                   </div>
 
-                  <div className="hidden shrink-0 items-center gap-1 sm:flex">
+                  <div className="hidden h-8 w-px shrink-0 bg-slate-200/90 lg:block" />
+
+                  {/* Primary nav — expands to fill center, items centered */}
+                  <div className="hidden flex-1 items-center justify-center gap-3 sm:flex">
+                    <Link
+                      href="/jobs/new"
+                      className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_22px_-18px_rgba(37,99,235,0.58)] transition-all hover:-translate-y-px hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:translate-y-0"
+                    >
+                      + New Job
+                    </Link>
+                    {isInternalUser ? (
+                      <Link
+                        href="/calendar"
+                        className={shellSecondaryLinkClass}
+                      >
+                        View Calendar
+                      </Link>
+                    ) : null}
+                    <Link
+                      href="/customers"
+                      className={shellSecondaryLinkClass}
+                    >
+                      Search Customers
+                    </Link>
+                  </div>
+
+                  {/* Utility links — fixed right */}
+                  <div className="hidden shrink-0 items-center gap-2 sm:flex">
                     {isInternalUser && (
                       <Link
                         href="/ops/notifications"
