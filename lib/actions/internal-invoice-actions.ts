@@ -96,6 +96,20 @@ function parseMoneyToCents(raw: string, fieldLabel: string) {
   return parseScaledInteger(raw, 2, fieldLabel);
 }
 
+function parseNonNegativeMoneyNumberToCents(raw: unknown, fieldLabel: string) {
+  const normalized = Number(raw);
+  if (!Number.isFinite(normalized)) {
+    throw new Error(`${fieldLabel} must be a valid number.`);
+  }
+
+  const cents = Math.round(normalized * 100);
+  if (cents < 0) {
+    throw new Error(`${fieldLabel} must be greater than or equal to zero.`);
+  }
+
+  return cents;
+}
+
 function parseQuantityToHundredths(raw: string) {
   const quantity = parseScaledInteger(raw, 2, 'Quantity');
   if (quantity <= 0) {
@@ -275,6 +289,22 @@ function parseLineItemDraftFields(formData: FormData) {
     unit_price: formatScaledInt(unitPriceCents, 2),
     line_subtotal: formatScaledInt(lineSubtotalCents, 2),
   };
+}
+
+async function loadScopedPricebookSnapshot(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  pricebookItemId: string;
+}) {
+  const { data, error } = await params.supabase
+    .from('pricebook_items')
+    .select('id, account_owner_user_id, item_name, item_type, category, default_description, default_unit_price, unit_label, is_active')
+    .eq('id', params.pricebookItemId)
+    .eq('account_owner_user_id', params.accountOwnerUserId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ?? null;
 }
 
 async function loadInternalInvoiceContext(formData: FormData) {
@@ -919,6 +949,7 @@ export async function addInternalInvoiceLineItemFromForm(formData: FormData) {
     .insert({
       invoice_id: invoice.id,
       sort_order: nextSortOrder,
+      source_kind: 'manual',
       ...payload,
       created_by_user_id: context.userId,
       updated_by_user_id: context.userId,
@@ -936,6 +967,79 @@ export async function addInternalInvoiceLineItemFromForm(formData: FormData) {
   revalidatePath('/jobs');
   revalidatePath('/ops');
   redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_line_item_added'));
+}
+
+export async function addInternalInvoiceLineItemFromPricebookForm(formData: FormData) {
+  const context = await requireDraftInvoiceContext(formData);
+  const invoice = context.invoice!;
+
+  const pricebookItemId = getTrimmedString(formData.get('pricebook_item_id'));
+  if (!pricebookItemId) {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_item_missing');
+  }
+
+  let quantityHundredths = 0;
+  try {
+    quantityHundredths = parseQuantityToHundredths(getTrimmedString(formData.get('quantity')) || '1');
+  } catch {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_quantity_invalid');
+  }
+
+  const pricebookItem = await loadScopedPricebookSnapshot({
+    supabase: context.supabase,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    pricebookItemId,
+  });
+
+  if (!pricebookItem?.id) {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_item_not_found');
+  }
+
+  if (!pricebookItem.is_active) {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_item_inactive');
+  }
+
+  let unitPriceCents = 0;
+  try {
+    unitPriceCents = parseNonNegativeMoneyNumberToCents(pricebookItem.default_unit_price, 'Unit price');
+  } catch {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_negative_price_deferred');
+  }
+
+  const lineSubtotalCents = computeLineSubtotalCents(quantityHundredths, unitPriceCents);
+  const nextSortOrder = (invoice.line_items?.length ?? 0) + 1;
+
+  const { error } = await context.supabase
+    .from('internal_invoice_line_items')
+    .insert({
+      invoice_id: invoice.id,
+      sort_order: nextSortOrder,
+      source_kind: 'pricebook',
+      source_pricebook_item_id: String(pricebookItem.id),
+      item_name_snapshot: getTrimmedString(pricebookItem.item_name),
+      description_snapshot: getOptionalText(pricebookItem.default_description),
+      item_type_snapshot: normalizeInternalInvoiceItemType(pricebookItem.item_type),
+      category_snapshot: getOptionalText(pricebookItem.category),
+      unit_label_snapshot: getOptionalText(pricebookItem.unit_label),
+      quantity: formatScaledInt(quantityHundredths, 2),
+      unit_price: formatScaledInt(unitPriceCents, 2),
+      line_subtotal: formatScaledInt(lineSubtotalCents, 2),
+      created_by_user_id: context.userId,
+      updated_by_user_id: context.userId,
+    });
+
+  if (error) throw error;
+
+  await syncInvoiceTotalsFromLineItems({
+    supabase: context.supabase,
+    invoiceId: invoice.id,
+    userId: context.userId,
+  });
+
+  revalidatePath(`/jobs/${context.jobId}`);
+  revalidatePath('/jobs');
+  revalidatePath('/ops');
+  redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_pricebook_line_item_added'));
 }
 
 export async function updateInternalInvoiceLineItemFromForm(formData: FormData) {

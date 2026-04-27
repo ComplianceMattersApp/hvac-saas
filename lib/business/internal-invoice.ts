@@ -8,9 +8,13 @@ export type InternalInvoiceLineItemRecord = {
   id: string;
   invoice_id: string;
   sort_order: number;
+  source_kind: 'manual' | 'pricebook' | null;
+  source_pricebook_item_id: string | null;
   item_name_snapshot: string;
   description_snapshot: string | null;
   item_type_snapshot: InternalInvoiceItemType;
+  category_snapshot: string | null;
+  unit_label_snapshot: string | null;
   quantity: number;
   unit_price: number;
   line_subtotal: number;
@@ -91,9 +95,13 @@ const INTERNAL_INVOICE_LINE_ITEM_SELECT = [
   "id",
   "invoice_id",
   "sort_order",
+  "source_kind",
+  "source_pricebook_item_id",
   "item_name_snapshot",
   "description_snapshot",
   "item_type_snapshot",
+  "category_snapshot",
+  "unit_label_snapshot",
   "quantity",
   "unit_price",
   "line_subtotal",
@@ -120,13 +128,22 @@ export function normalizeInternalInvoiceItemType(value: unknown): InternalInvoic
 }
 
 function normalizeInternalInvoiceLineItemRow(row: any): InternalInvoiceLineItemRecord {
+  const sourceKindRaw = String(row?.source_kind ?? '').trim().toLowerCase();
+  const sourceKind = sourceKindRaw === 'manual' || sourceKindRaw === 'pricebook'
+    ? (sourceKindRaw as 'manual' | 'pricebook')
+    : null;
+
   return {
     id: String(row?.id ?? "").trim(),
     invoice_id: String(row?.invoice_id ?? "").trim(),
     sort_order: Number(row?.sort_order ?? 0) || 0,
+    source_kind: sourceKind,
+    source_pricebook_item_id: String(row?.source_pricebook_item_id ?? '').trim() || null,
     item_name_snapshot: String(row?.item_name_snapshot ?? "").trim(),
     description_snapshot: String(row?.description_snapshot ?? "").trim() || null,
     item_type_snapshot: normalizeInternalInvoiceItemType(row?.item_type_snapshot),
+    category_snapshot: String(row?.category_snapshot ?? '').trim() || null,
+    unit_label_snapshot: String(row?.unit_label_snapshot ?? '').trim() || null,
     quantity: Number(row?.quantity ?? 0) || 0,
     unit_price: Number(row?.unit_price ?? 0) || 0,
     line_subtotal: Number(row?.line_subtotal ?? 0) || 0,
