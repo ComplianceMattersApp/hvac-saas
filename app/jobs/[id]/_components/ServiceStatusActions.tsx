@@ -92,8 +92,8 @@ export default async function ServiceStatusActions({
 
       {isInternalInvoicing ? (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs leading-5 text-amber-900">
-          Internal invoicing mode is enabled for this company. The lightweight external billing action is hidden here
-          because billing closeout runs through the job-linked internal invoice workflow.
+          Internal invoicing is enabled. Complete billing closure using the Internal Invoice panel below: create or
+          review the draft, then issue and send. Payment recording is optional tracking-only and does not charge cards.
         </div>
       ) : null}
 
