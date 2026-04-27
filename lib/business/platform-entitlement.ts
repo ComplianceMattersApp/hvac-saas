@@ -5,10 +5,9 @@
 //   - tenant billed truth (internal_invoices / internal_invoice_line_items)
 //   - collected payment truth (internal_invoice_payments)
 //
-// Stripe placeholder fields (stripe_customer_id, stripe_subscription_id,
-// stripe_price_id) exist in the DB schema but are intentionally excluded from
-// all selects and types here. No application code reads or writes them in
-// this slice.
+// Raw Stripe identifiers remain excluded from resolver output. The resolver
+// may expose narrow internal billing summary fields derived from entitlement
+// Stripe columns without returning the raw identifiers themselves.
 
 export type PlatformPlanKey = "starter" | "professional" | "enterprise";
 
@@ -27,6 +26,11 @@ export type AccountEntitlementContext = {
   activeSeatCount: number;
   trialEndsAt: Date | null;
   entitlementValidUntil: Date | null;
+  billingCustomerLinked: boolean;
+  billingSubscriptionLinked: boolean;
+  billingSubscriptionStatus: string | null;
+  billingCurrentPeriodEnd: Date | null;
+  billingCancelAtPeriodEnd: boolean;
 };
 
 const ACTIVE_STATUSES: ReadonlySet<EntitlementStatus> = new Set([
@@ -101,11 +105,21 @@ export async function resolveAccountEntitlement(
     return buildSafeDefault(activeSeatCount);
   }
 
-  // Stripe placeholder fields are explicitly excluded from the select.
   const { data, error } = await supabase
     .from("platform_account_entitlements")
     .select(
-      "plan_key, entitlement_status, seat_limit, trial_ends_at, entitlement_valid_until",
+      [
+        "plan_key",
+        "entitlement_status",
+        "seat_limit",
+        "trial_ends_at",
+        "entitlement_valid_until",
+        "stripe_customer_id",
+        "stripe_subscription_id",
+        "stripe_subscription_status",
+        "stripe_current_period_end",
+        "stripe_cancel_at_period_end",
+      ].join(", "),
     )
     .eq("account_owner_user_id", normalizedOwnerId)
     .maybeSingle();
@@ -130,6 +144,16 @@ export async function resolveAccountEntitlement(
   const entitlementValidUntil = data.entitlement_valid_until
     ? new Date(data.entitlement_valid_until)
     : null;
+  const billingCustomerLinked = Boolean(String(data.stripe_customer_id ?? "").trim());
+  const billingSubscriptionLinked = Boolean(
+    String(data.stripe_subscription_id ?? "").trim(),
+  );
+  const billingSubscriptionStatus =
+    String(data.stripe_subscription_status ?? "").trim() || null;
+  const billingCurrentPeriodEnd = data.stripe_current_period_end
+    ? new Date(data.stripe_current_period_end)
+    : null;
+  const billingCancelAtPeriodEnd = Boolean(data.stripe_cancel_at_period_end);
 
   return {
     planKey,
@@ -139,6 +163,11 @@ export async function resolveAccountEntitlement(
     activeSeatCount,
     trialEndsAt,
     entitlementValidUntil,
+    billingCustomerLinked,
+    billingSubscriptionLinked,
+    billingSubscriptionStatus,
+    billingCurrentPeriodEnd,
+    billingCancelAtPeriodEnd,
   };
 }
 
@@ -151,5 +180,10 @@ function buildSafeDefault(activeSeatCount: number): AccountEntitlementContext {
     activeSeatCount,
     trialEndsAt: null,
     entitlementValidUntil: null,
+    billingCustomerLinked: false,
+    billingSubscriptionLinked: false,
+    billingSubscriptionStatus: null,
+    billingCurrentPeriodEnd: null,
+    billingCancelAtPeriodEnd: false,
   };
 }

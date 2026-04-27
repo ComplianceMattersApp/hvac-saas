@@ -32,6 +32,11 @@ function makeEntitlementRow(overrides: Partial<{
   seat_limit: number | null;
   trial_ends_at: string | null;
   entitlement_valid_until: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_subscription_status: string | null;
+  stripe_current_period_end: string | null;
+  stripe_cancel_at_period_end: boolean | null;
 }> = {}) {
   return {
     plan_key: "starter",
@@ -39,6 +44,11 @@ function makeEntitlementRow(overrides: Partial<{
     seat_limit: null,
     trial_ends_at: null,
     entitlement_valid_until: null,
+    stripe_customer_id: null,
+    stripe_subscription_id: null,
+    stripe_subscription_status: null,
+    stripe_current_period_end: null,
+    stripe_cancel_at_period_end: false,
     ...overrides,
   };
 }
@@ -126,6 +136,11 @@ describe("resolveAccountEntitlement", () => {
     expect(ctx.activeSeatCount).toBe(3);
     expect(ctx.trialEndsAt).toBeNull();
     expect(ctx.entitlementValidUntil).toBeInstanceOf(Date);
+    expect(ctx.billingCustomerLinked).toBe(false);
+    expect(ctx.billingSubscriptionLinked).toBe(false);
+    expect(ctx.billingSubscriptionStatus).toBeNull();
+    expect(ctx.billingCurrentPeriodEnd).toBeNull();
+    expect(ctx.billingCancelAtPeriodEnd).toBe(false);
   });
 
   // 2. Resolver returns safe default when no row exists (no throw)
@@ -144,6 +159,11 @@ describe("resolveAccountEntitlement", () => {
     expect(ctx.activeSeatCount).toBe(0);
     expect(ctx.trialEndsAt).toBeNull();
     expect(ctx.entitlementValidUntil).toBeNull();
+    expect(ctx.billingCustomerLinked).toBe(false);
+    expect(ctx.billingSubscriptionLinked).toBe(false);
+    expect(ctx.billingSubscriptionStatus).toBeNull();
+    expect(ctx.billingCurrentPeriodEnd).toBeNull();
+    expect(ctx.billingCancelAtPeriodEnd).toBe(false);
   });
 
   // 3. Live seat count is derived from internal_users
@@ -280,5 +300,33 @@ describe("resolveAccountEntitlement", () => {
     expect(ctx).toHaveProperty("activeSeatCount");
     expect(ctx).toHaveProperty("trialEndsAt");
     expect(ctx).toHaveProperty("entitlementValidUntil");
+    expect(ctx).toHaveProperty("billingCustomerLinked");
+    expect(ctx).toHaveProperty("billingSubscriptionLinked");
+    expect(ctx).toHaveProperty("billingSubscriptionStatus");
+    expect(ctx).toHaveProperty("billingCurrentPeriodEnd");
+    expect(ctx).toHaveProperty("billingCancelAtPeriodEnd");
+  });
+
+  it("returns narrow billing summary fields without exposing raw Stripe identifiers", async () => {
+    const supabase = makeSupabase({
+      entitlementRow: makeEntitlementRow({
+        stripe_customer_id: "cus_123",
+        stripe_subscription_id: "sub_123",
+        stripe_subscription_status: "active",
+        stripe_current_period_end: "2027-03-01T00:00:00Z",
+        stripe_cancel_at_period_end: true,
+      }),
+      internalUserCount: 2,
+    });
+
+    const ctx = await resolveAccountEntitlement(ACCOUNT_OWNER_A, supabase);
+
+    expect(ctx.billingCustomerLinked).toBe(true);
+    expect(ctx.billingSubscriptionLinked).toBe(true);
+    expect(ctx.billingSubscriptionStatus).toBe("active");
+    expect(ctx.billingCurrentPeriodEnd).toBeInstanceOf(Date);
+    expect(ctx.billingCancelAtPeriodEnd).toBe(true);
+    expect(ctx).not.toHaveProperty("stripe_customer_id");
+    expect(ctx).not.toHaveProperty("stripe_subscription_id");
   });
 });

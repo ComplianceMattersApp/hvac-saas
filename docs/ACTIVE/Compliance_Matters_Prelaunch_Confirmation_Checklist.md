@@ -32,6 +32,35 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirm Phase P1 payment-ready foundation is complete, while live processor-backed payment execution remains later/pre-launch enablement work.
 - Verify no UI implies live processor-backed payment collection before it truly exists.
 - Confirm Stripe-first future direction and QBO-optional boundary remain intact.
+- Confirm recent invoice/payment wording polish remains honest:
+  - payment entries are tracking-only and do not execute card charges
+  - no live Pay Now/Charge Card/checkout/refund/dispute/payout language appears as active behavior
+
+### 2.3.1 Launch-readiness catch-up confirmations (completed)
+- Service / Visit Scope clarity pass is complete:
+  - Service Details vs Visit Scope purpose wording is clarified on job detail
+  - Job Title fallback copy is clarified
+  - no model/validation/billing/ECC/RLS behavior changes were introduced
+- Invoice job-detail TLC pass is complete:
+  - panel scanability and issue/send/payment/void wording are clearer
+  - invoice truth anchor is explicit; payment recording remains tracking-only
+  - external-billing lightweight wording emphasizes Invoice Sent tracking
+- Internal invoice prefill fallback hardening is complete where source fields exist; existing drafts are not overwritten.
+- Address state capture/wiring pass is complete for relevant intake/finalization seams and supports billing-state prefill where source data is captured.
+- Internal invoice void recovery/replacement pass is complete:
+  - voided invoices remain historical
+  - voided invoices do not satisfy closeout billed truth
+  - replacement draft flow is available for same-job continuity
+- Invoice report wording polish is complete:
+  - Send Status replaces Comm State
+  - Payment Count replaces Payments
+  - CSV header wording aligned where applicable
+
+### 2.3.2 Stripe platform onboarding pre-launch priority
+- Stripe enablement for new account users/platform onboarding is elevated as a pre-launch priority.
+- Keep this priority separate from tenant customer invoice payment execution.
+- Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
+- Live payment execution surfaces (Pay Now/Charge Card/checkout/refunds/disputes/payouts) remain deferred.
 
 ### 2.4 First owner onboarding/provisioning readiness
 - **V1 implemented and browser-smoked.** Invite-only, platform-admin/operator provisioned. Not public signup.

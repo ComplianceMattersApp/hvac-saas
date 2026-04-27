@@ -55,6 +55,44 @@ It extends it.
 P1 closeout note:
 - Phase P1 payment-ready foundation is now complete enough to close at the current baseline, with final closeout-quality test fidelity polish completed on collected-payment report projections.
 
+### Launch-readiness catch-up (completed)
+- Service / Visit Scope clarity pass is complete:
+  - job detail now clarifies Service Details classification vs Visit Scope trip-owned work definition
+  - Job Title fallback copy is clarified
+  - no model, validation, billing, ECC, or RLS behavior changes were introduced in that pass
+- Invoice job-detail TLC pass is complete:
+  - internal invoice panel scanability is improved
+  - invoice truth anchor is explicit: invoices are billed truth, payment entries are tracking-only and do not execute card charges
+  - issue/send/payment/void section wording is clarified
+  - external-billing lightweight path wording now emphasizes Invoice Sent tracking
+  - line-item editor microcopy polish is complete
+  - no live payment execution was introduced
+- Internal invoice draft prefill fallback hardening is complete where source fields exist:
+  - available job/customer/contractor/location fields are now used for fallback prefill
+  - existing drafts are not overwritten
+  - issue/send/payment behavior is unchanged
+- Address state capture/wiring support is complete for relevant intake/finalization paths:
+  - `locations.state` is populated where state is captured
+  - contractor intake proposal state persists through `proposed_state`
+  - this supports invoice billing-state prefill where source data exists
+- Internal invoice void recovery/replacement behavior is complete:
+  - voided internal invoices remain historical
+  - voided invoices do not satisfy billed-truth closeout
+  - replacement draft invoice can be created for the same job and becomes the active billing/closeout path
+  - no payment execution was introduced
+- Invoice report label polish is complete:
+  - Comm State -> Send Status
+  - Payments -> Payment Count
+  - CSV header wording aligned where applicable
+  - no invoice/payment calculations were changed
+
+### Priority ordering update (pre-launch)
+- Stripe enablement for new account users/platform onboarding is elevated as a pre-launch priority.
+- This onboarding priority remains separate from tenant customer invoice payment execution.
+- Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
+- Live Pay Now/Charge Card/checkout/refunds/disputes/payout execution remains deferred.
+- Invoice/payment language remains tracking-only until processor-backed execution exists.
+
 ### Locked rule
 Business-layer modules must not collapse, overwrite, or blur operational ownership boundaries.
 
@@ -363,6 +401,10 @@ Reporting / analytics is no longer the active incomplete milestone.
 Payment P1 foundation is closed at the current baseline.
 Out-of-box readiness / business identity / settings packaging is also closed at the current baseline.
 The next natural roadmap area is smaller service-model revisions / service workflow refinement.
+
+Separate pre-launch enablement track:
+- Stripe enablement for new account users/platform onboarding is elevated as a pre-launch priority.
+- This does not move tenant customer invoice payment execution into current scope.
 
 Roadmap guardrail:
 - Payment P1 foundation is complete and closed.
@@ -733,6 +775,10 @@ Closed milestones:
 
 Next natural roadmap area:
 - Smaller service-model revisions / service workflow refinement.
+
+Separate pre-launch enablement track:
+- Stripe enablement for new account users/platform onboarding is elevated as a pre-launch priority.
+- This does not move tenant customer invoice payment execution into current scope.
 
 Roadmap guardrail:
 - Payment P1 foundation is complete and closed.

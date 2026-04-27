@@ -8,6 +8,7 @@ import {
   resolveInternalBusinessProfileLogoUrl,
 } from "@/lib/business/internal-business-profile";
 import { resolveAccountEntitlement, type AccountEntitlementContext } from "@/lib/business/platform-entitlement";
+import { getPlatformBillingAvailability } from "@/lib/business/platform-billing-stripe";
 import {
   isInternalAccessError,
   requireInternalRole,
@@ -85,6 +86,7 @@ export default async function AdminCompanyProfilePage({
   const supportPhone = String(profile?.support_phone ?? "").trim();
   const billingMode = profile?.billing_mode ?? DEFAULT_BILLING_MODE;
   const companyInitial = companyName.charAt(0).toUpperCase() || "C";
+  const platformBillingAvailability = getPlatformBillingAvailability();
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 text-gray-900 sm:p-6">
@@ -312,7 +314,10 @@ export default async function AdminCompanyProfilePage({
         </div>
       </div>
 
-      <PlatformAccountSection entitlement={entitlement} />
+      <PlatformAccountSection
+        entitlement={entitlement}
+        availability={platformBillingAvailability}
+      />
     </div>
   );
 }
@@ -337,8 +342,10 @@ const STATUS_LABELS: Record<string, string> = {
 
 function PlatformAccountSection({
   entitlement,
+  availability,
 }: {
   entitlement: AccountEntitlementContext;
+  availability: ReturnType<typeof getPlatformBillingAvailability>;
 }) {
   const planLabel = PLAN_LABELS[entitlement.planKey] ?? entitlement.planKey;
   const statusLabel =
@@ -355,6 +362,22 @@ function PlatformAccountSection({
         })
       : null;
 
+  const billingStatusLabel = entitlement.billingSubscriptionStatus
+    ? entitlement.billingSubscriptionStatus
+        .split("_")
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ")
+    : "Not connected";
+
+  const billingPeriodEndLabel = entitlement.billingCurrentPeriodEnd
+    ? entitlement.billingCurrentPeriodEnd.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : null;
+
   return (
     <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
@@ -369,12 +392,57 @@ function PlatformAccountSection({
         <PlatformAccountField label="Active users" value={String(entitlement.activeSeatCount)} />
         <PlatformAccountField label="User limit" value={userLimitLabel} />
       </dl>
+      <dl className="grid grid-cols-1 gap-px border-t border-slate-100 bg-slate-100/70 sm:grid-cols-3">
+        <PlatformAccountField
+          label="Billing customer"
+          value={entitlement.billingCustomerLinked ? "Linked" : "Not linked"}
+        />
+        <PlatformAccountField
+          label="Subscription"
+          value={entitlement.billingSubscriptionLinked ? billingStatusLabel : "Not connected"}
+        />
+        <PlatformAccountField
+          label="Period end"
+          value={billingPeriodEndLabel ?? "-"}
+        />
+      </dl>
       {trialEndsLabel ? (
         <div className="border-t border-slate-100 px-5 py-3 text-sm leading-6 text-slate-600">
           Trial ends:{" "}
           <span className="font-medium text-slate-900">{trialEndsLabel}</span>
         </div>
       ) : null}
+      {entitlement.billingCancelAtPeriodEnd ? (
+        <div className="border-t border-amber-100 bg-amber-50/70 px-5 py-3 text-sm leading-6 text-amber-900">
+          Subscription is set to cancel at the end of the current billing period.
+        </div>
+      ) : null}
+      <div className="border-t border-slate-100 px-5 py-4">
+        {availability.checkoutAvailable || availability.portalAvailable ? (
+          <div className="flex flex-wrap gap-2">
+            <form action="/api/stripe/checkout" method="post">
+              <button
+                type="submit"
+                className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+              >
+                Start subscription setup
+              </button>
+            </form>
+            <form action="/api/stripe/portal" method="post">
+              <button
+                type="submit"
+                className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
+              >
+                Manage billing
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+            Platform subscription setup is unavailable until Stripe server configuration is added.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
