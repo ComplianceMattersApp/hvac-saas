@@ -8,6 +8,7 @@ import {
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import DeleteInternalUserButton from "./_components/DeleteInternalUserButton";
+import { confirmTeamSetupFromForm } from "@/lib/actions/internal-business-profile-actions";
 import {
   activateInternalUserFromForm,
   createInternalUserFromForm,
@@ -65,7 +66,7 @@ function resolveInternalLifecycleState(isActive: boolean, emailConfirmed: boolea
   return "unknown" as const;
 }
 
-type SearchParams = Promise<{ invite_status?: string }>;
+type SearchParams = Promise<{ invite_status?: string; team_confirm?: string }>;
 
 const INVITE_STATUS_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
   invited: {
@@ -117,8 +118,17 @@ export default async function AdminInternalUsersPage({
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const inviteStatus = String(sp.invite_status ?? "").trim().toLowerCase();
   const inviteNotice = INVITE_STATUS_TEXT[inviteStatus];
+  const teamConfirmStatus = String(sp.team_confirm ?? "").trim().toLowerCase();
 
   const { supabase, userId, internalUser } = await requireAdminOrRedirect();
+
+  const { data: businessProfile } = await supabase
+    .from("internal_business_profiles")
+    .select("team_reviewed_at")
+    .eq("account_owner_user_id", internalUser.account_owner_user_id)
+    .maybeSingle();
+
+  const teamAlreadyConfirmed = Boolean((businessProfile as any)?.team_reviewed_at);
 
   const { data: internalUsers, error } = await supabase
     .from("internal_users")
@@ -190,6 +200,33 @@ export default async function AdminInternalUsersPage({
       {inviteNotice ? (
         <div className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${bannerClass(inviteNotice.tone)}`}>
           {inviteNotice.message}
+        </div>
+      ) : null}
+
+      {teamConfirmStatus === "confirmed" ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 shadow-sm">
+          Team setup confirmed.
+        </div>
+      ) : teamConfirmStatus === "failed" ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-900 shadow-sm">
+          Could not confirm team setup. Please try again.
+        </div>
+      ) : null}
+
+      {!teamAlreadyConfirmed ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">Team setup not yet confirmed</p>
+          <p className="mt-1 text-sm leading-6 text-amber-800">
+            Review your team members below, then confirm team setup to mark this onboarding step complete.
+          </p>
+          <form action={confirmTeamSetupFromForm} className="mt-3">
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-lg bg-amber-900 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-[background-color,box-shadow,transform] hover:bg-amber-800 active:translate-y-[0.5px]"
+            >
+              Confirm team setup
+            </button>
+          </form>
         </div>
       ) : null}
 

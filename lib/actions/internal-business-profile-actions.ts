@@ -157,6 +157,7 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
         support_phone: supportPhone,
         logo_url: nextLogoUrl,
         billing_mode: billingMode,
+        profile_reviewed_at: new Date().toISOString(),
       },
       {
         onConflict: "account_owner_user_id",
@@ -191,4 +192,24 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
   revalidatePath("/ops/admin/company-profile");
   revalidatePath("/jobs");
   redirect(withNotice("saved"));
+}
+
+export async function confirmTeamSetupFromForm(): Promise<void> {
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalRole("admin", { supabase });
+
+  const admin = createAdminClient();
+
+  const { error } = await admin
+    .from("internal_business_profiles")
+    .update({ team_reviewed_at: new Date().toISOString() })
+    .eq("account_owner_user_id", internalUser.account_owner_user_id);
+
+  if (error) {
+    redirect("/ops/admin/internal-users?team_confirm=failed");
+  }
+
+  revalidatePath("/ops/admin");
+  revalidatePath("/ops/admin/internal-users");
+  redirect("/ops/admin/internal-users?team_confirm=confirmed");
 }

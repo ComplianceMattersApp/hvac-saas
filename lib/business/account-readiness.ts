@@ -22,6 +22,8 @@ type InternalBusinessProfileRow = {
   support_phone: string | null;
   billing_mode: string | null;
   logo_url: string | null;
+  profile_reviewed_at: string | null;
+  team_reviewed_at: string | null;
 };
 
 function toCleanString(value: unknown) {
@@ -109,7 +111,7 @@ export async function resolveAccountReadiness(
   const [profileResult, activeInternalUsersResult, contractorsResult, entitlement] = await Promise.all([
     supabase
       .from("internal_business_profiles")
-      .select("display_name, support_email, support_phone, billing_mode, logo_url")
+      .select("display_name, support_email, support_phone, billing_mode, logo_url, profile_reviewed_at, team_reviewed_at")
       .eq("account_owner_user_id", ownerId)
       .maybeSingle(),
     supabase
@@ -148,6 +150,8 @@ export async function resolveAccountReadiness(
   const supportPhone = toCleanString(profile?.support_phone);
   const billingMode = toCleanString(profile?.billing_mode);
   const logoUrl = toCleanString(profile?.logo_url);
+  const profileReviewed = Boolean(profile?.profile_reviewed_at);
+  const teamReviewed = Boolean(profile?.team_reviewed_at);
   const activeInternalUserCount = normalizeCount(activeInternalUsersResult.count);
   const contractorCount = normalizeCount(contractorsResult.count);
 
@@ -155,47 +159,51 @@ export async function resolveAccountReadiness(
     {
       key: "company_name",
       label: "Company name",
-      description: displayName
-        ? "Company name is set."
-        : "Set company name in Company Profile.",
-      status: displayName ? "complete" : "incomplete",
+      description:
+        profileReviewed && displayName
+          ? "Company name is set."
+          : "Save your company profile to confirm company name.",
+      status: profileReviewed && displayName ? "complete" : "incomplete",
       href: "/ops/admin/company-profile",
     },
     {
       key: "support_email",
       label: "Support email",
-      description: supportEmail
-        ? "Support email is set."
-        : "Set support email in Company Profile.",
-      status: supportEmail ? "complete" : "incomplete",
+      description:
+        profileReviewed && supportEmail
+          ? "Support email is set."
+          : "Save your company profile to confirm support email.",
+      status: profileReviewed && supportEmail ? "complete" : "incomplete",
       href: "/ops/admin/company-profile",
     },
     {
       key: "support_phone",
       label: "Support phone",
-      description: supportPhone
-        ? "Support phone is set."
-        : "Set support phone in Company Profile.",
-      status: supportPhone ? "complete" : "incomplete",
+      description:
+        profileReviewed && supportPhone
+          ? "Support phone is set."
+          : "Save your company profile to confirm support phone.",
+      status: profileReviewed && supportPhone ? "complete" : "incomplete",
       href: "/ops/admin/company-profile",
     },
     {
       key: "billing_mode",
       label: "Billing mode",
-      description: billingMode
-        ? `Billing mode is set to ${billingMode}.`
-        : "Select billing mode in Company Profile.",
-      status: billingMode ? "complete" : "incomplete",
+      description:
+        profileReviewed && billingMode
+          ? `Billing mode confirmed as ${billingMode}.`
+          : "Save your company profile to confirm billing mode.",
+      status: profileReviewed && billingMode ? "complete" : "incomplete",
       href: "/ops/admin/company-profile",
     },
     {
       key: "active_internal_users",
       label: "Active internal users",
       description:
-        activeInternalUserCount > 0
-          ? `${activeInternalUserCount} active internal user${activeInternalUserCount === 1 ? "" : "s"} found.`
-          : "Add at least one active internal user.",
-      status: activeInternalUserCount > 0 ? "complete" : "incomplete",
+        teamReviewed && activeInternalUserCount > 0
+          ? `${activeInternalUserCount} active internal user${activeInternalUserCount === 1 ? "" : "s"} confirmed.`
+          : "Review your internal team and confirm setup.",
+      status: teamReviewed && activeInternalUserCount > 0 ? "complete" : "incomplete",
       href: "/ops/admin/internal-users",
     },
   ];

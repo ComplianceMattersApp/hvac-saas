@@ -14,6 +14,8 @@ function makeSupabase(opts?: {
     support_phone: string | null;
     billing_mode: string | null;
     logo_url: string | null;
+    profile_reviewed_at?: string | null;
+    team_reviewed_at?: string | null;
   } | null;
   profileError?: { message: string } | null;
   activeInternalUsersCount?: number;
@@ -100,6 +102,8 @@ describe("resolveAccountReadiness", () => {
         support_phone: "(555) 111-2222",
         billing_mode: "external_billing",
         logo_url: "storage://attachments/company-profile/logo.png",
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
       },
       activeInternalUsersCount: 2,
       contractorsCount: 0,
@@ -112,6 +116,73 @@ describe("resolveAccountReadiness", () => {
     expect(summary.isOperationallyReady).toBe(true);
   });
 
+  it("provisioned fields present but no review timestamps => all required incomplete", async () => {
+    const supabase = makeSupabase({
+      profile: {
+        display_name: "Acme HVAC",
+        support_email: "support@acme.test",
+        support_phone: "(555) 111-2222",
+        billing_mode: "external_billing",
+        logo_url: null,
+        profile_reviewed_at: null,
+        team_reviewed_at: null,
+      },
+      activeInternalUsersCount: 1,
+    });
+
+    const summary = await resolveAccountReadiness("owner-1", supabase);
+
+    expect(summary.completedRequiredCount).toBe(0);
+    expect(summary.isOperationallyReady).toBe(false);
+    expect(summary.items.find((x) => x.key === "company_name")?.status).toBe("incomplete");
+    expect(summary.items.find((x) => x.key === "support_email")?.status).toBe("incomplete");
+    expect(summary.items.find((x) => x.key === "support_phone")?.status).toBe("incomplete");
+    expect(summary.items.find((x) => x.key === "billing_mode")?.status).toBe("incomplete");
+    expect(summary.items.find((x) => x.key === "active_internal_users")?.status).toBe("incomplete");
+  });
+
+  it("profile reviewed but team not => 4 of 5 complete", async () => {
+    const supabase = makeSupabase({
+      profile: {
+        display_name: "Acme HVAC",
+        support_email: "support@acme.test",
+        support_phone: "(555) 111-2222",
+        billing_mode: "external_billing",
+        logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: null,
+      },
+      activeInternalUsersCount: 1,
+    });
+
+    const summary = await resolveAccountReadiness("owner-1", supabase);
+
+    expect(summary.completedRequiredCount).toBe(4);
+    expect(summary.isOperationallyReady).toBe(false);
+    expect(summary.items.find((x) => x.key === "active_internal_users")?.status).toBe("incomplete");
+  });
+
+  it("team reviewed but profile not => 1 of 5 complete", async () => {
+    const supabase = makeSupabase({
+      profile: {
+        display_name: "Acme HVAC",
+        support_email: "support@acme.test",
+        support_phone: "(555) 111-2222",
+        billing_mode: "external_billing",
+        logo_url: null,
+        profile_reviewed_at: null,
+        team_reviewed_at: "2026-04-26T00:00:00Z",
+      },
+      activeInternalUsersCount: 1,
+    });
+
+    const summary = await resolveAccountReadiness("owner-1", supabase);
+
+    expect(summary.completedRequiredCount).toBe(1);
+    expect(summary.isOperationallyReady).toBe(false);
+    expect(summary.items.find((x) => x.key === "active_internal_users")?.status).toBe("complete");
+  });
+
   it("missing company name => incomplete", async () => {
     const supabase = makeSupabase({
       profile: {
@@ -120,6 +191,8 @@ describe("resolveAccountReadiness", () => {
         support_phone: "(555) 111-2222",
         billing_mode: "external_billing",
         logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
       },
       activeInternalUsersCount: 1,
     });
@@ -139,6 +212,8 @@ describe("resolveAccountReadiness", () => {
         support_phone: "(555) 111-2222",
         billing_mode: "external_billing",
         logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
       },
       activeInternalUsersCount: 1,
     });
@@ -158,6 +233,8 @@ describe("resolveAccountReadiness", () => {
         support_phone: "",
         billing_mode: "external_billing",
         logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
       },
       activeInternalUsersCount: 1,
     });
@@ -177,6 +254,8 @@ describe("resolveAccountReadiness", () => {
         support_phone: "(555) 111-2222",
         billing_mode: null,
         logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
       },
       activeInternalUsersCount: 1,
     });
@@ -196,6 +275,8 @@ describe("resolveAccountReadiness", () => {
         support_phone: "(555) 111-2222",
         billing_mode: "internal_invoicing",
         logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
       },
       activeInternalUsersCount: 0,
     });
@@ -215,6 +296,8 @@ describe("resolveAccountReadiness", () => {
         support_phone: "(555) 111-2222",
         billing_mode: "internal_invoicing",
         logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
       },
       activeInternalUsersCount: 1,
       contractorsCount: 0,
@@ -235,6 +318,8 @@ describe("resolveAccountReadiness", () => {
         support_phone: "(555) 111-2222",
         billing_mode: "external_billing",
         logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
       },
       activeInternalUsersCount: 1,
       contractorsCount: 0,

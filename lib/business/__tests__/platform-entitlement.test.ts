@@ -32,12 +32,12 @@ function makeEntitlementRow(overrides: Partial<{
   seat_limit: number | null;
   trial_ends_at: string | null;
   entitlement_valid_until: string | null;
+  notes: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   stripe_subscription_status: string | null;
   stripe_current_period_end: string | null;
   stripe_cancel_at_period_end: boolean | null;
-  notes: string | null;
 }> = {}) {
   return {
     plan_key: "starter",
@@ -45,12 +45,12 @@ function makeEntitlementRow(overrides: Partial<{
     seat_limit: null,
     trial_ends_at: null,
     entitlement_valid_until: null,
+    notes: null,
     stripe_customer_id: null,
     stripe_subscription_id: null,
     stripe_subscription_status: null,
     stripe_current_period_end: null,
     stripe_cancel_at_period_end: false,
-    notes: null,
     ...overrides,
   };
 }
@@ -145,6 +145,8 @@ describe("resolveAccountEntitlement", () => {
     expect(ctx.billingSubscriptionStatus).toBeNull();
     expect(ctx.billingCurrentPeriodEnd).toBeNull();
     expect(ctx.billingCancelAtPeriodEnd).toBe(false);
+    expect(ctx.isInternalComped).toBe(false);
+    expect(ctx.internalCompedSignal).toBe("none");
   });
 
   // 2. Resolver returns safe default when no row exists (no throw)
@@ -170,6 +172,8 @@ describe("resolveAccountEntitlement", () => {
     expect(ctx.billingSubscriptionStatus).toBeNull();
     expect(ctx.billingCurrentPeriodEnd).toBeNull();
     expect(ctx.billingCancelAtPeriodEnd).toBe(false);
+    expect(ctx.isInternalComped).toBe(false);
+    expect(ctx.internalCompedSignal).toBe("none");
   });
 
   // 3. Live seat count is derived from internal_users
@@ -313,6 +317,46 @@ describe("resolveAccountEntitlement", () => {
     expect(ctx).toHaveProperty("billingSubscriptionStatus");
     expect(ctx).toHaveProperty("billingCurrentPeriodEnd");
     expect(ctx).toHaveProperty("billingCancelAtPeriodEnd");
+    expect(ctx).toHaveProperty("isInternalComped");
+    expect(ctx).toHaveProperty("internalCompedSignal");
+  });
+
+  it("detects internal comped entitlement when marker and safety constraints are met", async () => {
+    const supabase = makeSupabase({
+      entitlementRow: makeEntitlementRow({
+        plan_key: "starter",
+        entitlement_status: "active",
+        seat_limit: null,
+        notes: "internal_comped_v1",
+        stripe_customer_id: null,
+        stripe_subscription_id: null,
+      }),
+      internalUserCount: 1,
+    });
+
+    const ctx = await resolveAccountEntitlement(ACCOUNT_OWNER_A, supabase);
+
+    expect(ctx.isInternalComped).toBe(true);
+    expect(ctx.internalCompedSignal).toBe("notes_marker");
+  });
+
+  it("does not mark internal comped when marker exists but Stripe linkage exists", async () => {
+    const supabase = makeSupabase({
+      entitlementRow: makeEntitlementRow({
+        plan_key: "starter",
+        entitlement_status: "active",
+        seat_limit: null,
+        notes: "internal_comped_v1",
+        stripe_customer_id: "cus_123",
+        stripe_subscription_id: null,
+      }),
+      internalUserCount: 1,
+    });
+
+    const ctx = await resolveAccountEntitlement(ACCOUNT_OWNER_A, supabase);
+
+    expect(ctx.isInternalComped).toBe(false);
+    expect(ctx.internalCompedSignal).toBe("none");
   });
 
   it("returns narrow billing summary fields without exposing raw Stripe identifiers", async () => {
