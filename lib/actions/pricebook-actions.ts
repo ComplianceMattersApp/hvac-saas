@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireInternalRole } from "@/lib/auth/internal-user";
+import {
+  parsePricebookCategory,
+  parsePricebookUnitLabel,
+} from "@/lib/business/pricebook-options";
 import { createClient } from "@/lib/supabase/server";
 
 const ITEM_TYPES = new Set(["service", "material", "diagnostic", "adjustment"]);
@@ -13,6 +17,8 @@ type PricebookNotice =
   | "status_updated"
   | "invalid_item_name"
   | "invalid_item_type"
+  | "invalid_category"
+  | "invalid_unit_label"
   | "invalid_unit_price"
   | "negative_only_for_adjustment"
   | "not_found"
@@ -29,6 +35,22 @@ function normalizeText(value: FormDataEntryValue | null) {
 function normalizeNullableText(value: FormDataEntryValue | null) {
   const normalized = normalizeText(value);
   return normalized || null;
+}
+
+function parseAllowedCategory(raw: FormDataEntryValue | null): string | null | "INVALID" {
+  const normalized = normalizeNullableText(raw);
+  if (!normalized) return null;
+  const parsed = parsePricebookCategory(normalized);
+  if (!parsed) return "INVALID";
+  return parsed;
+}
+
+function parseAllowedUnitLabel(raw: FormDataEntryValue | null): string | null | "INVALID" {
+  const normalized = normalizeNullableText(raw);
+  if (!normalized) return null;
+  const parsed = parsePricebookUnitLabel(normalized);
+  if (!parsed) return "INVALID";
+  return parsed;
 }
 
 function parseItemType(raw: FormDataEntryValue | null): string | null {
@@ -87,9 +109,16 @@ export async function createPricebookItemFromForm(formData: FormData) {
     redirect(withNotice("negative_only_for_adjustment"));
   }
 
-  const category = normalizeNullableText(formData.get("category"));
+  const category = parseAllowedCategory(formData.get("category"));
+  if (category === "INVALID") {
+    redirect(withNotice("invalid_category"));
+  }
+
   const defaultDescription = normalizeNullableText(formData.get("default_description"));
-  const unitLabel = normalizeNullableText(formData.get("unit_label"));
+  const unitLabel = parseAllowedUnitLabel(formData.get("unit_label"));
+  if (unitLabel === "INVALID") {
+    redirect(withNotice("invalid_unit_label"));
+  }
 
   const { error } = await supabase.from("pricebook_items").insert({
     account_owner_user_id: accountOwnerUserId,
@@ -138,9 +167,16 @@ export async function updatePricebookItemFromForm(formData: FormData) {
     redirect(withNotice("negative_only_for_adjustment"));
   }
 
-  const category = normalizeNullableText(formData.get("category"));
+  const category = parseAllowedCategory(formData.get("category"));
+  if (category === "INVALID") {
+    redirect(withNotice("invalid_category"));
+  }
+
   const defaultDescription = normalizeNullableText(formData.get("default_description"));
-  const unitLabel = normalizeNullableText(formData.get("unit_label"));
+  const unitLabel = parseAllowedUnitLabel(formData.get("unit_label"));
+  if (unitLabel === "INVALID") {
+    redirect(withNotice("invalid_unit_label"));
+  }
 
   const { data: existing, error: existingError } = await supabase
     .from("pricebook_items")

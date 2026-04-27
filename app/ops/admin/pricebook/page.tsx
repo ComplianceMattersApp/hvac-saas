@@ -9,6 +9,12 @@ import {
   setPricebookItemActiveFromForm,
   updatePricebookItemFromForm,
 } from "@/lib/actions/pricebook-actions";
+import {
+  PRICEBOOK_CATEGORY_OPTIONS,
+  PRICEBOOK_UNIT_LABEL_OPTIONS,
+  isKnownPricebookCategory,
+  isKnownPricebookUnitLabel,
+} from "@/lib/business/pricebook-options";
 import { createClient } from "@/lib/supabase/server";
 
 type SearchParams = Promise<{ notice?: string }>;
@@ -33,6 +39,8 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   status_updated: { tone: "success", message: "Item status updated." },
   invalid_item_name: { tone: "error", message: "Item name is required." },
   invalid_item_type: { tone: "error", message: "Item type must be service, material, diagnostic, or adjustment." },
+  invalid_category: { tone: "error", message: "Category must be selected from the allowed list." },
+  invalid_unit_label: { tone: "error", message: "Unit label must be selected from the allowed list." },
   invalid_unit_price: { tone: "error", message: "Unit price must be a valid number." },
   negative_only_for_adjustment: {
     tone: "error",
@@ -77,6 +85,18 @@ function normalizeItemType(value: unknown): PricebookRow["item_type"] {
   if (normalized === "diagnostic") return "diagnostic";
   if (normalized === "adjustment") return "adjustment";
   return "service";
+}
+
+function displayCategory(value: string | null) {
+  if (!value) return "-";
+  if (isKnownPricebookCategory(value)) return value;
+  return `Legacy / Unknown (${value})`;
+}
+
+function displayUnitLabel(value: string | null) {
+  if (!value) return "-";
+  if (isKnownPricebookUnitLabel(value)) return value;
+  return `Legacy / Unknown (${value})`;
 }
 
 async function requireAdminOrRedirect() {
@@ -234,22 +254,34 @@ export default async function AdminPricebookPage({
 
           <label className="space-y-1 text-sm text-slate-700">
             <span className="font-medium text-slate-900">Category</span>
-            <input
-              type="text"
+            <select
               name="category"
+              defaultValue=""
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-              placeholder="HVAC - Repair"
-            />
+            >
+              <option value="">No category</option>
+              {PRICEBOOK_CATEGORY_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="space-y-1 text-sm text-slate-700">
             <span className="font-medium text-slate-900">Unit Label</span>
-            <input
-              type="text"
+            <select
               name="unit_label"
+              defaultValue=""
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-              placeholder="each, hr, lb"
-            />
+            >
+              <option value="">No unit label</option>
+              {PRICEBOOK_UNIT_LABEL_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="space-y-1 text-sm text-slate-700 md:col-span-2 xl:col-span-2">
@@ -310,13 +342,13 @@ export default async function AdminPricebookPage({
                       </span>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <div className="min-w-[160px] text-slate-700">{row.category || "-"}</div>
+                      <div className="min-w-[160px] text-slate-700">{displayCategory(row.category)}</div>
                     </td>
                     <td className="px-4 py-3 align-top">
                       <div className="min-w-[130px] text-slate-900">{currency(row.default_unit_price)}</div>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <div className="min-w-[120px] text-slate-700">{row.unit_label || "-"}</div>
+                      <div className="min-w-[120px] text-slate-700">{displayUnitLabel(row.unit_label)}</div>
                     </td>
                     <td className="px-4 py-3 align-top">
                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusBadgeClass(row.is_active)}`}>
@@ -362,12 +394,21 @@ export default async function AdminPricebookPage({
                           </label>
                           <label className="block space-y-1 text-xs text-slate-700">
                             <span className="font-medium text-slate-900">Category</span>
-                            <input
-                              type="text"
+                            <select
                               name="category"
-                              defaultValue={row.category ?? ""}
+                              defaultValue={isKnownPricebookCategory(row.category) ? (row.category ?? "") : ""}
                               className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                            />
+                            >
+                              <option value="">No category</option>
+                              {PRICEBOOK_CATEGORY_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                            {!isKnownPricebookCategory(row.category) && row.category ? (
+                              <span className="text-[11px] text-amber-700">Legacy value currently stored: {row.category}</span>
+                            ) : null}
                           </label>
                           <label className="block space-y-1 text-xs text-slate-700">
                             <span className="font-medium text-slate-900">Unit Price</span>
@@ -381,12 +422,21 @@ export default async function AdminPricebookPage({
                           </label>
                           <label className="block space-y-1 text-xs text-slate-700">
                             <span className="font-medium text-slate-900">Unit Label</span>
-                            <input
-                              type="text"
+                            <select
                               name="unit_label"
-                              defaultValue={row.unit_label ?? ""}
+                              defaultValue={isKnownPricebookUnitLabel(row.unit_label) ? (row.unit_label ?? "") : ""}
                               className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                            />
+                            >
+                              <option value="">No unit label</option>
+                              {PRICEBOOK_UNIT_LABEL_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                            {!isKnownPricebookUnitLabel(row.unit_label) && row.unit_label ? (
+                              <span className="text-[11px] text-amber-700">Legacy value currently stored: {row.unit_label}</span>
+                            ) : null}
                           </label>
                           <label className="block space-y-1 text-xs text-slate-700">
                             <span className="font-medium text-slate-900">Description</span>
