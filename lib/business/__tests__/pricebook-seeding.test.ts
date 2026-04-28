@@ -1,6 +1,7 @@
 ﻿import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   STARTER_KIT_V1_SEEDS,
+  STARTER_KIT_V2_SEEDS,
   applyPricebookSeeding,
   createPricebookSeedingStoreFromSupabase,
   dryRunPricebookSeeding,
@@ -9,6 +10,10 @@ import {
   PricebookStarterSeedDefinition,
 } from '../pricebook-seeding';
 import { SupabaseClient } from '@supabase/supabase-js';
+import {
+  PRICEBOOK_CATEGORY_OPTIONS,
+  PRICEBOOK_UNIT_LABEL_OPTIONS,
+} from '../pricebook-options';
 
 describe('PricebookSeeding', () => {
   describe('validateSeedDefinitions', () => {
@@ -443,6 +448,108 @@ describe('PricebookSeeding', () => {
       expectedKeys.forEach((key) => {
         expect(STARTER_KIT_V1_SEEDS.some((s) => s.seed_key === key)).toBe(true);
       });
+    });
+  });
+
+  describe('STARTER_KIT_V2_SEEDS constants', () => {
+    it('should have exactly 23 seeds', () => {
+      expect(STARTER_KIT_V2_SEEDS).toHaveLength(23);
+    });
+
+    it('should validate V2 seed definitions with unique seed keys', () => {
+      const errors = validateSeedDefinitions(STARTER_KIT_V2_SEEDS);
+      expect(errors).toEqual([]);
+    });
+
+    it('should ensure all V2 seeds have starter_version=starter_v2', () => {
+      STARTER_KIT_V2_SEEDS.forEach((seed) => {
+        expect(seed.starter_version).toBe('starter_v2');
+      });
+    });
+
+    it('should ensure all V2 seed keys start with starter_v2.', () => {
+      STARTER_KIT_V2_SEEDS.forEach((seed) => {
+        expect(seed.seed_key.startsWith('starter_v2.')).toBe(true);
+      });
+    });
+
+    it('should use only controlled category values', () => {
+      const allowedCategories = new Set<string>(PRICEBOOK_CATEGORY_OPTIONS);
+      STARTER_KIT_V2_SEEDS.forEach((seed) => {
+        const category = String(seed.category ?? '');
+        expect(allowedCategories.has(category)).toBe(true);
+      });
+    });
+
+    it('should use only controlled unit labels', () => {
+      const allowedUnitLabels = new Set<string>(PRICEBOOK_UNIT_LABEL_OPTIONS);
+      STARTER_KIT_V2_SEEDS.forEach((seed) => {
+        const unitLabel = String(seed.unit_label ?? '');
+        expect(allowedUnitLabels.has(unitLabel)).toBe(true);
+      });
+    });
+
+    it('should use valid item types only', () => {
+      const allowedItemTypes = new Set<string>(['service', 'material', 'diagnostic', 'adjustment']);
+      STARTER_KIT_V2_SEEDS.forEach((seed) => {
+        expect(allowedItemTypes.has(seed.item_type)).toBe(true);
+      });
+    });
+
+    it('should have no negative default unit prices', () => {
+      STARTER_KIT_V2_SEEDS.forEach((seed) => {
+        expect(seed.default_unit_price).toBeGreaterThanOrEqual(0);
+      });
+    });
+
+    it('should keep adjustment deferred rows inactive and non-adjustment rows active', () => {
+      STARTER_KIT_V2_SEEDS.forEach((seed) => {
+        if (seed.item_type === 'adjustment') {
+          expect(seed.is_active).toBe(false);
+          return;
+        }
+
+        expect(seed.is_active).toBe(true);
+      });
+    });
+
+    it('should avoid duplicate item_name/category/unit_label combinations within V2', () => {
+      const seen = new Set<string>();
+
+      STARTER_KIT_V2_SEEDS.forEach((seed) => {
+        const signature = `${seed.item_name}||${seed.category ?? ''}||${seed.unit_label ?? ''}`;
+        expect(seen.has(signature)).toBe(false);
+        seen.add(signature);
+      });
+    });
+  });
+
+  describe('V1 + V2 compatibility guardrails', () => {
+    it('keeps V1 count and keyset unchanged', () => {
+      const expectedV1Keys = [
+        'starter_v1.fees.service_call',
+        'starter_v1.diagnostics.diagnostic_fee',
+        'starter_v1.maintenance.preventive_maintenance_residential',
+        'starter_v1.maintenance.preventive_maintenance_commercial',
+        'starter_v1.refrigerant.r410a_per_lb',
+        'starter_v1.parts.filter_replacement',
+        'starter_v1.parts.thermostat_standard',
+        'starter_v1.repair.capacitor_replacement',
+        'starter_v1.repair.contactor_replacement',
+        'starter_v1.compliance.ecc_title_24_test',
+        'starter_v1.labor.hourly',
+        'starter_v1.adjustments.discount_adjustment',
+      ];
+
+      expect(STARTER_KIT_V1_SEEDS).toHaveLength(12);
+      expect(STARTER_KIT_V1_SEEDS.map((seed) => seed.seed_key).sort()).toEqual(expectedV1Keys.sort());
+    });
+
+    it('has no duplicate seed_key across V1 and V2', () => {
+      const combined = [...STARTER_KIT_V1_SEEDS, ...STARTER_KIT_V2_SEEDS];
+      const keySet = new Set(combined.map((seed) => seed.seed_key));
+
+      expect(keySet.size).toBe(combined.length);
     });
   });
 });
