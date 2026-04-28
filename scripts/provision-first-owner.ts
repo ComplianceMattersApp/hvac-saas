@@ -5,6 +5,7 @@ import {
   type FirstOwnerProvisioningInput,
   type FirstOwnerProvisioningResult,
 } from "../lib/business/first-owner-provisioning";
+import type { PricebookSeedInsertRow } from "../lib/business/pricebook-seeding";
 import { resolveInviteRedirectTo } from "../lib/utils/resolve-invite-redirect-to";
 
 type ParsedArgs = {
@@ -31,6 +32,7 @@ type ScriptResult = {
   recordsCreated: string[];
   recordsConfirmed: string[];
   recordsPatched: string[];
+  pricebookSeeding: FirstOwnerProvisioningResult["pricebookSeeding"];
   inviteSent: boolean;
   inviteSkippedReason?: string;
   warnings: string[];
@@ -198,6 +200,7 @@ export async function runProvisionFirstOwnerScript(
       recordsCreated: [],
       recordsConfirmed: [],
       recordsPatched: [],
+      pricebookSeeding: null,
       inviteSent: false,
       warnings: [],
       errors: guardrailErrors,
@@ -230,6 +233,7 @@ export async function runProvisionFirstOwnerScript(
       recordsCreated: provisioning.recordsCreated,
       recordsConfirmed: provisioning.recordsConfirmed,
       recordsPatched: provisioning.recordsPatched,
+      pricebookSeeding: provisioning.pricebookSeeding,
       inviteSent: false,
       warnings,
       errors,
@@ -244,6 +248,7 @@ export async function runProvisionFirstOwnerScript(
       recordsCreated: provisioning.recordsCreated,
       recordsConfirmed: provisioning.recordsConfirmed,
       recordsPatched: provisioning.recordsPatched,
+      pricebookSeeding: provisioning.pricebookSeeding,
       inviteSent: false,
       inviteSkippedReason: "dry_run",
       warnings,
@@ -260,6 +265,7 @@ export async function runProvisionFirstOwnerScript(
       recordsCreated: provisioning.recordsCreated,
       recordsConfirmed: provisioning.recordsConfirmed,
       recordsPatched: provisioning.recordsPatched,
+      pricebookSeeding: provisioning.pricebookSeeding,
       inviteSent: false,
       warnings,
       errors: [
@@ -281,6 +287,7 @@ export async function runProvisionFirstOwnerScript(
       recordsCreated: provisioning.recordsCreated,
       recordsConfirmed: provisioning.recordsConfirmed,
       recordsPatched: provisioning.recordsPatched,
+      pricebookSeeding: provisioning.pricebookSeeding,
       inviteSent: false,
       warnings,
       errors: [
@@ -303,6 +310,7 @@ export async function runProvisionFirstOwnerScript(
       recordsCreated: provisioning.recordsCreated,
       recordsConfirmed: provisioning.recordsConfirmed,
       recordsPatched: provisioning.recordsPatched,
+      pricebookSeeding: provisioning.pricebookSeeding,
       inviteSent: false,
       inviteSkippedReason: "invite_already_pending",
       warnings,
@@ -329,6 +337,7 @@ export async function runProvisionFirstOwnerScript(
       recordsCreated: provisioning.recordsCreated,
       recordsConfirmed: provisioning.recordsConfirmed,
       recordsPatched: provisioning.recordsPatched,
+      pricebookSeeding: provisioning.pricebookSeeding,
       inviteSent: false,
       warnings,
       errors: [...errors, { code: "METADATA_WRITE_FAILED", message }],
@@ -350,6 +359,7 @@ export async function runProvisionFirstOwnerScript(
       recordsCreated: provisioning.recordsCreated,
       recordsConfirmed: provisioning.recordsConfirmed,
       recordsPatched: provisioning.recordsPatched,
+      pricebookSeeding: provisioning.pricebookSeeding,
       inviteSent: false,
       warnings,
       errors: [...errors, { code: "INVITE_SEND_FAILED", message }],
@@ -363,6 +373,7 @@ export async function runProvisionFirstOwnerScript(
     recordsCreated: provisioning.recordsCreated,
     recordsConfirmed: provisioning.recordsConfirmed,
     recordsPatched: provisioning.recordsPatched,
+    pricebookSeeding: provisioning.pricebookSeeding,
     inviteSent: true,
     warnings,
     errors,
@@ -638,6 +649,44 @@ function createProvisioningClientFromAdmin(admin: any): FirstOwnerProvisioningCl
         notes: toCleanString(data.notes) || null,
       };
     },
+
+    async listExistingPricebookSeedRows(ownerUserId) {
+      const { data, error } = await admin
+        .from("pricebook_items")
+        .select("seed_key, item_name")
+        .eq("account_owner_user_id", ownerUserId)
+        .not("seed_key", "is", null);
+      if (error) throw error;
+      return Array.isArray(data)
+        ? data
+            .map((row: any) => ({
+              seed_key: toCleanString(row?.seed_key),
+              item_name: toCleanString(row?.item_name),
+            }))
+            .filter((row) => row.seed_key)
+        : [];
+    },
+
+    async insertPricebookSeedRows(rows: PricebookSeedInsertRow[]) {
+      if (rows.length === 0) return;
+
+      const { error } = await admin.from("pricebook_items").insert(
+        rows.map((row) => ({
+          account_owner_user_id: row.account_owner_user_id,
+          seed_key: row.seed_key,
+          starter_version: row.starter_version,
+          item_name: row.item_name,
+          item_type: row.item_type,
+          category: row.category,
+          default_description: row.default_description,
+          default_unit_price: row.default_unit_price,
+          unit_label: row.unit_label,
+          is_active: row.is_active,
+          is_starter: row.is_starter,
+        })),
+      );
+      if (error) throw error;
+    },
   };
 }
 
@@ -693,6 +742,7 @@ export async function main(argv = process.argv.slice(2)) {
     recordsCreated: result.recordsCreated,
     recordsConfirmed: result.recordsConfirmed,
     recordsPatched: result.recordsPatched,
+    pricebookSeeding: result.pricebookSeeding,
     inviteSent: result.inviteSent,
     inviteSkippedReason: result.inviteSkippedReason,
     warnings: result.warnings,

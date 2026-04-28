@@ -4,6 +4,7 @@ import {
   runProvisionFirstOwnerScript,
 } from "../../scripts/provision-first-owner";
 import type { FirstOwnerProvisioningResult } from "../../lib/business/first-owner-provisioning";
+import { STARTER_KIT_V1_SEEDS } from "../../lib/business/pricebook-seeding";
 
 function makeProvisioningSuccess(overrides?: Partial<FirstOwnerProvisioningResult>): FirstOwnerProvisioningResult {
   return {
@@ -18,6 +19,15 @@ function makeProvisioningSuccess(overrides?: Partial<FirstOwnerProvisioningResul
       email: "owner@example.com",
       authUserId: "owner-1",
       reason: "ready_for_invite",
+    },
+    pricebookSeeding: {
+      inserted_count: STARTER_KIT_V1_SEEDS.length,
+      skipped_count: 0,
+      inserted_rows: STARTER_KIT_V1_SEEDS.map((seed) => ({
+        seed_key: seed.seed_key,
+        item_name: seed.item_name,
+      })),
+      skipped_rows: [],
     },
     warnings: [],
     errors: [],
@@ -130,6 +140,9 @@ describe("runProvisionFirstOwnerScript", () => {
     expect(deps.sendInvite).not.toHaveBeenCalled();
     expect(result.inviteSent).toBe(false);
     expect(result.inviteSkippedReason).toBe("dry_run");
+    expect(result.pricebookSeeding).toEqual(
+      expect.objectContaining({ inserted_count: STARTER_KIT_V1_SEEDS.length }),
+    );
   });
 
   it("apply mode sends invite after helper success", async () => {
@@ -162,6 +175,9 @@ describe("runProvisionFirstOwnerScript", () => {
       }),
     );
     expect(result.inviteSent).toBe(true);
+    expect(result.pricebookSeeding).toEqual(
+      expect.objectContaining({ inserted_count: STARTER_KIT_V1_SEEDS.length }),
+    );
   });
 
   it("apply mode does not send invite if helper fails", async () => {
