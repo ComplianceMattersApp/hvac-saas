@@ -4,8 +4,10 @@ export const PRICEBOOK_CATEGORY_OPTIONS = [
   "HVAC - Maintenance",
   "HVAC - Repair",
   "Compliance",
+  "Compliance Docs",
   "ECC / Compliance Testing",
   "Duct / Airflow",
+  "Electrical",
   "Refrigerant",
   "Refrigerant Services",
   "Fees",
@@ -26,7 +28,8 @@ export const PRICEBOOK_UNIT_LABEL_OPTIONS = [
   "job",
   "flat",
   "system",
-  "cfm",
+  "trip",
+  "doc",
 ] as const;
 
 const CATEGORY_OPTION_SET = new Set<string>(PRICEBOOK_CATEGORY_OPTIONS);
