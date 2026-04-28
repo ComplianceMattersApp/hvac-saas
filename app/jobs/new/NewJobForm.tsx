@@ -10,7 +10,6 @@ import ActionFeedback from "@/components/ui/ActionFeedback";
 import VisitScopeBuilder, { type VisitScopeDraftItem } from "@/components/jobs/VisitScopeBuilder";
 import {
   createVisitScopeItemId,
-  hasVisitScopeContent,
   sanitizeVisitScopeItemId,
 } from "@/lib/jobs/visit-scope";
 
@@ -929,9 +928,9 @@ const [billingRecipient, setBillingRecipient] = useState<
 
     if (isInternalMode && jobType === "service") {
       const nonEmptyItems = visitScopeItems.filter((item) => item.title.trim() || item.details.trim());
-      if (!hasVisitScopeContent(visitScopeSummary.trim() || null, nonEmptyItems)) {
+      if (nonEmptyItems.length === 0) {
         event.preventDefault();
-        setVisitScopeError("Add a Visit Summary or one Visit Scope item so the field team knows what this service visit should cover.");
+        setVisitScopeError("Add at least one structured Visit Scope item before creating a Service job.");
         window.requestAnimationFrame(() => {
           visitScopeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         });
@@ -1053,7 +1052,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             : errorCode === "contractor_proposal_submit_failed"
             ? "Could not submit your job. Please try again, or contact us if the issue persists."
             : errorCode === "visit_scope_required"
-            ? "Service jobs require a Visit Summary or at least one Visit Scope item."
+            ? "Service jobs require at least one Visit Scope work item."
             : errorCode === "visit_scope_invalid"
             ? "Visit Scope could not be read. Please review the Visit Scope section and try again."
             : null
@@ -2221,7 +2220,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                     <h3 className="text-base font-semibold text-slate-900">Visit Scope</h3>
                     <p className="mt-1 text-sm text-slate-500">
                       {jobType === "service"
-                        ? "Add a short summary and the scope items that define this trip."
+                        ? "Add at least one structured scope item that defines this trip. Summary is optional context."
                         : "Optional for ECC intake. The inspection or test type already defines the trip; use Visit Scope only for extra context when it helps."}
                     </p>
                   </div>

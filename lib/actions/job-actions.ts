@@ -5522,7 +5522,7 @@ if (!isContractorUser) {
     redirect("/jobs/new?err=visit_scope_invalid");
   }
 
-  if (jobType === "service" && !hasVisitScopeContent(visit_scope_summary, visit_scope_items)) {
+  if (jobType === "service" && visit_scope_items.length === 0) {
     redirect("/jobs/new?err=visit_scope_required");
   }
 }

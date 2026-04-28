@@ -8,6 +8,7 @@ const requireInternalRoleMock = vi.fn();
 const sendEmailMock = vi.fn();
 const createContractorIntakeProposalAwarenessNotificationMock = vi.fn();
 const insertInternalNotificationForEventMock = vi.fn();
+const loadScopedActiveInternalContractorForMutationMock = vi.fn();
 
 const ALLOW_PATH_REACHED = "ALLOW_PATH_REACHED";
 
@@ -16,8 +17,14 @@ type WriteCall = {
   method: "insert" | "update" | "delete";
 };
 
+type InsertCall = {
+  table: string;
+  payload: unknown;
+};
+
 type FixtureOptions = {
   throwOnJobsInsert?: boolean;
+  contractorId?: string | null;
 };
 
 vi.mock("next/navigation", () => ({
@@ -52,6 +59,12 @@ vi.mock("@/lib/actions/notification-actions", () => ({
     insertInternalNotificationForEventMock(...args),
 }));
 
+vi.mock("@/lib/auth/internal-contractor-scope", () => ({
+  loadScopedActiveInternalContractorForMutation: (...args: unknown[]) =>
+    loadScopedActiveInternalContractorForMutationMock(...args),
+  loadScopedInternalContractorForMutation: vi.fn(),
+}));
+
 vi.mock("@/lib/email/sendEmail", () => ({
   sendEmail: (...args: unknown[]) => sendEmailMock(...args),
 }));
@@ -62,6 +75,38 @@ function buildIntakeFormData() {
   formData.set("title", "Intake Smoke Test Job");
   formData.set("customer_id", "cust-1");
   formData.set("location_id", "loc-1");
+  return formData;
+}
+
+function buildInternalServiceIntakeFormData(options?: {
+  visitScopeSummary?: string;
+  visitScopeItemsJson?: string;
+}) {
+  const formData = new FormData();
+  formData.set("job_type", "service");
+  formData.set("title", "Service Intake Test Job");
+  formData.set("customer_id", "cust-1");
+  formData.set("location_id", "loc-1");
+  formData.set("visit_scope_summary", options?.visitScopeSummary ?? "");
+  formData.set("visit_scope_items_json", options?.visitScopeItemsJson ?? "[]");
+  return formData;
+}
+
+function buildInternalEccIntakeFormData(options?: {
+  visitScopeSummary?: string;
+  visitScopeItemsJson?: string;
+}) {
+  const formData = new FormData();
+  formData.set("job_type", "ecc");
+  formData.set("title", "ECC Intake Test Job");
+  formData.set("customer_id", "cust-1");
+  formData.set("location_id", "loc-1");
+  if (typeof options?.visitScopeSummary === "string") {
+    formData.set("visit_scope_summary", options.visitScopeSummary);
+  }
+  if (typeof options?.visitScopeItemsJson === "string") {
+    formData.set("visit_scope_items_json", options.visitScopeItemsJson);
+  }
   return formData;
 }
 
@@ -76,6 +121,7 @@ function buildCustomerContextFormDataWithoutCustomer() {
 
 function buildSupabaseFixture(options: FixtureOptions = {}) {
   const writeCalls: WriteCall[] = [];
+  const insertCalls: InsertCall[] = [];
 
   function makeReadQuery(table: string, selected: string) {
     const filters: Array<{ column: string; value: unknown }> = [];
@@ -103,6 +149,9 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
 
     function resolveMaybeSingle() {
       if (table === "contractor_users") {
+        if (options.contractorId) {
+          return { data: { contractor_id: options.contractorId }, error: null };
+        }
         return { data: null, error: null };
       }
 
@@ -200,6 +249,7 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
         select: vi.fn((selected: string) => makeReadQuery(table, selected)),
         insert: vi.fn((_payload: unknown) => {
           writeCalls.push({ table, method: "insert" });
+          insertCalls.push({ table, payload: _payload });
           return {
             select: vi.fn((selected: string) => makeReadQuery(table, selected)),
           };
@@ -228,7 +278,7 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
     },
   };
 
-  return { supabase, writeCalls };
+  return { supabase, writeCalls, insertCalls };
 }
 
 describe("job intake create same-account hardening", () => {
@@ -259,6 +309,7 @@ describe("job intake create same-account hardening", () => {
     createContractorIntakeProposalAwarenessNotificationMock.mockResolvedValue(undefined);
     insertInternalNotificationForEventMock.mockResolvedValue(undefined);
     sendEmailMock.mockResolvedValue(undefined);
+    loadScopedActiveInternalContractorForMutationMock.mockResolvedValue({ id: "ctr-1" });
   });
 
   it("allows same-account internal createJobFromForm to reach authorized create path", async () => {
@@ -278,6 +329,137 @@ describe("job intake create same-account hardening", () => {
     expect(
       fixture.writeCalls.filter((call) => ["customers", "locations", "jobs", "job_events"].includes(call.table)),
     ).toContainEqual({ table: "jobs", method: "insert" });
+  });
+
+  it("rejects internal Service intake with no Visit Scope items", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: false });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(
+        buildInternalServiceIntakeFormData({
+          visitScopeSummary: "",
+          visitScopeItemsJson: "[]",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/new?err=visit_scope_required");
+
+    expect(fixture.writeCalls.find((call) => call.table === "jobs" && call.method === "insert")).toBeUndefined();
+  });
+
+  it("rejects internal Service intake when scope is summary-only", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: false });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(
+        buildInternalServiceIntakeFormData({
+          visitScopeSummary: "Summary only should not satisfy service intake.",
+          visitScopeItemsJson: "[]",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/new?err=visit_scope_required");
+
+    expect(fixture.writeCalls.find((call) => call.table === "jobs" && call.method === "insert")).toBeUndefined();
+  });
+
+  it("allows internal Service intake with at least one structured Visit Scope item", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: true });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(
+        buildInternalServiceIntakeFormData({
+          visitScopeSummary: "Optional summary context",
+          visitScopeItemsJson: '[{"title":"Diagnose airflow issue","details":"Main hallway return","kind":"primary"}]',
+        }),
+      ),
+    ).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    expect(
+      fixture.writeCalls.filter((call) => ["customers", "locations", "jobs", "job_events"].includes(call.table)),
+    ).toContainEqual({ table: "jobs", method: "insert" });
+  });
+
+  it("allows internal ECC intake with optional companion scope items", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: true });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(
+        buildInternalEccIntakeFormData({
+          visitScopeItemsJson: '[{"title":"Duct Cleaning follow-up","kind":"companion_service"}]',
+        }),
+      ),
+    ).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    expect(
+      fixture.writeCalls.filter((call) => ["customers", "locations", "jobs", "job_events"].includes(call.table)),
+    ).toContainEqual({ table: "jobs", method: "insert" });
+  });
+
+  it("keeps contractor intake proposal-only and does not persist canonical Visit Scope fields", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: true, contractorId: "ctr-1" });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(
+        buildInternalServiceIntakeFormData({
+          visitScopeSummary: "Contractor proposal summary",
+          visitScopeItemsJson: '[{"title":"Proposed scope","kind":"primary"}]',
+        }),
+      ),
+    ).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    const jobsInsertCall = fixture.insertCalls.find((call) => call.table === "jobs");
+    const jobsPayloadRaw = jobsInsertCall?.payload;
+    const jobsPayload = (
+      Array.isArray(jobsPayloadRaw) ? jobsPayloadRaw[0] : jobsPayloadRaw
+    ) as Record<string, unknown> | null | undefined;
+
+    expect(jobsPayload).toBeTruthy();
+    expect(jobsPayload?.visit_scope_summary ?? null).toBeNull();
+    expect(Array.isArray(jobsPayload?.visit_scope_items) ? jobsPayload.visit_scope_items : []).toEqual([]);
   });
 
   it("denies cross-account or invalid-scope internal createJobFromForm before canonical writes and side effects", async () => {
