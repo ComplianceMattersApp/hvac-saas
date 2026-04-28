@@ -47,6 +47,10 @@ function toDraftItems(
 
   if (normalized.length > 0) return normalized;
 
+  if (jobType === "ecc") {
+    return [];
+  }
+
   return [
     {
       id: createVisitScopeItemId(),
@@ -69,10 +73,18 @@ export default function VisitScopeBuilder({
 }: Props) {
   const [summary, setSummary] = useState(String(initialSummary ?? ""));
   const [items, setItems] = useState<VisitScopeDraftItem[]>(() => toDraftItems(initialItems, jobType));
+  const [showEccOptionalScope, setShowEccOptionalScope] = useState(() => {
+    const seededItems = toDraftItems(initialItems, jobType);
+    const hasSummary = String(initialSummary ?? "").trim().length > 0;
+    return jobType === "service" || hasSummary || seededItems.length > 0;
+  });
 
   useEffect(() => {
+    const seededItems = toDraftItems(initialItems, jobType);
+    const hasSummary = String(initialSummary ?? "").trim().length > 0;
     setSummary(String(initialSummary ?? ""));
-    setItems(toDraftItems(initialItems, jobType));
+    setItems(seededItems);
+    setShowEccOptionalScope(jobType === "service" || hasSummary || seededItems.length > 0);
   }, [jobType, resetKey]);
 
   useEffect(() => {
@@ -133,6 +145,9 @@ export default function VisitScopeBuilder({
   function removeItem(itemId: string) {
     setItems((prev) => {
       if (prev.length <= 1) {
+        if (jobType === "ecc") {
+          return [];
+        }
         return prev.map((item) =>
           item.id === itemId
             ? { ...item, title: "", details: "", kind: "primary" }
@@ -145,6 +160,23 @@ export default function VisitScopeBuilder({
 
   return (
     <div className="space-y-3">
+      {jobType === "ecc" && !showEccOptionalScope ? (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3.5 py-3">
+          <p className="text-sm text-slate-700">
+            Optional: add companion service work or extra visit notes if this ECC visit also includes service work.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowEccOptionalScope(true)}
+            className="mt-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+          >
+            Add Optional Scope
+          </button>
+        </div>
+      ) : null}
+
+      {jobType === "service" || showEccOptionalScope ? (
+      <>
       <div className="space-y-1">
         <label className="block text-sm font-medium text-slate-900">
           {jobType === "service" ? "Job Title" : "Known trip context"}
@@ -269,6 +301,12 @@ export default function VisitScopeBuilder({
       </div>
 
       <input type="hidden" name={itemsName} value={serializedItems} />
+      </>
+      ) : null}
+
+      {jobType === "ecc" && !showEccOptionalScope ? (
+        <input type="hidden" name={itemsName} value={serializedItems} />
+      ) : null}
     </div>
   );
 }

@@ -2205,7 +2205,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <p className="mt-1 text-sm text-slate-500">
                     {jobType === "service"
                       ? "Capture a short trip summary, then list what belongs in this visit."
-                      : "Add any known context for the ECC trip, then capture only the minimum job details needed to dispatch cleanly."}
+                      : "ECC testing can be created without scope items; add optional companion work context only when this visit also includes service work."}
                   </p>
                 </div>
               ) : (
@@ -2221,7 +2221,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                     <p className="mt-1 text-sm text-slate-500">
                       {jobType === "service"
                         ? "Add at least one structured scope item that defines this trip. Summary is optional context."
-                        : "Optional for ECC intake. The inspection or test type already defines the trip; use Visit Scope only for extra context when it helps."}
+                        : "ECC testing does not require Visit Scope items. Add companion work only when this visit also includes service-related work."}
                     </p>
                   </div>
                   <VisitScopeBuilder
