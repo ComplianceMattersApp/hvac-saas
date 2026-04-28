@@ -1324,16 +1324,34 @@ const existingVisitScopeInvoiceSourceIds = new Set(
     .map((lineItem) => sanitizeVisitScopeItemId(lineItem.source_visit_scope_item_id))
     .filter(Boolean) as string[],
 );
-const visitScopeInvoicePickerItems = visitScopeItems
-  .map((item) => {
-    const itemId = sanitizeVisitScopeItemId(item.id);
-    if (!itemId) return null;
+const rawVisitScopeRows = Array.isArray((job as any).visit_scope_items)
+  ? (job as any).visit_scope_items
+  : [];
+const visitScopeInvoicePickerItems = rawVisitScopeRows
+  .map((rawRow: any) => {
+    const persistedItemId = sanitizeVisitScopeItemId(rawRow?.id);
+    if (!persistedItemId) return null;
+
+    let sanitizedRowItems: Array<{
+      title: string;
+      details: string | null;
+      kind: "primary" | "companion_service";
+    }> = [];
+    try {
+      sanitizedRowItems = sanitizeVisitScopeItems([rawRow]);
+    } catch {
+      return null;
+    }
+
+    const sanitizedRow = sanitizedRowItems[0];
+    if (!sanitizedRow) return null;
+
     return {
-      id: itemId,
-      title: item.title,
-      details: item.details,
-      kind: item.kind,
-      alreadyAdded: existingVisitScopeInvoiceSourceIds.has(itemId),
+      id: persistedItemId,
+      title: sanitizedRow.title,
+      details: sanitizedRow.details,
+      kind: sanitizedRow.kind,
+      alreadyAdded: existingVisitScopeInvoiceSourceIds.has(persistedItemId),
     };
   })
   .filter(Boolean) as Array<{
