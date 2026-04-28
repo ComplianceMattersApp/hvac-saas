@@ -170,6 +170,30 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed.
 - Confirmed: Starter Kit V2 content is still not implemented by D3B.
 
+### 2.10 Visit Scope -> invoice bridge promotion confirmation (A1-A5)
+- Completed: A1-A5 Visit Scope -> invoice bridge stack is production-promoted on `main`.
+- Completed: production migration `20260428113000_internal_invoice_line_items_visit_scope_provenance_v1.sql` was applied and migration list sync was confirmed.
+- Completed: promotion validation passed before and after merge:
+  - targeted suite: 37 tests passed
+  - `npx tsc --noEmit` passed
+- Completed: broader smoke coverage confirmed the production-intent behavior set:
+  - Service intake rejects summary-only scope
+  - Service intake succeeds with at least one structured Visit Scope item
+  - ECC optional scope remains lightweight/optional
+  - ECC companion scope remains allowed
+  - Build Invoice from Visit Scope adds draft line items at qty `1.00` / unit `$0.00`
+  - Already-added state prevents duplicate scope-item adds
+  - manual draft invoice line add still works
+  - Pricebook draft invoice line add still works
+  - issued/void invoice states keep builder/edit controls hidden
+  - invoice/payment wording remains tracking-only and does not imply live charging
+- Before launch (post-deploy), operators should verify this path in production UI:
+  - Service intake structured-scope requirement
+  - ECC optional scope behavior
+  - Build Invoice from Visit Scope draft builder
+  - manual + Pricebook invoice add coexistence
+  - issued/void invoice lock behavior
+
 ---
 
 ## 3. Support / customer-operations readiness

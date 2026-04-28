@@ -368,6 +368,7 @@ Current D2C continuation clarifications:
 - dry-run previews starter seeding before apply
 - existing accounts are not auto-backfilled in D2C-3/D2C-4
 - Starter Kit V2 content remains future work
+- after this docs/source-of-truth alignment pass, Starter Kit V2 is the next resume target for Pricebook content expansion
 - D3B controlled-options refinement is production-promoted on `main` (merge `58dcb31`, change `3084906`):
   - code/test-only option refinement in `lib/business/pricebook-options.ts` and `lib/business/__tests__/pricebook-options.test.ts`
   - categories added: `Electrical`, `Compliance Docs`
@@ -928,7 +929,7 @@ Approved estimate → service case/business scope first, then jobs/visits under 
 
 ---
 
-## 11. Invoice sourcing rules (implemented baseline + planned expansion)
+## 11. Invoice sourcing rules (implemented production baseline + planned expansion)
 
 ### Core rule
 Invoice line items must come from a defined source, then become frozen billing records.
@@ -943,6 +944,21 @@ Internal invoicing remains downstream of visit execution and must not define vis
 - invoice line item remains a frozen billed snapshot once written
 - editing/deactivating Pricebook items must not mutate existing invoice lines
 - current provenance/snapshot fields used for this seam are: `source_kind`, `source_pricebook_item_id`, `category_snapshot`, `unit_label_snapshot`
+
+### Current production-promoted Visit Scope bridge extension (A1-A5)
+- Visit Scope -> draft internal invoice build flow is production-promoted and production-smoke confirmed.
+- Visit Scope items now carry durable IDs for stable invoice-sourcing linkage.
+- Internal invoice line provenance now supports Visit Scope linkage through:
+  - `source_kind = visit_scope`
+  - `source_visit_scope_item_id`
+- Draft invoice panel supports selecting Visit Scope items and creating draft invoice lines from those selections.
+- Visit Scope-sourced draft lines initialize as `quantity = 1.00` and `unit_price = 0.00` and are review/edit-first before issuing.
+- Already-added behavior prevents duplicate addition of the same Visit Scope item to the active draft invoice.
+- Service intake now enforces structured Visit Scope presence; summary-only submissions are rejected.
+- ECC intake optional scope remains lightweight and companion scope remains allowed.
+- Manual draft line add and Pricebook draft line add continue to coexist with Visit Scope draft build.
+- Issued/void invoice behavior remains immutable.
+- No payment execution, Stripe, QBO, or service lifecycle redesign was introduced by A1-A5.
 
 ### Allowed source paths
 - approved estimate scope
@@ -965,7 +981,7 @@ Invoice = billed scope.
 
 They may overlap heavily, but they are not the same record.
 
-Completed visit scope may feed invoice creation later, but invoice line items remain frozen billed snapshots rather than the primary operational work-definition layer.
+Completed/defined visit scope can now feed draft internal invoice creation in production, but invoice line items remain frozen billed snapshots rather than the primary operational work-definition layer.
 
 ---
 
@@ -1056,8 +1072,9 @@ Invoice line items are frozen billing snapshots.
 Required line-item fields:
 - invoice_id
 - sort_order
-- source_kind optional (`manual` | `pricebook`)
+- source_kind optional (`manual` | `pricebook` | `visit_scope`)
 - source_pricebook_item_id optional
+- source_visit_scope_item_id optional
 - source_estimate_line_item_id optional
 - category_snapshot optional
 - unit_label_snapshot optional

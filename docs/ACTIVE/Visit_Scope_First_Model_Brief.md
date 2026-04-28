@@ -6,6 +6,16 @@
 
 - Job detail is already mostly Visit Scope-first.
 - A helper line was added to reinforce workflow priority: "Scope first: confirm the work for this visit, then complete closeout and billing."
+- A1-A5 Visit Scope -> invoice bridge is production-promoted on main.
+- Visit Scope items now use durable IDs for downstream draft-invoice provenance.
+- Internal invoice line provenance now supports Visit Scope linkage (`source_kind = visit_scope`, `source_visit_scope_item_id`).
+- Draft internal invoice panels can build invoice lines from selected Visit Scope items.
+- Visit Scope-sourced draft lines initialize at qty `1.00` and unit price `$0.00`, then require operator review/edit before issue.
+- Service intake now requires at least one structured Visit Scope item (summary-only Service scope is rejected).
+- ECC optional scope is simplified/lightweight and does not auto-seed blank structured rows.
+- ECC companion scope remains allowed.
+- Manual and Pricebook draft invoice line adds still coexist with Visit Scope-based draft build.
+- Issued/void invoice records remain immutable and hide draft build/edit controls.
 - Service / Visit Scope clarity pass is complete for launch-readiness scope:
 	- Service job detail now clearly distinguishes Service Details (visit classification) from Visit Scope (trip-owned work definition)
 	- Job Title fallback copy is clarified to reduce ambiguity
@@ -16,6 +26,7 @@
 	- internal invoice void recovery/replacement behavior is in place without changing Visit Scope ownership
 	- invoice report labels are clearer (Send Status, Payment Count) with no calculation changes
 - Future service-model work should focus on workflow refinement, not a model rebuild.
+- No payment execution, Stripe, QBO, Pricebook seed behavior, or service lifecycle redesign was introduced by A1-A5.
 
 ## 1. Model foundation
 
@@ -133,16 +144,23 @@ But contractor-submitted scope should remain requested operational scope, not co
 
 7. Invoice sourcing implications
 
-If you adopt visit-scope-first, invoice becomes a downstream action:
+With the production baseline, visit-scope-first invoice sourcing now exists for draft internal invoices:
 
-For internal-invoicing companies, invoice lines should later source from:
+- selected Visit Scope items can become draft invoice candidates directly in the job invoice panel
+- selected items create draft invoice lines with conservative defaults (qty `1.00`, unit `$0.00`) for operator review/edit
+- provenance is now durable and traceable through Visit Scope linkage fields
+- automatic billing is not implemented; operator review/issue remains required
+
+Invoice still remains a downstream commercial action:
+
+For internal-invoicing companies, invoice lines source from:
 approved estimate scope if present
 completed job scope if no approved estimate exists
 manual office creation as fallback
 
 That is already the locked business roadmap direction.
 
-So the new conceptual chain becomes:
+So the conceptual chain is:
 
 Visit scope → operational work performed
 Completed job scope → candidate invoice source
@@ -191,5 +209,13 @@ Keep ECC Test and Service as top-level job families
 Introduce job-level Visit Scope items as the field-first work layer
 Use ECC-first + companion scope for same-trip mixed visits
 Promote companion service scope into a real Service job when it becomes its own lifecycle
-Let invoice lines be sourced from completed job scope later
+Allow draft invoice lines to be sourced from Visit Scope with operator review before issue
 Make the top of the job page scope-first, not invoice-first
+
+11. Future work still deferred
+
+- completion/billable toggles on Visit Scope items are not implemented yet
+- Pricebook-backed Visit Scope defaults are not implemented yet
+- normalized Visit Scope item table redesign is not implemented yet
+- estimate-first/full estimate flow integration remains future work
+- automatic billing from Visit Scope without operator review is not implemented

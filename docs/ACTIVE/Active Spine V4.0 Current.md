@@ -373,6 +373,37 @@ an ECC-first visit may carry same-visit companion service scope while the work r
 but companion scope must promote into a real Service job once it becomes its own lifecycle thread
 (for example: separate scheduling, separate assignment, return-trip work, or separate follow-up continuity).
 
+8.7 Visit Scope -> Invoice Bridge (A1-A5, production-promoted)
+
+Status:
+The A1-A5 Visit Scope -> invoice bridge baseline is production-promoted on main.
+
+Production behavior now locked:
+- Visit Scope items use durable IDs for downstream selection/provenance.
+- Internal invoice line provenance supports Visit Scope sourcing via:
+  - `source_kind = visit_scope`
+  - `source_visit_scope_item_id`
+- Draft internal invoice panels can build line items from selected Visit Scope items.
+- Visit Scope-sourced draft invoice lines start at `quantity = 1.00` and `unit_price = 0.00`, then require operator review/edit before issue.
+- Service intake requires at least one structured Visit Scope item; summary-only Service scope is rejected.
+- ECC intake keeps lightweight optional scope behavior and does not auto-seed blank structured rows.
+- ECC companion scope remains allowed under the existing promotion-to-Service rule when work becomes its own lifecycle thread.
+- Contractor intake remains requested/proposed work submission only; contractor canonical scope authority is unchanged.
+- Issued/void invoice records remain immutable and do not expose draft build controls.
+
+Explicit non-changes in this promotion:
+- No payment execution behavior changes.
+- No Stripe behavior changes.
+- No QBO behavior changes.
+- No Pricebook seed behavior changes.
+- No service lifecycle or `jobs.ops_status` redesign.
+
+Truth-boundary reminder (unchanged):
+- Visit Scope = operational work definition.
+- Invoice line item = frozen billed/commercial snapshot.
+- Pricebook item = reusable mutable catalog/default definition.
+- Payment = collected-truth layer only where materially implemented.
+
 9. Staffing / Assignment System (Locked)
 9.1 Source of truth
 
