@@ -79,12 +79,14 @@ vi.mock('@/lib/notifications/account-owner', () => ({
 
 type SupabaseFixtureParams = {
   pricebookItem?: Record<string, unknown> | null;
+  visitScopeItems?: Array<Record<string, unknown>>;
 };
 
 function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
   const insertedLineItems: Array<Record<string, unknown>> = [];
   const invoiceUpdates: Array<Record<string, unknown>> = [];
   const pricebookItem = params.pricebookItem;
+  const visitScopeItems = params.visitScopeItems ?? [];
 
   const supabase = {
     from: vi.fn((table: string) => {
@@ -92,6 +94,13 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: {
+                  id: 'job-1',
+                  visit_scope_items: visitScopeItems,
+                },
+                error: null,
+              })),
               single: vi.fn(async () => ({
                 data: {
                   id: 'job-1',
@@ -125,8 +134,12 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
 
       if (table === 'internal_invoice_line_items') {
         return {
-          insert: vi.fn((payload: Record<string, unknown>) => {
-            insertedLineItems.push(payload);
+          insert: vi.fn((payload: Record<string, unknown> | Array<Record<string, unknown>>) => {
+            if (Array.isArray(payload)) {
+              insertedLineItems.push(...payload);
+            } else {
+              insertedLineItems.push(payload);
+            }
             return Promise.resolve({ error: null });
           }),
           select: vi.fn(() => ({
@@ -202,6 +215,19 @@ function pricebookLineFormData(overrides: Partial<Record<string, string>> = {}) 
   return formData;
 }
 
+function visitScopeLineFormData(itemIds: string[], overrides: Partial<Record<string, string>> = {}) {
+  const formData = new FormData();
+  formData.set('job_id', 'job-1');
+  formData.set('tab', 'info');
+  itemIds.forEach((itemId) => formData.append('visit_scope_item_ids', itemId));
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value != null) formData.set(key, value);
+  }
+
+  return formData;
+}
+
 describe('internal invoice line item pricebook plumbing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -239,6 +265,219 @@ describe('internal invoice line item pricebook plumbing', () => {
     expect(invoiceUpdates).toHaveLength(1);
     expect(invoiceUpdates[0].subtotal_cents).toBe(10000);
     expect(invoiceUpdates[0].total_cents).toBe(10000);
+  });
+
+  it('adds selected visit scope items to draft invoice with frozen snapshots and provenance', async () => {
+    const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture({
+      visitScopeItems: [
+        {
+          id: selectedScopeId,
+          title: 'Repair blower assembly',
+          details: 'Replace failed motor and verify airflow',
+          kind: 'primary',
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalInvoiceLineItemsFromVisitScopeForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(addInternalInvoiceLineItemsFromVisitScopeForm(visitScopeLineFormData([selectedScopeId]))).rejects.toThrow(
+      'banner=internal_invoice_visit_scope_line_item_added',
+    );
+
+    expect(insertedLineItems).toHaveLength(1);
+    expect(insertedLineItems[0]).toEqual(
+      expect.objectContaining({
+        source_kind: 'visit_scope',
+        source_visit_scope_item_id: selectedScopeId,
+        item_name_snapshot: 'Repair blower assembly',
+        description_snapshot: 'Replace failed motor and verify airflow',
+        item_type_snapshot: 'service',
+        quantity: '1.00',
+        unit_price: '0.00',
+        line_subtotal: '0.00',
+        category_snapshot: null,
+        unit_label_snapshot: null,
+      }),
+    );
+
+    expect(invoiceUpdates).toHaveLength(1);
+    expect(invoiceUpdates[0].subtotal_cents).toBe(0);
+    expect(invoiceUpdates[0].total_cents).toBe(0);
+  });
+
+  it('denies issued invoice for visit scope-backed line insert', async () => {
+    const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const { supabase, insertedLineItems } = makeSupabaseFixture({
+      visitScopeItems: [
+        {
+          id: selectedScopeId,
+          title: 'Repair blower assembly',
+          details: 'Replace failed motor and verify airflow',
+          kind: 'primary',
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(draftInvoice({ status: 'issued' }));
+
+    const { addInternalInvoiceLineItemsFromVisitScopeForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(addInternalInvoiceLineItemsFromVisitScopeForm(visitScopeLineFormData([selectedScopeId]))).rejects.toThrow(
+      'banner=internal_invoice_line_items_locked',
+    );
+
+    expect(insertedLineItems).toHaveLength(0);
+  });
+
+  it('denies void invoice for visit scope-backed line insert', async () => {
+    const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const { supabase, insertedLineItems } = makeSupabaseFixture({
+      visitScopeItems: [
+        {
+          id: selectedScopeId,
+          title: 'Repair blower assembly',
+          details: 'Replace failed motor and verify airflow',
+          kind: 'primary',
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(draftInvoice({ status: 'void' }));
+
+    const { addInternalInvoiceLineItemsFromVisitScopeForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(addInternalInvoiceLineItemsFromVisitScopeForm(visitScopeLineFormData([selectedScopeId]))).rejects.toThrow(
+      'banner=internal_invoice_line_items_locked',
+    );
+
+    expect(insertedLineItems).toHaveLength(0);
+  });
+
+  it('denies malformed selected visit scope item ids safely', async () => {
+    const { supabase, insertedLineItems } = makeSupabaseFixture({
+      visitScopeItems: [
+        {
+          id: '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f',
+          title: 'Repair blower assembly',
+          details: 'Replace failed motor and verify airflow',
+          kind: 'primary',
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalInvoiceLineItemsFromVisitScopeForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(addInternalInvoiceLineItemsFromVisitScopeForm(visitScopeLineFormData(['not-a-uuid']))).rejects.toThrow(
+      'banner=internal_invoice_visit_scope_item_invalid',
+    );
+
+    expect(insertedLineItems).toHaveLength(0);
+  });
+
+  it('denies selected visit scope ids that do not belong to the job scope', async () => {
+    const scopedId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const nonScopedId = 'f35d564e-6bcf-4cb3-bfae-9444cc7524fe';
+    const { supabase, insertedLineItems } = makeSupabaseFixture({
+      visitScopeItems: [
+        {
+          id: scopedId,
+          title: 'Repair blower assembly',
+          details: 'Replace failed motor and verify airflow',
+          kind: 'primary',
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalInvoiceLineItemsFromVisitScopeForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(addInternalInvoiceLineItemsFromVisitScopeForm(visitScopeLineFormData([nonScopedId]))).rejects.toThrow(
+      'banner=internal_invoice_visit_scope_item_not_found',
+    );
+
+    expect(insertedLineItems).toHaveLength(0);
+  });
+
+  it('prevents duplicate visit scope lines already present on the same draft invoice', async () => {
+    const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture({
+      visitScopeItems: [
+        {
+          id: selectedScopeId,
+          title: 'Repair blower assembly',
+          details: 'Replace failed motor and verify airflow',
+          kind: 'primary',
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(
+      draftInvoice({
+        line_items: [
+          {
+            id: 'line-existing-1',
+            source_kind: 'visit_scope',
+            source_visit_scope_item_id: selectedScopeId,
+          },
+        ],
+      }),
+    );
+
+    const { addInternalInvoiceLineItemsFromVisitScopeForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(addInternalInvoiceLineItemsFromVisitScopeForm(visitScopeLineFormData([selectedScopeId]))).rejects.toThrow(
+      'banner=internal_invoice_visit_scope_line_item_duplicate',
+    );
+
+    expect(insertedLineItems).toHaveLength(0);
+    expect(invoiceUpdates).toHaveLength(0);
+  });
+
+  it('adds only new scope items when selection includes already-added duplicates', async () => {
+    const existingScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const newScopeId = 'f35d564e-6bcf-4cb3-bfae-9444cc7524fe';
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture({
+      visitScopeItems: [
+        {
+          id: existingScopeId,
+          title: 'Repair blower assembly',
+          details: 'Replace failed motor and verify airflow',
+          kind: 'primary',
+        },
+        {
+          id: newScopeId,
+          title: 'Re-check static pressure',
+          details: 'Capture return and supply readings',
+          kind: 'primary',
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(
+      draftInvoice({
+        line_items: [
+          {
+            id: 'line-existing-1',
+            source_kind: 'visit_scope',
+            source_visit_scope_item_id: existingScopeId,
+          },
+        ],
+      }),
+    );
+
+    const { addInternalInvoiceLineItemsFromVisitScopeForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(
+      addInternalInvoiceLineItemsFromVisitScopeForm(visitScopeLineFormData([existingScopeId, newScopeId])),
+    ).rejects.toThrow('banner=internal_invoice_visit_scope_line_item_partial_added');
+
+    expect(insertedLineItems).toHaveLength(1);
+    expect(insertedLineItems[0].source_visit_scope_item_id).toBe(newScopeId);
+    expect(invoiceUpdates).toHaveLength(1);
   });
 
   it('adds a pricebook-backed draft line with frozen snapshot and provenance fields', async () => {

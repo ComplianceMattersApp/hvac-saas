@@ -21,6 +21,7 @@ import { insertJobEvent } from '@/lib/actions/job-actions';
 import { renderSystemEmailLayout, escapeHtml } from '@/lib/email/layout';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { resolveNotificationAccountOwnerUserId } from '@/lib/notifications/account-owner';
+import { sanitizeVisitScopeItemId, sanitizeVisitScopeItems } from '@/lib/jobs/visit-scope';
 
 function getTrimmedString(value: FormDataEntryValue | null | undefined) {
   return String(value ?? '').trim();
@@ -288,6 +289,38 @@ function parseLineItemDraftFields(formData: FormData) {
     quantity: formatScaledInt(quantityHundredths, 2),
     unit_price: formatScaledInt(unitPriceCents, 2),
     line_subtotal: formatScaledInt(lineSubtotalCents, 2),
+  };
+}
+
+function parseSelectedVisitScopeItemIds(formData: FormData) {
+  const rawSelectedValues = [
+    ...formData.getAll('visit_scope_item_ids'),
+    ...String(formData.get('visit_scope_item_ids_csv') ?? '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean),
+  ];
+
+  const malformedIds: string[] = [];
+  const selectedIds: string[] = [];
+  const seen = new Set<string>();
+
+  for (const rawSelectedValue of rawSelectedValues) {
+    const normalizedId = sanitizeVisitScopeItemId(rawSelectedValue);
+    if (!normalizedId) {
+      const rawText = String(rawSelectedValue ?? '').trim();
+      if (rawText) malformedIds.push(rawText);
+      continue;
+    }
+
+    if (seen.has(normalizedId)) continue;
+    seen.add(normalizedId);
+    selectedIds.push(normalizedId);
+  }
+
+  return {
+    selectedIds,
+    malformedIds,
   };
 }
 
@@ -1045,6 +1078,119 @@ export async function addInternalInvoiceLineItemFromPricebookForm(formData: Form
   revalidatePath('/jobs');
   revalidatePath('/ops');
   redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_pricebook_line_item_added'));
+}
+
+export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: FormData) {
+  const context = await requireDraftInvoiceContext(formData);
+  const invoice = context.invoice!;
+
+  const { selectedIds, malformedIds } = parseSelectedVisitScopeItemIds(formData);
+
+  if (malformedIds.length > 0) {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_item_invalid');
+  }
+
+  if (selectedIds.length === 0) {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_item_missing');
+  }
+
+  let quantityHundredths = 100;
+  try {
+    quantityHundredths = parseQuantityToHundredths(getTrimmedString(formData.get('quantity')) || '1');
+  } catch {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_quantity_invalid');
+  }
+
+  const { data: jobScopeRow, error: jobScopeErr } = await context.supabase
+    .from('jobs')
+    .select('id, visit_scope_items')
+    .eq('id', context.jobId)
+    .maybeSingle();
+
+  if (jobScopeErr) throw jobScopeErr;
+  if (!jobScopeRow?.id) {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_item_not_found');
+  }
+
+  let scopeItems: ReturnType<typeof sanitizeVisitScopeItems> = [];
+  try {
+    scopeItems = sanitizeVisitScopeItems(jobScopeRow.visit_scope_items ?? []);
+  } catch {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_item_invalid');
+  }
+
+  const scopeItemsById = new Map(
+    scopeItems
+      .map((scopeItem) => {
+        const scopeItemId = sanitizeVisitScopeItemId(scopeItem.id);
+        if (!scopeItemId) return null;
+        return [scopeItemId, scopeItem] as const;
+      })
+      .filter(Boolean) as Array<readonly [string, (typeof scopeItems)[number]]>,
+  );
+
+  const missingScopeIds = selectedIds.filter((selectedId) => !scopeItemsById.has(selectedId));
+  if (missingScopeIds.length > 0) {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_item_not_found');
+  }
+
+  const existingScopeSourceIds = new Set(
+    (invoice.line_items ?? [])
+      .filter((lineItem) => lineItem.source_kind === 'visit_scope')
+      .map((lineItem) => sanitizeVisitScopeItemId(lineItem.source_visit_scope_item_id))
+      .filter(Boolean) as string[],
+  );
+
+  const idsToInsert = selectedIds.filter((selectedId) => !existingScopeSourceIds.has(selectedId));
+  if (idsToInsert.length === 0) {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_line_item_duplicate');
+  }
+
+  const nextSortOrder = (invoice.line_items?.length ?? 0) + 1;
+  const unitPriceCents = 0;
+  const lineSubtotalCents = computeLineSubtotalCents(quantityHundredths, unitPriceCents);
+
+  const payload = idsToInsert.map((scopeItemId, index) => {
+    const scopeItem = scopeItemsById.get(scopeItemId)!;
+    return {
+      invoice_id: invoice.id,
+      sort_order: nextSortOrder + index,
+      source_kind: 'visit_scope',
+      source_visit_scope_item_id: scopeItemId,
+      item_name_snapshot: getTrimmedString(scopeItem.title),
+      description_snapshot: getOptionalText(scopeItem.details),
+      item_type_snapshot: 'service',
+      category_snapshot: null,
+      unit_label_snapshot: null,
+      quantity: formatScaledInt(quantityHundredths, 2),
+      unit_price: formatScaledInt(unitPriceCents, 2),
+      line_subtotal: formatScaledInt(lineSubtotalCents, 2),
+      created_by_user_id: context.userId,
+      updated_by_user_id: context.userId,
+    };
+  });
+
+  const { error: insertErr } = await context.supabase
+    .from('internal_invoice_line_items')
+    .insert(payload);
+
+  if (insertErr) throw insertErr;
+
+  await syncInvoiceTotalsFromLineItems({
+    supabase: context.supabase,
+    invoiceId: invoice.id,
+    userId: context.userId,
+  });
+
+  revalidatePath(`/jobs/${context.jobId}`);
+  revalidatePath('/jobs');
+  revalidatePath('/ops');
+
+  if (idsToInsert.length < selectedIds.length) {
+    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_visit_scope_line_item_partial_added'));
+  }
+
+  redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_visit_scope_line_item_added'));
 }
 
 export async function updateInternalInvoiceLineItemFromForm(formData: FormData) {
