@@ -234,6 +234,7 @@ Implemented files:
 - `scripts/provision-first-owner.ts` — operator script wrapper; defaults to dry-run; hosted `.supabase.co` targets require both allow flags for dry-run and apply as explicit remote-target confirmation
 - `lib/auth/first-owner-routing.ts` — first-owner marker detection; routes to `/ops/admin` when all anchor rows confirmed; fails closed if any row is missing
 - `app/set-password/page.tsx` — updated to call routing seam; routes first-owner to `/ops/admin`, normal internal to `/ops`, contractor to `/portal`
+- `lib/business/pricebook-seeding.ts` — starter seed helper with V1 starter definitions and idempotent dry-run/apply behavior by `seed_key`
 
 Tenant identity boundaries (unchanged):
 - `internal_users` / `account_owner_user_id` = tenant/account anchor; owner row self-anchors (user_id = account_owner_user_id)
@@ -244,10 +245,17 @@ Tenant identity boundaries (unchanged):
 V1 confirmed sequence:
 - operator runs provisioning script (dry-run first, then apply with explicit allow flags)
 - provisioning confirms/creates all required tenant rows
+- provisioning dry-run/apply now includes Pricebook starter seeding through the helper
 - first-owner marker is durably written to user metadata before invite send
 - first owner accepts invite and sets password
 - routing seam confirms all anchor rows before routing to `/ops/admin`; fails closed otherwise
 - first owner lands in Admin Center readiness setup flow
+
+Production dry-run smoke confirmation for D2C-3/D2C-4:
+- top-level output `mode` is `dry_run`
+- structured `pricebookSeeding` appears in operator output
+- dry-run preview confirmed V1 starter set (`inserted_count = 12`, `skipped_count = 0`)
+- no errors returned, no invite sent, and no apply/write action executed during smoke
 
 Operator flag note: hosted Supabase projects use `.supabase.co` and are classified as production-like remote targets by the provisioning script. `ALLOW_FIRST_OWNER_PROVISIONING=true` enables the tool. `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true` is also required for any hosted Supabase project (including sandbox) as explicit remote-target confirmation. Operators must verify the intended project before running apply. Dry-run should always be run first.
 
@@ -316,6 +324,10 @@ Pricebook V1 is no longer fully deferred.
 Current baseline state is:
 - implemented in production from prior work: Pricebook admin surface, starter catalog rows, controlled Category/Unit Label options, and server-side validation of controlled Pricebook values
 - production-promoted for C1B/C1C: invoice-line provenance/snapshot plumbing and draft internal invoice picker wiring are now production-complete and production-smoke confirmed
+- production includes seed identity/versioning foundation: `seed_key` and `starter_version` (migration `20260427170000_pricebook_seed_identity_v1`)
+- D2C-3 seed helper is production-promoted and matches original V1 starter seed definitions
+- D2C-4 first-owner provisioning integration is production-promoted and uses helper dry-run/apply paths
+- operator script now surfaces structured `pricebookSeeding` output for first-owner dry-run/apply visibility
 
 ### Purpose
 Pricebook is the reusable catalog of billable items.
@@ -350,6 +362,16 @@ Each company must be able to:
 - expand categories
 - deactivate items
 - customize its own working catalog over time
+
+Current D2C continuation clarifications:
+- seeding is idempotent by `seed_key`
+- dry-run previews starter seeding before apply
+- existing accounts are not auto-backfilled in D2C-3/D2C-4
+- Starter Kit V2 content remains future work
+- expanded category/unit rollout remains future work
+- no new starter seed rows were introduced by D2C-3/D2C-4
+- no negative credit/adjustment implementation was introduced
+- no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by D2C-3/D2C-4
 
 ### Production-complete C1B/C1C closeout (production-promoted)
 - nullable invoice-line provenance/snapshot fields are production-migrated: `source_kind`, `source_pricebook_item_id`, `category_snapshot`, `unit_label_snapshot`

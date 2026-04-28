@@ -828,6 +828,9 @@ For V1 launch readiness, first company/account onboarding is invite-only and pla
 Confirmed V1 sequence:
 - operator runs provisioning script (dry-run first, then apply with explicit allow flags)
 - provisioning confirms/creates: auth user, profile, owner-anchored `internal_users` row, `internal_business_profiles`, `platform_account_entitlements`
+- provisioning now also evaluates Pricebook starter seeding through the seed helper:
+  - dry-run surfaces structured `pricebookSeeding` preview output
+  - apply seeds missing starter rows idempotently by `seed_key`
 - first-owner marker is durably written to user metadata before invite send
 - first owner receives invite
 - first owner accepts invite and sets password via `/set-password?mode=invite`
@@ -1216,6 +1219,13 @@ Current position:
   - C1B/C1C production-promoted behavior includes server-side Pricebook-to-invoice-line frozen snapshot mapping and draft invoice picker wiring; manual line flow remains intact; issued/void invoice immutability remains intact
   - inactive and negative/default-credit items are blocked/deferred from new draft picker selection
   - production smoke is confirmed for Pricebook C1B/C1C with no payment-execution language drift observed
+  - production already includes Pricebook seed identity foundation (`seed_key`, `starter_version`) from migration `20260427170000_pricebook_seed_identity_v1`
+  - D2C-3 seed helper is production-promoted and matches the original V1 starter definitions
+  - D2C-4 first-owner provisioning integration is production-promoted and now surfaces structured `pricebookSeeding` output in dry-run/apply paths
+  - production dry-run smoke confirmed `mode = dry_run`, `pricebookSeeding` preview present, `inserted_count = 12`, `skipped_count = 0`, `errors = []`, and `inviteSent = false`
+  - D2C-3/D2C-4 added no new starter rows; Starter Kit V2 content remains future work
+  - expanded category/unit options remain deferred for a later phase
+  - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by D2C-3/D2C-4
 - Launch-readiness polish catch-up is complete for current scope:
   - Service/Visit Scope clarity pass is complete, including clearer Service Details vs Visit Scope guidance and clearer Job Title fallback copy.
   - Invoice job-detail TLC pass is complete, including scanability improvements and explicit truth language that payments are tracking-only entries (no card charge execution).
