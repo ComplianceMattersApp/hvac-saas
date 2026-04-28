@@ -1224,8 +1224,15 @@ Current position:
   - D2C-4 first-owner provisioning integration is production-promoted and now surfaces structured `pricebookSeeding` output in dry-run/apply paths
   - production dry-run smoke confirmed `mode = dry_run`, `pricebookSeeding` preview present, `inserted_count = 12`, `skipped_count = 0`, `errors = []`, and `inviteSent = false`
   - D2C-3/D2C-4 added no new starter rows; Starter Kit V2 content remains future work
-  - expanded category/unit options remain deferred for a later phase
+  - D3B controlled-options refinement is production-promoted on `main` via merge commit `58dcb31` (change commit `3084906`):
+    - controlled options were refined in code/test only (`lib/business/pricebook-options.ts`, `lib/business/__tests__/pricebook-options.test.ts`)
+    - added categories: `Electrical`, `Compliance Docs`
+    - added unit labels: `trip`, `doc`
+    - removed Pricebook controlled unit label: `cfm` (CFM remains valid in ECC/airflow test contexts)
+    - no schema migration, Supabase command, or DB write action was part of this promotion
+  - Starter Kit V2 content remains future work and was not implemented by D3B
   - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by D2C-3/D2C-4
+  - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by D3B
 - Launch-readiness polish catch-up is complete for current scope:
   - Service/Visit Scope clarity pass is complete, including clearer Service Details vs Visit Scope guidance and clearer Job Title fallback copy.
   - Invoice job-detail TLC pass is complete, including scanability improvements and explicit truth language that payments are tracking-only entries (no card charge execution).

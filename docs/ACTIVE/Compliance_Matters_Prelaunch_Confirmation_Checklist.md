@@ -156,6 +156,20 @@ If any item here conflicts with the active spine, the spine wins.
   - confirm `pricebookSeeding` preview output is present and sane
   - run apply only when intentionally provisioning a real account
 
+### 2.9 Pricebook controlled-options refinement promotion confirmation (D3B)
+- Completed: D3B controlled-options refinement is production-promoted on `main` (merge `58dcb31`, change `3084906`).
+- Completed: controlled options were refined in code/test only:
+  - `lib/business/pricebook-options.ts`
+  - `lib/business/__tests__/pricebook-options.test.ts`
+- Completed: controlled option refinement for Pricebook includes:
+  - categories added: `Electrical`, `Compliance Docs`
+  - unit labels added: `trip`, `doc`
+  - Pricebook controlled unit label removed: `cfm`
+- Confirmed: CFM remains valid in ECC/airflow/testing contexts; this promotion did not alter ECC/workflow logic.
+- Confirmed: no schema migration, Supabase command, or DB write action occurred for this promotion.
+- Confirmed: no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed.
+- Confirmed: Starter Kit V2 content is still not implemented by D3B.
+
 ---
 
 ## 3. Support / customer-operations readiness

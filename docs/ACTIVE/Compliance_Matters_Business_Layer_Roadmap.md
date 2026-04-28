@@ -368,10 +368,18 @@ Current D2C continuation clarifications:
 - dry-run previews starter seeding before apply
 - existing accounts are not auto-backfilled in D2C-3/D2C-4
 - Starter Kit V2 content remains future work
-- expanded category/unit rollout remains future work
+- D3B controlled-options refinement is production-promoted on `main` (merge `58dcb31`, change `3084906`):
+  - code/test-only option refinement in `lib/business/pricebook-options.ts` and `lib/business/__tests__/pricebook-options.test.ts`
+  - categories added: `Electrical`, `Compliance Docs`
+  - unit labels added: `trip`, `doc`
+  - Pricebook controlled unit label removed: `cfm` (CFM remains in ECC/airflow/testing contexts)
+  - no schema migration, Supabase command, or DB write action was part of this promotion
+- broader category/unit rollout remains future work
 - no new starter seed rows were introduced by D2C-3/D2C-4
+- Starter Kit V2 content remains future work and was not implemented by D3B
 - no negative credit/adjustment implementation was introduced
 - no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by D2C-3/D2C-4
+- no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by D3B
 
 ### Production-complete C1B/C1C closeout (production-promoted)
 - nullable invoice-line provenance/snapshot fields are production-migrated: `source_kind`, `source_pricebook_item_id`, `category_snapshot`, `unit_label_snapshot`
