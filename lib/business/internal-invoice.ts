@@ -8,8 +8,9 @@ export type InternalInvoiceLineItemRecord = {
   id: string;
   invoice_id: string;
   sort_order: number;
-  source_kind: 'manual' | 'pricebook' | null;
+  source_kind: 'manual' | 'pricebook' | 'visit_scope' | null;
   source_pricebook_item_id: string | null;
+  source_visit_scope_item_id: string | null;
   item_name_snapshot: string;
   description_snapshot: string | null;
   item_type_snapshot: InternalInvoiceItemType;
@@ -97,6 +98,7 @@ const INTERNAL_INVOICE_LINE_ITEM_SELECT = [
   "sort_order",
   "source_kind",
   "source_pricebook_item_id",
+  "source_visit_scope_item_id",
   "item_name_snapshot",
   "description_snapshot",
   "item_type_snapshot",
@@ -129,8 +131,8 @@ export function normalizeInternalInvoiceItemType(value: unknown): InternalInvoic
 
 function normalizeInternalInvoiceLineItemRow(row: any): InternalInvoiceLineItemRecord {
   const sourceKindRaw = String(row?.source_kind ?? '').trim().toLowerCase();
-  const sourceKind = sourceKindRaw === 'manual' || sourceKindRaw === 'pricebook'
-    ? (sourceKindRaw as 'manual' | 'pricebook')
+  const sourceKind = sourceKindRaw === 'manual' || sourceKindRaw === 'pricebook' || sourceKindRaw === 'visit_scope'
+    ? (sourceKindRaw as 'manual' | 'pricebook' | 'visit_scope')
     : null;
 
   return {
@@ -139,6 +141,7 @@ function normalizeInternalInvoiceLineItemRow(row: any): InternalInvoiceLineItemR
     sort_order: Number(row?.sort_order ?? 0) || 0,
     source_kind: sourceKind,
     source_pricebook_item_id: String(row?.source_pricebook_item_id ?? '').trim() || null,
+    source_visit_scope_item_id: String(row?.source_visit_scope_item_id ?? '').trim() || null,
     item_name_snapshot: String(row?.item_name_snapshot ?? "").trim(),
     description_snapshot: String(row?.description_snapshot ?? "").trim() || null,
     item_type_snapshot: normalizeInternalInvoiceItemType(row?.item_type_snapshot),

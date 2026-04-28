@@ -8,7 +8,11 @@ import { createJobFromForm, getInternalIntakeRelationshipContext } from "@/lib/a
 import JobCoreFields from "@/components/jobs/JobCoreFields";
 import ActionFeedback from "@/components/ui/ActionFeedback";
 import VisitScopeBuilder, { type VisitScopeDraftItem } from "@/components/jobs/VisitScopeBuilder";
-import { hasVisitScopeContent } from "@/lib/jobs/visit-scope";
+import {
+  createVisitScopeItemId,
+  hasVisitScopeContent,
+  sanitizeVisitScopeItemId,
+} from "@/lib/jobs/visit-scope";
 
 type Contractor = { id: string; name: string };
 
@@ -107,6 +111,7 @@ type NewJobDraft = {
   locationId?: string;
   visitScopeSummary?: string;
   visitScopeItems?: Array<{
+    id?: string;
     title: string;
     details: string | null;
     kind: "primary" | "companion_service";
@@ -786,6 +791,7 @@ const [billingRecipient, setBillingRecipient] = useState<
         locationId,
         visitScopeSummary,
         visitScopeItems: visitScopeItems.map((item) => ({
+          id: item.id,
           title: item.title.trim(),
           details: item.details.trim() || null,
           kind: item.kind,
@@ -832,7 +838,7 @@ const [billingRecipient, setBillingRecipient] = useState<
     setVisitScopeItems(
       Array.isArray(d.visitScopeItems)
         ? d.visitScopeItems.map((item) => ({
-            id: uid(),
+            id: sanitizeVisitScopeItemId(item.id) ?? createVisitScopeItemId(),
             title: String(item.title ?? ""),
             details: String(item.details ?? ""),
             kind: item.kind === "companion_service" ? "companion_service" : "primary",

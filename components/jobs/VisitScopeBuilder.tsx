@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   VISIT_SCOPE_ITEM_LIMIT,
+  createVisitScopeItemId,
   formatVisitScopeItemKindLabel,
+  sanitizeVisitScopeItemId,
   type VisitScopeItem,
   type VisitScopeItemKind,
 } from "@/lib/jobs/visit-scope";
@@ -24,17 +26,13 @@ type Props = {
   onItemsChange?: (items: VisitScopeDraftItem[]) => void;
 };
 
-function uid() {
-  return Math.random().toString(16).slice(2) + Date.now().toString(16);
-}
-
 function toDraftItems(
   items: VisitScopeItem[] | null | undefined,
   jobType: "ecc" | "service",
 ): VisitScopeDraftItem[] {
   const normalized: VisitScopeDraftItem[] = Array.isArray(items)
     ? items.map((item) => ({
-        id: uid(),
+        id: sanitizeVisitScopeItemId(item.id) ?? createVisitScopeItemId(),
         title: String(item.title ?? ""),
         details: String(item.details ?? ""),
         kind:
@@ -51,7 +49,7 @@ function toDraftItems(
 
   return [
     {
-      id: uid(),
+      id: createVisitScopeItemId(),
       title: "",
       details: "",
       kind: "primary",
@@ -102,6 +100,7 @@ export default function VisitScopeBuilder({
   const serializedItems = useMemo(() => {
     const payload = items
       .map((item) => ({
+        id: item.id,
         title: item.title.trim(),
         details: item.details.trim(),
         kind: jobType === "ecc" ? item.kind : "primary",
@@ -119,7 +118,7 @@ export default function VisitScopeBuilder({
     setItems((prev) => [
       ...prev,
       {
-        id: uid(),
+        id: createVisitScopeItemId(),
         title: "",
         details: "",
         kind: "primary",
