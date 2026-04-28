@@ -1,5 +1,14 @@
 import { normalizeBillingMode, type BillingMode } from "@/lib/business/internal-business-profile";
 import type { EntitlementStatus, PlatformPlanKey } from "@/lib/business/platform-entitlement";
+import {
+  STARTER_KIT_V1_SEEDS,
+  applyPricebookSeeding,
+  dryRunPricebookSeeding,
+  type PricebookExistingSeedRow,
+  type PricebookSeedInsertRow,
+  type PricebookSeedResult,
+  type PricebookSeedingStore,
+} from "@/lib/business/pricebook-seeding";
 
 export type FirstOwnerProvisioningStatus = "provisioned" | "confirmed" | "failed" | "dry_run";
 export type EntitlementPreset = "standard" | "internal_comped";
@@ -11,7 +20,8 @@ type RecordKey =
   | "profiles"
   | "internal_users"
   | "internal_business_profiles"
-  | "platform_account_entitlements";
+  | "platform_account_entitlements"
+  | "pricebook_items";
 
 export type FirstOwnerProvisioningError = {
   code: string;
@@ -23,6 +33,7 @@ export type FirstOwnerProvisioningError = {
     | "internal_users"
     | "internal_business_profiles"
     | "platform_account_entitlements"
+    | "pricebook_items"
     | "invariants";
 };
 
@@ -41,6 +52,7 @@ export type FirstOwnerProvisioningResult = {
   recordsConfirmed: RecordKey[];
   recordsPatched: RecordKey[];
   inviteIntent: FirstOwnerProvisioningInviteIntent;
+  pricebookSeeding: PricebookSeedResult | null;
   warnings: string[];
   errors: FirstOwnerProvisioningError[];
 };
@@ -155,11 +167,62 @@ export type FirstOwnerProvisioningClient = {
     stripe_cancel_at_period_end?: boolean;
     notes?: string | null;
   }): Promise<ProvisioningEntitlementRow>;
+
+  listExistingPricebookSeedRows(ownerUserId: string): Promise<PricebookExistingSeedRow[]>;
+  insertPricebookSeedRows(rows: PricebookSeedInsertRow[]): Promise<void>;
 };
 
 const DEFAULT_BUSINESS_NAME = "Compliance Matters";
 const DEFAULT_PLAN_KEY: PlatformPlanKey = "starter";
 const DEFAULT_ENTITLEMENT_STATUS: EntitlementStatus = "trial";
+
+function buildSeedPreviewForNewAccount(): PricebookSeedResult {
+  return {
+    inserted_count: STARTER_KIT_V1_SEEDS.length,
+    skipped_count: 0,
+    inserted_rows: STARTER_KIT_V1_SEEDS.map((seed) => ({
+      seed_key: seed.seed_key,
+      item_name: seed.item_name,
+    })),
+    skipped_rows: [],
+  };
+}
+
+function createPricebookSeedingStore(
+  client: FirstOwnerProvisioningClient,
+): PricebookSeedingStore {
+  return {
+    async listExistingSeedRows(account_owner_user_id) {
+      try {
+        return {
+          data: await client.listExistingPricebookSeedRows(account_owner_user_id),
+          error: null,
+        };
+      } catch (error) {
+        return {
+          data: null,
+          error: {
+            message:
+              error instanceof Error ? error.message : "Failed to load existing pricebook seed rows.",
+          },
+        };
+      }
+    },
+    async insertSeedRows(rows) {
+      try {
+        await client.insertPricebookSeedRows(rows);
+        return { error: null };
+      } catch (error) {
+        return {
+          error: {
+            message:
+              error instanceof Error ? error.message : "Failed to insert starter pricebook rows.",
+          },
+        };
+      }
+    },
+  };
+}
 
 function toCleanString(value: unknown) {
   return String(value ?? "").trim();
@@ -193,6 +256,7 @@ function pushError(
       reason: "failed",
     },
     warnings: [],
+    pricebookSeeding: null,
     errors,
   };
 }
@@ -271,6 +335,7 @@ export async function provisionFirstOwnerAccount(params: {
   const billingMode = normalizeBillingMode(input.defaultBillingMode);
   const entitlementPreset = normalizeEntitlementPreset(input.entitlementPreset);
   const entitlementPresetValues = buildEntitlementPresetValues(entitlementPreset);
+  const pricebookSeedStore = createPricebookSeedingStore(client);
 
   if (!email || !isValidEmail(email)) {
     return pushError(errors, {
@@ -299,6 +364,7 @@ export async function provisionFirstOwnerAccount(params: {
             authUserId: null,
             reason: "dry_run",
           },
+          pricebookSeeding: buildSeedPreviewForNewAccount(),
           warnings,
           errors,
         };
@@ -500,6 +566,44 @@ export async function provisionFirstOwnerAccount(params: {
       }
     }
 
+    const pricebookSeeding = dryRun
+      ? await dryRunPricebookSeeding(pricebookSeedStore, authUserId, STARTER_KIT_V1_SEEDS)
+      : await applyPricebookSeeding(pricebookSeedStore, authUserId, STARTER_KIT_V1_SEEDS);
+
+    if (pricebookSeeding.errors?.length) {
+      errors.push({
+        code: "PRICEBOOK_SEEDING_FAILED",
+        message: pricebookSeeding.errors.join(" | "),
+        stage: "pricebook_items",
+      });
+
+      return {
+        status: "failed",
+        accountOwnerUserId: authUserId,
+        authUserId,
+        recordsCreated: dedupeRecordKeys(recordsCreated),
+        recordsConfirmed: dedupeRecordKeys(recordsConfirmed),
+        recordsPatched: dedupeRecordKeys(recordsPatched),
+        inviteIntent: {
+          shouldSendInvite: false,
+          email,
+          authUserId,
+          reason: "failed",
+        },
+        pricebookSeeding,
+        warnings,
+        errors,
+      };
+    }
+
+    if (!dryRun) {
+      if (pricebookSeeding.inserted_count > 0) {
+        recordsCreated.push("pricebook_items");
+      } else {
+        recordsConfirmed.push("pricebook_items");
+      }
+    }
+
     if (!dryRun) {
       const invariantFailures: string[] = [];
 
@@ -563,6 +667,7 @@ export async function provisionFirstOwnerAccount(params: {
         authUserId,
         reason: dryRun ? "dry_run" : "ready_for_invite",
       },
+      pricebookSeeding,
       warnings,
       errors,
     };

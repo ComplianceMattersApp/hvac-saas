@@ -12,7 +12,7 @@
  *   - No integration with provisioning or admin UI yet.
  */
 
-import { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Definition of a starter Pricebook item.
@@ -53,6 +53,85 @@ export interface PricebookSeedResult {
   }>;
   /** Errors or validation notes. */
   errors?: string[];
+}
+
+export type PricebookExistingSeedRow = {
+  seed_key: string;
+  item_name: string;
+};
+
+export type PricebookSeedInsertRow = PricebookStarterSeedDefinition & {
+  account_owner_user_id: string;
+};
+
+export interface PricebookSeedingStore {
+  listExistingSeedRows(account_owner_user_id: string): Promise<{
+    data: PricebookExistingSeedRow[] | null;
+    error: { message: string } | null;
+  }>;
+  insertSeedRows(rows: PricebookSeedInsertRow[]): Promise<{
+    error: { message: string } | null;
+  }>;
+}
+
+export function createPricebookSeedingStoreFromSupabase(
+  client: SupabaseClient,
+): PricebookSeedingStore {
+  return {
+    async listExistingSeedRows(account_owner_user_id) {
+      const { data, error } = await client
+        .from('pricebook_items')
+        .select('seed_key, item_name')
+        .eq('account_owner_user_id', account_owner_user_id)
+        .not('seed_key', 'is', null);
+
+      return {
+        data: (data ?? null) as PricebookExistingSeedRow[] | null,
+        error: error ? { message: error.message } : null,
+      };
+    },
+
+    async insertSeedRows(rows) {
+      const { error } = await client.from('pricebook_items').insert(rows);
+      return { error: error ? { message: error.message } : null };
+    },
+  };
+}
+
+function buildSeedPlan(
+  existing: PricebookExistingSeedRow[] | null,
+  account_owner_user_id: string,
+  seeds: PricebookStarterSeedDefinition[],
+) {
+  const existing_keys = new Set(existing?.map((row) => row.seed_key) || []);
+  const inserted_rows: Array<{ seed_key: string; item_name: string }> = [];
+  const skipped_rows: Array<{ seed_key: string; item_name: string }> = [];
+  const to_insert: PricebookSeedInsertRow[] = [];
+
+  seeds.forEach((seed) => {
+    if (existing_keys.has(seed.seed_key)) {
+      skipped_rows.push({
+        seed_key: seed.seed_key,
+        item_name: seed.item_name,
+      });
+      return;
+    }
+
+    inserted_rows.push({
+      seed_key: seed.seed_key,
+      item_name: seed.item_name,
+    });
+    to_insert.push({
+      ...seed,
+      account_owner_user_id,
+    });
+  });
+
+  return {
+    inserted_rows,
+    skipped_rows,
+    to_insert,
+  };
 }
 
 /**
@@ -262,7 +341,7 @@ export function validateSeedDefinitions(
  * and what would be skipped.
  */
 export async function dryRunPricebookSeeding(
-  client: SupabaseClient,
+  store: PricebookSeedingStore,
   account_owner_user_id: string,
   seeds: PricebookStarterSeedDefinition[]
 ): Promise<PricebookSeedResult> {
@@ -284,12 +363,7 @@ export async function dryRunPricebookSeeding(
   }
 
   try {
-    // Fetch existing seed keys for this account
-    const { data: existing, error } = await client
-      .from('pricebook_items')
-      .select('seed_key, item_name')
-      .eq('account_owner_user_id', account_owner_user_id)
-      .not('seed_key', 'is', null);
+    const { data: existing, error } = await store.listExistingSeedRows(account_owner_user_id);
 
     if (error) {
       return {
@@ -299,23 +373,11 @@ export async function dryRunPricebookSeeding(
       };
     }
 
-    const existing_keys = new Set(existing?.map((r) => r.seed_key) || []);
-    const inserted_rows: Array<{ seed_key: string; item_name: string }> = [];
-    const skipped_rows: Array<{ seed_key: string; item_name: string }> = [];
-
-    seeds.forEach((seed) => {
-      if (existing_keys.has(seed.seed_key)) {
-        skipped_rows.push({
-          seed_key: seed.seed_key,
-          item_name: seed.item_name,
-        });
-      } else {
-        inserted_rows.push({
-          seed_key: seed.seed_key,
-          item_name: seed.item_name,
-        });
-      }
-    });
+    const { inserted_rows, skipped_rows } = buildSeedPlan(
+      existing,
+      account_owner_user_id,
+      seeds,
+    );
 
     return {
       inserted_count: inserted_rows.length,
@@ -339,7 +401,7 @@ export async function dryRunPricebookSeeding(
  * Skips rows where seed_key already exists; does not update existing rows.
  */
 export async function applyPricebookSeeding(
-  client: SupabaseClient,
+  store: PricebookSeedingStore,
   account_owner_user_id: string,
   seeds: PricebookStarterSeedDefinition[]
 ): Promise<PricebookSeedResult> {
@@ -361,12 +423,7 @@ export async function applyPricebookSeeding(
   }
 
   try {
-    // Fetch existing seed keys for this account
-    const { data: existing, error: selectError } = await client
-      .from('pricebook_items')
-      .select('seed_key, item_name')
-      .eq('account_owner_user_id', account_owner_user_id)
-      .not('seed_key', 'is', null);
+    const { data: existing, error: selectError } = await store.listExistingSeedRows(account_owner_user_id);
 
     if (selectError) {
       return {
@@ -376,36 +433,16 @@ export async function applyPricebookSeeding(
       };
     }
 
-    const existing_keys = new Set(existing?.map((r) => r.seed_key) || []);
-    const to_insert: Array<
-      Omit<PricebookStarterSeedDefinition, 'seed_key' | 'starter_version'> & {
-        seed_key: string;
-        starter_version: string;
-        account_owner_user_id: string;
-      }
-    > = [];
-    const skipped_rows: Array<{ seed_key: string; item_name: string }> = [];
-
-    seeds.forEach((seed) => {
-      if (existing_keys.has(seed.seed_key)) {
-        skipped_rows.push({
-          seed_key: seed.seed_key,
-          item_name: seed.item_name,
-        });
-      } else {
-        to_insert.push({
-          ...seed,
-          account_owner_user_id,
-        });
-      }
-    });
+    const { inserted_rows, skipped_rows, to_insert } = buildSeedPlan(
+      existing,
+      account_owner_user_id,
+      seeds,
+    );
 
     // Insert new rows
     let inserted_count = 0;
     if (to_insert.length > 0) {
-      const { error: insertError } = await client
-        .from('pricebook_items')
-        .insert(to_insert);
+      const { error: insertError } = await store.insertSeedRows(to_insert);
 
       if (insertError) {
         return {
@@ -421,10 +458,7 @@ export async function applyPricebookSeeding(
     return {
       inserted_count,
       skipped_count: skipped_rows.length,
-      inserted_rows: to_insert.map((row) => ({
-        seed_key: row.seed_key,
-        item_name: row.item_name,
-      })),
+      inserted_rows,
       skipped_rows,
     };
   } catch (err) {

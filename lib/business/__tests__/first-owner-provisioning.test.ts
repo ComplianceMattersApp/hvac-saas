@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { provisionFirstOwnerAccount, type FirstOwnerProvisioningClient } from "@/lib/business/first-owner-provisioning";
+import { STARTER_KIT_V1_SEEDS, type PricebookSeedInsertRow } from "@/lib/business/pricebook-seeding";
 
 type EntitlementRow = {
   account_owner_user_id: string;
@@ -41,6 +42,7 @@ type Store = {
     }
   >;
   entitlementsByOwnerId: Record<string, EntitlementRow>;
+  pricebookSeedRowsByOwnerId: Record<string, Array<{ seed_key: string; item_name: string }>>;
   sequence: number;
 };
 
@@ -69,6 +71,7 @@ function createStore(seed?: Partial<Store>): Store {
     internalUsersByUserId: seed?.internalUsersByUserId ?? {},
     businessProfilesByOwnerId: seed?.businessProfilesByOwnerId ?? {},
     entitlementsByOwnerId: seed?.entitlementsByOwnerId ?? {},
+    pricebookSeedRowsByOwnerId: seed?.pricebookSeedRowsByOwnerId ?? {},
     sequence: seed?.sequence ?? 1,
   };
 }
@@ -159,6 +162,21 @@ function createMockClient(store: Store): FirstOwnerProvisioningClient {
       store.entitlementsByOwnerId[input.account_owner_user_id] = row;
       return row;
     }),
+
+    listExistingPricebookSeedRows: vi.fn(async (ownerUserId: string) => {
+      return store.pricebookSeedRowsByOwnerId[ownerUserId] ?? [];
+    }),
+
+    insertPricebookSeedRows: vi.fn(async (rows: PricebookSeedInsertRow[]) => {
+      rows.forEach((row) => {
+        const existing = store.pricebookSeedRowsByOwnerId[row.account_owner_user_id] ?? [];
+        existing.push({
+          seed_key: row.seed_key,
+          item_name: row.item_name,
+        });
+        store.pricebookSeedRowsByOwnerId[row.account_owner_user_id] = existing;
+      });
+    }),
   };
 }
 
@@ -187,7 +205,14 @@ describe("provisionFirstOwnerAccount", () => {
         "internal_users",
         "internal_business_profiles",
         "platform_account_entitlements",
+        "pricebook_items",
       ]),
+    );
+    expect(result.pricebookSeeding).toEqual(
+      expect.objectContaining({
+        inserted_count: STARTER_KIT_V1_SEEDS.length,
+        skipped_count: 0,
+      }),
     );
     expect(result.inviteIntent.shouldSendInvite).toBe(true);
     expect(result.inviteIntent.email).toBe("owner@example.com");
@@ -227,6 +252,12 @@ describe("provisionFirstOwnerAccount", () => {
           entitlement_status: "active",
         }),
       },
+      pricebookSeedRowsByOwnerId: {
+        [ownerId]: STARTER_KIT_V1_SEEDS.map((seed) => ({
+          seed_key: seed.seed_key,
+          item_name: seed.item_name,
+        })),
+      },
     });
 
     const client = createMockClient(store);
@@ -246,10 +277,39 @@ describe("provisionFirstOwnerAccount", () => {
         "internal_users",
         "internal_business_profiles",
         "platform_account_entitlements",
+        "pricebook_items",
       ]),
+    );
+    expect(result.pricebookSeeding).toEqual(
+      expect.objectContaining({
+        inserted_count: 0,
+        skipped_count: STARTER_KIT_V1_SEEDS.length,
+      }),
     );
     expect(client.createAuthUser).not.toHaveBeenCalled();
     expect(client.insertProfile).not.toHaveBeenCalled();
+  });
+
+  it("dry run previews starter pricebook seeding for a new account", async () => {
+    const store = createStore();
+    const client = createMockClient(store);
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: {
+        targetEmail: "owner@example.com",
+        dryRun: true,
+      },
+    });
+
+    expect(result.status).toBe("dry_run");
+    expect(result.accountOwnerUserId).toBeNull();
+    expect(result.pricebookSeeding).toEqual(
+      expect.objectContaining({
+        inserted_count: STARTER_KIT_V1_SEEDS.length,
+        skipped_count: 0,
+      }),
+    );
   });
 
   it("missing business profile is reconciled", async () => {
@@ -506,6 +566,12 @@ describe("provisionFirstOwnerAccount", () => {
           entitlement_status: "trial",
         }),
       },
+      pricebookSeedRowsByOwnerId: {
+        [ownerId]: STARTER_KIT_V1_SEEDS.map((seed) => ({
+          seed_key: seed.seed_key,
+          item_name: seed.item_name,
+        })),
+      },
     });
     const client = createMockClient(store);
 
@@ -560,6 +626,12 @@ describe("provisionFirstOwnerAccount", () => {
           plan_key: "enterprise",
           entitlement_status: "active",
         }),
+      },
+      pricebookSeedRowsByOwnerId: {
+        [ownerId]: STARTER_KIT_V1_SEEDS.map((seed) => ({
+          seed_key: seed.seed_key,
+          item_name: seed.item_name,
+        })),
       },
     });
     const client = createMockClient(store);
@@ -635,5 +707,12 @@ describe("provisionFirstOwnerAccount", () => {
     expect(Object.keys(store.internalUsersByUserId)).toHaveLength(1);
     expect(Object.keys(store.businessProfilesByOwnerId)).toHaveLength(1);
     expect(Object.keys(store.entitlementsByOwnerId)).toHaveLength(1);
+    expect(store.pricebookSeedRowsByOwnerId["user-1"]).toHaveLength(STARTER_KIT_V1_SEEDS.length);
+    expect(second.pricebookSeeding).toEqual(
+      expect.objectContaining({
+        inserted_count: 0,
+        skipped_count: STARTER_KIT_V1_SEEDS.length,
+      }),
+    );
   });
 });

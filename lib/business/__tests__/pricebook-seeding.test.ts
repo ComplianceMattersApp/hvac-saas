@@ -2,7 +2,9 @@
 import {
   STARTER_KIT_V1_SEEDS,
   applyPricebookSeeding,
+  createPricebookSeedingStoreFromSupabase,
   dryRunPricebookSeeding,
+  type PricebookSeedingStore,
   validateSeedDefinitions,
   PricebookStarterSeedDefinition,
 } from '../pricebook-seeding';
@@ -88,33 +90,25 @@ describe('PricebookSeeding', () => {
   });
 
   describe('dryRunPricebookSeeding', () => {
-    let mockClient: any;
+    let mockStore: PricebookSeedingStore;
+    let listExistingSeedRowsMock: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
-      mockClient = {
-        from: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        not: vi.fn().mockReturnThis(),
+      listExistingSeedRowsMock = vi.fn();
+      mockStore = {
+        listExistingSeedRows: listExistingSeedRowsMock,
+        insertSeedRows: vi.fn(),
       };
     });
 
     it('should return insert candidates when account has no existing seed rows', async () => {
-      mockClient.not.mockReturnValue({
-        data: [],
-        error: null,
-      });
-
-      mockClient.from.mockReturnValue(mockClient);
-      mockClient.select.mockReturnValue(mockClient);
-      mockClient.eq.mockReturnValue(mockClient);
-      mockClient.not.mockReturnValue({
+      listExistingSeedRowsMock.mockResolvedValue({
         data: [],
         error: null,
       });
 
       const result = await dryRunPricebookSeeding(
-        mockClient as unknown as SupabaseClient,
+        mockStore,
         'test-account-id',
         STARTER_KIT_V1_SEEDS
       );
@@ -129,10 +123,7 @@ describe('PricebookSeeding', () => {
     });
 
     it('should skip rows with existing seed_key', async () => {
-      mockClient.from.mockReturnValue(mockClient);
-      mockClient.select.mockReturnValue(mockClient);
-      mockClient.eq.mockReturnValue(mockClient);
-      mockClient.not.mockReturnValue({
+      listExistingSeedRowsMock.mockResolvedValue({
         data: [
           {
             seed_key: 'starter_v1.fees.service_call',
@@ -147,7 +138,7 @@ describe('PricebookSeeding', () => {
       });
 
       const result = await dryRunPricebookSeeding(
-        mockClient as unknown as SupabaseClient,
+        mockStore,
         'test-account-id',
         STARTER_KIT_V1_SEEDS
       );
@@ -159,7 +150,7 @@ describe('PricebookSeeding', () => {
 
     it('should require explicit account_owner_user_id', async () => {
       const result = await dryRunPricebookSeeding(
-        mockClient as unknown as SupabaseClient,
+        mockStore,
         '',
         STARTER_KIT_V1_SEEDS
       );
@@ -180,7 +171,7 @@ describe('PricebookSeeding', () => {
       ];
 
       const result = await dryRunPricebookSeeding(
-        mockClient as unknown as SupabaseClient,
+        mockStore,
         'test-account-id',
         invalidSeeds
       );
@@ -191,16 +182,13 @@ describe('PricebookSeeding', () => {
     });
 
     it('should handle database errors', async () => {
-      mockClient.from.mockReturnValue(mockClient);
-      mockClient.select.mockReturnValue(mockClient);
-      mockClient.eq.mockReturnValue(mockClient);
-      mockClient.not.mockReturnValue({
+      listExistingSeedRowsMock.mockResolvedValue({
         data: null,
         error: { message: 'Connection error' },
       });
 
       const result = await dryRunPricebookSeeding(
-        mockClient as unknown as SupabaseClient,
+        mockStore,
         'test-account-id',
         STARTER_KIT_V1_SEEDS
       );
@@ -211,53 +199,47 @@ describe('PricebookSeeding', () => {
   });
 
   describe('applyPricebookSeeding', () => {
-    let mockClient: any;
+    let mockStore: PricebookSeedingStore;
+    let listExistingSeedRowsMock: ReturnType<typeof vi.fn>;
+    let insertSeedRowsMock: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
-      mockClient = {
-        from: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        not: vi.fn().mockReturnThis(),
-        insert: vi.fn().mockReturnThis(),
+      listExistingSeedRowsMock = vi.fn();
+      insertSeedRowsMock = vi.fn();
+      mockStore = {
+        listExistingSeedRows: listExistingSeedRowsMock,
+        insertSeedRows: insertSeedRowsMock,
       };
     });
 
     it('should insert missing rows', async () => {
-      mockClient.from.mockReturnValue(mockClient);
-      mockClient.select.mockReturnValue(mockClient);
-      mockClient.eq.mockReturnValue(mockClient);
-      mockClient.not.mockReturnValue({
+      listExistingSeedRowsMock.mockResolvedValue({
         data: [],
         error: null,
       });
-      mockClient.insert.mockReturnValue({
-        data: null,
+      insertSeedRowsMock.mockResolvedValue({
         error: null,
       });
 
       const result = await applyPricebookSeeding(
-        mockClient as unknown as SupabaseClient,
+        mockStore,
         'test-account-id',
         STARTER_KIT_V1_SEEDS
       );
 
       expect(result.inserted_count).toBe(12);
       expect(result.skipped_count).toBe(0);
-      expect(mockClient.insert).toHaveBeenCalled();
+      expect(insertSeedRowsMock).toHaveBeenCalled();
 
       // Verify insert was called with correct payload
-      const insertCall = mockClient.insert.mock.calls[0]?.[0];
+      const insertCall = insertSeedRowsMock.mock.calls[0]?.[0];
       expect(insertCall).toBeDefined();
       expect(insertCall.length).toBe(12);
       expect(insertCall[0]).toHaveProperty('account_owner_user_id', 'test-account-id');
     });
 
     it('should skip rows when called twice (idempotency)', async () => {
-      mockClient.from.mockReturnValue(mockClient);
-      mockClient.select.mockReturnValue(mockClient);
-      mockClient.eq.mockReturnValue(mockClient);
-      mockClient.not.mockReturnValue({
+      listExistingSeedRowsMock.mockResolvedValue({
         data: STARTER_KIT_V1_SEEDS.map((s) => ({
           seed_key: s.seed_key,
           item_name: s.item_name,
@@ -266,21 +248,18 @@ describe('PricebookSeeding', () => {
       });
 
       const result = await applyPricebookSeeding(
-        mockClient as unknown as SupabaseClient,
+        mockStore,
         'test-account-id',
         STARTER_KIT_V1_SEEDS
       );
 
       expect(result.inserted_count).toBe(0);
       expect(result.skipped_count).toBe(12);
-      expect(mockClient.insert).not.toHaveBeenCalled();
+      expect(insertSeedRowsMock).not.toHaveBeenCalled();
     });
 
     it('should not duplicate when called multiple times', async () => {
-      mockClient.from.mockReturnValue(mockClient);
-      mockClient.select.mockReturnValue(mockClient);
-      mockClient.eq.mockReturnValue(mockClient);
-      mockClient.not.mockReturnValue({
+      listExistingSeedRowsMock.mockResolvedValue({
         data: [
           {
             seed_key: 'starter_v1.fees.service_call',
@@ -289,13 +268,12 @@ describe('PricebookSeeding', () => {
         ],
         error: null,
       });
-      mockClient.insert.mockReturnValue({
-        data: null,
+      insertSeedRowsMock.mockResolvedValue({
         error: null,
       });
 
       const result = await applyPricebookSeeding(
-        mockClient as unknown as SupabaseClient,
+        mockStore,
         'test-account-id',
         STARTER_KIT_V1_SEEDS
       );
@@ -304,7 +282,7 @@ describe('PricebookSeeding', () => {
       expect(result.skipped_count).toBe(1);
 
       // Verify insert only includes 11 rows (excluding the existing one)
-      const insertCall = mockClient.insert.mock.calls[0]?.[0];
+      const insertCall = insertSeedRowsMock.mock.calls[0]?.[0];
       expect(insertCall.length).toBe(11);
       expect(insertCall.every((row: any) => row.seed_key !== 'starter_v1.fees.service_call')).toBe(
         true
@@ -313,7 +291,7 @@ describe('PricebookSeeding', () => {
 
     it('should require explicit account_owner_user_id', async () => {
       const result = await applyPricebookSeeding(
-        mockClient as unknown as SupabaseClient,
+        mockStore,
         '',
         STARTER_KIT_V1_SEEDS
       );
@@ -323,24 +301,20 @@ describe('PricebookSeeding', () => {
       expect(result.errors!.some((e) => e.includes('account_owner_user_id'))).toBe(
         true
       );
-      expect(mockClient.insert).not.toHaveBeenCalled();
+      expect(insertSeedRowsMock).not.toHaveBeenCalled();
     });
 
     it('should handle insert errors', async () => {
-      mockClient.from.mockReturnValue(mockClient);
-      mockClient.select.mockReturnValue(mockClient);
-      mockClient.eq.mockReturnValue(mockClient);
-      mockClient.not.mockReturnValue({
+      listExistingSeedRowsMock.mockResolvedValue({
         data: [],
         error: null,
       });
-      mockClient.insert.mockReturnValue({
-        data: null,
+      insertSeedRowsMock.mockResolvedValue({
         error: { message: 'Insert failed' },
       });
 
       const result = await applyPricebookSeeding(
-        mockClient as unknown as SupabaseClient,
+        mockStore,
         'test-account-id',
         STARTER_KIT_V1_SEEDS
       );
@@ -351,16 +325,13 @@ describe('PricebookSeeding', () => {
     });
 
     it('should handle select errors gracefully', async () => {
-      mockClient.from.mockReturnValue(mockClient);
-      mockClient.select.mockReturnValue(mockClient);
-      mockClient.eq.mockReturnValue(mockClient);
-      mockClient.not.mockReturnValue({
+      listExistingSeedRowsMock.mockResolvedValue({
         data: null,
         error: { message: 'Select failed' },
       });
 
       const result = await applyPricebookSeeding(
-        mockClient as unknown as SupabaseClient,
+        mockStore,
         'test-account-id',
         STARTER_KIT_V1_SEEDS
       );
@@ -371,20 +342,16 @@ describe('PricebookSeeding', () => {
     });
 
     it('should populate inserted_rows with seed metadata', async () => {
-      mockClient.from.mockReturnValue(mockClient);
-      mockClient.select.mockReturnValue(mockClient);
-      mockClient.eq.mockReturnValue(mockClient);
-      mockClient.not.mockReturnValue({
+      listExistingSeedRowsMock.mockResolvedValue({
         data: [],
         error: null,
       });
-      mockClient.insert.mockReturnValue({
-        data: null,
+      insertSeedRowsMock.mockResolvedValue({
         error: null,
       });
 
       const result = await applyPricebookSeeding(
-        mockClient as unknown as SupabaseClient,
+        mockStore,
         'test-account-id',
         STARTER_KIT_V1_SEEDS
       );
@@ -395,6 +362,35 @@ describe('PricebookSeeding', () => {
         seed_key: 'starter_v1.fees.service_call',
         item_name: 'Service Call',
       });
+    });
+
+    it('creates a Supabase-backed store adapter', async () => {
+      const mockClient = {
+        from: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        not: vi.fn().mockResolvedValue({
+          data: [],
+          error: null,
+        }),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      };
+
+      const store = createPricebookSeedingStoreFromSupabase(
+        mockClient as unknown as SupabaseClient,
+      );
+
+      const listResult = await store.listExistingSeedRows('test-account-id');
+      expect(listResult.data).toEqual([]);
+
+      const insertResult = await store.insertSeedRows([
+        {
+          ...STARTER_KIT_V1_SEEDS[0],
+          account_owner_user_id: 'test-account-id',
+        },
+      ]);
+      expect(insertResult.error).toBeNull();
+      expect(mockClient.from).toHaveBeenCalledWith('pricebook_items');
     });
   });
 
