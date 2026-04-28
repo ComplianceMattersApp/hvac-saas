@@ -55,6 +55,9 @@ Important clarification:
 
 Operator must verify the intended Supabase project before dry-run and before apply.
 
+Security logging rule:
+- Never paste service-role keys or other secrets into terminal logs, tickets, chat transcripts, or screenshots.
+
 ## 4. Dry-run first (required)
 
 Hosted target dry-run example:
@@ -90,6 +93,9 @@ npx tsx scripts/provision-first-owner.ts \
 Expected dry-run behavior:
 - No writes are committed
 - Output lists what would be created/confirmed/patched
+- Output now includes structured `pricebookSeeding` preview
+- For a new account, dry-run should preview the V1 starter set (12 rows)
+- Dry-run remains non-mutating and must not send invites
 
 ## 5. Apply after project verification
 
@@ -119,6 +125,8 @@ Confirm the run completed and the owner invite path is valid:
 - internal_business_profiles row exists
 - platform_account_entitlements row exists
 - first-owner marker is written before invite send
+- starter Pricebook rows exist for the new account after apply
+- starter seeding is idempotent by `seed_key` (re-running apply does not duplicate seeded rows)
 
 When `--entitlement-preset internal_comped` is used, also verify:
 - `plan_key = starter`

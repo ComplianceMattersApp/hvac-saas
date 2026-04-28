@@ -141,6 +141,21 @@ If any item here conflicts with the active spine, the spine wins.
 - Deferred policy remains unchanged: negative/default-credit adjustments remain blocked/deferred pending a separate adjustment/credit policy track.
 - Payment execution remains deferred; tenant customer card/checkout charging is not part of this closeout.
 
+### 2.8 Pricebook starter seeding promotion confirmation (D2C-3/D2C-4)
+- Completed: D2C-3/D2C-4 are production-promoted.
+  - D2C-3: starter seed helper foundation
+  - D2C-4: first-owner provisioning integration + structured operator output
+- Completed: production dry-run smoke confirmed `pricebookSeeding` output shape.
+  - top-level mode was `dry_run`
+  - `pricebookSeeding` preview returned the V1 starter set (`inserted_count = 12`, `skipped_count = 0`)
+  - errors were empty and invite send was false
+- Confirmed: no apply/write/invite action occurred during smoke.
+- Before onboarding first real production accounts, operators must:
+  - run dry-run first
+  - verify production project ref before each run
+  - confirm `pricebookSeeding` preview output is present and sane
+  - run apply only when intentionally provisioning a real account
+
 ---
 
 ## 3. Support / customer-operations readiness
