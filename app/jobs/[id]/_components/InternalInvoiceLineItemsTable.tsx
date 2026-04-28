@@ -16,6 +16,14 @@ type PricebookPickerItem = {
   default_description: string | null;
 };
 
+type VisitScopePickerItem = {
+  id: string;
+  title: string;
+  details: string | null;
+  kind: 'primary' | 'companion_service';
+  alreadyAdded: boolean;
+};
+
 type InternalInvoiceLineItemsTableProps = {
   jobId: string;
   tab: string;
@@ -23,9 +31,11 @@ type InternalInvoiceLineItemsTableProps = {
   totalCents: number;
   addLineItemAction: ServerFormAction;
   addPricebookLineItemAction: ServerFormAction;
+  addVisitScopeLineItemsAction: ServerFormAction;
   updateLineItemAction: ServerFormAction;
   removeLineItemAction: ServerFormAction;
   pricebookPickerItems: PricebookPickerItem[];
+  visitScopePickerItems: VisitScopePickerItem[];
   workspaceFieldLabelClass: string;
   workspaceInputClass: string;
   primaryButtonClass: string;
@@ -66,9 +76,11 @@ export default function InternalInvoiceLineItemsTable({
   totalCents,
   addLineItemAction,
   addPricebookLineItemAction,
+  addVisitScopeLineItemsAction,
   updateLineItemAction,
   removeLineItemAction,
   pricebookPickerItems,
+  visitScopePickerItems,
   workspaceFieldLabelClass,
   workspaceInputClass,
   primaryButtonClass,
@@ -79,8 +91,18 @@ export default function InternalInvoiceLineItemsTable({
   const [selectedPricebookItemId, setSelectedPricebookItemId] = useState<string>(
     pricebookPickerItems[0]?.id ?? '',
   );
+  const [selectedVisitScopeItemIds, setSelectedVisitScopeItemIds] = useState<string[]>([]);
   const selectedPricebookItem =
     pricebookPickerItems.find((item) => item.id === selectedPricebookItemId) ?? null;
+  const eligibleVisitScopeItems = visitScopePickerItems.filter((item) => !item.alreadyAdded);
+
+  function toggleVisitScopeItem(itemId: string) {
+    setSelectedVisitScopeItemIds((prev) =>
+      prev.includes(itemId)
+        ? prev.filter((value) => value !== itemId)
+        : [...prev, itemId],
+    );
+  }
 
   return (
     <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50/72 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.28)]">
@@ -165,6 +187,78 @@ export default function InternalInvoiceLineItemsTable({
             </div>
           )}
         </form>
+
+        {visitScopePickerItems.length > 0 ? (
+          <form action={addVisitScopeLineItemsAction} className="bg-white/92 px-5 py-5">
+            <input type="hidden" name="job_id" value={jobId} />
+            <input type="hidden" name="tab" value={tab} />
+            <input type="hidden" name="quantity" value="1.00" />
+
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Build Invoice from Visit Scope</div>
+                <div className="mt-1 text-xs leading-5 text-slate-500">
+                  Add selected scope items as draft invoice lines. Pricing starts at $0.00 and should be reviewed before issuing.
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {visitScopePickerItems.map((item) => {
+                const isChecked = selectedVisitScopeItemIds.includes(item.id);
+                return (
+                  <label
+                    key={item.id}
+                    className={`block rounded-xl border px-3.5 py-3 ${item.alreadyAdded ? 'border-slate-200 bg-slate-50/80' : 'border-slate-200 bg-white'}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        name="visit_scope_item_ids"
+                        value={item.id}
+                        checked={isChecked}
+                        disabled={item.alreadyAdded}
+                        onChange={() => toggleVisitScopeItem(item.id)}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="text-sm font-semibold text-slate-900">{item.title}</div>
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                            {item.kind === 'companion_service' ? 'Companion Service' : 'Primary'}
+                          </span>
+                          {item.alreadyAdded ? (
+                            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-700">
+                              Already added
+                            </span>
+                          ) : null}
+                        </div>
+                        {item.details ? (
+                          <div className="mt-1 text-xs leading-5 text-slate-600">{item.details}</div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5">
+              <div className="text-xs text-slate-500">
+                {eligibleVisitScopeItems.length === 0
+                  ? 'All available Visit Scope items are already on this draft invoice.'
+                  : 'Select one or more scope items to add them as draft invoice lines.'}
+              </div>
+              <SubmitButton
+                loadingText="Adding..."
+                className={primaryButtonClass}
+                disabled={selectedVisitScopeItemIds.length === 0}
+              >
+                Add Selected Scope Items
+              </SubmitButton>
+            </div>
+          </form>
+        ) : null}
 
         {lineItems.map((lineItem, index) => {
           const isPrimaryRow = index === 0;

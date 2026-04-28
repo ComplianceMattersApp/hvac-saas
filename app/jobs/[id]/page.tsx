@@ -78,6 +78,7 @@ import {
 import {
   addInternalInvoiceLineItemFromForm,
   addInternalInvoiceLineItemFromPricebookForm,
+  addInternalInvoiceLineItemsFromVisitScopeForm,
   createInternalInvoiceDraftFromForm,
   issueInternalInvoiceFromForm,
   removeInternalInvoiceLineItemFromForm,
@@ -101,6 +102,7 @@ import {
   buildVisitScopeReadModel,
   formatVisitScopeItemKindLabel,
   isVisitScopeItemPromoted,
+  sanitizeVisitScopeItemId,
   sanitizeVisitScopeItems,
   sanitizeVisitScopeSummary,
 } from "@/lib/jobs/visit-scope";
@@ -1267,6 +1269,7 @@ const showReplacementInvoicePrompt =
 
 const visitScopeSummary = sanitizeVisitScopeSummary((job as any).visit_scope_summary);
 let visitScopeItems = [] as Array<{
+  id?: string;
   title: string;
   details: string | null;
   kind: "primary" | "companion_service";
@@ -1315,6 +1318,31 @@ const internalInvoiceBillingAddress = internalInvoice
   : [];
 
 const internalInvoiceLineItemCount = internalInvoice?.line_items?.length ?? 0;
+const existingVisitScopeInvoiceSourceIds = new Set(
+  (internalInvoice?.line_items ?? [])
+    .filter((lineItem) => lineItem.source_kind === "visit_scope")
+    .map((lineItem) => sanitizeVisitScopeItemId(lineItem.source_visit_scope_item_id))
+    .filter(Boolean) as string[],
+);
+const visitScopeInvoicePickerItems = visitScopeItems
+  .map((item) => {
+    const itemId = sanitizeVisitScopeItemId(item.id);
+    if (!itemId) return null;
+    return {
+      id: itemId,
+      title: item.title,
+      details: item.details,
+      kind: item.kind,
+      alreadyAdded: existingVisitScopeInvoiceSourceIds.has(itemId),
+    };
+  })
+  .filter(Boolean) as Array<{
+    id: string;
+    title: string;
+    details: string | null;
+    kind: "primary" | "companion_service";
+    alreadyAdded: boolean;
+  }>;
 const internalInvoiceRecipientName = String(internalInvoice?.billing_name ?? "").trim() || "Billing recipient not set";
 const internalInvoiceRecipientContact = [
   String(internalInvoice?.billing_email ?? "").trim(),
@@ -2534,6 +2562,43 @@ const renderTimelineItem = (e: any, key: string) => {
         />
       )}
 
+      {banner === "internal_invoice_visit_scope_line_item_added" && (
+        <FlashBanner
+          type="success"
+          message="Selected Visit Scope items were added to the draft invoice."
+        />
+      )}
+
+      {banner === "internal_invoice_visit_scope_line_item_partial_added" && (
+        <FlashBanner
+          type="warning"
+          message="Some selected Visit Scope items were already added. New selections were added to the draft invoice."
+        />
+      )}
+
+      {banner === "internal_invoice_visit_scope_line_item_duplicate" && (
+        <FlashBanner
+          type="warning"
+          message="Selected Visit Scope items were already on this draft invoice."
+        />
+      )}
+
+      {(banner === "internal_invoice_visit_scope_item_invalid" ||
+        banner === "internal_invoice_visit_scope_item_missing" ||
+        banner === "internal_invoice_visit_scope_item_not_found") && (
+        <FlashBanner
+          type="warning"
+          message="Select valid Visit Scope items from this job to add them to the draft invoice."
+        />
+      )}
+
+      {banner === "internal_invoice_visit_scope_quantity_invalid" && (
+        <FlashBanner
+          type="warning"
+          message="Visit Scope quantity must be greater than zero."
+        />
+      )}
+
       {banner === "service_contract_saved" && (
         <FlashBanner
           type="success"
@@ -3452,6 +3517,12 @@ const renderTimelineItem = (e: any, key: string) => {
                   </div>
                 </div>
 
+                {visitScopeInvoicePickerItems.length === 0 ? (
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-600">
+                    No Visit Scope items are available to add to this draft invoice.
+                  </div>
+                ) : null}
+
                 <InternalInvoiceLineItemsTable
                   jobId={job.id}
                   tab={tab}
@@ -3459,9 +3530,11 @@ const renderTimelineItem = (e: any, key: string) => {
                   totalCents={internalInvoice.total_cents}
                   addLineItemAction={addInternalInvoiceLineItemFromForm}
                   addPricebookLineItemAction={addInternalInvoiceLineItemFromPricebookForm}
+                  addVisitScopeLineItemsAction={addInternalInvoiceLineItemsFromVisitScopeForm}
                   updateLineItemAction={updateInternalInvoiceLineItemFromForm}
                   removeLineItemAction={removeInternalInvoiceLineItemFromForm}
                   pricebookPickerItems={pricebookPickerItems}
+                  visitScopePickerItems={visitScopeInvoicePickerItems}
                   workspaceFieldLabelClass={workspaceFieldLabelClass}
                   workspaceInputClass={workspaceInputClass}
                   primaryButtonClass={primaryButtonClass}
