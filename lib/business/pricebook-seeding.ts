@@ -70,9 +70,49 @@ export interface PricebookSeedResult {
   inactive_seed_count?: number;
 }
 
+export type ExistingAccountStarterKitBackfillPlan = {
+  mode: 'dry_run';
+  account_owner_user_id: string;
+  starter_kit_version: 'v2';
+  seed_count: number;
+  active_seed_count: number;
+  inactive_seed_count: number;
+  would_insert_count: number;
+  would_skip_existing_seed_key_count: number;
+  possible_collision_count: number;
+  preview_insert_rows: Array<{
+    seed_key: string;
+    item_name: string;
+  }>;
+  preview_skip_rows: Array<{
+    seed_key: string;
+    item_name: string;
+  }>;
+  possible_collisions: Array<{
+    seed_key: string;
+    candidate_item_name: string;
+    candidate_category: string | null;
+    candidate_unit_label: string | null;
+    existing_row_id: string | null;
+    existing_row_is_active: boolean | null;
+    existing_row_seed_key: string | null;
+  }>;
+  warnings: string[];
+  errors: string[];
+};
+
 export type PricebookExistingSeedRow = {
   seed_key: string;
   item_name: string;
+};
+
+export type PricebookExistingCollisionRow = {
+  id: string | null;
+  seed_key: string | null;
+  item_name: string | null;
+  category: string | null;
+  unit_label: string | null;
+  is_active: boolean | null;
 };
 
 export type PricebookSeedInsertRow = PricebookStarterSeedDefinition & {
@@ -85,6 +125,10 @@ export interface PricebookSeedingStore {
     error: { message: string } | null;
   }>;
   insertSeedRows(rows: PricebookSeedInsertRow[]): Promise<{
+    error: { message: string } | null;
+  }>;
+  listExistingRowsForCollision?(account_owner_user_id: string): Promise<{
+    data: PricebookExistingCollisionRow[] | null;
     error: { message: string } | null;
   }>;
 }
@@ -109,6 +153,18 @@ export function createPricebookSeedingStoreFromSupabase(
     async insertSeedRows(rows) {
       const { error } = await client.from('pricebook_items').insert(rows);
       return { error: error ? { message: error.message } : null };
+    },
+
+    async listExistingRowsForCollision(account_owner_user_id) {
+      const { data, error } = await client
+        .from('pricebook_items')
+        .select('id, seed_key, item_name, category, unit_label, is_active')
+        .eq('account_owner_user_id', account_owner_user_id);
+
+      return {
+        data: (data ?? null) as PricebookExistingCollisionRow[] | null,
+        error: error ? { message: error.message } : null,
+      };
     },
   };
 }
@@ -789,5 +845,172 @@ export async function applyPricebookSeeding(
       skipped_count: 0,
       errors: [`Unexpected error: ${err instanceof Error ? err.message : String(err)}`],
     };
+  }
+}
+
+/**
+ * Existing-account planner helper for Starter Kit V2 backfill.
+ *
+ * Dry-run only: computes missing vs existing seed_keys for one account.
+ * This helper never writes data.
+ */
+export async function planExistingAccountStarterKitBackfill(params: {
+  store: PricebookSeedingStore;
+  account_owner_user_id: string;
+  previewLimit?: number;
+}): Promise<ExistingAccountStarterKitBackfillPlan> {
+  const { store, account_owner_user_id } = params;
+  const selection = resolveStarterKitSeeds('v2');
+  const resolvedPreviewLimit = Number.isInteger(params.previewLimit) && Number(params.previewLimit) > 0
+    ? Number(params.previewLimit)
+    : 10;
+
+  const buildPlanResult = (input: {
+    would_insert_rows: Array<{ seed_key: string; item_name: string }>;
+    would_skip_rows: Array<{ seed_key: string; item_name: string }>;
+    possible_collisions: ExistingAccountStarterKitBackfillPlan['possible_collisions'];
+    warnings?: string[];
+    errors?: string[];
+  }): ExistingAccountStarterKitBackfillPlan => {
+    const wouldInsertRows = input.would_insert_rows;
+    const wouldSkipRows = input.would_skip_rows;
+    const possibleCollisions = input.possible_collisions;
+
+    return {
+      mode: 'dry_run',
+      account_owner_user_id,
+      starter_kit_version: 'v2',
+      seed_count: selection.seedCount,
+      active_seed_count: selection.activeCount,
+      inactive_seed_count: selection.inactiveCount,
+      would_insert_count: wouldInsertRows.length,
+      would_skip_existing_seed_key_count: wouldSkipRows.length,
+      possible_collision_count: possibleCollisions.length,
+      preview_insert_rows: wouldInsertRows.slice(0, resolvedPreviewLimit),
+      preview_skip_rows: wouldSkipRows.slice(0, resolvedPreviewLimit),
+      possible_collisions: possibleCollisions.slice(0, resolvedPreviewLimit),
+      warnings: input.warnings ?? [],
+      errors: input.errors ?? [],
+    };
+  };
+
+  if (!account_owner_user_id || account_owner_user_id.trim() === '') {
+    return {
+      ...buildPlanResult({
+        would_insert_rows: [],
+        would_skip_rows: [],
+        possible_collisions: [],
+        errors: ['account_owner_user_id is required and cannot be empty'],
+      }),
+      account_owner_user_id: account_owner_user_id || '',
+    };
+  }
+
+  const seedDefinitionErrors = validateSeedDefinitions(selection.seeds);
+  if (seedDefinitionErrors.length > 0) {
+    return buildPlanResult({
+      would_insert_rows: [],
+      would_skip_rows: [],
+      possible_collisions: [],
+      errors: seedDefinitionErrors,
+    });
+  }
+
+  try {
+    const { data: existing, error } = await store.listExistingSeedRows(account_owner_user_id);
+    if (error) {
+        return buildPlanResult({
+          would_insert_rows: [],
+          would_skip_rows: [],
+          possible_collisions: [],
+          errors: [`Database error: ${error.message}`],
+        });
+    }
+
+    const { inserted_rows, skipped_rows } = buildSeedPlan(
+      existing,
+      account_owner_user_id,
+      selection.seeds,
+    );
+
+    let collisionRows: PricebookExistingCollisionRow[] = [];
+    if (store.listExistingRowsForCollision) {
+      const { data: existingCollisionRows, error: collisionError } =
+        await store.listExistingRowsForCollision(account_owner_user_id);
+
+      if (collisionError) {
+        return buildPlanResult({
+          would_insert_rows: inserted_rows,
+          would_skip_rows: skipped_rows,
+          possible_collisions: [],
+          errors: [`Database error: ${collisionError.message}`],
+        });
+      }
+
+      collisionRows = existingCollisionRows ?? [];
+    }
+
+    const possibleCollisions: ExistingAccountStarterKitBackfillPlan['possible_collisions'] = [];
+    if (collisionRows.length > 0) {
+      const candidateBySeedKey = new Map(selection.seeds.map((seed) => [seed.seed_key, seed]));
+
+      inserted_rows.forEach((candidate) => {
+        const fullSeed = candidateBySeedKey.get(candidate.seed_key);
+        if (!fullSeed) {
+          return;
+        }
+
+        collisionRows.forEach((existingRow) => {
+          const sameSignature =
+            String(existingRow.item_name ?? '') === fullSeed.item_name &&
+            String(existingRow.category ?? '') === String(fullSeed.category ?? '') &&
+            String(existingRow.unit_label ?? '') === String(fullSeed.unit_label ?? '');
+
+          const hasMatchingSeedKey = String(existingRow.seed_key ?? '') === fullSeed.seed_key;
+          if (!sameSignature || hasMatchingSeedKey) {
+            return;
+          }
+
+          possibleCollisions.push({
+            seed_key: fullSeed.seed_key,
+            candidate_item_name: fullSeed.item_name,
+            candidate_category: fullSeed.category,
+            candidate_unit_label: fullSeed.unit_label,
+            existing_row_id: existingRow.id,
+            existing_row_is_active: existingRow.is_active,
+            existing_row_seed_key: existingRow.seed_key,
+          });
+        });
+      });
+    }
+
+    const warnings: string[] = [];
+    if (selection.inactiveCount > 0) {
+      warnings.push(
+        `${selection.inactiveCount} deferred/inactive starter rows are included in planning output.`,
+      );
+    }
+
+    if (possibleCollisions.length > 0) {
+      warnings.push(
+        `Possible name/category/unit collisions detected for ${possibleCollisions.length} starter rows.`,
+      );
+    }
+
+    return buildPlanResult({
+      would_insert_rows: inserted_rows,
+      would_skip_rows: skipped_rows,
+      possible_collisions: possibleCollisions,
+      warnings,
+      errors: [],
+    });
+  } catch (err) {
+    return buildPlanResult({
+      would_insert_rows: [],
+      would_skip_rows: [],
+      possible_collisions: [],
+      warnings: [],
+      errors: [`Unexpected error: ${err instanceof Error ? err.message : String(err)}`],
+    });
   }
 }
