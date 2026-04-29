@@ -348,7 +348,11 @@ Current baseline state is:
   - existing V1 `R-410A` row was not duplicated
   - sandbox Pricebook UI now shows `109` items
 - existing-account backfill remains operator-controlled and dry-run-first
-- sandbox apply succeeded; production existing-account apply has not occurred
+- controlled production existing-account Starter Kit V3 verification is complete for owner account `93dd810e-3c0c-4b69-9dae-edfa0e481dbb` on host `ornrnvxtwwtulohqwxop.supabase.co`:
+  - production owner-account terminal dry-run state is verified: `would_insert_count = 0`, `would_skip_existing_seed_key_count = 96`, `would_skip_existing_equivalent_count = 1`, `possible_collision_count = 0`, `errors = []`
+  - production owner-account Pricebook count is verified: `108`
+  - existing V1 `R-410A` remains non-duplicated and is still treated as safe equivalent skip
+- Pricebook V3 rollout/verification is closed for the current scope after this docs closeout.
 - Pricebook/Admin Polish P3 is complete and production-promoted on `main`:
   - Search Pricebook
   - category filter from existing account rows
@@ -367,6 +371,8 @@ It feeds:
 - estimates
 - invoices (draft internal invoice Pricebook picker flow is production-promoted)
 - future reporting by item/category
+
+Estimate/quoting expansion remains planned/deferred follow-on work after current Pricebook continuation and does not change the locked backfill boundaries above.
 
 ### Pricebook item ownership
 Pricebook owns reusable definitions, not transactional history.
@@ -405,7 +411,7 @@ Current D2C continuation clarifications:
   - backfill default remains `v2`; explicit `--starter-kit-version v3` is supported where needed for controlled runs
   - backfill is single-account only, insert-only, and never mutates existing or customized rows
   - hosted targets require both `ALLOW_FIRST_OWNER_PROVISIONING=true` and `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true` before dry-run or apply
-  - no real production account has been backfilled; the operator tool exists but has not been run against real data
+  - controlled production owner-account V3 backfill verification is complete for `93dd810e-3c0c-4b69-9dae-edfa0e481dbb` with terminal post-apply state (`would_insert_count = 0`, `would_skip_existing_seed_key_count = 96`, `would_skip_existing_equivalent_count = 1`, `possible_collision_count = 0`, `errors = []`, account count `108`)
   - operator must always run dry-run first and review output before any apply
   - admin UI backfill controls remain future work
   - batch backfill remains future work
@@ -531,11 +537,14 @@ Reporting / analytics is no longer the active incomplete milestone.
 Payment P1 foundation is closed at the current baseline.
 Out-of-box readiness / business identity / settings packaging is also closed at the current baseline.
 The next natural roadmap area is smaller service-model revisions / service workflow refinement.
+After service workflow refinement, estimates/quoting is the next planned product track.
+Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Separate pre-launch enablement track:
 - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed in production for the platform account subscription slice.
 - Live confirmation includes deployed env, live webhook handling, successful non-owner checkout completion, entitlement sync, and Manage billing availability.
 - This does not move tenant customer invoice payment execution into current scope.
+- Platform subscription billing must remain separate from future tenant customer/work payment execution.
 
 Roadmap guardrail:
 - Payment P1 foundation is complete and closed.
@@ -907,11 +916,14 @@ Closed milestones:
 
 Next natural roadmap area:
 - Smaller service-model revisions / service workflow refinement.
+- Then estimates/quoting follow as the next planned product track.
+- Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Separate pre-launch enablement track:
 - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed in production for the platform account subscription slice.
 - Live confirmation includes deployed env, live webhook handling, successful non-owner checkout completion, entitlement sync, and Manage billing availability.
 - This does not move tenant customer invoice payment execution into current scope.
+- Platform subscription billing must remain separate from future tenant customer/work payment execution.
 
 Roadmap guardrail:
 - Payment P1 foundation is complete and closed.

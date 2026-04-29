@@ -31,7 +31,15 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirm launch posture remains `payment-ready by design, payment-active later` unless explicitly changed.
 - Confirm Phase P1 payment-ready foundation is complete, while live processor-backed payment execution remains later/pre-launch enablement work.
 - Confirm Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
-- Confirm this Stripe work is separate from tenant customer invoice payment execution.
+- Confirm this Stripe work is separate from tenant customer/work invoice payment execution.
+- Confirm the tenant customer/work payment execution track remains future/deferred:
+  - customer pays invoice online
+  - payment outcome writes back to Compliance Matters
+  - invoice payment status/balance updates
+  - partial/full payment outcomes anticipated
+  - refunds/disputes/payment-failure handling remains later
+  - optional small platform fee remains future capability
+  - QBO remains optional/downstream only
 - Verify no UI implies live processor-backed payment collection before it truly exists.
 - Confirm Stripe-first future direction and QBO-optional boundary remain intact.
 - Confirm recent invoice/payment wording polish remains honest:
@@ -292,7 +300,29 @@ If any item here conflicts with the active spine, the spine wins.
 - Completed: validation passed for both promotion slices (`npx tsc --noEmit`; targeted Pricebook suites).
 - Confirmed: no production data was touched for this closeout.
 - Confirmed: no Supabase command, migration, provisioning apply, or backfill batch/automatic run occurred.
-- Pre-launch operator note: before any production existing-account backfill, run dry-run first and verify inserts/skips/equivalents/collisions are sane before any apply.
+- Pre-launch operator note: before any additional production existing-account backfill, run dry-run first and verify inserts/skips/equivalents/collisions are sane before any apply.
+
+### 2.17 Pricebook V3 production existing-account backfill verification confirmation
+- Completed: production existing-account Starter Kit V3 verification is complete for owner account `93dd810e-3c0c-4b69-9dae-edfa0e481dbb` on host `ornrnvxtwwtulohqwxop.supabase.co`.
+- Completed: production owner-account Pricebook count is verified at `108` items.
+- Completed: production terminal dry-run state is verified:
+  - `would_insert_count = 0`
+  - `would_skip_existing_seed_key_count = 96`
+  - `would_skip_existing_equivalent_count = 1`
+  - `possible_collision_count = 0`
+  - `errors = 0`
+- Completed: R-410A non-duplication is verified:
+  - `Refrigerant R-410A (per lb)` count = `1`
+  - legacy V1 `R-410A` remains the safe equivalent skip row
+- Confirmed: no Supabase CLI command, migration, provisioning apply, schema change, code change, file change, push, or commit occurred during final verification.
+- Confirmed: production data was already in post-apply terminal state when final verification was executed.
+- Security follow-up preserved:
+  - previously exposed legacy production service_role key was rotated
+  - new Supabase secret key is in use
+  - Vercel `SUPABASE_SERVICE_ROLE_KEY` was updated as Sensitive
+  - production was redeployed and smoke tested successfully
+  - terminal sessions were closed
+- Deferred hardening item (still required): migrate away from legacy JWT anon/service_role key usage before disabling JWT-based API keys.
 
 ---
 

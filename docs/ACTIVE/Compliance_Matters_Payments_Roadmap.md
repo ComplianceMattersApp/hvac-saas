@@ -310,28 +310,35 @@ Does **not** include:
 - saved cards
 - refunds through processor
 
-### Phase P2 — Customer payment acceptance (later)
-First live processor phase, currently a planning target rather than immediate implementation.
+### Phase P2 — Stripe customer/work payment execution (tenant invoice acceptance, later)
+First live tenant payment-acceptance phase, currently a planning target rather than immediate implementation.
 
 Locked carry-forward clarification:
 - Dashboard payment/cash-performance analytics expansion remains deferred.
-- Customer payment acceptance remains a later P2 Stripe-first implementation.
+- Tenant customer/work payment execution remains a later P2 Stripe-first implementation.
 - Platform subscription billing for account onboarding is implemented in V1 and live-smoke confirmed in production.
-- This platform-billing slice remains separate from tenant internal invoice collected-payment tracking rollout.
+- This platform-billing slice remains separate from tenant internal invoice/customer-work payment execution.
 
 Launch-status update:
 - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed in production.
 - This work no longer sits in pending live-environment readiness; live keys, live webhook, and final smoke are complete for the platform-account subscription slice.
-- This does not move tenant customer invoice payment execution into current scope.
-- Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
+- This does not move tenant customer invoice/work-payment execution into current scope.
+- Tenant customer invoice/work-payment execution remains deferred unless explicitly pulled forward.
 - Live Pay Now/Charge Card/checkout/refunds/disputes/payout execution remains deferred.
 
-Recommended first scope:
+Recommended first scope for tenant customer/work payments:
 - customer pays invoice online
 - transaction outcome writes back to Compliance Matters
-- payment state updates automatically
+- invoice payment status and balance due update automatically
+- partial and full payment outcomes are supported
 - minimal processor-led implementation
 - no contractor payout complexity unless explicitly required
+
+Deferred-later scope within/after P2:
+- refunds/disputes handling remains later
+- processor payment-failure recovery workflows remain later
+- optional small configurable platform fee remains a future capability
+- QBO remains optional/downstream only and must not gate tenant payment execution
 
 ### Phase P3 — Contractor/platform payout layer (later)
 Only after customer payment acceptance is stable.

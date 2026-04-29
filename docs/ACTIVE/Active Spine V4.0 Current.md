@@ -1243,6 +1243,11 @@ Current position:
 - Reporting / analytics is now substantially complete for the current milestone-3 scope.
 - Payment P1 foundation is closed at the current baseline.
 - Pricebook V1 is no longer fully deferred and is the active product-track continuation area.
+- Pricebook V3 rollout/verification is closed for current scope after this docs closeout.
+- Next product focus remains smaller service-model revisions / service workflow refinement.
+- Estimates/quoting follows service workflow refinement.
+- Stripe customer/work payment execution follows service/invoice/estimate workflow readiness unless explicitly pulled forward.
+- Stripe Platform Subscription V1 remains platform/app usage billing only and must not be conflated with tenant customer/work payment execution.
 - Current Pricebook baseline status:
   - production-complete baseline from prior work includes Pricebook admin surface, starter catalog rows, controlled Category/Unit Label values, and server-side controlled-value validation
   - production-promoted C1B/C1C is now complete on `main` (merge commit `e208555`) with production migration applied: `20260427153000_internal_invoice_line_items_pricebook_provenance_v1.sql`
@@ -1280,7 +1285,12 @@ Current position:
     - backfill is single-account only; no batch or auto-discovery mode exists
     - insert-only; existing rows are never updated; customized rows are never mutated
     - hosted/production-like targets require both `ALLOW_FIRST_OWNER_PROVISIONING=true` and `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true` before dry-run or apply
-    - no real production account has been backfilled; the CLI exists but has not been run against real data
+    - controlled production existing-account Starter Kit V3 backfill verification is complete for live owner account `93dd810e-3c0c-4b69-9dae-edfa0e481dbb` on host `ornrnvxtwwtulohqwxop.supabase.co`
+    - production verified terminal dry-run state for that owner account is: `would_insert_count = 0`, `would_skip_existing_seed_key_count = 96`, `would_skip_existing_equivalent_count = 1`, `possible_collision_count = 0`, `errors = []`
+    - production owner-account Pricebook count is verified at `108` rows (`12` baseline + `96` inserted) and existing V1 `R-410A` remains non-duplicated (`Refrigerant R-410A (per lb)` count = `1`)
+    - production verification was read-only and confirmed post-apply terminal state; no schema/code/file change, migration, provisioning apply action, Supabase CLI command, push, or commit occurred during final verification
+    - security follow-up: previously exposed legacy production service-role key was rotated, new Supabase secret key is in use, Vercel `SUPABASE_SERVICE_ROLE_KEY` was updated as sensitive, production was redeployed and smoke tested, and terminal sessions were closed
+    - deferred hardening remains: migrate away from legacy JWT anon/service_role API-key usage before disabling JWT-based API keys
     - backfill remains operator-controlled and dry-run-first; existing-account backfill was intentionally not run during V3 default adoption
     - Pricebook remains catalog/default pricing truth, not operational truth
     - historical invoices and invoice snapshots are not touched by backfill

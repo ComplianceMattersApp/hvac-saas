@@ -410,7 +410,7 @@ npx tsx scripts/backfill-pricebook-starter-kit.ts \
 - Visit Scope and service workflow behavior are unchanged.
 - Collision blocking is the default: unsafe/ambiguous collisions still block apply unless `--allow-collisions` is passed.
 - Seeding is idempotent by `seed_key`: re-running apply does not duplicate rows already seeded.
-- Production existing-account backfill remains dry-run-first and operator-controlled; this runbook section does not imply any production apply has been run.
+- Production existing-account backfill remains dry-run-first and operator-controlled; one controlled production owner-account V3 verification has been completed and documented, but this does not change single-account/manual operator boundaries.
 
 ### 10.8 Post-apply verification
 
@@ -419,3 +419,20 @@ After apply, verify:
 - `skipped_existing_seed_key_count` reflects already-present seed_key rows (expected 0 for a fresh backfill)
 - Pricebook admin surface for the target account shows starter rows for the selected version (`v2` or `v3`)
 - No invoice, payment, or user records were changed
+
+### 10.9 Production verification example outcome (reference)
+
+Reference-only example from completed controlled production verification:
+
+- target owner: `93dd810e-3c0c-4b69-9dae-edfa0e481dbb`
+- target host: `ornrnvxtwwtulohqwxop.supabase.co`
+- terminal post-apply dry-run state:
+  - `would_insert_count = 0`
+  - `would_skip_existing_seed_key_count = 96`
+  - `would_skip_existing_equivalent_count = 1`
+  - `possible_collision_count = 0`
+  - `errors = 0`
+- owner-account Pricebook count verified: `108`
+- legacy V1 `R-410A` remained non-duplicated and continued to classify as safe equivalent skip
+
+This reference outcome does not imply automatic, batch, or admin-UI-triggered backfill behavior. Dry-run-first operator control remains mandatory.
