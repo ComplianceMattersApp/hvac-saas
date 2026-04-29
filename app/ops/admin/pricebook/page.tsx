@@ -17,7 +17,7 @@ import {
 } from "@/lib/business/pricebook-options";
 import { createClient } from "@/lib/supabase/server";
 
-type SearchParams = Promise<{ notice?: string; view?: string }>;
+type SearchParams = Promise<{ notice?: string; view?: string; q?: string; category?: string }>;
 
 type PricebookView = "all" | "active" | "inactive" | "starter" | "custom";
 
@@ -160,6 +160,14 @@ function filterButtonClass(isSelected: boolean) {
   return "border-slate-300 bg-white text-slate-700 hover:bg-slate-50";
 }
 
+function normalizeSearchQuery(raw: unknown) {
+  return String(raw ?? "").trim();
+}
+
+function normalizeCategoryFilter(raw: unknown) {
+  return String(raw ?? "").trim();
+}
+
 async function requireAdminOrRedirect() {
   const supabase = await createClient();
   const {
@@ -196,6 +204,8 @@ export default async function AdminPricebookPage({
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const notice = NOTICE_TEXT[String(sp.notice ?? "").trim().toLowerCase()];
   const view = parseView(sp.view);
+  const searchQuery = normalizeSearchQuery(sp.q);
+  const selectedCategory = normalizeCategoryFilter(sp.category);
 
   const { supabase, internalUser } = await requireAdminOrRedirect();
 
@@ -225,13 +235,35 @@ export default async function AdminPricebookPage({
     updated_at: String(row.updated_at ?? ""),
   }));
 
+  const availableCategories = Array.from(
+    new Set(rows.map((row) => String(row.category ?? "").trim()).filter((value) => value.length > 0)),
+  ).sort((a, b) => a.localeCompare(b));
+
+  const normalizedSearchQuery = searchQuery.toLowerCase();
   const filteredRows = rows.filter((row) => {
     const source = getSourceTag(row);
-    if (view === "active") return row.is_active;
-    if (view === "inactive") return !row.is_active;
-    if (view === "starter") return source === "starter";
-    if (view === "custom") return source === "custom";
-    return true;
+    if (view === "active" && !row.is_active) return false;
+    if (view === "inactive" && row.is_active) return false;
+    if (view === "starter" && source !== "starter") return false;
+    if (view === "custom" && source !== "custom") return false;
+
+    if (selectedCategory.length > 0 && String(row.category ?? "") !== selectedCategory) {
+      return false;
+    }
+
+    if (!normalizedSearchQuery) return true;
+
+    const haystack = [
+      row.item_name,
+      row.default_description ?? "",
+      row.category ?? "",
+      row.item_type,
+      row.unit_label ?? "",
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(normalizedSearchQuery);
   });
 
   const activeCount = rows.filter((row) => row.is_active).length;
@@ -239,6 +271,8 @@ export default async function AdminPricebookPage({
   const starterCount = rows.filter((row) => getSourceTag(row) !== "custom").length;
   const customCount = rows.filter((row) => getSourceTag(row) === "custom").length;
   const deferredCount = rows.filter((row) => isDeferredPlaceholder(row)).length;
+
+  const isAnyFilterActive = view !== "all" || searchQuery.length > 0 || selectedCategory.length > 0;
 
   const viewOptions: Array<{ key: PricebookView; label: string }> = [
     { key: "all", label: "All" },
@@ -252,6 +286,8 @@ export default async function AdminPricebookPage({
     const params = new URLSearchParams();
     if (notice) params.set("notice", String(sp.notice ?? ""));
     if (nextView !== "all") params.set("view", nextView);
+    if (searchQuery) params.set("q", searchQuery);
+    if (selectedCategory) params.set("category", selectedCategory);
     const qs = params.toString();
     return qs ? `/ops/admin/pricebook?${qs}` : "/ops/admin/pricebook";
   };
@@ -322,6 +358,61 @@ export default async function AdminPricebookPage({
             );
           })}
         </div>
+
+        <form method="get" className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_260px_auto] lg:items-end">
+          {notice ? <input type="hidden" name="notice" value={String(sp.notice ?? "")} /> : null}
+          {view !== "all" ? <input type="hidden" name="view" value={view} /> : null}
+
+          <label className="space-y-1 text-sm text-slate-700 sm:col-span-2 lg:col-span-1">
+            <span className="font-semibold text-slate-900">Search Pricebook</span>
+            <input
+              type="text"
+              name="q"
+              defaultValue={searchQuery}
+              placeholder="Search item, category, description..."
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            />
+          </label>
+
+          <label className="space-y-1 text-sm text-slate-700">
+            <span className="font-semibold text-slate-900">Category</span>
+            <select
+              name="category"
+              defaultValue={selectedCategory}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            >
+              <option value="">All categories</option>
+              {availableCategories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+            >
+              Apply
+            </button>
+            {isAnyFilterActive ? (
+              <Link
+                href="/ops/admin/pricebook"
+                className="inline-flex items-center rounded-lg border border-transparent px-2 py-1.5 text-sm font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 transition hover:text-slate-900"
+              >
+                Clear filters
+              </Link>
+            ) : null}
+          </div>
+        </form>
+
+        <p className="mt-3 text-sm text-slate-600">
+          {filteredRows.length === 0
+            ? "No items match your filters."
+            : `Showing ${filteredRows.length} of ${rows.length} items${selectedCategory ? ` in ${selectedCategory}` : ""}.`}
+        </p>
       </section>
 
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
@@ -444,16 +535,22 @@ export default async function AdminPricebookPage({
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center">
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-slate-700">
-                        No {filterLabel(view).toLowerCase()} items found.
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {view !== "all" ? (
-                          <>Try <Link href="/ops/admin/pricebook" className="font-medium text-slate-600 hover:text-slate-900 underline">clearing filters</Link> to see all items.</>
-                        ) : (
-                          <>Create your first item above to get started.</>
-                        )}
-                      </p>
+                      {isAnyFilterActive ? (
+                        <>
+                          <p className="text-sm font-medium text-slate-700">No Pricebook items match your filters.</p>
+                          <p className="text-xs text-slate-500">
+                            <Link href="/ops/admin/pricebook" className="font-medium text-slate-600 hover:text-slate-900 underline">
+                              Clear filters
+                            </Link>{" "}
+                            to view all items.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-medium text-slate-700">No {filterLabel(view).toLowerCase()} items found.</p>
+                          <p className="text-xs text-slate-500">Create your first item above to get started.</p>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
