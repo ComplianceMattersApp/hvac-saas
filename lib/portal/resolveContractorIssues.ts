@@ -80,7 +80,11 @@ function normalize(value: string | null | undefined) {
 
 export function finalRunPass(run: any): boolean | null {
   if (!run) return null;
-  return run.override_pass != null ? Boolean(run.override_pass) : Boolean(run.computed_pass);
+  // Photo attestation is pending human review — it is not a pass or a fail
+  if (run.computed?.status === "photo_evidence") return null;
+  if (run.override_pass != null) return Boolean(run.override_pass);
+  if (run.computed_pass != null) return Boolean(run.computed_pass);
+  return null;
 }
 
 export function extractFailureReasons(run: any): string[] {

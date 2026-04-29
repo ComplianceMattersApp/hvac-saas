@@ -1,4 +1,5 @@
 import { CalendarView } from '@/components/calendar/calendar-view';
+import CalendarResponsiveDefaultView from '@/components/calendar/CalendarResponsiveDefaultView';
 import { redirect } from 'next/navigation';
 
 import { createClient } from '@/lib/supabase/server';
@@ -22,6 +23,7 @@ export default async function CalendarPage({
     job?: string;
     block?: string;
     tech?: string;
+    inspector?: string;
     prefill_date?: string;
   }>;
 }) {
@@ -41,10 +43,14 @@ export default async function CalendarPage({
 
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const date = String(sp.date ?? '').trim() || todayYmdLA();
+  const requestedView = String(sp.view ?? '').trim();
+  const view = requestedView || 'month';
+  const hadExplicitViewParam = requestedView.length > 0;
 
   return (
     <div className="min-h-screen w-full bg-gray-50 px-3 py-4 sm:px-6 sm:py-5">
-      <CalendarView view={sp.view} date={date} banner={sp.banner} job={sp.job} block={sp.block} tech={sp.tech} prefillDate={sp.prefill_date} />
+      <CalendarResponsiveDefaultView hadExplicitViewParam={hadExplicitViewParam} />
+      <CalendarView view={view} date={date} banner={sp.banner} job={sp.job} block={sp.block} tech={sp.tech} inspector={sp.inspector} prefillDate={sp.prefill_date} />
     </div>
   );
 }

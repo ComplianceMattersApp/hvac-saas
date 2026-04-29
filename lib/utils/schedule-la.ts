@@ -4,14 +4,18 @@ const TZ = "America/Los_Angeles";
 // --- Formatting (DB -> UI) ---
 
 // Business-date display: parses YYYY-MM-DD by splitting, never via new Date().
-// Returns M/D/YYYY (no leading zeros). Safe across all timezones.
+// Returns MM-DD-YYYY with zero-padded month/day. Safe across all timezones.
 // Use for scheduled_date, permit_date, and any other DB `date` column.
-export function formatBusinessDateUS(value?: string | null): string {
+export function formatDateOnlyDisplay(value?: string | null): string {
   if (!value) return "";
   const s = String(value).trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // not a recognized business date, pass through
   const [y, m, d] = s.split("-");
-  return `${Number(m)}/${Number(d)}/${y}`; // M/D/YYYY
+  return `${m}-${d}-${y}`;
+}
+
+export function formatBusinessDateUS(value?: string | null): string {
+  return formatDateOnlyDisplay(value);
 }
 
 // Accepts ISO/timestamptz strings. Also tolerates legacy "HH:MM[:SS]" strings.

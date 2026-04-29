@@ -187,11 +187,35 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
       const overrideDetails = String(fd.get("rc_override_details") ?? "").trim();
 
       const isChargeExempt = exemptPackageUnit || exemptConditions;
+      const isPhotoTaken = fd.get("rc_photo_taken") === "on";
       const exemptionReason = exemptPackageUnit
         ? "Charge verification exempt: package unit"
         : exemptConditions
         ? "Charge verification override: conditions not met"
         : "";
+
+      if (isPhotoTaken) {
+        setContent(
+          <div className="min-h-[96px] rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-semibold text-blue-900">Photo Taken — Attestation</div>
+              <div className="min-w-[120px] rounded-full border border-blue-300 bg-blue-100 px-2 py-0.5 text-center text-xs font-medium text-blue-800">
+                Photo Attestation
+              </div>
+            </div>
+            <div className="mt-1 text-xs">
+              User confirmed gauge photo was taken. Numeric readings not entered.
+            </div>
+            <div className="mt-1 text-xs text-blue-600">
+              This test will require manual review before the job can resolve.
+            </div>
+            {overrideDetails ? (
+              <div className="mt-1 text-xs">Notes: {overrideDetails}</div>
+            ) : null}
+          </div>
+        );
+        return;
+      }
 
       const measuredSubcool = condenserSat != null && liquidTemp != null ? condenserSat - liquidTemp : null;
       const measuredSuperheat = suctionTemp != null && evapSat != null ? suctionTemp - evapSat : null;

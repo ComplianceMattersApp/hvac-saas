@@ -7,6 +7,7 @@ import {
   getContractorIntakeProposalPortalDetail,
   requireCurrentContractorPortalContext,
 } from "@/lib/portal/intake-proposal-read-model";
+import { formatDateOnlyDisplay } from "@/lib/utils/schedule-la";
 
 function formatDateTimeLA(iso: string | null) {
   if (!iso) return "-";
@@ -80,7 +81,7 @@ export default async function PortalIntakeSubmissionDetailPage({
   const proposedProjectType = String((submission as any)?.proposed_project_type ?? "").trim();
   const proposedPermit = String((submission as any)?.proposed_permit_number ?? "").trim();
   const proposedJurisdiction = String((submission as any)?.proposed_jurisdiction ?? "").trim();
-  const proposedPermitDate = String((submission as any)?.proposed_permit_date ?? "").trim();
+  const proposedPermitDate = formatDateOnlyDisplay(String((submission as any)?.proposed_permit_date ?? "").trim());
   const proposedNotes = String((submission as any)?.proposed_job_notes ?? "").trim();
   const submittedFileCount = detail.proposalAttachmentCount;
   const addendumRows = detail.addendumRows;

@@ -34,6 +34,7 @@ function makeSupabase(fixture: {
   notifications: NotificationRow[];
   submissions: Array<{ id: string; review_status: string }>;
   contractors?: Array<{ id: string; name: string }>;
+  jobs?: Array<{ id: string; title: string | null; customer_first_name: string | null; customer_last_name: string | null; city: string | null; contractor_id: string | null }>;
 }) {
   return {
     from(table: string) {
@@ -73,6 +74,19 @@ function makeSupabase(fixture: {
 
         if (table === "contractors") {
           let rows = [...(fixture.contractors ?? [])];
+
+          for (const filter of filters) {
+            if (filter.kind === "in") {
+              const values = Array.isArray(filter.value) ? filter.value : [];
+              rows = rows.filter((row: any) => values.includes(row?.[filter.column]));
+            }
+          }
+
+          return { data: rows, error: null };
+        }
+
+        if (table === "jobs") {
+          let rows = [...(fixture.jobs ?? [])];
 
           for (const filter of filters) {
             if (filter.kind === "in") {
@@ -217,5 +231,86 @@ describe("internal notification readers", () => {
     expect(notifications[0]?.notification_type).toBe("contractor_intake_proposal_submitted");
     expect(notifications[0]?.is_unread).toBe(true);
     expect(unreadCount).toBe(1);
+  });
+
+  it("excludes a proposal notification from the unread count once its read_at is set", async () => {
+    // Simulates the state after finalizeContractorIntakeSubmissionFromForm has written read_at.
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-finalized",
+            account_owner_user_id: "owner-1",
+            job_id: null,
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_intake_proposal_submitted",
+            subject: "Proposal Finalized",
+            body: null,
+            payload: { contractor_intake_submission_id: "proposal-finalized" },
+            status: "queued",
+            read_at: "2026-04-22T09:00:00.000Z",
+            created_at: "2026-04-22T08:00:00.000Z",
+          },
+        ],
+        submissions: [{ id: "proposal-finalized", review_status: "finalized" }],
+      }),
+    );
+
+    const { getInternalUnreadNotificationCount } = await import("@/lib/actions/notification-read-actions");
+    const unreadCount = await getInternalUnreadNotificationCount();
+
+    expect(unreadCount).toBe(0);
+  });
+
+  it("attaches job_enrichment to contractor update notifications", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-contractor-note",
+            account_owner_user_id: "owner-1",
+            job_id: "job-abc",
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_note",
+            subject: "Contractor note",
+            body: "Technician left a note on the job.",
+            payload: {},
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-22T10:00:00.000Z",
+          },
+        ],
+        submissions: [],
+        jobs: [
+          {
+            id: "job-abc",
+            title: "HVAC System Inspection",
+            customer_first_name: "Linda",
+            customer_last_name: "Garza",
+            city: "Pasadena",
+            contractor_id: "contractor-x",
+          },
+        ],
+        contractors: [{ id: "contractor-x", name: "Cool Air Services" }],
+      }),
+    );
+
+    const { listInternalNotifications } = await import("@/lib/actions/notification-read-actions");
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+      filterKey: "contractor_updates",
+    });
+
+    expect(notifications).toHaveLength(1);
+    const notif = notifications[0]!;
+    expect(notif.notification_type).toBe("contractor_note");
+    expect(notif.job_enrichment).not.toBeNull();
+    expect(notif.job_enrichment?.job_title).toBe("HVAC System Inspection");
+    expect(notif.job_enrichment?.customer_name).toBe("Linda Garza");
+    expect(notif.job_enrichment?.city).toBe("Pasadena");
+    expect(notif.job_enrichment?.contractor_name).toBe("Cool Air Services");
   });
 });

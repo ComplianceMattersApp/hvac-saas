@@ -42,6 +42,7 @@ import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 function getEffectiveResultLabel(t: any) {
   if (t.override_pass === true) return "PASS (override)";
   if (t.override_pass === false) return "FAIL (override)";
+  if (t.computed?.status === "photo_evidence") return "Photo Taken (attestation)";
   if (t.computed?.status === "blocked") return "BLOCKED (conditions)";
   if (t.computed_pass === true) return "PASS";
   if (t.computed_pass === false) return "FAIL";
@@ -123,6 +124,15 @@ function getRequiredTestStatusForSystem(job: any, systemId: string, testType: Ec
     return {
       state: runDataKeys > 0 ? ("saved" as const) : ("open" as const),
       label: runDataKeys > 0 ? "Saved" : "Open",
+      tone: "border-blue-200 bg-blue-50 text-blue-700",
+      run,
+    };
+  }
+
+  if (run.computed?.status === "photo_evidence") {
+    return {
+      state: "attestation" as const,
+      label: "Photo Taken",
       tone: "border-blue-200 bg-blue-50 text-blue-700",
       run,
     };
@@ -353,6 +363,13 @@ function hasFilterDrierFailure(run: any) {
 
 function refrigerantNumericChecksPassing(run: any) {
   const computed = run?.computed ?? {};
+  const verificationMethod = run?.data?.verification_method;
+
+  // Photo Taken is evidence-based, not numeric
+  if (verificationMethod === "photo_taken") {
+    return false;
+  }
+
   const measuredSubcool = computed?.measured_subcool_f;
   const targetSubcool = run?.data?.target_subcool_f;
   const measuredSuperheat = computed?.measured_superheat_f;
@@ -382,6 +399,12 @@ function outdoorQualificationStatus(run: any) {
 
 function refrigerantComplianceF(run: any) {
   const computed = run?.computed ?? {};
+  const verificationMethod = run?.data?.verification_method;
+
+  if (verificationMethod === "photo_taken") {
+    return "User confirmed gauge photo was taken (photo attestation)";
+  }
+
   if (includesBlocked(computed, "indoor temp below") || includesBlocked(computed, "outdoor temp below")) {
     return "Not compliant (temperature qualification not met)";
   }
@@ -410,6 +433,12 @@ function refrigerantRequirementResultG(run: any) {
 
 function refrigerantComplianceG(run: any) {
   const computed = run?.computed ?? {};
+  const verificationMethod = run?.data?.verification_method;
+
+  if (verificationMethod === "photo_taken") {
+    return "User confirmed gauge photo was taken (photo attestation)";
+  }
+
   if (includesFailure(computed, "superheat")) {
     return "Not compliant (superheat threshold exceeded)";
   }
@@ -1848,7 +1877,12 @@ const defaultHeatingOutputBtu =
                         className="w-full rounded-md border px-3 py-2"
                         defaultValue={runDL.override_reason ?? ""}
                         placeholder="Explain override"
+                        list={`ovr-reason-list-${runDL.id}`}
                       />
+                      <datalist id={`ovr-reason-list-${runDL.id}`}>
+                        <option value="Smoke Test" />
+                        <option value="Asbestos" />
+                      </datalist>
                     </div>
                   </div>
                 </form>
@@ -2323,8 +2357,24 @@ const defaultHeatingOutputBtu =
                 <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
                 <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   <div>Overall Result: {getEffectiveResultLabel(runRC)}</div>
-                  <div>Measured Subcool: {fmtValue(runRC.computed?.measured_subcool_f, "°F")}</div>
-                  <div>Measured Superheat: {fmtValue(runRC.computed?.measured_superheat_f, "°F")}</div>
+                  {runRC.data?.verification_method === "photo_taken" ? (
+                    <>
+                      <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                        <div className="font-medium">Photo Taken</div>
+                        <div className="mt-1 text-xs">User confirmed gauge photo was captured. Numeric readings not entered.</div>
+                        {runRC.data?.photo_taken_timestamp && (
+                          <div className="mt-1 text-xs">
+                            Attested: {new Date(runRC.data.photo_taken_timestamp).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>Measured Subcool: {fmtValue(runRC.computed?.measured_subcool_f, "°F")}</div>
+                      <div>Measured Superheat: {fmtValue(runRC.computed?.measured_superheat_f, "°F")}</div>
+                    </>
+                  )}
                   <div>Status: {fallbackText(runRC.computed?.status)}</div>
                   {getComputedFailures(runRC).length > 0 ? (
                     <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -2347,10 +2397,20 @@ const defaultHeatingOutputBtu =
                 <div className="rounded-md border p-3 mt-3 sm:col-span-2 space-y-2">
                   <div className="text-sm font-semibold">Charge Verification Override (if applicable)</div>
                   <div className="text-xs text-slate-600">
-                    Select exemption as needed, then use Save Draft or Complete Test.
+                    Select an option, then use Save Draft or Complete Test.
                   </div>
 
                   <label className="flex items-center gap-2 text-sm">
+                    <input
+                      form={rcSaveFormId}
+                      type="checkbox"
+                      name="rc_photo_taken"
+                      defaultChecked={runRC.data?.verification_method === "photo_taken"}
+                    />
+                    Photo Taken — user attests gauge photo was captured
+                  </label>
+
+                  <label className="flex items-center gap-2 text-sm mt-2">
                     <input
                       form={rcSaveFormId}
                       type="checkbox"
@@ -2371,13 +2431,13 @@ const defaultHeatingOutputBtu =
                   </label>
 
                   <div className="mt-2">
-                    <label className="block text-xs mb-1">Override details (optional)</label>
+                    <label className="block text-xs mb-1">Notes/details (optional)</label>
                     <input
                       form={rcSaveFormId}
                       name="rc_override_details"
                       className="w-full rounded-md border px-3 py-2 text-sm"
                       defaultValue={runRC.data?.charge_exempt_details ?? ""}
-                      placeholder='Example: "Outdoor temp 48°F" or "Rain / unsafe roof access"'
+                      placeholder='Example: "Photo shows both gauges stable" or "Outdoor temp 48°F"'
                     />
                   </div>
                 </div>

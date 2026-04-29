@@ -18,11 +18,14 @@ type JobRow = {
   window_start: string | null;
   window_end: string | null;
   city: string | null;
+  customer_phone: string | null;
   job_address: string | null;
   customer_first_name: string | null;
   customer_last_name: string | null;
   contractor_id: string | null;
   contractors: { name: string | null } | null;
+  customers: { phone: string | null } | null;
+  locations: { city: string | null } | null;
   created_at: string;
   deleted_at: string | null;
 };
@@ -74,11 +77,14 @@ function makeCalendarFixture() {
       window_start: "09:00",
       window_end: "11:00",
       city: "Los Angeles",
+      customer_phone: null,
       job_address: "111 Scoped St",
       customer_first_name: "Alice",
       customer_last_name: "Scoped",
       contractor_id: null,
       contractors: null,
+      customers: { phone: null },
+      locations: { city: "Los Angeles" },
       created_at: "2026-04-24T08:00:00.000Z",
       deleted_at: null,
     },
@@ -95,11 +101,14 @@ function makeCalendarFixture() {
       window_start: "12:00",
       window_end: "13:00",
       city: "Pasadena",
+      customer_phone: null,
       job_address: "999 Cross Ave",
       customer_first_name: "Bob",
       customer_last_name: "Cross",
       contractor_id: null,
       contractors: null,
+      customers: { phone: null },
+      locations: { city: "Pasadena" },
       created_at: "2026-04-24T09:00:00.000Z",
       deleted_at: null,
     },

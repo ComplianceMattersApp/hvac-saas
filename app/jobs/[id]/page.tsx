@@ -204,7 +204,11 @@ function formatInternalInvoiceItemType(type?: InternalInvoiceItemType | string |
 
 function finalRunPass(run: any): boolean | null {
   if (!run) return null;
-  return run.override_pass != null ? !!run.override_pass : !!run.computed_pass;
+  // Photo attestation is pending human review — it is not a pass or a fail
+  if (run.computed?.status === "photo_evidence") return null;
+  if (run.override_pass != null) return Boolean(run.override_pass);
+  if (run.computed_pass != null) return Boolean(run.computed_pass);
+  return null;
 }
 
 function isFailedFamilyOpsStatus(value?: string | null) {
@@ -4252,7 +4256,7 @@ const renderTimelineItem = (e: any, key: string) => {
                       <div className="mt-1 text-xs text-slate-500">
                         Created:{" "}
                         {visit.created_at ? formatDateLAFromIso(String(visit.created_at)) : "—"}
-                        {visit.scheduled_date ? ` • Scheduled: ${visit.scheduled_date}` : ""}
+                        {visit.scheduled_date ? ` • Scheduled: ${formatBusinessDateUS(String(visit.scheduled_date))}` : ""}
                         {win ? ` • ${win}` : ""}
                       </div>
                       {isFailedFamilyOpsStatus(visit.ops_status) && failureReason ? (

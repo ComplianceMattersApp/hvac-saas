@@ -210,6 +210,124 @@ function makeSessionClientFixture() {
   return { supabase, updateCalls, insertCalls, deleteCalls };
 }
 
+describe("duct leakage override reason — Asbestos", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    requireInternalUserMock.mockResolvedValue({
+      userId: "internal-user-1",
+      internalUser: {
+        user_id: "internal-user-1",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+    evaluateEccOpsStatusMock.mockResolvedValue(undefined);
+  });
+
+
+  it("persists Asbestos override reason with override_pass=true", async () => {
+    const { supabase, updateCalls } = makeSessionClientFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalEccTestRunForMutationMock.mockResolvedValue({
+      job: { id: "job-a1", job_type: "ecc" },
+      testRun: { id: "run-a1", job_id: "job-a1", system_id: "sys-1", test_type: "duct_leakage" },
+    });
+
+    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/job-actions");
+
+    const formData = new FormData();
+    formData.set("job_id", "job-a1");
+    formData.set("test_run_id", "run-a1");
+    formData.set("system_id", "sys-1");
+    formData.set("project_type", "alteration");
+    formData.set("airflow_method", "cooling");
+    formData.set("override", "pass");
+    formData.set("override_reason", "Asbestos");
+
+    await expect(saveDuctLeakageDataFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-a1/tests?t=duct_leakage&s=sys-1",
+    );
+
+    expect(updateCalls).toContainEqual({
+      table: "ecc_test_runs",
+      values: expect.objectContaining({
+        override_pass: true,
+        override_reason: "Asbestos",
+      }),
+      eq: [["id", "run-a1"], ["job_id", "job-a1"]],
+    });
+  });
+
+  it("persists Smoke Test override reason with override_pass=true (existing path unchanged)", async () => {
+    const { supabase, updateCalls } = makeSessionClientFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalEccTestRunForMutationMock.mockResolvedValue({
+      job: { id: "job-a2", job_type: "ecc" },
+      testRun: { id: "run-a2", job_id: "job-a2", system_id: "sys-1", test_type: "duct_leakage" },
+    });
+
+    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/job-actions");
+
+    const formData = new FormData();
+    formData.set("job_id", "job-a2");
+    formData.set("test_run_id", "run-a2");
+    formData.set("system_id", "sys-1");
+    formData.set("project_type", "alteration");
+    formData.set("airflow_method", "cooling");
+    formData.set("override", "pass");
+    formData.set("override_reason", "Smoke Test");
+
+    await expect(saveDuctLeakageDataFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-a2/tests?t=duct_leakage&s=sys-1",
+    );
+
+    expect(updateCalls).toContainEqual({
+      table: "ecc_test_runs",
+      values: expect.objectContaining({
+        override_pass: true,
+        override_reason: "Smoke Test",
+      }),
+      eq: [["id", "run-a2"], ["job_id", "job-a2"]],
+    });
+  });
+
+  it("numeric path writes override_pass=null and override_reason=null when no override selected", async () => {
+    const { supabase, updateCalls } = makeSessionClientFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalEccTestRunForMutationMock.mockResolvedValue({
+      job: { id: "job-a3", job_type: "ecc" },
+      testRun: { id: "run-a3", job_id: "job-a3", system_id: "sys-1", test_type: "duct_leakage" },
+    });
+
+    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/job-actions");
+
+    const formData = new FormData();
+    formData.set("job_id", "job-a3");
+    formData.set("test_run_id", "run-a3");
+    formData.set("system_id", "sys-1");
+    formData.set("project_type", "alteration");
+    formData.set("measured_duct_leakage_cfm", "60");
+    formData.set("tonnage", "3");
+    formData.set("airflow_method", "cooling");
+    formData.set("override", "none");
+
+    await expect(saveDuctLeakageDataFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-a3/tests?t=duct_leakage&s=sys-1",
+    );
+
+    expect(updateCalls).toContainEqual({
+      table: "ecc_test_runs",
+      values: expect.objectContaining({
+        override_pass: null,
+        override_reason: null,
+      }),
+      eq: [["id", "run-a3"], ["job_id", "job-a3"]],
+    });
+  });
+});
+
 describe("internal ECC same-account hardening", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -424,3 +542,4 @@ describe("internal ECC same-account hardening", () => {
     expect(updateCalls).toHaveLength(0);
   });
 });
+

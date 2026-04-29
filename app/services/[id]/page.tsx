@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
+import { formatDateOnlyDisplay } from "@/lib/utils/schedule-la";
 
 export default async function ServiceDetailPage({
   params,
@@ -37,7 +38,7 @@ export default async function ServiceDetailPage({
           <div className="flex justify-between">
             <span className="text-gray-600">Scheduled Date</span>
             <span className="font-medium">
-              {service.scheduled_date ? new Date(service.scheduled_date).toLocaleString() : "—"}
+              {service.scheduled_date ? formatDateOnlyDisplay(String(service.scheduled_date)) : "—"}
             </span>
           </div>
 

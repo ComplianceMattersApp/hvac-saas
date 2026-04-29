@@ -39,6 +39,15 @@ type IntakeSubmissionRow = {
   review_status: string;
 };
 
+type IntakeSubmissionCommentRow = {
+  id: string;
+  submission_id: string;
+  author_user_id: string | null;
+  author_role: string | null;
+  comment_text: string | null;
+  created_at: string | null;
+};
+
 function normalizeText(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -129,6 +138,135 @@ async function requireScopedPendingAdjudication(formData: FormData) {
     submissionId,
     submission,
   };
+}
+
+async function listSubmissionComments(params: {
+  admin: ReturnType<typeof createAdminClient>;
+  submissionId: string;
+}) {
+  const { admin, submissionId } = params;
+
+  const { data, error } = await admin
+    .from("contractor_intake_submission_comments")
+    .select("id, submission_id, author_user_id, author_role, comment_text, created_at")
+    .eq("submission_id", submissionId)
+    .order("created_at", { ascending: true })
+    .limit(500);
+
+  if (error) throw error;
+  return (data ?? []) as IntakeSubmissionCommentRow[];
+}
+
+async function appendFinalizationNarrativeEvents(params: {
+  admin: ReturnType<typeof createAdminClient>;
+  jobId: string;
+  submission: IntakeSubmissionRow;
+  reviewNote: string | null;
+  reviewerUserId: string;
+}) {
+  const { admin, jobId, submission, reviewNote, reviewerUserId } = params;
+  const submissionId = submission.id;
+
+  const submissionComments = await listSubmissionComments({
+    admin,
+    submissionId,
+  });
+
+  const contractorComments = submissionComments.filter((row) => {
+    const role = normalizeText(row.author_role).toLowerCase();
+    return role === "contractor" && Boolean(normalizeText(row.comment_text));
+  });
+
+  const { data: existingRows, error: existingErr } = await admin
+    .from("job_events")
+    .select("event_type, meta")
+    .eq("job_id", jobId)
+    .contains("meta", { contractor_intake_submission_id: submissionId })
+    .limit(500);
+
+  if (existingErr) throw existingErr;
+
+  const existingCommentIds = new Set<string>();
+  let hasSubmissionNoteEvent = false;
+  let hasReviewNoteEvent = false;
+
+  for (const row of existingRows ?? []) {
+    const type = normalizeText((row as any)?.event_type).toLowerCase();
+    const meta = (row as any)?.meta;
+    if (!meta || typeof meta !== "object" || Array.isArray(meta)) continue;
+
+    const source = normalizeText((meta as any).source).toLowerCase();
+    const commentId = normalizeText((meta as any).contractor_intake_comment_id);
+    if (commentId) existingCommentIds.add(commentId);
+    if (type === "contractor_note" && source === "contractor_intake_submission_note") {
+      hasSubmissionNoteEvent = true;
+    }
+    if (type === "internal_note" && source === "contractor_intake_review_note") {
+      hasReviewNoteEvent = true;
+    }
+  }
+
+  const submissionNote = normalizeText(submission.proposed_job_notes);
+  const normalizedContractorCommentNotes = new Set(
+    contractorComments.map((row) => normalizeText(row.comment_text)).filter(Boolean),
+  );
+  const shouldAddSubmissionNoteEvent =
+    Boolean(submissionNote) &&
+    !hasSubmissionNoteEvent &&
+    !normalizedContractorCommentNotes.has(submissionNote);
+
+  const eventsToInsert: Array<{
+    job_id: string;
+    event_type: string;
+    user_id: string | null;
+    meta: Record<string, unknown>;
+  }> = contractorComments
+    .filter((row) => !existingCommentIds.has(normalizeText(row.id)))
+    .map((row) => ({
+      job_id: jobId,
+      event_type: "contractor_note",
+      user_id: normalizeText(row.author_user_id) || null,
+      meta: {
+        note: normalizeText(row.comment_text),
+        source: "contractor_intake_submission_comment",
+        contractor_intake_submission_id: submissionId,
+        contractor_intake_comment_id: normalizeText(row.id),
+        contractor_intake_comment_created_at: normalizeText(row.created_at) || null,
+        contractor_intake_comment_author_role: normalizeText(row.author_role) || "contractor",
+      },
+    }));
+
+  if (shouldAddSubmissionNoteEvent) {
+    eventsToInsert.push({
+      job_id: jobId,
+      event_type: "contractor_note",
+      user_id: normalizeText(submission.submitted_by_user_id) || null,
+      meta: {
+        note: submissionNote,
+        source: "contractor_intake_submission_note",
+        contractor_intake_submission_id: submissionId,
+      },
+    });
+  }
+
+  const trimmedReviewNote = normalizeText(reviewNote);
+  if (trimmedReviewNote && !hasReviewNoteEvent) {
+    eventsToInsert.push({
+      job_id: jobId,
+      event_type: "internal_note",
+      user_id: reviewerUserId,
+      meta: {
+        note: trimmedReviewNote,
+        source: "contractor_intake_review_note",
+        contractor_intake_submission_id: submissionId,
+      },
+    });
+  }
+
+  if (eventsToInsert.length === 0) return;
+
+  const { error: insertErr } = await admin.from("job_events").insert(eventsToInsert);
+  if (insertErr) throw insertErr;
 }
 
 async function assertExistingCustomerOwned(params: {
@@ -439,6 +577,20 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
 
   if (proposalUpdateErr) throw proposalUpdateErr;
 
+  // Mark any unread internal notifications tied to this proposal as read.
+  // The filterPendingProposalVisibilityRows guard uses the user-scoped client which may
+  // not be able to read the submission row (RLS) once status is no longer "pending",
+  // causing the fallback to keep the notification visible. Writing read_at here is
+  // the authoritative cleanup: it scopes to account + recipient_type to avoid touching
+  // unrelated notifications.
+  await admin
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("recipient_type", "internal")
+    .contains("payload", { contractor_intake_submission_id: submission.id })
+    .is("read_at", null);
+
   await admin.from("job_events").insert({
     job_id: created.id,
     event_type: "contractor_intake_finalized",
@@ -447,6 +599,14 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
       contractor_intake_submission_id: submission.id,
       finalization_mode: mode,
     },
+  });
+
+  await appendFinalizationNarrativeEvents({
+    admin,
+    jobId: created.id,
+    submission,
+    reviewNote,
+    reviewerUserId: userId,
   });
 
   revalidatePath("/ops");
@@ -461,7 +621,7 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
 }
 
 export async function rejectContractorIntakeSubmissionFromForm(formData: FormData) {
-  const { userId, admin, submission } = await requireScopedPendingAdjudication(formData);
+  const { userId, admin, accountOwnerUserId, submission } = await requireScopedPendingAdjudication(formData);
   const reviewNote = normalizeText(formData.get("review_note")) || null;
 
   const reviewedAtIso = new Date().toISOString();
@@ -478,6 +638,16 @@ export async function rejectContractorIntakeSubmissionFromForm(formData: FormDat
     .eq("review_status", "pending");
 
   if (error) throw error;
+
+  // Mark any unread internal notifications tied to this proposal as read;
+  // the proposal is no longer actionable once rejected.
+  await admin
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("recipient_type", "internal")
+    .contains("payload", { contractor_intake_submission_id: submission.id })
+    .is("read_at", null);
 
   revalidatePath("/ops");
   revalidatePath("/ops/admin/contractor-intake-submissions");

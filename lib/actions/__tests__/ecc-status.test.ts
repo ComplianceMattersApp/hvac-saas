@@ -257,4 +257,114 @@ describe("evaluateEccOpsStatus", () => {
     expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
     expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
   });
+
+  it("photo attestation completed run does not satisfy allRequiredPassed (outcome = unknown)", async () => {
+    // A completed run with photo_evidence status has computed_pass=null and override_pass=null.
+    // getOutcome() returns "unknown" → anyPass stays false → allRequiredPassed = false.
+    // With field_complete=true, job should fall to paperwork_required (needs manual review).
+    await runEvaluation({
+      job: {
+        id: "job-1",
+        status: "completed",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        ops_status: "paperwork_required",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+      },
+      runs: [
+        {
+          id: "run-1",
+          system_id: "sys-1",
+          test_type: "duct_leakage",
+          is_completed: true,
+          computed_pass: null,       // photo attestation: not a numeric pass
+          override_pass: null,       // not overridden
+          data: { verification_method: "photo_taken" },
+          computed: { status: "photo_evidence" },
+        },
+      ],
+      correctionResolutionEvent: null,
+    });
+
+    // anyPass=false, anyFail=false → not allRequiredPassed, not anyRequiredFail
+    // field_complete=true → paperwork_required fallback
+    expect(setOpsStatusIfNotManualMock).toHaveBeenCalledWith("job-1", "paperwork_required");
+    expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("photo attestation run does not trigger anyRequiredFail (outcome = unknown, not fail)", async () => {
+    // Photo attestation must not cause the job to set ops_status = "failed".
+    // outcome = "unknown" means anyFail stays false.
+    await runEvaluation({
+      job: {
+        id: "job-1",
+        status: "completed",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        ops_status: "paperwork_required",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+      },
+      runs: [
+        {
+          id: "run-1",
+          system_id: "sys-1",
+          test_type: "duct_leakage",
+          is_completed: true,
+          computed_pass: null,
+          override_pass: null,
+          data: { verification_method: "photo_taken" },
+          computed: { status: "photo_evidence" },
+        },
+      ],
+      correctionResolutionEvent: null,
+    });
+
+    expect(forceSetOpsStatusMock).not.toHaveBeenCalledWith("job-1", "failed");
+  });
+
+  it("override_pass=true on a photo attestation run promotes it to pass for job resolution", async () => {
+    // After admin review, if override_pass is set to true on a photo attestation run,
+    // getOutcome() returns "pass" → allRequiredPassed = true → job resolves.
+    await runEvaluation({
+      job: {
+        id: "job-1",
+        status: "completed",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: true,
+        certs_complete: true,
+        invoice_complete: true,
+        ops_status: "paperwork_required",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+      },
+      runs: [
+        {
+          id: "run-1",
+          system_id: "sys-1",
+          test_type: "duct_leakage",
+          is_completed: true,
+          computed_pass: null,
+          override_pass: true,       // admin reviewed and approved
+          data: { verification_method: "photo_taken" },
+          computed: { status: "photo_evidence" },
+        },
+      ],
+      correctionResolutionEvent: null,
+    });
+
+    expect(forceSetOpsStatusMock).toHaveBeenCalledWith("job-1", "closed");
+    expect(forceSetOpsStatusMock).toHaveBeenCalledTimes(1);
+  });
 });

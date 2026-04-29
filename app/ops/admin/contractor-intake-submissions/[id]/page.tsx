@@ -7,6 +7,7 @@ import {
   rejectContractorIntakeSubmissionFromForm,
   markContractorIntakeSubmissionAsDuplicateFromForm,
 } from "@/lib/actions/contractor-intake-actions";
+import { formatDateOnlyDisplay } from "@/lib/utils/schedule-la";
 import GuidedFinalizationWizard from "./_components/GuidedFinalizationWizard";
 
 type SearchParams = Promise<{ notice?: string }>;
@@ -366,7 +367,7 @@ export default async function ContractorIntakeSubmissionDetailPage({
             {proposedTypeIsEcc && normalizeText(submission.proposed_permit_date) ? (
               <div>
                 <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Permit date</dt>
-                <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_permit_date)}</dd>
+                <dd className="mt-0.5 text-sm text-slate-700">{formatDateOnlyDisplay(normalizeText(submission.proposed_permit_date))}</dd>
               </div>
             ) : null}
           </dl>

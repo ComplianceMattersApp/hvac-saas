@@ -23,6 +23,11 @@ import {
   listPendingContractorIntakeProposalsForContractor,
   requireCurrentContractorPortalContext,
 } from "@/lib/portal/intake-proposal-read-model";
+import {
+  didOpsStatusChangeTo,
+  formatStatusAgeCompact,
+  resolveStatusAgeDays,
+} from "@/lib/utils/status-aging";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -213,6 +218,7 @@ export default async function PortalPage({
       "contractor_note",
       "retest_ready_requested",
       "status_changed",
+      "ops_update",
     ])
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -225,6 +231,45 @@ export default async function PortalPage({
     if (!jobId) continue;
     if (!eventsByJob.has(jobId)) eventsByJob.set(jobId, []);
     eventsByJob.get(jobId)!.push(ev);
+  }
+
+  const pendingInfoSetAtByJob = new Map<string, string>();
+  for (const ev of rawIssueEvents ?? []) {
+    const type = String((ev as any)?.event_type ?? "").trim().toLowerCase();
+    if (type !== "ops_update") continue;
+
+    const jobId = String((ev as any)?.job_id ?? "").trim();
+    if (!jobId || pendingInfoSetAtByJob.has(jobId)) continue;
+    if (!didOpsStatusChangeTo((ev as any)?.meta, "pending_info")) continue;
+
+    const createdAt = String((ev as any)?.created_at ?? "").trim();
+    if (createdAt) pendingInfoSetAtByJob.set(jobId, createdAt);
+  }
+
+  function failedStatusSinceByJob(jobId: string): string | null {
+    const failedRun = failedRunByJob.get(jobId);
+    if (!failedRun) return null;
+
+    const createdAt = String((failedRun as any)?.created_at ?? "").trim();
+    return createdAt || null;
+  }
+
+  function statusMetaWithAging(input: { job: any; resolved: any; openRetestChild?: any }) {
+    const meta = getPortalJobStatusMeta(input);
+    const jobId = String(input.job?.id ?? "").trim();
+    const statusAgeDays = resolveStatusAgeDays({
+      status: String(input.job?.ops_status ?? ""),
+      failedInstant: failedStatusSinceByJob(jobId),
+      pendingInfoInstant: pendingInfoSetAtByJob.get(jobId) ?? null,
+      fallbackUpdatedAt: String(input.job?.created_at ?? "").trim() || null,
+    });
+
+    if (statusAgeDays == null) return meta;
+
+    return {
+      ...meta,
+      label: `${meta.label} · ${formatStatusAgeCompact(statusAgeDays)}`,
+    };
   }
 
   // Attachment counts for "photos uploaded" signal on cards
@@ -490,7 +535,7 @@ export default async function PortalPage({
           {actionRequiredJobs.slice(0, 5).map(({ job: j, resolved }) => {
             const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = getPortalJobDetailLine({ job: j, resolved, openRetestChild });
-              const statusMeta = getPortalJobStatusMeta({ job: j, resolved, openRetestChild });
+              const statusMeta = statusMetaWithAging({ job: j, resolved, openRetestChild });
             const photoCount = attachmentCountByJob.get(String(j.id)) ?? 0;
 
             return (
@@ -545,7 +590,7 @@ export default async function PortalPage({
             {upcomingScheduledJobs.slice(0, 5).map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = getPortalJobDetailLine({ job: j, resolved, openRetestChild });
-              const statusMeta = getPortalJobStatusMeta({ job: j, resolved, openRetestChild });
+              const statusMeta = statusMetaWithAging({ job: j, resolved, openRetestChild });
 
               return (
                 <PortalJobListItem
@@ -598,7 +643,7 @@ export default async function PortalPage({
             {activeWorkJobs.slice(0, 5).map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = getPortalJobDetailLine({ job: j, resolved, openRetestChild });
-              const statusMeta = getPortalJobStatusMeta({ job: j, resolved, openRetestChild });
+              const statusMeta = statusMetaWithAging({ job: j, resolved, openRetestChild });
               return (
                 <PortalJobListItem
                   key={j.id}
@@ -669,7 +714,7 @@ export default async function PortalPage({
               const { job: j, resolved } = card.row;
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = getPortalJobDetailLine({ job: j, resolved, openRetestChild });
-              const statusMeta = getPortalJobStatusMeta({ job: j, resolved, openRetestChild });
+              const statusMeta = statusMetaWithAging({ job: j, resolved, openRetestChild });
 
               return (
                 <PortalJobListItem
@@ -723,7 +768,7 @@ export default async function PortalPage({
               const resolvedAt = j.data_entry_completed_at ?? j.created_at;
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
               const detailLine = getPortalJobDetailLine({ job: j, resolved, openRetestChild });
-              const statusMeta = getPortalJobStatusMeta({ job: j, resolved, openRetestChild });
+              const statusMeta = statusMetaWithAging({ job: j, resolved, openRetestChild });
               return (
                 <PortalJobListItem
                   key={j.id}

@@ -23,6 +23,7 @@ export type DispatchJob = {
   job_address: string | null;
   customer_first_name: string | null;
   customer_last_name: string | null;
+  customer_phone: string | null;
   contractor_id: string | null;
   contractor_name?: string | null;
   assignments: Array<{
@@ -86,8 +87,11 @@ type JobDispatchRow = {
   job_address: string | null;
   customer_first_name: string | null;
   customer_last_name: string | null;
+  customer_phone: string | null;
   contractor_id: string | null;
   contractors: { name: string | null } | { name: string | null }[] | null;
+  customers: { phone: string | null } | { phone: string | null }[] | null;
+  locations: { city: string | null } | { city: string | null }[] | null;
   created_at: string | null;
 };
 
@@ -194,6 +198,14 @@ function mergeJobRow(params: {
   const jobId = String(row?.id ?? '');
   const assignment = assignmentFieldsFromMap(assignmentMap, jobId);
   const latestEvent = latestEventByJob.get(jobId);
+  const canonicalCity = Array.isArray(row.locations)
+    ? String(row.locations[0]?.city ?? '').trim()
+    : String(row.locations?.city ?? '').trim();
+  const canonicalPhone = Array.isArray(row.customers)
+    ? String(row.customers[0]?.phone ?? '').trim()
+    : String(row.customers?.phone ?? '').trim();
+  const snapshotCity = String(row?.city ?? '').trim();
+  const snapshotPhone = String(row?.customer_phone ?? '').trim();
 
   return {
     id: jobId,
@@ -207,10 +219,11 @@ function mergeJobRow(params: {
     scheduled_date: row?.scheduled_date ? String(row.scheduled_date) : null,
     window_start: row?.window_start ? String(row.window_start) : null,
     window_end: row?.window_end ? String(row.window_end) : null,
-    city: row?.city ? String(row.city) : null,
+    city: canonicalCity || snapshotCity || null,
     job_address: row?.job_address ? String(row.job_address) : null,
     customer_first_name: row?.customer_first_name ? String(row.customer_first_name) : null,
     customer_last_name: row?.customer_last_name ? String(row.customer_last_name) : null,
+    customer_phone: canonicalPhone || snapshotPhone || null,
     contractor_id: row?.contractor_id ? String(row.contractor_id) : null,
     contractor_name: Array.isArray(row.contractors)
       ? (row.contractors[0]?.name ? String(row.contractors[0].name) : null)
@@ -301,11 +314,14 @@ export async function getDispatchCalendarData(params: {
     'window_start',
     'window_end',
     'city',
+    'customer_phone',
     'job_address',
     'customer_first_name',
     'customer_last_name',
     'contractor_id',
     'contractors(name)',
+    'customers:customer_id(phone)',
+    'locations:location_id(city)',
     'created_at',
     'deleted_at',
   ].join(', ');

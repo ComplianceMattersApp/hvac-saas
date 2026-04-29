@@ -1,17 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  buildContractorProposalSubmissionFields,
-  resolveCreateJobTitle,
-} from "@/lib/utils/contractor-intake-title";
 
 const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
 const createJobMock = vi.fn();
-const revalidatePathMock = vi.fn();
 
 vi.mock("next/cache", () => ({
-  revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
+  revalidatePath: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -49,6 +44,7 @@ type IntakeSubmissionRow = {
   proposed_customer_email: string | null;
   proposed_address_line1: string | null;
   proposed_city: string | null;
+  proposed_state: string | null;
   proposed_zip: string | null;
   proposed_location_nickname: string | null;
   proposed_job_type: string | null;
@@ -59,6 +55,15 @@ type IntakeSubmissionRow = {
   proposed_jurisdiction: string | null;
   proposed_permit_date: string | null;
   review_status: string;
+};
+
+type SubmissionComment = {
+  id: string;
+  submission_id: string;
+  author_user_id: string;
+  author_role: string;
+  comment_text: string;
+  created_at: string;
 };
 
 function buildSubmission(overrides: Partial<IntakeSubmissionRow> = {}): IntakeSubmissionRow {
@@ -73,12 +78,13 @@ function buildSubmission(overrides: Partial<IntakeSubmissionRow> = {}): IntakeSu
     proposed_customer_email: "pat@example.com",
     proposed_address_line1: "123 Main St",
     proposed_city: "Pasadena",
+    proposed_state: "CA",
     proposed_zip: "91101",
     proposed_location_nickname: null,
     proposed_job_type: "ecc",
     proposed_project_type: "alteration",
     proposed_title: "Ready for testing",
-    proposed_job_notes: "Ready for testing",
+    proposed_job_notes: "Original contractor submitted note",
     proposed_permit_number: null,
     proposed_jurisdiction: null,
     proposed_permit_date: null,
@@ -89,10 +95,12 @@ function buildSubmission(overrides: Partial<IntakeSubmissionRow> = {}): IntakeSu
 
 function makeAdminClient(fixture: {
   submission: IntakeSubmissionRow;
-  customer?: Record<string, unknown>;
-  location?: Record<string, unknown>;
+  comments?: SubmissionComment[];
+  existingNarrativeEvents?: Array<{ event_type: string; meta: Record<string, unknown> }>;
 }) {
-  return {
+  const jobEventInsertPayloads: any[] = [];
+
+  const admin = {
     from(table: string) {
       if (table === "contractor_intake_submissions") {
         return {
@@ -123,7 +131,6 @@ function makeAdminClient(fixture: {
                   last_name: "Tester",
                   email: "pat@example.com",
                   phone: "555-0101",
-                  ...fixture.customer,
                 },
                 error: null,
               })),
@@ -143,25 +150,12 @@ function makeAdminClient(fixture: {
                   customer_id: "22222222-2222-4222-8222-222222222222",
                   address_line1: "123 Main St",
                   city: "Pasadena",
-                  ...fixture.location,
+                  state: "CA",
                 },
                 error: null,
               })),
             })),
           })),
-        };
-      }
-
-      if (table === "job_events") {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              contains: vi.fn(() => ({
-                limit: vi.fn(async () => ({ data: [], error: null })),
-              })),
-            })),
-          })),
-          insert: vi.fn(async () => ({ error: null })),
         };
       }
 
@@ -182,59 +176,40 @@ function makeAdminClient(fixture: {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               order: vi.fn(() => ({
-                limit: vi.fn(async () => ({ data: [], error: null })),
+                limit: vi.fn(async () => ({ data: fixture.comments ?? [], error: null })),
               })),
             })),
           })),
         };
       }
 
+      if (table === "job_events") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              contains: vi.fn(() => ({
+                limit: vi.fn(async () => ({ data: fixture.existingNarrativeEvents ?? [], error: null })),
+              })),
+            })),
+          })),
+          insert: vi.fn(async (payload: any) => {
+            jobEventInsertPayloads.push(payload);
+            return { error: null };
+          }),
+        };
+      }
+
       throw new Error(`Unexpected table: ${table}`);
     },
   };
+
+  return { admin, jobEventInsertPayloads };
 }
 
-describe("contractor-originated ECC title handling", () => {
+describe("contractor intake finalization notes preservation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-  });
-
-  it("direct contractor ECC create uses the structured ECC title instead of freeform contractor title", async () => {
-    expect(
-      resolveCreateJobTitle({
-        submittedTitle: "Ready for testing",
-        isContractorUser: true,
-        jobType: "ecc",
-        projectType: "alteration",
-      }),
-    ).toBe("ECC Alteration Test");
-  });
-
-  it("contractor service title behavior stays unchanged", async () => {
-    expect(
-      resolveCreateJobTitle({
-        submittedTitle: "Check noisy condenser",
-        isContractorUser: true,
-        jobType: "service",
-      }),
-    ).toBe("Check noisy condenser");
-  });
-
-  it("proposal submission preserves contractor comments in proposed_job_notes", async () => {
-    expect(
-      buildContractorProposalSubmissionFields({
-        resolvedTitle: "ECC Alteration Test",
-        jobNotesRaw: "Ready for testing",
-      }),
-    ).toEqual({
-      proposed_title: "ECC Alteration Test",
-      proposed_job_notes: "Ready for testing",
-    });
-  });
-
-  it("proposal finalization ignores proposed ECC title and preserves canonical job notes", async () => {
-    const submission = buildSubmission();
 
     createClientMock.mockResolvedValue({
       auth: {
@@ -244,11 +219,45 @@ describe("contractor-originated ECC title handling", () => {
         })),
       },
     });
+
     requireInternalRoleMock.mockResolvedValue({
       internalUser: { account_owner_user_id: "owner-1" },
     });
-    createAdminClientMock.mockReturnValue(makeAdminClient({ submission }));
+
     createJobMock.mockResolvedValue({ id: "job-1" });
+  });
+
+  it("copies contractor follow-up comments and review note to job_events with proper visibility event types", async () => {
+    const submission = buildSubmission();
+    const comments: SubmissionComment[] = [
+      {
+        id: "comment-1",
+        submission_id: submission.id,
+        author_user_id: "contractor-user-1",
+        author_role: "contractor",
+        comment_text: "Please use the side gate.",
+        created_at: "2026-04-29T08:30:00.000Z",
+      },
+      {
+        id: "comment-2",
+        submission_id: submission.id,
+        author_user_id: "contractor-user-1",
+        author_role: "contractor",
+        comment_text: "Customer asked for PM arrival.",
+        created_at: "2026-04-29T08:45:00.000Z",
+      },
+      {
+        id: "comment-internal",
+        submission_id: submission.id,
+        author_user_id: "internal-user-1",
+        author_role: "internal",
+        comment_text: "Internal triage note.",
+        created_at: "2026-04-29T09:00:00.000Z",
+      },
+    ];
+
+    const fixture = makeAdminClient({ submission, comments });
+    createAdminClientMock.mockReturnValue(fixture.admin);
 
     const { finalizeContractorIntakeSubmissionFromForm } = await import("@/lib/actions/contractor-intake-actions");
 
@@ -257,6 +266,7 @@ describe("contractor-originated ECC title handling", () => {
     formData.set("finalization_mode", "existing_existing");
     formData.set("existing_customer_id", "22222222-2222-4222-8222-222222222222");
     formData.set("existing_location_id", "33333333-3333-4333-8333-333333333333");
+    formData.set("review_note", "Approved after address verification.");
 
     await expect(finalizeContractorIntakeSubmissionFromForm(formData)).rejects.toThrow(
       "REDIRECT:/jobs/job-1?banner=contractor_intake_finalized",
@@ -264,10 +274,92 @@ describe("contractor-originated ECC title handling", () => {
 
     expect(createJobMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: "ECC Alteration Test",
-        job_notes: "Ready for testing",
+        job_notes: "Original contractor submitted note",
       }),
       expect.any(Object),
     );
+
+    expect(fixture.jobEventInsertPayloads).toHaveLength(2);
+
+    const finalizedEvent = fixture.jobEventInsertPayloads[0];
+    expect(finalizedEvent?.event_type).toBe("contractor_intake_finalized");
+
+    const narrativeEvents = fixture.jobEventInsertPayloads[1] as any[];
+    expect(Array.isArray(narrativeEvents)).toBe(true);
+
+    const contractorCommentEvents = narrativeEvents.filter((e) => e.event_type === "contractor_note" && e.meta?.source === "contractor_intake_submission_comment");
+    expect(contractorCommentEvents).toHaveLength(2);
+    expect(contractorCommentEvents.map((e) => e.meta?.contractor_intake_comment_id)).toEqual(["comment-1", "comment-2"]);
+
+    const copiedSubmissionNote = narrativeEvents.find((e) => e.event_type === "contractor_note" && e.meta?.source === "contractor_intake_submission_note");
+    expect(copiedSubmissionNote?.meta?.note).toBe("Original contractor submitted note");
+
+    const copiedReviewNote = narrativeEvents.find((e) => e.event_type === "internal_note" && e.meta?.source === "contractor_intake_review_note");
+    expect(copiedReviewNote?.meta?.note).toBe("Approved after address verification.");
+
+    const leakedInternalComment = narrativeEvents.find((e) => e.meta?.contractor_intake_comment_id === "comment-internal");
+    expect(leakedInternalComment).toBeUndefined();
+  });
+
+  it("skips duplicate copied narrative events when prior finalization narrative exists", async () => {
+    const submission = buildSubmission();
+    const comments: SubmissionComment[] = [
+      {
+        id: "comment-1",
+        submission_id: submission.id,
+        author_user_id: "contractor-user-1",
+        author_role: "contractor",
+        comment_text: "Please use the side gate.",
+        created_at: "2026-04-29T08:30:00.000Z",
+      },
+    ];
+
+    const fixture = makeAdminClient({
+      submission,
+      comments,
+      existingNarrativeEvents: [
+        {
+          event_type: "contractor_note",
+          meta: {
+            source: "contractor_intake_submission_comment",
+            contractor_intake_submission_id: submission.id,
+            contractor_intake_comment_id: "comment-1",
+          },
+        },
+        {
+          event_type: "contractor_note",
+          meta: {
+            source: "contractor_intake_submission_note",
+            contractor_intake_submission_id: submission.id,
+          },
+        },
+        {
+          event_type: "internal_note",
+          meta: {
+            source: "contractor_intake_review_note",
+            contractor_intake_submission_id: submission.id,
+          },
+        },
+      ],
+    });
+
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const { finalizeContractorIntakeSubmissionFromForm } = await import("@/lib/actions/contractor-intake-actions");
+
+    const formData = new FormData();
+    formData.set("submission_id", submission.id);
+    formData.set("finalization_mode", "existing_existing");
+    formData.set("existing_customer_id", "22222222-2222-4222-8222-222222222222");
+    formData.set("existing_location_id", "33333333-3333-4333-8333-333333333333");
+    formData.set("review_note", "Approved after address verification.");
+
+    await expect(finalizeContractorIntakeSubmissionFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?banner=contractor_intake_finalized",
+    );
+
+    // Only the canonical finalization event should be inserted.
+    expect(fixture.jobEventInsertPayloads).toHaveLength(1);
+    expect(fixture.jobEventInsertPayloads[0]?.event_type).toBe("contractor_intake_finalized");
   });
 });

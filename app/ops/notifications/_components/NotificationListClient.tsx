@@ -1,6 +1,6 @@
 "use client";
 
-import type { NotificationRowForUI, ProposalEnrichment } from "@/lib/actions/notification-read-actions";
+import type { NotificationRowForUI, ProposalEnrichment, JobEnrichment } from "@/lib/actions/notification-read-actions";
 import {
   isContractorUpdateNotificationType,
 } from "@/lib/notifications/internal-awareness";
@@ -80,6 +80,8 @@ function ContractorUpdateCard({
       : notif.body
     : null;
 
+  const jobEnrichment = notif.job_enrichment ?? null;
+
   return (
     <div
       className={`relative overflow-hidden rounded-lg border bg-white transition ${
@@ -107,6 +109,46 @@ function ContractorUpdateCard({
               </span>
             )}
           </div>
+
+          {/* Job identity block — shows what job this is about */}
+          {(jobEnrichment?.job_title || jobEnrichment?.customer_name) && (
+            <div className="mb-2 space-y-0.5">
+              {jobEnrichment.job_title && (
+                <p className="flex items-baseline gap-1.5 text-sm text-slate-700">
+                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    Job
+                  </span>
+                  <span className="font-medium">{jobEnrichment.job_title}</span>
+                </p>
+              )}
+              {jobEnrichment.customer_name && (
+                <p className="flex items-baseline gap-1.5 text-sm text-slate-700">
+                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    Customer
+                  </span>
+                  <span>{jobEnrichment.customer_name}</span>
+                </p>
+              )}
+              {(jobEnrichment.contractor_name || jobEnrichment.city) && (
+                <p className="flex items-baseline gap-1.5 text-sm text-slate-700">
+                  {jobEnrichment.contractor_name && (
+                    <>
+                      <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                        Contractor
+                      </span>
+                      <span>{jobEnrichment.contractor_name}</span>
+                    </>
+                  )}
+                  {jobEnrichment.contractor_name && jobEnrichment.city && (
+                    <span className="text-slate-300" aria-hidden="true">/</span>
+                  )}
+                  {jobEnrichment.city && (
+                    <span className="text-slate-500">{jobEnrichment.city}</span>
+                  )}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Secondary preview: restrained, not the main message */}
           {bodyPreview && (

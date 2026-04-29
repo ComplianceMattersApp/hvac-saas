@@ -34,9 +34,17 @@ export type ProposalEnrichment = {
   notes_preview: string | null;
 };
 
+export type JobEnrichment = {
+  job_title: string | null;
+  customer_name: string | null;
+  city: string | null;
+  contractor_name: string | null;
+};
+
 export type NotificationRowForUI = NotificationRow & {
   is_unread: boolean;
   proposal_enrichment?: ProposalEnrichment | null;
+  job_enrichment?: JobEnrichment | null;
 };
 
 const DEFAULT_READ_RETENTION_DAYS = 30;
@@ -150,6 +158,71 @@ async function buildProposalEnrichmentMap(
       has_permit_details: hasPermitDetails,
       has_notes: Boolean(rawNotes),
       notes_preview: notesPreview,
+    });
+  }
+
+  return enrichmentMap;
+}
+
+async function buildJobEnrichmentMap(
+  supabase: any,
+  rows: NotificationRow[]
+): Promise<Map<string, JobEnrichment>> {
+  const enrichmentMap = new Map<string, JobEnrichment>();
+
+  const jobRows = rows.filter((row) => {
+    const type = String(row.notification_type ?? "").trim().toLowerCase();
+    return !isProposalNotificationType(type) && Boolean(row.job_id);
+  });
+
+  const uniqueJobIds = Array.from(
+    new Set(jobRows.map((row) => String(row.job_id ?? "").trim()).filter(Boolean))
+  );
+  if (!uniqueJobIds.length) return enrichmentMap;
+
+  const { data: jobs } = await supabase
+    .from("jobs")
+    .select("id, title, customer_first_name, customer_last_name, city, contractor_id")
+    .in("id", uniqueJobIds);
+
+  // Collect contractor IDs from jobs for contractor name lookup
+  const contractorIdByJobId = new Map<string, string>();
+  for (const job of (jobs ?? []) as Record<string, unknown>[]) {
+    const id = String(job.id ?? "").trim();
+    const cid = String(job.contractor_id ?? "").trim();
+    if (id && cid) contractorIdByJobId.set(id, cid);
+  }
+
+  const uniqueContractorIds = Array.from(new Set(Array.from(contractorIdByJobId.values()).filter(Boolean)));
+  const contractorNameById = new Map<string, string>();
+  if (uniqueContractorIds.length) {
+    const { data: contractors } = await supabase
+      .from("contractors")
+      .select("id, name")
+      .in("id", uniqueContractorIds);
+    for (const c of (contractors ?? []) as Record<string, unknown>[]) {
+      const id = String(c.id ?? "").trim();
+      const name = String(c.name ?? "").trim();
+      if (id && name) contractorNameById.set(id, name);
+    }
+  }
+
+  for (const job of (jobs ?? []) as Record<string, unknown>[]) {
+    const id = String(job.id ?? "").trim();
+    if (!id) continue;
+
+    const firstName = String(job.customer_first_name ?? "").trim();
+    const lastName = String(job.customer_last_name ?? "").trim();
+    const customerName = [firstName, lastName].filter(Boolean).join(" ") || null;
+
+    const contractorId = contractorIdByJobId.get(id) ?? "";
+    const contractorName = contractorNameById.get(contractorId) || null;
+
+    enrichmentMap.set(id, {
+      job_title: String(job.title ?? "").trim() || null,
+      customer_name: customerName,
+      city: String(job.city ?? "").trim() || null,
+      contractor_name: contractorName,
     });
   }
 
@@ -348,14 +421,18 @@ export async function listInternalNotifications(params: {
   const visibilityRows = dedupeProposalVisibilityRows(filteredRows).slice(0, limit);
 
   const proposalEnrichmentMap = await buildProposalEnrichmentMap(supabase, visibilityRows);
+  const jobEnrichmentMap = await buildJobEnrichmentMap(supabase, visibilityRows);
 
   return visibilityRows.map(row => {
     const submissionId = proposalSubmissionId(row);
     const enrichment = (submissionId && proposalEnrichmentMap.get(submissionId)) || null;
+    const jobId = String(row.job_id ?? "").trim() || null;
+    const jobEnrichment = (jobId && jobEnrichmentMap.get(jobId)) || null;
     return {
       ...row,
       is_unread: row.read_at === null,
       proposal_enrichment: enrichment,
+      job_enrichment: jobEnrichment,
     };
   });
 }

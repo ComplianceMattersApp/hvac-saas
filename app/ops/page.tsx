@@ -24,6 +24,11 @@ import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import { buildPromotedCompanionReadModel, buildVisitScopeReadModel } from "@/lib/jobs/visit-scope";
 import { listInternalNotifications } from "@/lib/actions/notification-read-actions";
+import {
+  didOpsStatusChangeTo,
+  formatStatusAgeCompact,
+  resolveStatusAgeDays,
+} from "@/lib/utils/status-aging";
 import OperationalReportingSection from "./_components/OperationalReportingSection";
 import {
   buildOperationalReportingReadModel,
@@ -1150,6 +1155,33 @@ const allOpenOpsJobIds = uniqueAllOpenOpsJobs
   .map((j: any) => String(j.id ?? ""))
   .filter(Boolean);
 
+const pendingInfoJobIds = uniqueAllOpenOpsJobs
+  .filter((j: any) => String(j?.ops_status ?? "").toLowerCase() === "pending_info")
+  .map((j: any) => String(j.id ?? ""))
+  .filter(Boolean);
+
+const { data: pendingInfoTransitionEvents, error: pendingInfoTransitionErr } = pendingInfoJobIds.length
+  ? await supabase
+      .from("job_events")
+      .select("job_id, created_at, meta")
+      .in("job_id", pendingInfoJobIds)
+      .eq("event_type", "ops_update")
+      .order("created_at", { ascending: false })
+      .range(0, 5000)
+  : { data: [], error: null };
+
+if (pendingInfoTransitionErr) throw pendingInfoTransitionErr;
+
+const pendingInfoSetAtByJob = new Map<string, string>();
+for (const ev of pendingInfoTransitionEvents ?? []) {
+  const jobId = String((ev as any)?.job_id ?? "").trim();
+  if (!jobId || pendingInfoSetAtByJob.has(jobId)) continue;
+  if (!didOpsStatusChangeTo((ev as any)?.meta, "pending_info")) continue;
+
+  const createdAt = String((ev as any)?.created_at ?? "").trim();
+  if (createdAt) pendingInfoSetAtByJob.set(jobId, createdAt);
+}
+
 const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
   supabase,
   jobIds: allOpenOpsJobIds,
@@ -1206,7 +1238,7 @@ const unreadContractorUpdateNotifications = unreadContractorAwarenessNotificatio
 
 const { data: failedRuns, error: failedRunsErr } = await supabase
   .from("ecc_test_runs")
-  .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, updated_at, created_at")
+  .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, created_at")
   .in(
     "job_id",
     allOpenOpsJobIds.length
@@ -1230,11 +1262,9 @@ for (const run of failedRuns ?? []) {
   }
 
   const currentMs = Math.max(
-    toEpochMs((current as any)?.updated_at),
     toEpochMs((current as any)?.created_at)
   );
   const nextMs = Math.max(
-    toEpochMs((run as any)?.updated_at),
     toEpochMs((run as any)?.created_at)
   );
 
@@ -1249,6 +1279,14 @@ for (const [jobId, run] of latestFailedRunByJob.entries()) {
   const primaryLine = reasons[0] ?? "";
   const formatted = normalizeFailureLine(primaryLine, String((run as any)?.test_type ?? ""));
   primaryFailureReasonByJob.set(jobId, formatted);
+}
+
+function failedStatusSinceByJob(jobId: string): string | null {
+  const run = latestFailedRunByJob.get(jobId);
+  if (!run) return null;
+
+  const createdAt = String((run as any)?.created_at ?? "").trim();
+  return createdAt || null;
 }
 
 const latestRetestReadyByJob = new Map<string, any>();
@@ -1696,6 +1734,13 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     : { label: "Open", tone: "border-slate-200 bg-slate-50 text-slate-800" };
   const pendingInfoSignal = opsStatus === "pending_info";
   const onHoldSignal = opsStatus === "on_hold";
+  const statusAgeDays = resolveStatusAgeDays({
+    status: opsStatus,
+    failedInstant: failedStatusSinceByJob(jobId),
+    pendingInfoInstant: pendingInfoSetAtByJob.get(jobId) ?? null,
+    fallbackUpdatedAt: String(j?.created_at ?? "").trim() || null,
+  });
+  const statusAgeSuffix = statusAgeDays == null ? "" : ` · ${formatStatusAgeCompact(statusAgeDays)}`;
   const needsAttention = isNeedsAttentionJob(j);
   const pendingInfoContext = pendingInfoBannerText(j);
   const onHoldContext = onHoldBannerText(j);
@@ -1773,7 +1818,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         labelTone: "text-rose-700",
         bodyTone: "text-rose-900",
         supportTone: "text-rose-900/80",
-        label: failedStatusLabel,
+        label: `${failedStatusLabel}${statusAgeSuffix}`,
         message: failedReasonText,
         support: failedSupportText,
       }
@@ -1783,7 +1828,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         labelTone: "text-amber-700",
         bodyTone: "text-amber-900",
         supportTone: "text-amber-900/80",
-        label: "Pending Info",
+        label: `Pending Info${statusAgeSuffix}`,
         message: pendingInfoContext,
         support: "",
       }

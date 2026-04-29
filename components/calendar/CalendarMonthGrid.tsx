@@ -22,7 +22,13 @@ interface CalendarMonthGridProps {
 function buildCalendarHref(
   view: 'day' | 'week' | 'list' | 'month',
   date: string,
-  params?: { job?: string | null; block?: string | null; tech?: string | null; prefillDate?: string | null },
+  params?: {
+    job?: string | null;
+    block?: string | null;
+    tech?: string | null;
+    prefillDate?: string | null;
+    inspector?: string | null;
+  },
 ) {
   const q = new URLSearchParams();
   q.set('view', view);
@@ -31,6 +37,8 @@ function buildCalendarHref(
   if (params?.block) q.set('block', params.block);
   if (params?.tech) q.set('tech', params.tech);
   if (params?.prefillDate) q.set('prefill_date', params.prefillDate);
+  if (params?.inspector) q.set('inspector', params.inspector);
+  else if (params?.job) q.set('inspector', '1');
   return `/calendar?${q.toString()}`;
 }
 
@@ -112,12 +120,16 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
       </div>
 
       <div className="grid grid-cols-7 gap-2">
-        {days.map((day) => {
+        {days.map((day, dayIndex) => {
           const ymd = format(day, 'yyyy-MM-dd');
           const dayJobs = jobMap.get(ymd) || [];
           const dayBlockEvents = blockEventMap.get(ymd) || [];
           const isSelectedDate = ymd === selectedDate;
           const isAdjacentMonthDay = !isSameMonth(day, month);
+          const colIndex = dayIndex % 7;
+          const rowIndex = Math.floor(dayIndex / 7);
+          const tooltipHorizontalClass = colIndex >= 5 ? 'right-0' : colIndex <= 1 ? 'left-0' : 'left-1/2 -translate-x-1/2';
+          const tooltipVerticalClass = rowIndex >= 4 ? 'bottom-full mb-2' : 'top-full mt-2';
           const visibleJobs = dayJobs.slice(0, maxEntriesPerCell);
           const remainingSlots = Math.max(maxEntriesPerCell - visibleJobs.length, 0);
           const visibleBlockEvents = dayBlockEvents.slice(0, remainingSlots);
@@ -130,7 +142,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                 if (event.defaultPrevented) return;
                 if (clickStartedInsideInteractiveElement(event.target)) return;
 
-                router.push(buildCalendarHref('month', ymd, { tech }), { scroll: false });
+                router.push(buildCalendarHref('month', ymd, { tech, inspector: '1' }), { scroll: false });
               }}
               onDragOver={(event) => {
                 if (!event.dataTransfer) return;
@@ -152,11 +164,12 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                     job: droppedJobId,
                     tech,
                     prefillDate: ymd,
+                    inspector: '1',
                   }),
                   { scroll: false },
                 );
               }}
-              className={`min-h-28 rounded-2xl border p-3 transition ${
+              className={`min-h-28 overflow-visible rounded-2xl border p-3 transition ${
                 isToday(day)
                   ? 'border-blue-200 bg-blue-50/70'
                   : isAdjacentMonthDay
@@ -166,7 +179,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
             >
               <div className="mb-2 flex items-center justify-between">
                 <Link
-                  href={buildCalendarHref('month', ymd, { tech })}
+                  href={buildCalendarHref('month', ymd, { tech, inspector: '1' })}
                   className={`rounded-full px-2.5 py-1 text-lg font-bold transition hover:bg-slate-100 ${
                     isToday(day) ? 'bg-blue-600 text-white shadow-sm' : isAdjacentMonthDay ? 'text-slate-400' : 'text-slate-900'
                   } ${isSelectedDate && !isToday(day) ? 'bg-slate-100 text-slate-900' : ''}`}
@@ -180,18 +193,18 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                 ) : null}
               </div>
 
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 overflow-visible">
                 {visibleJobs.map((job) => {
                   const needsTech = !!job.scheduled_date && (!job.assignments || job.assignments.length === 0);
                   const lifecycle = getCalendarDisplayStatus(job);
                   const isCancelledJob = lifecycle === 'cancelled';
                   const dotClass = calendarStatusDotClass(lifecycle);
                   const faded = lifecycle === 'closed' || lifecycle === 'cancelled' ? 'opacity-50' : '';
-                  const primaryLine = job.job_address || shortTitle(job);
-                  const secondaryLine = job.job_type || normalizeRetestLinkedJobTitle(job.title) || 'Job';
+                  const primaryLine = shortTitle(job);
+                  const secondaryLine = job.city || 'City not available';
 
                   return (
-                    <div key={job.id} className="group relative">
+                    <div key={job.id} className="group relative overflow-visible">
                       <Link
                         href={buildCalendarHref('month', ymd, { job: job.id, tech })}
                         draggable={!isCancelledJob}
@@ -203,7 +216,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                           event.dataTransfer.setData('application/x-cm-job-id', job.id);
                           event.dataTransfer.effectAllowed = 'move';
                         }}
-                        className={`flex min-h-[36px] items-start gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-sm shadow-slate-950/5 transition ${isCancelledJob ? 'cursor-default' : 'cursor-grab active:cursor-grabbing hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'} ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
+                        className={`flex min-h-[36px] min-w-0 items-start gap-2 overflow-hidden rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-sm shadow-slate-950/5 transition ${isCancelledJob ? 'cursor-default' : 'cursor-grab active:cursor-grabbing hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'} ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
                         scroll={false}
                       >
                         <div className={`mt-[5px] h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
@@ -215,13 +228,13 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                           ) : null}
                         </div>
                         {needsTech ? (
-                          <span className="ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
-                            Needs Tech
+                          <span className="mt-0.5 max-w-[7rem] truncate rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
+                            No tech assigned
                           </span>
                         ) : null}
                       </Link>
 
-                      <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-72 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-900 shadow-xl shadow-slate-950/10 group-hover:block group-focus-within:block">
+                      <div className={`pointer-events-none absolute z-30 w-72 max-w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-900 opacity-0 shadow-xl shadow-slate-950/10 invisible translate-y-1 transition duration-150 ease-out group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 ${tooltipHorizontalClass} ${tooltipVerticalClass}`}>
                         <div className="mb-1 font-semibold">{normalizeRetestLinkedJobTitle(job.title) || shortTitle(job)}</div>
                         <div className="mb-1 text-slate-700">{job.job_address || 'No address'}</div>
 
@@ -248,7 +261,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
 
                         {needsTech ? (
                           <div className="mt-1 inline-block rounded border border-amber-200 bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800">
-                            Needs Tech
+                            No tech assigned
                           </div>
                         ) : null}
                       </div>
@@ -257,8 +270,8 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                 })}
 
                 {visibleBlockEvents.map((event) => (
-                  <div key={event.id} className="group relative">
-                    <div className={`flex min-h-[28px] items-center gap-2 rounded-xl border border-emerald-200 border-dashed bg-emerald-50/70 px-2.5 py-1.5 text-[11px] text-emerald-950 shadow-sm shadow-emerald-950/5 ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}>
+                  <div key={event.id} className="group relative overflow-visible">
+                    <div className={`flex min-h-[28px] min-w-0 items-center gap-2 overflow-hidden rounded-xl border border-emerald-200 border-dashed bg-emerald-50/70 px-2.5 py-1.5 text-[11px] text-emerald-950 shadow-sm shadow-emerald-950/5 ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}>
                       <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                         Block
                       </span>
@@ -272,7 +285,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                       </Link>
                     </div>
 
-                    <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-64 rounded-xl border border-emerald-200 bg-white p-3 text-xs text-slate-900 shadow-xl shadow-emerald-950/10 group-hover:block group-focus-within:block">
+                    <div className={`pointer-events-none absolute z-30 w-64 max-w-[min(16rem,calc(100vw-1.5rem))] rounded-xl border border-emerald-200 bg-white p-3 text-xs text-slate-900 opacity-0 shadow-xl shadow-emerald-950/10 invisible translate-y-1 transition duration-150 ease-out group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 ${tooltipHorizontalClass} ${tooltipVerticalClass}`}>
                       <div className="mb-1 flex items-center gap-2">
                         <span className="inline-flex rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                           Block

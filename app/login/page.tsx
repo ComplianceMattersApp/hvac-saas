@@ -77,6 +77,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -180,10 +181,20 @@ export default function LoginPage() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+          <div className="flex items-center justify-between gap-3">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+            <button
+              type="button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword((current) => !current)}
+              className="text-xs font-medium text-gray-600 underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-gray-300 dark:text-gray-300 dark:focus:ring-gray-600"
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
           <input
             className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 transition-all"
-            type="password"
+            type={showPassword ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"

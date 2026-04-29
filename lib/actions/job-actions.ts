@@ -4096,6 +4096,7 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   const testRunId = String(formData.get("test_run_id") || "").trim();
 
     // Override / exemption flags (no schema change; stored + enforced via override_pass)
+  const photoTaken = formData.get("rc_photo_taken") === "on";
   const exemptPackageUnit = formData.get("rc_exempt_package_unit") === "on";
   const exemptConditions = formData.get("rc_exempt_conditions") === "on";
   const overrideDetails = String(formData.get("rc_override_details") || "").trim() || null;
@@ -4151,6 +4152,9 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
     refrigerant_type: String(formData.get("refrigerant_type") || "").trim() || null,
     filter_drier_installed: formData.get("filter_drier_installed") === "on",
     notes: String(formData.get("notes") || "").trim() || null,
+    // Photo Taken evidence
+    verification_method: photoTaken ? "photo_taken" : null,
+    photo_taken_timestamp: photoTaken ? new Date().toISOString() : null,
   };
 
   const measuredSubcool =
@@ -4228,14 +4232,21 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
 
   const isBlocked = blocked.length > 0;
 
-  // ✅ Exemption/override path: counts as PASS and should not block job resolution
-  const computedPass = isChargeExempt
-    ? true
-    : isBlocked
-      ? null
-      : hasCoreCompute
-        ? failures.length === 0
-        : null;
+  // Photo Taken is evidence-based, not a numeric pass
+  const computedPass = photoTaken
+    ? null
+    : isChargeExempt
+      ? true
+      : isBlocked
+        ? null
+        : hasCoreCompute
+          ? failures.length === 0
+          : null;
+
+  if (photoTaken) {
+    warnings.push("User confirmed gauge photo was taken (photo attestation)");
+    if (overrideDetails) warnings.push(`Photo attestation notes: ${overrideDetails}`);
+  }
 
   if (isChargeExempt) {
     // keep a breadcrumb inside computed for auditing
@@ -4248,7 +4259,7 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   }
 
   const computed = {
-    status: isChargeExempt ? "exempt" : isBlocked ? "blocked" : "computed",
+    status: photoTaken ? "photo_evidence" : isChargeExempt ? "exempt" : isBlocked ? "blocked" : "computed",
     blocked: isChargeExempt ? [] : blocked,
     measured_subcool_f: measuredSubcool,
     measured_superheat_f: measuredSuperheat,
@@ -4905,6 +4916,8 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
     return Number.isFinite(val) ? val : null;
   };
 
+  // Override / exemption flags (no schema change; stored + enforced via override_pass)
+  const photoTaken = formData.get("rc_photo_taken") === "on";
   const exemptPackageUnit = formData.get("rc_exempt_package_unit") === "on";
   const exemptConditions = formData.get("rc_exempt_conditions") === "on";
   const overrideDetails = String(formData.get("rc_override_details") || "").trim() || null;
@@ -4944,6 +4957,9 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
     refrigerant_type: String(formData.get("refrigerant_type") || "").trim() || null,
     filter_drier_installed: formData.get("filter_drier_installed") === "on",
     notes: String(formData.get("notes") || "").trim() || null,
+    // Photo Taken evidence
+    verification_method: photoTaken ? "photo_taken" : null,
+    photo_taken_timestamp: photoTaken ? new Date().toISOString() : null,
   };
 
   const measuredSubcool =
@@ -5015,13 +5031,22 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
 
   const isBlocked = blocked.length > 0;
 
-  const computedPass = isChargeExempt
-    ? true
-    : isBlocked
-      ? null
-      : hasCoreCompute
-        ? failures.length === 0
-        : null;
+  const isPhotoEvidence = photoTaken;
+
+  const computedPass = photoTaken
+    ? null
+    : isChargeExempt
+      ? true
+      : isBlocked
+        ? null
+        : hasCoreCompute
+          ? failures.length === 0
+          : null;
+
+  if (photoTaken) {
+    warnings.push("User confirmed gauge photo was taken (photo attestation)");
+    if (overrideDetails) warnings.push(`Photo attestation notes: ${overrideDetails}`);
+  }
 
   if (isChargeExempt) {
     warnings.push(
@@ -5033,7 +5058,7 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
   }
 
   const computed = {
-    status: isChargeExempt ? "exempt" : isBlocked ? "blocked" : "computed",
+    status: photoTaken ? "photo_evidence" : isChargeExempt ? "exempt" : isBlocked ? "blocked" : "computed",
     blocked: isChargeExempt ? [] : blocked,
     measured_subcool_f: measuredSubcool,
     measured_superheat_f: measuredSuperheat,
@@ -7405,6 +7430,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const permitDateRaw = String(formData.get("permit_date") || "").trim();
   const jurisdictionRaw = String(formData.get("jurisdiction") || "").trim();
   const returnToRaw = String(formData.get("return_to") || "").trim();
+  const noRedirect = String(formData.get("no_redirect") || "").trim() === "1";
 
   function redirectToScheduleTarget(banner: string) {
     if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
@@ -7415,6 +7441,13 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     }
 
     redirect(`/jobs/${id}?banner=${banner}`);
+  }
+
+  function finishScheduleTarget(banner: string) {
+    if (noRedirect) {
+      return;
+    }
+    redirectToScheduleTarget(banner);
   }
 
   await requireInternalScopedJobAccessOrRedirect({
@@ -7495,7 +7528,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   if (!didScheduleFieldsChange && !didPermitFieldsChange) {
     revalidatePath(`/jobs/${id}`);
     revalidatePath(`/calendar`);
-    redirectToScheduleTarget("schedule_already_saved");
+    return finishScheduleTarget("schedule_already_saved");
   }
 
   const nextLifecycleStatus =
@@ -7518,7 +7551,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   try {
     await evaluateJobOpsStatus(id);
   } catch {
-    redirectToScheduleTarget("schedule_saved_ops_eval_failed");
+    return finishScheduleTarget("schedule_saved_ops_eval_failed");
   }
 
   const hadPendingInfoSignal =
@@ -7625,7 +7658,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${id}`);
 
-  redirectToScheduleTarget("schedule_saved");
+  return finishScheduleTarget("schedule_saved");
 }
 
 

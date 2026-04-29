@@ -3,7 +3,16 @@ import { X } from 'lucide-react';
 import { eachWeekOfInterval, endOfMonth, format as formatDate, parseISO, startOfMonth } from 'date-fns';
 
 import CalendarMonthGrid from './CalendarMonthGrid';
+import CalendarDispatchGrid from './CalendarDispatchGrid';
+import CalendarDragJobLink from './CalendarDragJobLink';
 import { CALENDAR_STATUS_LEGEND, calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
+import {
+  CALENDAR_TECH_FILTER_UNASSIGNED,
+  filterJobsForTechnician,
+  isSpecificTechnicianFilter,
+  isUnassignedTechFilter,
+  normalizeCalendarTechFilter,
+} from './calendar-filtering';
 import SubmitButton from '@/components/SubmitButton';
 import { createCalendarBlockEventFromForm, deleteCalendarBlockEventFromForm, updateCalendarBlockEventFromForm } from '@/lib/actions/calendar-event-actions';
 import {
@@ -26,20 +35,8 @@ type Props = {
   block?: string;
   tech?: string;
   prefillDate?: string;
+  inspector?: string;
 };
-
-const TECH_COLOR_PALETTE = [
-  'bg-blue-500',
-  'bg-emerald-500',
-  'bg-violet-500',
-  'bg-orange-500',
-  'bg-teal-500',
-  'bg-cyan-500',
-  'bg-lime-500',
-  'bg-sky-500',
-  'bg-fuchsia-500',
-  'bg-amber-500',
-];
 
 function bannerMessage(banner?: string) {
   const map: Record<string, string> = {
@@ -111,7 +108,13 @@ function customerPhone(job: DispatchJob) {
     customer_phone?: string | null;
     customer_phone_number?: string | null;
   };
-  return String(extended.customer_phone ?? extended.customer_phone_number ?? extended.phone ?? '').trim();
+  return String(
+    job.customer_phone ??
+      extended.customer_phone ??
+      extended.customer_phone_number ??
+      extended.phone ??
+      '',
+  ).trim();
 }
 
 function phoneHrefValue(rawPhone: string) {
@@ -129,7 +132,14 @@ function buildReturnTo(view: CalendarUIView, date: string, tech?: string | null)
 function buildCalendarHref(
   view: CalendarUIView,
   date: string,
-  params?: { banner?: string; job?: string | null; block?: string | null; tech?: string | null; prefillDate?: string | null },
+  params?: {
+    banner?: string;
+    job?: string | null;
+    block?: string | null;
+    tech?: string | null;
+    prefillDate?: string | null;
+    inspector?: string | null;
+  },
 ) {
   const q = new URLSearchParams();
   q.set('view', view);
@@ -139,6 +149,8 @@ function buildCalendarHref(
   if (params?.block) q.set('block', params.block);
   if (params?.tech) q.set('tech', params.tech);
   if (params?.prefillDate) q.set('prefill_date', params.prefillDate);
+  if (params?.inspector) q.set('inspector', params.inspector);
+  else if (params?.job) q.set('inspector', '1');
   return `/calendar?${q.toString()}`;
 }
 
@@ -226,7 +238,6 @@ function parseMinutes(value?: string | null): number | null {
 function isDispatchVisibleForLayout(job: DispatchJob) {
   const ops = String(job.ops_status ?? '').toLowerCase();
   if (!job.scheduled_date || !job.window_start) return false;
-  if (!Array.isArray(job.assignments) || job.assignments.length === 0) return false;
   if (ops === 'on_hold') return false;
   return true;
 }
@@ -271,59 +282,16 @@ function calendarJobTooltip(job: DispatchJob) {
   ];
 
   if (job.contractor_name) summary.push(`Contractor: ${job.contractor_name}`);
-  if (job.scheduled_date && (!job.assignments || job.assignments.length === 0)) summary.push('Needs Tech');
+  if (job.scheduled_date && (!job.assignments || job.assignments.length === 0)) summary.push('No tech assigned');
 
   return summary.filter((line) => String(line ?? '').trim()).join('\n');
-}
-
-function uniqueById(users: Array<{ user_id: string; display_name: string }>) {
-  const seen = new Set<string>();
-  const out: Array<{ user_id: string; display_name: string }> = [];
-  for (const user of users) {
-    const id = String(user.user_id ?? '').trim();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    out.push({ user_id: id, display_name: String(user.display_name ?? '').trim() || 'Tech' });
-  }
-  return out;
-}
-
-function splitTechnicianLabel(displayName: string, userId: string) {
-  const rawName = String(displayName ?? '').trim() || 'Technician';
-  const emailMatch = rawName.match(/([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i);
-  const emailFromName = emailMatch ? emailMatch[1] : '';
-  const userIsEmail = /@/.test(String(userId ?? '')) ? String(userId) : '';
-  const email = emailFromName || userIsEmail || 'email unavailable';
-  const name = emailFromName ? rawName.replace(emailFromName, '').replace(/[()]/g, '').trim() || 'Technician' : rawName;
-  return { name, email };
-}
-
-function colorClassForUserId(userId: string) {
-  let hash = 0;
-  const raw = String(userId ?? '');
-  for (let i = 0; i < raw.length; i += 1) {
-    hash = (hash * 31 + raw.charCodeAt(i)) >>> 0;
-  }
-  return TECH_COLOR_PALETTE[hash % TECH_COLOR_PALETTE.length];
-}
-
-function initialsFromName(name: string) {
-  const parts = String(name ?? '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (!parts.length) return 'T';
-  const first = parts[0]?.[0] ?? '';
-  const second = parts[1]?.[0] ?? '';
-  const letters = `${first}${second}`.trim();
-  return (letters || first || 'T').toUpperCase();
 }
 
 function dispatchVisibilityIssueLabels(job: DispatchJob) {
   const labels: string[] = [];
   if (String(job.ops_status ?? '').trim().toLowerCase() === 'on_hold') labels.push('On hold');
   if (!job.window_start) labels.push('Time not set');
-  if (!Array.isArray(job.assignments) || job.assignments.length === 0) labels.push('Needs tech');
+  if (!Array.isArray(job.assignments) || job.assignments.length === 0) labels.push('No tech assigned');
   return labels;
 }
 
@@ -398,357 +366,6 @@ function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | n
   );
 }
 
-function DispatchGrid(props: {
-  jobs: DispatchJob[];
-  blockEvents: DispatchCalendarBlockEvent[];
-  assignableUsers: Array<{ user_id: string; display_name: string }>;
-  mode: DispatchViewMode;
-  date: string;
-  tech?: string | null;
-  selectedJobId?: string;
-}) {
-  const { jobs, blockEvents, assignableUsers, mode, date, tech, selectedJobId } = props;
-  const startHour = 6;
-  const endHour = 18;
-  const hourHeight = 50;
-  const gridStartMinutes = startHour * 60;
-  const gridEndMinutes = endHour * 60;
-
-  const gridJobs = jobs
-    .flatMap((job) =>
-      job.assignments.map((assignment) => ({
-        job,
-        user_id: assignment.user_id,
-      })),
-    )
-    .filter((item) => {
-      if (mode === 'day') return String(item.job.scheduled_date) === date;
-      return true;
-    });
-
-  const gridBlockEvents = blockEvents
-    .filter((event) => event.calendar_date === date)
-    .map((event) => ({
-      event,
-      user_id: event.internal_user_id,
-    }));
-
-  type LaneItem = {
-    id: string;
-    user_id: string;
-    kind: 'job' | 'block';
-    job?: DispatchJob;
-    event?: DispatchCalendarBlockEvent;
-    start: number;
-    end: number;
-    lane: number;
-    laneCount: number;
-  };
-
-  const laneItemsByUser = new Map<string, LaneItem[]>();
-
-  for (const item of gridJobs) {
-    const start = parseMinutes(item.job.window_start);
-    const parsedEnd = parseMinutes(item.job.window_end);
-    if (start == null) continue;
-
-    const clampedStart = Math.max(start, gridStartMinutes);
-    const clampedEnd = Math.min(
-      Math.max(parsedEnd ?? clampedStart + 60, clampedStart + 30),
-      gridEndMinutes,
-    );
-
-    const row: LaneItem = {
-      id: `${item.job.id}-${item.user_id}`,
-      user_id: item.user_id,
-      kind: 'job',
-      job: item.job,
-      start: clampedStart,
-      end: clampedEnd,
-      lane: 0,
-      laneCount: 1,
-    };
-
-    if (!laneItemsByUser.has(item.user_id)) laneItemsByUser.set(item.user_id, []);
-    laneItemsByUser.get(item.user_id)!.push(row);
-  }
-
-  for (const item of gridBlockEvents) {
-    const start = parseMinutes(item.event.start_time);
-    const parsedEnd = parseMinutes(item.event.end_time);
-    if (start == null || parsedEnd == null) continue;
-
-    const clampedStart = Math.max(start, gridStartMinutes);
-    const clampedEnd = Math.min(Math.max(parsedEnd, clampedStart + 30), gridEndMinutes);
-
-    const row: LaneItem = {
-      id: `${item.event.id}-${item.user_id}`,
-      user_id: item.user_id,
-      kind: 'block',
-      event: item.event,
-      start: clampedStart,
-      end: clampedEnd,
-      lane: 0,
-      laneCount: 1,
-    };
-
-    if (!laneItemsByUser.has(item.user_id)) laneItemsByUser.set(item.user_id, []);
-    laneItemsByUser.get(item.user_id)!.push(row);
-  }
-
-  for (const [userId, rows] of laneItemsByUser.entries()) {
-    rows.sort((a, b) => (a.start - b.start) || (a.end - b.end));
-
-    const laneEndTimes: number[] = [];
-    let groupStart = 0;
-    let groupEnd = -1;
-
-    const finalizeGroup = (startIndex: number, endIndex: number) => {
-      if (endIndex < startIndex) return;
-      let maxLane = 0;
-      for (let i = startIndex; i <= endIndex; i += 1) {
-        if (rows[i].lane > maxLane) maxLane = rows[i].lane;
-      }
-      const count = Math.max(maxLane + 1, 1);
-      for (let i = startIndex; i <= endIndex; i += 1) {
-        rows[i].laneCount = count;
-      }
-    };
-
-    for (let i = 0; i < rows.length; i += 1) {
-      const row = rows[i];
-
-      let laneIndex = laneEndTimes.findIndex((end) => end <= row.start);
-      if (laneIndex < 0) {
-        laneIndex = laneEndTimes.length;
-        laneEndTimes.push(row.end);
-      } else {
-        laneEndTimes[laneIndex] = row.end;
-      }
-      row.lane = laneIndex;
-
-      if (i === 0) {
-        groupStart = 0;
-        groupEnd = row.end;
-      } else if (row.start < groupEnd) {
-        groupEnd = Math.max(groupEnd, row.end);
-      } else {
-        finalizeGroup(groupStart, i - 1);
-        groupStart = i;
-        groupEnd = row.end;
-      }
-    }
-
-    finalizeGroup(groupStart, rows.length - 1);
-    laneItemsByUser.set(userId, rows);
-  }
-
-  const techMap = new Map<string, string>();
-  const displayNameByUserId = new Map(assignableUsers.map((user) => [user.user_id, user.display_name]));
-  for (const item of gridJobs) {
-    const techName = item.job.assignments.find((a) => a.user_id === item.user_id)?.display_name ?? 'Tech';
-    techMap.set(item.user_id, techName);
-  }
-  for (const item of gridBlockEvents) {
-    techMap.set(item.user_id, displayNameByUserId.get(item.user_id) ?? 'Tech');
-  }
-
-  const columns = uniqueById(
-    Array.from(techMap.entries()).map(([user_id, display_name]) => ({ user_id, display_name })),
-  );
-
-  const totalGridHeight = (endHour - startHour) * hourHeight;
-
-  const isTodayColumn = String(date) === todayYmdLA();
-  const nowMinutes = currentMinutesLA();
-  const showNowLine = isTodayColumn && nowMinutes != null && nowMinutes >= gridStartMinutes && nowMinutes <= gridEndMinutes;
-  const nowTop = showNowLine ? ((Number(nowMinutes) - gridStartMinutes) / 60) * hourHeight : 0;
-
-  if (!columns.length) {
-    return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-sm text-slate-500">No assigned scheduled jobs or blocks for this {mode}.</div>;
-  }
-
-  const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i);
-
-  return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
-      <div className="grid" style={{ gridTemplateColumns: `84px repeat(${columns.length}, minmax(190px, 1fr))` }}>
-        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Time</div>
-        {columns.map((col) => {
-          const tech = splitTechnicianLabel(col.display_name, col.user_id);
-          return (
-            <div key={col.user_id} className="border-b border-r border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-3">
-              <p className="truncate text-sm font-semibold text-slate-900">{tech.name}</p>
-              <p className="mt-0.5 truncate text-[11px] text-slate-500">{tech.email}</p>
-            </div>
-          );
-        })}
-
-        <div className="relative border-r border-slate-200 bg-white" style={{ height: `${totalGridHeight}px` }}>
-          {Array.from({ length: endHour - startHour }, (_, i) => (
-            <div
-              key={`shade-${i}`}
-              className={i % 2 === 0 ? 'absolute left-0 right-0 bg-slate-50/40' : 'absolute left-0 right-0 bg-white'}
-              style={{ top: `${i * hourHeight}px`, height: `${hourHeight}px` }}
-            />
-          ))}
-          {hours.map((hour) => {
-            const y = (hour - startHour) * hourHeight;
-            const label = hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`;
-            return (
-              <div key={hour} className="absolute left-0 right-0" style={{ top: `${y}px` }}>
-                <div className="-translate-y-1/2 px-3 text-[11px] font-medium text-slate-500">{label}</div>
-              </div>
-            );
-          })}
-          {showNowLine ? (
-            <>
-              <div className="absolute left-0 right-0 border-t border-rose-400/70" style={{ top: `${nowTop}px` }} />
-              <div className="absolute left-2 -translate-y-1/2 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700" style={{ top: `${nowTop}px` }}>
-                Now
-              </div>
-            </>
-          ) : null}
-        </div>
-
-        {columns.map((col) => (
-          <div key={col.user_id} className="relative border-r border-slate-200 bg-white" style={{ height: `${totalGridHeight}px` }}>
-            {Array.from({ length: endHour - startHour }, (_, i) => (
-              <div
-                key={`col-${col.user_id}-shade-${i}`}
-                className={i % 2 === 0 ? 'absolute left-0 right-0 bg-slate-50/35' : 'absolute left-0 right-0 bg-white'}
-                style={{ top: `${i * hourHeight}px`, height: `${hourHeight}px` }}
-              />
-            ))}
-            {hours.map((hour) => {
-              const y = (hour - startHour) * hourHeight;
-              return <div key={hour} className="absolute left-0 right-0 border-t border-slate-100/90" style={{ top: `${y}px` }} />;
-            })}
-            {showNowLine ? <div className="absolute left-0 right-0 border-t border-rose-400/70" style={{ top: `${nowTop}px` }} /> : null}
-
-            {(laneItemsByUser.get(col.user_id) ?? []).map((row) => {
-              const top = ((row.start - gridStartMinutes) / 60) * hourHeight;
-              const height = Math.max(((row.end - row.start) / 60) * hourHeight, 36);
-              const laneWidthPct = 100 / Math.max(row.laneCount, 1);
-              const laneLeftPct = row.lane * laneWidthPct;
-              const laneGapPx = 3;
-
-              if (row.kind === 'block' && row.event) {
-                const blockEvent = row.event;
-
-                return (
-                  <div
-                    key={row.id}
-                    className="absolute left-1 right-1 overflow-hidden rounded-xl border border-emerald-300 border-dashed bg-emerald-50/95 px-2.5 py-1.5 text-emerald-950 shadow-sm shadow-emerald-950/5"
-                    style={{
-                      top: `${top}px`,
-                      height: `${height}px`,
-                      left: `calc(${laneLeftPct}% + ${laneGapPx}px)`,
-                      width: `calc(${laneWidthPct}% - ${laneGapPx * 2}px)`,
-                      right: 'auto',
-                    }}
-                  >
-                    <div className="flex h-full min-w-0 items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-semibold leading-4 text-emerald-950">{blockEvent.title}</p>
-                        {blockEvent.description ? (
-                          <p className="mt-0.5 truncate text-[10px] leading-4 text-emerald-900/75">{blockEvent.description}</p>
-                        ) : null}
-                      </div>
-                      <form action={deleteCalendarBlockEventFromForm} className="ml-2 shrink-0 self-center">
-                        <div className="flex items-center gap-1.5">
-                          <Link
-                            href={buildCalendarHref(mode, date, { block: blockEvent.id, tech })}
-                            scroll={false}
-                            className="inline-flex h-6 w-14 items-center justify-center rounded-lg border border-emerald-300 bg-white/95 px-1.5 py-1 text-[9px] font-semibold uppercase leading-none tracking-wide text-emerald-800 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-                          >
-                            Edit
-                          </Link>
-                          <input type="hidden" name="event_id" value={blockEvent.id} />
-                          <input type="hidden" name="return_to" value={buildCalendarHref(mode, date, { tech })} />
-                          <SubmitButton className="appearance-none !inline-flex !h-6 !min-h-0 !w-14 items-center justify-center rounded-lg border border-emerald-300 bg-white/95 px-1.5 py-1 text-[9px] font-semibold uppercase leading-none tracking-wide text-emerald-800 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700" loadingText="...">
-                            Remove
-                          </SubmitButton>
-                        </div>
-                      </form>
-                    </div>
-                  </div>
-                );
-              }
-
-              const job = row.job!;
-              const isSelected = selectedJobId === job.id;
-              const assignees = Array.isArray(job.assignments) ? job.assignments : [];
-              const colorBars = assignees.slice(0, 3);
-              const overflowCount = Math.max(assignees.length - colorBars.length, 0);
-              const initials = assignees.slice(0, 2).map((a) => initialsFromName(a.display_name)).join(' ');
-              const lifecycle = getCalendarDisplayStatus(job);
-              const statusBadgeLabel =
-                lifecycle === 'cancelled' || lifecycle === 'on_my_way' || lifecycle === 'in_progress'
-                  ? formatCalendarDisplayStatus(lifecycle)
-                  : null;
-              const statusBadgeClass =
-                lifecycle === 'cancelled'
-                  ? 'border-slate-300 bg-slate-200 text-slate-600'
-                  : lifecycle === 'on_my_way'
-                    ? 'border-blue-300 bg-blue-100 text-blue-950'
-                    : 'border-indigo-300 bg-indigo-100 text-indigo-900';
-
-              return (
-                <Link
-                  key={row.id}
-                  href={buildCalendarHref(mode, date, { job: job.id, tech })}
-                  title={calendarJobTooltip(job)}
-                  scroll={false}
-                  className={`absolute left-1 right-1 rounded-xl border py-1 pr-2 pl-5 shadow-sm shadow-slate-950/5 transition hover:cursor-pointer hover:-translate-y-px hover:shadow-md hover:brightness-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${dispatchBlockClass(lifecycle)} ${isSelected ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
-                  style={{
-                    top: `${top}px`,
-                    height: `${height}px`,
-                    left: `calc(${laneLeftPct}% + ${laneGapPx}px)`,
-                    width: `calc(${laneWidthPct}% - ${laneGapPx * 2}px)`,
-                    right: 'auto',
-                  }}
-                >
-                  <div className="absolute inset-y-1 left-1 flex items-start gap-0.5">
-                    {colorBars.map((assignment) => (
-                      <span
-                        key={`${job.id}-${assignment.user_id}-bar`}
-                        className={`inline-block rounded-sm ${colorClassForUserId(assignment.user_id)} ${isSelected ? 'w-1.5' : 'w-1'} h-full`}
-                        title={assignment.display_name}
-                      />
-                    ))}
-                    {overflowCount > 0 ? (
-                      <span className="inline-flex h-3 min-w-3 items-center justify-center rounded-sm bg-slate-700/75 px-0.5 text-[9px] font-semibold text-white">
-                        +{overflowCount}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="truncate text-xs font-semibold leading-4 text-slate-950">{shortTitle(job)}</p>
-                  {statusBadgeLabel ? (
-                    <span className={`ml-1 inline-block rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${statusBadgeClass}`}>
-                      {statusBadgeLabel}
-                    </span>
-                  ) : null}
-                  {job.scheduled_date && (!job.assignments || job.assignments.length === 0) ? (
-                    <span className="ml-2 inline-block rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                      Needs Tech
-                    </span>
-                  ) : null}
-                  <p className="truncate text-[11px] leading-4 text-slate-700/90">{job.city || job.contractor_name || 'No city or contractor'}</p>
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <p className="truncate rounded-full bg-white/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-700/90">{blockTimeLabel(row.start, row.end)}</p>
-                    {initials ? <p className="truncate text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-700/70">{initials}</p> : null}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function AgendaList(props: {
   jobs: DispatchJob[];
   blockEvents: DispatchCalendarBlockEvent[];
@@ -814,7 +431,7 @@ function AgendaList(props: {
                   <div className="flex items-start gap-3">
                     <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-slate-900">{job.job_address || shortTitle(job)}</div>
+                      <div className="truncate text-sm font-semibold text-slate-900">{shortTitle(job)}</div>
                       <div className="mt-0.5 truncate text-[11px] text-slate-600">{job.city || 'No city'}</div>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
                         <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium text-slate-700">{listTimeWindowLabel(job.window_start, job.window_end)}</span>
@@ -824,11 +441,11 @@ function AgendaList(props: {
                         </span>
                         {needsTech ? (
                           <span className="inline-block rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                            Needs Tech
+                            No tech assigned
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-1 truncate text-[11px] text-slate-500">{job.job_type || normalizeRetestLinkedJobTitle(job.title)}</div>
+                      <div className="mt-1 truncate text-[11px] text-slate-500">{job.job_address || customerName(job) || job.job_type || normalizeRetestLinkedJobTitle(job.title)}</div>
                     </div>
                   </div>
                 </Link>
@@ -869,6 +486,7 @@ function AgendaList(props: {
 function DetailPanel(props: {
   job: DispatchJob;
   returnTo: string;
+  closeHref: string;
   assignableUsers: Array<{ user_id: string; display_name: string }>;
   view: CalendarUIView;
   date: string;
@@ -876,7 +494,7 @@ function DetailPanel(props: {
   prefillDate?: string | null;
   className?: string;
 }) {
-  const { job, returnTo, assignableUsers, view, date, tech, prefillDate, className = '' } = props;
+  const { job, returnTo, closeHref, assignableUsers, view, date, tech, prefillDate, className = '' } = props;
   const phone = customerPhone(job);
   const phoneHref = phoneHrefValue(phone);
   const hasPhone = Boolean(phoneHref);
@@ -917,7 +535,7 @@ function DetailPanel(props: {
             </div>
           </div>
           <Link
-            href={buildCalendarHref(view, date, { tech })}
+            href={closeHref}
             scroll={false}
             aria-label="Close details"
             className="shrink-0 rounded-lg border border-transparent p-2 text-slate-500 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-800"
@@ -1145,14 +763,14 @@ function MonthInspectorDaySummary(props: {
             <div className="flex items-start gap-2">
               <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-semibold text-slate-900">{customerName(job)}</div>
-                <div className="mt-0.5 truncate text-[11px] text-slate-700">{normalizeRetestLinkedJobTitle(job.title) || shortTitle(job)}</div>
-                <div className="truncate text-[11px] text-slate-500">{job.job_address || job.city || 'Address not available'}</div>
+                <div className="truncate text-xs font-semibold text-slate-900">{normalizeRetestLinkedJobTitle(job.title) || shortTitle(job)}</div>
+                <div className="mt-0.5 truncate text-[11px] text-slate-700">{job.city || 'City not available'}</div>
+                <div className="truncate text-[11px] text-slate-500">{customerName(job)}</div>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">{cueParts.filter(Boolean).join(' · ')}</span>
                   {needsTech ? (
                     <span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">
-                      Needs Tech
+                      No tech assigned
                     </span>
                   ) : null}
                 </div>
@@ -1179,7 +797,9 @@ export async function CalendarView(props: Props) {
     anchorDate: props.date,
   });
 
-  const activeTech = String(props.tech ?? '').trim() || null;
+  const activeTech = normalizeCalendarTechFilter(props.tech);
+  const activeTechnicianUserId = isSpecificTechnicianFilter(activeTech) ? activeTech : null;
+  const activeUnassignedFilter = isUnassignedTechFilter(activeTech);
   const returnTo = buildReturnTo(uiView, data.anchorDate, activeTech);
   const banner = bannerMessage(props.banner);
   const selectedJobId = String(props.job ?? '').trim();
@@ -1250,7 +870,7 @@ export async function CalendarView(props: Props) {
     canonicalDispatchJobsForRange = canonicalDispatchJobsByDay.flatMap((day) => day.jobs);
   }
 
-  const techFilteredBlockEvents = activeTech
+  const techFilteredBlockEvents = activeTechnicianUserId
     ? canonicalBlockEventsForRange.filter((event) => event.internal_user_id === activeTech)
     : canonicalBlockEventsForRange;
   const selectedBlock = canonicalBlockEventsForRange.find((event) => event.id === selectedBlockId) ?? null;
@@ -1260,10 +880,31 @@ export async function CalendarView(props: Props) {
     data.unassignedScheduledJobs.find((job) => job.id === selectedJobId) ||
     null;
 
+  const inspectorStateRaw = String(props.inspector ?? '').trim().toLowerCase();
+  const inspectorForcedOpen = inspectorStateRaw === '1' || inspectorStateRaw === 'open';
+  const inspectorForcedClosed = inspectorStateRaw === '0' || inspectorStateRaw === 'closed';
+  const inspectorOpen = inspectorForcedOpen || (Boolean(selectedJob) && !inspectorForcedClosed);
+
+  const inspectorToggleHref = buildCalendarHref(uiView, data.anchorDate, {
+    tech: activeTech,
+    job: selectedJobId || null,
+    block: selectedBlockId || null,
+    prefillDate,
+    inspector: inspectorOpen ? '0' : '1',
+  });
+
+  const hideInspectorHref = buildCalendarHref(uiView, data.anchorDate, {
+    tech: activeTech,
+    job: selectedJobId || null,
+    block: selectedBlockId || null,
+    prefillDate,
+    inspector: '0',
+  });
+
   const techFilteredScheduledJobsByDay = activeTech
     ? canonicalDispatchJobsByDay.map((day) => ({
         ...day,
-        jobs: day.jobs.filter((job) => job.assignments.some((a) => a.user_id === activeTech)),
+        jobs: filterJobsForTechnician(day.jobs, activeTech),
       }))
     : canonicalDispatchJobsByDay;
 
@@ -1273,7 +914,7 @@ export async function CalendarView(props: Props) {
   }));
 
   const attentionWindowScheduledJobs = activeTech
-    ? data.scheduledAttentionWindowJobs.filter((job) => job.assignments.some((a) => a.user_id === activeTech))
+    ? filterJobsForTechnician(data.scheduledAttentionWindowJobs, activeTech)
     : data.scheduledAttentionWindowJobs;
 
   const hiddenScheduledJobs = attentionWindowScheduledJobs
@@ -1292,7 +933,7 @@ export async function CalendarView(props: Props) {
   const filteredDayJobs = filteredJobsByDay.find((day) => day.date === data.day.date)?.jobs ?? [];
   const selectedDayJobs = techFilteredScheduledJobsByDay.find((day) => day.date === data.anchorDate)?.jobs ?? [];
   const mondayAnchorDate = startOfWeekMondayYmd(data.anchorDate);
-  const showDesktopInspectorColumn = uiView === 'month' || Boolean(selectedJob);
+  const showDesktopInspectorColumn = inspectorOpen && (uiView === 'month' || Boolean(selectedJob));
 
   const targetDateForView = (viewValue: CalendarUIView) => {
     if (viewValue === 'week' || viewValue === 'list') return mondayAnchorDate;
@@ -1344,6 +985,13 @@ export async function CalendarView(props: Props) {
               ))}
             </div>
             <NavLinks view={uiView} date={data.anchorDate} tech={activeTech} />
+            <Link
+              href={inspectorToggleHref}
+              scroll={false}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            >
+              {inspectorOpen ? 'Hide Inspector' : 'Show Inspector'}
+            </Link>
           </div>
         </div>
         </div>
@@ -1354,10 +1002,10 @@ export async function CalendarView(props: Props) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Technician Filter</p>
-                  <p className="mt-0.5 text-xs text-slate-500">Show all technicians or focus the calendar on one assigned technician.</p>
+                  <p className="mt-0.5 text-xs text-slate-500">Show all technicians, focus one technician, or isolate unassigned scheduled jobs.</p>
                 </div>
                 <div className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">
-                  {activeTech ? 'Single technician view' : 'All technicians'}
+                  {activeUnassignedFilter ? 'Unassigned only' : activeTechnicianUserId ? 'Single technician view' : 'All technicians'}
                 </div>
               </div>
 
@@ -1371,6 +1019,16 @@ export async function CalendarView(props: Props) {
                   }`}
                 >
                   All technicians
+                </Link>
+                <Link
+                  href={buildCalendarHref(uiView, data.anchorDate, { tech: CALENDAR_TECH_FILTER_UNASSIGNED })}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    activeUnassignedFilter
+                      ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  Unassigned
                 </Link>
                 {data.assignableUsers.map((user) => (
                   <Link
@@ -1511,7 +1169,7 @@ export async function CalendarView(props: Props) {
                     />
                     <select
                       name="internal_user_id"
-                      defaultValue={activeTech ?? ''}
+                      defaultValue={activeTechnicianUserId ?? ''}
                       className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
                       required
                     >
@@ -1577,11 +1235,18 @@ export async function CalendarView(props: Props) {
                   const isCancelledJob = lifecycle === 'cancelled';
 
                   return (
-                    <Link
+                    <CalendarDragJobLink
                       key={`hidden-scheduled-${job.id}`}
                       href={buildCalendarHref(uiView, job.scheduled_date ?? data.anchorDate, { job: job.id, tech: activeTech })}
                       title={calendarJobTooltip(job)}
                       draggable={!isCancelledJob}
+                      jobId={job.id}
+                      windowStart={job.window_start}
+                      windowEnd={job.window_end}
+                      jobTitle={shortTitle(job)}
+                      jobCity={job.city}
+                      assigneeSummary={Array.isArray(job.assignments) ? job.assignments.map((a) => a.display_name).filter(Boolean).join(', ') : null}
+                      hasNoTechAssigned={!job.assignments || job.assignments.length === 0}
                       scroll={false}
                       className={`group block rounded-xl border border-amber-200 bg-white/90 px-3 py-3 shadow-sm shadow-amber-950/5 transition ${isCancelledJob ? 'cursor-default opacity-80' : 'cursor-grab hover:-translate-y-px hover:border-amber-300 hover:bg-white hover:shadow-md active:cursor-grabbing active:opacity-85'}`}
                     >
@@ -1591,11 +1256,11 @@ export async function CalendarView(props: Props) {
                       <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-amber-700/90 group-hover:text-amber-800">
                         {isCancelledJob
                           ? 'Historical cancelled record'
-                          : uiView === 'month'
-                          ? 'Drag to a day'
-                          : 'Open to review'}
+                          : uiView === 'list'
+                          ? 'Open to review'
+                          : 'Drag to schedule'}
                       </p>
-                    </Link>
+                    </CalendarDragJobLink>
                   );
                 })}
               </div>
@@ -1607,9 +1272,9 @@ export async function CalendarView(props: Props) {
             <div>
               <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">Unscheduled Jobs</h3>
               <p className="mt-0.5 text-[11px] text-slate-500">
-                {uiView === 'month'
-                  ? 'Drag onto the calendar when a visit is ready to place.'
-                  : 'Open a job to review and place it on the schedule.'}
+                {uiView === 'list'
+                  ? 'Open a job to review and place it on the schedule.'
+                  : 'Drag onto the calendar when a visit is ready to place.'}
               </p>
             </div>
           </div>
@@ -1622,11 +1287,18 @@ export async function CalendarView(props: Props) {
                 const cityLabel = String(job.city ?? '').trim();
 
                 return (
-                  <Link
+                  <CalendarDragJobLink
                     key={`unassigned-${job.id}`}
                     href={buildCalendarHref(uiView, data.anchorDate, { job: job.id, tech: activeTech })}
                     title={calendarJobTooltip(job)}
                     draggable
+                    jobId={job.id}
+                    windowStart={job.window_start}
+                    windowEnd={job.window_end}
+                    jobTitle={shortTitle(job)}
+                    jobCity={job.city}
+                    assigneeSummary={null}
+                    hasNoTechAssigned={true}
                     scroll={false}
                     className="group block cursor-grab rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:cursor-grabbing active:opacity-85"
                   >
@@ -1649,9 +1321,9 @@ export async function CalendarView(props: Props) {
                       ))}
                     </div>
                     <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-500 group-hover:text-slate-700">
-                      {uiView === 'month' ? 'Drag to a day' : 'Open to schedule'}
+                      {uiView === 'list' ? 'Open to schedule' : 'Drag to schedule'}
                     </p>
-                  </Link>
+                  </CalendarDragJobLink>
                 );
               })
             ) : (
@@ -1691,7 +1363,7 @@ export async function CalendarView(props: Props) {
                   <p className="mt-0.5 text-sm font-medium text-slate-700">{formatDayDateHeader(data.day.date)}</p>
                 </div>
               </div>
-              <DispatchGrid
+              <CalendarDispatchGrid
                 jobs={filteredDayJobs}
                 blockEvents={techFilteredBlockEvents}
                 assignableUsers={data.assignableUsers}
@@ -1699,6 +1371,8 @@ export async function CalendarView(props: Props) {
                 date={data.day.date}
                 tech={activeTech}
                 selectedJobId={selectedJobId}
+                dropReturnTo={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech, inspector: '1' })}
+                scheduleAction={updateJobScheduleFromForm}
               />
             </section>
           ) : (
@@ -1712,7 +1386,7 @@ export async function CalendarView(props: Props) {
                     </div>
                     <p className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">{day.jobs.length} jobs</p>
                   </div>
-                  <DispatchGrid
+                  <CalendarDispatchGrid
                     jobs={day.jobs}
                     blockEvents={techFilteredBlockEvents}
                     assignableUsers={data.assignableUsers}
@@ -1720,6 +1394,8 @@ export async function CalendarView(props: Props) {
                     date={day.date}
                     tech={activeTech}
                     selectedJobId={selectedJobId}
+                    dropReturnTo={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech, inspector: '1' })}
+                    scheduleAction={updateJobScheduleFromForm}
                   />
                 </div>
               ))}
@@ -1733,6 +1409,7 @@ export async function CalendarView(props: Props) {
               <DetailPanel
                 job={selectedJob}
                 returnTo={returnTo}
+                closeHref={hideInspectorHref}
                 assignableUsers={data.assignableUsers}
                 view={uiView}
                 date={data.anchorDate}
@@ -1758,11 +1435,12 @@ export async function CalendarView(props: Props) {
         ) : null}
       </div>
 
-      {selectedJob ? (
+      {selectedJob && inspectorOpen ? (
         <div className="fixed inset-0 z-50 bg-black/30 px-3 pb-4 pt-24 sm:px-4 sm:pb-5 sm:pt-28 xl:hidden">
           <DetailPanel
             job={selectedJob}
             returnTo={returnTo}
+            closeHref={hideInspectorHref}
             assignableUsers={data.assignableUsers}
             view={uiView}
             date={data.anchorDate}
