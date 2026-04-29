@@ -18,6 +18,7 @@ import {
   advanceJobStatusFromForm,
   updateJobTypeFromForm,
   updateJobServiceContractFromForm,
+  createNextServiceVisitFromForm,
   completeDataEntryFromForm,
   type JobStatus,
   createRetestJobFromForm,
@@ -1304,7 +1305,7 @@ const visitScopeBadgeMainText = visitScopeBadgeItemCount > 0
   ? `${visitScopeBadgeItemCount} item${visitScopeBadgeItemCount === 1 ? "" : "s"} · ${visitScopeBadgeFirstTitle}${visitScopeBadgeItemCount > 1 ? ` + ${visitScopeBadgeItemCount - 1} more` : ""}`
   : visitScopeSummary
     ? "Summary added"
-    : "No scope details yet";
+    : "No work details yet";
 const visitScopeBadgeSubtext = visitScopeBadgeItemCount > 0
   ? visitScopeSummary
     ? "Summary added"
@@ -1860,6 +1861,22 @@ const renderTimelineItem = (e: any, key: string) => {
         <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Appointment</div>
         <div className="mt-1 text-[1.32rem] font-semibold tracking-[-0.02em] text-slate-950">{appointmentDateLabel}</div>
         <div className="mt-1 text-sm leading-6 text-slate-600">{appointmentTimeLabel}</div>
+
+        {job.job_type === "service" ? (
+          <div className="mt-4 border-t border-slate-200/60 pt-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Needed</div>
+            <div className="mt-1 text-sm font-semibold leading-5 text-slate-900">{visitScopeBadgeMainText}</div>
+            {visitScopeBadgeSubtext ? (
+              <div className="mt-0.5 text-xs leading-5 text-slate-600">{visitScopeBadgeSubtext}</div>
+            ) : null}
+            <a
+              href="#visit-scope-section"
+              className="mt-1.5 inline-block text-xs font-semibold text-slate-600 underline-offset-2 transition-colors hover:text-slate-900 hover:underline"
+            >
+              {hasVisitScopeDefined ? "View work details" : "Add work details"}
+            </a>
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-2xl border border-white/80 bg-white/76 px-3.5 py-3 shadow-[0_12px_28px_-30px_rgba(15,23,42,0.3)] backdrop-blur-[2px]">
@@ -1887,29 +1904,6 @@ const renderTimelineItem = (e: any, key: string) => {
             <div className="mt-1 text-[15px] font-semibold tracking-[-0.01em] text-slate-800">{formatOpsStatusLabel(job.ops_status)}</div>
           </div>
         </div>
-
-        {job.job_type === "service" ? (
-          <div className="mt-3 border-t border-slate-200/80 pt-3">
-            <div className="rounded-xl border border-slate-200/80 bg-slate-50/78 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit Scope</div>
-                  <div className="mt-1 text-sm font-semibold leading-5 text-slate-900">{visitScopeBadgeMainText}</div>
-                  {visitScopeBadgeSubtext ? (
-                    <div className="mt-1 text-xs leading-5 text-slate-600">{visitScopeBadgeSubtext}</div>
-                  ) : null}
-                </div>
-
-                <a
-                  href="#visit-scope-section"
-                  className="shrink-0 text-xs font-semibold text-slate-600 underline-offset-2 transition-colors hover:text-slate-900 hover:underline"
-                >
-                  View scope
-                </a>
-              </div>
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   </div>
@@ -2002,6 +1996,98 @@ const renderTimelineItem = (e: any, key: string) => {
           {attemptCount} attempt{attemptCount === 1 ? "" : "s"} • last: {lastAttemptLabel}
         </div>
       </div>
+
+      <div className="mt-4 border-t border-slate-200/80 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Assigned Team</div>
+          <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
+        </div>
+        {assignedTeam.length > 0 ? (
+          <div className="mt-3 flex min-w-0 flex-wrap gap-2">
+            {assignedTeam.map((assignee) => (
+              <div
+                key={`${assignee.job_id}-${assignee.user_id}`}
+                className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-800 shadow-[0_8px_20px_-24px_rgba(15,23,42,0.22)]"
+              >
+                <span className="max-w-full break-words">{assignee.display_name}</span>
+                {assignee.is_primary ? (
+                  <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                    Primary
+                  </span>
+                ) : null}
+
+                {isInternalUser && !assignee.is_primary ? (
+                  <form action={setPrimaryJobAssigneeFromForm} className="shrink-0">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="user_id" value={assignee.user_id} />
+                    <input type="hidden" name="tab" value={tab} />
+                    <button
+                      type="submit"
+                      className={workspaceUtilityControlClass}
+                    >
+                      Make Primary
+                    </button>
+                  </form>
+                ) : null}
+
+                {isInternalUser ? (
+                  <form action={removeJobAssigneeFromForm} className="shrink-0">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="user_id" value={assignee.user_id} />
+                    <input type="hidden" name="tab" value={tab} />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
+                    >
+                      Remove
+                    </button>
+                  </form>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={`mt-3 ${workspaceEmptyStateClass}`}>
+            No team assigned yet.
+          </div>
+        )}
+
+        {isInternalUser ? (
+          <form action={assignJobAssigneeFromForm} className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <input type="hidden" name="job_id" value={job.id} />
+            <input type="hidden" name="tab" value={tab} />
+            <select
+              name="user_id"
+              className={`${workspaceInputClass} w-full min-w-0 sm:w-auto sm:min-w-[14rem]`}
+              required
+              defaultValue=""
+              disabled={assignmentCandidates.length === 0}
+            >
+              <option value="" disabled>
+                {assignmentCandidates.length === 0 ? "No available assignees" : "Select assignee"}
+              </option>
+              {assignmentCandidates.map((candidate) => (
+                <option key={candidate.user_id} value={candidate.user_id}>
+                  {candidate.display_name}
+                </option>
+              ))}
+            </select>
+
+            <label className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
+              <input type="checkbox" name="make_primary" value="1" className="h-3.5 w-3.5" />
+              Set as primary
+            </label>
+
+            <button
+              type="submit"
+              disabled={assignmentCandidates.length === 0}
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              Assign
+            </button>
+          </form>
+        ) : null}
+      </div>
     </div>
 
     {/* Center: destination panel */}
@@ -2065,123 +2151,47 @@ const renderTimelineItem = (e: any, key: string) => {
     ) : null}
   </div>
 
-  <div className="mt-3.5 grid gap-3 xl:grid-cols-[minmax(250px,0.7fr)_minmax(0,1.3fr)] xl:items-start">
-    <div className="rounded-xl border border-slate-200/80 bg-slate-50/78 px-4 py-3.5 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)]">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Immediate Context</div>
-      <div className="mt-2 text-sm leading-6 text-slate-700">
-        Field status <span className="font-semibold text-slate-900">{formatStatus(job.status)}</span>. Ops status <span className="font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status)}</span>.
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-        {actionablePendingInfo ? <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-amber-800">Pending Info</span> : null}
-        {onHoldActive ? <span className="inline-flex rounded-md border border-slate-300 bg-slate-100 px-2.5 py-1 text-slate-800">On Hold</span> : null}
-        {hasFollowUpReminder ? <span className="inline-flex rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-700">Follow Up Set</span> : null}
-      </div>
-
-      {currentStatusReasonLabel ? (
-        <div className="mt-3 rounded-lg border border-slate-200/80 bg-white/92 px-3.5 py-3 text-sm text-slate-700">
-          <span className="font-semibold text-slate-900">{currentStatusReasonLabel}:</span>{" "}
-          {currentStatusReasonText || "Reason not set."}
-        </div>
-      ) : (
-        <div className="mt-3 text-sm text-slate-500">
-          {hasFollowUpReminder ? "Follow-up planning is already on file for this job." : "No immediate blocker is active on this job right now."}
-        </div>
-      )}
-    </div>
-
-    <div className="rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)]">
+  {isInternalUser && job.job_type === "service" ? (
+    <div className="mt-3.5 rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Assigned Team</div>
-        <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Next Service Action</div>
+          <div className="mt-1 text-sm font-semibold text-slate-900">Track what happens next for this service case.</div>
+        </div>
+        {serviceCaseVisitCount > 1 ? (
+          <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+            {serviceCaseVisitCount} visits linked
+          </span>
+        ) : null}
       </div>
-      {assignedTeam.length > 0 ? (
-        <div className="mt-3 flex min-w-0 flex-wrap gap-2">
-          {assignedTeam.map((assignee) => (
-            <div
-              key={`${assignee.job_id}-${assignee.user_id}`}
-              className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-800 shadow-[0_8px_20px_-24px_rgba(15,23,42,0.22)]"
-            >
-              <span className="max-w-full break-words">{assignee.display_name}</span>
-              {assignee.is_primary ? (
-                <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                  Primary
-                </span>
-              ) : null}
 
-              {isInternalUser && !assignee.is_primary ? (
-                <form action={setPrimaryJobAssigneeFromForm} className="shrink-0">
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <input type="hidden" name="user_id" value={assignee.user_id} />
-                  <input type="hidden" name="tab" value={tab} />
-                  <button
-                    type="submit"
-                    className={workspaceUtilityControlClass}
-                  >
-                    Make Primary
-                  </button>
-                </form>
-              ) : null}
+      <form action={createNextServiceVisitFromForm} className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <input type="hidden" name="job_id" value={job.id} />
+        <input type="hidden" name="tab" value={tab} />
+        <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}`} />
 
-              {isInternalUser ? (
-                <form action={removeJobAssigneeFromForm} className="shrink-0">
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <input type="hidden" name="user_id" value={assignee.user_id} />
-                  <input type="hidden" name="tab" value={tab} />
-                  <button
-                    type="submit"
-                    className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
-                  >
-                    Remove
-                  </button>
-                </form>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className={`mt-3 ${workspaceEmptyStateClass}`}>
-          No team assigned yet.
-        </div>
-      )}
-
-      {isInternalUser ? (
-        <form action={assignJobAssigneeFromForm} className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <input type="hidden" name="job_id" value={job.id} />
-          <input type="hidden" name="tab" value={tab} />
-          <select
-            name="user_id"
-            className={`${workspaceInputClass} w-full min-w-0 sm:w-auto sm:min-w-[14rem]`}
+        <div className="space-y-1">
+          <label className={workspaceFieldLabelClass}>Reason for next visit</label>
+          <input
+            type="text"
+            name="next_visit_reason"
             required
-            defaultValue=""
-            disabled={assignmentCandidates.length === 0}
-          >
-            <option value="" disabled>
-              {assignmentCandidates.length === 0 ? "No available assignees" : "Select assignee"}
-            </option>
-            {assignmentCandidates.map((candidate) => (
-              <option key={candidate.user_id} value={candidate.user_id}>
-                {candidate.display_name}
-              </option>
-            ))}
-          </select>
+            maxLength={220}
+            placeholder="Example: install ordered part, return to complete repair, customer approved follow-up work"
+            className={workspaceInputClass}
+          />
+          <p className="text-xs leading-5 text-slate-600">
+            Use this when this problem needs another trip, return visit, part install, callback, or follow-up repair.
+          </p>
+        </div>
 
-          <label className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
-            <input type="checkbox" name="make_primary" value="1" className="h-3.5 w-3.5" />
-            Set as primary
-          </label>
-
-          <button
-            type="submit"
-            disabled={assignmentCandidates.length === 0}
-            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-          >
-            Assign
-          </button>
-        </form>
-      ) : null}
+        <SubmitButton loadingText="Creating..." className={darkButtonClass}>
+          Create Next Visit
+        </SubmitButton>
+      </form>
     </div>
-  </div>
+  ) : null}
+
 </section>
       {/* Header */}
 
@@ -3340,24 +3350,39 @@ const renderTimelineItem = (e: any, key: string) => {
   <div id="visit-scope-section" className="mt-6 rounded-2xl border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)]">
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit Scope</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit Scope / Work Items</div>
         {job.job_type === "service" ? (
           <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
             {visitScopeCount > 0 ? "Scope set" : "No scope items yet"}
           </span>
         ) : null}
+      </div>
 
-        <details className="peer">
-          <summary className="cursor-pointer list-none text-sm font-medium text-slate-700 hover:text-slate-900">
+      <div className="text-xs leading-5 text-slate-600">
+        Work items for this trip. These can later be used as invoice candidates.
+      </div>
+
+      <details className="group">
+          <summary className="inline-flex min-h-9 cursor-pointer list-none items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
           {hasVisitScopeDefined ? "Edit Scope" : "Add Scope"}
           </summary>
-        </details>
-      </div>
+
+          <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
+            <VisitScopeJobDetailForm
+              jobId={job.id}
+              jobType={job.job_type === "service" ? "service" : "ecc"}
+              tab={tab}
+              initialSummary={visitScopeSummary}
+              initialItems={visitScopeItems}
+              primaryButtonClass={primaryButtonClass}
+            />
+          </div>
+      </details>
 
       <div className="rounded-xl border border-slate-200/70 bg-white/92 px-4 py-3.5 shadow-[0_10px_20px_-30px_rgba(15,23,42,0.18)]">
       <div className="space-y-3.5">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit reason</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit brief</div>
           <div className="mt-1 text-sm leading-6 text-slate-900">
             {visitScopeLeadText || "No visit brief saved yet."}
           </div>
@@ -3440,16 +3465,6 @@ const renderTimelineItem = (e: any, key: string) => {
       </div>
       </div>
 
-      <div className="hidden pt-1 peer-open:block">
-        <VisitScopeJobDetailForm
-          jobId={job.id}
-          jobType={job.job_type === "service" ? "service" : "ecc"}
-          tab={tab}
-          initialSummary={visitScopeSummary}
-          initialItems={visitScopeItems}
-          primaryButtonClass={primaryButtonClass}
-        />
-      </div>
     </div>
   </div>
 ) : null}

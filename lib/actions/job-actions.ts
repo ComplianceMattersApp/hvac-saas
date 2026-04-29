@@ -2872,6 +2872,155 @@ export async function promoteCompanionScopeToServiceJobFromForm(formData: FormDa
   redirect(`/jobs/${created.id}?banner=companion_scope_promoted`);
 }
 
+export async function createNextServiceVisitFromForm(formData: FormData) {
+  const supabase = await createClient();
+
+  const sourceJobId = String(formData.get("job_id") || "").trim();
+  const tabRaw = String(formData.get("tab") || "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+  const nextVisitReasonRaw = String(formData.get("next_visit_reason") || "").trim();
+
+  if (!sourceJobId) throw new Error("Missing job_id");
+
+  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: sourceJobId,
+    onUnauthorized: () => {
+      redirectToJobWithBanner({
+        jobId: sourceJobId,
+        banner: "not_authorized",
+        tabRaw,
+        returnToRaw,
+      });
+    },
+  });
+
+  if (!nextVisitReasonRaw) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "next_service_visit_reason_required",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const { data: sourceJob, error: sourceJobErr } = await supabase
+    .from("jobs")
+    .select(
+      "id, job_type, title, customer_id, location_id, contractor_id, customer_first_name, customer_last_name, customer_email, customer_phone, job_address, city, service_case_id, service_visit_type"
+    )
+    .eq("id", sourceJobId)
+    .maybeSingle();
+
+  if (sourceJobErr) throw sourceJobErr;
+  if (!sourceJob?.id) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "next_service_visit_create_failed",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  if (String(sourceJob.job_type ?? "").trim().toLowerCase() !== "service") {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "next_service_visit_not_service",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  const customerId = String(sourceJob.customer_id ?? "").trim();
+  const locationId = String(sourceJob.location_id ?? "").trim();
+  if (!customerId || !locationId) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "next_service_visit_create_failed",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  const serviceCaseId =
+    String(sourceJob.service_case_id ?? "").trim() ||
+    (await ensureServiceCaseForJob({
+      supabase,
+      jobId: sourceJobId,
+    }));
+
+  const childTitle = `Follow-up: ${nextVisitReasonRaw}`.slice(0, 220);
+  const childVisitType =
+    normalizeServiceVisitType(String(sourceJob.service_visit_type ?? "").trim()) ?? "return_visit";
+
+  const created = await createJob(
+    {
+      job_type: "service",
+      service_case_id: serviceCaseId,
+      service_visit_type: childVisitType,
+      service_visit_reason: nextVisitReasonRaw,
+      service_visit_outcome: "follow_up_required",
+      title: childTitle,
+      city: String(sourceJob.city ?? "").trim() || "Unknown",
+      job_address: String(sourceJob.job_address ?? "").trim() || null,
+      scheduled_date: null,
+      window_start: null,
+      window_end: null,
+      status: "open",
+      ops_status: "need_to_schedule",
+      contractor_id: String(sourceJob.contractor_id ?? "").trim() || null,
+      customer_id: customerId,
+      location_id: locationId,
+      customer_first_name: String(sourceJob.customer_first_name ?? "").trim() || null,
+      customer_last_name: String(sourceJob.customer_last_name ?? "").trim() || null,
+      customer_email: String(sourceJob.customer_email ?? "").trim() || null,
+      customer_phone: String(sourceJob.customer_phone ?? "").trim() || null,
+      visit_scope_summary: null,
+      visit_scope_items: [],
+      job_notes: `Created from prior service visit ${String(sourceJob.id).slice(0, 8)}.`,
+    },
+    {
+      serviceCaseWriteClient: supabase,
+    }
+  );
+
+  await insertJobEvent({
+    supabase,
+    jobId: sourceJobId,
+    event_type: "service_next_visit_created",
+    meta: {
+      source_job_id: sourceJobId,
+      child_job_id: created.id,
+      service_case_id: serviceCaseId,
+      next_visit_reason: nextVisitReasonRaw,
+    },
+    userId: actingUserId,
+  });
+
+  await insertJobEvent({
+    supabase,
+    jobId: created.id,
+    event_type: "created_from_service_visit",
+    meta: {
+      source_job_id: sourceJobId,
+      child_job_id: created.id,
+      service_case_id: serviceCaseId,
+      next_visit_reason: nextVisitReasonRaw,
+    },
+    userId: actingUserId,
+  });
+
+  revalidatePath(`/jobs/${sourceJobId}`, "page");
+  revalidatePath(`/jobs/${created.id}`, "page");
+  revalidatePath("/ops", "page");
+  revalidatePath("/jobs", "page");
+
+  redirect(`/jobs/${created.id}?banner=next_service_visit_created`);
+}
+
 export async function getContractors(accountOwnerUserId?: string | null) {
   const supabase = await createClient();
   return listScopedContractorsForJobDetail({
