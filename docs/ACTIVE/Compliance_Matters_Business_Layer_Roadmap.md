@@ -395,6 +395,23 @@ Current D2C continuation clarifications:
   - automatic backfill remains prohibited
   - negative/default-credit adjustment behavior remains deferred
 - no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by Pricebook/Admin Polish P1
+- Pricebook/Admin Polish P2 is production-promoted on `main` (commit `a97c764`):
+  - catalog management usability improved: add item form now explains reusable catalog purpose and clarifies that changes affect future selections only (existing invoices unchanged)
+  - edit fields disclosure now clearly labeled with improved form layout and spacing
+  - price/unit display now grouped in single column for easier scanning of pricing information
+  - activate/deactivate buttons now color-coded (red/green) with helper text clarifying operational intent:
+    - deactivation prevents future selection and does not mutate historical invoice lines
+    - activation enables item in future selections
+  - empty state messaging clarified with actionable guidance when no items match filters
+  - P1 clarity fully preserved: Starter, Custom, Active, Inactive, and Deferred placeholder status remain for normal operators
+  - V1/V2 terminology remains hidden from normal admin-facing page and labels
+  - no admin UI backfill button/control was added
+  - admin UI backfill controls remain future work
+  - batch backfill remains future work
+  - automatic backfill remains prohibited
+  - negative/default-credit adjustment behavior remains deferred
+- no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by Pricebook/Admin Polish P2
+- no business logic, seed definitions, or backfill behavior changed by Pricebook/Admin Polish P2
 - D3B controlled-options refinement is production-promoted on `main` (merge `58dcb31`, change `3084906`):
   - code/test-only option refinement in `lib/business/pricebook-options.ts` and `lib/business/__tests__/pricebook-options.test.ts`
   - categories added: `Electrical`, `Compliance Docs`

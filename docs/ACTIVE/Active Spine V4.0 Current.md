@@ -1291,6 +1291,20 @@ Current position:
     - no admin backfill apply button/control exists; existing-account backfill remains operator-run tooling and is not automatic from admin UI
     - Pricebook remains reusable catalog/default pricing truth, not operational truth
   - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by Pricebook/Admin Polish P1
+  - Pricebook/Admin Polish P2 is production-promoted on `main` (commit `a97c764`):
+    - catalog management usability improved: add item form is clearer with helper copy explaining reusable catalog purpose and future-selection behavior
+    - edit fields clarity improved: disclosure control is labeled "Edit fields" with better form layout and spacing
+    - price and unit display now grouped together in a single table column for easier scanning
+    - activate/deactivate controls now have color-coded buttons (red for deactivating, green for activating) with helpful tooltips and helper text clarifying behavior:
+      - deactivation prevents future selection and does not mutate historical invoice lines
+      - activation enables the item in future selections
+    - empty state messaging clarified with actionable guidance
+    - P1 clarity fully preserved: Starter, Custom, Active, Inactive, and Deferred placeholder status remain emphasized for normal operators
+    - V1/V2 terminology remains intentionally hidden from normal admin-facing labels and page content
+    - no admin backfill button/control was added; operator-run tooling boundary remains intact
+    - Pricebook remains reusable catalog/default pricing truth, not operational truth
+  - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by Pricebook/Admin Polish P2
+  - no business logic, seed definitions, or backfill behavior changed by Pricebook/Admin Polish P2
 - Launch-readiness polish catch-up is complete for current scope:
   - Service/Visit Scope clarity pass is complete, including clearer Service Details vs Visit Scope guidance and clearer Job Title fallback copy.
   - Invoice job-detail TLC pass is complete, including scanability improvements and explicit truth language that payments are tracking-only entries (no card charge execution).

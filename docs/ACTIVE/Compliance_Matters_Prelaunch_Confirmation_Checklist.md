@@ -238,6 +238,31 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: no Supabase command, migration, provisioning apply, or backfill run occurred as part of P1 promotion.
 - Confirmed: no business/seed/backfill behavior changed by P1; this promotion is UI/read-only clarity polish.
 
+### 2.14 Pricebook/Admin usability polish promotion confirmation (P2)
+- Completed: Pricebook/Admin Polish P2 is production-promoted on `main` (commit `a97c764`).
+- Completed: catalog management usability improvements confirmed:
+  - add item form is clearer with helper copy explaining reusable catalog item purpose and future-selection-only impact
+  - edit fields disclosure clearly labeled "Edit fields" with improved form layout and spacing
+  - price and unit display now grouped in single table column for easier scanning
+  - activate/deactivate buttons now color-coded (red for deactivating, green for activating) with helper text clarifying:
+    - deactivation prevents future selection and does not mutate historical invoices
+    - activation enables item in future selections
+  - empty state messaging clarified with actionable guidance
+- Completed: P1 clarity fully preserved for normal admin users:
+  - Starter/Custom source identification remains clear
+  - Active/Inactive status remains clear
+  - Deferred placeholder status remains clear where applicable
+- Completed: V1/V2 terminology remains intentionally hidden from normal admin-facing page and labels.
+- Completed: promotion validation passed:
+  - `npx tsc --noEmit` passed
+  - Pricebook test suites passed (69 tests total)
+    - `lib/business/__tests__/pricebook-options.test.ts`: 5 tests
+    - `lib/business/__tests__/pricebook-seeding.test.ts`: 64 tests
+- Confirmed: no Supabase command, migration, provisioning apply, or backfill run occurred as part of P2 promotion.
+- Confirmed: no business logic, seed definitions, or backfill behavior changed by P2; this promotion is UI/usability polish only.
+- Confirmed: admin UI backfill controls remain future work; operator-run tooling boundary is unchanged.
+- Confirmed: no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by P2.
+
 ---
 
 ## 3. Support / customer-operations readiness
