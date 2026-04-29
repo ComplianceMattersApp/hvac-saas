@@ -385,6 +385,16 @@ Current D2C continuation clarifications:
   - automatic backfill remains prohibited
   - negative/default-credit adjustment behavior remains deferred
 - no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by V2C-1/V2C-2/V2C-3
+- Pricebook/Admin Polish P1 is production-promoted on `main` (commit `aecb735`):
+  - admin Pricebook visibility polish is complete for normal operator workflows
+  - user-facing clarity now centers on Starter, Custom, Active, Inactive, and Deferred placeholder where applicable
+  - V1/V2 terminology is intentionally hidden from normal admin page labels while internal `starter_version`/`seed_key` data remains available for tooling
+  - no behavior expansion was introduced (no new backfill action, no new seed mutation behavior, no billing/payment behavior changes)
+  - admin UI backfill controls remain future work
+  - batch backfill remains future work
+  - automatic backfill remains prohibited
+  - negative/default-credit adjustment behavior remains deferred
+- no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by Pricebook/Admin Polish P1
 - D3B controlled-options refinement is production-promoted on `main` (merge `58dcb31`, change `3084906`):
   - code/test-only option refinement in `lib/business/pricebook-options.ts` and `lib/business/__tests__/pricebook-options.test.ts`
   - categories added: `Electrical`, `Compliance Docs`

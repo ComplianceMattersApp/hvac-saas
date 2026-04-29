@@ -222,6 +222,22 @@ If any item here conflicts with the active spine, the spine wins.
 - Pre-launch operator verification item: before any real account backfill, operator must run dry-run only against the intended target, review the full plan output, and confirm `would_insert_count` and collision output are sane before any apply.
 - Runbook reference: `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` (Section 10).
 
+### 2.13 Pricebook/Admin visibility polish promotion confirmation (P1)
+- Completed: Pricebook/Admin Polish P1 is production-promoted on `main` (commit `aecb735`).
+- Completed: admin Pricebook screen smoke confirms clarity-focused UI labels/chips for normal users:
+  - Starter
+  - Custom
+  - Active
+  - Inactive
+  - Deferred placeholder (where applicable)
+- Completed: filter/chip language is consolidated for normal admin clarity and no longer exposes V1/V2 terminology on the page.
+- Completed: promotion validation passed:
+  - `npx tsc --noEmit` passed
+  - Pricebook test suites passed (`lib/business/__tests__/pricebook-options.test.ts`, `lib/business/__tests__/pricebook-seeding.test.ts`)
+  - total passed: 69 tests
+- Confirmed: no Supabase command, migration, provisioning apply, or backfill run occurred as part of P1 promotion.
+- Confirmed: no business/seed/backfill behavior changed by P1; this promotion is UI/read-only clarity polish.
+
 ---
 
 ## 3. Support / customer-operations readiness

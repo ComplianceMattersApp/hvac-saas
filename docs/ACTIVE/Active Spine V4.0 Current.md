@@ -1284,6 +1284,13 @@ Current position:
     - batch backfill remains future work
     - automatic backfill remains prohibited
   - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by V2C-1/V2C-2/V2C-3
+  - Pricebook/Admin Polish P1 is production-promoted on `main` (commit `aecb735`):
+    - admin Pricebook UI clarity now emphasizes Starter, Custom, Active, Inactive, and Deferred placeholder status for normal operator workflows
+    - V1/V2 seed-version terminology is intentionally hidden from normal admin-facing labels
+    - `starter_version` and `seed_key` remain internal/tooling detail and were not removed from backend/operator behavior
+    - no admin backfill apply button/control exists; existing-account backfill remains operator-run tooling and is not automatic from admin UI
+    - Pricebook remains reusable catalog/default pricing truth, not operational truth
+  - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by Pricebook/Admin Polish P1
 - Launch-readiness polish catch-up is complete for current scope:
   - Service/Visit Scope clarity pass is complete, including clearer Service Details vs Visit Scope guidance and clearer Job Title fallback copy.
   - Invoice job-detail TLC pass is complete, including scanability improvements and explicit truth language that payments are tracking-only entries (no card charge execution).
