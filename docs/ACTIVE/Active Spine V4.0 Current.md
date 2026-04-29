@@ -128,6 +128,8 @@ Job ECC resolution is derived from completed test runs and projected into jobs.o
 
 Refrigerant charge overall pass requires all active refrigerant-charge checks to pass, not just numeric subcool and superheat checks. Unless an approved charge exemption applies, overall pass also requires filter drier confirmation and applicable temperature qualification. UI surfaces must show non-numeric failure reasons from ecc_test_runs.computed.failures and must not imply that numeric check chips alone determine the final result.
 
+Completed production-shipped ECC/test cleanup: refrigerant charge now supports a Photo Taken attestation path as an evidence-method statement only. It does not require or verify uploaded photo proof, does not claim numeric readings were entered/passed, and keeps computed_pass = null until manual/admin review or override where applicable. Existing numeric and manual override paths remain intact. Duct leakage override suggestions now include Asbestos while preserving custom/manual reason behavior.
+
 6.3 UI discipline
 
 ECC-specific actions and surfaces must only appear when ECC behavior actually applies.
@@ -446,12 +448,13 @@ schedule-linked ops visibility
 schedule-related event logging
 technician-aware calendar filtering
 unschedule capability exposed in UI
+unified-surface drag/drop scheduling in day/week views (no technician-column primary calendar; assignment/no-tech remains metadata)
 10.3 What is not missing
 
 The system does not require a new calendar engine or a calendar rebuild.
 
 10.4 What remains as UX-only
-optional drag-and-drop scheduling
+optional drag/drop micro-polish beyond the current unified scheduling baseline
 optional further visual/operator refinements
 optional additional filter/speed affordances
 10.5 Product rule
@@ -497,6 +500,8 @@ Calendar may visually distinguish historical records, but should preserve them a
 11.1 Current state
 
 Notifications are now complete as a v1 internal visibility layer.
+
+Completed production-shipped notifications/proposal cleanup: proposal notifications now clear from unread awareness when proposals are accepted/rejected/finalized; notification cards retain identifying context; contractor follow-up comments and internal approval/adjudication notes are preserved; contractor-visible vs internal-only note boundaries remain intact.
 
 11.2 Includes
 notification ledger/backend
@@ -785,7 +790,7 @@ These are not currently failures of the spine. They are future/business-layer mo
 
 price book / quoting
 maintenance / agreement systems
-optional drag-and-drop dispatch UX
+additional dispatch UX micro-polish beyond the current unified drag/drop baseline
 deeper notification prioritization/escalation layers
 broader role model refinement
 future branding/settings/business-profile formalization
@@ -1346,6 +1351,12 @@ Current position:
   - Address state capture/wiring is complete on relevant intake/finalization paths, including contractor intake proposal state persistence and downstream billing-state prefill support where captured.
   - Internal invoice void recovery/replacement behavior is complete: voided invoices remain historical, do not satisfy billed-truth closeout, and replacement draft flow exists as the active billing path.
   - Invoice report wording polish is complete: Send Status and Payment Count labels are now the launch wording targets.
+  - Completed production-shipped cleanup batch (notifications/calendar/UI/ECC) is now part of the current baseline:
+    - proposal unread-awareness cleanup, proposal/notification card identity restoration, and proposal-note boundary preservation are complete
+    - calendar details/identity/no-tech visibility/filtering/inspector-default behavior cleanup is complete
+    - unified calendar drag/drop behavior is complete without introducing technician-assignment ownership changes
+    - date-display formatting polish, login password show/hide toggle, and aging counters on Failed/Need Info surfaces are complete
+    - ECC refrigerant Photo Taken attestation path and Asbestos duct-leakage override suggestion are complete with existing truth boundaries preserved
   - These polish slices did not introduce payment execution, Stripe checkout, card charge flows, refunds/disputes, payouts, QBO sync, or RLS model changes.
 - Out-of-box readiness / business identity / settings packaging now has Admin Readiness / Setup Checklist V1 complete at the current baseline:
   - readiness is a read-only derived packaging layer over existing tenant/account data (no new truth table)

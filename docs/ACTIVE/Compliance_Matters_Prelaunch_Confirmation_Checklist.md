@@ -96,6 +96,20 @@ If any item here conflicts with the active spine, the spine wins.
 - Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
 - Live payment execution surfaces (Pay Now/Charge Card/checkout/refunds/disputes/payouts) remain deferred.
 
+### 2.3.3 Completed production-shipped cleanup sequence confirmation
+- Completed production-shipped cleanup batch is confirmed as launch-readiness baseline documentation:
+  - Notifications/proposals: unread-awareness cleanup on accept/reject/finalize, card identity restoration, preserved contractor follow-up comments, preserved internal adjudication notes, and intact contractor-visible/internal-only boundaries.
+  - Calendar/scheduling: phone wiring fix in details, card identity restoration (job title/city), no-tech scheduled visibility, unassigned filter chip, inspector collapsible/default-closed behavior, responsive default views (desktop Month, mobile List, explicit view preserved), and unified-surface drag/drop direction with manual scheduling still available.
+  - UI polish: date-only display format changed to MM-DD-YYYY (storage/input/query unchanged), login password show/hide toggle, and day/aging counters on Failed and Need Info/Pending Info internal/portal surfaces.
+  - ECC/test workflow: refrigerant Photo Taken path is attestation-only, does not require/verify uploaded photo proof, does not claim numeric pass, preserves computed_pass = null until manual/admin review or override where needed, and keeps numeric/manual override paths intact.
+  - Duct leakage override suggestion list includes Asbestos while preserving custom/manual reason support.
+- Confirmed boundaries for this closeout:
+  - no payment execution behavior change
+  - no Pricebook behavior change
+  - no RLS behavior change
+  - no claim of calendar engine rebuild
+  - no technician-assignment ownership change from calendar drag/drop
+
 ### 2.4 First owner onboarding/provisioning readiness
 - **V1 implemented and browser-smoked.** Invite-only, platform-admin/operator provisioned. Not public signup.
 - Confirmed: provisioning script (`scripts/provision-first-owner.ts`) requires explicit allow flags for apply mode; defaults to dry-run.

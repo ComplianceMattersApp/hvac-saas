@@ -86,6 +86,13 @@ P1 closeout note:
   - CSV header wording aligned where applicable
   - no invoice/payment calculations were changed
 
+Completed production-shipped cleanup batch note (current baseline):
+- Notifications/proposals: unread-awareness cleanup, card identity restoration, and proposal follow-up/internal-note preservation are complete with contractor/internal visibility boundaries intact.
+- Calendar/scheduling: customer/job phone wiring fix, card identity restoration, no-tech visibility + unassigned filter, inspector default-collapsed behavior, responsive default-view behavior, and unified-surface drag/drop direction are complete.
+- UI polish: date display format update (MM-DD-YYYY), login password show/hide, and Failed/Need Info aging counters are complete.
+- ECC/test workflow: refrigerant Photo Taken is attestation-only (no upload-proof validation claim), and Asbestos is included as a duct-leakage override suggestion while custom reasons remain supported.
+- This closeout note is baseline alignment only and does not add a new roadmap milestone.
+
 ### Priority ordering update (pre-launch)
 - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed in production for the platform account subscription slice.
 - Live confirmation includes deployed env, live webhook handling, successful non-owner checkout completion, entitlement sync, and Manage billing availability.
