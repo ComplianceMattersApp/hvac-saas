@@ -25,14 +25,16 @@ Supported entitlement preset values for --entitlement-preset:
 - internal_comped
 
 Supported starter kit selector values for --starter-kit-version:
-- v1 (default when omitted)
-- v2 (explicit selection only)
+- v1 (explicit legacy/manual option)
+- v2 (explicit legacy/manual option)
+- v3 (default when omitted, also explicit)
 
 Default behavior:
 - If --default-billing-mode is omitted or invalid, billing mode normalizes to external_billing.
 - If --entitlement-preset is omitted, provisioning uses standard.
-- If --starter-kit-version is omitted, provisioning uses starter kit v1.
-- Starter kit v2 is used only when `--starter-kit-version v2` is explicitly provided.
+- If --starter-kit-version is omitted, provisioning uses starter kit v3.
+- Starter kit v1 and v2 remain supported only when explicitly selected.
+- Starter kit v3 is supported explicitly and also matches the omitted-selector default.
 - Invalid `--starter-kit-version` values are rejected before provisioning executes.
 
 Entitlement preset behavior:
@@ -117,8 +119,15 @@ Expected dry-run behavior:
 - No writes are committed
 - Output lists what would be created/confirmed/patched
 - Output now includes structured `pricebookSeeding` preview
-- For a new account with omitted selector, dry-run should preview the V1 starter set (12 rows)
-- With `--starter-kit-version v2`, dry-run should preview the V2 starter set (23 rows)
+- For a new account with omitted selector, dry-run should preview the V3 starter set (`97` rows)
+- With `--starter-kit-version v1`, dry-run should preview the V1 starter set (`12` rows)
+- With `--starter-kit-version v2`, dry-run should preview the V2 starter set (`23` rows)
+- With `--starter-kit-version v3`, dry-run should preview the V3 starter set (`97` rows)
+- For omitted selector, expected V3 metadata is:
+  - `starter_kit_version = v3`
+  - `seed_count = 97`
+  - `active_seed_count = 91`
+  - `inactive_seed_count = 6`
 - Dry-run output includes selected starter kit metadata (`starter_kit_version`, `seed_count`, `active_seed_count`, `inactive_seed_count`)
 - Dry-run remains non-mutating and must not send invites
 
@@ -286,7 +295,7 @@ First-owner provisioning behavior is unchanged by Stripe Platform Subscription V
 This section is separate from first-owner provisioning.
 
 First-owner provisioning seeds Pricebook rows as part of new account creation.
-This section covers backfilling Starter Kit V2 rows into an existing account that was already provisioned before V2 seeds existed.
+This section covers controlled backfill into existing accounts and is separate from first-owner provisioning defaults.
 
 ### 10.1 Scope and boundaries
 
@@ -313,7 +322,7 @@ Required:
 - `--account-owner-user-id <uuid>` — the owner UUID of the account to backfill (required)
 
 Optional:
-- `--starter-kit-version v2` — starter kit version to backfill (default: `v2`; only `v2` is supported by this tool)
+- `--starter-kit-version v2|v3` — starter kit version to backfill (default: `v2`)
 - `--apply` — run apply mode (write rows); omit for dry-run (default)
 - `--allow-collisions` — required to override collision blocking when `possible_collision_count > 0`
 - `--preview-limit <n>` — number of preview rows to include in dry-run output (default: 10; must be a positive integer)
@@ -347,9 +356,9 @@ npx tsx scripts/backfill-pricebook-starter-kit.ts \
 
 Expected dry-run output fields:
 - `mode`: `dry_run`
-- `seed_count`: total V2 seed rows (23)
-- `active_seed_count`: active V2 seeds (21)
-- `inactive_seed_count`: inactive/deferred V2 seeds (2)
+- `seed_count`: total rows for the selected starter version (`23` for `v2`, `97` for `v3`)
+- `active_seed_count`: active rows for selected starter version (`21` for `v2`, `91` for `v3`)
+- `inactive_seed_count`: inactive/deferred rows for selected starter version (`2` for `v2`, `6` for `v3`)
 - `would_insert_count`: rows that would be inserted
 - `would_skip_existing_seed_key_count`: rows skipped because seed_key already exists
 - `possible_collision_count`: non-seed rows with a matching `item_name` that would not be inserted
@@ -401,5 +410,5 @@ npx tsx scripts/backfill-pricebook-starter-kit.ts \
 After apply, verify:
 - `inserted_count` matches the expected number of new rows
 - `skipped_existing_seed_key_count` reflects already-present seed_key rows (expected 0 for a fresh backfill)
-- Pricebook admin surface for the target account shows the V2 starter rows
+- Pricebook admin surface for the target account shows starter rows for the selected version (`v2` or `v3`)
 - No invoice, payment, or user records were changed

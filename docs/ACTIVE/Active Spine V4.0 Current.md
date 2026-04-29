@@ -1256,11 +1256,14 @@ Current position:
   - production dry-run smoke confirmed `mode = dry_run`, `pricebookSeeding` preview present, `inserted_count = 12`, `skipped_count = 0`, `errors = []`, and `inviteSent = false`
   - V2A/V2B are production-promoted on `main` (commits `7bf9867` and `51ce27c`)
   - Starter Kit V2 seed definitions are implemented in code with 23 rows (`active = 21`, `inactive/deferred = 2`)
-  - first-owner provisioning default starter kit remains `v1` when selector is omitted
-  - Starter Kit `v2` only runs when explicitly selected (`--starter-kit-version v2`)
+  - Starter Kit V3 is production-promoted on `main` (commits `28cc757`, `b31d433`) and is now the default first-owner starter catalog
+  - Starter Kit V3 catalog has 97 rows (`active = 91`, `inactive/deferred = 6`)
+  - Starter Kit V3 includes modern refrigerants: `R-410A`, `R-454B`, `R-32`
+  - first-owner provisioning now defaults to Starter Kit `v3` when selector is omitted
+  - explicit selectors remain supported for `v1`, `v2`, and `v3`
   - invalid starter kit selector values are rejected before provisioning execution
   - dry-run output now includes selected starter kit metadata (`starter_kit_version`, `seed_count`, `active_seed_count`, `inactive_seed_count`)
-  - no schema migration, Supabase command, provisioning apply action, payment behavior change, or production data action was part of V2A/V2B promotion
+  - no schema migration, Supabase command, provisioning apply action, payment behavior change, or production data action was part of V2A/V2B/V3 promotion
   - D3B controlled-options refinement is production-promoted on `main` via merge commit `58dcb31` (change commit `3084906`):
     - controlled options were refined in code/test only (`lib/business/pricebook-options.ts`, `lib/business/__tests__/pricebook-options.test.ts`)
     - added categories: `Electrical`, `Compliance Docs`
@@ -1278,6 +1281,7 @@ Current position:
     - insert-only; existing rows are never updated; customized rows are never mutated
     - hosted/production-like targets require both `ALLOW_FIRST_OWNER_PROVISIONING=true` and `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true` before dry-run or apply
     - no real production account has been backfilled; the CLI exists but has not been run against real data
+    - backfill remains operator-controlled and dry-run-first; existing-account backfill was intentionally not run during V3 default adoption
     - Pricebook remains catalog/default pricing truth, not operational truth
     - historical invoices and invoice snapshots are not touched by backfill
     - admin UI backfill controls remain future work
@@ -1301,6 +1305,7 @@ Current position:
     - empty state messaging clarified with actionable guidance
     - P1 clarity fully preserved: Starter, Custom, Active, Inactive, and Deferred placeholder status remain emphasized for normal operators
     - V1/V2 terminology remains intentionally hidden from normal admin-facing labels and page content
+    - follow-up cleanup was promoted in `987af81` and removed internal-facing/backfill implementation language from the normal admin page
     - no admin backfill button/control was added; operator-run tooling boundary remains intact
     - Pricebook remains reusable catalog/default pricing truth, not operational truth
   - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by Pricebook/Admin Polish P2

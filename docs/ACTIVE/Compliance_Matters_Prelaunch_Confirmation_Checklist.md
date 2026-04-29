@@ -263,6 +263,22 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: admin UI backfill controls remain future work; operator-run tooling boundary is unchanged.
 - Confirmed: no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by P2.
 
+### 2.15 Starter Kit V3 default adoption promotion confirmation
+- Completed: Starter Kit V3 promotion is confirmed on `main` (commits `28cc757`, `b31d433`) with prior P2 cleanup commit `987af81` in the same promoted stack.
+- Completed: first-owner provisioning default changed from starter kit `v1` to starter kit `v3` when selector is omitted.
+- Completed: explicit starter kit selectors remain preserved (`v1`, `v2`, `v3`) and invalid values still fail closed.
+- Completed: promoted V3 catalog baseline is confirmed:
+  - `seed_count = 97`
+  - `active_seed_count = 91`
+  - `inactive_seed_count = 6`
+  - refrigerant coverage includes `R-410A`, `R-454B`, `R-32`
+- Completed: promotion validation passed:
+  - `npx tsc --noEmit` passed
+  - 5-file validation suite passed (`140` tests)
+- Confirmed: no Supabase command, migration, provisioning apply, backfill run against real data, or production data action occurred during promotion.
+- Confirmed: existing-account backfill remains operator-controlled and dry-run-first; no account has been backfilled as part of V3 default adoption.
+- Pre-launch operator requirement: before onboarding the first real account on this baseline, verify dry-run preview output shows V3 starter metadata and sane row counts.
+
 ---
 
 ## 3. Support / customer-operations readiness

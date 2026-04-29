@@ -330,8 +330,12 @@ Current baseline state is:
 - operator script now surfaces structured `pricebookSeeding` output for first-owner dry-run/apply visibility
 - V2A/V2B are production-promoted on `main` (commits `7bf9867`, `51ce27c`)
 - Starter Kit V2 seed definitions are implemented in code (`23` rows total: `21` active, `2` inactive/deferred)
-- first-owner provisioning default behavior remains Starter Kit `v1`
-- Starter Kit `v2` is available only by explicit selector (`--starter-kit-version v2`); invalid selector values are rejected
+- Starter Kit V3 is production-promoted on `main` and is now the default starter kit for new first-owner provisioning
+- Starter Kit V3 supersedes V2 as the intended default starter catalog for newly provisioned accounts
+- Starter Kit V3 catalog totals `97` rows (`91` active, `6` inactive/deferred)
+- Starter Kit V3 includes modern refrigerant rows: `R-410A`, `R-454B`, and `R-32`
+- Starter Kit `v1` and `v2` remain explicitly selectable legacy-supported options; `v3` is also explicitly selectable
+- invalid selector values remain rejected before provisioning execution
 - dry-run output now includes selected starter kit metadata (`starter_kit_version`, `seed_count`, `active_seed_count`, `inactive_seed_count`)
 
 ### Purpose
@@ -376,6 +380,7 @@ Current D2C continuation clarifications:
   - V2C-1 dry-run planner helper (`planExistingAccountStarterKitBackfill`) is production-promoted
   - V2C-2 apply helper (`applyExistingAccountStarterKitBackfill`) is production-promoted; requires explicit `confirmApply: true`; collision-blocking is the default
   - V2C-3 CLI wrapper (`scripts/backfill-pricebook-starter-kit.ts`) is production-promoted; dry-run is the default mode; apply requires explicit `--apply`; `--allow-collisions` is required to override collision blocking
+  - backfill default remains `v2`; explicit `--starter-kit-version v3` is supported where needed for controlled runs
   - backfill is single-account only, insert-only, and never mutates existing or customized rows
   - hosted targets require both `ALLOW_FIRST_OWNER_PROVISIONING=true` and `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true` before dry-run or apply
   - no real production account has been backfilled; the operator tool exists but has not been run against real data
