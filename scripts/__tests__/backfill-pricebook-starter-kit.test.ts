@@ -32,12 +32,14 @@ function makePlanResult(
     inactive_seed_count: inactiveSeedCount,
     would_insert_count: seeds.length,
     would_skip_existing_seed_key_count: 0,
+    would_skip_existing_equivalent_count: 0,
     possible_collision_count: 0,
     preview_insert_rows: seeds.slice(0, 10).map((s) => ({
       seed_key: s.seed_key,
       item_name: s.item_name,
     })),
     preview_skip_rows: [],
+    preview_existing_equivalent_rows: [],
     possible_collisions: [],
     warnings: ["2 deferred/inactive starter rows are included in planning output."],
     errors: [],
@@ -62,12 +64,14 @@ function makeApplyResult(
     inactive_seed_count: inactiveSeedCount,
     inserted_count: seeds.length,
     skipped_existing_seed_key_count: 0,
+    skipped_existing_equivalent_count: 0,
     possible_collision_count: 0,
     inserted_rows: seeds.map((s) => ({
       seed_key: s.seed_key,
       item_name: s.item_name,
     })),
     skipped_rows: [],
+    equivalent_rows: [],
     possible_collisions: [],
     warnings: [],
     errors: [],
@@ -373,7 +377,9 @@ describe("runBackfillScript", () => {
     expect(parsed.starter_kit_version).toBe("v2");
     expect(typeof parsed.seed_count).toBe("number");
     expect(typeof parsed.would_insert_count).toBe("number");
+    expect(typeof parsed.would_skip_existing_equivalent_count).toBe("number");
     expect(Array.isArray(parsed.preview_insert_rows)).toBe(true);
+    expect(Array.isArray(parsed.preview_existing_equivalent_rows)).toBe(true);
     expect(Array.isArray(parsed.errors)).toBe(true);
   });
 
@@ -388,7 +394,9 @@ describe("runBackfillScript", () => {
     expect(parsed.mode).toBe("apply");
     expect(parsed.starter_kit_version).toBe("v2");
     expect(typeof parsed.inserted_count).toBe("number");
+    expect(typeof parsed.skipped_existing_equivalent_count).toBe("number");
     expect(Array.isArray(parsed.inserted_rows)).toBe(true);
+    expect(Array.isArray(parsed.equivalent_rows)).toBe(true);
     expect(Array.isArray(parsed.errors)).toBe(true);
   });
 });

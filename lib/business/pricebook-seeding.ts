@@ -80,6 +80,7 @@ export type ExistingAccountStarterKitBackfillPlan = {
   inactive_seed_count: number;
   would_insert_count: number;
   would_skip_existing_seed_key_count: number;
+  would_skip_existing_equivalent_count: number;
   possible_collision_count: number;
   preview_insert_rows: Array<{
     seed_key: string;
@@ -89,14 +90,26 @@ export type ExistingAccountStarterKitBackfillPlan = {
     seed_key: string;
     item_name: string;
   }>;
+  preview_existing_equivalent_rows: Array<{
+    seed_key: string;
+    candidate_item_name: string;
+    candidate_category: string | null;
+    candidate_unit_label: string | null;
+    candidate_item_type: PricebookStarterSeedDefinition['item_type'];
+    existing_row_id: string | null;
+    existing_row_is_active: boolean | null;
+    existing_row_seed_key: string | null;
+  }>;
   possible_collisions: Array<{
     seed_key: string;
     candidate_item_name: string;
     candidate_category: string | null;
     candidate_unit_label: string | null;
+    candidate_item_type: PricebookStarterSeedDefinition['item_type'];
     existing_row_id: string | null;
     existing_row_is_active: boolean | null;
     existing_row_seed_key: string | null;
+    existing_row_item_type: string | null;
   }>;
   warnings: string[];
   errors: string[];
@@ -111,6 +124,7 @@ export type ExistingAccountStarterKitBackfillApplyResult = {
   inactive_seed_count: number;
   inserted_count: number;
   skipped_existing_seed_key_count: number;
+  skipped_existing_equivalent_count: number;
   possible_collision_count: number;
   inserted_rows: Array<{
     seed_key: string;
@@ -120,6 +134,7 @@ export type ExistingAccountStarterKitBackfillApplyResult = {
     seed_key: string;
     item_name: string;
   }>;
+  equivalent_rows: ExistingAccountStarterKitBackfillPlan['preview_existing_equivalent_rows'];
   possible_collisions: ExistingAccountStarterKitBackfillPlan['possible_collisions'];
   warnings: string[];
   errors: string[];
@@ -136,6 +151,7 @@ export type PricebookExistingCollisionRow = {
   item_name: string | null;
   category: string | null;
   unit_label: string | null;
+  item_type?: string | null;
   is_active: boolean | null;
 };
 
@@ -182,7 +198,7 @@ export function createPricebookSeedingStoreFromSupabase(
     async listExistingRowsForCollision(account_owner_user_id) {
       const { data, error } = await client
         .from('pricebook_items')
-        .select('id, seed_key, item_name, category, unit_label, is_active')
+        .select('id, seed_key, item_name, category, unit_label, item_type, is_active')
         .eq('account_owner_user_id', account_owner_user_id);
 
       return {
@@ -191,6 +207,10 @@ export function createPricebookSeedingStoreFromSupabase(
       };
     },
   };
+}
+
+function normalizePlannerComparableValue(value: unknown): string {
+  return String(value ?? '');
 }
 
 function buildSeedPlan(
@@ -1050,12 +1070,14 @@ export async function planExistingAccountStarterKitBackfill(params: {
   const buildPlanResult = (input: {
     would_insert_rows: Array<{ seed_key: string; item_name: string }>;
     would_skip_rows: Array<{ seed_key: string; item_name: string }>;
+    would_skip_existing_equivalent_rows: ExistingAccountStarterKitBackfillPlan['preview_existing_equivalent_rows'];
     possible_collisions: ExistingAccountStarterKitBackfillPlan['possible_collisions'];
     warnings?: string[];
     errors?: string[];
   }): ExistingAccountStarterKitBackfillPlan => {
     const wouldInsertRows = input.would_insert_rows;
     const wouldSkipRows = input.would_skip_rows;
+    const wouldSkipEquivalentRows = input.would_skip_existing_equivalent_rows;
     const possibleCollisions = input.possible_collisions;
 
     return {
@@ -1067,9 +1089,11 @@ export async function planExistingAccountStarterKitBackfill(params: {
       inactive_seed_count: selection.inactiveCount,
       would_insert_count: wouldInsertRows.length,
       would_skip_existing_seed_key_count: wouldSkipRows.length,
+      would_skip_existing_equivalent_count: wouldSkipEquivalentRows.length,
       possible_collision_count: possibleCollisions.length,
       preview_insert_rows: wouldInsertRows.slice(0, resolvedPreviewLimit),
       preview_skip_rows: wouldSkipRows.slice(0, resolvedPreviewLimit),
+      preview_existing_equivalent_rows: wouldSkipEquivalentRows.slice(0, resolvedPreviewLimit),
       possible_collisions: possibleCollisions.slice(0, resolvedPreviewLimit),
       warnings: input.warnings ?? [],
       errors: input.errors ?? [],
@@ -1081,6 +1105,7 @@ export async function planExistingAccountStarterKitBackfill(params: {
       ...buildPlanResult({
         would_insert_rows: [],
         would_skip_rows: [],
+        would_skip_existing_equivalent_rows: [],
         possible_collisions: [],
         errors: ['account_owner_user_id is required and cannot be empty'],
       }),
@@ -1093,6 +1118,7 @@ export async function planExistingAccountStarterKitBackfill(params: {
     return buildPlanResult({
       would_insert_rows: [],
       would_skip_rows: [],
+      would_skip_existing_equivalent_rows: [],
       possible_collisions: [],
       errors: seedDefinitionErrors,
     });
@@ -1104,6 +1130,7 @@ export async function planExistingAccountStarterKitBackfill(params: {
         return buildPlanResult({
           would_insert_rows: [],
           would_skip_rows: [],
+          would_skip_existing_equivalent_rows: [],
           possible_collisions: [],
           errors: [`Database error: ${error.message}`],
         });
@@ -1124,6 +1151,7 @@ export async function planExistingAccountStarterKitBackfill(params: {
         return buildPlanResult({
           would_insert_rows: inserted_rows,
           would_skip_rows: skipped_rows,
+          would_skip_existing_equivalent_rows: [],
           possible_collisions: [],
           errors: [`Database error: ${collisionError.message}`],
         });
@@ -1133,6 +1161,8 @@ export async function planExistingAccountStarterKitBackfill(params: {
     }
 
     const possibleCollisions: ExistingAccountStarterKitBackfillPlan['possible_collisions'] = [];
+    const equivalentRows: ExistingAccountStarterKitBackfillPlan['preview_existing_equivalent_rows'] = [];
+    const filteredInsertRows: Array<{ seed_key: string; item_name: string }> = [];
     if (collisionRows.length > 0) {
       const candidateBySeedKey = new Map(selection.seeds.map((seed) => [seed.seed_key, seed]));
 
@@ -1141,29 +1171,68 @@ export async function planExistingAccountStarterKitBackfill(params: {
         if (!fullSeed) {
           return;
         }
-
-        collisionRows.forEach((existingRow) => {
+        const signatureMatches = collisionRows.filter((existingRow) => {
           const sameSignature =
-            String(existingRow.item_name ?? '') === fullSeed.item_name &&
-            String(existingRow.category ?? '') === String(fullSeed.category ?? '') &&
-            String(existingRow.unit_label ?? '') === String(fullSeed.unit_label ?? '');
+            normalizePlannerComparableValue(existingRow.item_name) ===
+              normalizePlannerComparableValue(fullSeed.item_name) &&
+            normalizePlannerComparableValue(existingRow.category) ===
+              normalizePlannerComparableValue(fullSeed.category) &&
+            normalizePlannerComparableValue(existingRow.unit_label) ===
+              normalizePlannerComparableValue(fullSeed.unit_label);
 
-          const hasMatchingSeedKey = String(existingRow.seed_key ?? '') === fullSeed.seed_key;
-          if (!sameSignature || hasMatchingSeedKey) {
+          const hasMatchingSeedKey =
+            normalizePlannerComparableValue(existingRow.seed_key) ===
+            normalizePlannerComparableValue(fullSeed.seed_key);
+
+          return sameSignature && !hasMatchingSeedKey;
+        });
+
+        if (signatureMatches.length === 0) {
+          filteredInsertRows.push(candidate);
+          return;
+        }
+
+        if (signatureMatches.length === 1) {
+          const existingRow = signatureMatches[0];
+          const existingRowItemType = normalizePlannerComparableValue(existingRow.item_type);
+          const candidateItemType = normalizePlannerComparableValue(fullSeed.item_type);
+          const hasKnownItemType = existingRowItemType.length > 0;
+          const itemTypeMatches = hasKnownItemType && existingRowItemType === candidateItemType;
+          const isActiveEquivalent = existingRow.is_active === true;
+
+          if (isActiveEquivalent && itemTypeMatches) {
+            equivalentRows.push({
+              seed_key: fullSeed.seed_key,
+              candidate_item_name: fullSeed.item_name,
+              candidate_category: fullSeed.category,
+              candidate_unit_label: fullSeed.unit_label,
+              candidate_item_type: fullSeed.item_type,
+              existing_row_id: existingRow.id,
+              existing_row_is_active: existingRow.is_active,
+              existing_row_seed_key: existingRow.seed_key,
+            });
             return;
           }
+        }
 
+        filteredInsertRows.push(candidate);
+
+        signatureMatches.forEach((existingRow) => {
           possibleCollisions.push({
             seed_key: fullSeed.seed_key,
             candidate_item_name: fullSeed.item_name,
             candidate_category: fullSeed.category,
             candidate_unit_label: fullSeed.unit_label,
+            candidate_item_type: fullSeed.item_type,
             existing_row_id: existingRow.id,
             existing_row_is_active: existingRow.is_active,
             existing_row_seed_key: existingRow.seed_key,
+            existing_row_item_type: existingRow.item_type ?? null,
           });
         });
       });
+    } else {
+      filteredInsertRows.push(...inserted_rows);
     }
 
     const warnings: string[] = [];
@@ -1179,9 +1248,16 @@ export async function planExistingAccountStarterKitBackfill(params: {
       );
     }
 
+    if (equivalentRows.length > 0) {
+      warnings.push(
+        `Skipped ${equivalentRows.length} existing active equivalent row(s) with legacy/different seed keys.`,
+      );
+    }
+
     return buildPlanResult({
-      would_insert_rows: inserted_rows,
+      would_insert_rows: filteredInsertRows,
       would_skip_rows: skipped_rows,
+      would_skip_existing_equivalent_rows: equivalentRows,
       possible_collisions: possibleCollisions,
       warnings,
       errors: [],
@@ -1190,6 +1266,7 @@ export async function planExistingAccountStarterKitBackfill(params: {
     return buildPlanResult({
       would_insert_rows: [],
       would_skip_rows: [],
+      would_skip_existing_equivalent_rows: [],
       possible_collisions: [],
       warnings: [],
       errors: [`Unexpected error: ${err instanceof Error ? err.message : String(err)}`],
@@ -1222,6 +1299,7 @@ export async function applyExistingAccountStarterKitBackfill(params: {
   const buildApplyResult = (input: {
     inserted_rows: Array<{ seed_key: string; item_name: string }>;
     skipped_rows: Array<{ seed_key: string; item_name: string }>;
+    equivalent_rows: ExistingAccountStarterKitBackfillApplyResult['equivalent_rows'];
     possible_collisions: ExistingAccountStarterKitBackfillApplyResult['possible_collisions'];
     warnings?: string[];
     errors?: string[];
@@ -1234,9 +1312,11 @@ export async function applyExistingAccountStarterKitBackfill(params: {
     inactive_seed_count: selection.inactiveCount,
     inserted_count: input.inserted_rows.length,
     skipped_existing_seed_key_count: input.skipped_rows.length,
+    skipped_existing_equivalent_count: input.equivalent_rows.length,
     possible_collision_count: input.possible_collisions.length,
     inserted_rows: input.inserted_rows,
     skipped_rows: input.skipped_rows,
+    equivalent_rows: input.equivalent_rows,
     possible_collisions: input.possible_collisions,
     warnings: input.warnings ?? [],
     errors: input.errors ?? [],
@@ -1247,6 +1327,7 @@ export async function applyExistingAccountStarterKitBackfill(params: {
     return buildApplyResult({
       inserted_rows: [],
       skipped_rows: [],
+      equivalent_rows: [],
       possible_collisions: [],
       errors: ['confirmApply: true is required to execute the apply path.'],
     });
@@ -1263,6 +1344,7 @@ export async function applyExistingAccountStarterKitBackfill(params: {
     return buildApplyResult({
       inserted_rows: [],
       skipped_rows: plan.preview_skip_rows,
+      equivalent_rows: plan.preview_existing_equivalent_rows,
       possible_collisions: plan.possible_collisions,
       warnings: plan.warnings,
       errors: plan.errors,
@@ -1274,6 +1356,7 @@ export async function applyExistingAccountStarterKitBackfill(params: {
     return buildApplyResult({
       inserted_rows: [],
       skipped_rows: plan.preview_skip_rows,
+      equivalent_rows: plan.preview_existing_equivalent_rows,
       possible_collisions: plan.possible_collisions,
       warnings: plan.warnings,
       errors: [
@@ -1294,6 +1377,7 @@ export async function applyExistingAccountStarterKitBackfill(params: {
     return buildApplyResult({
       inserted_rows: [],
       skipped_rows: plan.preview_skip_rows,
+      equivalent_rows: plan.preview_existing_equivalent_rows,
       possible_collisions: plan.possible_collisions,
       warnings: plan.warnings,
       errors: [
@@ -1306,6 +1390,7 @@ export async function applyExistingAccountStarterKitBackfill(params: {
     return buildApplyResult({
       inserted_rows: [],
       skipped_rows: plan.preview_skip_rows,
+      equivalent_rows: plan.preview_existing_equivalent_rows,
       possible_collisions: plan.possible_collisions,
       warnings: plan.warnings,
       errors: [],
@@ -1318,6 +1403,7 @@ export async function applyExistingAccountStarterKitBackfill(params: {
       return buildApplyResult({
         inserted_rows: [],
         skipped_rows: plan.preview_skip_rows,
+        equivalent_rows: plan.preview_existing_equivalent_rows,
         possible_collisions: plan.possible_collisions,
         warnings: plan.warnings,
         errors: [`Database insert error: ${insertError.message}`],
@@ -1327,6 +1413,7 @@ export async function applyExistingAccountStarterKitBackfill(params: {
     return buildApplyResult({
       inserted_rows: plan.preview_insert_rows,
       skipped_rows: plan.preview_skip_rows,
+      equivalent_rows: plan.preview_existing_equivalent_rows,
       possible_collisions: plan.possible_collisions,
       warnings: plan.warnings,
       errors: [],
@@ -1335,6 +1422,7 @@ export async function applyExistingAccountStarterKitBackfill(params: {
     return buildApplyResult({
       inserted_rows: [],
       skipped_rows: plan.preview_skip_rows,
+      equivalent_rows: plan.preview_existing_equivalent_rows,
       possible_collisions: plan.possible_collisions,
       warnings: plan.warnings,
       errors: [`Unexpected error: ${err instanceof Error ? err.message : String(err)}`],

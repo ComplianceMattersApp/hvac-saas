@@ -421,6 +421,153 @@ describe('PricebookSeeding', () => {
       expect(result.warnings.some((w) => w.includes('Possible name/category/unit collisions'))).toBe(true);
     });
 
+    it('exact active equivalent row with legacy seed_key is skipped as equivalent and not collision', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [
+          {
+            id: 'legacy-r410a-row',
+            seed_key: 'starter_v1.refrigerant.r410a_per_lb',
+            item_name: 'Refrigerant R-410A (per lb)',
+            category: 'Refrigerant',
+            unit_label: 'lb',
+            item_type: 'material',
+            is_active: true,
+          },
+        ],
+        error: null,
+      });
+
+      const result = await planExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        starter_kit_version: 'v3',
+      });
+
+      expect(result.would_insert_count).toBe(STARTER_KIT_V3_SEEDS.length - 1);
+      expect(result.would_skip_existing_seed_key_count).toBe(0);
+      expect(result.would_skip_existing_equivalent_count).toBe(1);
+      expect(result.possible_collision_count).toBe(0);
+      expect(
+        result.preview_existing_equivalent_rows.some(
+          (row) =>
+            row.seed_key === 'starter_v3.refrigerant.r410a_per_lb' &&
+            row.existing_row_seed_key === 'starter_v1.refrigerant.r410a_per_lb',
+        ),
+      ).toBe(true);
+    });
+
+    it('inactive existing row with same signature remains unsafe collision', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [
+          {
+            id: 'inactive-r410a-row',
+            seed_key: 'starter_v1.refrigerant.r410a_per_lb',
+            item_name: 'Refrigerant R-410A (per lb)',
+            category: 'Refrigerant',
+            unit_label: 'lb',
+            item_type: 'material',
+            is_active: false,
+          },
+        ],
+        error: null,
+      });
+
+      const result = await planExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        starter_kit_version: 'v3',
+      });
+
+      expect(result.would_skip_existing_equivalent_count).toBe(0);
+      expect(result.possible_collision_count).toBe(1);
+      expect(result.would_insert_count).toBe(STARTER_KIT_V3_SEEDS.length);
+    });
+
+    it('same name/category/unit but different item_type remains unsafe collision', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [
+          {
+            id: 'wrong-type-r410a-row',
+            seed_key: 'starter_v1.refrigerant.r410a_per_lb',
+            item_name: 'Refrigerant R-410A (per lb)',
+            category: 'Refrigerant',
+            unit_label: 'lb',
+            item_type: 'service',
+            is_active: true,
+          },
+        ],
+        error: null,
+      });
+
+      const result = await planExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        starter_kit_version: 'v3',
+      });
+
+      expect(result.would_skip_existing_equivalent_count).toBe(0);
+      expect(result.possible_collision_count).toBe(1);
+      expect(result.possible_collisions[0]).toEqual(
+        expect.objectContaining({
+          seed_key: 'starter_v3.refrigerant.r410a_per_lb',
+          candidate_item_type: 'material',
+          existing_row_item_type: 'service',
+        }),
+      );
+    });
+
+    it('multiple matching rows remain unsafe/ambiguous collisions', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [
+          {
+            id: 'dup-a',
+            seed_key: 'starter_v1.refrigerant.r410a_per_lb',
+            item_name: 'Refrigerant R-410A (per lb)',
+            category: 'Refrigerant',
+            unit_label: 'lb',
+            item_type: 'material',
+            is_active: true,
+          },
+          {
+            id: 'dup-b',
+            seed_key: null,
+            item_name: 'Refrigerant R-410A (per lb)',
+            category: 'Refrigerant',
+            unit_label: 'lb',
+            item_type: 'material',
+            is_active: true,
+          },
+        ],
+        error: null,
+      });
+
+      const result = await planExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        starter_kit_version: 'v3',
+      });
+
+      expect(result.would_skip_existing_equivalent_count).toBe(0);
+      expect(result.possible_collision_count).toBe(2);
+      expect(result.would_insert_count).toBe(STARTER_KIT_V3_SEEDS.length);
+    });
+
     it('edited starter row with same seed_key is skipped and does not create collision', async () => {
       listExistingSeedRowsMock.mockResolvedValue({
         data: [
@@ -767,6 +914,53 @@ describe('PricebookSeeding', () => {
       expect(result.possible_collision_count).toBe(1);
       expect(result.errors.some((e) => e.includes('Apply blocked'))).toBe(true);
       expect(insertSeedRowsMock).not.toHaveBeenCalled();
+    });
+
+    it('active equivalent row is skipped and does not block apply', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [
+          {
+            id: 'legacy-r410a-row',
+            seed_key: 'starter_v1.refrigerant.r410a_per_lb',
+            item_name: 'Refrigerant R-410A (per lb)',
+            category: 'Refrigerant',
+            unit_label: 'lb',
+            item_type: 'material',
+            is_active: true,
+          },
+        ],
+        error: null,
+      });
+      insertSeedRowsMock.mockResolvedValue({ error: null });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        starter_kit_version: 'v3',
+        confirmApply: true,
+      });
+
+      expect(result.inserted_count).toBe(STARTER_KIT_V3_SEEDS.length - 1);
+      expect(result.skipped_existing_equivalent_count).toBe(1);
+      expect(result.possible_collision_count).toBe(0);
+      expect(result.errors).toEqual([]);
+      expect(
+        result.equivalent_rows.some(
+          (row) =>
+            row.seed_key === 'starter_v3.refrigerant.r410a_per_lb' &&
+            row.existing_row_seed_key === 'starter_v1.refrigerant.r410a_per_lb',
+        ),
+      ).toBe(true);
+
+      const insertedPayload = insertSeedRowsMock.mock.calls[0]?.[0] ?? [];
+      expect(insertedPayload).toHaveLength(STARTER_KIT_V3_SEEDS.length - 1);
+      expect(
+        insertedPayload.some((row: any) => row.seed_key === 'starter_v3.refrigerant.r410a_per_lb'),
+      ).toBe(false);
     });
 
     it('collision with allowCollisions: true inserts missing rows despite collision', async () => {
