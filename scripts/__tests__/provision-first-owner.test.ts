@@ -3,10 +3,27 @@ import {
   parseProvisionFirstOwnerArgs,
   runProvisionFirstOwnerScript,
 } from "../../scripts/provision-first-owner";
-import type { FirstOwnerProvisioningResult } from "../../lib/business/first-owner-provisioning";
-import { STARTER_KIT_V1_SEEDS } from "../../lib/business/pricebook-seeding";
+import type {
+  FirstOwnerProvisioningInput,
+  FirstOwnerProvisioningResult,
+} from "../../lib/business/first-owner-provisioning";
+import {
+  STARTER_KIT_V1_SEEDS,
+  STARTER_KIT_V2_SEEDS,
+  STARTER_KIT_V3_SEEDS,
+} from "../../lib/business/pricebook-seeding";
 
-function makeProvisioningSuccess(overrides?: Partial<FirstOwnerProvisioningResult>): FirstOwnerProvisioningResult {
+function seedsForVersion(version: "v1" | "v2" | "v3") {
+  if (version === "v1") return STARTER_KIT_V1_SEEDS;
+  if (version === "v2") return STARTER_KIT_V2_SEEDS;
+  return STARTER_KIT_V3_SEEDS;
+}
+
+function makeProvisioningSuccess(
+  version: "v1" | "v2" | "v3" = "v3",
+  overrides?: Partial<FirstOwnerProvisioningResult>,
+): FirstOwnerProvisioningResult {
+  const seeds = seedsForVersion(version);
   return {
     status: "provisioned",
     accountOwnerUserId: "owner-1",
@@ -21,13 +38,13 @@ function makeProvisioningSuccess(overrides?: Partial<FirstOwnerProvisioningResul
       reason: "ready_for_invite",
     },
     pricebookSeeding: {
-      starter_kit_version: "v1",
-      seed_count: STARTER_KIT_V1_SEEDS.length,
-      active_seed_count: STARTER_KIT_V1_SEEDS.length,
-      inactive_seed_count: 0,
-      inserted_count: STARTER_KIT_V1_SEEDS.length,
+      starter_kit_version: version,
+      seed_count: seeds.length,
+      active_seed_count: seeds.filter((seed) => seed.is_active).length,
+      inactive_seed_count: seeds.filter((seed) => !seed.is_active).length,
+      inserted_count: seeds.length,
       skipped_count: 0,
-      inserted_rows: STARTER_KIT_V1_SEEDS.map((seed) => ({
+      inserted_rows: seeds.map((seed) => ({
         seed_key: seed.seed_key,
         item_name: seed.item_name,
       })),
@@ -49,7 +66,13 @@ function makeDeps(overrides?: Partial<Parameters<typeof runProvisionFirstOwnerSc
       USERNAME: "operator",
       ...(overrides?.env ?? {}),
     } as NodeJS.ProcessEnv,
-    provision: vi.fn(async () => makeProvisioningSuccess()),
+    provision: vi.fn(async (input: FirstOwnerProvisioningInput) =>
+      makeProvisioningSuccess(
+        input.starterKitVersion === "v1" || input.starterKitVersion === "v2" || input.starterKitVersion === "v3"
+          ? input.starterKitVersion
+          : "v3",
+      ),
+    ),
     getAuthUserById: vi.fn(async () => ({
       id: "owner-1",
       email: "owner@example.com",
@@ -99,6 +122,19 @@ describe("parseProvisionFirstOwnerArgs", () => {
     ]);
 
     expect(parsed.entitlementPreset).toBe("standard");
+    expect(parsed.starterKitVersion).toBe("v3");
+  });
+
+  it("accepts explicit starter kit v1", () => {
+    const parsed = parseProvisionFirstOwnerArgs([
+      "--email",
+      "owner@example.com",
+      "--business-display-name",
+      "My Company",
+      "--starter-kit-version",
+      "v1",
+    ]);
+
     expect(parsed.starterKitVersion).toBe("v1");
   });
 
@@ -153,7 +189,7 @@ describe("runProvisionFirstOwnerScript", () => {
     email: "owner@example.com",
     businessDisplayName: "My Company",
     entitlementPreset: "standard" as const,
-    starterKitVersion: "v1" as const,
+    starterKitVersion: "v3" as const,
     resendInvite: false,
     apply: false,
   };
@@ -169,7 +205,7 @@ describe("runProvisionFirstOwnerScript", () => {
         targetEmail: "owner@example.com",
         businessDisplayName: "My Company",
         entitlementPreset: "standard",
-        starterKitVersion: "v1",
+        starterKitVersion: "v3",
         dryRun: true,
       }),
     );
@@ -177,7 +213,45 @@ describe("runProvisionFirstOwnerScript", () => {
     expect(result.inviteSent).toBe(false);
     expect(result.inviteSkippedReason).toBe("dry_run");
     expect(result.pricebookSeeding).toEqual(
-      expect.objectContaining({ inserted_count: STARTER_KIT_V1_SEEDS.length }),
+      expect.objectContaining({
+        starter_kit_version: "v3",
+        inserted_count: STARTER_KIT_V3_SEEDS.length,
+      }),
+    );
+  });
+
+  it("omitted starter kit arg resolves to v3 in dry-run metadata", async () => {
+    const deps = makeDeps();
+    const parsed = parseProvisionFirstOwnerArgs([
+      "--email",
+      "owner@example.com",
+      "--business-display-name",
+      "My Company",
+    ]);
+
+    const result = await runProvisionFirstOwnerScript(parsed, deps);
+
+    expect(parsed.starterKitVersion).toBe("v3");
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.objectContaining({ starterKitVersion: "v3", dryRun: true }),
+    );
+    expect(result.pricebookSeeding).toEqual(
+      expect.objectContaining({
+        starter_kit_version: "v3",
+        seed_count: STARTER_KIT_V3_SEEDS.length,
+      }),
+    );
+  });
+
+  it("passes explicit starter kit v1 to provisioning helper", async () => {
+    const deps = makeDeps();
+
+    await runProvisionFirstOwnerScript({ ...baseArgs, starterKitVersion: "v1" }, deps);
+
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        starterKitVersion: "v1",
+      }),
     );
   });
 
@@ -189,6 +263,18 @@ describe("runProvisionFirstOwnerScript", () => {
     expect(deps.provision).toHaveBeenCalledWith(
       expect.objectContaining({
         starterKitVersion: "v2",
+      }),
+    );
+  });
+
+  it("passes explicit starter kit v3 to provisioning helper", async () => {
+    const deps = makeDeps();
+
+    await runProvisionFirstOwnerScript({ ...baseArgs, starterKitVersion: "v3" }, deps);
+
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        starterKitVersion: "v3",
       }),
     );
   });
@@ -224,14 +310,17 @@ describe("runProvisionFirstOwnerScript", () => {
     );
     expect(result.inviteSent).toBe(true);
     expect(result.pricebookSeeding).toEqual(
-      expect.objectContaining({ inserted_count: STARTER_KIT_V1_SEEDS.length }),
+      expect.objectContaining({
+        starter_kit_version: "v3",
+        inserted_count: STARTER_KIT_V3_SEEDS.length,
+      }),
     );
   });
 
   it("apply mode does not send invite if helper fails", async () => {
     const deps = makeDeps({
       provision: vi.fn(async () =>
-        makeProvisioningSuccess({
+        makeProvisioningSuccess("v3", {
           status: "failed",
           errors: [
             {

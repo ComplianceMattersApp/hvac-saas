@@ -181,7 +181,7 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
         ? (() => {
             throw new Error("Invalid --starter-kit-version (expected: v1|v2|v3)");
           })()
-        : "v1";
+        : "v3";
 
   return {
     email,

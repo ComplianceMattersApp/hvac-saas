@@ -3,6 +3,7 @@ import { provisionFirstOwnerAccount, type FirstOwnerProvisioningClient } from "@
 import {
   STARTER_KIT_V1_SEEDS,
   STARTER_KIT_V2_SEEDS,
+  STARTER_KIT_V3_SEEDS,
   type PricebookSeedInsertRow,
 } from "@/lib/business/pricebook-seeding";
 
@@ -214,11 +215,11 @@ describe("provisionFirstOwnerAccount", () => {
     );
     expect(result.pricebookSeeding).toEqual(
       expect.objectContaining({
-        starter_kit_version: "v1",
-        seed_count: STARTER_KIT_V1_SEEDS.length,
-        active_seed_count: STARTER_KIT_V1_SEEDS.length,
-        inactive_seed_count: 0,
-        inserted_count: STARTER_KIT_V1_SEEDS.length,
+        starter_kit_version: "v3",
+        seed_count: STARTER_KIT_V3_SEEDS.length,
+        active_seed_count: STARTER_KIT_V3_SEEDS.filter((seed) => seed.is_active).length,
+        inactive_seed_count: STARTER_KIT_V3_SEEDS.filter((seed) => !seed.is_active).length,
+        inserted_count: STARTER_KIT_V3_SEEDS.length,
         skipped_count: 0,
       }),
     );
@@ -261,7 +262,7 @@ describe("provisionFirstOwnerAccount", () => {
         }),
       },
       pricebookSeedRowsByOwnerId: {
-        [ownerId]: STARTER_KIT_V1_SEEDS.map((seed) => ({
+        [ownerId]: STARTER_KIT_V3_SEEDS.map((seed) => ({
           seed_key: seed.seed_key,
           item_name: seed.item_name,
         })),
@@ -290,10 +291,10 @@ describe("provisionFirstOwnerAccount", () => {
     );
     expect(result.pricebookSeeding).toEqual(
       expect.objectContaining({
-        starter_kit_version: "v1",
-        seed_count: STARTER_KIT_V1_SEEDS.length,
+        starter_kit_version: "v3",
+        seed_count: STARTER_KIT_V3_SEEDS.length,
         inserted_count: 0,
-        skipped_count: STARTER_KIT_V1_SEEDS.length,
+        skipped_count: STARTER_KIT_V3_SEEDS.length,
       }),
     );
     expect(client.createAuthUser).not.toHaveBeenCalled();
@@ -316,12 +317,39 @@ describe("provisionFirstOwnerAccount", () => {
     expect(result.accountOwnerUserId).toBeNull();
     expect(result.pricebookSeeding).toEqual(
       expect.objectContaining({
+        starter_kit_version: "v3",
+        seed_count: STARTER_KIT_V3_SEEDS.length,
+        inserted_count: STARTER_KIT_V3_SEEDS.length,
+        skipped_count: 0,
+      }),
+    );
+  });
+
+  it("explicit v1 starter kit still seeds v1 rows and reports selected version", async () => {
+    const store = createStore();
+    const client = createMockClient(store);
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: {
+        targetEmail: "owner@example.com",
+        businessDisplayName: "Owner Business",
+        starterKitVersion: "v1",
+      },
+    });
+
+    expect(result.status).toBe("provisioned");
+    expect(result.pricebookSeeding).toEqual(
+      expect.objectContaining({
         starter_kit_version: "v1",
         seed_count: STARTER_KIT_V1_SEEDS.length,
+        active_seed_count: STARTER_KIT_V1_SEEDS.filter((seed) => seed.is_active).length,
+        inactive_seed_count: STARTER_KIT_V1_SEEDS.filter((seed) => !seed.is_active).length,
         inserted_count: STARTER_KIT_V1_SEEDS.length,
         skipped_count: 0,
       }),
     );
+    expect(store.pricebookSeedRowsByOwnerId["user-1"]).toHaveLength(STARTER_KIT_V1_SEEDS.length);
   });
 
   it("explicit v2 starter kit seeds v2 rows and reports selected version", async () => {
@@ -606,7 +634,7 @@ describe("provisionFirstOwnerAccount", () => {
         }),
       },
       pricebookSeedRowsByOwnerId: {
-        [ownerId]: STARTER_KIT_V1_SEEDS.map((seed) => ({
+        [ownerId]: STARTER_KIT_V3_SEEDS.map((seed) => ({
           seed_key: seed.seed_key,
           item_name: seed.item_name,
         })),
@@ -667,7 +695,7 @@ describe("provisionFirstOwnerAccount", () => {
         }),
       },
       pricebookSeedRowsByOwnerId: {
-        [ownerId]: STARTER_KIT_V1_SEEDS.map((seed) => ({
+        [ownerId]: STARTER_KIT_V3_SEEDS.map((seed) => ({
           seed_key: seed.seed_key,
           item_name: seed.item_name,
         })),
@@ -756,11 +784,11 @@ describe("provisionFirstOwnerAccount", () => {
     expect(Object.keys(store.internalUsersByUserId)).toHaveLength(1);
     expect(Object.keys(store.businessProfilesByOwnerId)).toHaveLength(1);
     expect(Object.keys(store.entitlementsByOwnerId)).toHaveLength(1);
-    expect(store.pricebookSeedRowsByOwnerId["user-1"]).toHaveLength(STARTER_KIT_V1_SEEDS.length);
+    expect(store.pricebookSeedRowsByOwnerId["user-1"]).toHaveLength(STARTER_KIT_V3_SEEDS.length);
     expect(second.pricebookSeeding).toEqual(
       expect.objectContaining({
         inserted_count: 0,
-        skipped_count: STARTER_KIT_V1_SEEDS.length,
+        skipped_count: STARTER_KIT_V3_SEEDS.length,
       }),
     );
   });

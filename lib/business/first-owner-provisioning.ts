@@ -178,6 +178,7 @@ export type FirstOwnerProvisioningClient = {
 const DEFAULT_BUSINESS_NAME = "Compliance Matters";
 const DEFAULT_PLAN_KEY: PlatformPlanKey = "starter";
 const DEFAULT_ENTITLEMENT_STATUS: EntitlementStatus = "trial";
+const DEFAULT_FIRST_OWNER_STARTER_KIT_VERSION: StarterKitVersion = "v3";
 
 function buildSeedPreviewForNewAccount(selection: StarterKitSeedSelection): PricebookSeedResult {
   return {
@@ -342,7 +343,9 @@ export async function provisionFirstOwnerAccount(params: {
   const billingMode = normalizeBillingMode(input.defaultBillingMode);
   const entitlementPreset = normalizeEntitlementPreset(input.entitlementPreset);
   const entitlementPresetValues = buildEntitlementPresetValues(entitlementPreset);
-  const starterKitSelection = resolveStarterKitSeeds(input.starterKitVersion);
+  const starterKitSelection = resolveStarterKitSeeds(
+    input.starterKitVersion ?? DEFAULT_FIRST_OWNER_STARTER_KIT_VERSION,
+  );
   const pricebookSeedStore = createPricebookSeedingStore(client);
 
   if (!email || !isValidEmail(email)) {
