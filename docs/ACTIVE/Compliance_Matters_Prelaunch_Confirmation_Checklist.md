@@ -168,9 +168,20 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: CFM remains valid in ECC/airflow/testing contexts; this promotion did not alter ECC/workflow logic.
 - Confirmed: no schema migration, Supabase command, or DB write action occurred for this promotion.
 - Confirmed: no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed.
-- Confirmed: Starter Kit V2 content is still not implemented by D3B.
+- Confirmed: Starter Kit V2 content was not implemented by D3B and was implemented later by V2A/V2B.
 
-### 2.10 Visit Scope -> invoice bridge promotion confirmation (A1-A5)
+### 2.10 Pricebook Starter Kit V2A/V2B promotion confirmation
+- Completed: V2A/V2B are production-promoted on `main`.
+  - V2A: Starter Kit V2 seed definitions added (`23` rows total, `21` active, `2` inactive/deferred)
+  - V2B: explicit provisioning selector wiring added for Starter Kit `v1|v2`
+- Completed: default first-owner dry-run path still resolves to Starter Kit `v1` when selector is omitted.
+- Completed: explicit `--starter-kit-version v2` dry-run path returns V2 preview (`23` rows) with selector metadata.
+- Completed: invalid selector values (for example `v3`) are rejected clearly before provisioning execution.
+- Completed: no provisioning apply/backfill action occurred during promotion verification.
+- Completed: no payment behavior changed by V2A/V2B promotion.
+- Completed: no migration, Supabase command, or production data action occurred as part of V2A/V2B promotion.
+
+### 2.11 Visit Scope -> invoice bridge promotion confirmation (A1-A5)
 - Completed: A1-A5 Visit Scope -> invoice bridge stack is production-promoted on `main`.
 - Completed: production migration `20260428113000_internal_invoice_line_items_visit_scope_provenance_v1.sql` was applied and migration list sync was confirmed.
 - Completed: promotion validation passed before and after merge:

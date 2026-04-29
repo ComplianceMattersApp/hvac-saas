@@ -24,9 +24,16 @@ Supported entitlement preset values for --entitlement-preset:
 - standard (default)
 - internal_comped
 
+Supported starter kit selector values for --starter-kit-version:
+- v1 (default when omitted)
+- v2 (explicit selection only)
+
 Default behavior:
 - If --default-billing-mode is omitted or invalid, billing mode normalizes to external_billing.
 - If --entitlement-preset is omitted, provisioning uses standard.
+- If --starter-kit-version is omitted, provisioning uses starter kit v1.
+- Starter kit v2 is used only when `--starter-kit-version v2` is explicitly provided.
+- Invalid `--starter-kit-version` values are rejected before provisioning executes.
 
 Entitlement preset behavior:
 - standard
@@ -90,14 +97,35 @@ npx tsx scripts/provision-first-owner.ts \
   --default-billing-mode external_billing
 ```
 
+Explicit Starter Kit v2 dry-run example:
+
+```bash
+ALLOW_FIRST_OWNER_PROVISIONING=true \
+ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true \
+npx tsx scripts/provision-first-owner.ts \
+  --email owner@example.com \
+  --business-display-name "Example HVAC" \
+  --owner-display-name "Example Owner" \
+  --support-email support@example.com \
+  --support-phone "+1-555-555-0100" \
+  --entitlement-preset standard \
+  --default-billing-mode external_billing \
+  --starter-kit-version v2
+```
+
 Expected dry-run behavior:
 - No writes are committed
 - Output lists what would be created/confirmed/patched
 - Output now includes structured `pricebookSeeding` preview
-- For a new account, dry-run should preview the V1 starter set (12 rows)
+- For a new account with omitted selector, dry-run should preview the V1 starter set (12 rows)
+- With `--starter-kit-version v2`, dry-run should preview the V2 starter set (23 rows)
+- Dry-run output includes selected starter kit metadata (`starter_kit_version`, `seed_count`, `active_seed_count`, `inactive_seed_count`)
 - Dry-run remains non-mutating and must not send invites
 
 ## 5. Apply after project verification
+
+Apply remains an explicit operator action and is never implied by dry-run.
+Use `--apply` only after dry-run verification and project-ref confirmation.
 
 Hosted target apply example:
 

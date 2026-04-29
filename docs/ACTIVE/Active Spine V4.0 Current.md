@@ -1254,14 +1254,20 @@ Current position:
   - D2C-3 seed helper is production-promoted and matches the original V1 starter definitions
   - D2C-4 first-owner provisioning integration is production-promoted and now surfaces structured `pricebookSeeding` output in dry-run/apply paths
   - production dry-run smoke confirmed `mode = dry_run`, `pricebookSeeding` preview present, `inserted_count = 12`, `skipped_count = 0`, `errors = []`, and `inviteSent = false`
-  - D2C-3/D2C-4 added no new starter rows; Starter Kit V2 content remains future work
+  - V2A/V2B are production-promoted on `main` (commits `7bf9867` and `51ce27c`)
+  - Starter Kit V2 seed definitions are implemented in code with 23 rows (`active = 21`, `inactive/deferred = 2`)
+  - first-owner provisioning default starter kit remains `v1` when selector is omitted
+  - Starter Kit `v2` only runs when explicitly selected (`--starter-kit-version v2`)
+  - invalid starter kit selector values are rejected before provisioning execution
+  - dry-run output now includes selected starter kit metadata (`starter_kit_version`, `seed_count`, `active_seed_count`, `inactive_seed_count`)
+  - no schema migration, Supabase command, provisioning apply action, payment behavior change, or production data action was part of V2A/V2B promotion
   - D3B controlled-options refinement is production-promoted on `main` via merge commit `58dcb31` (change commit `3084906`):
     - controlled options were refined in code/test only (`lib/business/pricebook-options.ts`, `lib/business/__tests__/pricebook-options.test.ts`)
     - added categories: `Electrical`, `Compliance Docs`
     - added unit labels: `trip`, `doc`
     - removed Pricebook controlled unit label: `cfm` (CFM remains valid in ECC/airflow test contexts)
     - no schema migration, Supabase command, or DB write action was part of this promotion
-  - Starter Kit V2 content remains future work and was not implemented by D3B
+  - Starter Kit V2 content was not implemented by D3B (it was implemented later in V2A/V2B)
   - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by D2C-3/D2C-4
   - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by D3B
 - Launch-readiness polish catch-up is complete for current scope:

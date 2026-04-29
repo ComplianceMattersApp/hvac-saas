@@ -328,6 +328,11 @@ Current baseline state is:
 - D2C-3 seed helper is production-promoted and matches original V1 starter seed definitions
 - D2C-4 first-owner provisioning integration is production-promoted and uses helper dry-run/apply paths
 - operator script now surfaces structured `pricebookSeeding` output for first-owner dry-run/apply visibility
+- V2A/V2B are production-promoted on `main` (commits `7bf9867`, `51ce27c`)
+- Starter Kit V2 seed definitions are implemented in code (`23` rows total: `21` active, `2` inactive/deferred)
+- first-owner provisioning default behavior remains Starter Kit `v1`
+- Starter Kit `v2` is available only by explicit selector (`--starter-kit-version v2`); invalid selector values are rejected
+- dry-run output now includes selected starter kit metadata (`starter_kit_version`, `seed_count`, `active_seed_count`, `inactive_seed_count`)
 
 ### Purpose
 Pricebook is the reusable catalog of billable items.
@@ -367,8 +372,7 @@ Current D2C continuation clarifications:
 - seeding is idempotent by `seed_key`
 - dry-run previews starter seeding before apply
 - existing accounts are not auto-backfilled in D2C-3/D2C-4
-- Starter Kit V2 content remains future work
-- after this docs/source-of-truth alignment pass, Starter Kit V2 is the next resume target for Pricebook content expansion
+- existing-account Starter Kit V2 backfill remains future work
 - D3B controlled-options refinement is production-promoted on `main` (merge `58dcb31`, change `3084906`):
   - code/test-only option refinement in `lib/business/pricebook-options.ts` and `lib/business/__tests__/pricebook-options.test.ts`
   - categories added: `Electrical`, `Compliance Docs`
@@ -377,10 +381,11 @@ Current D2C continuation clarifications:
   - no schema migration, Supabase command, or DB write action was part of this promotion
 - broader category/unit rollout remains future work
 - no new starter seed rows were introduced by D2C-3/D2C-4
-- Starter Kit V2 content remains future work and was not implemented by D3B
+- Starter Kit V2 content was not implemented by D3B (it was implemented later by V2A/V2B)
 - no negative credit/adjustment implementation was introduced
 - no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by D2C-3/D2C-4
 - no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by D3B
+- no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by V2A/V2B
 
 ### Production-complete C1B/C1C closeout (production-promoted)
 - nullable invoice-line provenance/snapshot fields are production-migrated: `source_kind`, `source_pricebook_item_id`, `category_snapshot`, `unit_label_snapshot`
