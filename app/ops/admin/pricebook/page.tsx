@@ -327,99 +327,103 @@ export default async function AdminPricebookPage({
       </section>
 
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
-        <div>
+        <div className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Create Item</p>
-          <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">Add a catalog item</h2>
+          <h2 className="text-xl font-semibold tracking-[-0.02em] text-slate-950">Add a reusable catalog item</h2>
+          <p className="text-sm text-slate-600">Create a pricing template for future estimates and invoices. Changes affect new selections only—existing invoices remain unchanged.</p>
         </div>
 
-        <form action={createPricebookItemFromForm} className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="space-y-1 text-sm text-slate-700 xl:col-span-2">
-            <span className="font-medium text-slate-900">Item Name</span>
-            <input
-              type="text"
-              name="item_name"
-              required
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-              placeholder="Example: Blower Motor Replacement"
-            />
-          </label>
+        <form action={createPricebookItemFromForm} className="mt-6 space-y-6">
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="space-y-2 text-sm text-slate-700 md:col-span-2">
+              <span className="font-semibold text-slate-900">Item Name</span>
+              <input
+                type="text"
+                name="item_name"
+                required
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                placeholder="Example: Blower Motor Replacement"
+              />
+            </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
-            <span className="font-medium text-slate-900">Type</span>
-            <select
-              name="item_type"
-              defaultValue="service"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-            >
-              <option value="service">Service</option>
-              <option value="material">Material</option>
-              <option value="diagnostic">Diagnostic</option>
-              <option value="adjustment">Adjustment</option>
-            </select>
-          </label>
+            <label className="space-y-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-900">Type</span>
+              <select
+                name="item_type"
+                defaultValue="service"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              >
+                <option value="service">Service</option>
+                <option value="material">Material</option>
+                <option value="diagnostic">Diagnostic</option>
+                <option value="adjustment">Adjustment</option>
+              </select>
+            </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
-            <span className="font-medium text-slate-900">Unit Price</span>
-            <input
-              type="number"
-              step="0.01"
-              name="default_unit_price"
-              required
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-              placeholder="0.00"
-            />
-          </label>
+            <label className="space-y-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-900">Unit Price</span>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="default_unit_price"
+                  required
+                  className="w-full rounded-lg border border-slate-300 bg-white pl-6 pr-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  placeholder="0.00"
+                />
+              </div>
+            </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
-            <span className="font-medium text-slate-900">Category</span>
-            <select
-              name="category"
-              defaultValue=""
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-            >
-              <option value="">No category</option>
-              {PRICEBOOK_CATEGORY_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="space-y-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-900">Unit Label</span>
+              <select
+                name="unit_label"
+                defaultValue=""
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              >
+                <option value="">None</option>
+                {PRICEBOOK_UNIT_LABEL_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
-            <span className="font-medium text-slate-900">Unit Label</span>
-            <select
-              name="unit_label"
-              defaultValue=""
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-            >
-              <option value="">No unit label</option>
-              {PRICEBOOK_UNIT_LABEL_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="space-y-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-900">Category</span>
+              <select
+                name="category"
+                defaultValue=""
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              >
+                <option value="">None</option>
+                {PRICEBOOK_CATEGORY_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="space-y-1 text-sm text-slate-700 md:col-span-2 xl:col-span-2">
-            <span className="font-medium text-slate-900">Default Description</span>
-            <input
-              type="text"
-              name="default_description"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-              placeholder="Optional default line-item description"
-            />
-          </label>
-
-          <div className="md:col-span-2 xl:col-span-4">
-            <button
-              type="submit"
-              className="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
-            >
-              Create item
-            </button>
+            <label className="space-y-2 text-sm text-slate-700 md:col-span-2">
+              <span className="font-semibold text-slate-900">Default Description</span>
+              <input
+                type="text"
+                name="default_description"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                placeholder="Optional default line-item description"
+              />
+            </label>
           </div>
+
+          <button
+            type="submit"
+            className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
+          >
+            Create item
+          </button>
         </form>
       </section>
 
@@ -431,8 +435,7 @@ export default async function AdminPricebookPage({
                 <th className="px-4 py-3">Item Name</th>
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Unit Price</th>
-                <th className="px-4 py-3">Unit Label</th>
+                <th className="px-4 py-3">Price & Unit</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Source</th>
                 <th className="px-4 py-3">Actions</th>
@@ -441,18 +444,31 @@ export default async function AdminPricebookPage({
             <tbody className="divide-y divide-slate-100 bg-white">
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-600">
-                    No {filterLabel(view).toLowerCase()} items in this view.
+                  <td colSpan={7} className="px-4 py-12 text-center">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-slate-700">
+                        No {filterLabel(view).toLowerCase()} items found.
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {view !== "all" ? (
+                          <>Try <Link href="/ops/admin/pricebook" className="font-medium text-slate-600 hover:text-slate-900 underline">clearing filters</Link> to see all items.</>
+                        ) : (
+                          <>Create your first item above to get started.</>
+                        )}
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 filteredRows.map((row) => (
                   <tr key={row.id} className={!row.is_active ? "bg-slate-50/60" : undefined}>
                     <td className="px-4 py-3 align-top">
-                      <div className="min-w-[230px] font-semibold text-slate-900">{row.item_name}</div>
-                      {row.default_description ? (
-                        <div className="mt-1 text-xs text-slate-500">{row.default_description}</div>
-                      ) : null}
+                      <div className="min-w-[200px]">
+                        <div className="font-semibold text-slate-900">{row.item_name}</div>
+                        {row.default_description ? (
+                          <div className="mt-1 text-xs text-slate-500">{row.default_description}</div>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3 align-top">
                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${typeBadgeClass(row.item_type)}`}>
@@ -460,13 +476,13 @@ export default async function AdminPricebookPage({
                       </span>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <div className="min-w-[160px] text-slate-700">{displayCategory(row.category)}</div>
+                      <div className="min-w-[140px] text-sm text-slate-700">{displayCategory(row.category)}</div>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <div className="min-w-[130px] text-slate-900">{currency(row.default_unit_price)}</div>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="min-w-[120px] text-slate-700">{displayUnitLabel(row.unit_label)}</div>
+                      <div className="min-w-[100px]">
+                        <div className="text-sm font-semibold text-slate-900">{currency(row.default_unit_price)}</div>
+                        <div className="text-xs text-slate-600">{displayUnitLabel(row.unit_label)}</div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 align-top">
                       <div className="flex min-w-[170px] flex-wrap gap-1.5">
@@ -484,120 +500,134 @@ export default async function AdminPricebookPage({
                       {(() => {
                         const source = getSourceTag(row);
                         return (
-                          <div className="min-w-[170px] space-y-1">
+                          <div className="min-w-[140px] space-y-1">
                             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${sourceBadgeClass(source)}`}>
                               {getSourceLabel(source)}
                             </span>
-                            {source !== "custom" ? (
-                              <div className="text-[11px] text-slate-500">Starter seed row</div>
-                            ) : (
-                              <div className="text-[11px] text-slate-500">Manual/custom row</div>
-                            )}
+                            <div className="text-[11px] text-slate-500">
+                              {source !== "custom" ? "Starter seed row" : "Custom row"}
+                            </div>
                           </div>
                         );
                       })()}
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <details className="mb-2 rounded-md border border-slate-200 bg-slate-50/80 p-2">
-                        <summary className="cursor-pointer text-xs font-semibold text-slate-800">Edit</summary>
-                        <form action={updatePricebookItemFromForm} className="mt-2 space-y-2">
+                      <div className="flex flex-col gap-2">
+                        <details className="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
+                          <summary className="cursor-pointer text-xs font-semibold text-slate-800 hover:text-slate-900">
+                            Edit fields
+                          </summary>
+                          <form action={updatePricebookItemFromForm} className="mt-3 space-y-3">
+                            <input type="hidden" name="item_id" value={row.id} />
+                            <label className="block space-y-1 text-xs text-slate-700">
+                              <span className="font-semibold text-slate-900">Item Name</span>
+                              <input
+                                type="text"
+                                name="item_name"
+                                defaultValue={row.item_name}
+                                required
+                                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                              />
+                            </label>
+                            <label className="block space-y-1 text-xs text-slate-700">
+                              <span className="font-semibold text-slate-900">Type</span>
+                              <select
+                                name="item_type"
+                                defaultValue={row.item_type}
+                                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                              >
+                                <option value="service">Service</option>
+                                <option value="material">Material</option>
+                                <option value="diagnostic">Diagnostic</option>
+                                <option value="adjustment">Adjustment</option>
+                              </select>
+                            </label>
+                            <label className="block space-y-1 text-xs text-slate-700">
+                              <span className="font-semibold text-slate-900">Category</span>
+                              <select
+                                name="category"
+                                defaultValue={isKnownPricebookCategory(row.category) ? (row.category ?? "") : ""}
+                                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                              >
+                                <option value="">None</option>
+                                {PRICEBOOK_CATEGORY_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                              {!isKnownPricebookCategory(row.category) && row.category ? (
+                                <span className="text-[10px] text-amber-700">Legacy value: {row.category}</span>
+                              ) : null}
+                            </label>
+                            <label className="block space-y-1 text-xs text-slate-700">
+                              <span className="font-semibold text-slate-900">Unit Price</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                name="default_unit_price"
+                                defaultValue={String(row.default_unit_price)}
+                                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                              />
+                            </label>
+                            <label className="block space-y-1 text-xs text-slate-700">
+                              <span className="font-semibold text-slate-900">Unit Label</span>
+                              <select
+                                name="unit_label"
+                                defaultValue={isKnownPricebookUnitLabel(row.unit_label) ? (row.unit_label ?? "") : ""}
+                                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                              >
+                                <option value="">None</option>
+                                {PRICEBOOK_UNIT_LABEL_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                              {!isKnownPricebookUnitLabel(row.unit_label) && row.unit_label ? (
+                                <span className="text-[10px] text-amber-700">Legacy value: {row.unit_label}</span>
+                              ) : null}
+                            </label>
+                            <label className="block space-y-1 text-xs text-slate-700">
+                              <span className="font-semibold text-slate-900">Description</span>
+                              <input
+                                type="text"
+                                name="default_description"
+                                defaultValue={row.default_description ?? ""}
+                                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                              />
+                            </label>
+                            <button
+                              type="submit"
+                              className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
+                            >
+                              Save changes
+                            </button>
+                          </form>
+                        </details>
+
+                        <form action={setPricebookItemActiveFromForm} className="flex flex-col gap-2">
                           <input type="hidden" name="item_id" value={row.id} />
-                          <label className="block space-y-1 text-xs text-slate-700">
-                            <span className="font-medium text-slate-900">Name</span>
-                            <input
-                              type="text"
-                              name="item_name"
-                              defaultValue={row.item_name}
-                              required
-                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                            />
-                          </label>
-                          <label className="block space-y-1 text-xs text-slate-700">
-                            <span className="font-medium text-slate-900">Type</span>
-                            <select
-                              name="item_type"
-                              defaultValue={row.item_type}
-                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                          <input type="hidden" name="is_active" value={row.is_active ? "0" : "1"} />
+                          <div>
+                            <button
+                              type="submit"
+                              className="w-full rounded-md border px-2.5 py-1.5 text-xs font-semibold transition"
+                              title={row.is_active ? "Mark as inactive—existing invoices stay unchanged" : "Mark as active—will appear in selections"}
+                              style={{
+                                borderColor: row.is_active ? "#fca5a5" : "#86efac",
+                                backgroundColor: row.is_active ? "#fee2e2" : "#f0fdf4",
+                                color: row.is_active ? "#dc2626" : "#16a34a",
+                              }}
                             >
-                              <option value="service">Service</option>
-                              <option value="material">Material</option>
-                              <option value="diagnostic">Diagnostic</option>
-                              <option value="adjustment">Adjustment</option>
-                            </select>
-                          </label>
-                          <label className="block space-y-1 text-xs text-slate-700">
-                            <span className="font-medium text-slate-900">Category</span>
-                            <select
-                              name="category"
-                              defaultValue={isKnownPricebookCategory(row.category) ? (row.category ?? "") : ""}
-                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                            >
-                              <option value="">No category</option>
-                              {PRICEBOOK_CATEGORY_OPTIONS.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                            {!isKnownPricebookCategory(row.category) && row.category ? (
-                              <span className="text-[11px] text-amber-700">Legacy value currently stored: {row.category}</span>
-                            ) : null}
-                          </label>
-                          <label className="block space-y-1 text-xs text-slate-700">
-                            <span className="font-medium text-slate-900">Unit Price</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              name="default_unit_price"
-                              defaultValue={String(row.default_unit_price)}
-                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                            />
-                          </label>
-                          <label className="block space-y-1 text-xs text-slate-700">
-                            <span className="font-medium text-slate-900">Unit Label</span>
-                            <select
-                              name="unit_label"
-                              defaultValue={isKnownPricebookUnitLabel(row.unit_label) ? (row.unit_label ?? "") : ""}
-                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                            >
-                              <option value="">No unit label</option>
-                              {PRICEBOOK_UNIT_LABEL_OPTIONS.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                            {!isKnownPricebookUnitLabel(row.unit_label) && row.unit_label ? (
-                              <span className="text-[11px] text-amber-700">Legacy value currently stored: {row.unit_label}</span>
-                            ) : null}
-                          </label>
-                          <label className="block space-y-1 text-xs text-slate-700">
-                            <span className="font-medium text-slate-900">Description</span>
-                            <input
-                              type="text"
-                              name="default_description"
-                              defaultValue={row.default_description ?? ""}
-                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                            />
-                          </label>
-                          <button
-                            type="submit"
-                            className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
-                          >
-                            Save
-                          </button>
+                              {row.is_active ? "Deactivate" : "Activate"}
+                            </button>
+                            <p className="mt-1 text-[10px] text-slate-500 px-0.5">
+                              {row.is_active ? "Prevents future selection" : "Enables in selections"}
+                            </p>
+                          </div>
                         </form>
-                      </details>
-                      <form action={setPricebookItemActiveFromForm}>
-                        <input type="hidden" name="item_id" value={row.id} />
-                        <input type="hidden" name="is_active" value={row.is_active ? "0" : "1"} />
-                        <button
-                          type="submit"
-                          className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
-                        >
-                          {row.is_active ? "Deactivate" : "Activate"}
-                        </button>
-                      </form>
+                      </div>
                     </td>
                   </tr>
                 ))
