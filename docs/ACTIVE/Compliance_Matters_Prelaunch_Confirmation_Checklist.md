@@ -205,6 +205,23 @@ If any item here conflicts with the active spine, the spine wins.
   - manual + Pricebook invoice add coexistence
   - issued/void invoice lock behavior
 
+### 2.12 Pricebook existing-account Starter Kit V2 backfill tooling promotion confirmation (V2C-1/V2C-2/V2C-3)
+- Completed: V2C-1/V2C-2/V2C-3 are production-promoted on `main` (commit `4ead046`).
+  - V2C-1: dry-run planner helper promoted
+  - V2C-2: apply helper promoted (requires explicit `confirmApply: true`; collision-blocking is default)
+  - V2C-3: CLI wrapper (`scripts/backfill-pricebook-starter-kit.ts`) promoted
+- Completed: promotion validation passed before and after merge:
+  - 86 tests passed (64 pricebook-seeding + 22 backfill CLI)
+  - `npx tsc --noEmit` passed
+- Confirmed: no Supabase command, migration, provisioning apply, backfill run against real data, or production data action occurred as part of V2C promotion.
+- Confirmed: backfill is not automatic; no production account has been backfilled.
+- Confirmed: CLI defaults to dry-run; apply requires explicit `--apply` flag.
+- Confirmed: insert-only behavior; existing rows are never updated or mutated.
+- Confirmed: hosted/production-like targets require both `ALLOW_FIRST_OWNER_PROVISIONING=true` and `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true` before dry-run or apply.
+- Confirmed: invoice snapshots, historical invoices, payments, Stripe, QBO, Visit Scope, and service workflow behavior are unchanged.
+- Pre-launch operator verification item: before any real account backfill, operator must run dry-run only against the intended target, review the full plan output, and confirm `would_insert_count` and collision output are sane before any apply.
+- Runbook reference: `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` (Section 10).
+
 ---
 
 ## 3. Support / customer-operations readiness

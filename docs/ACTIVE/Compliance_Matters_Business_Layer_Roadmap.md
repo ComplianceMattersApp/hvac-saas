@@ -372,7 +372,19 @@ Current D2C continuation clarifications:
 - seeding is idempotent by `seed_key`
 - dry-run previews starter seeding before apply
 - existing accounts are not auto-backfilled in D2C-3/D2C-4
-- existing-account Starter Kit V2 backfill remains future work
+- V2C-1/V2C-2/V2C-3 existing-account Starter Kit V2 backfill operator tooling is production-promoted on `main` (commit `4ead046`):
+  - V2C-1 dry-run planner helper (`planExistingAccountStarterKitBackfill`) is production-promoted
+  - V2C-2 apply helper (`applyExistingAccountStarterKitBackfill`) is production-promoted; requires explicit `confirmApply: true`; collision-blocking is the default
+  - V2C-3 CLI wrapper (`scripts/backfill-pricebook-starter-kit.ts`) is production-promoted; dry-run is the default mode; apply requires explicit `--apply`; `--allow-collisions` is required to override collision blocking
+  - backfill is single-account only, insert-only, and never mutates existing or customized rows
+  - hosted targets require both `ALLOW_FIRST_OWNER_PROVISIONING=true` and `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true` before dry-run or apply
+  - no real production account has been backfilled; the operator tool exists but has not been run against real data
+  - operator must always run dry-run first and review output before any apply
+  - admin UI backfill controls remain future work
+  - batch backfill remains future work
+  - automatic backfill remains prohibited
+  - negative/default-credit adjustment behavior remains deferred
+- no invoice/payment/Stripe/QBO/Visit Scope/service workflow behavior changed by V2C-1/V2C-2/V2C-3
 - D3B controlled-options refinement is production-promoted on `main` (merge `58dcb31`, change `3084906`):
   - code/test-only option refinement in `lib/business/pricebook-options.ts` and `lib/business/__tests__/pricebook-options.test.ts`
   - categories added: `Electrical`, `Compliance Docs`

@@ -1270,6 +1270,20 @@ Current position:
   - Starter Kit V2 content was not implemented by D3B (it was implemented later in V2A/V2B)
   - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by D2C-3/D2C-4
   - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by D3B
+  - V2C-1/V2C-2/V2C-3 existing-account Starter Kit V2 backfill tooling is production-promoted on `main` (commit `4ead046`):
+    - V2C-1: dry-run planner helper (`planExistingAccountStarterKitBackfill`) is production-promoted
+    - V2C-2: apply helper (`applyExistingAccountStarterKitBackfill`) is production-promoted; requires explicit `confirmApply: true`; collision-blocking is on by default
+    - V2C-3: operator CLI wrapper (`scripts/backfill-pricebook-starter-kit.ts`) is production-promoted; dry-run is the default mode; apply requires explicit `--apply` flag; `--allow-collisions` required to override collision blocking
+    - backfill is single-account only; no batch or auto-discovery mode exists
+    - insert-only; existing rows are never updated; customized rows are never mutated
+    - hosted/production-like targets require both `ALLOW_FIRST_OWNER_PROVISIONING=true` and `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true` before dry-run or apply
+    - no real production account has been backfilled; the CLI exists but has not been run against real data
+    - Pricebook remains catalog/default pricing truth, not operational truth
+    - historical invoices and invoice snapshots are not touched by backfill
+    - admin UI backfill controls remain future work
+    - batch backfill remains future work
+    - automatic backfill remains prohibited
+  - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by V2C-1/V2C-2/V2C-3
 - Launch-readiness polish catch-up is complete for current scope:
   - Service/Visit Scope clarity pass is complete, including clearer Service Details vs Visit Scope guidance and clearer Job Title fallback copy.
   - Invoice job-detail TLC pass is complete, including scanability improvements and explicit truth language that payments are tracking-only entries (no card charge execution).
