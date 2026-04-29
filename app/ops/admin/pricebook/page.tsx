@@ -267,9 +267,6 @@ export default async function AdminPricebookPage({
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
               Manage reusable catalog items for your account. Pricebook values are editable defaults and do not mutate historical invoice line snapshots.
             </p>
-            <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Slice B: admin CRUD only
-            </div>
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -297,15 +294,16 @@ export default async function AdminPricebookPage({
               {activeCount} active • {inactiveCount} inactive • {starterCount} starter • {customCount} custom
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              Starter rows: {starterCount} • Deferred placeholders: {deferredCount}
+              Starter rows: {starterCount}
+              {deferredCount > 0 ? ` • Deferred placeholders: ${deferredCount}` : ""}
             </p>
           </div>
         </div>
 
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-700">
-          <p className="font-semibold text-slate-900">Operator clarity</p>
+          <p className="font-semibold text-slate-900">Pricebook clarity</p>
           <p className="mt-1 leading-6">
-            Pricebook rows are reusable defaults for future estimates and invoices. Editing a Pricebook row does not rewrite historical invoice lines. Starter Kit backfill is handled through operator tooling and does not run automatically from this page.
+            Pricebook rows are reusable defaults for future estimates and invoices. Editing a Pricebook row affects future selections only and does not change historical invoice lines.
           </p>
         </div>
 
@@ -634,9 +632,6 @@ export default async function AdminPricebookPage({
               )}
             </tbody>
           </table>
-        </div>
-        <div className="border-t border-slate-200 bg-slate-50/60 px-4 py-3 text-xs leading-5 text-slate-600">
-          Starter Kit backfill is handled through operator tooling and remains dry-run-first. No automatic backfill runs from this page.
         </div>
       </section>
     </div>
