@@ -337,6 +337,28 @@ Current baseline state is:
 - Starter Kit `v1` and `v2` remain explicitly selectable legacy-supported options; `v3` is also explicitly selectable
 - invalid selector values remain rejected before provisioning execution
 - dry-run output now includes selected starter kit metadata (`starter_kit_version`, `seed_count`, `active_seed_count`, `inactive_seed_count`)
+- safe-equivalent existing-account backfill behavior is production-promoted on `main`:
+  - exact active legacy/different-seed-key equivalents are safely skipped
+  - unsafe/ambiguous collisions remain blocking by default
+  - existing rows are never updated or mutated
+- controlled sandbox existing-account V3 backfill validation is complete for this phase:
+  - pre-apply dry-run: `would_insert_count = 96`, `would_skip_existing_equivalent_count = 1`, `possible_collision_count = 0`, `errors = []`
+  - apply result: `inserted_count = 96`, `skipped_existing_equivalent_count = 1`, `possible_collision_count = 0`, `errors = []`
+  - post-apply dry-run: `would_insert_count = 0`, `would_skip_existing_seed_key_count = 96`, `would_skip_existing_equivalent_count = 1`, `possible_collision_count = 0`, `errors = []`
+  - existing V1 `R-410A` row was not duplicated
+  - sandbox Pricebook UI now shows `109` items
+- existing-account backfill remains operator-controlled and dry-run-first
+- sandbox apply succeeded; production existing-account apply has not occurred
+- Pricebook/Admin Polish P3 is complete and production-promoted on `main`:
+  - Search Pricebook
+  - category filter from existing account rows
+  - clear filters
+  - filtered counts
+  - empty filtered state guidance
+- admin UI backfill controls remain future work
+- batch backfill remains future work
+- automatic backfill remains prohibited
+- negative/default-credit behavior remains deferred
 
 ### Purpose
 Pricebook is the reusable catalog of billable items.

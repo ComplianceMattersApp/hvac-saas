@@ -361,10 +361,12 @@ Expected dry-run output fields:
 - `inactive_seed_count`: inactive/deferred rows for selected starter version (`2` for `v2`, `6` for `v3`)
 - `would_insert_count`: rows that would be inserted
 - `would_skip_existing_seed_key_count`: rows skipped because seed_key already exists
-- `possible_collision_count`: non-seed rows with a matching `item_name` that would not be inserted
+- `would_skip_existing_equivalent_count`: rows safely skipped because an active exact equivalent already exists under a different/legacy seed key
+- `preview_existing_equivalent_rows`: preview of safe equivalent skips
+- `possible_collision_count`: rows requiring review because they are not safe equivalents (unsafe/ambiguous matches)
 - `preview_insert_rows`: preview of rows that would be inserted (limited by `--preview-limit`)
 - `preview_skip_rows`: preview of rows that would be skipped
-- `possible_collisions`: rows with potential name overlap
+- `possible_collisions`: rows requiring review before apply (collision-blocking remains default)
 - `warnings`: any non-fatal warnings
 - `errors`: any blocking errors (empty on success)
 
@@ -399,11 +401,16 @@ npx tsx scripts/backfill-pricebook-starter-kit.ts \
 
 - Insert-only: the backfill never updates existing Pricebook rows.
 - Customized rows are never mutated.
+- Safe-equivalent behavior:
+  - exact active legacy/different-seed-key equivalents are skipped
+  - safe equivalence requires matching item signature (`item_name`, `category`, `unit_label`, and `item_type` where available)
+  - equivalent skips do not block apply
 - Historical invoices and invoice snapshots are not touched.
 - Payment, Stripe, and QBO behavior are unchanged.
 - Visit Scope and service workflow behavior are unchanged.
-- Collision blocking is the default: if `possible_collision_count > 0`, apply will error unless `--allow-collisions` is passed.
+- Collision blocking is the default: unsafe/ambiguous collisions still block apply unless `--allow-collisions` is passed.
 - Seeding is idempotent by `seed_key`: re-running apply does not duplicate rows already seeded.
+- Production existing-account backfill remains dry-run-first and operator-controlled; this runbook section does not imply any production apply has been run.
 
 ### 10.8 Post-apply verification
 

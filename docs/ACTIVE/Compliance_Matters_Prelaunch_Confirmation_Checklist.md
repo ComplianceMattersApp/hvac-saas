@@ -279,6 +279,21 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: existing-account backfill remains operator-controlled and dry-run-first; no account has been backfilled as part of V3 default adoption.
 - Pre-launch operator requirement: before onboarding the first real account on this baseline, verify dry-run preview output shows V3 starter metadata and sane row counts.
 
+### 2.16 Pricebook V3 sandbox backfill + Admin P3 closeout confirmation
+- Completed: safe-equivalent existing-account backfill tooling is production-promoted on `main` (commit `41d5dae`).
+- Completed: controlled sandbox existing-account V3 backfill apply succeeded for account owner `6e93b2f7-1509-4a39-87e5-6558497f2157`.
+- Completed verification:
+  - pre-apply dry-run: `seed_count = 97`, `would_insert_count = 96`, `would_skip_existing_equivalent_count = 1`, `possible_collision_count = 0`, `errors = []`
+  - apply result: `inserted_count = 96`, `skipped_existing_equivalent_count = 1`, `possible_collision_count = 0`, `errors = []`
+  - post-apply dry-run: `would_insert_count = 0`, `would_skip_existing_seed_key_count = 96`, `would_skip_existing_equivalent_count = 1`, `possible_collision_count = 0`, `errors = []`
+- Completed: existing V1 `R-410A` row was not duplicated.
+- Completed: sandbox Pricebook UI now shows `109` items.
+- Completed: Pricebook/Admin P3 usability promotion is on `main` (commit `4446af3`) with Search Pricebook, category filter, clear filters, filtered counts, and filtered empty state.
+- Completed: validation passed for both promotion slices (`npx tsc --noEmit`; targeted Pricebook suites).
+- Confirmed: no production data was touched for this closeout.
+- Confirmed: no Supabase command, migration, provisioning apply, or backfill batch/automatic run occurred.
+- Pre-launch operator note: before any production existing-account backfill, run dry-run first and verify inserts/skips/equivalents/collisions are sane before any apply.
+
 ---
 
 ## 3. Support / customer-operations readiness

@@ -1310,6 +1310,25 @@ Current position:
     - Pricebook remains reusable catalog/default pricing truth, not operational truth
   - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by Pricebook/Admin Polish P2
   - no business logic, seed definitions, or backfill behavior changed by Pricebook/Admin Polish P2
+  - safe-equivalent existing-account backfill tooling is production-promoted on `main` (commit `41d5dae`):
+    - exact active legacy/different-seed-key equivalents are safely skipped when signature matches (`item_name`, `category`, `unit_label`, `item_type`)
+    - unsafe/ambiguous collisions remain blocking by default
+    - existing rows are never updated or mutated by backfill
+  - controlled sandbox existing-account V3 backfill was completed successfully for account owner `6e93b2f7-1509-4a39-87e5-6558497f2157`:
+    - pre-apply dry-run confirmed: `would_insert_count = 96`, `would_skip_existing_equivalent_count = 1`, `possible_collision_count = 0`, `errors = []`
+    - apply result confirmed: `inserted_count = 96`, `skipped_existing_equivalent_count = 1`, `possible_collision_count = 0`, `errors = []`
+    - post-apply dry-run confirmed terminal state: `would_insert_count = 0`, `would_skip_existing_seed_key_count = 96`, `would_skip_existing_equivalent_count = 1`, `possible_collision_count = 0`, `errors = []`
+    - existing V1 `R-410A` row was not duplicated
+    - sandbox admin UI now shows `109` Pricebook items
+  - Pricebook/Admin Polish P3 is production-promoted on `main` (commit `4446af3`):
+    - admin Pricebook catalog now supports search and category navigation on the normal admin page
+    - combined filtering is available across status/source plus search/category
+    - clear-filters behavior, filtered count summary, and filtered empty-state guidance are now present
+    - normal admin page still does not expose V1/V2/V3 implementation labels and does not include backfill controls
+  - existing-account backfill remains operator-controlled and dry-run-first; no automatic or batch backfill behavior exists
+  - no production data was touched for existing-account V3 backfill closeout
+  - Pricebook remains reusable catalog/default pricing truth, not operational truth
+  - no invoice/payment/Stripe/QBO/Visit Scope/service-workflow behavior changed by safe-equivalent tooling or Pricebook/Admin Polish P3
 - Launch-readiness polish catch-up is complete for current scope:
   - Service/Visit Scope clarity pass is complete, including clearer Service Details vs Visit Scope guidance and clearer Job Title fallback copy.
   - Invoice job-detail TLC pass is complete, including scanability improvements and explicit truth language that payments are tracking-only entries (no card charge execution).
