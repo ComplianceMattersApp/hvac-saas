@@ -101,6 +101,29 @@ export type ExistingAccountStarterKitBackfillPlan = {
   errors: string[];
 };
 
+export type ExistingAccountStarterKitBackfillApplyResult = {
+  mode: 'apply';
+  account_owner_user_id: string;
+  starter_kit_version: 'v2';
+  seed_count: number;
+  active_seed_count: number;
+  inactive_seed_count: number;
+  inserted_count: number;
+  skipped_existing_seed_key_count: number;
+  possible_collision_count: number;
+  inserted_rows: Array<{
+    seed_key: string;
+    item_name: string;
+  }>;
+  skipped_rows: Array<{
+    seed_key: string;
+    item_name: string;
+  }>;
+  possible_collisions: ExistingAccountStarterKitBackfillPlan['possible_collisions'];
+  warnings: string[];
+  errors: string[];
+};
+
 export type PricebookExistingSeedRow = {
   seed_key: string;
   item_name: string;
@@ -1010,6 +1033,147 @@ export async function planExistingAccountStarterKitBackfill(params: {
       would_skip_rows: [],
       possible_collisions: [],
       warnings: [],
+      errors: [`Unexpected error: ${err instanceof Error ? err.message : String(err)}`],
+    });
+  }
+}
+
+/**
+ * Existing-account apply helper for Starter Kit V2 backfill.
+ *
+ * Apply path is explicit and single-account only.
+ * This helper reuses the dry-run planner before writing, then inserts only
+ * missing V2 seed rows by seed_key. Existing rows are never updated/deleted.
+ *
+ * Requires `confirmApply: true` to execute the write path.
+ * Blocked by default if collisions are detected; pass `allowCollisions: true` to override.
+ */
+export async function applyExistingAccountStarterKitBackfill(params: {
+  store: PricebookSeedingStore;
+  account_owner_user_id: string;
+  confirmApply: true;
+  allowCollisions?: true;
+}): Promise<ExistingAccountStarterKitBackfillApplyResult> {
+  const { store, account_owner_user_id } = params;
+  const selection = resolveStarterKitSeeds('v2');
+
+  const buildApplyResult = (input: {
+    inserted_rows: Array<{ seed_key: string; item_name: string }>;
+    skipped_rows: Array<{ seed_key: string; item_name: string }>;
+    possible_collisions: ExistingAccountStarterKitBackfillApplyResult['possible_collisions'];
+    warnings?: string[];
+    errors?: string[];
+  }): ExistingAccountStarterKitBackfillApplyResult => ({
+    mode: 'apply',
+    account_owner_user_id,
+    starter_kit_version: 'v2',
+    seed_count: selection.seedCount,
+    active_seed_count: selection.activeCount,
+    inactive_seed_count: selection.inactiveCount,
+    inserted_count: input.inserted_rows.length,
+    skipped_existing_seed_key_count: input.skipped_rows.length,
+    possible_collision_count: input.possible_collisions.length,
+    inserted_rows: input.inserted_rows,
+    skipped_rows: input.skipped_rows,
+    possible_collisions: input.possible_collisions,
+    warnings: input.warnings ?? [],
+    errors: input.errors ?? [],
+  });
+
+  // Runtime guard: explicit confirmation required even though the type enforces confirmApply: true.
+  if (params.confirmApply !== true) {
+    return buildApplyResult({
+      inserted_rows: [],
+      skipped_rows: [],
+      possible_collisions: [],
+      errors: ['confirmApply: true is required to execute the apply path.'],
+    });
+  }
+
+  const plan = await planExistingAccountStarterKitBackfill({
+    store,
+    account_owner_user_id,
+    previewLimit: selection.seedCount,
+  });
+
+  if (plan.errors.length > 0) {
+    return buildApplyResult({
+      inserted_rows: [],
+      skipped_rows: plan.preview_skip_rows,
+      possible_collisions: plan.possible_collisions,
+      warnings: plan.warnings,
+      errors: plan.errors,
+    });
+  }
+
+  // Collision blocking: block by default; require explicit allowCollisions: true to proceed.
+  if (plan.possible_collision_count > 0 && params.allowCollisions !== true) {
+    return buildApplyResult({
+      inserted_rows: [],
+      skipped_rows: plan.preview_skip_rows,
+      possible_collisions: plan.possible_collisions,
+      warnings: plan.warnings,
+      errors: [
+        `Apply blocked: ${plan.possible_collision_count} possible name/category/unit collision(s) detected. Review collisions and pass allowCollisions: true to proceed.`,
+      ],
+    });
+  }
+
+  const plannedInsertKeys = new Set(plan.preview_insert_rows.map((row) => row.seed_key));
+  const to_insert = selection.seeds
+    .filter((seed) => plannedInsertKeys.has(seed.seed_key))
+    .map((seed) => ({
+      ...seed,
+      account_owner_user_id,
+    }));
+
+  if (to_insert.length !== plan.would_insert_count) {
+    return buildApplyResult({
+      inserted_rows: [],
+      skipped_rows: plan.preview_skip_rows,
+      possible_collisions: plan.possible_collisions,
+      warnings: plan.warnings,
+      errors: [
+        'Planner/apply mismatch: incomplete insert candidate set; no rows were written.',
+      ],
+    });
+  }
+
+  if (to_insert.length === 0) {
+    return buildApplyResult({
+      inserted_rows: [],
+      skipped_rows: plan.preview_skip_rows,
+      possible_collisions: plan.possible_collisions,
+      warnings: plan.warnings,
+      errors: [],
+    });
+  }
+
+  try {
+    const { error: insertError } = await store.insertSeedRows(to_insert);
+    if (insertError) {
+      return buildApplyResult({
+        inserted_rows: [],
+        skipped_rows: plan.preview_skip_rows,
+        possible_collisions: plan.possible_collisions,
+        warnings: plan.warnings,
+        errors: [`Database insert error: ${insertError.message}`],
+      });
+    }
+
+    return buildApplyResult({
+      inserted_rows: plan.preview_insert_rows,
+      skipped_rows: plan.preview_skip_rows,
+      possible_collisions: plan.possible_collisions,
+      warnings: plan.warnings,
+      errors: [],
+    });
+  } catch (err) {
+    return buildApplyResult({
+      inserted_rows: [],
+      skipped_rows: plan.preview_skip_rows,
+      possible_collisions: plan.possible_collisions,
+      warnings: plan.warnings,
       errors: [`Unexpected error: ${err instanceof Error ? err.message : String(err)}`],
     });
   }

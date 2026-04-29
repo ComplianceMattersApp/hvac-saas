@@ -2,6 +2,7 @@
 import {
   STARTER_KIT_V1_SEEDS,
   STARTER_KIT_V2_SEEDS,
+  applyExistingAccountStarterKitBackfill,
   applyPricebookSeeding,
   createPricebookSeedingStoreFromSupabase,
   dryRunPricebookSeeding,
@@ -522,6 +523,359 @@ describe('PricebookSeeding', () => {
       expect(result.would_insert_count).toBe(0);
       expect(result.errors.some((e) => e.includes('Connection error'))).toBe(true);
       expect(mockStore.insertSeedRows).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('applyExistingAccountStarterKitBackfill', () => {
+    let mockStore: PricebookSeedingStore;
+    let listExistingSeedRowsMock: ReturnType<typeof vi.fn>;
+    let listExistingRowsForCollisionMock: ReturnType<typeof vi.fn>;
+    let insertSeedRowsMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      listExistingSeedRowsMock = vi.fn();
+      listExistingRowsForCollisionMock = vi.fn();
+      insertSeedRowsMock = vi.fn();
+      mockStore = {
+        listExistingSeedRows: listExistingSeedRowsMock,
+        listExistingRowsForCollision: listExistingRowsForCollisionMock,
+        insertSeedRows: insertSeedRowsMock,
+      };
+    });
+
+    it('inserts all missing V2 seeds when none exist', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      insertSeedRowsMock.mockResolvedValue({ error: null });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        confirmApply: true,
+      });
+
+      expect(result.mode).toBe('apply');
+      expect(result.starter_kit_version).toBe('v2');
+      expect(result.inserted_count).toBe(23);
+      expect(result.skipped_existing_seed_key_count).toBe(0);
+      expect(result.errors).toEqual([]);
+      expect(insertSeedRowsMock).toHaveBeenCalledTimes(1);
+
+      const insertedPayload = insertSeedRowsMock.mock.calls[0]?.[0] ?? [];
+      expect(insertedPayload).toHaveLength(23);
+      expect(insertedPayload.every((row: any) => row.seed_key.startsWith('starter_v2.'))).toBe(true);
+    });
+
+    it('inserts only missing V2 seeds when some seed_keys already exist', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: STARTER_KIT_V2_SEEDS.slice(0, 2).map((seed) => ({
+          seed_key: seed.seed_key,
+          item_name: seed.item_name,
+        })),
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      insertSeedRowsMock.mockResolvedValue({ error: null });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        confirmApply: true,
+      });
+
+      expect(result.inserted_count).toBe(21);
+      expect(result.skipped_existing_seed_key_count).toBe(2);
+      expect(result.errors).toEqual([]);
+
+      const insertedPayload = insertSeedRowsMock.mock.calls[0]?.[0] ?? [];
+      expect(insertedPayload).toHaveLength(21);
+      expect(
+        insertedPayload.some((row: any) => row.seed_key === STARTER_KIT_V2_SEEDS[0].seed_key),
+      ).toBe(false);
+      expect(
+        insertedPayload.some((row: any) => row.seed_key === STARTER_KIT_V2_SEEDS[1].seed_key),
+      ).toBe(false);
+    });
+
+    it('does not write when all V2 seed keys already exist', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: STARTER_KIT_V2_SEEDS.map((seed) => ({
+          seed_key: seed.seed_key,
+          item_name: seed.item_name,
+        })),
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        confirmApply: true,
+      });
+
+      expect(result.inserted_count).toBe(0);
+      expect(result.skipped_existing_seed_key_count).toBe(23);
+      expect(result.errors).toEqual([]);
+      expect(insertSeedRowsMock).not.toHaveBeenCalled();
+    });
+
+    it('returns planner errors and does not write', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: null,
+        error: { message: 'Connection error' },
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        confirmApply: true,
+      });
+
+      expect(result.inserted_count).toBe(0);
+      expect(result.errors.some((e) => e.includes('Connection error'))).toBe(true);
+      expect(insertSeedRowsMock).not.toHaveBeenCalled();
+    });
+
+    it('returns insert errors from store write step', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      insertSeedRowsMock.mockResolvedValue({
+        error: { message: 'Insert failed' },
+      });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        confirmApply: true,
+      });
+
+      expect(result.inserted_count).toBe(0);
+      expect(result.errors.some((e) => e.includes('Insert failed'))).toBe(true);
+      expect(insertSeedRowsMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('collision blocks apply by default when allowCollisions is not set', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [
+          {
+            id: 'row-1',
+            seed_key: null,
+            item_name: 'Service Call',
+            category: 'Fees',
+            unit_label: 'trip',
+            is_active: true,
+          },
+        ],
+        error: null,
+      });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        confirmApply: true,
+      });
+
+      expect(result.inserted_count).toBe(0);
+      expect(result.possible_collision_count).toBe(1);
+      expect(result.errors.some((e) => e.includes('Apply blocked'))).toBe(true);
+      expect(insertSeedRowsMock).not.toHaveBeenCalled();
+    });
+
+    it('collision with allowCollisions: true inserts missing rows despite collision', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [
+          {
+            id: 'row-1',
+            seed_key: null,
+            item_name: 'Service Call',
+            category: 'Fees',
+            unit_label: 'trip',
+            is_active: true,
+          },
+        ],
+        error: null,
+      });
+      insertSeedRowsMock.mockResolvedValue({ error: null });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        confirmApply: true,
+        allowCollisions: true,
+      });
+
+      expect(result.inserted_count).toBe(23);
+      expect(result.possible_collision_count).toBe(1);
+      expect(result.warnings.some((w) => w.includes('Possible name/category/unit collisions'))).toBe(true);
+      expect(result.errors).toEqual([]);
+      expect(insertSeedRowsMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('blocks apply when confirmApply is not explicitly true', async () => {
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        confirmApply: false as unknown as true,
+      });
+
+      expect(result.inserted_count).toBe(0);
+      expect(result.errors.some((e) => e.includes('confirmApply'))).toBe(true);
+      expect(insertSeedRowsMock).not.toHaveBeenCalled();
+    });
+
+    it('V1-only starter rows in account inserts all 23 V2 rows', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: STARTER_KIT_V1_SEEDS.map((seed) => ({
+          seed_key: seed.seed_key,
+          item_name: seed.item_name,
+        })),
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      insertSeedRowsMock.mockResolvedValue({ error: null });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        confirmApply: true,
+      });
+
+      expect(result.inserted_count).toBe(23);
+      expect(result.skipped_existing_seed_key_count).toBe(0);
+      expect(result.errors).toEqual([]);
+      expect(insertSeedRowsMock).toHaveBeenCalledTimes(1);
+
+      const insertedPayload = insertSeedRowsMock.mock.calls[0]?.[0] ?? [];
+      expect(insertedPayload).toHaveLength(23);
+      expect(insertedPayload.every((row: any) => row.seed_key.startsWith('starter_v2.'))).toBe(true);
+    });
+
+    it('edited starter row with same seed_key is skipped and not re-inserted', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [
+          {
+            seed_key: 'starter_v2.fees.service_call_standard',
+            item_name: 'My Custom Service Call Name',
+          },
+        ],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [
+          {
+            id: 'row-edited',
+            seed_key: 'starter_v2.fees.service_call_standard',
+            item_name: 'My Custom Service Call Name',
+            category: 'Fees',
+            unit_label: 'trip',
+            is_active: true,
+          },
+        ],
+        error: null,
+      });
+      insertSeedRowsMock.mockResolvedValue({ error: null });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        confirmApply: true,
+      });
+
+      expect(result.skipped_existing_seed_key_count).toBe(1);
+      expect(result.inserted_count).toBe(22);
+      expect(result.possible_collision_count).toBe(0);
+      expect(result.errors).toEqual([]);
+
+      const insertedPayload = insertSeedRowsMock.mock.calls[0]?.[0] ?? [];
+      expect(insertedPayload.some((row: any) => row.seed_key === 'starter_v2.fees.service_call_standard')).toBe(false);
+    });
+
+    it('inactive/deferred V2 rows are inserted when missing and counted in inserted_rows', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      insertSeedRowsMock.mockResolvedValue({ error: null });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        confirmApply: true,
+      });
+
+      expect(result.inserted_count).toBe(23);
+      expect(result.inactive_seed_count).toBe(2);
+      const inactiveSeedKeys = STARTER_KIT_V2_SEEDS
+        .filter((s) => !s.is_active)
+        .map((s) => s.seed_key);
+      expect(
+        inactiveSeedKeys.every((key) =>
+          result.inserted_rows.some((row) => row.seed_key === key),
+        ),
+      ).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('idempotency: second apply when all seeds exist inserts 0 and does not write', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: STARTER_KIT_V2_SEEDS.map((seed) => ({
+          seed_key: seed.seed_key,
+          item_name: seed.item_name,
+        })),
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        confirmApply: true,
+      });
+
+      expect(result.inserted_count).toBe(0);
+      expect(result.skipped_existing_seed_key_count).toBe(23);
+      expect(result.errors).toEqual([]);
+      expect(insertSeedRowsMock).not.toHaveBeenCalled();
     });
   });
 
