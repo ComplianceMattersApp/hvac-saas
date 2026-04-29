@@ -17,7 +17,9 @@ import {
 } from "@/lib/business/pricebook-options";
 import { createClient } from "@/lib/supabase/server";
 
-type SearchParams = Promise<{ notice?: string }>;
+type SearchParams = Promise<{ notice?: string; view?: string }>;
+
+type PricebookView = "all" | "active" | "inactive" | "starter" | "custom";
 
 type PricebookRow = {
   id: string;
@@ -29,6 +31,8 @@ type PricebookRow = {
   unit_label: string | null;
   is_active: boolean;
   is_starter: boolean;
+  seed_key: string | null;
+  starter_version: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -69,6 +73,15 @@ function statusBadgeClass(isActive: boolean) {
     : "border-slate-300 bg-slate-100 text-slate-700";
 }
 
+function sourceBadgeClass(source: "starter" | "custom") {
+  if (source === "starter") return "border-yellow-200 bg-yellow-50 text-yellow-900";
+  return "border-slate-300 bg-slate-100 text-slate-700";
+}
+
+function deferredBadgeClass() {
+  return "border-violet-200 bg-violet-50 text-violet-900";
+}
+
 function currency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -97,6 +110,54 @@ function displayUnitLabel(value: string | null) {
   if (!value) return "-";
   if (isKnownPricebookUnitLabel(value)) return value;
   return `Legacy / Unknown (${value})`;
+}
+
+function normalizeStarterVersion(value: string | null): "v1" | "v2" | null {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "v1" || normalized === "starter_v1") return "v1";
+  if (normalized === "v2" || normalized === "starter_v2") return "v2";
+  return null;
+}
+
+function getSourceTag(row: PricebookRow): "starter" | "custom" {
+  const version = normalizeStarterVersion(row.starter_version);
+  if (version === "v1" || version === "v2") return "starter";
+  if (row.is_starter || row.seed_key) return "starter";
+  return "custom";
+}
+
+function getSourceLabel(source: ReturnType<typeof getSourceTag>) {
+  if (source === "starter") return "Starter";
+  return "Custom";
+}
+
+function isDeferredPlaceholder(row: PricebookRow) {
+  return row.is_starter && !row.is_active && row.item_type === "adjustment";
+}
+
+function parseView(raw: unknown): PricebookView {
+  const normalized = String(raw ?? "").trim().toLowerCase();
+  if (normalized === "active") return "active";
+  if (normalized === "inactive") return "inactive";
+  if (normalized === "starter" || normalized === "starter_v1" || normalized === "starter_v2") return "starter";
+  if (normalized === "custom") return "custom";
+  return "all";
+}
+
+function filterLabel(view: PricebookView) {
+  if (view === "active") return "Active";
+  if (view === "inactive") return "Inactive";
+  if (view === "starter") return "Starter";
+  if (view === "custom") return "Custom";
+  return "All";
+}
+
+function filterButtonClass(isSelected: boolean) {
+  if (isSelected) {
+    return "border-slate-900 bg-slate-900 text-white shadow-[0_12px_22px_-16px_rgba(15,23,42,0.55)]";
+  }
+  return "border-slate-300 bg-white text-slate-700 hover:bg-slate-50";
 }
 
 async function requireAdminOrRedirect() {
@@ -134,13 +195,14 @@ export default async function AdminPricebookPage({
 }) {
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const notice = NOTICE_TEXT[String(sp.notice ?? "").trim().toLowerCase()];
+  const view = parseView(sp.view);
 
   const { supabase, internalUser } = await requireAdminOrRedirect();
 
   const { data, error } = await supabase
     .from("pricebook_items")
     .select(
-      "id, item_name, item_type, category, default_description, default_unit_price, unit_label, is_active, is_starter, created_at, updated_at",
+      "id, item_name, item_type, category, default_description, default_unit_price, unit_label, is_active, is_starter, seed_key, starter_version, created_at, updated_at",
     )
     .eq("account_owner_user_id", internalUser.account_owner_user_id)
     .order("item_name", { ascending: true });
@@ -157,12 +219,42 @@ export default async function AdminPricebookPage({
     unit_label: row.unit_label ? String(row.unit_label) : null,
     is_active: Boolean(row.is_active),
     is_starter: Boolean(row.is_starter),
+    seed_key: row.seed_key ? String(row.seed_key) : null,
+    starter_version: row.starter_version ? String(row.starter_version) : null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
   }));
+
+  const filteredRows = rows.filter((row) => {
+    const source = getSourceTag(row);
+    if (view === "active") return row.is_active;
+    if (view === "inactive") return !row.is_active;
+    if (view === "starter") return source === "starter";
+    if (view === "custom") return source === "custom";
+    return true;
+  });
+
   const activeCount = rows.filter((row) => row.is_active).length;
   const inactiveCount = rows.length - activeCount;
-  const starterCount = rows.filter((row) => row.is_starter).length;
+  const starterCount = rows.filter((row) => getSourceTag(row) !== "custom").length;
+  const customCount = rows.filter((row) => getSourceTag(row) === "custom").length;
+  const deferredCount = rows.filter((row) => isDeferredPlaceholder(row)).length;
+
+  const viewOptions: Array<{ key: PricebookView; label: string }> = [
+    { key: "all", label: "All" },
+    { key: "active", label: "Active" },
+    { key: "inactive", label: "Inactive" },
+    { key: "starter", label: "Starter" },
+    { key: "custom", label: "Custom" },
+  ];
+
+  const hrefForView = (nextView: PricebookView) => {
+    const params = new URLSearchParams();
+    if (notice) params.set("notice", String(sp.notice ?? ""));
+    if (nextView !== "all") params.set("view", nextView);
+    const qs = params.toString();
+    return qs ? `/ops/admin/pricebook?${qs}` : "/ops/admin/pricebook";
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 text-gray-900 sm:p-6">
@@ -173,7 +265,7 @@ export default async function AdminPricebookPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
             <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Pricebook</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Manage reusable catalog items for your account. Items remain definitions only and do not mutate historical records.
+              Manage reusable catalog items for your account. Pricebook values are editable defaults and do not mutate historical invoice line snapshots.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
               Slice B: admin CRUD only
@@ -202,9 +294,35 @@ export default async function AdminPricebookPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Catalog Summary</p>
             <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">{rows.length} items</h2>
             <p className="mt-1 text-sm text-slate-600">
-              {activeCount} active • {inactiveCount} inactive • {starterCount} starter
+              {activeCount} active • {inactiveCount} inactive • {starterCount} starter • {customCount} custom
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Starter rows: {starterCount} • Deferred placeholders: {deferredCount}
             </p>
           </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-700">
+          <p className="font-semibold text-slate-900">Operator clarity</p>
+          <p className="mt-1 leading-6">
+            Pricebook rows are reusable defaults for future estimates and invoices. Editing a Pricebook row does not rewrite historical invoice lines. Starter Kit backfill is handled through operator tooling and does not run automatically from this page.
+          </p>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {viewOptions.map((option) => {
+            const selected = option.key === view;
+            return (
+              <Link
+                key={option.key}
+                href={hrefForView(option.key)}
+                className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition ${filterButtonClass(selected)}`}
+                aria-current={selected ? "page" : undefined}
+              >
+                {option.label}
+              </Link>
+            );
+          })}
         </div>
       </section>
 
@@ -316,19 +434,19 @@ export default async function AdminPricebookPage({
                 <th className="px-4 py-3">Unit Price</th>
                 <th className="px-4 py-3">Unit Label</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Starter</th>
+                <th className="px-4 py-3">Source</th>
                 <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
-              {rows.length === 0 ? (
+              {filteredRows.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-600">
-                    No items in this account yet.
+                    No {filterLabel(view).toLowerCase()} items in this view.
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => (
+                filteredRows.map((row) => (
                   <tr key={row.id} className={!row.is_active ? "bg-slate-50/60" : undefined}>
                     <td className="px-4 py-3 align-top">
                       <div className="min-w-[230px] font-semibold text-slate-900">{row.item_name}</div>
@@ -351,18 +469,33 @@ export default async function AdminPricebookPage({
                       <div className="min-w-[120px] text-slate-700">{displayUnitLabel(row.unit_label)}</div>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusBadgeClass(row.is_active)}`}>
-                        {row.is_active ? "Active" : "Inactive"}
-                      </span>
+                      <div className="flex min-w-[170px] flex-wrap gap-1.5">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${statusBadgeClass(row.is_active)}`}>
+                          {row.is_active ? "Active" : "Inactive"}
+                        </span>
+                        {isDeferredPlaceholder(row) ? (
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${deferredBadgeClass()}`}>
+                            Deferred placeholder
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      {row.is_starter ? (
-                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">
-                          Starter
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-500">Custom</span>
-                      )}
+                      {(() => {
+                        const source = getSourceTag(row);
+                        return (
+                          <div className="min-w-[170px] space-y-1">
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${sourceBadgeClass(source)}`}>
+                              {getSourceLabel(source)}
+                            </span>
+                            {source !== "custom" ? (
+                              <div className="text-[11px] text-slate-500">Starter seed row</div>
+                            ) : (
+                              <div className="text-[11px] text-slate-500">Manual/custom row</div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 align-top">
                       <details className="mb-2 rounded-md border border-slate-200 bg-slate-50/80 p-2">
@@ -471,6 +604,9 @@ export default async function AdminPricebookPage({
               )}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-slate-200 bg-slate-50/60 px-4 py-3 text-xs leading-5 text-slate-600">
+          Starter Kit backfill is handled through operator tooling and remains dry-run-first. No automatic backfill runs from this page.
         </div>
       </section>
     </div>
