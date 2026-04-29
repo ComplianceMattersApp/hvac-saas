@@ -33,6 +33,16 @@ export interface PricebookStarterSeedDefinition {
   is_starter: boolean;
 }
 
+export type StarterKitVersion = 'v1' | 'v2';
+
+export type StarterKitSeedSelection = {
+  starterKitVersion: StarterKitVersion;
+  seeds: PricebookStarterSeedDefinition[];
+  seedCount: number;
+  activeCount: number;
+  inactiveCount: number;
+};
+
 /**
  * Result of a dry-run or apply operation.
  */
@@ -53,6 +63,11 @@ export interface PricebookSeedResult {
   }>;
   /** Errors or validation notes. */
   errors?: string[];
+  /** Starter kit metadata for preview/apply reporting. */
+  starter_kit_version?: StarterKitVersion;
+  seed_count?: number;
+  active_seed_count?: number;
+  inactive_seed_count?: number;
 }
 
 export type PricebookExistingSeedRow = {
@@ -576,6 +591,25 @@ export const STARTER_KIT_V2_SEEDS: PricebookStarterSeedDefinition[] = [
     is_starter: true,
   },
 ];
+
+export function normalizeStarterKitVersion(value: unknown): StarterKitVersion {
+  return String(value ?? '').trim().toLowerCase() === 'v2' ? 'v2' : 'v1';
+}
+
+export function resolveStarterKitSeeds(version?: unknown): StarterKitSeedSelection {
+  const starterKitVersion = normalizeStarterKitVersion(version);
+  const seeds = starterKitVersion === 'v2' ? STARTER_KIT_V2_SEEDS : STARTER_KIT_V1_SEEDS;
+  const activeCount = seeds.filter((seed) => seed.is_active).length;
+  const inactiveCount = seeds.length - activeCount;
+
+  return {
+    starterKitVersion,
+    seeds,
+    seedCount: seeds.length,
+    activeCount,
+    inactiveCount,
+  };
+}
 
 /**
  * Validate seed definitions.

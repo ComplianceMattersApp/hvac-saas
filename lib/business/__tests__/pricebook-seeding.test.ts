@@ -6,6 +6,7 @@ import {
   createPricebookSeedingStoreFromSupabase,
   dryRunPricebookSeeding,
   type PricebookSeedingStore,
+  resolveStarterKitSeeds,
   validateSeedDefinitions,
   PricebookStarterSeedDefinition,
 } from '../pricebook-seeding';
@@ -200,6 +201,26 @@ describe('PricebookSeeding', () => {
 
       expect(result.errors).toBeDefined();
       expect(result.errors!.some((e) => e.includes('Connection error'))).toBe(true);
+    });
+  });
+
+  describe('resolveStarterKitSeeds', () => {
+    it('defaults to v1 when version is omitted', () => {
+      const selection = resolveStarterKitSeeds();
+
+      expect(selection.starterKitVersion).toBe('v1');
+      expect(selection.seedCount).toBe(STARTER_KIT_V1_SEEDS.length);
+      expect(selection.activeCount).toBe(STARTER_KIT_V1_SEEDS.length);
+      expect(selection.inactiveCount).toBe(0);
+    });
+
+    it('returns v2 with active/inactive counts', () => {
+      const selection = resolveStarterKitSeeds('v2');
+
+      expect(selection.starterKitVersion).toBe('v2');
+      expect(selection.seedCount).toBe(STARTER_KIT_V2_SEEDS.length);
+      expect(selection.activeCount).toBe(21);
+      expect(selection.inactiveCount).toBe(2);
     });
   });
 

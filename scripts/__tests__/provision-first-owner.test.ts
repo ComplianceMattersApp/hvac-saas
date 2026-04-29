@@ -21,6 +21,10 @@ function makeProvisioningSuccess(overrides?: Partial<FirstOwnerProvisioningResul
       reason: "ready_for_invite",
     },
     pricebookSeeding: {
+      starter_kit_version: "v1",
+      seed_count: STARTER_KIT_V1_SEEDS.length,
+      active_seed_count: STARTER_KIT_V1_SEEDS.length,
+      inactive_seed_count: 0,
       inserted_count: STARTER_KIT_V1_SEEDS.length,
       skipped_count: 0,
       inserted_rows: STARTER_KIT_V1_SEEDS.map((seed) => ({
@@ -71,6 +75,8 @@ describe("parseProvisionFirstOwnerArgs", () => {
       "Owner Name",
       "--entitlement-preset",
       "internal_comped",
+      "--starter-kit-version",
+      "v2",
       "--resend-invite",
       "--apply",
     ]);
@@ -78,7 +84,8 @@ describe("parseProvisionFirstOwnerArgs", () => {
     expect(parsed.email).toBe("owner@example.com");
     expect(parsed.businessDisplayName).toBe("My Company");
     expect(parsed.ownerDisplayName).toBe("Owner Name");
-  expect(parsed.entitlementPreset).toBe("internal_comped");
+    expect(parsed.entitlementPreset).toBe("internal_comped");
+    expect(parsed.starterKitVersion).toBe("v2");
     expect(parsed.resendInvite).toBe(true);
     expect(parsed.apply).toBe(true);
   });
@@ -92,6 +99,7 @@ describe("parseProvisionFirstOwnerArgs", () => {
     ]);
 
     expect(parsed.entitlementPreset).toBe("standard");
+    expect(parsed.starterKitVersion).toBe("v1");
   });
 
   it("throws on invalid entitlement preset", () => {
@@ -112,6 +120,19 @@ describe("parseProvisionFirstOwnerArgs", () => {
       parseProvisionFirstOwnerArgs(["--email", "owner@example.com"]),
     ).toThrow("Missing required --business-display-name");
   });
+
+  it("throws on invalid starter kit version", () => {
+    expect(() =>
+      parseProvisionFirstOwnerArgs([
+        "--email",
+        "owner@example.com",
+        "--business-display-name",
+        "My Company",
+        "--starter-kit-version",
+        "v3",
+      ]),
+    ).toThrow("Invalid --starter-kit-version (expected: v1|v2)");
+  });
 });
 
 describe("runProvisionFirstOwnerScript", () => {
@@ -119,6 +140,7 @@ describe("runProvisionFirstOwnerScript", () => {
     email: "owner@example.com",
     businessDisplayName: "My Company",
     entitlementPreset: "standard" as const,
+    starterKitVersion: "v1" as const,
     resendInvite: false,
     apply: false,
   };
@@ -134,6 +156,7 @@ describe("runProvisionFirstOwnerScript", () => {
         targetEmail: "owner@example.com",
         businessDisplayName: "My Company",
         entitlementPreset: "standard",
+        starterKitVersion: "v1",
         dryRun: true,
       }),
     );
@@ -142,6 +165,18 @@ describe("runProvisionFirstOwnerScript", () => {
     expect(result.inviteSkippedReason).toBe("dry_run");
     expect(result.pricebookSeeding).toEqual(
       expect.objectContaining({ inserted_count: STARTER_KIT_V1_SEEDS.length }),
+    );
+  });
+
+  it("passes explicit starter kit v2 to provisioning helper", async () => {
+    const deps = makeDeps();
+
+    await runProvisionFirstOwnerScript({ ...baseArgs, starterKitVersion: "v2" }, deps);
+
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        starterKitVersion: "v2",
+      }),
     );
   });
 

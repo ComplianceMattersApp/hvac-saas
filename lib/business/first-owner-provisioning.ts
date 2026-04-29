@@ -1,13 +1,15 @@
 import { normalizeBillingMode, type BillingMode } from "@/lib/business/internal-business-profile";
 import type { EntitlementStatus, PlatformPlanKey } from "@/lib/business/platform-entitlement";
 import {
-  STARTER_KIT_V1_SEEDS,
   applyPricebookSeeding,
   dryRunPricebookSeeding,
   type PricebookExistingSeedRow,
   type PricebookSeedInsertRow,
   type PricebookSeedResult,
   type PricebookSeedingStore,
+  type StarterKitSeedSelection,
+  type StarterKitVersion,
+  resolveStarterKitSeeds,
 } from "@/lib/business/pricebook-seeding";
 
 export type FirstOwnerProvisioningStatus = "provisioned" | "confirmed" | "failed" | "dry_run";
@@ -71,6 +73,7 @@ export type FirstOwnerProvisioningInput = {
   supportPhone?: string | null;
   defaultBillingMode?: BillingMode | string | null;
   entitlementPreset?: EntitlementPreset | string | null;
+  starterKitVersion?: StarterKitVersion | string | null;
   operatorMetadata?: FirstOwnerOperatorMetadata;
   dryRun?: boolean;
 };
@@ -176,11 +179,15 @@ const DEFAULT_BUSINESS_NAME = "Compliance Matters";
 const DEFAULT_PLAN_KEY: PlatformPlanKey = "starter";
 const DEFAULT_ENTITLEMENT_STATUS: EntitlementStatus = "trial";
 
-function buildSeedPreviewForNewAccount(): PricebookSeedResult {
+function buildSeedPreviewForNewAccount(selection: StarterKitSeedSelection): PricebookSeedResult {
   return {
-    inserted_count: STARTER_KIT_V1_SEEDS.length,
+    starter_kit_version: selection.starterKitVersion,
+    seed_count: selection.seedCount,
+    active_seed_count: selection.activeCount,
+    inactive_seed_count: selection.inactiveCount,
+    inserted_count: selection.seedCount,
     skipped_count: 0,
-    inserted_rows: STARTER_KIT_V1_SEEDS.map((seed) => ({
+    inserted_rows: selection.seeds.map((seed) => ({
       seed_key: seed.seed_key,
       item_name: seed.item_name,
     })),
@@ -335,6 +342,7 @@ export async function provisionFirstOwnerAccount(params: {
   const billingMode = normalizeBillingMode(input.defaultBillingMode);
   const entitlementPreset = normalizeEntitlementPreset(input.entitlementPreset);
   const entitlementPresetValues = buildEntitlementPresetValues(entitlementPreset);
+  const starterKitSelection = resolveStarterKitSeeds(input.starterKitVersion);
   const pricebookSeedStore = createPricebookSeedingStore(client);
 
   if (!email || !isValidEmail(email)) {
@@ -364,7 +372,7 @@ export async function provisionFirstOwnerAccount(params: {
             authUserId: null,
             reason: "dry_run",
           },
-          pricebookSeeding: buildSeedPreviewForNewAccount(),
+          pricebookSeeding: buildSeedPreviewForNewAccount(starterKitSelection),
           warnings,
           errors,
         };
@@ -566,9 +574,17 @@ export async function provisionFirstOwnerAccount(params: {
       }
     }
 
-    const pricebookSeeding = dryRun
-      ? await dryRunPricebookSeeding(pricebookSeedStore, authUserId, STARTER_KIT_V1_SEEDS)
-      : await applyPricebookSeeding(pricebookSeedStore, authUserId, STARTER_KIT_V1_SEEDS);
+    const basePricebookSeeding = dryRun
+      ? await dryRunPricebookSeeding(pricebookSeedStore, authUserId, starterKitSelection.seeds)
+      : await applyPricebookSeeding(pricebookSeedStore, authUserId, starterKitSelection.seeds);
+
+    const pricebookSeeding: PricebookSeedResult = {
+      ...basePricebookSeeding,
+      starter_kit_version: starterKitSelection.starterKitVersion,
+      seed_count: starterKitSelection.seedCount,
+      active_seed_count: starterKitSelection.activeCount,
+      inactive_seed_count: starterKitSelection.inactiveCount,
+    };
 
     if (pricebookSeeding.errors?.length) {
       errors.push({

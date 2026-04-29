@@ -16,6 +16,7 @@ type ParsedArgs = {
   supportPhone?: string;
   defaultBillingMode?: string;
   entitlementPreset: "standard" | "internal_comped";
+  starterKitVersion: "v1" | "v2";
   resendInvite: boolean;
   apply: boolean;
 };
@@ -152,6 +153,7 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
   const supportPhone = toCleanString(parseArgValue(argv, "--support-phone"));
   const defaultBillingMode = toCleanString(parseArgValue(argv, "--default-billing-mode"));
   const entitlementPresetRaw = toCleanString(parseArgValue(argv, "--entitlement-preset")).toLowerCase();
+  const starterKitVersionRaw = toCleanString(parseArgValue(argv, "--starter-kit-version")).toLowerCase();
   const resendInvite = hasFlag(argv, "--resend-invite");
   const apply = hasFlag(argv, "--apply");
 
@@ -172,6 +174,15 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
           })()
         : "standard";
 
+  const starterKitVersion =
+    starterKitVersionRaw === "v1" || starterKitVersionRaw === "v2"
+      ? starterKitVersionRaw
+      : starterKitVersionRaw
+        ? (() => {
+            throw new Error("Invalid --starter-kit-version (expected: v1|v2)");
+          })()
+        : "v1";
+
   return {
     email,
     businessDisplayName,
@@ -180,6 +191,7 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
     supportPhone: supportPhone || undefined,
     defaultBillingMode: defaultBillingMode || undefined,
     entitlementPreset,
+    starterKitVersion,
     resendInvite,
     apply,
   };
@@ -215,6 +227,7 @@ export async function runProvisionFirstOwnerScript(
     supportPhone: args.supportPhone,
     defaultBillingMode: args.defaultBillingMode,
     entitlementPreset: args.entitlementPreset,
+    starterKitVersion: args.starterKitVersion,
     dryRun: !args.apply,
     operatorMetadata: {
       requestedBy: toCleanString(deps.env.USER || deps.env.USERNAME) || null,

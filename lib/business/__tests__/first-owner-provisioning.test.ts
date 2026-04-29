@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { provisionFirstOwnerAccount, type FirstOwnerProvisioningClient } from "@/lib/business/first-owner-provisioning";
-import { STARTER_KIT_V1_SEEDS, type PricebookSeedInsertRow } from "@/lib/business/pricebook-seeding";
+import {
+  STARTER_KIT_V1_SEEDS,
+  STARTER_KIT_V2_SEEDS,
+  type PricebookSeedInsertRow,
+} from "@/lib/business/pricebook-seeding";
 
 type EntitlementRow = {
   account_owner_user_id: string;
@@ -210,6 +214,10 @@ describe("provisionFirstOwnerAccount", () => {
     );
     expect(result.pricebookSeeding).toEqual(
       expect.objectContaining({
+        starter_kit_version: "v1",
+        seed_count: STARTER_KIT_V1_SEEDS.length,
+        active_seed_count: STARTER_KIT_V1_SEEDS.length,
+        inactive_seed_count: 0,
         inserted_count: STARTER_KIT_V1_SEEDS.length,
         skipped_count: 0,
       }),
@@ -282,6 +290,8 @@ describe("provisionFirstOwnerAccount", () => {
     );
     expect(result.pricebookSeeding).toEqual(
       expect.objectContaining({
+        starter_kit_version: "v1",
+        seed_count: STARTER_KIT_V1_SEEDS.length,
         inserted_count: 0,
         skipped_count: STARTER_KIT_V1_SEEDS.length,
       }),
@@ -306,10 +316,39 @@ describe("provisionFirstOwnerAccount", () => {
     expect(result.accountOwnerUserId).toBeNull();
     expect(result.pricebookSeeding).toEqual(
       expect.objectContaining({
+        starter_kit_version: "v1",
+        seed_count: STARTER_KIT_V1_SEEDS.length,
         inserted_count: STARTER_KIT_V1_SEEDS.length,
         skipped_count: 0,
       }),
     );
+  });
+
+  it("explicit v2 starter kit seeds v2 rows and reports selected version", async () => {
+    const store = createStore();
+    const client = createMockClient(store);
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: {
+        targetEmail: "owner@example.com",
+        businessDisplayName: "Owner Business",
+        starterKitVersion: "v2",
+      },
+    });
+
+    expect(result.status).toBe("provisioned");
+    expect(result.pricebookSeeding).toEqual(
+      expect.objectContaining({
+        starter_kit_version: "v2",
+        seed_count: STARTER_KIT_V2_SEEDS.length,
+        active_seed_count: 21,
+        inactive_seed_count: 2,
+        inserted_count: STARTER_KIT_V2_SEEDS.length,
+        skipped_count: 0,
+      }),
+    );
+    expect(store.pricebookSeedRowsByOwnerId["user-1"]).toHaveLength(STARTER_KIT_V2_SEEDS.length);
   });
 
   it("missing business profile is reconciled", async () => {
