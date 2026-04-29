@@ -129,9 +129,22 @@ describe("parseProvisionFirstOwnerArgs", () => {
         "--business-display-name",
         "My Company",
         "--starter-kit-version",
-        "v3",
+        "v4",
       ]),
-    ).toThrow("Invalid --starter-kit-version (expected: v1|v2)");
+    ).toThrow("Invalid --starter-kit-version (expected: v1|v2|v3)");
+  });
+
+  it("accepts starter kit v3", () => {
+    const parsed = parseProvisionFirstOwnerArgs([
+      "--email",
+      "owner@example.com",
+      "--business-display-name",
+      "My Company",
+      "--starter-kit-version",
+      "v3",
+    ]);
+
+    expect(parsed.starterKitVersion).toBe("v3");
   });
 });
 

@@ -6,6 +6,7 @@ import {
 } from "../../scripts/backfill-pricebook-starter-kit";
 import {
   STARTER_KIT_V2_SEEDS,
+  STARTER_KIT_V3_SEEDS,
   type ExistingAccountStarterKitBackfillPlan,
   type ExistingAccountStarterKitBackfillApplyResult,
 } from "../../lib/business/pricebook-seeding";
@@ -17,17 +18,22 @@ import {
 function makePlanResult(
   overrides?: Partial<ExistingAccountStarterKitBackfillPlan>,
 ): ExistingAccountStarterKitBackfillPlan {
+  const starterKitVersion = overrides?.starter_kit_version ?? "v2";
+  const seeds = starterKitVersion === "v3" ? STARTER_KIT_V3_SEEDS : STARTER_KIT_V2_SEEDS;
+  const activeSeedCount = seeds.filter((seed) => seed.is_active).length;
+  const inactiveSeedCount = seeds.length - activeSeedCount;
+
   return {
     mode: "dry_run",
     account_owner_user_id: "test-account-id",
-    starter_kit_version: "v2",
-    seed_count: 23,
-    active_seed_count: 21,
-    inactive_seed_count: 2,
-    would_insert_count: 23,
+    starter_kit_version: starterKitVersion,
+    seed_count: seeds.length,
+    active_seed_count: activeSeedCount,
+    inactive_seed_count: inactiveSeedCount,
+    would_insert_count: seeds.length,
     would_skip_existing_seed_key_count: 0,
     possible_collision_count: 0,
-    preview_insert_rows: STARTER_KIT_V2_SEEDS.slice(0, 10).map((s) => ({
+    preview_insert_rows: seeds.slice(0, 10).map((s) => ({
       seed_key: s.seed_key,
       item_name: s.item_name,
     })),
@@ -42,17 +48,22 @@ function makePlanResult(
 function makeApplyResult(
   overrides?: Partial<ExistingAccountStarterKitBackfillApplyResult>,
 ): ExistingAccountStarterKitBackfillApplyResult {
+  const starterKitVersion = overrides?.starter_kit_version ?? "v2";
+  const seeds = starterKitVersion === "v3" ? STARTER_KIT_V3_SEEDS : STARTER_KIT_V2_SEEDS;
+  const activeSeedCount = seeds.filter((seed) => seed.is_active).length;
+  const inactiveSeedCount = seeds.length - activeSeedCount;
+
   return {
     mode: "apply",
     account_owner_user_id: "test-account-id",
-    starter_kit_version: "v2",
-    seed_count: 23,
-    active_seed_count: 21,
-    inactive_seed_count: 2,
-    inserted_count: 23,
+    starter_kit_version: starterKitVersion,
+    seed_count: seeds.length,
+    active_seed_count: activeSeedCount,
+    inactive_seed_count: inactiveSeedCount,
+    inserted_count: seeds.length,
     skipped_existing_seed_key_count: 0,
     possible_collision_count: 0,
-    inserted_rows: STARTER_KIT_V2_SEEDS.map((s) => ({
+    inserted_rows: seeds.map((s) => ({
       seed_key: s.seed_key,
       item_name: s.item_name,
     })),
@@ -121,7 +132,7 @@ describe("parseBackfillArgs", () => {
     expect(parsed.starterKitVersion).toBe("v2");
   });
 
-  it("4: rejects non-v2 starter kit version", () => {
+  it("4: rejects v1 starter kit version", () => {
     expect(() =>
       parseBackfillArgs([
         "--account-owner-user-id",
@@ -129,7 +140,7 @@ describe("parseBackfillArgs", () => {
         "--starter-kit-version",
         "v1",
       ]),
-    ).toThrow("only v2 is supported for backfill");
+    ).toThrow("supported: v2|v3");
   });
 
   it("4b: rejects unknown starter kit version string", () => {
@@ -138,9 +149,20 @@ describe("parseBackfillArgs", () => {
         "--account-owner-user-id",
         "test-id",
         "--starter-kit-version",
-        "v3",
+        "v4",
       ]),
-    ).toThrow("only v2 is supported for backfill");
+    ).toThrow("supported: v2|v3");
+  });
+
+  it("4c: accepts --starter-kit-version v3", () => {
+    const parsed = parseBackfillArgs([
+      "--account-owner-user-id",
+      "test-id",
+      "--starter-kit-version",
+      "v3",
+    ]);
+
+    expect(parsed.starterKitVersion).toBe("v3");
   });
 
   it("5: accepts --apply flag", () => {
@@ -206,7 +228,10 @@ describe("runBackfillScript", () => {
     expect(result.mode).toBe("dry_run");
     expect(deps.planBackfill).toHaveBeenCalledOnce();
     expect(deps.planBackfill).toHaveBeenCalledWith(
-      expect.objectContaining({ account_owner_user_id: "test-account-id" }),
+      expect.objectContaining({
+        account_owner_user_id: "test-account-id",
+        starter_kit_version: "v2",
+      }),
     );
     expect(deps.applyBackfill).not.toHaveBeenCalled();
     expect(result.planResult).toBeDefined();
@@ -231,6 +256,7 @@ describe("runBackfillScript", () => {
     expect(deps.applyBackfill).toHaveBeenCalledWith(
       expect.objectContaining({
         account_owner_user_id: "test-account-id",
+        starter_kit_version: "v2",
         confirmApply: true,
       }),
     );
@@ -254,6 +280,20 @@ describe("runBackfillScript", () => {
 
     const callArg = (deps.applyBackfill as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     expect(callArg.allowCollisions).toBeUndefined();
+  });
+
+  it("9d: forwards starter_kit_version=v3 to plan/apply paths", async () => {
+    const deps = makeDeps();
+
+    await runBackfillScript({ ...baseArgs, starterKitVersion: "v3" }, deps);
+    expect(deps.planBackfill).toHaveBeenCalledWith(
+      expect.objectContaining({ starter_kit_version: "v3" }),
+    );
+
+    await runBackfillScript({ ...baseArgs, starterKitVersion: "v3", apply: true }, deps);
+    expect(deps.applyBackfill).toHaveBeenCalledWith(
+      expect.objectContaining({ starter_kit_version: "v3" }),
+    );
   });
 
   it("10: apply on hosted target fails closed without ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING", async () => {

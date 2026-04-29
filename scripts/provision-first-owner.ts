@@ -16,7 +16,7 @@ type ParsedArgs = {
   supportPhone?: string;
   defaultBillingMode?: string;
   entitlementPreset: "standard" | "internal_comped";
-  starterKitVersion: "v1" | "v2";
+  starterKitVersion: "v1" | "v2" | "v3";
   resendInvite: boolean;
   apply: boolean;
 };
@@ -175,11 +175,11 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
         : "standard";
 
   const starterKitVersion =
-    starterKitVersionRaw === "v1" || starterKitVersionRaw === "v2"
+    starterKitVersionRaw === "v1" || starterKitVersionRaw === "v2" || starterKitVersionRaw === "v3"
       ? starterKitVersionRaw
       : starterKitVersionRaw
         ? (() => {
-            throw new Error("Invalid --starter-kit-version (expected: v1|v2)");
+            throw new Error("Invalid --starter-kit-version (expected: v1|v2|v3)");
           })()
         : "v1";
 

@@ -33,7 +33,8 @@ export interface PricebookStarterSeedDefinition {
   is_starter: boolean;
 }
 
-export type StarterKitVersion = 'v1' | 'v2';
+export type StarterKitVersion = 'v1' | 'v2' | 'v3';
+export type BackfillStarterKitVersion = Exclude<StarterKitVersion, 'v1'>;
 
 export type StarterKitSeedSelection = {
   starterKitVersion: StarterKitVersion;
@@ -73,7 +74,7 @@ export interface PricebookSeedResult {
 export type ExistingAccountStarterKitBackfillPlan = {
   mode: 'dry_run';
   account_owner_user_id: string;
-  starter_kit_version: 'v2';
+  starter_kit_version: BackfillStarterKitVersion;
   seed_count: number;
   active_seed_count: number;
   inactive_seed_count: number;
@@ -104,7 +105,7 @@ export type ExistingAccountStarterKitBackfillPlan = {
 export type ExistingAccountStarterKitBackfillApplyResult = {
   mode: 'apply';
   account_owner_user_id: string;
-  starter_kit_version: 'v2';
+  starter_kit_version: BackfillStarterKitVersion;
   seed_count: number;
   active_seed_count: number;
   inactive_seed_count: number;
@@ -671,13 +672,168 @@ export const STARTER_KIT_V2_SEEDS: PricebookStarterSeedDefinition[] = [
   },
 ];
 
+function createStarterV3Seed(params: {
+  seed_key: string;
+  item_name: string;
+  item_type: 'service' | 'material' | 'diagnostic' | 'adjustment';
+  category: string;
+  default_description: string;
+  default_unit_price?: number;
+  unit_label: string;
+  is_active?: boolean;
+}): PricebookStarterSeedDefinition {
+  return {
+    seed_key: params.seed_key,
+    starter_version: 'starter_v3',
+    item_name: params.item_name,
+    item_type: params.item_type,
+    category: params.category,
+    default_description: params.default_description,
+    default_unit_price: params.default_unit_price ?? 0,
+    unit_label: params.unit_label,
+    is_active: params.is_active ?? true,
+    is_starter: true,
+  };
+}
+
+export const STARTER_KIT_V3_SEEDS: PricebookStarterSeedDefinition[] = [
+  // Diagnostics
+  createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.service_call', item_name: 'Service Call', item_type: 'service', category: 'Fees', default_description: 'Standard dispatched service call fee.', default_unit_price: 95, unit_label: 'trip' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.diagnostic_fee', item_name: 'Diagnostic Fee', item_type: 'diagnostic', category: 'HVAC - Diagnostics', default_description: 'System diagnostic and fault isolation.', default_unit_price: 0, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.performance_diagnostic', item_name: 'System Performance Diagnostic', item_type: 'diagnostic', category: 'HVAC - Diagnostics', default_description: 'Performance diagnostic for airflow, electrical, and refrigerant checks.', default_unit_price: 0, unit_label: 'system' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.airflow_diagnostic', item_name: 'Airflow Diagnostic', item_type: 'diagnostic', category: 'Duct / Airflow', default_description: 'Airflow diagnostic including static checks and balancing observations.', default_unit_price: 0, unit_label: 'test' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.electrical_diagnostic', item_name: 'Electrical Diagnostic', item_type: 'diagnostic', category: 'Electrical', default_description: 'Electrical system diagnostic for low/high voltage controls and components.', default_unit_price: 0, unit_label: 'system' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.refrigerant_diagnostic', item_name: 'Refrigerant Diagnostic', item_type: 'diagnostic', category: 'Refrigerant Services', default_description: 'Refrigerant system diagnostic and baseline verification.', default_unit_price: 0, unit_label: 'system' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.no_cooling', item_name: 'No Cooling Diagnostic', item_type: 'diagnostic', category: 'HVAC - Diagnostics', default_description: 'Targeted no-cooling troubleshooting diagnostic.', default_unit_price: 0, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.no_heating', item_name: 'No Heating Diagnostic', item_type: 'diagnostic', category: 'HVAC - Diagnostics', default_description: 'Targeted no-heating troubleshooting diagnostic.', default_unit_price: 0, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.noise_vibration', item_name: 'Noise / Vibration Diagnostic', item_type: 'diagnostic', category: 'HVAC - Diagnostics', default_description: 'Diagnostic for abnormal noise, vibration, and mechanical resonance.', default_unit_price: 0, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.startup_commissioning', item_name: 'Startup / Commissioning Diagnostic', item_type: 'diagnostic', category: 'HVAC - Diagnostics', default_description: 'Startup diagnostics and commissioning baseline checks.', default_unit_price: 0, unit_label: 'system' }),
+
+  // Maintenance
+  createStarterV3Seed({ seed_key: 'starter_v3.maintenance.pm_residential', item_name: 'Preventive Maintenance - Residential', item_type: 'service', category: 'HVAC - Maintenance', default_description: 'Residential preventive maintenance visit.', default_unit_price: 150, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.maintenance.pm_commercial', item_name: 'Preventive Maintenance - Commercial', item_type: 'service', category: 'HVAC - Maintenance', default_description: 'Commercial preventive maintenance visit.', default_unit_price: 260, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.maintenance.pm_heat_pump', item_name: 'Heat Pump Maintenance', item_type: 'service', category: 'HVAC - Maintenance', default_description: 'Seasonal preventive maintenance for heat pump systems.', default_unit_price: 0, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.maintenance.filter_change_visit', item_name: 'Filter Change Visit', item_type: 'service', category: 'HVAC - Maintenance', default_description: 'Scheduled visit for filter replacement and quick operational check.', default_unit_price: 0, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.maintenance.condenser_coil_cleaning', item_name: 'Condenser Coil Cleaning', item_type: 'service', category: 'HVAC - Maintenance', default_description: 'Condenser coil cleaning service.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.maintenance.evaporator_coil_cleaning', item_name: 'Evaporator Coil Cleaning', item_type: 'service', category: 'HVAC - Maintenance', default_description: 'Evaporator coil cleaning service.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.maintenance.drain_line_flush', item_name: 'Drain Line Flush', item_type: 'service', category: 'HVAC - Maintenance', default_description: 'Preventive condensate drain line flush and treatment.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.maintenance.electrical_safety_check', item_name: 'Electrical Safety Check', item_type: 'diagnostic', category: 'Electrical', default_description: 'Electrical safety check during preventive maintenance.', default_unit_price: 0, unit_label: 'system' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.maintenance.maintenance_report', item_name: 'Maintenance Report Package', item_type: 'service', category: 'Compliance Docs', default_description: 'Maintenance findings and service documentation package.', default_unit_price: 0, unit_label: 'doc' }),
+
+  // Electrical
+  createStarterV3Seed({ seed_key: 'starter_v3.electrical.capacitor_replacement', item_name: 'Capacitor Replacement', item_type: 'service', category: 'Electrical', default_description: 'Capacitor replacement parts and labor.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.electrical.contactor_replacement', item_name: 'Contactor Replacement', item_type: 'service', category: 'Electrical', default_description: 'Contactor replacement parts and labor.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.electrical.relay_replacement', item_name: 'Relay Replacement', item_type: 'service', category: 'Electrical', default_description: 'Control relay replacement parts and labor.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.electrical.disconnect_replacement', item_name: 'Disconnect Replacement', item_type: 'service', category: 'Electrical', default_description: 'Service disconnect replacement.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.electrical.breaker_replacement', item_name: 'Breaker Replacement', item_type: 'service', category: 'Electrical', default_description: 'Breaker replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.electrical.fuse_replacement', item_name: 'Fuse Replacement', item_type: 'service', category: 'Electrical', default_description: 'Fuse replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.electrical.hard_start_kit_install', item_name: 'Hard Start Kit Install', item_type: 'service', category: 'Electrical', default_description: 'Hard start kit install labor and materials.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.electrical.wiring_repair_minor', item_name: 'Minor Wiring Repair', item_type: 'service', category: 'Electrical', default_description: 'Minor HVAC wiring repair and securement.', default_unit_price: 0, unit_label: 'job' }),
+
+  // Motors / Fans
+  createStarterV3Seed({ seed_key: 'starter_v3.motors.blower_motor_replacement', item_name: 'Blower Motor Replacement', item_type: 'service', category: 'Parts', default_description: 'Blower motor replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.motors.condenser_fan_motor_replacement', item_name: 'Condenser Fan Motor Replacement', item_type: 'service', category: 'Parts', default_description: 'Condenser fan motor replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.motors.inducer_motor_replacement', item_name: 'Inducer Motor Replacement', item_type: 'service', category: 'Parts', default_description: 'Inducer motor replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.motors.ecm_module_replacement', item_name: 'ECM Motor Module Replacement', item_type: 'service', category: 'Parts', default_description: 'ECM module replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.motors.blower_wheel_cleaning', item_name: 'Blower Wheel Cleaning', item_type: 'service', category: 'HVAC - Maintenance', default_description: 'Blower wheel cleaning service.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.motors.blower_wheel_replacement', item_name: 'Blower Wheel Replacement', item_type: 'service', category: 'Parts', default_description: 'Blower wheel replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.motors.fan_blade_replacement', item_name: 'Fan Blade Replacement', item_type: 'service', category: 'Parts', default_description: 'Condenser fan blade replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.motors.motor_run_test', item_name: 'Motor Amp-Draw / Run Test', item_type: 'diagnostic', category: 'Electrical', default_description: 'Motor run test and amp-draw verification.', default_unit_price: 0, unit_label: 'test' }),
+
+  // Refrigerant
+  createStarterV3Seed({ seed_key: 'starter_v3.refrigerant.r410a_per_lb', item_name: 'Refrigerant R-410A (per lb)', item_type: 'material', category: 'Refrigerant', default_description: 'R-410A refrigerant material charged per pound.', default_unit_price: 0, unit_label: 'lb' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.refrigerant.r454b_per_lb', item_name: 'Refrigerant R-454B (per lb)', item_type: 'material', category: 'Refrigerant', default_description: 'R-454B refrigerant material charged per pound.', default_unit_price: 0, unit_label: 'lb' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.refrigerant.r32_per_lb', item_name: 'Refrigerant R-32 (per lb)', item_type: 'material', category: 'Refrigerant', default_description: 'R-32 refrigerant material charged per pound.', default_unit_price: 0, unit_label: 'lb' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.refrigerant.leak_search', item_name: 'Refrigerant Leak Search', item_type: 'service', category: 'Refrigerant Services', default_description: 'Refrigerant leak search and pinpoint diagnostic.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.refrigerant.leak_repair_minor', item_name: 'Refrigerant Leak Repair (Minor)', item_type: 'service', category: 'Refrigerant Services', default_description: 'Minor refrigerant leak repair labor allowance.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.refrigerant.nitrogen_pressure_test', item_name: 'Nitrogen Pressure Test', item_type: 'diagnostic', category: 'Refrigerant Services', default_description: 'Nitrogen pressure test for leak verification.', default_unit_price: 0, unit_label: 'test' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.refrigerant.vacuum_decay_test', item_name: 'Vacuum / Decay Test', item_type: 'diagnostic', category: 'Refrigerant Services', default_description: 'Vacuum and decay integrity verification test.', default_unit_price: 0, unit_label: 'test' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.refrigerant.filter_drier_replacement', item_name: 'Filter Drier Replacement', item_type: 'service', category: 'Refrigerant Services', default_description: 'Filter drier replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.refrigerant.refrigerant_recovery', item_name: 'Refrigerant Recovery', item_type: 'service', category: 'Refrigerant Services', default_description: 'Recovery and handling of existing refrigerant charge.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.refrigerant.charge_adjustment', item_name: 'Refrigerant Charge Adjustment', item_type: 'service', category: 'Refrigerant Services', default_description: 'Charge adjustment labor allowance (material billed separately).', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.refrigerant.refrigerant_service_report', item_name: 'Refrigerant Service Report', item_type: 'service', category: 'Compliance Docs', default_description: 'Refrigerant service and compliance documentation package.', default_unit_price: 0, unit_label: 'doc' }),
+
+  // Drain / Condensate
+  createStarterV3Seed({ seed_key: 'starter_v3.drain.drain_line_clear', item_name: 'Condensate Drain Line Clear', item_type: 'service', category: 'HVAC - Repair', default_description: 'Drain line clearing and flow restore service.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.drain.condensate_pump_replacement', item_name: 'Condensate Pump Replacement', item_type: 'service', category: 'Parts', default_description: 'Condensate pump replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.drain.trap_rebuild', item_name: 'Drain Trap Rebuild', item_type: 'service', category: 'HVAC - Repair', default_description: 'Condensate trap rebuild and sealing.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.drain.float_switch_install', item_name: 'Float Switch Install', item_type: 'service', category: 'Controls', default_description: 'Condensate safety float switch installation.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.drain.secondary_pan_treatment', item_name: 'Secondary Drain Pan Treatment', item_type: 'service', category: 'HVAC - Maintenance', default_description: 'Secondary pan treatment and inspection.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.drain.safety_flush', item_name: 'Condensate Safety Flush', item_type: 'service', category: 'HVAC - Maintenance', default_description: 'Preventive condensate line safety flush.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.drain.system_inspection', item_name: 'Condensate System Inspection', item_type: 'diagnostic', category: 'HVAC - Diagnostics', default_description: 'Condensate routing and performance inspection.', default_unit_price: 0, unit_label: 'visit' }),
+
+  // Thermostats / Controls
+  createStarterV3Seed({ seed_key: 'starter_v3.controls.thermostat_standard', item_name: 'Thermostat (Standard)', item_type: 'material', category: 'Controls', default_description: 'Standard thermostat install starter row.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.controls.thermostat_smart', item_name: 'Thermostat (Smart)', item_type: 'material', category: 'Controls', default_description: 'Smart thermostat install starter row.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.controls.thermostat_wiring_repair', item_name: 'Thermostat Wiring Repair', item_type: 'service', category: 'Controls', default_description: 'Low-voltage thermostat wiring repair.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.controls.transformer_replacement', item_name: 'Low-Voltage Transformer Replacement', item_type: 'service', category: 'Controls', default_description: '24V transformer replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.controls.control_board_replacement', item_name: 'Control Board Replacement', item_type: 'service', category: 'Controls', default_description: 'Control board replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.controls.zoning_damper_service', item_name: 'Zoning Damper Service', item_type: 'service', category: 'Controls', default_description: 'Zoning damper service and calibration.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.controls.zoning_panel_diagnostic', item_name: 'Zoning Panel Diagnostic', item_type: 'diagnostic', category: 'Controls', default_description: 'Zoning control panel diagnostic.', default_unit_price: 0, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.controls.thermostat_wifi_setup', item_name: 'Thermostat Wi-Fi Setup', item_type: 'service', category: 'Controls', default_description: 'Thermostat Wi-Fi/app setup support.', default_unit_price: 0, unit_label: 'job' }),
+
+  // Heating
+  createStarterV3Seed({ seed_key: 'starter_v3.heating.ignitor_replacement', item_name: 'Ignitor Replacement', item_type: 'service', category: 'HVAC - Repair', default_description: 'Ignitor replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.heating.flame_sensor_cleaning', item_name: 'Flame Sensor Cleaning', item_type: 'service', category: 'HVAC - Maintenance', default_description: 'Flame sensor cleaning service.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.heating.flame_sensor_replacement', item_name: 'Flame Sensor Replacement', item_type: 'service', category: 'HVAC - Repair', default_description: 'Flame sensor replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.heating.gas_valve_replacement', item_name: 'Gas Valve Replacement', item_type: 'service', category: 'HVAC - Repair', default_description: 'Gas valve replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.heating.pressure_switch_replacement', item_name: 'Pressure Switch Replacement', item_type: 'service', category: 'HVAC - Repair', default_description: 'Pressure switch replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.heating.limit_switch_replacement', item_name: 'Limit Switch Replacement', item_type: 'service', category: 'HVAC - Repair', default_description: 'Limit switch replacement labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.heating.heat_exchanger_inspection', item_name: 'Heat Exchanger Inspection', item_type: 'diagnostic', category: 'HVAC - Diagnostics', default_description: 'Heat exchanger inspection and condition notes.', default_unit_price: 0, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.heating.furnace_tuneup', item_name: 'Furnace Tune-Up', item_type: 'service', category: 'HVAC - Maintenance', default_description: 'Seasonal furnace tune-up service.', default_unit_price: 0, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.heating.heat_pump_defrost_service', item_name: 'Heat Pump Defrost Service', item_type: 'service', category: 'HVAC - Repair', default_description: 'Heat pump defrost system service and calibration.', default_unit_price: 0, unit_label: 'job' }),
+
+  // IAQ
+  createStarterV3Seed({ seed_key: 'starter_v3.iaq.filter_1in', item_name: 'Filter (1-inch Standard)', item_type: 'material', category: 'Parts', default_description: 'Standard 1-inch filter material row.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.iaq.filter_4in', item_name: 'Filter (4-inch Media)', item_type: 'material', category: 'Parts', default_description: '4-inch media filter material row.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.iaq.uv_light_install', item_name: 'UV Light Install', item_type: 'service', category: 'Parts', default_description: 'UV light installation labor and parts allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.iaq.media_filter_cabinet_install', item_name: 'Media Filter Cabinet Install', item_type: 'service', category: 'Parts', default_description: 'Media filter cabinet installation labor and materials.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.iaq.assessment', item_name: 'IAQ Assessment', item_type: 'diagnostic', category: 'HVAC - Diagnostics', default_description: 'Indoor air quality assessment and recommendation baseline.', default_unit_price: 0, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.iaq.duct_sanitizing_treatment', item_name: 'Duct Sanitizing Treatment', item_type: 'service', category: 'Duct / Airflow', default_description: 'Duct sanitizing treatment service allowance.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.iaq.dehumidifier_service', item_name: 'Dehumidifier Service', item_type: 'service', category: 'HVAC - Repair', default_description: 'Dehumidifier service and performance check.', default_unit_price: 0, unit_label: 'visit' }),
+
+  // Duct / Vent / Airflow
+  createStarterV3Seed({ seed_key: 'starter_v3.duct.duct_leakage_test', item_name: 'Duct Leakage Test', item_type: 'diagnostic', category: 'Duct / Airflow', default_description: 'Duct leakage testing service item.', default_unit_price: 0, unit_label: 'test' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.duct.airflow_verification', item_name: 'Airflow Verification', item_type: 'diagnostic', category: 'Duct / Airflow', default_description: 'Airflow verification and balancing test item.', default_unit_price: 0, unit_label: 'test' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.duct.static_pressure_test', item_name: 'Static Pressure Test', item_type: 'diagnostic', category: 'Duct / Airflow', default_description: 'External static pressure measurement and documentation.', default_unit_price: 0, unit_label: 'test' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.duct.duct_sealing_minor', item_name: 'Duct Sealing (Minor)', item_type: 'service', category: 'Duct / Airflow', default_description: 'Minor accessible duct sealing service.', default_unit_price: 0, unit_label: 'job' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.duct.supply_register_repair', item_name: 'Supply Register Repair', item_type: 'service', category: 'Duct / Airflow', default_description: 'Supply register repair/replacement labor allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.duct.return_grille_repair', item_name: 'Return Grille Repair', item_type: 'service', category: 'Duct / Airflow', default_description: 'Return grille repair/replacement labor allowance.', default_unit_price: 0, unit_label: 'each' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.duct.dryer_vent_inspection', item_name: 'Dryer Vent Inspection', item_type: 'diagnostic', category: 'Duct / Airflow', default_description: 'Dryer vent airflow and blockage inspection.', default_unit_price: 0, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.duct.balance_adjustment', item_name: 'Air Balance Adjustment', item_type: 'service', category: 'Duct / Airflow', default_description: 'Air balancing adjustment service.', default_unit_price: 0, unit_label: 'system' }),
+
+  // Compliance docs
+  createStarterV3Seed({ seed_key: 'starter_v3.docs.compliance_package', item_name: 'Compliance Documentation Package', item_type: 'service', category: 'Compliance Docs', default_description: 'Compliance documentation preparation and packet handling.', default_unit_price: 0, unit_label: 'doc' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.docs.permit_filing_admin_fee', item_name: 'Permit / Filing Admin Fee', item_type: 'service', category: 'Permits / Documentation', default_description: 'Permit and filing administrative processing fee.', default_unit_price: 0, unit_label: 'doc' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.docs.hers_upload', item_name: 'HERS Upload / Registry Entry', item_type: 'service', category: 'Compliance Docs', default_description: 'HERS registry upload and submission handling.', default_unit_price: 0, unit_label: 'doc' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.docs.title24_forms', item_name: 'Title 24 Forms Processing', item_type: 'service', category: 'Compliance Docs', default_description: 'Title 24 documentation prep and processing.', default_unit_price: 0, unit_label: 'doc' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.docs.photo_documentation', item_name: 'Photo Documentation Package', item_type: 'service', category: 'Compliance Docs', default_description: 'Photo documentation and attachment packaging.', default_unit_price: 0, unit_label: 'doc' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.docs.closeout_report', item_name: 'Closeout Report Package', item_type: 'service', category: 'Compliance Docs', default_description: 'Project closeout summary and attached documentation.', default_unit_price: 0, unit_label: 'doc' }),
+
+  // Replacement / estimate placeholders
+  createStarterV3Seed({ seed_key: 'starter_v3.replacement.system_replacement_estimate_split', item_name: 'System Replacement Estimate Placeholder (Split)', item_type: 'service', category: 'Other', default_description: 'Placeholder estimate line for split-system replacement scoping.', default_unit_price: 0, unit_label: 'system', is_active: false }),
+  createStarterV3Seed({ seed_key: 'starter_v3.replacement.system_replacement_estimate_package', item_name: 'System Replacement Estimate Placeholder (Package)', item_type: 'service', category: 'Other', default_description: 'Placeholder estimate line for package-unit replacement scoping.', default_unit_price: 0, unit_label: 'system', is_active: false }),
+  createStarterV3Seed({ seed_key: 'starter_v3.replacement.duct_replacement_estimate', item_name: 'Duct Replacement Estimate Placeholder', item_type: 'service', category: 'Other', default_description: 'Placeholder estimate line for duct replacement scoping.', default_unit_price: 0, unit_label: 'job', is_active: false }),
+  createStarterV3Seed({ seed_key: 'starter_v3.replacement.panel_upgrade_estimate', item_name: 'Electrical Panel Upgrade Placeholder', item_type: 'service', category: 'Other', default_description: 'Placeholder estimate line for panel upgrade coordination.', default_unit_price: 0, unit_label: 'job', is_active: false }),
+  createStarterV3Seed({ seed_key: 'starter_v3.replacement.permit_allowance_placeholder', item_name: 'Permit Allowance Placeholder', item_type: 'service', category: 'Permits / Documentation', default_description: 'Placeholder allowance line for permit estimate assumptions.', default_unit_price: 0, unit_label: 'doc', is_active: false }),
+  createStarterV3Seed({ seed_key: 'starter_v3.replacement.crane_service_placeholder', item_name: 'Crane Service Placeholder', item_type: 'service', category: 'Other', default_description: 'Placeholder line for equipment crane coordination.', default_unit_price: 0, unit_label: 'job', is_active: false }),
+];
+
 export function normalizeStarterKitVersion(value: unknown): StarterKitVersion {
-  return String(value ?? '').trim().toLowerCase() === 'v2' ? 'v2' : 'v1';
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (normalized === 'v3') return 'v3';
+  if (normalized === 'v2') return 'v2';
+  return 'v1';
 }
 
 export function resolveStarterKitSeeds(version?: unknown): StarterKitSeedSelection {
   const starterKitVersion = normalizeStarterKitVersion(version);
-  const seeds = starterKitVersion === 'v2' ? STARTER_KIT_V2_SEEDS : STARTER_KIT_V1_SEEDS;
+  const seeds =
+    starterKitVersion === 'v3'
+      ? STARTER_KIT_V3_SEEDS
+      : starterKitVersion === 'v2'
+        ? STARTER_KIT_V2_SEEDS
+        : STARTER_KIT_V1_SEEDS;
   const activeCount = seeds.filter((seed) => seed.is_active).length;
   const inactiveCount = seeds.length - activeCount;
 
@@ -880,10 +1036,13 @@ export async function applyPricebookSeeding(
 export async function planExistingAccountStarterKitBackfill(params: {
   store: PricebookSeedingStore;
   account_owner_user_id: string;
+  starter_kit_version?: BackfillStarterKitVersion;
   previewLimit?: number;
 }): Promise<ExistingAccountStarterKitBackfillPlan> {
   const { store, account_owner_user_id } = params;
-  const selection = resolveStarterKitSeeds('v2');
+  const starterKitVersion: BackfillStarterKitVersion =
+    params.starter_kit_version === 'v3' ? 'v3' : 'v2';
+  const selection = resolveStarterKitSeeds(starterKitVersion);
   const resolvedPreviewLimit = Number.isInteger(params.previewLimit) && Number(params.previewLimit) > 0
     ? Number(params.previewLimit)
     : 10;
@@ -902,7 +1061,7 @@ export async function planExistingAccountStarterKitBackfill(params: {
     return {
       mode: 'dry_run',
       account_owner_user_id,
-      starter_kit_version: 'v2',
+      starter_kit_version: starterKitVersion,
       seed_count: selection.seedCount,
       active_seed_count: selection.activeCount,
       inactive_seed_count: selection.inactiveCount,
@@ -1051,11 +1210,14 @@ export async function planExistingAccountStarterKitBackfill(params: {
 export async function applyExistingAccountStarterKitBackfill(params: {
   store: PricebookSeedingStore;
   account_owner_user_id: string;
+  starter_kit_version?: BackfillStarterKitVersion;
   confirmApply: true;
   allowCollisions?: true;
 }): Promise<ExistingAccountStarterKitBackfillApplyResult> {
   const { store, account_owner_user_id } = params;
-  const selection = resolveStarterKitSeeds('v2');
+  const starterKitVersion: BackfillStarterKitVersion =
+    params.starter_kit_version === 'v3' ? 'v3' : 'v2';
+  const selection = resolveStarterKitSeeds(starterKitVersion);
 
   const buildApplyResult = (input: {
     inserted_rows: Array<{ seed_key: string; item_name: string }>;
@@ -1066,7 +1228,7 @@ export async function applyExistingAccountStarterKitBackfill(params: {
   }): ExistingAccountStarterKitBackfillApplyResult => ({
     mode: 'apply',
     account_owner_user_id,
-    starter_kit_version: 'v2',
+    starter_kit_version: starterKitVersion,
     seed_count: selection.seedCount,
     active_seed_count: selection.activeCount,
     inactive_seed_count: selection.inactiveCount,
@@ -1093,6 +1255,7 @@ export async function applyExistingAccountStarterKitBackfill(params: {
   const plan = await planExistingAccountStarterKitBackfill({
     store,
     account_owner_user_id,
+    starter_kit_version: starterKitVersion,
     previewLimit: selection.seedCount,
   });
 

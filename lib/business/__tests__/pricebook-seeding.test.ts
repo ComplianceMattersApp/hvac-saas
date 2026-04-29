@@ -2,6 +2,7 @@
 import {
   STARTER_KIT_V1_SEEDS,
   STARTER_KIT_V2_SEEDS,
+  STARTER_KIT_V3_SEEDS,
   applyExistingAccountStarterKitBackfill,
   applyPricebookSeeding,
   createPricebookSeedingStoreFromSupabase,
@@ -224,6 +225,15 @@ describe('PricebookSeeding', () => {
       expect(selection.activeCount).toBe(21);
       expect(selection.inactiveCount).toBe(2);
     });
+
+    it('returns v3 with active/inactive counts', () => {
+      const selection = resolveStarterKitSeeds('v3');
+
+      expect(selection.starterKitVersion).toBe('v3');
+      expect(selection.seedCount).toBe(STARTER_KIT_V3_SEEDS.length);
+      expect(selection.activeCount).toBe(STARTER_KIT_V3_SEEDS.filter((seed) => seed.is_active).length);
+      expect(selection.inactiveCount).toBe(STARTER_KIT_V3_SEEDS.filter((seed) => !seed.is_active).length);
+    });
   });
 
   describe('planExistingAccountStarterKitBackfill', () => {
@@ -267,6 +277,30 @@ describe('PricebookSeeding', () => {
       expect(result.preview_insert_rows).toHaveLength(10);
       expect(result.preview_skip_rows).toHaveLength(0);
       expect(result.possible_collisions).toHaveLength(0);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('supports explicit v3 planning with v3 seed counts', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+
+      const result = await planExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        starter_kit_version: 'v3',
+      });
+
+      expect(result.starter_kit_version).toBe('v3');
+      expect(result.seed_count).toBe(STARTER_KIT_V3_SEEDS.length);
+      expect(result.active_seed_count).toBe(STARTER_KIT_V3_SEEDS.filter((seed) => seed.is_active).length);
+      expect(result.inactive_seed_count).toBe(STARTER_KIT_V3_SEEDS.filter((seed) => !seed.is_active).length);
+      expect(result.would_insert_count).toBe(STARTER_KIT_V3_SEEDS.length);
       expect(result.errors).toEqual([]);
     });
 
@@ -570,6 +604,34 @@ describe('PricebookSeeding', () => {
       const insertedPayload = insertSeedRowsMock.mock.calls[0]?.[0] ?? [];
       expect(insertedPayload).toHaveLength(23);
       expect(insertedPayload.every((row: any) => row.seed_key.startsWith('starter_v2.'))).toBe(true);
+    });
+
+    it('supports explicit v3 apply with insert-only behavior', async () => {
+      listExistingSeedRowsMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      listExistingRowsForCollisionMock.mockResolvedValue({
+        data: [],
+        error: null,
+      });
+      insertSeedRowsMock.mockResolvedValue({ error: null });
+
+      const result = await applyExistingAccountStarterKitBackfill({
+        store: mockStore,
+        account_owner_user_id: 'test-account-id',
+        starter_kit_version: 'v3',
+        confirmApply: true,
+      });
+
+      expect(result.starter_kit_version).toBe('v3');
+      expect(result.inserted_count).toBe(STARTER_KIT_V3_SEEDS.length);
+      expect(result.skipped_existing_seed_key_count).toBe(0);
+      expect(result.errors).toEqual([]);
+
+      const insertedPayload = insertSeedRowsMock.mock.calls[0]?.[0] ?? [];
+      expect(insertedPayload).toHaveLength(STARTER_KIT_V3_SEEDS.length);
+      expect(insertedPayload.every((row: any) => row.seed_key.startsWith('starter_v3.'))).toBe(true);
     });
 
     it('inserts only missing V2 seeds when some seed_keys already exist', async () => {
@@ -1200,7 +1262,68 @@ describe('PricebookSeeding', () => {
     });
   });
 
-  describe('V1 + V2 compatibility guardrails', () => {
+  describe('STARTER_KIT_V3_SEEDS constants', () => {
+    it('should have a robust starter kit size', () => {
+      expect(STARTER_KIT_V3_SEEDS.length).toBeGreaterThanOrEqual(75);
+      expect(STARTER_KIT_V3_SEEDS.length).toBeLessThanOrEqual(100);
+    });
+
+    it('should validate V3 seed definitions with unique seed keys', () => {
+      const errors = validateSeedDefinitions(STARTER_KIT_V3_SEEDS);
+      expect(errors).toEqual([]);
+    });
+
+    it('should ensure all V3 seeds have starter_version=starter_v3', () => {
+      STARTER_KIT_V3_SEEDS.forEach((seed) => {
+        expect(seed.starter_version).toBe('starter_v3');
+      });
+    });
+
+    it('should ensure all V3 seed keys start with starter_v3.', () => {
+      STARTER_KIT_V3_SEEDS.forEach((seed) => {
+        expect(seed.seed_key.startsWith('starter_v3.')).toBe(true);
+      });
+    });
+
+    it('should use only controlled category values', () => {
+      const allowedCategories = new Set<string>(PRICEBOOK_CATEGORY_OPTIONS);
+      STARTER_KIT_V3_SEEDS.forEach((seed) => {
+        const category = String(seed.category ?? '');
+        expect(allowedCategories.has(category)).toBe(true);
+      });
+    });
+
+    it('should use only controlled unit labels', () => {
+      const allowedUnitLabels = new Set<string>(PRICEBOOK_UNIT_LABEL_OPTIONS);
+      STARTER_KIT_V3_SEEDS.forEach((seed) => {
+        const unitLabel = String(seed.unit_label ?? '');
+        expect(allowedUnitLabels.has(unitLabel)).toBe(true);
+      });
+    });
+
+    it('should have non-negative default prices', () => {
+      STARTER_KIT_V3_SEEDS.forEach((seed) => {
+        expect(seed.default_unit_price).toBeGreaterThanOrEqual(0);
+      });
+    });
+
+    it('should not include starter adjustment/credit rows yet', () => {
+      expect(STARTER_KIT_V3_SEEDS.some((seed) => seed.item_type === 'adjustment')).toBe(false);
+      expect(
+        STARTER_KIT_V3_SEEDS.some((seed) => seed.item_name.toLowerCase().includes('credit')),
+      ).toBe(false);
+    });
+
+    it('should report active and inactive/deferred counts explicitly', () => {
+      const activeCount = STARTER_KIT_V3_SEEDS.filter((seed) => seed.is_active).length;
+      const inactiveCount = STARTER_KIT_V3_SEEDS.length - activeCount;
+
+      expect(activeCount).toBeGreaterThan(0);
+      expect(inactiveCount).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('V1 + V2 + V3 compatibility guardrails', () => {
     it('keeps V1 count and keyset unchanged', () => {
       const expectedV1Keys = [
         'starter_v1.fees.service_call',
@@ -1221,8 +1344,8 @@ describe('PricebookSeeding', () => {
       expect(STARTER_KIT_V1_SEEDS.map((seed) => seed.seed_key).sort()).toEqual(expectedV1Keys.sort());
     });
 
-    it('has no duplicate seed_key across V1 and V2', () => {
-      const combined = [...STARTER_KIT_V1_SEEDS, ...STARTER_KIT_V2_SEEDS];
+    it('has no duplicate seed_key across V1, V2, and V3', () => {
+      const combined = [...STARTER_KIT_V1_SEEDS, ...STARTER_KIT_V2_SEEDS, ...STARTER_KIT_V3_SEEDS];
       const keySet = new Set(combined.map((seed) => seed.seed_key));
 
       expect(keySet.size).toBe(combined.length);

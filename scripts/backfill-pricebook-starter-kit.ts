@@ -13,7 +13,7 @@ import { createAdminClient } from "../lib/supabase/server";
 
 export type ParsedBackfillArgs = {
   accountOwnerUserId: string;
-  starterKitVersion: "v2";
+  starterKitVersion: "v2" | "v3";
   apply: boolean;
   allowCollisions: boolean;
   previewLimit: number;
@@ -36,10 +36,12 @@ export type BackfillScriptDeps = {
   env: NodeJS.ProcessEnv;
   planBackfill: (params: {
     account_owner_user_id: string;
+    starter_kit_version?: "v2" | "v3";
     previewLimit?: number;
   }) => Promise<ExistingAccountStarterKitBackfillPlan>;
   applyBackfill: (params: {
     account_owner_user_id: string;
+    starter_kit_version?: "v2" | "v3";
     confirmApply: true;
     allowCollisions?: true;
   }) => Promise<ExistingAccountStarterKitBackfillApplyResult>;
@@ -139,9 +141,9 @@ export function parseBackfillArgs(argv: string[]): ParsedBackfillArgs {
     throw new Error("Missing required --account-owner-user-id");
   }
 
-  if (starterKitVersionRaw && starterKitVersionRaw !== "v2") {
+  if (starterKitVersionRaw && starterKitVersionRaw !== "v2" && starterKitVersionRaw !== "v3") {
     throw new Error(
-      `Invalid --starter-kit-version: "${starterKitVersionRaw}" (only v2 is supported for backfill)`,
+      `Invalid --starter-kit-version: "${starterKitVersionRaw}" (supported: v2|v3)`,
     );
   }
 
@@ -158,7 +160,7 @@ export function parseBackfillArgs(argv: string[]): ParsedBackfillArgs {
 
   return {
     accountOwnerUserId,
-    starterKitVersion: "v2",
+    starterKitVersion: starterKitVersionRaw === "v3" ? "v3" : "v2",
     apply,
     allowCollisions,
     previewLimit,
@@ -189,6 +191,7 @@ export async function runBackfillScript(
   if (!args.apply) {
     const planResult = await deps.planBackfill({
       account_owner_user_id: args.accountOwnerUserId,
+      starter_kit_version: args.starterKitVersion,
       previewLimit: args.previewLimit,
     });
     return {
@@ -201,6 +204,7 @@ export async function runBackfillScript(
 
   const applyResult = await deps.applyBackfill({
     account_owner_user_id: args.accountOwnerUserId,
+    starter_kit_version: args.starterKitVersion,
     confirmApply: true,
     allowCollisions: args.allowCollisions ? true : undefined,
   });
@@ -223,16 +227,18 @@ function createRealDeps(): BackfillScriptDeps {
 
   return {
     env: process.env,
-    planBackfill: ({ account_owner_user_id, previewLimit }) =>
+    planBackfill: ({ account_owner_user_id, starter_kit_version, previewLimit }) =>
       planExistingAccountStarterKitBackfill({
         store,
         account_owner_user_id,
+        starter_kit_version: starter_kit_version ?? "v2",
         previewLimit,
       }),
-    applyBackfill: ({ account_owner_user_id, allowCollisions }) =>
+    applyBackfill: ({ account_owner_user_id, starter_kit_version, allowCollisions }) =>
       applyExistingAccountStarterKitBackfill({
         store,
         account_owner_user_id,
+        starter_kit_version: starter_kit_version ?? "v2",
         confirmApply: true,
         ...(allowCollisions === true ? { allowCollisions: true } : {}),
       }),
