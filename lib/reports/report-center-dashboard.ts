@@ -430,10 +430,10 @@ export async function buildReportCenterDashboardReadModel(params: {
           href: `/reports/jobs?${new URLSearchParams({ ...Object.fromEntries(buildRangeParams(params.filters)), date_field: "completed" }).toString()}`,
         },
         {
-          label: "Unassigned open visits",
+          label: "Unassigned Open Visits",
           value: new Intl.NumberFormat("en-US").format(unassignedOpenVisits),
-          helperText: "Active visits with no current active assignment.",
-          href: null,
+          helperText: "Active visits with no assigned team member.",
+          href: "/reports/jobs?assignee=unassigned",
         },
       ],
       trend: operationalTrend,

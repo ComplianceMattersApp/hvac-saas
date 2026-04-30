@@ -196,31 +196,51 @@ function csvEscape(value: string) {
   return value;
 }
 
-async function resolveAssignedJobIds(params: {
+type AssignmentFilter =
+  | { mode: "include"; jobIds: string[] }
+  | { mode: "unassigned"; assignedJobIds: string[] }
+  | null;
+
+async function resolveAssignmentFilter(params: {
   supabase: any;
   assigneeUserId: string;
-}): Promise<string[] | null> {
-  const assigneeUserId = String(params.assigneeUserId ?? "").trim();
-  if (!assigneeUserId) return null;
+}): Promise<AssignmentFilter> {
+  const value = String(params.assigneeUserId ?? "").trim();
+  if (!value) return null;
+
+  if (value === "unassigned") {
+    const { data, error } = await params.supabase
+      .from("job_assignments")
+      .select("job_id")
+      .eq("is_active", true);
+    if (error) throw error;
+    const assignedJobIds = Array.from<string>(
+      new Set(
+        (data ?? [])
+          .map((row: any) => String(row?.job_id ?? "").trim())
+          .filter(Boolean),
+      ),
+    );
+    return { mode: "unassigned", assignedJobIds };
+  }
 
   const { data, error } = await params.supabase
     .from("job_assignments")
     .select("job_id")
-    .eq("user_id", assigneeUserId)
+    .eq("user_id", value)
     .eq("is_active", true);
-
   if (error) throw error;
-
-  return Array.from<string>(
+  const jobIds = Array.from<string>(
     new Set(
       (data ?? [])
         .map((row: any) => String(row?.job_id ?? "").trim())
         .filter(Boolean),
     ),
   );
+  return { mode: "include", jobIds };
 }
 
-function applyLedgerFilters(query: any, filters: JobVisitLedgerFilters, assignedJobIds: string[] | null) {
+function applyLedgerFilters(query: any, filters: JobVisitLedgerFilters, assignmentFilter: AssignmentFilter) {
   if (filters.scope === "active") {
     query = query.neq("status", "cancelled").neq("ops_status", "closed");
   } else if (filters.scope === "historical") {
@@ -239,8 +259,10 @@ function applyLedgerFilters(query: any, filters: JobVisitLedgerFilters, assigned
     query = query.eq("job_type", filters.jobType);
   }
 
-  if (assignedJobIds) {
-    query = query.in("id", assignedJobIds);
+  if (assignmentFilter?.mode === "include") {
+    query = query.in("id", assignmentFilter.jobIds);
+  } else if (assignmentFilter?.mode === "unassigned" && assignmentFilter.assignedJobIds.length > 0) {
+    query = query.not("id", "in", `(${assignmentFilter.assignedJobIds.join(",")})`);
   }
 
   if (filters.dateField === "scheduled") {
@@ -361,12 +383,12 @@ export async function listJobVisitLedgerRows(params: {
   includeCount?: boolean;
 }): Promise<JobVisitLedgerResult> {
   const limit = params.limit ?? JOB_VISIT_LEDGER_PAGE_LIMIT;
-  const [contractorIds, assignedJobIds] = await Promise.all([
+  const [contractorIds, assignmentFilter] = await Promise.all([
     resolveReportAccountContractorIds({
       supabase: params.supabase,
       accountOwnerUserId: params.accountOwnerUserId,
     }),
-    resolveAssignedJobIds({
+    resolveAssignmentFilter({
       supabase: params.supabase,
       assigneeUserId: params.filters.assigneeUserId,
     }),
@@ -376,7 +398,8 @@ export async function listJobVisitLedgerRows(params: {
     return { rows: [], totalCount: 0, truncated: false };
   }
 
-  if (assignedJobIds && assignedJobIds.length === 0) {
+  // For specific-user filter with no matching assignments, there are no results
+  if (assignmentFilter?.mode === "include" && assignmentFilter.jobIds.length === 0) {
     return { rows: [], totalCount: 0, truncated: false };
   }
 
@@ -386,7 +409,7 @@ export async function listJobVisitLedgerRows(params: {
     .is("deleted_at", null)
     .in("contractor_id", accountScopeInList(contractorIds));
 
-  query = applyLedgerFilters(query, params.filters, assignedJobIds);
+  query = applyLedgerFilters(query, params.filters, assignmentFilter);
   query = query.limit(limit);
 
   const { data, error, count } = await query;

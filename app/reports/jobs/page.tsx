@@ -155,9 +155,10 @@ export default async function JobsReportPage({
           </label>
 
           <label className="grid gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Assigned tech</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Assigned Team</span>
             <select name="assignee" defaultValue={filters.assigneeUserId} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
-              <option value="">All assignees</option>
+              <option value="">All team members</option>
+              <option value="unassigned">Unassigned</option>
               {filterOptions.assignees.map((assignee) => (
                 <option key={assignee.user_id} value={assignee.user_id}>{assignee.display_name}</option>
               ))}
