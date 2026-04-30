@@ -126,7 +126,7 @@ export async function buildOperationalKpiReadModel(params: {
     (job) => String(job.ops_status ?? "").trim().toLowerCase() === "paperwork_required",
   ).length;
   const invoiceRequiredBacklog = activeJobs.filter(
-    (job) => getCloseoutNeeds(projectionsByJobId.get(job.id) ?? job).needsInvoice,
+    (job) => Boolean(job.field_complete) && getCloseoutNeeds(projectionsByJobId.get(job.id) ?? job).needsInvoice,
   ).length;
   const closeoutBacklog = activeJobs.filter((job) => isInCloseoutQueue(projectionsByJobId.get(job.id) ?? job)).length;
   const closeoutAgedSevenPlus = activeJobs.filter((job) => {

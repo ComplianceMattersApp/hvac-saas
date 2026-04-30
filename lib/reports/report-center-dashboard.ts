@@ -455,9 +455,9 @@ export async function buildReportCenterDashboardReadModel(params: {
           href: "/reports/closeout?paperwork_only=1",
         },
         {
-          label: "Invoice follow-up needed",
+          label: "Invoice Follow-Up Needed",
           value: getMetricValue(metricMap, "invoice_required_backlog"),
-          helperText: "Billing-aware invoice follow-up only, not finance collection.",
+          helperText: "Visits still waiting on invoice action.",
           href: "/reports/closeout?invoice_only=1",
         },
       ],
