@@ -44,6 +44,7 @@ export type ServiceCaseContinuityFilters = {
   fromDate: string;
   toDate: string;
   repeatOnly: boolean;
+  activeRepeatOnly?: boolean;
   sort: ServiceCaseContinuitySort;
 };
 
@@ -342,6 +343,7 @@ export function parseServiceCaseContinuityFilters(source: FilterSource): Service
     fromDate: normalizeYmd(readParam(source, "from")),
     toDate: normalizeYmd(readParam(source, "to")),
     repeatOnly: String(readParam(source, "repeat_only") ?? "").trim() === "1",
+    activeRepeatOnly: String(readParam(source, "active_repeat_visits") ?? "").trim() === "1",
     sort: normalizeChoice(
       readParam(source, "sort"),
       SERVICE_CASE_CONTINUITY_SORT_OPTIONS,
@@ -359,6 +361,7 @@ export function buildServiceCaseContinuitySearchParams(filters: ServiceCaseConti
   if (filters.fromDate) searchParams.set("from", filters.fromDate);
   if (filters.toDate) searchParams.set("to", filters.toDate);
   if (filters.repeatOnly) searchParams.set("repeat_only", "1");
+  if (filters.activeRepeatOnly) searchParams.set("active_repeat_visits", "1");
   if (filters.sort !== "created_desc") searchParams.set("sort", filters.sort);
   return searchParams;
 }
@@ -401,7 +404,7 @@ export async function listServiceCaseContinuityRows(params: {
       supabase: params.supabase,
       contractorId: params.filters.contractorId,
     }),
-    params.filters.repeatOnly
+    params.filters.repeatOnly || params.filters.activeRepeatOnly
       ? resolveRepeatCaseIds({
           supabase: params.supabase,
           contractorId: params.filters.contractorId,
@@ -558,15 +561,19 @@ export async function listServiceCaseContinuityRows(params: {
     ? unsortedRows.filter((row) => row.isEffectivelyOpen)
     : unsortedRows) as ServiceCaseContinuityRow[];
 
+  const filteredRows = params.filters.activeRepeatOnly
+    ? rows.filter((row) => row.visitCount > 1 && row.activeLinkedVisitCount > 0)
+    : rows;
+
   if (params.filters.sort === "created_asc") {
-    rows.sort((left, right) => left.createdDateDisplay.localeCompare(right.createdDateDisplay));
+    filteredRows.sort((left, right) => left.createdDateDisplay.localeCompare(right.createdDateDisplay));
   } else if (params.filters.sort === "resolved_desc") {
-    rows.sort((left, right) => right.resolvedDateDisplay.localeCompare(left.resolvedDateDisplay));
+    filteredRows.sort((left, right) => right.resolvedDateDisplay.localeCompare(left.resolvedDateDisplay));
   }
 
   return {
-    rows,
-    totalCount: rows.length,
+    rows: filteredRows,
+    totalCount: filteredRows.length,
     truncated: params.includeCount === false ? false : Number(count ?? rows.length) > serviceCases.length,
   };
 }

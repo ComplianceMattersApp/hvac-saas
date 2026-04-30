@@ -392,7 +392,7 @@ export async function buildReportCenterDashboardReadModel(params: {
         label: "Active Repeat Visits",
         value: getMetricValue(metricMap, "repeat_visit_cases"),
         helperText: "Multi-visit cases with active work still open.",
-        href: "/reports/service-cases?repeat_only=1",
+        href: "/reports/service-cases?repeat_only=1&active_repeat_visits=1",
         tone: "emerald",
       },
       {
@@ -471,10 +471,10 @@ export async function buildReportCenterDashboardReadModel(params: {
           href: "/reports/service-cases?case_status=open",
         },
         {
-          label: "Repeat-visit cases",
+          label: "Active Repeat Visits",
           value: getMetricValue(metricMap, "repeat_visit_cases"),
-          helperText: "Cases already showing repeat-visit pressure.",
-          href: "/reports/service-cases?repeat_only=1",
+          helperText: "Multi-visit cases with active work still open.",
+          href: "/reports/service-cases?repeat_only=1&active_repeat_visits=1",
         },
         {
           label: "Cases resolved this period",

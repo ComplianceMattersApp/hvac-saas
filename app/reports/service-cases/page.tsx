@@ -131,10 +131,16 @@ export default async function ServiceCaseContinuityPage({
               <input name="to" type="date" defaultValue={filters.toDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
             </label>
 
-            <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 xl:mt-6">
-              <input type="checkbox" name="repeat_only" value="1" defaultChecked={filters.repeatOnly} className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300" />
-              <span>Repeat visits only</span>
-            </label>
+            <div className="grid gap-2 xl:mt-6">
+              <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <input type="checkbox" name="repeat_only" value="1" defaultChecked={filters.repeatOnly} className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300" />
+                <span>Multiple visits only</span>
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <input type="checkbox" name="active_repeat_visits" value="1" defaultChecked={Boolean(filters.activeRepeatOnly)} className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300" />
+                <span>Active repeat visits only</span>
+              </label>
+            </div>
           </div>
 
           <div className="flex flex-col gap-4 border-t border-slate-200/80 pt-4 lg:flex-row lg:items-end lg:justify-between">

@@ -11,7 +11,11 @@ import {
   accountScopeInList,
   resolveReportAccountCustomerIds,
 } from "@/lib/reports/report-account-scope";
+<<<<<<< HEAD
 import { isServiceCaseContinuityOpen } from "@/lib/reports/service-case-continuity";
+=======
+import { countActiveLinkedJobs, isServiceCaseEffectivelyOpen } from "@/lib/reports/service-case-continuity";
+>>>>>>> sandbox-clean-start
 
 type ContinuityCaseRow = {
   id: string;
@@ -129,7 +133,10 @@ export async function buildContinuityKpiReadModel(params: {
   const resolvedServiceCases = serviceCases.filter(
     (serviceCase) => String(serviceCase.status ?? "").trim().toLowerCase() === "resolved",
   ).length;
-  const repeatVisitCases = Array.from(linkedJobCounts.values()).filter((count) => count >= 2).length;
+  const repeatVisitCases = serviceCases.filter((serviceCase) => {
+    const linkedJobs = linkedJobsByCaseId.get(String(serviceCase.id ?? "").trim()) ?? [];
+    return linkedJobs.length > 1 && countActiveLinkedJobs(linkedJobs) > 0;
+  }).length;
   const averageVisitsPerServiceCase = serviceCases.length
     ? Array.from(linkedJobCounts.values()).reduce((total, count) => total + count, 0) / serviceCases.length
     : 0;
@@ -186,7 +193,7 @@ export async function buildContinuityKpiReadModel(params: {
         priorityReason: "Repeat visits are a strong continuity and service-quality signal and deserve first-line dashboard visibility.",
         source: "linked jobs by service_case_id",
         bucketRule: "Current snapshot only.",
-        derivation: "Count service cases with two or more linked non-deleted jobs.",
+        derivation: "Count service cases with two or more linked non-deleted jobs and at least one linked visit still operationally active.",
       },
       {
         key: "average_visits_per_service_case",
