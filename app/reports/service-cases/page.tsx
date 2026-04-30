@@ -180,7 +180,7 @@ export default async function ServiceCaseContinuityPage({
             <thead className="bg-slate-50/90">
               <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
                 <th className="px-3 py-3">Case Ref</th>
-                <th className="px-3 py-3">Problem Summary</th>
+                <th className="px-3 py-3">Case Problem Summary</th>
                 <th className="px-3 py-3">Kind</th>
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Customer</th>
