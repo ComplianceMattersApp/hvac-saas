@@ -421,7 +421,59 @@ describe("provisionFirstOwnerAccount", () => {
   });
 
   it("missing entitlement row is reconciled", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-30T00:00:00.000Z"));
+
     const ownerId = "user-102";
+    const store = createStore({
+      authUsersByEmail: {
+        "owner@example.com": { id: ownerId, email: "owner@example.com" },
+      },
+      profilesById: {
+        [ownerId]: { id: ownerId, email: "owner@example.com", full_name: "Owner" },
+      },
+      internalUsersByUserId: {
+        [ownerId]: {
+          user_id: ownerId,
+          account_owner_user_id: ownerId,
+          role: "admin",
+          is_active: true,
+          created_by: ownerId,
+        },
+      },
+      businessProfilesByOwnerId: {
+        [ownerId]: {
+          account_owner_user_id: ownerId,
+          display_name: "Existing",
+          support_email: null,
+          support_phone: null,
+          billing_mode: "external_billing",
+        },
+      },
+    });
+    const client = createMockClient(store);
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: { targetEmail: "owner@example.com" },
+    });
+
+    try {
+      expect(result.status).toBe("provisioned");
+      expect(result.recordsCreated).toContain("platform_account_entitlements");
+      expect(store.entitlementsByOwnerId[ownerId]?.plan_key).toBe("starter");
+      expect(store.entitlementsByOwnerId[ownerId]?.entitlement_status).toBe("trial");
+      expect(store.entitlementsByOwnerId[ownerId]?.trial_ends_at).toBe(
+        "2026-05-14T00:00:00.000Z",
+      );
+      expect(store.entitlementsByOwnerId[ownerId]?.trial_ends_at).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("standard newly created entitlement does not use indefinite/null trial", async () => {
+    const ownerId = "user-106";
     const store = createStore({
       authUsersByEmail: {
         "owner@example.com": { id: ownerId, email: "owner@example.com" },
@@ -457,8 +509,8 @@ describe("provisionFirstOwnerAccount", () => {
 
     expect(result.status).toBe("provisioned");
     expect(result.recordsCreated).toContain("platform_account_entitlements");
-    expect(store.entitlementsByOwnerId[ownerId]?.plan_key).toBe("starter");
-    expect(store.entitlementsByOwnerId[ownerId]?.entitlement_status).toBe("trial");
+    expect(store.entitlementsByOwnerId[ownerId]?.trial_ends_at).toEqual(expect.any(String));
+    expect(store.entitlementsByOwnerId[ownerId]?.trial_ends_at).not.toBeNull();
   });
 
   it("internal_comped preset creates entitlement with comped-safe values", async () => {
@@ -502,8 +554,14 @@ describe("provisionFirstOwnerAccount", () => {
         plan_key: "starter",
         entitlement_status: "active",
         seat_limit: null,
+        trial_ends_at: null,
+        entitlement_valid_until: null,
         stripe_customer_id: null,
         stripe_subscription_id: null,
+        stripe_price_id: null,
+        stripe_subscription_status: null,
+        stripe_current_period_end: null,
+        stripe_cancel_at_period_end: false,
         notes: "internal_comped_v1",
       }),
     );

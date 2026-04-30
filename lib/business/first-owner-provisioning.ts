@@ -179,6 +179,7 @@ const DEFAULT_BUSINESS_NAME = "Compliance Matters";
 const DEFAULT_PLAN_KEY: PlatformPlanKey = "starter";
 const DEFAULT_ENTITLEMENT_STATUS: EntitlementStatus = "trial";
 const DEFAULT_FIRST_OWNER_STARTER_KIT_VERSION: StarterKitVersion = "v3";
+const STANDARD_TRIAL_DURATION_DAYS = 14;
 
 function buildSeedPreviewForNewAccount(selection: StarterKitSeedSelection): PricebookSeedResult {
   return {
@@ -295,7 +296,14 @@ function normalizeEntitlementPreset(value: unknown): EntitlementPreset {
     : "standard";
 }
 
-function buildEntitlementPresetValues(preset: EntitlementPreset) {
+function computeStandardTrialEndsAtIso(now: Date = new Date()) {
+  const trialEndsAt = new Date(
+    now.getTime() + STANDARD_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000,
+  );
+  return trialEndsAt.toISOString();
+}
+
+function buildEntitlementPresetValues(preset: EntitlementPreset, now: Date = new Date()) {
   if (preset === "internal_comped") {
     return {
       plan_key: "starter" as PlatformPlanKey,
@@ -316,6 +324,7 @@ function buildEntitlementPresetValues(preset: EntitlementPreset) {
   return {
     plan_key: DEFAULT_PLAN_KEY,
     entitlement_status: DEFAULT_ENTITLEMENT_STATUS,
+    trial_ends_at: computeStandardTrialEndsAtIso(now),
   };
 }
 
