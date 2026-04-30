@@ -165,7 +165,23 @@ function makeJob(input: {
   };
 }
 
-describe("service case effective-open reporting", () => {
+describe("service case open continuity reporting", () => {
+  it("excludes a service case with zero linked visits from case_status=open", async () => {
+    const supabase = makeSupabaseMock({
+      serviceCases: [makeServiceCase("case-empty")],
+      jobs: [],
+    });
+
+    const result = await listServiceCaseContinuityRows({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      filters: DEFAULT_FILTERS,
+      internalBusinessDisplayName: "Compliance Matters",
+    });
+
+    expect(result.rows).toHaveLength(0);
+  });
+
   it("excludes a stored-open case with only closed linked jobs from case_status=open", async () => {
     const supabase = makeSupabaseMock({
       serviceCases: [makeServiceCase("case-closed")],
@@ -182,10 +198,10 @@ describe("service case effective-open reporting", () => {
     expect(result.rows).toHaveLength(0);
   });
 
-  it("keeps a stored-open case with any active linked job in case_status=open", async () => {
+  it("excludes a single ordinary need-to-schedule visit from case_status=open", async () => {
     const supabase = makeSupabaseMock({
       serviceCases: [makeServiceCase("case-active")],
-      jobs: [makeJob({ id: "job-active", serviceCaseId: "case-active", opsStatus: "scheduled" })],
+      jobs: [makeJob({ id: "job-active", serviceCaseId: "case-active", opsStatus: "need_to_schedule" })],
     });
 
     const result = await listServiceCaseContinuityRows({
@@ -195,48 +211,30 @@ describe("service case effective-open reporting", () => {
       internalBusinessDisplayName: "Compliance Matters",
     });
 
-    expect(result.rows.map((row) => row.serviceCaseId)).toEqual(["case-active"]);
-    expect(result.rows[0]?.activeLinkedVisitCount).toBe(1);
+    expect(result.rows).toHaveLength(0);
   });
 
-  it("uses the same effective-open rule for the continuity KPI count", async () => {
+  it("excludes a single ordinary scheduled visit from case_status=open", async () => {
     const supabase = makeSupabaseMock({
-      serviceCases: [
-        makeServiceCase("case-stale-open", "open"),
-        makeServiceCase("case-live-open", "open"),
-        makeServiceCase("case-stale-resolved", "resolved"),
-      ],
-      jobs: [
-        makeJob({ id: "job-closed", serviceCaseId: "case-stale-open", opsStatus: "closed" }),
-        makeJob({ id: "job-scheduled", serviceCaseId: "case-live-open", opsStatus: "scheduled" }),
-        makeJob({ id: "job-failed", serviceCaseId: "case-stale-resolved", opsStatus: "failed" }),
-      ],
+      serviceCases: [makeServiceCase("case-scheduled")],
+      jobs: [makeJob({ id: "job-scheduled", serviceCaseId: "case-scheduled", opsStatus: "scheduled" })],
     });
 
-    const result = await buildContinuityKpiReadModel({
+    const result = await listServiceCaseContinuityRows({
       supabase,
       accountOwnerUserId: ACCOUNT_OWNER,
-      filters: { fromDate: "", toDate: "", granularity: "monthly" },
-      buckets: [],
+      filters: DEFAULT_FILTERS,
+      internalBusinessDisplayName: "Compliance Matters",
     });
 
-    expect(result.metrics.find((metric) => metric.key === "open_service_cases")?.currentValue).toBe("2");
+    expect(result.rows).toHaveLength(0);
   });
 
-  it("keeps failed, retest, pending-office-review, paperwork-required, and invoice-required linked cases open", async () => {
-    const serviceCases = [
-      makeServiceCase("case-failed"),
-      makeServiceCase("case-retest"),
-      makeServiceCase("case-review"),
-      makeServiceCase("case-paperwork"),
-      makeServiceCase("case-invoice"),
-    ];
+  it("keeps a single failed or pending-office-review case included", async () => {
+    const serviceCases = [makeServiceCase("case-failed"), makeServiceCase("case-review")];
     const jobs = [
       makeJob({ id: "job-failed", serviceCaseId: "case-failed", opsStatus: "failed" }),
-      makeJob({ id: "job-retest", serviceCaseId: "case-retest", opsStatus: "retest_needed" }),
       makeJob({ id: "job-review", serviceCaseId: "case-review", opsStatus: "pending_office_review" }),
-      makeJob({ id: "job-paperwork", serviceCaseId: "case-paperwork", opsStatus: "paperwork_required" }),
-      makeJob({ id: "job-invoice", serviceCaseId: "case-invoice", opsStatus: "invoice_required" }),
     ];
     const supabase = makeSupabaseMock({ serviceCases, jobs });
 
@@ -247,22 +245,13 @@ describe("service case effective-open reporting", () => {
       internalBusinessDisplayName: "Compliance Matters",
     });
 
-    expect(result.rows.map((row) => row.serviceCaseId).sort()).toEqual(serviceCases.map((serviceCase) => serviceCase.id).sort());
+    expect(result.rows.map((row) => row.serviceCaseId).sort()).toEqual(["case-failed", "case-review"]);
   });
 
-  it("handles single-visit and multi-visit cases correctly", async () => {
+  it("keeps a multi-visit chain with any active linked visit included", async () => {
     const supabase = makeSupabaseMock({
-      serviceCases: [
-        makeServiceCase("case-single-closed"),
-        makeServiceCase("case-single-active"),
-        makeServiceCase("case-multi-closed"),
-        makeServiceCase("case-multi-active"),
-      ],
+      serviceCases: [makeServiceCase("case-multi-active")],
       jobs: [
-        makeJob({ id: "job-single-closed", serviceCaseId: "case-single-closed", opsStatus: "closed", createdAt: "2026-01-11T10:00:00Z" }),
-        makeJob({ id: "job-single-active", serviceCaseId: "case-single-active", opsStatus: "need_to_schedule", createdAt: "2026-01-11T10:00:00Z" }),
-        makeJob({ id: "job-multi-closed-a", serviceCaseId: "case-multi-closed", opsStatus: "closed", createdAt: "2026-01-11T10:00:00Z" }),
-        makeJob({ id: "job-multi-closed-b", serviceCaseId: "case-multi-closed", opsStatus: "closed", createdAt: "2026-01-12T10:00:00Z" }),
         makeJob({ id: "job-multi-active-a", serviceCaseId: "case-multi-active", opsStatus: "closed", createdAt: "2026-01-11T10:00:00Z" }),
         makeJob({ id: "job-multi-active-b", serviceCaseId: "case-multi-active", opsStatus: "invoice_required", createdAt: "2026-01-12T10:00:00Z" }),
       ],
@@ -275,11 +264,65 @@ describe("service case effective-open reporting", () => {
       internalBusinessDisplayName: "Compliance Matters",
     });
 
-    expect(result.rows.map((row) => row.serviceCaseId).sort()).toEqual([
-      "case-multi-active",
-      "case-single-active",
+    expect(result.rows.map((row) => row.serviceCaseId)).toEqual(["case-multi-active"]);
+    expect(result.rows[0]?.visitCount).toBe(2);
+    expect(result.rows[0]?.activeLinkedVisitCount).toBe(1);
+  });
+
+  it("excludes a fully closed multi-visit chain", async () => {
+    const supabase = makeSupabaseMock({
+      serviceCases: [makeServiceCase("case-multi-closed")],
+      jobs: [
+        makeJob({ id: "job-multi-closed-a", serviceCaseId: "case-multi-closed", opsStatus: "closed", createdAt: "2026-01-11T10:00:00Z" }),
+        makeJob({ id: "job-multi-closed-b", serviceCaseId: "case-multi-closed", opsStatus: "closed", createdAt: "2026-01-12T10:00:00Z" }),
+      ],
+    });
+
+    const result = await listServiceCaseContinuityRows({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      filters: DEFAULT_FILTERS,
+      internalBusinessDisplayName: "Compliance Matters",
+    });
+
+    expect(result.rows).toHaveLength(0);
+  });
+
+  it("uses the same refined continuity-open rule for the KPI and report", async () => {
+    const supabase = makeSupabaseMock({
+      serviceCases: [
+        makeServiceCase("case-empty"),
+        makeServiceCase("case-scheduled"),
+        makeServiceCase("case-failed"),
+        makeServiceCase("case-multi-active"),
+        makeServiceCase("case-multi-closed"),
+      ],
+      jobs: [
+        makeJob({ id: "job-scheduled", serviceCaseId: "case-scheduled", opsStatus: "scheduled" }),
+        makeJob({ id: "job-failed", serviceCaseId: "case-failed", opsStatus: "failed" }),
+        makeJob({ id: "job-multi-active-a", serviceCaseId: "case-multi-active", opsStatus: "closed", createdAt: "2026-01-11T10:00:00Z" }),
+        makeJob({ id: "job-multi-active-b", serviceCaseId: "case-multi-active", opsStatus: "pending_info", createdAt: "2026-01-12T10:00:00Z" }),
+        makeJob({ id: "job-multi-closed-a", serviceCaseId: "case-multi-closed", opsStatus: "closed", createdAt: "2026-01-11T10:00:00Z" }),
+        makeJob({ id: "job-multi-closed-b", serviceCaseId: "case-multi-closed", opsStatus: "closed", createdAt: "2026-01-12T10:00:00Z" }),
+      ],
+    });
+
+    const [report, kpi] = await Promise.all([
+      listServiceCaseContinuityRows({
+        supabase,
+        accountOwnerUserId: ACCOUNT_OWNER,
+        filters: DEFAULT_FILTERS,
+        internalBusinessDisplayName: "Compliance Matters",
+      }),
+      buildContinuityKpiReadModel({
+        supabase,
+        accountOwnerUserId: ACCOUNT_OWNER,
+        filters: { fromDate: "", toDate: "", granularity: "monthly" },
+        buckets: [],
+      }),
     ]);
-    expect(result.rows.find((row) => row.serviceCaseId === "case-single-active")?.visitCount).toBe(1);
-    expect(result.rows.find((row) => row.serviceCaseId === "case-multi-active")?.visitCount).toBe(2);
+
+    expect(report.rows.map((row) => row.serviceCaseId).sort()).toEqual(["case-failed", "case-multi-active"]);
+    expect(kpi.metrics.find((metric) => metric.key === "open_service_cases")?.currentValue).toBe("2");
   });
 });

@@ -202,15 +202,34 @@ export function countActiveLinkedJobs(jobs: ServiceCaseLinkedJobStatus[]) {
   return jobs.filter((job) => isActiveLinkedJob(job)).length;
 }
 
-export function isServiceCaseEffectivelyOpen(input: {
-  storedStatus?: string | null;
+function isContinuityForcingSingleVisitOpsStatus(value?: string | null) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return [
+    "failed",
+    "pending_office_review",
+    "retest_needed",
+    "pending_info",
+    "on_hold",
+  ].includes(normalized);
+}
+
+export function isServiceCaseContinuityOpen(input: {
   linkedJobs: ServiceCaseLinkedJobStatus[];
 }) {
-  if (input.linkedJobs.length === 0) {
-    return String(input.storedStatus ?? "").trim().toLowerCase() !== "resolved";
-  }
+  if (input.linkedJobs.length === 0) return false;
 
-  return countActiveLinkedJobs(input.linkedJobs) > 0;
+  const activeLinkedJobs = input.linkedJobs.filter((job) => isActiveLinkedJob(job));
+  if (activeLinkedJobs.length === 0) return false;
+
+  if (input.linkedJobs.length >= 2) return true;
+
+  return isContinuityForcingSingleVisitOpsStatus(activeLinkedJobs[0]?.ops_status);
+}
+
+export function isServiceCaseEffectivelyOpen(input: {
+  linkedJobs: ServiceCaseLinkedJobStatus[];
+}) {
+  return isServiceCaseContinuityOpen(input);
 }
 
 function getLatestVisitDateDisplay(job: LinkedJobRow | null | undefined) {
@@ -491,8 +510,7 @@ export async function listServiceCaseContinuityRows(params: {
     const customer = customersById.get(String(serviceCase.customer_id ?? ""));
     const location = locationsById.get(String(serviceCase.location_id ?? ""));
     const activeLinkedVisitCount = countActiveLinkedJobs(linked);
-    const isEffectivelyOpen = isServiceCaseEffectivelyOpen({
-      storedStatus: serviceCase.status,
+    const isEffectivelyOpen = isServiceCaseContinuityOpen({
       linkedJobs: linked,
     });
     const latestAssigneeDisplay = latestJob ? assignmentMap[String(latestJob.id ?? "")]?.[0]?.display_name ?? "-" : "-";

@@ -9,10 +9,9 @@ import {
 } from "@/lib/reports/kpi-foundation";
 import {
   accountScopeInList,
-  resolveReportAccountContractorIds,
   resolveReportAccountCustomerIds,
 } from "@/lib/reports/report-account-scope";
-import { isServiceCaseEffectivelyOpen } from "@/lib/reports/service-case-continuity";
+import { isServiceCaseContinuityOpen } from "@/lib/reports/service-case-continuity";
 
 type ContinuityCaseRow = {
   id: string;
@@ -123,8 +122,7 @@ export async function buildContinuityKpiReadModel(params: {
   }
 
   const openServiceCases = serviceCases.filter((serviceCase) =>
-    isServiceCaseEffectivelyOpen({
-      storedStatus: serviceCase.status,
+    isServiceCaseContinuityOpen({
       linkedJobs: linkedJobsByCaseId.get(String(serviceCase.id ?? "").trim()) ?? [],
     }),
   ).length;
