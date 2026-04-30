@@ -11,11 +11,7 @@ import {
   accountScopeInList,
   resolveReportAccountCustomerIds,
 } from "@/lib/reports/report-account-scope";
-<<<<<<< HEAD
-import { isServiceCaseContinuityOpen } from "@/lib/reports/service-case-continuity";
-=======
-import { countActiveLinkedJobs, isServiceCaseEffectivelyOpen } from "@/lib/reports/service-case-continuity";
->>>>>>> sandbox-clean-start
+import { countActiveLinkedJobs, isServiceCaseContinuityOpen } from "@/lib/reports/service-case-continuity";
 
 type ContinuityCaseRow = {
   id: string;
