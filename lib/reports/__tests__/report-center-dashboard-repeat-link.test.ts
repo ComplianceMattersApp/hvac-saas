@@ -45,6 +45,10 @@ vi.mock("@/lib/business/job-billing-state", () => ({
   buildBillingTruthCloseoutProjectionMap: vi.fn(async () => ({ projectionsByJobId: new Map() })),
 }));
 
+vi.mock("@/lib/business/internal-business-profile", () => ({
+  resolveBillingModeByAccountOwnerId: vi.fn(async () => "external_billing"),
+}));
+
 vi.mock("@/lib/staffing/human-layer", () => ({
   getActiveJobAssignmentDisplayMap: vi.fn(async () => ({})),
 }));

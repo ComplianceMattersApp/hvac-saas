@@ -1,4 +1,5 @@
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
+import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import {
   getKpiRange,
@@ -275,7 +276,7 @@ export async function buildReportCenterDashboardReadModel(params: {
     accountOwnerUserId: params.accountOwnerUserId,
   });
 
-  const [families, jobsResult, invoiceResult] = await Promise.all([
+  const [families, jobsResult, invoiceResult, billingMode] = await Promise.all([
     listReportCenterKpiFamilies(params),
     params.supabase
       .from("jobs")
@@ -286,6 +287,10 @@ export async function buildReportCenterDashboardReadModel(params: {
       .from("internal_invoices")
       .select("id, job_id, status, issued_at, total_cents")
       .eq("account_owner_user_id", params.accountOwnerUserId),
+    resolveBillingModeByAccountOwnerId({
+      supabase: params.supabase,
+      accountOwnerUserId: params.accountOwnerUserId,
+    }),
   ]);
 
   if (jobsResult.error) throw jobsResult.error;
@@ -304,7 +309,8 @@ export async function buildReportCenterDashboardReadModel(params: {
       certs_complete: job.certs_complete,
     })),
   });
-  const invoices = (invoiceResult.data ?? []) as DashboardInvoiceRow[];
+  const usesInternalInvoicing = billingMode === "internal_invoicing";
+  const invoices = usesInternalInvoicing ? ((invoiceResult.data ?? []) as DashboardInvoiceRow[]) : [];
   const activeJobs = jobs.filter(
     (job) =>
       String(job.status ?? "").trim().toLowerCase() !== "cancelled" &&

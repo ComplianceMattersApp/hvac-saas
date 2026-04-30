@@ -37,6 +37,10 @@ vi.mock("@/lib/reports/kpi-foundation", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/business/internal-business-profile", () => ({
+  resolveBillingModeByAccountOwnerId: vi.fn(async () => "external_billing"),
+}));
+
 // Spy on buildBillingTruthCloseoutProjectionMap so individual tests can override
 vi.mock("@/lib/business/job-billing-state", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/business/job-billing-state")>();
