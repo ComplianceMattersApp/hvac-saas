@@ -12,6 +12,7 @@ import {
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import {
   accountScopeInList,
+  resolveReportAccountCustomerIds,
   resolveReportAccountContractorIds,
 } from "@/lib/reports/report-account-scope";
 
@@ -201,6 +202,29 @@ type AssignmentFilter =
   | { mode: "unassigned"; assignedJobIds: string[] }
   | null;
 
+type JobLedgerAccountScope = {
+  contractorIds: string[];
+  customerIds: string[];
+};
+
+function buildJobLedgerAccountScopeOrFilter(scope: JobLedgerAccountScope) {
+  const contractorIds = accountScopeInList(scope.contractorIds).join(",");
+  const customerIds = accountScopeInList(scope.customerIds).join(",");
+  return `contractor_id.in.(${contractorIds}),and(contractor_id.is.null,customer_id.in.(${customerIds}))`;
+}
+
+function applyJobLedgerAccountScope(
+  query: any,
+  scope: JobLedgerAccountScope,
+  filters: JobVisitLedgerFilters,
+) {
+  if (filters.contractorId) {
+    return query.in("contractor_id", accountScopeInList(scope.contractorIds));
+  }
+
+  return query.or(buildJobLedgerAccountScopeOrFilter(scope));
+}
+
 async function resolveAssignmentFilter(params: {
   supabase: any;
   assigneeUserId: string;
@@ -383,8 +407,12 @@ export async function listJobVisitLedgerRows(params: {
   includeCount?: boolean;
 }): Promise<JobVisitLedgerResult> {
   const limit = params.limit ?? JOB_VISIT_LEDGER_PAGE_LIMIT;
-  const [contractorIds, assignmentFilter] = await Promise.all([
+  const [contractorIds, customerIds, assignmentFilter] = await Promise.all([
     resolveReportAccountContractorIds({
+      supabase: params.supabase,
+      accountOwnerUserId: params.accountOwnerUserId,
+    }),
+    resolveReportAccountCustomerIds({
       supabase: params.supabase,
       accountOwnerUserId: params.accountOwnerUserId,
     }),
@@ -394,7 +422,10 @@ export async function listJobVisitLedgerRows(params: {
     }),
   ]);
 
-  if (contractorIds.length === 0) {
+  if (
+    (params.filters.contractorId && contractorIds.length === 0) ||
+    (!params.filters.contractorId && contractorIds.length === 0 && customerIds.length === 0)
+  ) {
     return { rows: [], totalCount: 0, truncated: false };
   }
 
@@ -406,8 +437,13 @@ export async function listJobVisitLedgerRows(params: {
   let query = params.supabase
     .from("jobs")
     .select(JOB_BASE_SELECT, params.includeCount === false ? undefined : { count: "exact" })
-    .is("deleted_at", null)
-    .in("contractor_id", accountScopeInList(contractorIds));
+    .is("deleted_at", null);
+
+  query = applyJobLedgerAccountScope(
+    query,
+    { contractorIds, customerIds },
+    params.filters,
+  );
 
   query = applyLedgerFilters(query, params.filters, assignmentFilter);
   query = query.limit(limit);
@@ -416,7 +452,7 @@ export async function listJobVisitLedgerRows(params: {
   if (error) throw error;
 
   const jobs = data ?? [];
-  const customerIds = Array.from(
+  const customerLookupIds = Array.from(
     new Set(jobs.map((job: any) => String(job?.customer_id ?? "").trim()).filter(Boolean)),
   );
   const locationIds = Array.from(
@@ -424,11 +460,11 @@ export async function listJobVisitLedgerRows(params: {
   );
 
   const [customerResult, locationResult, assignmentMap] = await Promise.all([
-    customerIds.length
+    customerLookupIds.length
       ? params.supabase
           .from("customers")
           .select("id, full_name, first_name, last_name")
-          .in("id", customerIds)
+        .in("id", customerLookupIds)
       : Promise.resolve({ data: [] as any[], error: null }),
     locationIds.length
       ? params.supabase

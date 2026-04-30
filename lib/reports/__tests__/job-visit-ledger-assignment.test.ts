@@ -23,6 +23,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/reports/report-account-scope", () => ({
   accountScopeInList: (ids: string[]) => ids,
   resolveReportAccountContractorIds: vi.fn(async () => ["contractor-1"]),
+  resolveReportAccountCustomerIds: vi.fn(async () => ["customer-1"]),
 }));
 
 vi.mock("@/lib/staffing/human-layer", () => ({
@@ -98,7 +99,10 @@ vi.mock("@/lib/reports/kpi-foundation", async (importOriginal) => {
 // Static imports (after mocks)
 // ---------------------------------------------------------------------------
 
-import { resolveReportAccountContractorIds } from "@/lib/reports/report-account-scope";
+import {
+  resolveReportAccountContractorIds,
+  resolveReportAccountCustomerIds,
+} from "@/lib/reports/report-account-scope";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import {
   listJobVisitLedgerRows,
@@ -146,6 +150,18 @@ const JOB_C = baseJob("job-c", { customer_first_name: "Carol", customer_last_nam
 
 const JOB_CLOSED = baseJob("job-closed", { ops_status: "closed" });
 const JOB_CANCELLED = baseJob("job-cancelled", { status: "cancelled" });
+const JOB_NULL_CONTRACTOR = baseJob("job-null-contractor", {
+  contractor_id: null as any,
+  customer_id: "customer-1",
+  customer_first_name: "Nina",
+  customer_last_name: "Null",
+});
+const JOB_NULL_CONTRACTOR_CROSS_CUSTOMER = baseJob("job-null-cross-customer", {
+  contractor_id: null as any,
+  customer_id: "customer-2",
+  customer_first_name: "Cross",
+  customer_last_name: "Account",
+});
 
 type Assignment = { job_id: string; user_id: string; is_active: boolean };
 
@@ -169,13 +185,16 @@ function makeSupabaseMock(opts: { jobs: typeof JOB_A[]; assignments: Assignment[
       const neqFilters: Array<{ col: string; val: unknown }> = [];
       const inFilters: Array<{ col: string; vals: string[] }> = [];
       const notInFilters: Array<{ col: string; vals: string[] }> = [];
+      const isFilters: Array<{ col: string; val: unknown }> = [];
+      const orFilters: string[] = [];
 
       const build = (): any => ({
         select: () => build(),
-        is: () => build(),
+        is: (col: string, val: unknown) => { isFilters.push({ col, val }); return build(); },
         eq: (col: string, val: unknown) => { eqFilters.push({ col, val }); return build(); },
         neq: (col: string, val: unknown) => { neqFilters.push({ col, val }); return build(); },
         in: (col: string, vals: string[]) => { inFilters.push({ col, vals }); return build(); },
+        or: (expr: string) => { orFilters.push(expr); return build(); },
         not: (col: string, operator: string, val: string) => {
           if (operator === "in") {
             const ids = val.replace(/^\(|\)$/g, "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -183,7 +202,6 @@ function makeSupabaseMock(opts: { jobs: typeof JOB_A[]; assignments: Assignment[
           }
           return build();
         },
-        or: () => build(),
         order: () => build(),
         limit: () => build(),
         gte: () => build(),
@@ -203,9 +221,34 @@ function makeSupabaseMock(opts: { jobs: typeof JOB_A[]; assignments: Assignment[
             }
           } else if (table === "jobs") {
             rows = [...opts.jobs];
+            for (const { col, val } of isFilters) {
+              rows = rows.filter((r) => {
+                const rowValue = (r as any)[col];
+                return val === null ? rowValue == null : rowValue === val;
+              });
+            }
             // Apply scope (neq filters: status !== cancelled, ops_status !== closed)
             for (const { col, val } of neqFilters) {
               rows = rows.filter((r) => (r as any)[col] !== val);
+            }
+            // Apply OR account-scope filter used by job-visit-ledger.ts
+            for (const expr of orFilters) {
+              const contractorMatch = expr.match(/contractor_id\.in\.\(([^)]*)\)/);
+              const customerMatch = expr.match(/customer_id\.in\.\(([^)]*)\)/);
+              const contractorIds = contractorMatch
+                ? contractorMatch[1].split(",").map((s) => s.trim()).filter(Boolean)
+                : [];
+              const customerIds = customerMatch
+                ? customerMatch[1].split(",").map((s) => s.trim()).filter(Boolean)
+                : [];
+
+              rows = rows.filter((r) => {
+                const contractorId = (r as any).contractor_id;
+                const customerId = (r as any).customer_id;
+                const inContractorScope = contractorIds.includes(String(contractorId ?? ""));
+                const inCustomerFallback = (contractorId == null || contractorId === "") && customerIds.includes(String(customerId ?? ""));
+                return inContractorScope || inCustomerFallback;
+              });
             }
             // Apply in filters (contractor scope + include-mode assignment)
             for (const { col, vals } of inFilters) {
@@ -542,6 +585,145 @@ describe("Jobs Report — assignment filter respects account scope", () => {
 
     // job-cross has contractor-2, not in contractor-1 scope, must be excluded
     expect(result.rows.map((r) => r.jobId)).not.toContain("job-cross");
+  });
+
+  it("includes contractor-null same-account customer-owned active jobs", async () => {
+    vi.mocked(resolveReportAccountContractorIds).mockResolvedValue([CONTRACTOR_1]);
+    vi.mocked(resolveReportAccountCustomerIds).mockResolvedValue(["customer-1"]);
+
+    const supabase = makeSupabaseMock({
+      jobs: [JOB_A, JOB_NULL_CONTRACTOR],
+      assignments: [],
+    });
+
+    const result = await listJobVisitLedgerRows({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      filters: { ...DEFAULT_FILTERS, scope: "all" },
+      internalBusinessDisplayName: "Test Biz",
+    });
+
+    expect(result.rows.map((r) => r.jobId)).toContain("job-null-contractor");
+  });
+
+  it("excludes contractor-null jobs when customer is outside account scope", async () => {
+    vi.mocked(resolveReportAccountContractorIds).mockResolvedValue([CONTRACTOR_1]);
+    vi.mocked(resolveReportAccountCustomerIds).mockResolvedValue(["customer-1"]);
+
+    const supabase = makeSupabaseMock({
+      jobs: [JOB_A, JOB_NULL_CONTRACTOR_CROSS_CUSTOMER],
+      assignments: [],
+    });
+
+    const result = await listJobVisitLedgerRows({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      filters: { ...DEFAULT_FILTERS, scope: "all" },
+      internalBusinessDisplayName: "Test Biz",
+    });
+
+    expect(result.rows.map((r) => r.jobId)).not.toContain("job-null-cross-customer");
+  });
+
+  it("specific-user filter includes contractor-null jobs assigned to that user", async () => {
+    vi.mocked(resolveReportAccountContractorIds).mockResolvedValue([CONTRACTOR_1]);
+    vi.mocked(resolveReportAccountCustomerIds).mockResolvedValue(["customer-1"]);
+
+    const supabase = makeSupabaseMock({
+      jobs: [JOB_A, JOB_NULL_CONTRACTOR],
+      assignments: [{ job_id: "job-null-contractor", user_id: USER_EDDIE, is_active: true }],
+    });
+
+    const result = await listJobVisitLedgerRows({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      filters: { ...DEFAULT_FILTERS, assigneeUserId: USER_EDDIE, scope: "all" },
+      internalBusinessDisplayName: "Test Biz",
+    });
+
+    expect(result.rows.map((r) => r.jobId)).toContain("job-null-contractor");
+  });
+
+  it("unassigned filter excludes contractor-null active jobs that have an active assignment", async () => {
+    vi.mocked(resolveReportAccountContractorIds).mockResolvedValue([CONTRACTOR_1]);
+    vi.mocked(resolveReportAccountCustomerIds).mockResolvedValue(["customer-1"]);
+
+    const supabase = makeSupabaseMock({
+      jobs: [JOB_NULL_CONTRACTOR],
+      assignments: [{ job_id: "job-null-contractor", user_id: USER_EDDIE, is_active: true }],
+    });
+
+    const result = await listJobVisitLedgerRows({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      filters: { ...DEFAULT_FILTERS, assigneeUserId: "unassigned", scope: "all" },
+      internalBusinessDisplayName: "Test Biz",
+    });
+
+    expect(result.rows.map((r) => r.jobId)).not.toContain("job-null-contractor");
+  });
+
+  it("unassigned filter includes contractor-null active jobs with no active assignment", async () => {
+    vi.mocked(resolveReportAccountContractorIds).mockResolvedValue([CONTRACTOR_1]);
+    vi.mocked(resolveReportAccountCustomerIds).mockResolvedValue(["customer-1"]);
+
+    const supabase = makeSupabaseMock({
+      jobs: [JOB_NULL_CONTRACTOR],
+      assignments: [],
+    });
+
+    const result = await listJobVisitLedgerRows({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      filters: { ...DEFAULT_FILTERS, assigneeUserId: "unassigned", scope: "all" },
+      internalBusinessDisplayName: "Test Biz",
+    });
+
+    expect(result.rows.map((r) => r.jobId)).toContain("job-null-contractor");
+  });
+
+  it("active scope excludes contractor-null closed jobs", async () => {
+    vi.mocked(resolveReportAccountContractorIds).mockResolvedValue([CONTRACTOR_1]);
+    vi.mocked(resolveReportAccountCustomerIds).mockResolvedValue(["customer-1"]);
+    const nullClosed = { ...JOB_NULL_CONTRACTOR, id: "job-null-closed", ops_status: "closed" };
+
+    const supabase = makeSupabaseMock({
+      jobs: [JOB_NULL_CONTRACTOR, nullClosed],
+      assignments: [],
+    });
+
+    const result = await listJobVisitLedgerRows({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      filters: { ...DEFAULT_FILTERS, assigneeUserId: "unassigned" },
+      internalBusinessDisplayName: "Test Biz",
+    });
+
+    const ids = result.rows.map((r) => r.jobId);
+    expect(ids).toContain("job-null-contractor");
+    expect(ids).not.toContain("job-null-closed");
+  });
+
+  it("active scope excludes contractor-null cancelled jobs", async () => {
+    vi.mocked(resolveReportAccountContractorIds).mockResolvedValue([CONTRACTOR_1]);
+    vi.mocked(resolveReportAccountCustomerIds).mockResolvedValue(["customer-1"]);
+    const nullCancelled = { ...JOB_NULL_CONTRACTOR, id: "job-null-cancelled", status: "cancelled" };
+
+    const supabase = makeSupabaseMock({
+      jobs: [JOB_NULL_CONTRACTOR, nullCancelled],
+      assignments: [],
+    });
+
+    const result = await listJobVisitLedgerRows({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      filters: { ...DEFAULT_FILTERS, assigneeUserId: "unassigned" },
+      internalBusinessDisplayName: "Test Biz",
+    });
+
+    const ids = result.rows.map((r) => r.jobId);
+    expect(ids).toContain("job-null-contractor");
+    expect(ids).not.toContain("job-null-cancelled");
   });
 });
 
