@@ -101,6 +101,15 @@ Completed production-shipped cleanup batch note (current baseline):
 - Live Pay Now/Charge Card/checkout/refunds/disputes/payout execution remains deferred.
 - Invoice/payment language remains tracking-only until processor-backed execution exists.
 
+### Service workflow refinement V1 baseline (completed)
+- Service Case Reconciliation V1 is complete: centralized `reconcileServiceCaseStatusAfterJobChange` helper is wired into closeout and next-visit write paths; active linked visit keeps/reopens case open; all-terminal linked visits resolve case; `job_events` write intentionally deferred.
+- Interrupt/Waiting State V1 is complete: Pending Info, On Hold, and Waiting states with explicit clear actions; waiting reasons are V1-defined; job-level only; no auto-clear on Create Next Service Visit.
+- Create Next Service Visit is complete: foundation-only; internal users can create a next visit under the same service case; no auto-release, no parts inventory, no estimate automation, no Visit Scope copy-forward.
+- Reporting cleanup is complete: dashboard/report drilldown alignment done; Jobs Report assignment filter (All/Unassigned/specific user) is complete; Jobs Report now includes `contractor_id = null` same-account customer-owned jobs while cross-account null-contractor jobs remain excluded; contractor filter remains contractor-only for safety; Service Cases Report Latest Visit display is clarity-only polish; remaining work is visual/card polish, not data alignment.
+- Next planned product track after this baseline: estimates/quoting.
+- Stripe tenant customer payment execution remains deferred.
+- Confirmed: no schema changes, no migrations, no Supabase commands, no production data actions, no payment/Stripe/QBO/ECC/retest/Visit Scope/contractor/assignment/scheduling behavior changes were part of this baseline.
+
 ### Locked rule
 Business-layer modules must not collapse, overwrite, or blur operational ownership boundaries.
 

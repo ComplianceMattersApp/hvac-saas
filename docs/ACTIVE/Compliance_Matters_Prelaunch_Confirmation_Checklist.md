@@ -348,6 +348,28 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: no schema changes, no migrations, no Supabase commands, and no production-data actions were part of this slice.
 - Confirmed: no Pricebook, invoice, payment, Stripe, ECC/retest, contractor-authority, Visit Scope copy-forward, estimate implementation, or parts-inventory behavior changes were part of this slice.
 
+### 2.19 Service workflow refinement V1 baseline promotion confirmation
+- Completed: Service Case Reconciliation V1 is complete and production-promoted on `main` (commit `e3beda5`).
+  - Centralized `reconcileServiceCaseStatusAfterJobChange` helper is wired into closeout and Create Next Service Visit write paths.
+  - Active linked visit keeps/reopens case open; all-terminal linked visits resolve case.
+  - `job_events` write for reconciliation events is intentionally deferred.
+- Completed: Interrupt/Waiting State V1 is complete.
+  - Pending Info (clear: Mark Info Received), On Hold (clear: Resume Job), Waiting (clear: Mark Ready to Continue).
+  - Supported waiting reasons: Waiting on part, Waiting on customer approval, Estimate needed, Waiting on access, Waiting on information, Other.
+  - Job-level only; no service-case-level global blocker orchestration.
+  - No auto-clear on Create Next Service Visit; explicit/manual release required.
+- Completed: Create Next Service Visit is complete (foundation only).
+  - Internal users can create a next visit under the same service case.
+  - No auto-release, no parts inventory, no estimate automation, no Visit Scope copy-forward.
+- Completed: Reporting cleanup is complete.
+  - Dashboard and report drilldown alignment done.
+  - Jobs Report assignment filter (All/Unassigned/specific user) is complete and production-promoted on `main` (commit `422bb9d`).
+  - Jobs Report now includes `contractor_id = null` same-account customer-owned jobs; cross-account null-contractor jobs remain excluded; contractor filter remains contractor-only for safety.
+  - Service Cases Report Latest Visit display is clarity-only polish; no model change.
+  - Remaining report work is visual/card polish only; data alignment is complete.
+- Confirmed: no schema changes, no migrations, no Supabase commands, and no production data actions were part of this baseline.
+- Confirmed: no Pricebook, invoice, payment, Stripe, QBO, ECC/retest rules, contractor authority, Visit Scope behavior, assignment behavior, scheduling behavior, service-case lifecycle code outside the reconciliation helper, or job creation behavior changed.
+
 ---
 
 ## 3. Support / customer-operations readiness

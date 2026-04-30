@@ -26,6 +26,11 @@
 	- invoice line items remain downstream billed/commercial truth
 	- no Visit Scope copy-forward behavior was added
 	- no automatic billing behavior from waiting state was added
+- Create Next Service Visit does not replace Visit Scope:
+	- Visit Scope remains the work-to-perform definition for each visit/job
+	- waiting/interruption state explains why work is paused; it does not replace or defer Visit Scope
+	- no Visit Scope copy-forward was added in the service workflow refinement pass
+	- waiting state is job-level V1; no Visit Scope model change was introduced
 - Invoice remains downstream billed/commercial truth and no billing/payment execution behavior changed in this note.
 - Adjacent completed invoice/report polish that preserves this model boundary:
 	- invoice panel wording now anchors invoice as billed truth while payment entries remain tracking-only

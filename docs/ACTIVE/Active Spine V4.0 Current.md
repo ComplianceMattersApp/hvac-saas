@@ -450,6 +450,53 @@ Truth-boundary reminder (unchanged):
 - Pricebook item = reusable mutable catalog/default definition.
 - Payment = collected-truth layer only where materially implemented.
 
+8.8 Service Workflow Refinement V1 Baseline (completed)
+
+Status:
+Service Workflow Refinement V1 is complete and closed at the current baseline.
+
+### Service Case Reconciliation V1
+- Centralized `reconcileServiceCaseStatusAfterJobChange` helper is implemented and wired into all relevant write paths.
+- Write paths covered: closeout actions (mark service complete, mark invoice sent), Create Next Service Visit.
+- Logic: active linked visit keeps/reopens case open; all-terminal linked visits resolve case; Create Next Service Visit can reopen a resolved case.
+- `job_events` write for reconciliation events is intentionally deferred to a later service-narrative pass.
+- No schema changes; no migrations; no Supabase commands; no production data actions were part of this implementation.
+
+### Interrupt/Waiting State V1
+- Pending Info (clear: Mark Info Received), On Hold (clear: Resume Job), Waiting (clear: Mark Ready to Continue) are the three interrupt/waiting states.
+- Supported waiting reasons (V1): Waiting on part, Waiting on customer approval, Estimate needed, Waiting on access, Waiting on information, Other.
+- Waiting state is job-level V1 only; no service-case-level global blocker orchestration.
+- No auto-clear on Create Next Service Visit; release remains explicit/manual.
+- Existing fields reused: `jobs.ops_status`, `jobs.pending_info_reason`, `jobs.on_hold_reason`, `jobs.action_required_by`, `jobs.follow_up_date`, `jobs.next_action_note`.
+
+### Create Next Service Visit
+- Internal users can create a next visit under the same service case from a job detail page.
+- Supports diagnostic → waiting → next-visit workflow patterns.
+- No auto-release of source job waiting state on next-visit creation.
+- No parts inventory, no estimate automation, no Visit Scope copy-forward.
+
+### Reporting cleanup (V1 baseline)
+- Dashboard and report drilldown alignment is complete.
+- Open Service Cases = open/interrupted continuity cases.
+- Active Repeat Visits = cases with 2+ linked visits and at least 1 active.
+- Unassigned Open Visits → Jobs Report drilldown.
+- Jobs Report assignment filter: All / Unassigned / specific user.
+- Jobs Report contractor-null fallback: `contractor_id = null` same-account customer-owned jobs are now included in Jobs Report scope; cross-account null-contractor jobs remain excluded; the specific-contractor filter remains contractor-only for safety.
+- Service Cases Report Latest Visit display is display-only clarity polish; no model change.
+- Remaining report work is visual/card polish only; data alignment is complete for this baseline.
+
+Explicit non-changes in this baseline:
+- No schema changes, migrations, or Supabase commands.
+- No production data actions.
+- No payment execution behavior changes.
+- No Stripe, QBO, or ECC/retest behavior changes.
+- No contractor authority changes.
+- No assignment or scheduling behavior changes.
+- No Visit Scope copy-forward behavior added.
+- No parts inventory or estimate automation introduced.
+- No service-case lifecycle code changed outside the reconciliation helper.
+- No job creation behavior changed.
+
 9. Staffing / Assignment System (Locked)
 9.1 Source of truth
 
