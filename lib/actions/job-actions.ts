@@ -60,6 +60,7 @@ import {
   type VisitScopeItem,
 } from "@/lib/jobs/visit-scope";
 import { listScopedContractorsForJobDetail } from "@/lib/actions/internal-job-detail-read-boundary";
+import { getActiveWaitingState } from "@/lib/utils/ops-status";
 
 export type { JobStatus } from "@/lib/types/job";
 
@@ -2873,8 +2874,9 @@ export async function promoteCompanionScopeToServiceJobFromForm(formData: FormDa
 }
 
 export async function createNextServiceVisitFromForm(formData: FormData) {
-  const supabase = await createClient();
+  "use server";
 
+  const supabase = await createClient();
   const sourceJobId = String(formData.get("job_id") || "").trim();
   const tabRaw = String(formData.get("tab") || "").trim();
   const returnToRaw = String(formData.get("return_to") || "").trim();
@@ -2886,12 +2888,7 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     supabase,
     jobId: sourceJobId,
     onUnauthorized: () => {
-      redirectToJobWithBanner({
-        jobId: sourceJobId,
-        banner: "not_authorized",
-        tabRaw,
-        returnToRaw,
-      });
+      redirectToJobWithBanner({ jobId: sourceJobId, banner: "not_authorized", tabRaw, returnToRaw });
     },
   });
 
@@ -2907,12 +2904,13 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
   const { data: sourceJob, error: sourceJobErr } = await supabase
     .from("jobs")
     .select(
-      "id, job_type, title, customer_id, location_id, contractor_id, customer_first_name, customer_last_name, customer_email, customer_phone, job_address, city, service_case_id, service_visit_type"
+      "id, job_type, title, customer_id, location_id, contractor_id, customer_first_name, customer_last_name, customer_email, customer_phone, job_address, city, service_case_id, service_visit_type, ops_status, pending_info_reason, on_hold_reason, action_required_by, follow_up_date, next_action_note",
     )
     .eq("id", sourceJobId)
     .maybeSingle();
 
   if (sourceJobErr) throw sourceJobErr;
+
   if (!sourceJob?.id) {
     redirectToJobWithBanner({
       jobId: sourceJobId,
@@ -2935,6 +2933,7 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
 
   const customerId = String(sourceJob.customer_id ?? "").trim();
   const locationId = String(sourceJob.location_id ?? "").trim();
+
   if (!customerId || !locationId) {
     redirectToJobWithBanner({
       jobId: sourceJobId,
@@ -2947,14 +2946,17 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
 
   const serviceCaseId =
     String(sourceJob.service_case_id ?? "").trim() ||
-    (await ensureServiceCaseForJob({
-      supabase,
-      jobId: sourceJobId,
-    }));
+    (await ensureServiceCaseForJob({ supabase, jobId: sourceJobId }));
 
   const childTitle = `Follow-up: ${nextVisitReasonRaw}`.slice(0, 220);
   const childVisitType =
     normalizeServiceVisitType(String(sourceJob.service_visit_type ?? "").trim()) ?? "return_visit";
+
+  const activeWaitingState = getActiveWaitingState({
+    ops_status: sourceJob.ops_status ?? null,
+    pending_info_reason: (sourceJob as any).pending_info_reason ?? null,
+    on_hold_reason: (sourceJob as any).on_hold_reason ?? null,
+  });
 
   const created = await createJob(
     {
@@ -2984,7 +2986,7 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     },
     {
       serviceCaseWriteClient: supabase,
-    }
+    },
   );
 
   await insertJobEvent({
@@ -2996,6 +2998,12 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
       child_job_id: created.id,
       service_case_id: serviceCaseId,
       next_visit_reason: nextVisitReasonRaw,
+      ...(activeWaitingState
+        ? {
+            waiting_state_type: activeWaitingState.blockerType,
+            waiting_state_reason: activeWaitingState.blockerReason,
+          }
+        : {}),
     },
     userId: actingUserId,
   });
@@ -3012,6 +3020,32 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     },
     userId: actingUserId,
   });
+
+  if (activeWaitingState) {
+    await insertJobEvent({
+      supabase,
+      jobId: sourceJobId,
+      event_type: "ops_update",
+      meta: {
+        source: "job_detail",
+        message: "Waiting state resumed through next service visit",
+        blocker_action: "updated",
+        blocker_type: activeWaitingState.blockerType,
+        blocker_reason: activeWaitingState.blockerReason,
+        resumed_through_child_job_id: created.id,
+        ...(String((sourceJob as any).action_required_by ?? "").trim()
+          ? { action_required_by: String((sourceJob as any).action_required_by).trim() }
+          : {}),
+        ...(String((sourceJob as any).follow_up_date ?? "").trim()
+          ? { follow_up_date: String((sourceJob as any).follow_up_date).trim() }
+          : {}),
+        ...(String((sourceJob as any).next_action_note ?? "").trim()
+          ? { next_action_note: String((sourceJob as any).next_action_note).trim() }
+          : {}),
+      },
+      userId: actingUserId,
+    });
+  }
 
   revalidatePath(`/jobs/${sourceJobId}`, "page");
   revalidatePath(`/jobs/${created.id}`, "page");

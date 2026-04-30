@@ -923,8 +923,19 @@ Closed milestones:
 
 Next natural roadmap area:
 - Smaller service-model revisions / service workflow refinement.
+- Current service workflow refinement status (implemented):
+  - Create Next Service Visit foundation is restored/implemented and runtime-smoked.
+  - `createNextServiceVisitFromForm` remains the fast internal path for creating another Service visit under the same service case.
+  - Service Waiting State V1 is implemented as a no-schema, job-level waiting-state layer using existing pending/on-hold fields and `job_events` narrative context.
+  - Waiting-state labels include Waiting on part, Waiting on customer approval, Estimate needed, Waiting on access, Waiting on information, and Other.
+  - Create-next in V1 does not auto-clear source waiting state; explicit/manual release remains required.
+  - This refinement advances the service model without introducing parts inventory, estimate automation, service-case-level blocker orchestration, or auto-release behavior.
 - Then estimates/quoting follow as the next planned product track.
+- Estimate Needed may appear as a waiting-state label before full Estimates V1 implementation.
 - Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
+
+Current deferral reminder:
+- Stripe customer/work payment execution remains deferred and separate from this service workflow refinement.
 
 Separate pre-launch enablement track:
 - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed in production for the platform account subscription slice.

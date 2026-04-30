@@ -107,6 +107,11 @@ import {
   sanitizeVisitScopeItems,
   sanitizeVisitScopeSummary,
 } from "@/lib/jobs/visit-scope";
+import {
+  getActiveWaitingState,
+  getWaitingStateLabel,
+  WAITING_STATE_TYPES,
+} from "@/lib/utils/ops-status";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -1442,6 +1447,11 @@ const pendingInfoReasonText = String((job as any).pending_info_reason ?? "").tri
 const onHoldReasonText = String((job as any).on_hold_reason ?? "").trim();
 const explicitPendingInfoActive = currentOpsStatus === "pending_info";
 const onHoldActive = currentOpsStatus === "on_hold";
+const activeWaitingState = getActiveWaitingState({
+  ops_status: job.ops_status ?? null,
+  pending_info_reason: (job as any).pending_info_reason ?? null,
+  on_hold_reason: (job as any).on_hold_reason ?? null,
+});
 const actionablePendingInfo = explicitPendingInfoActive;
 const hasFollowUpReminder =
   Boolean((job as any).follow_up_date) ||
@@ -1506,7 +1516,9 @@ const followUpOwnerLabel = String((job as any).action_required_by ?? "").trim();
 const followUpDateValue = String((job as any).follow_up_date ?? "").trim();
 const followUpDateSummary = followUpDateValue ? displayDateLA(followUpDateValue) : "";
 const nextActionPreview = truncateSummaryText(String((job as any).next_action_note ?? ""), 78);
-const jobStatusSummaryText = explicitPendingInfoActive
+const jobStatusSummaryText = activeWaitingState
+  ? `${activeWaitingState.blockerLabel}${activeWaitingState.blockerReason ? ` • ${truncateSummaryText(activeWaitingState.blockerReason, 72)}` : ""}`
+  : explicitPendingInfoActive
   ? `Pending Info${pendingInfoReasonText ? ` • ${truncateSummaryText(pendingInfoReasonText, 72)}` : ""}`
   : onHoldActive
   ? `On Hold${onHoldReasonText ? ` • ${truncateSummaryText(onHoldReasonText, 72)}` : ""}`
@@ -4349,6 +4361,17 @@ const renderTimelineItem = (e: any, key: string) => {
     <input type="hidden" name="job_id" value={job.id} />
 
     <div className="flex-1 min-w-xs">
+      {activeWaitingState ? (
+        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm">
+          <div className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-800">
+            {activeWaitingState.blockerLabel}
+          </div>
+          {activeWaitingState.blockerReason ? (
+            <div className="mt-2 text-sm text-amber-900">{activeWaitingState.blockerReason}</div>
+          ) : null}
+        </div>
+      ) : null}
+
       <label className={workspaceFieldLabelClass}>Ops Status</label>
 
       {!["need_to_schedule", "scheduled", "pending_info", "on_hold"].includes(
@@ -4383,11 +4406,27 @@ const renderTimelineItem = (e: any, key: string) => {
         Choose the status-change type here. Use the reason field below for either a Pending Info blocker or an On Hold pause reason. Follow Up stays separate for reminders and next actions.
       </p>
 
+      <div className="mt-3">
+        <label className={workspaceFieldLabelClass}>Waiting State Type</label>
+        <select
+          name="waiting_state_type"
+          required
+          defaultValue={activeWaitingState?.blockerType ?? "other"}
+          className={workspaceInputClass}
+        >
+          {WAITING_STATE_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {getWaitingStateLabel(type)}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3">
         <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-900">Status Reason</label>
         <textarea
           name="status_reason"
-          defaultValue={explicitPendingInfoActive ? pendingInfoReasonText : onHoldReasonText}
+          defaultValue={activeWaitingState?.blockerReason ?? (explicitPendingInfoActive ? pendingInfoReasonText : onHoldReasonText)}
           className="min-h-[7rem] w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm text-slate-900"
           rows={3}
           placeholder="If Pending Info is selected, describe the blocker. If On Hold is selected, describe why the job is paused."
@@ -4407,7 +4446,9 @@ const renderTimelineItem = (e: any, key: string) => {
     <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-700">
       <div className="font-semibold text-slate-900">Current Status Detail</div>
       <div className="mt-1">
-        {explicitPendingInfoActive
+        {activeWaitingState
+          ? `${activeWaitingState.blockerLabel}: ${activeWaitingState.blockerReason}`
+          : explicitPendingInfoActive
           ? (pendingInfoReasonText
               ? `Pending Info blocker: ${pendingInfoReasonText}`
               : "Pending Info is active. Add the missing blocker detail if needed.")

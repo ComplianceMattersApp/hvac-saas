@@ -375,6 +375,50 @@ an ECC-first visit may carry same-visit companion service scope while the work r
 but companion scope must promote into a real Service job once it becomes its own lifecycle thread
 (for example: separate scheduling, separate assignment, return-trip work, or separate follow-up continuity).
 
+8.6.1 Service workflow refinement - Waiting State V1 (implemented)
+
+Status:
+Service Waiting State V1 is implemented as a no-schema service workflow refinement.
+
+Scope boundary (V1):
+- waiting state is job-level V1, not service-case-level global blocker orchestration
+- existing fields are reused:
+  - `jobs.ops_status`
+  - `jobs.pending_info_reason`
+  - `jobs.on_hold_reason`
+  - `jobs.action_required_by`
+  - `jobs.follow_up_date`
+  - `jobs.next_action_note`
+- `job_events` remains audit/narrative truth for waiting-state change history
+
+Supported waiting types (V1):
+- Waiting on part
+- Waiting on customer approval
+- Estimate needed
+- Waiting on access
+- Waiting on information
+- Other
+
+Persistence rule (V1):
+- waiting reasons persist in existing pending/on-hold reason fields using readable prefixed text (for example: `Waiting on part: condenser fan motor`)
+- legacy unprefixed reasons remain tolerated through fallback-safe parsing
+
+Create-next interaction rule (V1):
+- creating a next service visit does not auto-clear the source job waiting state
+- explicit/manual release remains required for audit safety
+- event context remains the traceable service narrative path in `job_events`
+
+Product intent:
+This closes a real in-between service-state gap that common field apps often miss, while preserving locked truth boundaries.
+
+Deferred-later service workflow items:
+- parts inventory
+- purchase orders/vendor tracking
+- service-case-level blocker orchestration
+- Visit Scope copy-forward
+- estimate automation
+- explicit create-next-plus-release option / auto-release on next-visit creation
+
 8.7 Visit Scope -> Invoice Bridge (A1-A5, production-promoted)
 
 Status:

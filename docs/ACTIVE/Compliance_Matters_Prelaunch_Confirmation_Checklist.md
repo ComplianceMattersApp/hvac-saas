@@ -338,6 +338,16 @@ If any item here conflicts with the active spine, the spine wins.
   - terminal sessions were closed
 - Deferred hardening item (still required): migrate away from legacy JWT anon/service_role key usage before disabling JWT-based API keys.
 
+### 2.18 Service workflow refinement baseline confirmation (completed)
+- Completed: Service Waiting State V1 is complete as a no-schema implementation.
+- Completed: Create Next Service Visit restoration/confirmation is complete.
+- Completed validation:
+  - waiting-state tests passed: 10/10
+  - legacy job-detail hardening tests passed: 9/9
+  - `npx tsc --noEmit` passed silently
+- Confirmed: no schema changes, no migrations, no Supabase commands, and no production-data actions were part of this slice.
+- Confirmed: no Pricebook, invoice, payment, Stripe, ECC/retest, contractor-authority, Visit Scope copy-forward, estimate implementation, or parts-inventory behavior changes were part of this slice.
+
 ---
 
 ## 3. Support / customer-operations readiness

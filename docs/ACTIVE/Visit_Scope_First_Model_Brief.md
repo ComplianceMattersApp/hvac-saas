@@ -20,6 +20,12 @@
 	- Service job detail now clearly distinguishes Service Details (visit classification) from Visit Scope (trip-owned work definition)
 	- Job Title fallback copy is clarified to reduce ambiguity
 	- no model, validation, billing, ECC, or RLS behavior changed in this pass
+- Service Waiting State V1 is implemented and does not change Visit Scope ownership:
+	- Visit Scope / Work Items remain the operational work-item layer for the visit
+	- Waiting State is why work is paused/cannot proceed yet, not a replacement for Work Items
+	- invoice line items remain downstream billed/commercial truth
+	- no Visit Scope copy-forward behavior was added
+	- no automatic billing behavior from waiting state was added
 - Invoice remains downstream billed/commercial truth and no billing/payment execution behavior changed in this note.
 - Adjacent completed invoice/report polish that preserves this model boundary:
 	- invoice panel wording now anchors invoice as billed truth while payment entries remain tracking-only

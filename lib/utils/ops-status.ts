@@ -81,3 +81,113 @@ export function getPendingInfoSignal(input: PendingInfoSignalInput): boolean {
 
   return legacyPendingInfo || derivedPendingInfo;
 }
+
+export const WAITING_STATE_TYPES = [
+  "waiting_on_part",
+  "waiting_on_customer_approval",
+  "estimate_needed",
+  "waiting_on_access",
+  "waiting_on_information",
+  "other",
+] as const;
+
+export type WaitingStateType = (typeof WAITING_STATE_TYPES)[number];
+
+const WAITING_STATE_LABELS: Record<WaitingStateType, string> = {
+  waiting_on_part: "Waiting on part",
+  waiting_on_customer_approval: "Waiting on approval",
+  estimate_needed: "Estimate needed",
+  waiting_on_access: "Waiting on access",
+  waiting_on_information: "Waiting on information",
+  other: "Other",
+};
+
+type ActiveWaitingStatus = "pending_info" | "on_hold";
+
+export function isActiveWaitingOpsStatus(value: unknown): value is ActiveWaitingStatus {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "pending_info" || normalized === "on_hold";
+}
+
+export function getWaitingStateLabel(type: WaitingStateType): string {
+  return WAITING_STATE_LABELS[type];
+}
+
+export function parseWaitingStateType(value: unknown): WaitingStateType | null {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if ((WAITING_STATE_TYPES as readonly string[]).includes(normalized)) {
+    return normalized as WaitingStateType;
+  }
+  return null;
+}
+
+export function formatWaitingStateReason(type: WaitingStateType, reason: string): string {
+  const body = String(reason ?? "").trim();
+  if (!body) return "";
+  return `${WAITING_STATE_LABELS[type]}: ${body}`;
+}
+
+export type ParsedWaitingStateReason = {
+  blockerType: WaitingStateType;
+  blockerLabel: string;
+  blockerReason: string;
+};
+
+export function parseWaitingStateReason(raw: unknown): ParsedWaitingStateReason | null {
+  const text = String(raw ?? "").trim();
+  if (!text) return null;
+
+  const lowered = text.toLowerCase();
+  for (const type of WAITING_STATE_TYPES) {
+    const prefix = `${WAITING_STATE_LABELS[type]}:`.toLowerCase();
+    if (!lowered.startsWith(prefix)) continue;
+
+    const blockerReason = text.slice(prefix.length).trim();
+    if (!blockerReason) return null;
+
+    return {
+      blockerType: type,
+      blockerLabel: WAITING_STATE_LABELS[type],
+      blockerReason,
+    };
+  }
+
+  return null;
+}
+
+export type ActiveWaitingState = ParsedWaitingStateReason & {
+  status: ActiveWaitingStatus;
+  parsed: boolean;
+};
+
+export function getActiveWaitingState(input: {
+  ops_status?: string | null;
+  pending_info_reason?: string | null;
+  on_hold_reason?: string | null;
+}): ActiveWaitingState | null {
+  const statusRaw = String(input.ops_status ?? "").trim().toLowerCase();
+  if (!isActiveWaitingOpsStatus(statusRaw)) return null;
+
+  const rawReason = statusRaw === "pending_info"
+    ? String(input.pending_info_reason ?? "").trim()
+    : String(input.on_hold_reason ?? "").trim();
+
+  if (!rawReason) return null;
+
+  const parsed = parseWaitingStateReason(rawReason);
+  if (parsed) {
+    return {
+      ...parsed,
+      status: statusRaw,
+      parsed: true,
+    };
+  }
+
+  return {
+    blockerType: "other",
+    blockerLabel: WAITING_STATE_LABELS.other,
+    blockerReason: rawReason,
+    status: statusRaw,
+    parsed: false,
+  };
+}

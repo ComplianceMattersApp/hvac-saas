@@ -29,6 +29,7 @@ import {
   formatStatusAgeCompact,
   resolveStatusAgeDays,
 } from "@/lib/utils/status-aging";
+import { getActiveWaitingState } from "@/lib/utils/ops-status";
 import OperationalReportingSection from "./_components/OperationalReportingSection";
 import {
   buildOperationalReportingReadModel,
@@ -920,11 +921,25 @@ function toEpochMs(value?: string | null) {
 }
 
 function pendingInfoBannerText(j: any) {
-  return String(j?.pending_info_reason ?? "").trim();
+  const waitingState = getActiveWaitingState({
+    ops_status: j?.ops_status ?? null,
+    pending_info_reason: j?.pending_info_reason ?? null,
+    on_hold_reason: j?.on_hold_reason ?? null,
+  });
+  return waitingState?.status === "pending_info"
+    ? waitingState.blockerReason
+    : String(j?.pending_info_reason ?? "").trim();
 }
 
 function onHoldBannerText(j: any) {
-  return String(j?.on_hold_reason ?? "").trim();
+  const waitingState = getActiveWaitingState({
+    ops_status: j?.ops_status ?? null,
+    pending_info_reason: j?.pending_info_reason ?? null,
+    on_hold_reason: j?.on_hold_reason ?? null,
+  });
+  return waitingState?.status === "on_hold"
+    ? waitingState.blockerReason
+    : String(j?.on_hold_reason ?? "").trim();
 }
 
 function queueReason(j: any, activeBucket: string) {
@@ -956,6 +971,14 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "pending_info" || status === "pending_info") {
+    const waitingState = getActiveWaitingState({
+      ops_status: j?.ops_status ?? null,
+      pending_info_reason: j?.pending_info_reason ?? null,
+      on_hold_reason: j?.on_hold_reason ?? null,
+    });
+    if (waitingState?.status === "pending_info") {
+      return `${waitingState.blockerLabel} — ${waitingState.blockerReason}`;
+    }
     const pendingInfoReason = pendingInfoBannerText(j);
     return pendingInfoReason ? `Pending info — ${pendingInfoReason}` : "";
   }
@@ -976,6 +999,14 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "on_hold" || status === "on_hold") {
+    const waitingState = getActiveWaitingState({
+      ops_status: j?.ops_status ?? null,
+      pending_info_reason: j?.pending_info_reason ?? null,
+      on_hold_reason: j?.on_hold_reason ?? null,
+    });
+    if (waitingState?.status === "on_hold") {
+      return `${waitingState.blockerLabel} — ${waitingState.blockerReason}`;
+    }
     const onHoldReason = onHoldBannerText(j);
     return onHoldReason
       ? `On hold — ${onHoldReason}`
@@ -1734,6 +1765,11 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     : { label: "Open", tone: "border-slate-200 bg-slate-50 text-slate-800" };
   const pendingInfoSignal = opsStatus === "pending_info";
   const onHoldSignal = opsStatus === "on_hold";
+  const waitingState = getActiveWaitingState({
+    ops_status: j?.ops_status ?? null,
+    pending_info_reason: j?.pending_info_reason ?? null,
+    on_hold_reason: j?.on_hold_reason ?? null,
+  });
   const statusAgeDays = resolveStatusAgeDays({
     status: opsStatus,
     failedInstant: failedStatusSinceByJob(jobId),
@@ -1742,8 +1778,12 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   });
   const statusAgeSuffix = statusAgeDays == null ? "" : ` · ${formatStatusAgeCompact(statusAgeDays)}`;
   const needsAttention = isNeedsAttentionJob(j);
-  const pendingInfoContext = pendingInfoBannerText(j);
-  const onHoldContext = onHoldBannerText(j);
+  const pendingInfoContext = waitingState?.status === "pending_info"
+    ? waitingState.blockerReason
+    : pendingInfoBannerText(j);
+  const onHoldContext = waitingState?.status === "on_hold"
+    ? waitingState.blockerReason
+    : onHoldBannerText(j);
   const showPendingInfoBanner = pendingInfoSignal && Boolean(pendingInfoContext);
   const showOnHoldBanner = onHoldSignal && Boolean(onHoldContext);
   const customerName = customerNameOnly(j);
@@ -1828,7 +1868,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         labelTone: "text-amber-700",
         bodyTone: "text-amber-900",
         supportTone: "text-amber-900/80",
-        label: `Pending Info${statusAgeSuffix}`,
+        label: `${waitingState?.status === "pending_info" ? waitingState.blockerLabel : "Pending Info"}${statusAgeSuffix}`,
         message: pendingInfoContext,
         support: "",
       }
@@ -1838,7 +1878,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         labelTone: "text-slate-600",
         bodyTone: "text-slate-800",
         supportTone: "text-slate-700/80",
-        label: "On Hold",
+        label: waitingState?.status === "on_hold" ? waitingState.blockerLabel : "On Hold",
         message: onHoldContext,
         support: "",
       }

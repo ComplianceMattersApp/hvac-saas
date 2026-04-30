@@ -4,8 +4,14 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { resolveOpsStatus } from "@/lib/utils/ops-status";
-import { getPendingInfoSignal } from "@/lib/utils/ops-status";
+import {
+  formatWaitingStateReason,
+  getActiveWaitingState,
+  getPendingInfoSignal,
+  parseWaitingStateReason,
+  parseWaitingStateType,
+  resolveOpsStatus,
+} from "@/lib/utils/ops-status";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { forceSetOpsStatus } from "@/lib/actions/ops-status";
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from "@/lib/actions/job-evaluator";
@@ -1305,6 +1311,12 @@ export async function releaseAndReevaluate(
     }
   );
 
+  const previousWaitingState = getActiveWaitingState({
+    ops_status: before.ops_status ?? null,
+    pending_info_reason: before.pending_info_reason ?? null,
+    on_hold_reason: before.on_hold_reason ?? null,
+  });
+
   if (changes.length > 0) {
     const { error: eventErr } = await supabase.from("job_events").insert({
       job_id: jobId,
@@ -1313,6 +1325,13 @@ export async function releaseAndReevaluate(
       meta: {
         changes,
         source,
+        blocker_action: "cleared",
+        ...(previousWaitingState?.parsed
+          ? {
+              previous_blocker_type: previousWaitingState.blockerType,
+              previous_blocker_reason: previousWaitingState.blockerReason,
+            }
+          : {}),
         release_from: before.ops_status ?? null,
         release_to: nextOps,
         lifecycle_normalized: shouldSetCompletedLifecycle,
@@ -1358,7 +1377,7 @@ export async function releaseAndReevaluateFromForm(formData: FormData): Promise<
   if (!user) redirect("/login");
   await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
 
-  await releaseAndReevaluate(jobId, "manual_release_and_reevaluate");
+  await releaseAndReevaluate(jobId, "job_detail");
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
@@ -1373,6 +1392,7 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   const jobId = formData.get("job_id");
   const opsStatusRaw = formData.get("ops_status");
   const statusReasonRaw = formData.get("status_reason");
+  const waitingStateTypeRaw = formData.get("waiting_state_type");
 
   if (typeof jobId !== "string" || !jobId) {
     throw new Error("Missing job_id");
@@ -1418,6 +1438,15 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
     redirect(`/jobs/${jobId}?tab=ops&banner=${banner}`);
   }
 
+  const waitingStateType = parseWaitingStateType(waitingStateTypeRaw);
+  if (!waitingStateType) {
+    const banner = encodeURIComponent("Select a waiting-state reason type");
+    redirect(`/jobs/${jobId}?tab=ops&banner=${banner}`);
+  }
+
+  const blockerReason = formatWaitingStateReason(waitingStateType, statusReason);
+  const blockerReasonParsed = parseWaitingStateReason(blockerReason);
+
   // BEFORE
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")
@@ -1438,13 +1467,21 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
     action_required_by: beforeJob.action_required_by ?? null,
   };
 
+  const hadActiveWaitingState = Boolean(
+    getActiveWaitingState({
+      ops_status: before.ops_status,
+      pending_info_reason: before.pending_info_reason,
+      on_hold_reason: before.on_hold_reason,
+    })
+  );
+
   const nextOpsStatus = opsStatusRaw;
 
   const after: OpsSnapshot = {
     ...before,
     ops_status: nextOpsStatus,
-    pending_info_reason: nextOpsStatus === "pending_info" ? statusReason : null,
-    on_hold_reason: nextOpsStatus === "on_hold" ? statusReason : null,
+    pending_info_reason: nextOpsStatus === "pending_info" ? blockerReason : null,
+    on_hold_reason: nextOpsStatus === "on_hold" ? blockerReason : null,
   };
 
   const changes = buildOpsChanges(before, after);
@@ -1458,8 +1495,8 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
     .from("jobs")
     .update({
       ops_status: nextOpsStatus,
-      pending_info_reason: nextOpsStatus === "pending_info" ? statusReason : null,
-      on_hold_reason: nextOpsStatus === "on_hold" ? statusReason : null,
+      pending_info_reason: nextOpsStatus === "pending_info" ? blockerReason : null,
+      on_hold_reason: nextOpsStatus === "on_hold" ? blockerReason : null,
     })
     .eq("id", jobId);
 
@@ -1474,6 +1511,18 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
       changes,
       source: "job_detail",
       manual_allowed: true,
+      blocker_action: hadActiveWaitingState ? "updated" : "set",
+      blocker_type: blockerReasonParsed?.blockerType ?? waitingStateType,
+      blocker_reason: blockerReasonParsed?.blockerReason ?? statusReason,
+      ...(before.action_required_by
+        ? { action_required_by: before.action_required_by }
+        : {}),
+      ...(before.follow_up_date
+        ? { follow_up_date: before.follow_up_date }
+        : {}),
+      ...(String(before.next_action_note ?? "").trim()
+        ? { next_action_note: String(before.next_action_note).trim() }
+        : {}),
     },
   });
 

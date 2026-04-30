@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
+import { getActiveWaitingState } from "@/lib/utils/ops-status";
 
 type LifecycleFilter =
   | "all"
@@ -23,6 +24,7 @@ type OpsPreviewJob = {
   customer_last_name: string | null;
   customer_phone: string | null;
   pending_info_reason: string | null;
+  on_hold_reason: string | null;
   follow_up_date: string | null;
   next_action_note: string | null;
   action_required_by: string | null;
@@ -56,13 +58,18 @@ function hasSignalValue(value: unknown) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function getWaitingStateSignal(job: OpsPreviewJob) {
+  return getActiveWaitingState({
+    ops_status: job.ops_status,
+    pending_info_reason: job.pending_info_reason,
+    on_hold_reason: job.on_hold_reason,
+  });
+}
+
 function getPendingInfoSignal(job: OpsPreviewJob) {
-  return (
-    hasSignalValue(job.pending_info_reason) ||
-    hasSignalValue(job.follow_up_date) ||
-    hasSignalValue(job.next_action_note) ||
-    hasSignalValue(job.action_required_by)
-  );
+  const status = String(job.ops_status ?? "").toLowerCase();
+  if (status !== "pending_info") return false;
+  return hasSignalValue(job.pending_info_reason);
 }
 
 function customerLine(job: OpsPreviewJob) {
@@ -218,7 +225,9 @@ export default function OpsFilteredPreviewClient(props: Props) {
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredJobs.slice(0, 25).map((job) => (
+            {filteredJobs.slice(0, 25).map((job) => {
+              const waitingState = getWaitingStateSignal(job);
+              return (
               <div key={job.id} className="rounded-lg border border-gray-200 bg-white p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -230,9 +239,9 @@ export default function OpsFilteredPreviewClient(props: Props) {
                       <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium text-slate-700">
                         {String(job.ops_status ?? "").replace(/_/g, " ") || "unknown"}
                       </span>
-                      {getPendingInfoSignal(job) ? (
+                      {waitingState ? (
                         <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-                          Pending Info
+                          {waitingState.blockerLabel}
                         </span>
                       ) : null}
                       {String(job.ops_status ?? "").toLowerCase() === "on_hold" ? (
@@ -244,7 +253,8 @@ export default function OpsFilteredPreviewClient(props: Props) {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
