@@ -126,6 +126,7 @@ const DEFAULT_FILTERS = {
   fromDate: "",
   toDate: "",
   repeatOnly: false,
+  activeRepeatOnly: false,
   sort: "created_desc" as const,
 };
 
@@ -281,5 +282,73 @@ describe("service case effective-open reporting", () => {
     ]);
     expect(result.rows.find((row) => row.serviceCaseId === "case-single-active")?.visitCount).toBe(1);
     expect(result.rows.find((row) => row.serviceCaseId === "case-multi-active")?.visitCount).toBe(2);
+  });
+
+  it("multiple-visits filter includes historical closed multi-visit chains", async () => {
+    const supabase = makeSupabaseMock({
+      serviceCases: [
+        makeServiceCase("case-multi-closed"),
+        makeServiceCase("case-single-active"),
+      ],
+      jobs: [
+        makeJob({ id: "job-multi-closed-a", serviceCaseId: "case-multi-closed", opsStatus: "closed", createdAt: "2026-01-11T10:00:00Z" }),
+        makeJob({ id: "job-multi-closed-b", serviceCaseId: "case-multi-closed", opsStatus: "closed", createdAt: "2026-01-12T10:00:00Z" }),
+        makeJob({ id: "job-single-active", serviceCaseId: "case-single-active", opsStatus: "scheduled", createdAt: "2026-01-12T10:00:00Z" }),
+      ],
+    });
+
+    const result = await listServiceCaseContinuityRows({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      filters: {
+        ...DEFAULT_FILTERS,
+        caseStatus: "",
+        repeatOnly: true,
+      },
+      internalBusinessDisplayName: "Compliance Matters",
+    });
+
+    expect(result.rows.map((row) => row.serviceCaseId)).toEqual(["case-multi-closed"]);
+    expect(result.rows[0]?.activeLinkedVisitCount).toBe(0);
+  });
+
+  it("active-repeat report mode and KPI both count only multi-visit cases with active linked work", async () => {
+    const supabase = makeSupabaseMock({
+      serviceCases: [
+        makeServiceCase("case-multi-closed"),
+        makeServiceCase("case-multi-active"),
+        makeServiceCase("case-single-active"),
+      ],
+      jobs: [
+        makeJob({ id: "job-multi-closed-a", serviceCaseId: "case-multi-closed", opsStatus: "closed", createdAt: "2026-01-11T10:00:00Z" }),
+        makeJob({ id: "job-multi-closed-b", serviceCaseId: "case-multi-closed", opsStatus: "closed", createdAt: "2026-01-12T10:00:00Z" }),
+        makeJob({ id: "job-multi-active-a", serviceCaseId: "case-multi-active", opsStatus: "closed", createdAt: "2026-01-11T10:00:00Z" }),
+        makeJob({ id: "job-multi-active-b", serviceCaseId: "case-multi-active", opsStatus: "pending_info", createdAt: "2026-01-12T10:00:00Z" }),
+        makeJob({ id: "job-single-active", serviceCaseId: "case-single-active", opsStatus: "scheduled", createdAt: "2026-01-12T10:00:00Z" }),
+      ],
+    });
+
+    const [reportRows, continuityKpi] = await Promise.all([
+      listServiceCaseContinuityRows({
+        supabase,
+        accountOwnerUserId: ACCOUNT_OWNER,
+        filters: {
+          ...DEFAULT_FILTERS,
+          caseStatus: "",
+          repeatOnly: true,
+          activeRepeatOnly: true,
+        },
+        internalBusinessDisplayName: "Compliance Matters",
+      }),
+      buildContinuityKpiReadModel({
+        supabase,
+        accountOwnerUserId: ACCOUNT_OWNER,
+        filters: { fromDate: "", toDate: "", granularity: "monthly" },
+        buckets: [],
+      }),
+    ]);
+
+    expect(reportRows.rows.map((row) => row.serviceCaseId)).toEqual(["case-multi-active"]);
+    expect(continuityKpi.metrics.find((metric) => metric.key === "repeat_visit_cases")?.currentValue).toBe("1");
   });
 });
