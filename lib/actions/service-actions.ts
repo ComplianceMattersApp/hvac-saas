@@ -7,6 +7,7 @@ import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope"
 import { createClient } from "@/lib/supabase/server";
 import { setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
+import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-case-reconciliation";
 import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -84,7 +85,7 @@ async function requireInternalScopedServiceCloseoutJob(params: {
 
 export async function markServiceComplete(jobId: string): Promise<void> {
   const supabase = await createClient();
-  const { userId: actingUserId, job } = await requireInternalScopedServiceCloseoutJob({
+  const { userId: actingUserId, internalUser, job } = await requireInternalScopedServiceCloseoutJob({
     supabase,
     jobId,
     select:
@@ -118,18 +119,17 @@ export async function markServiceComplete(jobId: string): Promise<void> {
 
   if (updateErr) throw new Error(updateErr.message);
 
-  if (job.service_case_id && String(job.service_visit_outcome ?? "").trim().toLowerCase() === "resolved") {
-    const { error: serviceCaseErr } = await supabase
-      .from("service_cases")
-      .update({
-        status: "resolved",
-        resolved_by_job_id: jobId,
-        resolved_at: new Date().toISOString(),
-      })
-      .eq("id", String(job.service_case_id));
-
-    if (serviceCaseErr) throw new Error(serviceCaseErr.message);
-  }
+  await reconcileServiceCaseStatusAfterJobChange({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    serviceCaseId: job.service_case_id,
+    triggerJobId: jobId,
+    resolutionSummary:
+      String(job.service_visit_outcome ?? "").trim().toLowerCase() === "resolved"
+        ? "Service visit marked resolved"
+        : null,
+    source: "mark_service_complete",
+  });
 
   const eventMeta = buildMovementEventMeta({
     from: beforeStatus,
@@ -175,7 +175,7 @@ export async function markInvoiceSent(jobId: string): Promise<void> {
   const { userId: actingUserId, internalUser, job } = await requireInternalScopedServiceCloseoutJob({
     supabase,
     jobId,
-    select: "job_type, ops_status, invoice_complete, data_entry_completed_at",
+    select: "job_type, ops_status, invoice_complete, data_entry_completed_at, service_case_id",
   });
 
   const billingMode = await resolveBillingModeByAccountOwnerId({
@@ -264,6 +264,16 @@ export async function markInvoiceSent(jobId: string): Promise<void> {
     });
 
     if (eventErr) throw new Error(eventErr.message);
+  }
+
+  if (job.job_type === "service") {
+    await reconcileServiceCaseStatusAfterJobChange({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      serviceCaseId: job.service_case_id,
+      triggerJobId: jobId,
+      source: "mark_invoice_sent",
+    });
   }
 
   revalidatePath(`/jobs/${jobId}`);

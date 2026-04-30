@@ -31,6 +31,7 @@ type MockJob = {
   created_at: string | null;
   scheduled_date: string | null;
   title?: string | null;
+  service_visit_reason?: string | null;
   contractors?: { name?: string | null } | null;
   deleted_at?: string | null;
 };
@@ -150,6 +151,9 @@ function makeJob(input: {
   status?: string;
   opsStatus: string;
   createdAt?: string;
+  title?: string | null;
+  serviceVisitReason?: string | null;
+  scheduledDate?: string | null;
 }): MockJob {
   return {
     id: input.id,
@@ -159,8 +163,9 @@ function makeJob(input: {
     status: input.status ?? "open",
     ops_status: input.opsStatus,
     created_at: input.createdAt ?? "2026-01-11T10:00:00Z",
-    scheduled_date: null,
-    title: `Job ${input.id}`,
+    scheduled_date: input.scheduledDate ?? null,
+    title: input.title === undefined ? `Job ${input.id}` : input.title,
+    service_visit_reason: input.serviceVisitReason ?? null,
     contractors: { name: "Contractor 1" },
     deleted_at: null,
   };
@@ -393,5 +398,185 @@ describe("service case open continuity reporting", () => {
 
     expect(reportRows.rows.map((row) => row.serviceCaseId)).toEqual(["case-multi-active"]);
     expect(continuityKpi.metrics.find((metric) => metric.key === "repeat_visit_cases")?.currentValue).toBe("1");
+  });
+
+  it("includes latest visit title in row output and keeps case summary separate", async () => {
+    const supabase = makeSupabaseMock({
+      serviceCases: [
+        {
+          ...makeServiceCase("case-latest-title"),
+          problem_summary: "ECC alteration — Stockton",
+        },
+      ],
+      jobs: [
+        makeJob({
+          id: "job-old",
+          serviceCaseId: "case-latest-title",
+          opsStatus: "closed",
+          createdAt: "2026-01-10T10:00:00Z",
+          title: "Initial diagnosis",
+        }),
+        makeJob({
+          id: "job-new",
+          serviceCaseId: "case-latest-title",
+          opsStatus: "scheduled",
+          createdAt: "2026-01-12T10:00:00Z",
+          scheduledDate: "2026-01-15",
+          title: "Follow-up: Follow up Smoke Test",
+          serviceVisitReason: "Follow up Smoke Test",
+        }),
+      ],
+    });
+
+    const result = await listServiceCaseContinuityRows({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      filters: {
+        ...DEFAULT_FILTERS,
+        caseStatus: "",
+        repeatOnly: true,
+        activeRepeatOnly: true,
+      },
+      internalBusinessDisplayName: "Compliance Matters",
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]?.problemSummary).toBe("ECC alteration — Stockton");
+    expect(result.rows[0]?.latestVisitLabel).toBe("Follow-up: Follow up Smoke Test");
+    expect(result.rows[0]?.latestVisitOrdinal).toBe(2);
+    expect(result.rows[0]?.latestVisitDisplayTitle).toBe("Follow up Smoke Test");
+    expect(result.rows[0]?.latestVisitDisplayTitle).not.toMatch(/^Visit\s+\d+\s*-/i);
+    expect(result.rows[0]?.latestVisitKindLabel).toBe("Follow-up");
+    expect(result.rows[0]?.latestVisitDateDisplay).toBe("Scheduled: 01-15-2026");
+    expect(result.rows[0]?.activeLinkedVisitCount).toBe(1);
+    expect(result.rows[0]?.visitCount).toBe(2);
+  });
+
+  it("falls back to latest service_visit_reason when latest title is missing", async () => {
+    const supabase = makeSupabaseMock({
+      serviceCases: [makeServiceCase("case-latest-reason")],
+      jobs: [
+        makeJob({
+          id: "job-old",
+          serviceCaseId: "case-latest-reason",
+          opsStatus: "closed",
+          createdAt: "2026-01-10T10:00:00Z",
+          title: "Legacy visit",
+        }),
+        makeJob({
+          id: "job-new",
+          serviceCaseId: "case-latest-reason",
+          opsStatus: "need_to_schedule",
+          createdAt: "2026-01-13T10:00:00Z",
+          title: null,
+          serviceVisitReason: "Follow up Smoke Test",
+        }),
+      ],
+    });
+
+    const result = await listServiceCaseContinuityRows({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      filters: {
+        ...DEFAULT_FILTERS,
+        caseStatus: "",
+        repeatOnly: true,
+        activeRepeatOnly: true,
+      },
+      internalBusinessDisplayName: "Compliance Matters",
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]?.latestVisitLabel).toBe("Follow up Smoke Test");
+    expect(result.rows[0]?.latestVisitDisplayTitle).toBe("Follow up Smoke Test");
+    expect(result.rows[0]?.latestVisitDisplayTitle).not.toMatch(/^Visit\s+\d+\s*-/i);
+    expect(result.rows[0]?.latestVisitKindLabel).toBeNull();
+    expect(result.rows[0]?.latestVisitDateDisplay).toBe("Created: 01-13-2026");
+    expect(result.rows[0]?.visitCount).toBe(2);
+  });
+
+  it("cleans duplicate retest prefixes while preserving retest meaning", async () => {
+    const supabase = makeSupabaseMock({
+      serviceCases: [makeServiceCase("case-retest")],
+      jobs: [
+        makeJob({
+          id: "job-old",
+          serviceCaseId: "case-retest",
+          opsStatus: "closed",
+          createdAt: "2026-01-10T10:00:00Z",
+          title: "Initial visit",
+        }),
+        makeJob({
+          id: "job-new",
+          serviceCaseId: "case-retest",
+          opsStatus: "scheduled",
+          createdAt: "2026-01-13T10:00:00Z",
+          title: "Retest - Retest - ECC alteration - Stockton",
+        }),
+      ],
+    });
+
+    const result = await listServiceCaseContinuityRows({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      filters: {
+        ...DEFAULT_FILTERS,
+        caseStatus: "",
+        repeatOnly: true,
+        activeRepeatOnly: true,
+      },
+      internalBusinessDisplayName: "Compliance Matters",
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]?.latestVisitDisplayTitle).toBe("ECC alteration - Stockton");
+    expect(result.rows[0]?.latestVisitDisplayTitle).not.toMatch(/^Visit\s+\d+\s*-/i);
+    expect(result.rows[0]?.latestVisitKindLabel).toBe("Retest");
+    expect(result.rows[0]?.latestVisitOrdinal).toBe(2);
+  });
+
+  it("computes latest visit ordinal by created_at ascending order", async () => {
+    const supabase = makeSupabaseMock({
+      serviceCases: [makeServiceCase("case-ordinal")],
+      jobs: [
+        makeJob({
+          id: "job-1",
+          serviceCaseId: "case-ordinal",
+          opsStatus: "closed",
+          createdAt: "2026-01-10T10:00:00Z",
+          title: "Visit one",
+        }),
+        makeJob({
+          id: "job-2",
+          serviceCaseId: "case-ordinal",
+          opsStatus: "closed",
+          createdAt: "2026-01-11T10:00:00Z",
+          title: "Visit two",
+        }),
+        makeJob({
+          id: "job-3",
+          serviceCaseId: "case-ordinal",
+          opsStatus: "scheduled",
+          createdAt: "2026-01-12T10:00:00Z",
+          title: "Visit three",
+        }),
+      ],
+    });
+
+    const result = await listServiceCaseContinuityRows({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      filters: {
+        ...DEFAULT_FILTERS,
+        caseStatus: "",
+        repeatOnly: true,
+        activeRepeatOnly: true,
+      },
+      internalBusinessDisplayName: "Compliance Matters",
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]?.latestVisitOrdinal).toBe(3);
+    expect(result.rows[0]?.latestVisitDisplayTitle).toBe("Visit three");
   });
 });

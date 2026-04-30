@@ -18,6 +18,7 @@ import {
 } from '@/lib/business/internal-invoice';
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from '@/lib/actions/job-evaluator';
 import { insertJobEvent } from '@/lib/actions/job-actions';
+import { reconcileServiceCaseStatusAfterJobChange } from '@/lib/actions/service-case-reconciliation';
 import { renderSystemEmailLayout, escapeHtml } from '@/lib/email/layout';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { resolveNotificationAccountOwnerUserId } from '@/lib/notifications/account-owner';
@@ -207,6 +208,9 @@ async function recomputeOpsAfterInvoiceMutation(params: {
   supabase: any;
   jobId: string;
   userId: string;
+  accountOwnerUserId: string;
+  jobType?: string | null;
+  serviceCaseId?: string | null;
   previousOpsStatus: string | null;
   source: string;
 }) {
@@ -215,13 +219,28 @@ async function recomputeOpsAfterInvoiceMutation(params: {
 
   const { data: refreshedJob, error: refreshedJobErr } = await params.supabase
     .from('jobs')
-    .select('ops_status')
+    .select('ops_status, job_type, service_case_id')
     .eq('id', params.jobId)
     .single();
 
   if (refreshedJobErr) throw refreshedJobErr;
 
   const nextOpsStatus = String(refreshedJob?.ops_status ?? '').trim() || null;
+  const refreshedJobType = String(refreshedJob?.job_type ?? params.jobType ?? '').trim().toLowerCase();
+  const refreshedServiceCaseId = String(
+    refreshedJob?.service_case_id ?? params.serviceCaseId ?? '',
+  ).trim();
+
+  if (refreshedJobType === 'service' && refreshedServiceCaseId) {
+    await reconcileServiceCaseStatusAfterJobChange({
+      supabase: params.supabase,
+      accountOwnerUserId: params.accountOwnerUserId,
+      serviceCaseId: refreshedServiceCaseId,
+      triggerJobId: params.jobId,
+      source: params.source,
+    });
+  }
+
   if (nextOpsStatus === (params.previousOpsStatus ?? null)) return;
 
   await insertJobEvent({
@@ -883,6 +902,9 @@ export async function issueInternalInvoiceFromForm(formData: FormData) {
     supabase: context.supabase,
     jobId: context.jobId,
     userId: context.userId,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    jobType: context.job.job_type ?? null,
+    serviceCaseId: context.job.service_case_id ?? null,
     previousOpsStatus,
     source: 'internal_invoice_issue_recompute',
   });
@@ -953,6 +975,9 @@ export async function voidInternalInvoiceFromForm(formData: FormData) {
       supabase: context.supabase,
       jobId: context.jobId,
       userId: context.userId,
+      accountOwnerUserId: context.internalUser.account_owner_user_id,
+      jobType: context.job.job_type ?? null,
+      serviceCaseId: context.job.service_case_id ?? null,
       previousOpsStatus,
       source: 'internal_invoice_void_recompute',
     });

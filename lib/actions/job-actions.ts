@@ -11,6 +11,7 @@ import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from "@/lib/actions/job-evaluator";
 import { forceSetOpsStatus } from "@/lib/actions/ops-status";
 import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
+import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-case-reconciliation";
 import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions/job-event-meta";
 import {
   createContractorIntakeProposalAwarenessNotification,
@@ -2660,7 +2661,7 @@ export async function promoteCompanionScopeToServiceJobFromForm(formData: FormDa
 
   if (!sourceJobId) throw new Error("Missing job_id");
 
-  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: sourceJobId,
     onUnauthorized: () => {
@@ -2884,7 +2885,7 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
 
   if (!sourceJobId) throw new Error("Missing job_id");
 
-  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: sourceJobId,
     onUnauthorized: () => {
@@ -2988,6 +2989,14 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
       serviceCaseWriteClient: supabase,
     },
   );
+
+  await reconcileServiceCaseStatusAfterJobChange({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    serviceCaseId,
+    triggerJobId: created.id,
+    source: "create_next_service_visit",
+  });
 
   await insertJobEvent({
     supabase,
@@ -8069,7 +8078,7 @@ export async function completeDataEntryFromForm(formData: FormData) {
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
-    .select("id, job_type, ops_status, invoice_number, invoice_complete, data_entry_completed_at")
+    .select("id, job_type, ops_status, invoice_number, invoice_complete, data_entry_completed_at, service_case_id")
     .eq("id", id)
     .single();
 
@@ -8127,6 +8136,14 @@ if (jobType !== "ecc") {
         userId: actingUserId,
       });
     }
+
+      await reconcileServiceCaseStatusAfterJobChange({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        serviceCaseId: job?.service_case_id ?? null,
+        triggerJobId: id,
+        source: "complete_data_entry_from_form",
+      });
 
     redirect(`/jobs/${id}`);
   }

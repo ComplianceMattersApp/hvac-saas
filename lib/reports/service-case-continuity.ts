@@ -57,6 +57,10 @@ export type ServiceCaseContinuityRow = {
   serviceCaseHref: string;
   serviceCaseReference: string;
   problemSummary: string;
+  latestVisitLabel: string;
+  latestVisitOrdinal: number | null;
+  latestVisitDisplayTitle: string;
+  latestVisitKindLabel: string | null;
   caseKindLabel: string;
   caseStatusLabel: string;
   customerDisplay: string;
@@ -110,6 +114,7 @@ type LinkedJobRow = {
   id: string;
   service_case_id: string | null;
   title: string | null;
+  service_visit_reason: string | null;
   contractor_id: string | null;
   contractors?: { name?: string | null } | null;
   status: string | null;
@@ -123,7 +128,7 @@ export type ServiceCaseLinkedJobStatus = Pick<LinkedJobRow, "status" | "ops_stat
 const SERVICE_CASE_BASE_SELECT =
   "id, customer_id, location_id, problem_summary, case_kind, status, created_at, resolved_at, resolved_by_job_id";
 const LINKED_JOB_SELECT =
-  "id, service_case_id, title, contractor_id, contractors(name), status, ops_status, created_at, scheduled_date";
+  "id, service_case_id, title, service_visit_reason, contractor_id, contractors(name), status, ops_status, created_at, scheduled_date";
 
 function readParam(source: FilterSource, key: string) {
   if (source instanceof URLSearchParams) return source.get(key) ?? undefined;
@@ -235,9 +240,55 @@ export function isServiceCaseEffectivelyOpen(input: {
 
 function getLatestVisitDateDisplay(job: LinkedJobRow | null | undefined) {
   if (!job) return "-";
-  if (job.scheduled_date) return `${formatBusinessDateUS(job.scheduled_date)} scheduled`;
-  if (job.created_at) return `${displayDateLA(job.created_at)} created`;
+  if (job.scheduled_date) return `Scheduled: ${formatBusinessDateUS(job.scheduled_date)}`;
+  if (job.created_at) {
+    const createdYmd = String(job.created_at).slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(createdYmd)) {
+      return `Created: ${formatBusinessDateUS(createdYmd)}`;
+    }
+    return `Created: ${displayDateLA(job.created_at)}`;
+  }
   return "-";
+}
+
+function getLatestVisitLabel(job: LinkedJobRow | null | undefined) {
+  if (!job) return "-";
+  const title = String(job.title ?? "").trim();
+  if (title) return title;
+  const reason = String(job.service_visit_reason ?? "").trim();
+  if (reason) return reason;
+  return "-";
+}
+
+function parseLatestVisitDisplay(rawLabel: string) {
+  let value = String(rawLabel ?? "").trim();
+  if (!value || value === "-") {
+    return {
+      displayTitle: "-",
+      kindLabel: null as string | null,
+    };
+  }
+
+  let kindLabel: string | null = null;
+
+  const retestPrefix = /^(?:retest\s*[\-:—]\s*)+/i;
+  if (retestPrefix.test(value)) {
+    value = value.replace(retestPrefix, "").trim();
+    kindLabel = "Retest";
+  }
+
+  const followUpPrefix = /^(?:follow\s*-?up\s*[\-:—]\s*)+/i;
+  if (followUpPrefix.test(value)) {
+    value = value.replace(followUpPrefix, "").trim();
+    if (!kindLabel) kindLabel = "Follow-up";
+  }
+
+  if (!value) value = "-";
+
+  return {
+    displayTitle: value,
+    kindLabel,
+  };
 }
 
 async function resolveCaseIdsForContractor(params: {
@@ -503,13 +554,18 @@ export async function listServiceCaseContinuityRows(params: {
 
   const unsortedRows: Array<ServiceCaseContinuityRow & { isEffectivelyOpen: boolean }> = serviceCases.map((serviceCase) => {
     const serviceCaseId = String(serviceCase.id ?? "");
-    const linked = [...(linkedJobsByCaseId.get(serviceCaseId) ?? [])].sort((left, right) => {
+    const linked = [...(linkedJobsByCaseId.get(serviceCaseId) ?? [])];
+    const linkedByCreatedAsc = [...linked].sort((left, right) => {
       const leftMs = left.created_at ? new Date(left.created_at).getTime() : 0;
       const rightMs = right.created_at ? new Date(right.created_at).getTime() : 0;
-      return rightMs - leftMs;
+      if (leftMs !== rightMs) return leftMs - rightMs;
+      return String(left.id ?? "").localeCompare(String(right.id ?? ""));
     });
 
-    const latestJob = linked[0] ?? null;
+    const latestJob = linkedByCreatedAsc[linkedByCreatedAsc.length - 1] ?? null;
+    const latestVisitOrdinal = latestJob ? linkedByCreatedAsc.length : null;
+    const latestVisitLabel = getLatestVisitLabel(latestJob);
+    const latestVisitDisplay = parseLatestVisitDisplay(latestVisitLabel);
     const customer = customersById.get(String(serviceCase.customer_id ?? ""));
     const location = locationsById.get(String(serviceCase.location_id ?? ""));
     const activeLinkedVisitCount = countActiveLinkedJobs(linked);
@@ -539,6 +595,10 @@ export async function listServiceCaseContinuityRows(params: {
       serviceCaseHref: latestJob ? `/jobs/${String(latestJob.id)}?tab=ops` : "/reports/service-cases",
       serviceCaseReference: serviceCaseId.slice(0, 8),
       problemSummary: String(serviceCase.problem_summary ?? "").trim() || "-",
+      latestVisitLabel,
+      latestVisitOrdinal,
+      latestVisitDisplayTitle: latestVisitDisplay.displayTitle,
+      latestVisitKindLabel: latestVisitDisplay.kindLabel,
       caseKindLabel: formatCaseKindLabel(serviceCase.case_kind),
       caseStatusLabel: formatCaseStatusLabel(serviceCase.status),
       customerDisplay,

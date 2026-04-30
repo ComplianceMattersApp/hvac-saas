@@ -34,6 +34,7 @@ import {
 import { resolveAppUrl, renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
+import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-case-reconciliation";
 import { extractFailureReasons, finalRunPass } from "@/lib/portal/resolveContractorIssues";
 
 const OPS_STATUSES = [
@@ -783,7 +784,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
     .select(
-      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end, data_entry_completed_at"
+      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
     )
     .eq("id", jobId)
     .single();
@@ -916,7 +917,7 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
     .select(
-      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end, data_entry_completed_at"
+      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
     )
     .eq("id", jobId)
     .single();
@@ -1014,6 +1015,16 @@ if (!job.data_entry_completed_at && !updatedInvoiceRow.data_entry_completed_at) 
   });
 
   if (eventErr) throw eventErr;
+
+  if (String(job.job_type ?? "").trim().toLowerCase() === "service") {
+    await reconcileServiceCaseStatusAfterJobChange({
+      supabase,
+      accountOwnerUserId: authz.internalUser.account_owner_user_id,
+      serviceCaseId: job.service_case_id,
+      triggerJobId: jobId,
+      source: "mark_invoice_complete_from_form",
+    });
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);

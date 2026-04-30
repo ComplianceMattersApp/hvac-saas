@@ -186,7 +186,7 @@ export default async function ServiceCaseContinuityPage({
             <thead className="bg-slate-50/90">
               <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
                 <th className="px-3 py-3">Case Ref</th>
-                <th className="px-3 py-3">Case Problem Summary</th>
+                <th className="px-3 py-3">Case Summary</th>
                 <th className="px-3 py-3">Kind</th>
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Customer</th>
@@ -240,7 +240,17 @@ export default async function ServiceCaseContinuityPage({
                       )}
                     </td>
                     <td className="px-3 py-3 text-slate-700">{row.visitCount}</td>
-                    <td className="px-3 py-3 text-slate-700">{row.latestVisitDateDisplay}</td>
+                    <td className="px-3 py-3 text-slate-700">
+                      <div className="max-w-[18rem]">
+                        <div className="text-slate-900">{row.latestVisitDisplayTitle}</div>
+                        {row.latestVisitKindLabel ? (
+                          <div className="mt-1 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-slate-600">
+                            {row.latestVisitKindLabel}
+                          </div>
+                        ) : null}
+                        <div className="text-xs text-slate-500">{row.latestVisitDateDisplay}</div>
+                      </div>
+                    </td>
                     <td className="px-3 py-3 text-slate-700">{row.latestVisitOpsStatusLabel}</td>
                     <td className="px-3 py-3 text-slate-700">{row.latestAssignedTechDisplay}</td>
                     <td className="px-3 py-3 text-slate-700">{row.activeLinkedVisitCount}</td>
