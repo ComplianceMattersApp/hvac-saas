@@ -241,7 +241,7 @@ export default function OpsFilteredPreviewClient(props: Props) {
                       </span>
                       {waitingState ? (
                         <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-                          {waitingState.blockerLabel}
+                          Waiting
                         </span>
                       ) : null}
                       {String(job.ops_status ?? "").toLowerCase() === "on_hold" ? (

@@ -109,9 +109,9 @@ import {
 } from "@/lib/jobs/visit-scope";
 import {
   getActiveWaitingState,
-  getWaitingStateLabel,
-  WAITING_STATE_TYPES,
+  getInterruptClearActionLabel,
 } from "@/lib/utils/ops-status";
+import InterruptStateFields from "./_components/InterruptStateFields";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -1452,6 +1452,7 @@ const activeWaitingState = getActiveWaitingState({
   pending_info_reason: (job as any).pending_info_reason ?? null,
   on_hold_reason: (job as any).on_hold_reason ?? null,
 });
+const canShowWaitingReleaseQuickAction = Boolean(activeWaitingState) && canShowReleaseAndReevaluate;
 const actionablePendingInfo = explicitPendingInfoActive;
 const hasFollowUpReminder =
   Boolean((job as any).follow_up_date) ||
@@ -1467,6 +1468,30 @@ const currentStatusReasonText = explicitPendingInfoActive
   : onHoldActive
   ? onHoldReasonText
   : "";
+const currentInterruptState = activeWaitingState
+  ? "waiting"
+  : explicitPendingInfoActive
+  ? "pending_info"
+  : onHoldActive
+  ? "on_hold"
+  : "";
+const currentInterruptReasonText = activeWaitingState
+  ? activeWaitingState.blockerReason
+  : explicitPendingInfoActive
+  ? pendingInfoReasonText
+  : onHoldReasonText;
+const interruptReleaseActionLabel = currentInterruptState
+  ? getInterruptClearActionLabel(currentInterruptState)
+  : "Release & Re-evaluate";
+const initialWaitingReasonType = activeWaitingState?.blockerType ?? "waiting_on_information";
+const initialWaitingOtherReason = activeWaitingState?.blockerType === "other"
+  ? activeWaitingState.blockerReason
+  : "";
+const initialInterruptReason = activeWaitingState
+  ? ""
+  : explicitPendingInfoActive
+  ? pendingInfoReasonText
+  : onHoldReasonText;
 
 const locationId = serviceLocation?.id ?? null;
 
@@ -1517,7 +1542,7 @@ const followUpDateValue = String((job as any).follow_up_date ?? "").trim();
 const followUpDateSummary = followUpDateValue ? displayDateLA(followUpDateValue) : "";
 const nextActionPreview = truncateSummaryText(String((job as any).next_action_note ?? ""), 78);
 const jobStatusSummaryText = activeWaitingState
-  ? `${activeWaitingState.blockerLabel}${activeWaitingState.blockerReason ? ` • ${truncateSummaryText(activeWaitingState.blockerReason, 72)}` : ""}`
+  ? `Waiting${activeWaitingState.blockerReason ? ` • ${truncateSummaryText(activeWaitingState.blockerReason, 72)}` : ""}`
   : explicitPendingInfoActive
   ? `Pending Info${pendingInfoReasonText ? ` • ${truncateSummaryText(pendingInfoReasonText, 72)}` : ""}`
   : onHoldActive
@@ -2177,6 +2202,21 @@ const renderTimelineItem = (e: any, key: string) => {
         ) : null}
       </div>
 
+      {canShowWaitingReleaseQuickAction ? (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3">
+          <div className="text-sm font-semibold text-amber-900">Ready to resume this service visit?</div>
+          <p className="mt-1 text-xs leading-5 text-amber-900/90">
+            Use this when the part, approval, access, or missing information is no longer blocking the job.
+          </p>
+          <form action={releaseAndReevaluateFromForm} className="mt-2">
+            <input type="hidden" name="job_id" value={job.id} />
+            <SubmitButton loadingText="Updating..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+              Mark Ready to Continue
+            </SubmitButton>
+          </form>
+        </div>
+      ) : null}
+
       <form action={createNextServiceVisitFromForm} className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <input type="hidden" name="job_id" value={job.id} />
         <input type="hidden" name="tab" value={tab} />
@@ -2790,6 +2830,27 @@ const renderTimelineItem = (e: any, key: string) => {
         />
       )}
 
+      {banner === "interrupt_state_required" && (
+        <FlashBanner
+          type="warning"
+          message="Select an Interrupt State before saving."
+        />
+      )}
+
+      {banner === "waiting_reason_required" && (
+        <FlashBanner
+          type="warning"
+          message="Select a Waiting reason before saving."
+        />
+      )}
+
+      {banner === "waiting_other_reason_required" && (
+        <FlashBanner
+          type="warning"
+          message="Custom reason is required when Waiting reason is Other."
+        />
+      )}
+
       {banner === "contact_attempt_logged" && (
         <FlashBanner
           type="success"
@@ -2968,7 +3029,7 @@ const renderTimelineItem = (e: any, key: string) => {
         <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50/90 p-3.5 text-amber-900">
           <div className="text-sm font-semibold">{meta.title}</div>
           <div className="mt-1 text-sm">
-            Current Ops Status: <span className="font-medium">{formatOpsStatusLabel(ops)}</span>. {meta.body}
+            Current status: <span className="font-medium">{formatOpsStatusLabel(ops)}</span>. {meta.body}
           </div>
         </div>
       );
@@ -4364,15 +4425,26 @@ const renderTimelineItem = (e: any, key: string) => {
       {activeWaitingState ? (
         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm">
           <div className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-800">
-            {activeWaitingState.blockerLabel}
+            Waiting
           </div>
           {activeWaitingState.blockerReason ? (
             <div className="mt-2 text-sm text-amber-900">{activeWaitingState.blockerReason}</div>
           ) : null}
+          {canShowWaitingReleaseQuickAction ? (
+            <div className="mt-2 border-t border-amber-200/80 pt-2.5">
+              <p className="text-xs leading-5 text-amber-900/90">
+                Use this when the part, approval, access, or missing information is no longer blocking the job.
+              </p>
+              <form action={releaseAndReevaluateFromForm} className="mt-2">
+                <input type="hidden" name="job_id" value={job.id} />
+                <SubmitButton loadingText="Updating..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                  Mark Ready to Continue
+                </SubmitButton>
+              </form>
+            </div>
+          ) : null}
         </div>
       ) : null}
-
-      <label className={workspaceFieldLabelClass}>Ops Status</label>
 
       {!["need_to_schedule", "scheduled", "pending_info", "on_hold"].includes(
         String(job.ops_status ?? "")
@@ -4385,76 +4457,36 @@ const renderTimelineItem = (e: any, key: string) => {
         </div>
       ) : null}
 
-      <select
-        name="ops_status"
-        defaultValue={
-          explicitPendingInfoActive
-            ? "pending_info"
-            : onHoldActive
-            ? "on_hold"
-            : ""
-        }
-        required
-        className={workspaceInputClass}
-      >
-        <option value="" disabled>Select interrupt state…</option>
-        <option value="pending_info">Pending Info</option>
-        <option value="on_hold">On Hold</option>
-      </select>
-
-      <p className="mt-2 text-xs leading-5 text-slate-600">
-        Choose the status-change type here. Use the reason field below for either a Pending Info blocker or an On Hold pause reason. Follow Up stays separate for reminders and next actions.
-      </p>
-
-      <div className="mt-3">
-        <label className={workspaceFieldLabelClass}>Waiting State Type</label>
-        <select
-          name="waiting_state_type"
-          required
-          defaultValue={activeWaitingState?.blockerType ?? "other"}
-          className={workspaceInputClass}
-        >
-          {WAITING_STATE_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {getWaitingStateLabel(type)}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3">
-        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-900">Status Reason</label>
-        <textarea
-          name="status_reason"
-          defaultValue={activeWaitingState?.blockerReason ?? (explicitPendingInfoActive ? pendingInfoReasonText : onHoldReasonText)}
-          className="min-h-[7rem] w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm text-slate-900"
-          rows={3}
-          placeholder="If Pending Info is selected, describe the blocker. If On Hold is selected, describe why the job is paused."
-        />
-        <p className="mt-2 text-xs text-amber-900/80">
-          Required for both Pending Info and On Hold. It will be stored against the selected status only.
-        </p>
-      </div>
+      <InterruptStateFields
+        workspaceFieldLabelClass={workspaceFieldLabelClass}
+        workspaceInputClass={workspaceInputClass}
+        initialInterruptState={currentInterruptState as "" | "pending_info" | "on_hold" | "waiting"}
+        initialStatusReason={initialInterruptReason}
+        initialWaitingReasonType={initialWaitingReasonType}
+        initialWaitingOtherReason={initialWaitingOtherReason}
+      />
     </div>
 
     <SubmitButton loadingText="Saving..." className={`${primaryButtonClass} sm:shrink-0`}>
-      Save
+      Save Interrupt State
     </SubmitButton>
   </form>
 
-  {(String(job.ops_status ?? "").toLowerCase() === "on_hold" || explicitPendingInfoActive) ? (
+  {currentInterruptState ? (
     <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-700">
-      <div className="font-semibold text-slate-900">Current Status Detail</div>
+      <div className="font-semibold text-slate-900">Current Interrupt Detail</div>
       <div className="mt-1">
-        {activeWaitingState
-          ? `${activeWaitingState.blockerLabel}: ${activeWaitingState.blockerReason}`
-          : explicitPendingInfoActive
-          ? (pendingInfoReasonText
-              ? `Pending Info blocker: ${pendingInfoReasonText}`
-              : "Pending Info is active. Add the missing blocker detail if needed.")
-          : (onHoldReasonText
-              ? `On Hold reason: ${onHoldReasonText}`
-              : "On Hold is active. Add the pause reason if needed.")}
+        {currentInterruptReasonText
+          ? (currentInterruptState === "waiting"
+              ? `Waiting - ${currentInterruptReasonText}`
+              : currentInterruptState === "pending_info"
+              ? `Pending Info - ${currentInterruptReasonText}`
+              : `On Hold - ${currentInterruptReasonText}`)
+          : currentInterruptState === "waiting"
+          ? "Waiting is active. Add or update the blocking reason if needed."
+          : currentInterruptState === "pending_info"
+          ? "Pending Info is active. Add the missing blocker detail if needed."
+          : "On Hold is active. Add the pause reason if needed."}
       </div>
     </div>
   ) : null}
@@ -4463,9 +4495,7 @@ const renderTimelineItem = (e: any, key: string) => {
           <form action={releaseAndReevaluateFromForm} className="mt-2">
             <input type="hidden" name="job_id" value={job.id} />
             <SubmitButton loadingText="Updating..." className={`w-full ${secondaryButtonClass} sm:w-auto`}>
-              {String(job.ops_status ?? "").toLowerCase() === "pending_info"
-                ? "Release Pending Info & Re-evaluate"
-                : "Release & Re-evaluate"}
+              {interruptReleaseActionLabel}
             </SubmitButton>
           </form>
         ) : null}

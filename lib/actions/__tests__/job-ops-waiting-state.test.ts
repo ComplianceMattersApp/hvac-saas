@@ -98,12 +98,33 @@ type BeforeJob = {
   id?: string;
 };
 
-function buildUpdateFormData(type: string, reason: string, opsStatus = "pending_info") {
+function buildPendingInfoFormData(reason: string) {
   const formData = new FormData();
   formData.set("job_id", "job-1");
-  formData.set("ops_status", opsStatus);
-  formData.set("waiting_state_type", type);
+  formData.set("interrupt_state", "pending_info");
   formData.set("status_reason", reason);
+  return formData;
+}
+
+function buildOnHoldFormData(reason: string) {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
+  formData.set("interrupt_state", "on_hold");
+  formData.set("status_reason", reason);
+  return formData;
+}
+
+function buildWaitingFormData(type: string, options?: { otherReason?: string; legacyOpsStatus?: "pending_info" | "on_hold" }) {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
+  formData.set("interrupt_state", "waiting");
+  formData.set("waiting_state_type", type);
+  if (options?.otherReason) {
+    formData.set("waiting_other_reason", options.otherReason);
+  }
+  if (options?.legacyOpsStatus) {
+    formData.set("ops_status", options.legacyOpsStatus);
+  }
   return formData;
 }
 
@@ -187,7 +208,7 @@ function makeSupabaseForRelease(before: Required<BeforeJob> & { id: string }) {
   return { supabase, insertedEvents, getUpdatedPayload: () => updatedPayload };
 }
 
-describe("job ops waiting-state v1", () => {
+describe("job ops interrupt-state v2", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
@@ -207,7 +228,7 @@ describe("job ops waiting-state v1", () => {
     healStalePaperworkOpsStatusMock.mockResolvedValue(true);
   });
 
-  it("persists waiting on part with readable prefix in existing pending_info_reason", async () => {
+  it("persists pending info custom reason", async () => {
     const { supabase, getUpdatedPayload, insertedEvents } = makeSupabaseForUpdate({
       ops_status: "scheduled",
       pending_info_reason: null,
@@ -221,19 +242,19 @@ describe("job ops waiting-state v1", () => {
     const { updateJobOpsFromForm } = await import("@/lib/actions/job-ops-actions");
 
     await expect(
-      updateJobOpsFromForm(buildUpdateFormData("waiting_on_part", "condenser fan motor")),
+      updateJobOpsFromForm(buildPendingInfoFormData("Missing permit number")),
     ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=ops_status_saved");
 
     expect(getUpdatedPayload()).toMatchObject({
       ops_status: "pending_info",
-      pending_info_reason: "Waiting on part: condenser fan motor",
+      pending_info_reason: "Missing permit number",
       on_hold_reason: null,
     });
 
     expect(insertedEvents[0].meta).toMatchObject({
       blocker_action: "set",
-      blocker_type: "waiting_on_part",
-      blocker_reason: "condenser fan motor",
+      blocker_type: "pending_info",
+      blocker_reason: "Missing permit number",
       source: "job_detail",
       action_required_by: "rater",
       follow_up_date: "2026-05-01",
@@ -241,7 +262,7 @@ describe("job ops waiting-state v1", () => {
     });
   });
 
-  it("persists waiting on approval with readable prefix in existing reason fields", async () => {
+  it("persists on hold custom reason", async () => {
     const { supabase, getUpdatedPayload } = makeSupabaseForUpdate({
       ops_status: "scheduled",
       pending_info_reason: null,
@@ -255,19 +276,21 @@ describe("job ops waiting-state v1", () => {
     const { updateJobOpsFromForm } = await import("@/lib/actions/job-ops-actions");
 
     await expect(
-      updateJobOpsFromForm(buildUpdateFormData("waiting_on_customer_approval", "customer reviewing repair")),
+      updateJobOpsFromForm(buildOnHoldFormData("Customer requested delay")),
     ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=ops_status_saved");
 
     expect(getUpdatedPayload()).toMatchObject({
-      pending_info_reason: "Waiting on approval: customer reviewing repair",
+      ops_status: "on_hold",
+      pending_info_reason: null,
+      on_hold_reason: "Customer requested delay",
     });
   });
 
-  it("persists estimate needed with readable prefix in existing reason fields", async () => {
+  it("persists waiting dropdown reason", async () => {
     const { supabase, getUpdatedPayload, insertedEvents } = makeSupabaseForUpdate({
-      ops_status: "on_hold",
+      ops_status: "scheduled",
       pending_info_reason: null,
-      on_hold_reason: "Waiting on part: capacitor",
+      on_hold_reason: null,
       follow_up_date: null,
       next_action_note: null,
       action_required_by: null,
@@ -277,20 +300,38 @@ describe("job ops waiting-state v1", () => {
     const { updateJobOpsFromForm } = await import("@/lib/actions/job-ops-actions");
 
     await expect(
-      updateJobOpsFromForm(buildUpdateFormData("estimate_needed", "awaiting replacement quote", "on_hold")),
+      updateJobOpsFromForm(buildWaitingFormData("waiting_on_part")),
     ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=ops_status_saved");
 
     expect(getUpdatedPayload()).toMatchObject({
-      ops_status: "on_hold",
-      pending_info_reason: null,
-      on_hold_reason: "Estimate needed: awaiting replacement quote",
+      ops_status: "pending_info",
+      pending_info_reason: "Waiting on part: Waiting on part",
+      on_hold_reason: null,
     });
 
     expect(insertedEvents[0].meta).toMatchObject({
-      blocker_type: "estimate_needed",
-      blocker_action: "updated",
-      blocker_reason: "awaiting replacement quote",
+      blocker_type: "waiting_on_part",
+      blocker_action: "set",
+      blocker_reason: "Waiting on part",
     });
+  });
+
+  it("requires custom reason when waiting reason is other", async () => {
+    const { supabase } = makeSupabaseForUpdate({
+      ops_status: "scheduled",
+      pending_info_reason: null,
+      on_hold_reason: null,
+      follow_up_date: null,
+      next_action_note: null,
+      action_required_by: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { updateJobOpsFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      updateJobOpsFromForm(buildWaitingFormData("other")),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=waiting_other_reason_required");
   });
 
   it("emits blocker_action cleared metadata on release when previous blocker is parseable", async () => {

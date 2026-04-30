@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatWaitingStateReason,
   getActiveWaitingState,
+  getInterruptClearActionLabel,
   parseWaitingStateReason,
 } from "@/lib/utils/ops-status";
 
@@ -15,7 +16,7 @@ describe("ops waiting-state helpers", () => {
 
   it("formats waiting-on-approval reason with readable prefix", () => {
     expect(formatWaitingStateReason("waiting_on_customer_approval", "customer reviewing repair")).toBe(
-      "Waiting on approval: customer reviewing repair",
+      "Waiting on customer approval: customer reviewing repair",
     );
   });
 
@@ -53,5 +54,35 @@ describe("ops waiting-state helpers", () => {
 
   it("returns null for unparseable waiting-state reason text", () => {
     expect(parseWaitingStateReason("need callback from customer")).toBeNull();
+  });
+
+  it("does not classify plain pending-info custom reasons as waiting", () => {
+    expect(
+      getActiveWaitingState({
+        ops_status: "pending_info",
+        pending_info_reason: "Missing permit number",
+        on_hold_reason: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("parses legacy unprefixed waiting labels safely", () => {
+    expect(parseWaitingStateReason("Waiting on part")).toMatchObject({
+      blockerType: "waiting_on_part",
+      blockerReason: "Waiting on part",
+    });
+  });
+
+  it("parses legacy waiting-on-approval prefix safely", () => {
+    expect(parseWaitingStateReason("Waiting on approval: customer reviewing repair")).toMatchObject({
+      blockerType: "waiting_on_customer_approval",
+      blockerReason: "customer reviewing repair",
+    });
+  });
+
+  it("maps clear-action labels for all interrupt states", () => {
+    expect(getInterruptClearActionLabel("pending_info")).toBe("Mark Info Received");
+    expect(getInterruptClearActionLabel("on_hold")).toBe("Resume Job");
+    expect(getInterruptClearActionLabel("waiting")).toBe("Mark Ready to Continue");
   });
 });

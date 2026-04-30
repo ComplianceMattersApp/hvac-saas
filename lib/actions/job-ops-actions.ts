@@ -8,6 +8,7 @@ import {
   formatWaitingStateReason,
   getActiveWaitingState,
   getPendingInfoSignal,
+  getWaitingStateLabel,
   parseWaitingStateReason,
   parseWaitingStateType,
   resolveOpsStatus,
@@ -1390,9 +1391,11 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
 
   const jobId = formData.get("job_id");
+  const interruptStateRaw = formData.get("interrupt_state");
   const opsStatusRaw = formData.get("ops_status");
   const statusReasonRaw = formData.get("status_reason");
   const waitingStateTypeRaw = formData.get("waiting_state_type");
+  const waitingOtherReasonRaw = formData.get("waiting_other_reason");
 
   if (typeof jobId !== "string" || !jobId) {
     throw new Error("Missing job_id");
@@ -1405,47 +1408,73 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   if (!user) redirect("/login");
   await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
 
-  if (typeof opsStatusRaw !== "string" || !opsStatusRaw.trim()) {
-    throw new Error("Missing ops_status");
-  }
-
-  const allowedManualOpsStatuses = [
-    "pending_info",
-    "on_hold",
-  ] as const;
-
-  const isAllowedManualOpsStatus = (
-    value: string
-  ): value is (typeof allowedManualOpsStatuses)[number] =>
-    allowedManualOpsStatuses.includes(
-      value as (typeof allowedManualOpsStatuses)[number]
-    );
-
-  if (!isAllowedManualOpsStatus(opsStatusRaw)) {
-    const banner = encodeURIComponent("Select On Hold or Pending Info");
-    redirect(`/jobs/${jobId}?tab=ops&banner=${banner}`);
-  }
-
   const statusReason =
     typeof statusReasonRaw === "string" && statusReasonRaw.trim()
       ? statusReasonRaw.trim()
       : null;
 
-  if (!statusReason) {
-    const banner = opsStatusRaw === "pending_info"
-      ? "pending_info_reason_required"
-      : "on_hold_reason_required";
-    redirect(`/jobs/${jobId}?tab=ops&banner=${banner}`);
-  }
-
   const waitingStateType = parseWaitingStateType(waitingStateTypeRaw);
-  if (!waitingStateType) {
-    const banner = encodeURIComponent("Select a waiting-state reason type");
-    redirect(`/jobs/${jobId}?tab=ops&banner=${banner}`);
+  const waitingOtherReason =
+    typeof waitingOtherReasonRaw === "string" && waitingOtherReasonRaw.trim()
+      ? waitingOtherReasonRaw.trim()
+      : null;
+
+  type InterruptState = "pending_info" | "on_hold" | "waiting";
+  const normalizedInterruptState = String(interruptStateRaw ?? "").trim().toLowerCase();
+  const normalizedOpsStatus = String(opsStatusRaw ?? "").trim().toLowerCase();
+
+  const interruptState: InterruptState | null =
+    normalizedInterruptState === "pending_info" ||
+    normalizedInterruptState === "on_hold" ||
+    normalizedInterruptState === "waiting"
+      ? normalizedInterruptState
+      : waitingStateType
+        ? "waiting"
+        : normalizedOpsStatus === "pending_info" || normalizedOpsStatus === "on_hold"
+          ? normalizedOpsStatus
+          : null;
+
+  if (!interruptState) {
+    redirect(`/jobs/${jobId}?tab=ops&banner=interrupt_state_required`);
   }
 
-  const blockerReason = formatWaitingStateReason(waitingStateType, statusReason);
-  const blockerReasonParsed = parseWaitingStateReason(blockerReason);
+  let nextOpsStatus: "pending_info" | "on_hold";
+  let blockerReason = "";
+  let blockerReasonParsed: ReturnType<typeof parseWaitingStateReason> = null;
+  let blockerTypeForMeta: string = interruptState;
+  let blockerReasonForMeta: string = statusReason ?? "";
+
+  if (interruptState === "pending_info" || interruptState === "on_hold") {
+    if (!statusReason) {
+      const banner = interruptState === "pending_info"
+        ? "pending_info_reason_required"
+        : "on_hold_reason_required";
+      redirect(`/jobs/${jobId}?tab=ops&banner=${banner}`);
+    }
+
+    nextOpsStatus = interruptState;
+    blockerReason = statusReason;
+  } else {
+    if (!waitingStateType) {
+      redirect(`/jobs/${jobId}?tab=ops&banner=waiting_reason_required`);
+    }
+
+    if (waitingStateType === "other" && !waitingOtherReason) {
+      redirect(`/jobs/${jobId}?tab=ops&banner=waiting_other_reason_required`);
+    }
+
+    const waitingReasonBody = waitingStateType === "other"
+      ? (waitingOtherReason ?? "")
+      : getWaitingStateLabel(waitingStateType);
+
+    blockerReason = formatWaitingStateReason(waitingStateType, waitingReasonBody);
+    blockerReasonParsed = parseWaitingStateReason(blockerReason);
+    blockerTypeForMeta = blockerReasonParsed?.blockerType ?? waitingStateType;
+    blockerReasonForMeta = blockerReasonParsed?.blockerReason ?? waitingReasonBody;
+
+    // Preserve legacy callers that still post ops_status=on_hold with waiting-state fields.
+    nextOpsStatus = normalizedOpsStatus === "on_hold" ? "on_hold" : "pending_info";
+  }
 
   // BEFORE
   const { data: beforeJob, error: beforeErr } = await supabase
@@ -1474,8 +1503,6 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
       on_hold_reason: before.on_hold_reason,
     })
   );
-
-  const nextOpsStatus = opsStatusRaw;
 
   const after: OpsSnapshot = {
     ...before,
@@ -1512,8 +1539,8 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
       source: "job_detail",
       manual_allowed: true,
       blocker_action: hadActiveWaitingState ? "updated" : "set",
-      blocker_type: blockerReasonParsed?.blockerType ?? waitingStateType,
-      blocker_reason: blockerReasonParsed?.blockerReason ?? statusReason,
+      blocker_type: blockerTypeForMeta,
+      blocker_reason: blockerReasonForMeta,
       ...(before.action_required_by
         ? { action_required_by: before.action_required_by }
         : {}),

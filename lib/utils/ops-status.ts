@@ -95,14 +95,26 @@ export type WaitingStateType = (typeof WAITING_STATE_TYPES)[number];
 
 const WAITING_STATE_LABELS: Record<WaitingStateType, string> = {
   waiting_on_part: "Waiting on part",
-  waiting_on_customer_approval: "Waiting on approval",
+  waiting_on_customer_approval: "Waiting on customer approval",
   estimate_needed: "Estimate needed",
   waiting_on_access: "Waiting on access",
   waiting_on_information: "Waiting on information",
   other: "Other",
 };
 
+const WAITING_STATE_LEGACY_LABEL_ALIASES: Partial<Record<WaitingStateType, readonly string[]>> = {
+  waiting_on_customer_approval: ["Waiting on approval"],
+};
+
 type ActiveWaitingStatus = "pending_info" | "on_hold";
+
+export type InterruptState = "pending_info" | "on_hold" | "waiting";
+
+export function getInterruptClearActionLabel(state: InterruptState): string {
+  if (state === "pending_info") return "Mark Info Received";
+  if (state === "on_hold") return "Resume Job";
+  return "Mark Ready to Continue";
+}
 
 export function isActiveWaitingOpsStatus(value: unknown): value is ActiveWaitingStatus {
   const normalized = String(value ?? "").trim().toLowerCase();
@@ -139,17 +151,30 @@ export function parseWaitingStateReason(raw: unknown): ParsedWaitingStateReason 
 
   const lowered = text.toLowerCase();
   for (const type of WAITING_STATE_TYPES) {
-    const prefix = `${WAITING_STATE_LABELS[type]}:`.toLowerCase();
-    if (!lowered.startsWith(prefix)) continue;
+    const aliases = WAITING_STATE_LEGACY_LABEL_ALIASES[type] ?? [];
+    const candidateLabels = [WAITING_STATE_LABELS[type], ...aliases];
 
-    const blockerReason = text.slice(prefix.length).trim();
-    if (!blockerReason) return null;
+    for (const candidateLabel of candidateLabels) {
+      const prefix = `${candidateLabel}:`.toLowerCase();
+      if (!lowered.startsWith(prefix)) continue;
 
-    return {
-      blockerType: type,
-      blockerLabel: WAITING_STATE_LABELS[type],
-      blockerReason,
-    };
+      const blockerReason = text.slice(prefix.length).trim();
+      if (!blockerReason) return null;
+
+      return {
+        blockerType: type,
+        blockerLabel: WAITING_STATE_LABELS[type],
+        blockerReason,
+      };
+    }
+
+    if (type !== "other" && candidateLabels.some((label) => lowered === label.toLowerCase())) {
+      return {
+        blockerType: type,
+        blockerLabel: WAITING_STATE_LABELS[type],
+        blockerReason: WAITING_STATE_LABELS[type],
+      };
+    }
   }
 
   return null;
@@ -183,11 +208,5 @@ export function getActiveWaitingState(input: {
     };
   }
 
-  return {
-    blockerType: "other",
-    blockerLabel: WAITING_STATE_LABELS.other,
-    blockerReason: rawReason,
-    status: statusRaw,
-    parsed: false,
-  };
+  return null;
 }
