@@ -791,7 +791,11 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
 
   // Read current job snapshot
   const { data: job, error: jobErr } = await supabase
@@ -917,6 +921,10 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
 
   if (!user) redirect("/login");
   const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
   const billingMode = await resolveBillingModeByAccountOwnerId({
     supabase,
     accountOwnerUserId: authz.internalUser.account_owner_user_id,

@@ -8066,6 +8066,10 @@ export async function completeDataEntryFromForm(formData: FormData) {
     supabase,
     jobId: id,
   });
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
   const billingMode = await resolveBillingModeByAccountOwnerId({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,

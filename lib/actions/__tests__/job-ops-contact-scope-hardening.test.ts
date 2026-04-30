@@ -354,6 +354,9 @@ describe("internal same-account ops/contact mutation hardening", () => {
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
     );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+    );
   });
 
   it("allows same-account internal markInvoiceCompleteFromForm past scope preflight", async () => {
@@ -368,6 +371,9 @@ describe("internal same-account ops/contact mutation hardening", () => {
     );
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
+    );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
     );
   });
 
@@ -493,6 +499,92 @@ describe("internal same-account ops/contact mutation hardening", () => {
     await expect(updateJobOpsFromForm(buildUpdateOpsFormData())).rejects.toThrow(
       "ALLOW_PATH_REACHED",
     );
+  });
+
+  it("allows valid trial internal markInvoiceCompleteFromForm past entitlement preflight", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: "allowed_trial",
+    });
+
+    const { markInvoiceCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markInvoiceCompleteFromForm(buildJobOnlyFormData())).rejects.toThrow(
+      "ALLOW_PATH_REACHED",
+    );
+  });
+
+  it("blocks expired trial internal markInvoiceCompleteFromForm before writes", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_trial_expired",
+    });
+
+    const { markInvoiceCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markInvoiceCompleteFromForm(buildJobOnlyFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
+    );
+
+    expectNoOperationalWrites(writeCalls);
+  });
+
+  it("blocks null-ended trial internal markInvoiceCompleteFromForm before writes", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_trial_missing_end",
+    });
+
+    const { markInvoiceCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markInvoiceCompleteFromForm(buildJobOnlyFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
+    );
+
+    expectNoOperationalWrites(writeCalls);
+  });
+
+  it("allows internal comped markInvoiceCompleteFromForm past entitlement preflight", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: "allowed_internal_comped",
+    });
+
+    const { markInvoiceCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markInvoiceCompleteFromForm(buildJobOnlyFormData())).rejects.toThrow(
+      "ALLOW_PATH_REACHED",
+    );
+  });
+
+  it("blocks missing entitlement internal markInvoiceCompleteFromForm before writes", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_missing_entitlement",
+    });
+
+    const { markInvoiceCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markInvoiceCompleteFromForm(buildJobOnlyFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
+    );
+
+    expectNoOperationalWrites(writeCalls);
   });
 
   it("blocks expired trial internal updateJobOpsFromForm before writes", async () => {
