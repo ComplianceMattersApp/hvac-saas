@@ -15,6 +15,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   resolveAccountEntitlement,
+  resolveOperationalMutationEntitlementAccess,
   type AccountEntitlementContext,
 } from "@/lib/business/platform-entitlement";
 
@@ -90,6 +91,39 @@ function makeSupabase(opts: {
                 data: null,
                 count: internalUserCount,
                 error: internalUserError,
+              })),
+            })),
+          })),
+        };
+      }
+
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+          })),
+        })),
+      };
+    }),
+  };
+}
+
+function makeSupabaseForOperationalAccess(opts: {
+  entitlementRow?: ReturnType<typeof makeEntitlementRow> | null;
+  entitlementError?: { message: string } | null;
+}): any {
+  const entitlementData = opts.entitlementRow ?? null;
+  const entitlementError = opts.entitlementError ?? null;
+
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "platform_account_entitlements") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: entitlementData,
+                error: entitlementError,
               })),
             })),
           })),
@@ -418,5 +452,171 @@ describe("resolveAccountEntitlement", () => {
 
     expect(ctx.isInternalComped).toBe(false);
     expect(ctx.internalCompedSignal).toBe("none");
+  });
+});
+
+describe("resolveOperationalMutationEntitlementAccess", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("allows active subscription entitlement", async () => {
+    const supabase = makeSupabaseForOperationalAccess({
+      entitlementRow: makeEntitlementRow({
+        entitlement_status: "active",
+        stripe_subscription_status: "active",
+      }),
+    });
+
+    const decision = await resolveOperationalMutationEntitlementAccess({
+      accountOwnerUserId: ACCOUNT_OWNER_A,
+      supabase,
+      now: new Date("2026-04-30T00:00:00.000Z"),
+    });
+
+    expect(decision).toEqual({
+      authorized: true,
+      reason: "allowed_active",
+    });
+  });
+
+  it("allows active internal comped entitlement", async () => {
+    const supabase = makeSupabaseForOperationalAccess({
+      entitlementRow: makeEntitlementRow({
+        entitlement_status: "active",
+        seat_limit: null,
+        notes: "internal_comped_v1",
+        stripe_customer_id: null,
+        stripe_subscription_id: null,
+        stripe_subscription_status: null,
+      }),
+    });
+
+    const decision = await resolveOperationalMutationEntitlementAccess({
+      accountOwnerUserId: ACCOUNT_OWNER_A,
+      supabase,
+      now: new Date("2026-04-30T00:00:00.000Z"),
+    });
+
+    expect(decision).toEqual({
+      authorized: true,
+      reason: "allowed_internal_comped",
+    });
+  });
+
+  it("allows trial with future trial_ends_at", async () => {
+    const supabase = makeSupabaseForOperationalAccess({
+      entitlementRow: makeEntitlementRow({
+        entitlement_status: "trial",
+        trial_ends_at: "2026-05-14T00:00:00.000Z",
+      }),
+    });
+
+    const decision = await resolveOperationalMutationEntitlementAccess({
+      accountOwnerUserId: ACCOUNT_OWNER_A,
+      supabase,
+      now: new Date("2026-04-30T00:00:00.000Z"),
+    });
+
+    expect(decision).toEqual({
+      authorized: true,
+      reason: "allowed_trial",
+    });
+  });
+
+  it("blocks trial with past trial_ends_at", async () => {
+    const supabase = makeSupabaseForOperationalAccess({
+      entitlementRow: makeEntitlementRow({
+        entitlement_status: "trial",
+        trial_ends_at: "2026-04-01T00:00:00.000Z",
+      }),
+    });
+
+    const decision = await resolveOperationalMutationEntitlementAccess({
+      accountOwnerUserId: ACCOUNT_OWNER_A,
+      supabase,
+      now: new Date("2026-04-30T00:00:00.000Z"),
+    });
+
+    expect(decision).toEqual({
+      authorized: false,
+      reason: "blocked_trial_expired",
+    });
+  });
+
+  it("blocks trial with missing trial_ends_at", async () => {
+    const supabase = makeSupabaseForOperationalAccess({
+      entitlementRow: makeEntitlementRow({
+        entitlement_status: "trial",
+        trial_ends_at: null,
+      }),
+    });
+
+    const decision = await resolveOperationalMutationEntitlementAccess({
+      accountOwnerUserId: ACCOUNT_OWNER_A,
+      supabase,
+      now: new Date("2026-04-30T00:00:00.000Z"),
+    });
+
+    expect(decision).toEqual({
+      authorized: false,
+      reason: "blocked_trial_missing_end",
+    });
+  });
+
+  it.each([
+    { status: "cancelled", billing: null },
+    { status: "suspended", billing: null },
+    { status: "active", billing: "past_due" },
+    { status: "active", billing: "inactive" },
+  ])(
+    "blocks non-comped status combinations (status=$status, billing=$billing)",
+    async ({ status, billing }) => {
+      const supabase = makeSupabaseForOperationalAccess({
+        entitlementRow: makeEntitlementRow({
+          entitlement_status: status,
+          notes: null,
+          stripe_subscription_status: billing,
+          stripe_customer_id: "cus_123",
+          stripe_subscription_id: "sub_123",
+        }),
+      });
+
+      const decision = await resolveOperationalMutationEntitlementAccess({
+        accountOwnerUserId: ACCOUNT_OWNER_A,
+        supabase,
+        now: new Date("2026-04-30T00:00:00.000Z"),
+      });
+
+      if (status === "active") {
+        expect(decision).toEqual({
+          authorized: false,
+          reason: "blocked_billing_subscription_status",
+        });
+        return;
+      }
+
+      expect(decision).toEqual({
+        authorized: false,
+        reason: "blocked_entitlement_status",
+      });
+    },
+  );
+
+  it("blocks missing entitlement row for mutation authorization", async () => {
+    const supabase = makeSupabaseForOperationalAccess({
+      entitlementRow: null,
+    });
+
+    const decision = await resolveOperationalMutationEntitlementAccess({
+      accountOwnerUserId: ACCOUNT_OWNER_UNKNOWN,
+      supabase,
+      now: new Date("2026-04-30T00:00:00.000Z"),
+    });
+
+    expect(decision).toEqual({
+      authorized: false,
+      reason: "blocked_missing_entitlement",
+    });
   });
 });

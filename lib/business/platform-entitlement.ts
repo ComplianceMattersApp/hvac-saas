@@ -35,6 +35,23 @@ export type AccountEntitlementContext = {
   billingCancelAtPeriodEnd: boolean;
 };
 
+export type OperationalMutationEntitlementReason =
+  | "allowed_active"
+  | "allowed_trial"
+  | "allowed_internal_comped"
+  | "blocked_missing_account_owner"
+  | "blocked_missing_entitlement"
+  | "blocked_entitlement_query_error"
+  | "blocked_trial_missing_end"
+  | "blocked_trial_expired"
+  | "blocked_entitlement_status"
+  | "blocked_billing_subscription_status";
+
+export type OperationalMutationEntitlementDecision = {
+  authorized: boolean;
+  reason: OperationalMutationEntitlementReason;
+};
+
 const ACTIVE_STATUSES: ReadonlySet<EntitlementStatus> = new Set([
   "trial",
   "active",
@@ -62,6 +79,23 @@ function normalizeEntitlementStatus(value: unknown): EntitlementStatus {
   if (v === "cancelled") return "cancelled";
   return "trial";
 }
+
+function normalizeBillingSubscriptionStatus(value: unknown): string | null {
+  const v = String(value ?? "").trim().toLowerCase();
+  return v || null;
+}
+
+const BLOCKED_BILLING_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([
+  "past_due",
+  "inactive",
+  "incomplete",
+  "incomplete_expired",
+  "unpaid",
+  "paused",
+  "suspended",
+  "canceled",
+  "cancelled",
+]);
 
 function hasInternalCompedNotesMarker(value: unknown): boolean {
   const normalized = String(value ?? "").trim().toLowerCase();
@@ -212,6 +246,123 @@ export async function resolveAccountEntitlement(
     billingSubscriptionStatus,
     billingCurrentPeriodEnd,
     billingCancelAtPeriodEnd,
+  };
+}
+
+export async function resolveOperationalMutationEntitlementAccess(params: {
+  accountOwnerUserId: string;
+  supabase: any;
+  now?: Date;
+}): Promise<OperationalMutationEntitlementDecision> {
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+  if (!accountOwnerUserId) {
+    return {
+      authorized: false,
+      reason: "blocked_missing_account_owner",
+    };
+  }
+
+  const nowMs = (params.now ?? new Date()).getTime();
+  const { data, error } = await params.supabase
+    .from("platform_account_entitlements")
+    .select(
+      [
+        "entitlement_status",
+        "seat_limit",
+        "trial_ends_at",
+        "notes",
+        "stripe_customer_id",
+        "stripe_subscription_id",
+        "stripe_subscription_status",
+      ].join(", "),
+    )
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (error) {
+    return {
+      authorized: false,
+      reason: "blocked_entitlement_query_error",
+    };
+  }
+
+  if (!data) {
+    return {
+      authorized: false,
+      reason: "blocked_missing_entitlement",
+    };
+  }
+
+  const entitlementStatus = normalizeEntitlementStatus(data.entitlement_status);
+  const seatLimit =
+    data.seat_limit != null && Number.isInteger(Number(data.seat_limit))
+      ? Number(data.seat_limit)
+      : null;
+  const trialEndsAt = data.trial_ends_at ? new Date(data.trial_ends_at) : null;
+  const billingCustomerLinked = Boolean(String(data.stripe_customer_id ?? "").trim());
+  const billingSubscriptionLinked = Boolean(
+    String(data.stripe_subscription_id ?? "").trim(),
+  );
+  const internalCompedState = resolveInternalCompedState({
+    entitlementStatus,
+    seatLimit,
+    billingCustomerLinked,
+    billingSubscriptionLinked,
+    notes: data.notes,
+  });
+
+  if (internalCompedState.isInternalComped) {
+    return {
+      authorized: true,
+      reason: "allowed_internal_comped",
+    };
+  }
+
+  if (entitlementStatus === "active") {
+    const billingSubscriptionStatus = normalizeBillingSubscriptionStatus(
+      data.stripe_subscription_status,
+    );
+
+    if (
+      billingSubscriptionStatus &&
+      BLOCKED_BILLING_SUBSCRIPTION_STATUSES.has(billingSubscriptionStatus)
+    ) {
+      return {
+        authorized: false,
+        reason: "blocked_billing_subscription_status",
+      };
+    }
+
+    return {
+      authorized: true,
+      reason: "allowed_active",
+    };
+  }
+
+  if (entitlementStatus === "trial") {
+    if (!trialEndsAt || !Number.isFinite(trialEndsAt.getTime())) {
+      return {
+        authorized: false,
+        reason: "blocked_trial_missing_end",
+      };
+    }
+
+    if (trialEndsAt.getTime() <= nowMs) {
+      return {
+        authorized: false,
+        reason: "blocked_trial_expired",
+      };
+    }
+
+    return {
+      authorized: true,
+      reason: "allowed_trial",
+    };
+  }
+
+  return {
+    authorized: false,
+    reason: "blocked_entitlement_status",
   };
 }
 
