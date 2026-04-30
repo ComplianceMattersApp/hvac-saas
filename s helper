@@ -1,0 +1,398 @@
+[1mdiff --git a/lib/business/__tests__/platform-entitlement.test.ts b/lib/business/__tests__/platform-entitlement.test.ts[m
+[1mindex 633da0d..ae5e14f 100644[m
+[1m--- a/lib/business/__tests__/platform-entitlement.test.ts[m
+[1m+++ b/lib/business/__tests__/platform-entitlement.test.ts[m
+[36m@@ -15,6 +15,7 @@[m
+ import { beforeEach, describe, expect, it, vi } from "vitest";[m
+ import {[m
+   resolveAccountEntitlement,[m
+[32m+[m[32m  resolveOperationalMutationEntitlementAccess,[m
+   type AccountEntitlementContext,[m
+ } from "@/lib/business/platform-entitlement";[m
+ [m
+[36m@@ -107,6 +108,39 @@[m [mfunction makeSupabase(opts: {[m
+   };[m
+ }[m
+ [m
+[32m+[m[32mfunction makeSupabaseForOperationalAccess(opts: {[m
+[32m+[m[32m  entitlementRow?: ReturnType<typeof makeEntitlementRow> | null;[m
+[32m+[m[32m  entitlementError?: { message: string } | null;[m
+[32m+[m[32m}): any {[m
+[32m+[m[32m  const entitlementData = opts.entitlementRow ?? null;[m
+[32m+[m[32m  const entitlementError = opts.entitlementError ?? null;[m
+[32m+[m
+[32m+[m[32m  return {[m
+[32m+[m[32m    from: vi.fn((table: string) => {[m
+[32m+[m[32m      if (table === "platform_account_entitlements") {[m
+[32m+[m[32m        return {[m
+[32m+[m[32m          select: vi.fn(() => ({[m
+[32m+[m[32m            eq: vi.fn(() => ({[m
+[32m+[m[32m              maybeSingle: vi.fn(async () => ({[m
+[32m+[m[32m                data: entitlementData,[m
+[32m+[m[32m                error: entitlementError,[m
+[32m+[m[32m              })),[m
+[32m+[m[32m            })),[m
+[32m+[m[32m          })),[m
+[32m+[m[32m        };[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      return {[m
+[32m+[m[32m        select: vi.fn(() => ({[m
+[32m+[m[32m          eq: vi.fn(() => ({[m
+[32m+[m[32m            maybeSingle: vi.fn(async () => ({ data: null, error: null })),[m
+[32m+[m[32m          })),[m
+[32m+[m[32m        })),[m
+[32m+[m[32m      };[m
+[32m+[m[32m    }),[m
+[32m+[m[32m  };[m
+[32m+[m[32m}[m
+[32m+[m
+ // ---------------------------------------------------------------------------[m
+ // Tests[m
+ // ---------------------------------------------------------------------------[m
+[36m@@ -420,3 +454,169 @@[m [mdescribe("resolveAccountEntitlement", () => {[m
+     expect(ctx.internalCompedSignal).toBe("none");[m
+   });[m
+ });[m
+[32m+[m
+[32m+[m[32mdescribe("resolveOperationalMutationEntitlementAccess", () => {[m
+[32m+[m[32m  beforeEach(() => {[m
+[32m+[m[32m    vi.clearAllMocks();[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  it("allows active subscription entitlement", async () => {[m
+[32m+[m[32m    const supabase = makeSupabaseForOperationalAccess({[m
+[32m+[m[32m      entitlementRow: makeEntitlementRow({[m
+[32m+[m[32m        entitlement_status: "active",[m
+[32m+[m[32m        stripe_subscription_status: "active",[m
+[32m+[m[32m      }),[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    const decision = await resolveOperationalMutationEntitlementAccess({[m
+[32m+[m[32m      accountOwnerUserId: ACCOUNT_OWNER_A,[m
+[32m+[m[32m      supabase,[m
+[32m+[m[32m      now: new Date("2026-04-30T00:00:00.000Z"),[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    expect(decision).toEqual({[m
+[32m+[m[32m      authorized: true,[m
+[32m+[m[32m      reason: "allowed_active",[m
+[32m+[m[32m    });[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  it("allows active internal comped entitlement", async () => {[m
+[32m+[m[32m    const supabase = makeSupabaseForOperationalAccess({[m
+[32m+[m[32m      entitlementRow: makeEntitlementRow({[m
+[32m+[m[32m        entitlement_status: "active",[m
+[32m+[m[32m        seat_limit: null,[m
+[32m+[m[32m        notes: "internal_comped_v1",[m
+[32m+[m[32m        stripe_customer_id: null,[m
+[32m+[m[32m        stripe_subscription_id: null,[m
+[32m+[m[32m        stripe_subscription_status: null,[m
+[32m+[m[32m      }),[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    const decision = await resolveOperationalMutationEntitlementAccess({[m
+[32m+[m[32m      accountOwnerUserId: ACCOUNT_OWNER_A,[m
+[32m+[m[32m      supabase,[m
+[32m+[m[32m      now: new Date("2026-04-30T00:00:00.000Z"),[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    expect(decision).toEqual({[m
+[32m+[m[32m      authorized: true,[m
+[32m+[m[32m      reason: "allowed_internal_comped",[m
+[32m+[m[32m    });[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  it("allows trial with future trial_ends_at", async () => {[m
+[32m+[m[32m    const supabase = makeSupabaseForOperationalAccess({[m
+[32m+[m[32m      entitlementRow: makeEntitlementRow({[m
+[32m+[m[32m        entitlement_status: "trial",[m
+[32m+[m[32m        trial_ends_at: "2026-05-14T00:00:00.000Z",[m
+[32m+[m[32m      }),[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    const decision = await resolveOperationalMutationEntitlementAccess({[m
+[32m+[m[32m      accountOwnerUserId: ACCOUNT_OWNER_A,[m
+[32m+[m[32m      supabase,[m
+[32m+[m[32m      now: new Date("2026-04-30T00:00:00.000Z"),[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    expect(decision).toEqual({[m
+[32m+[m[32m      authorized: true,[m
+[32m+[m[32m      reason: "allowed_trial",[m
+[32m+[m[32m    });[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  it("blocks trial with past trial_ends_at", async () => {[m
+[32m+[m[32m    const supabase = makeSupabaseForOperationalAccess({[m
+[32m+[m[32m      entitlementRow: makeEntitlementRow({[m
+[32m+[m[32m        entitlement_status: "trial",[m
+[32m+[m[32m        trial_ends_at: "2026-04-01T00:00:00.000Z",[m
+[32m+[m[32m      }),[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    const decision = await resolveOperationalMutationEntitlementAccess({[m
+[32m+[m[32m      accountOwnerUserId: ACCOUNT_OWNER_A,[m
+[32m+[m[32m      supabase,[m
+[32m+[m[32m      now: new Date("2026-04-30T00:00:00.000Z"),[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    expect(decision).toEqual({[m
+[32m+[m[32m      authorized: false,[m
+[32m+[m[32m      reason: "blocked_trial_expired",[m
+[32m+[m[32m    });[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  it("blocks trial with missing trial_ends_at", async () => {[m
+[32m+[m[32m    const supabase = makeSupabaseForOperationalAccess({[m
+[32m+[m[32m      entitlementRow: makeEntitlementRow({[m
+[32m+[m[32m        entitlement_status: "trial",[m
+[32m+[m[32m        trial_ends_at: null,[m
+[32m+[m[32m      }),[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    const decision = await resolveOperationalMutationEntitlementAccess({[m
+[32m+[m[32m      accountOwnerUserId: ACCOUNT_OWNER_A,[m
+[32m+[m[32m      supabase,[m
+[32m+[m[32m      now: new Date("2026-04-30T00:00:00.000Z"),[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    expect(decision).toEqual({[m
+[32m+[m[32m      authorized: false,[m
+[32m+[m[32m      reason: "blocked_trial_missing_end",[m
+[32m+[m[32m    });[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  it.each([[m
+[32m+[m[32m    { status: "cancelled", billing: null },[m
+[32m+[m[32m    { status: "suspended", billing: null },[m
+[32m+[m[32m    { status: "active", billing: "past_due" },[m
+[32m+[m[32m    { status: "active", billing: "inactive" },[m
+[32m+[m[32m  ])([m
+[32m+[m[32m    "blocks non-comped status combinations (status=$status, billing=$billing)",[m
+[32m+[m[32m    async ({ status, billing }) => {[m
+[32m+[m[32m      const supabase = makeSupabaseForOperationalAccess({[m
+[32m+[m[32m        entitlementRow: makeEntitlementRow({[m
+[32m+[m[32m          entitlement_status: status,[m
+[32m+[m[32m          notes: null,[m
+[32m+[m[32m          stripe_subscription_status: billing,[m
+[32m+[m[32m          stripe_customer_id: "cus_123",[m
+[32m+[m[32m          stripe_subscription_id: "sub_123",[m
+[32m+[m[32m        }),[m
+[32m+[m[32m      });[m
+[32m+[m
+[32m+[m[32m      const decision = await resolveOperationalMutationEntitlementAccess({[m
+[32m+[m[32m        accountOwnerUserId: ACCOUNT_OWNER_A,[m
+[32m+[m[32m        supabase,[m
+[32m+[m[32m        now: new Date("2026-04-30T00:00:00.000Z"),[m
+[32m+[m[32m      });[m
+[32m+[m
+[32m+[m[32m      if (status === "active") {[m
+[32m+[m[32m        expect(decision).toEqual({[m
+[32m+[m[32m          authorized: false,[m
+[32m+[m[32m          reason: "blocked_billing_subscription_status",[m
+[32m+[m[32m        });[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      expect(decision).toEqual({[m
+[32m+[m[32m        authorized: false,[m
+[32m+[m[32m        reason: "blocked_entitlement_status",[m
+[32m+[m[32m      });[m
+[32m+[m[32m    },[m
+[32m+[m[32m  );[m
+[32m+[m
+[32m+[m[32m  it("blocks missing entitlement row for mutation authorization", async () => {[m
+[32m+[m[32m    const supabase = makeSupabaseForOperationalAccess({[m
+[32m+[m[32m      entitlementRow: null,[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    const decision = await resolveOperationalMutationEntitlementAccess({[m
+[32m+[m[32m      accountOwnerUserId: ACCOUNT_OWNER_UNKNOWN,[m
+[32m+[m[32m      supabase,[m
+[32m+[m[32m      now: new Date("2026-04-30T00:00:00.000Z"),[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    expect(decision).toEqual({[m
+[32m+[m[32m      authorized: false,[m
+[32m+[m[32m      reason: "blocked_missing_entitlement",[m
+[32m+[m[32m    });[m
+[32m+[m[32m  });[m
+[32m+[m[32m});[m
+[1mdiff --git a/lib/business/platform-entitlement.ts b/lib/business/platform-entitlement.ts[m
+[1mindex 4c1c593..34ae637 100644[m
+[1m--- a/lib/business/platform-entitlement.ts[m
+[1m+++ b/lib/business/platform-entitlement.ts[m
+[36m@@ -35,6 +35,23 @@[m [mexport type AccountEntitlementContext = {[m
+   billingCancelAtPeriodEnd: boolean;[m
+ };[m
+ [m
+[32m+[m[32mexport type OperationalMutationEntitlementReason =[m
+[32m+[m[32m  | "allowed_active"[m
+[32m+[m[32m  | "allowed_trial"[m
+[32m+[m[32m  | "allowed_internal_comped"[m
+[32m+[m[32m  | "blocked_missing_account_owner"[m
+[32m+[m[32m  | "blocked_missing_entitlement"[m
+[32m+[m[32m  | "blocked_entitlement_query_error"[m
+[32m+[m[32m  | "blocked_trial_missing_end"[m
+[32m+[m[32m  | "blocked_trial_expired"[m
+[32m+[m[32m  | "blocked_entitlement_status"[m
+[32m+[m[32m  | "blocked_billing_subscription_status";[m
+[32m+[m
+[32m+[m[32mexport type OperationalMutationEntitlementDecision = {[m
+[32m+[m[32m  authorized: boolean;[m
+[32m+[m[32m  reason: OperationalMutationEntitlementReason;[m
+[32m+[m[32m};[m
+[32m+[m
+ const ACTIVE_STATUSES: ReadonlySet<EntitlementStatus> = new Set([[m
+   "trial",[m
+   "active",[m
+[36m@@ -63,6 +80,23 @@[m [mfunction normalizeEntitlementStatus(value: unknown): EntitlementStatus {[m
+   return "trial";[m
+ }[m
+ [m
+[32m+[m[32mfunction normalizeBillingSubscriptionStatus(value: unknown): string | null {[m
+[32m+[m[32m  const v = String(value ?? "").trim().toLowerCase();[m
+[32m+[m[32m  return v || null;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mconst BLOCKED_BILLING_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([[m
+[32m+[m[32m  "past_due",[m
+[32m+[m[32m  "inactive",[m
+[32m+[m[32m  "incomplete",[m
+[32m+[m[32m  "incomplete_expired",[m
+[32m+[m[32m  "unpaid",[m
+[32m+[m[32m  "paused",[m
+[32m+[m[32m  "suspended",[m
+[32m+[m[32m  "canceled",[m
+[32m+[m[32m  "cancelled",[m
+[32m+[m[32m]);[m
+[32m+[m
+ function hasInternalCompedNotesMarker(value: unknown): boolean {[m
+   const normalized = String(value ?? "").trim().toLowerCase();[m
+   if (!normalized) return false;[m
+[36m@@ -215,6 +249,123 @@[m [mexport async function resolveAccountEntitlement([m
+   };[m
+ }[m
+ [m
+[32m+[m[32mexport async function resolveOperationalMutationEntitlementAccess(params: {[m
+[32m+[m[32m  accountOwnerUserId: string;[m
+[32m+[m[32m  supabase: any;[m
+[32m+[m[32m  now?: Date;[m
+[32m+[m[32m}): Promise<OperationalMutationEntitlementDecision> {[m
+[32m+[m[32m  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();[m
+[32m+[m[32m  if (!accountOwnerUserId) {[m
+[32m+[m[32m    return {[m
+[32m+[m[32m      authorized: false,[m
+[32m+[m[32m      reason: "blocked_missing_account_owner",[m
+[32m+[m[32m    };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const nowMs = (params.now ?? new Date()).getTime();[m
+[32m+[m[32m  const { data, error } = await params.supabase[m
+[32m+[m[32m    .from("platform_account_entitlements")[m
+[32m+[m[32m    .select([m
+[32m+[m[32m      [[m
+[32m+[m[32m        "entitlement_status",[m
+[32m+[m[32m        "seat_limit",[m
+[32m+[m[32m        "trial_ends_at",[m
+[32m+[m[32m        "notes",[m
+[32m+[m[32m        "stripe_customer_id",[m
+[32m+[m[32m        "stripe_subscription_id",[m
+[32m+[m[32m        "stripe_subscription_status",[m
+[32m+[m[32m      ].join(", "),[m
+[32m+[m[32m    )[m
+[32m+[m[32m    .eq("account_owner_user_id", accountOwnerUserId)[m
+[32m+[m[32m    .maybeSingle();[m
+[32m+[m
+[32m+[m[32m  if (error) {[m
+[32m+[m[32m    return {[m
+[32m+[m[32m      authorized: false,[m
+[32m+[m[32m      reason: "blocked_entitlement_query_error",[m
+[32m+[m[32m    };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  if (!data) {[m
+[32m+[m[32m    return {[m
+[32m+[m[32m      authorized: false,[m
+[32m+[m[32m      reason: "blocked_missing_entitlement",[m
+[32m+[m[32m    };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const entitlementStatus = normalizeEntitlementStatus(data.entitlement_status);[m
+[32m+[m[32m  const seatLimit =[m
+[32m+[m[32m    data.seat_limit != null && Number.isInteger(Number(data.seat_limit))[m
+[32m+[m[32m      ? Number(data.seat_limit)[m
+[32m+[m[32m      : null;[m
+[32m+[m[32m  const trialEndsAt = data.trial_ends_at ? new Date(data.trial_ends_at) : null;[m
+[32m+[m[32m  const billingCustomerLinked = Boolean(String(data.stripe_customer_id ?? "").trim());[m
+[32m+[m[32m  const billingSubscriptionLinked = Boolean([m
+[32m+[m[32m    String(data.stripe_subscription_id ?? "").trim(),[m
+[32m+[m[32m  );[m
+[32m+[m[32m  const internalCompedState = resolveInternalCompedState({[m
+[32m+[m[32m    entitlementStatus,[m
+[32m+[m[32m    seatLimit,[m
+[32m+[m[32m    billingCustomerLinked,[m
+[32m+[m[32m    billingSubscriptionLinked,[m
+[32m+[m[32m    notes: data.notes,[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  if (internalCompedState.isInternalComped) {[m
+[32m+[m[32m    return {[m
+[32m+[m[32m      authorized: true,[m
+[32m+[m[32m      reason: "allowed_internal_comped",[m
+[32m+[m[32m    };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  if (entitlementStatus === "active") {[m
+[32m+[m[32m    const billingSubscriptionStatus = normalizeBillingSubscriptionStatus([m
+[32m+[m[32m      data.stripe_subscription_status,[m
+[32m+[m[32m    );[m
+[32m+[m
+[32m+[m[32m    if ([m
+[32m+[m[32m      billingSubscriptionStatus &&[m
+[32m+[m[32m      BLOCKED_BILLING_SUBSCRIPTION_STATUSES.has(billingSubscriptionStatus)[m
+[32m+[m[32m    ) {[m
+[32m+[m[32m      return {[m
+[32m+[m[32m        authorized: false,[m
+[32m+[m[32m        reason: "blocked_billing_subscription_status",[m
+[32m+[m[32m      };[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    return {[m
+[32m+[m[32m      authorized: true,[m
+[32m+[m[32m      reason: "allowed_active",[m
+[32m+[m[32m    };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  if (entitlementStatus === "trial") {[m
+[32m+[m[32m    if (!trialEndsAt || !Number.isFinite(trialEndsAt.getTime())) {[m
+[32m+[m[32m      return {[m
+[32m+[m[32m        authorized: false,[m
+[32m+[m[32m        reason: "blocked_trial_missing_end",[m
+[32m+[m[32m      };[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (trialEndsAt.getTime() <= nowMs) {[m
+[32m+[m[32m      return {[m
+[32m+[m[32m        authorized: false,[m
+[32m+[m[32m        reason: "blocked_trial_expired",[m
+[32m+[m[32m      };[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    return {[m
+[32m+[m[32m      authorized: true,[m
+[32m+[m[32m      reason: "allowed_trial",[m
+[32m+[m[32m    };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return {[m
+[32m+[m[32m    authorized: false,[m
+[32m+[m[32m    reason: "blocked_entitlement_status",[m
+[32m+[m[32m  };[m
+[32m+[m[32m}[m
+[32m+[m
+ function buildSafeDefault(activeSeatCount: number): AccountEntitlementContext {[m
+   return {[m
+     planKey: "starter",[m
