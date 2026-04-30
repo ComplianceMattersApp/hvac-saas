@@ -38,6 +38,7 @@ import {
   resolveBillingModeByAccountOwnerId,
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { renderSystemEmailLayout, escapeHtml, resolveAppUrl } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { resolveNotificationAccountOwnerUserId } from "@/lib/notifications/account-owner";
@@ -5564,6 +5565,32 @@ async function requireOwnerScopedInternalIntakeCreateContext(params: {
   return internalUser;
 }
 
+async function requireOperationalIntakeCreateEntitlementAccess(params: {
+  supabase: any;
+  isContractorUser: boolean;
+  canonicalOwnerUserId: string;
+}) {
+  if (params.isContractorUser) {
+    return;
+  }
+
+  const accountOwnerUserId = String(params.canonicalOwnerUserId ?? "").trim();
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId,
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: "entitlement_blocked",
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
+}
+
 /**
  * CREATE: used by /jobs/new form
  */
@@ -5711,6 +5738,12 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
   await requireOwnerScopedInternalIntakeCreateContext({
     supabase,
     actorUserId: userId,
+    isContractorUser,
+    canonicalOwnerUserId: String(canonicalOwnerUserId ?? ""),
+  });
+
+  await requireOperationalIntakeCreateEntitlementAccess({
+    supabase,
     isContractorUser,
     canonicalOwnerUserId: String(canonicalOwnerUserId ?? ""),
   });
