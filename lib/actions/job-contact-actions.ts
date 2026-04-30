@@ -8,6 +8,7 @@ import {
   requireInternalUser,
 } from "@/lib/auth/internal-user";
 import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 type AttemptMethod = "call" | "text";
 
 function addDays(dateYYYYMMDD: string, days: number) {
@@ -37,6 +38,26 @@ function nextFollowUpDate(attemptCountAfterInsert: number) {
   const base = todayYYYYMMDD();
   const daysToAdd = attemptCountAfterInsert <= 3 ? 1 : 3;
   return addDays(base, daysToAdd);
+}
+
+async function requireOperationalContactMutationEntitlementAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? "").trim(),
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: "entitlement_blocked",
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
 }
 
 export async function logCustomerContactAttemptFromForm(formData: FormData): Promise<void> {
@@ -77,6 +98,11 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
   if (!scopedJob?.id) {
     redirect(`/jobs/${jobId}?notice=not_authorized`);
   }
+
+  await requireOperationalContactMutationEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
+  });
 
   // 1) Get existing attempt count + first attempt date
   const { data: attemptEvents, error: attemptsErr } = await supabase

@@ -3987,6 +3987,26 @@ async function requireInternalScopedJobAccessOrRedirect(params: {
   return { userId, internalUser, scopedJob };
 }
 
+async function requireOperationalScopedJobMutationAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? "").trim(),
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: "entitlement_blocked",
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
+}
+
 async function requireInternalAdminScopedJobAccessOrRedirect(params: {
   supabase: any;
   jobId: string;
@@ -7006,9 +7026,13 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   console.log("[ADVANCE_STATUS_ENTRY]", { jobId: id, ts: new Date().toISOString() });
 
   const supabase = await createClient();
-  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
+  });
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   // ✅ Read true current status from DB (source of truth)
@@ -7536,10 +7560,14 @@ export async function revertOnTheWayFromForm(formData: FormData) {
     redirect(`/jobs/${id}?${params.toString()}`);
   };
 
-  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
     onUnauthorized: () => redirect(`/jobs/${id}?notice=not_authorized`),
+  });
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   const eligibility = await getOnTheWayUndoEligibilityInternal({
@@ -7632,10 +7660,14 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     redirectToScheduleTarget(banner);
   }
 
-  await requireInternalScopedJobAccessOrRedirect({
+  const { internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
     onUnauthorized: () => redirectToScheduleTarget("not_authorized"),
+  });
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   // Read prior scheduling snapshot so we can log changes
@@ -7853,9 +7885,13 @@ export async function markJobFailedFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required");
 
   const supabase = await createClient();
-  await requireInternalScopedJobAccessOrRedirect({
+  const { internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
+  });
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   await updateJob({ id, status: "failed" });

@@ -24,6 +24,7 @@ import {
   resolveBillingModeByAccountOwnerId,
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { resolveAppUrl, renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
@@ -105,6 +106,26 @@ async function requireInternalOpsAccessOrRedirect(
 
     throw error;
   }
+}
+
+async function requireOperationalJobOpsEntitlementAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? "").trim(),
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: "entitlement_blocked",
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
 }
 
 function buildOpsChanges(before: OpsSnapshot, after: OpsSnapshot) {
@@ -1023,7 +1044,11 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from('jobs')
@@ -1335,7 +1360,11 @@ export async function releasePendingInfoAndRecomputeFromForm(formData: FormData)
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
 
   await releasePendingInfoAndRecompute(jobId, "manual_release_pending_info");
 
@@ -1356,7 +1385,11 @@ export async function releaseAndReevaluateFromForm(formData: FormData): Promise<
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
 
   await releaseAndReevaluate(jobId, "manual_release_and_reevaluate");
 
@@ -1383,7 +1416,11 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
 
   if (typeof opsStatusRaw !== "string" || !opsStatusRaw.trim()) {
     throw new Error("Missing ops_status");
@@ -1496,11 +1533,16 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  const { userId: actingUserId } = await requireInternalOpsAccessOrRedirect(
+  const authz = await requireInternalOpsAccessOrRedirect(
     supabase,
     user.id,
     jobId,
   );
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
+  const actingUserId = authz.userId;
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")

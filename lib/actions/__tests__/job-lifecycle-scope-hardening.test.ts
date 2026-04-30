@@ -6,6 +6,7 @@ const loadScopedInternalJobForMutationMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const refreshMock = vi.fn();
 const sendEmailMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -49,6 +50,11 @@ vi.mock("@/lib/actions/ops-status", () => ({
 
 vi.mock("@/lib/actions/job-ops-actions", () => ({
   releasePendingInfoAndRecompute: vi.fn(async () => null),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock("@/lib/actions/job-event-meta", () => ({
@@ -161,6 +167,10 @@ describe("internal same-account lifecycle scheduling hardening", () => {
     });
 
     sendEmailMock.mockResolvedValue(undefined);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
   });
 
   it("denies cross-account internal advanceJobStatusFromForm before writes", async () => {
@@ -217,6 +227,9 @@ describe("internal same-account lifecycle scheduling hardening", () => {
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
     );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+    );
   });
 
   it("allows same-account internal revertOnTheWayFromForm past scope preflight", async () => {
@@ -229,6 +242,9 @@ describe("internal same-account lifecycle scheduling hardening", () => {
     await expect(revertOnTheWayFromForm(buildRevertFormData())).rejects.toThrow("ALLOW_PATH_REACHED");
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
+    );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
     );
   });
 
@@ -243,5 +259,109 @@ describe("internal same-account lifecycle scheduling hardening", () => {
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
     );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+    );
+  });
+
+  it("allows same-account internal markJobFailedFromForm past scope preflight", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { markJobFailedFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(markJobFailedFromForm(buildJobOnlyFormData())).rejects.toThrow("ALLOW_PATH_REACHED");
+    expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
+    );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+    );
+  });
+
+  it("allows valid trial internal updateJobScheduleFromForm past entitlement preflight", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: "allowed_trial",
+    });
+
+    const { updateJobScheduleFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(updateJobScheduleFromForm(buildScheduleFormData())).rejects.toThrow("ALLOW_PATH_REACHED");
+  });
+
+  it("blocks expired trial internal updateJobScheduleFromForm before writes or emails", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_trial_expired",
+    });
+
+    const { updateJobScheduleFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(updateJobScheduleFromForm(buildScheduleFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
+    );
+
+    expect(writeCalls.filter((call) => ["jobs", "job_events"].includes(call.table))).toHaveLength(0);
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks null-ended trial internal updateJobScheduleFromForm before writes or emails", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_trial_missing_end",
+    });
+
+    const { updateJobScheduleFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(updateJobScheduleFromForm(buildScheduleFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
+    );
+
+    expect(writeCalls.filter((call) => ["jobs", "job_events"].includes(call.table))).toHaveLength(0);
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("allows internal comped updateJobScheduleFromForm past entitlement preflight", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: "allowed_internal_comped",
+    });
+
+    const { updateJobScheduleFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(updateJobScheduleFromForm(buildScheduleFormData())).rejects.toThrow("ALLOW_PATH_REACHED");
+  });
+
+  it("blocks missing entitlement internal updateJobScheduleFromForm before writes or emails", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_missing_entitlement",
+    });
+
+    const { updateJobScheduleFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(updateJobScheduleFromForm(buildScheduleFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
+    );
+
+    expect(writeCalls.filter((call) => ["jobs", "job_events"].includes(call.table))).toHaveLength(0);
+    expect(sendEmailMock).not.toHaveBeenCalled();
   });
 });

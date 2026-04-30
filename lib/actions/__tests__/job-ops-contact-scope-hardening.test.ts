@@ -4,6 +4,7 @@ const createClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 const loadScopedInternalJobForMutationMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -29,6 +30,11 @@ vi.mock("@/lib/auth/internal-user", () => ({
 vi.mock("@/lib/auth/internal-job-scope", () => ({
   loadScopedInternalJobForMutation: (...args: unknown[]) =>
     loadScopedInternalJobForMutationMock(...args),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock("@/lib/actions/ecc-status", () => ({
@@ -181,7 +187,18 @@ describe("internal same-account ops/contact mutation hardening", () => {
         account_owner_user_id: "owner-1",
       },
     });
+
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
   });
+
+  function expectNoOperationalWrites(writeCalls: Array<{ table: string; method: "update" | "insert" }>) {
+    expect(
+      writeCalls.filter((call) => ["jobs", "job_events", "notifications"].includes(call.table)),
+    ).toHaveLength(0);
+  }
 
   it("denies cross-account internal resolveFailureByCorrectionReviewFromForm before writes", async () => {
     const { supabase, writeCalls } = makeDenySupabaseFixture();
@@ -367,6 +384,9 @@ describe("internal same-account ops/contact mutation hardening", () => {
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
     );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+    );
   });
 
   it("allows same-account internal updateJobOpsFromForm past scope preflight", async () => {
@@ -381,6 +401,9 @@ describe("internal same-account ops/contact mutation hardening", () => {
     );
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
+    );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
     );
   });
 
@@ -397,6 +420,9 @@ describe("internal same-account ops/contact mutation hardening", () => {
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
     );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+    );
   });
 
   it("allows same-account internal logCustomerContactAttemptFromForm past scope preflight", async () => {
@@ -411,6 +437,9 @@ describe("internal same-account ops/contact mutation hardening", () => {
     );
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
+    );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
     );
   });
 
@@ -427,6 +456,9 @@ describe("internal same-account ops/contact mutation hardening", () => {
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
     );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+    );
   });
 
   it("allows same-account internal releaseAndReevaluateFromForm past scope preflight", async () => {
@@ -442,5 +474,94 @@ describe("internal same-account ops/contact mutation hardening", () => {
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1" }),
     );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+    );
+  });
+
+  it("allows valid trial internal updateJobOpsFromForm past entitlement preflight", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: "allowed_trial",
+    });
+
+    const { updateJobOpsFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(updateJobOpsFromForm(buildUpdateOpsFormData())).rejects.toThrow(
+      "ALLOW_PATH_REACHED",
+    );
+  });
+
+  it("blocks expired trial internal updateJobOpsFromForm before writes", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_trial_expired",
+    });
+
+    const { updateJobOpsFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(updateJobOpsFromForm(buildUpdateOpsFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
+    );
+
+    expectNoOperationalWrites(writeCalls);
+  });
+
+  it("blocks null-ended trial internal updateJobOpsFromForm before writes", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_trial_missing_end",
+    });
+
+    const { updateJobOpsFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(updateJobOpsFromForm(buildUpdateOpsFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
+    );
+
+    expectNoOperationalWrites(writeCalls);
+  });
+
+  it("allows internal comped updateJobOpsFromForm past entitlement preflight", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: "allowed_internal_comped",
+    });
+
+    const { updateJobOpsFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(updateJobOpsFromForm(buildUpdateOpsFormData())).rejects.toThrow(
+      "ALLOW_PATH_REACHED",
+    );
+  });
+
+  it("blocks missing entitlement internal updateJobOpsFromForm before writes", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_missing_entitlement",
+    });
+
+    const { updateJobOpsFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(updateJobOpsFromForm(buildUpdateOpsFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
+    );
+
+    expectNoOperationalWrites(writeCalls);
   });
 });
