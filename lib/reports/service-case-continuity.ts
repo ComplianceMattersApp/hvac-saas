@@ -117,6 +117,8 @@ type LinkedJobRow = {
   scheduled_date: string | null;
 };
 
+export type ServiceCaseLinkedJobStatus = Pick<LinkedJobRow, "status" | "ops_status">;
+
 const SERVICE_CASE_BASE_SELECT =
   "id, customer_id, location_id, problem_summary, case_kind, status, created_at, resolved_at, resolved_by_job_id";
 const LINKED_JOB_SELECT =
@@ -190,10 +192,25 @@ function csvEscape(value: string) {
   return value;
 }
 
-function isActiveLinkedJob(job: { status?: string | null; ops_status?: string | null }) {
+export function isActiveLinkedJob(job: { status?: string | null; ops_status?: string | null }) {
   const lifecycleStatus = String(job.status ?? "").trim().toLowerCase();
   if (lifecycleStatus === "cancelled") return false;
   return String(job.ops_status ?? "").trim().toLowerCase() !== "closed";
+}
+
+export function countActiveLinkedJobs(jobs: ServiceCaseLinkedJobStatus[]) {
+  return jobs.filter((job) => isActiveLinkedJob(job)).length;
+}
+
+export function isServiceCaseEffectivelyOpen(input: {
+  storedStatus?: string | null;
+  linkedJobs: ServiceCaseLinkedJobStatus[];
+}) {
+  if (input.linkedJobs.length === 0) {
+    return String(input.storedStatus ?? "").trim().toLowerCase() !== "resolved";
+  }
+
+  return countActiveLinkedJobs(input.linkedJobs) > 0;
 }
 
 function getLatestVisitDateDisplay(job: LinkedJobRow | null | undefined) {
@@ -263,7 +280,7 @@ function intersectIdSets(left: string[] | null, right: string[] | null) {
 }
 
 function applyCaseFilters(query: any, filters: ServiceCaseContinuityFilters, eligibleCaseIds: string[] | null) {
-  if (filters.caseStatus) query = query.eq("status", filters.caseStatus);
+  if (filters.caseStatus && filters.caseStatus !== "open") query = query.eq("status", filters.caseStatus);
   if (filters.caseKind) query = query.eq("case_kind", filters.caseKind);
 
   if (eligibleCaseIds) {
@@ -462,7 +479,7 @@ export async function listServiceCaseContinuityRows(params: {
     }
   }
 
-  const unsortedRows: ServiceCaseContinuityRow[] = serviceCases.map((serviceCase) => {
+  const unsortedRows: Array<ServiceCaseContinuityRow & { isEffectivelyOpen: boolean }> = serviceCases.map((serviceCase) => {
     const serviceCaseId = String(serviceCase.id ?? "");
     const linked = [...(linkedJobsByCaseId.get(serviceCaseId) ?? [])].sort((left, right) => {
       const leftMs = left.created_at ? new Date(left.created_at).getTime() : 0;
@@ -473,7 +490,11 @@ export async function listServiceCaseContinuityRows(params: {
     const latestJob = linked[0] ?? null;
     const customer = customersById.get(String(serviceCase.customer_id ?? ""));
     const location = locationsById.get(String(serviceCase.location_id ?? ""));
-    const activeLinkedVisitCount = linked.filter((job) => isActiveLinkedJob(job)).length;
+    const activeLinkedVisitCount = countActiveLinkedJobs(linked);
+    const isEffectivelyOpen = isServiceCaseEffectivelyOpen({
+      storedStatus: serviceCase.status,
+      linkedJobs: linked,
+    });
     const latestAssigneeDisplay = latestJob ? assignmentMap[String(latestJob.id ?? "")]?.[0]?.display_name ?? "-" : "-";
     const latestContractorDisplay = latestJob
       ? String(latestJob.contractors?.name ?? "").trim() || params.internalBusinessDisplayName
@@ -511,10 +532,13 @@ export async function listServiceCaseContinuityRows(params: {
       latestVisitOpsStatusLabel: formatOpsStatusLabel(latestJob?.ops_status),
       latestAssignedTechDisplay: latestAssigneeDisplay,
       activeLinkedVisitCount,
+      isEffectivelyOpen,
     };
   });
 
-  const rows = unsortedRows;
+  const rows = (params.filters.caseStatus === "open"
+    ? unsortedRows.filter((row) => row.isEffectivelyOpen)
+    : unsortedRows) as ServiceCaseContinuityRow[];
 
   if (params.filters.sort === "created_asc") {
     rows.sort((left, right) => left.createdDateDisplay.localeCompare(right.createdDateDisplay));
@@ -524,8 +548,8 @@ export async function listServiceCaseContinuityRows(params: {
 
   return {
     rows,
-    totalCount: params.includeCount === false ? rows.length : Number(count ?? rows.length),
-    truncated: Number(count ?? rows.length) > rows.length,
+    totalCount: rows.length,
+    truncated: params.includeCount === false ? false : Number(count ?? rows.length) > serviceCases.length,
   };
 }
 

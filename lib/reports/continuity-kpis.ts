@@ -12,6 +12,7 @@ import {
   resolveReportAccountContractorIds,
   resolveReportAccountCustomerIds,
 } from "@/lib/reports/report-account-scope";
+import { isServiceCaseEffectivelyOpen } from "@/lib/reports/service-case-continuity";
 
 type ContinuityCaseRow = {
   id: string;
@@ -19,6 +20,12 @@ type ContinuityCaseRow = {
   created_at: string | null;
   resolved_at: string | null;
   resolved_by_job_id: string | null;
+};
+
+type ContinuityLinkedJobRow = {
+  service_case_id: string | null;
+  status: string | null;
+  ops_status: string | null;
 };
 
 const CONTINUITY_BUCKET_METRICS = [
@@ -33,38 +40,40 @@ export async function buildContinuityKpiReadModel(params: {
   buckets: ReportCenterKpiBucket[];
 }): Promise<ReportCenterKpiFamilyReadModel> {
   const range = getKpiRange(params.filters);
-  const [customerIds, contractorIds] = await Promise.all([
+  const [customerIds] = await Promise.all([
     resolveReportAccountCustomerIds({
       supabase: params.supabase,
       accountOwnerUserId: params.accountOwnerUserId,
     }),
-    resolveReportAccountContractorIds({
-      supabase: params.supabase,
-      accountOwnerUserId: params.accountOwnerUserId,
-    }),
   ]);
-  const [{ data: serviceCaseData, error: serviceCaseError }, { data: linkedJobData, error: linkedJobError }] = await Promise.all([
-    params.supabase
-      .from("service_cases")
-      .select("id, status, created_at, resolved_at, resolved_by_job_id")
-      .in("customer_id", accountScopeInList(customerIds)),
-    params.supabase
-      .from("jobs")
-      .select("id, service_case_id")
-      .is("deleted_at", null)
-      .not("service_case_id", "is", null)
-      .in("contractor_id", accountScopeInList(contractorIds)),
-  ]);
+  const { data: serviceCaseData, error: serviceCaseError } = await params.supabase
+    .from("service_cases")
+    .select("id, status, created_at, resolved_at, resolved_by_job_id")
+    .in("customer_id", accountScopeInList(customerIds));
 
   if (serviceCaseError) throw serviceCaseError;
-  if (linkedJobError) throw linkedJobError;
 
   const serviceCases = (serviceCaseData ?? []) as ContinuityCaseRow[];
+  const serviceCaseIds = serviceCases.map((serviceCase) => String(serviceCase.id ?? "").trim()).filter(Boolean);
+  const { data: linkedJobData, error: linkedJobError } = serviceCaseIds.length
+    ? await params.supabase
+        .from("jobs")
+        .select("service_case_id, status, ops_status")
+        .is("deleted_at", null)
+        .in("service_case_id", serviceCaseIds)
+    : { data: [], error: null };
+
+  if (linkedJobError) throw linkedJobError;
+
   const linkedJobCounts = new Map<string, number>();
-  for (const row of linkedJobData ?? []) {
+  const linkedJobsByCaseId = new Map<string, ContinuityLinkedJobRow[]>();
+  for (const row of (linkedJobData ?? []) as ContinuityLinkedJobRow[]) {
     const serviceCaseId = String((row as any)?.service_case_id ?? "").trim();
     if (!serviceCaseId) continue;
     linkedJobCounts.set(serviceCaseId, (linkedJobCounts.get(serviceCaseId) ?? 0) + 1);
+    const linkedJobs = linkedJobsByCaseId.get(serviceCaseId) ?? [];
+    linkedJobs.push(row);
+    linkedJobsByCaseId.set(serviceCaseId, linkedJobs);
   }
 
   const bucketRows = initializeBucketRows(
@@ -113,8 +122,11 @@ export async function buildContinuityKpiReadModel(params: {
     }
   }
 
-  const openServiceCases = serviceCases.filter(
-    (serviceCase) => String(serviceCase.status ?? "").trim().toLowerCase() !== "resolved",
+  const openServiceCases = serviceCases.filter((serviceCase) =>
+    isServiceCaseEffectivelyOpen({
+      storedStatus: serviceCase.status,
+      linkedJobs: linkedJobsByCaseId.get(String(serviceCase.id ?? "").trim()) ?? [],
+    }),
   ).length;
   const resolvedServiceCases = serviceCases.filter(
     (serviceCase) => String(serviceCase.status ?? "").trim().toLowerCase() === "resolved",
