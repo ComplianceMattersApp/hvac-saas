@@ -66,6 +66,12 @@ Platform subscription billing for account onboarding is implemented as Stripe Pl
 Tenant customer invoice payment execution remains deferred.  
 Build tenant payment architecture so later Stripe execution can be introduced without structural rework.
 
+Alignment note:
+- operational entitlement mutation guard rollout for active internal operational mutation paths is complete on `sandbox-clean-start` through Slice 16C, pending final validation/promotion
+- that rollout blocks expired, null-ended, and missing-entitlement accounts from server-side operational mutations while still allowing active, valid-trial, and internal/comped accounts
+- that rollout did not introduce tenant customer/work payment execution, QBO behavior, schema migrations, or Supabase data changes
+- setup/recovery/admin availability remains intentionally accessible and does not change the deferred tenant payment-execution roadmap
+
 ---
 
 ## 5. Current product truth
