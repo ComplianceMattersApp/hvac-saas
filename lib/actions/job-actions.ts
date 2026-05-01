@@ -5448,6 +5448,12 @@ export async function addAlterationCoreTestsFromForm(formData: FormData) {
   if (!systemId) throw new Error("Missing system_id");
 
   const supabase = await createClient();
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // Attach to Visit #1 for now
   const { data: visit, error: visitErr } = await supabase
