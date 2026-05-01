@@ -504,6 +504,13 @@ export async function generateContractorReportPreview(input: {
   if (!jobId) throw new Error("Missing jobId");
 
   await requireInternalScopedJobUserOrThrow(supabase, jobId);
+  const authz = await requireInternalUser({ supabase });
+
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
+
   const report = await resolveContractorReportForJob({ supabase, jobId });
 
   return {
@@ -529,6 +536,13 @@ export async function sendContractorReport(input: {
   if (!jobId) throw new Error("Missing jobId");
 
   const user = await requireInternalScopedJobUserOrThrow(supabase, jobId);
+  const authz = await requireInternalUser({ supabase, userId: user.id });
+
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
+
   const report = await resolveContractorReportForJob({ supabase, jobId });
 
   const { data: job, error: jobErr } = await supabase
