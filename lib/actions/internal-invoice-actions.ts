@@ -292,6 +292,35 @@ function redirectInternalInvoiceValidation(jobId: string, tab: string, banner: s
   redirect(buildJobDetailHref(jobId, tab, banner));
 }
 
+export type InternalInvoiceActionResult = {
+  ok: boolean;
+  banner?: string;
+  fieldErrors?: Record<string, string>;
+};
+
+function isNoRedirectRequested(formData: FormData) {
+  return getTrimmedString(formData.get('no_redirect')) === '1';
+}
+
+function resolveSmallMutationResult(params: {
+  jobId: string;
+  tab: string;
+  banner: string;
+  noRedirect: boolean;
+  ok: boolean;
+  fieldErrors?: Record<string, string>;
+}): InternalInvoiceActionResult | never {
+  if (params.noRedirect) {
+    return {
+      ok: params.ok,
+      banner: params.banner,
+      fieldErrors: params.fieldErrors,
+    };
+  }
+
+  redirect(buildJobDetailHref(params.jobId, params.tab, params.banner));
+}
+
 function parseLineItemDraftFields(formData: FormData) {
   const itemName = getTrimmedString(formData.get('item_name_snapshot'));
   if (!itemName) {
@@ -804,20 +833,42 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
   redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_draft_created'));
 }
 
-export async function saveInternalInvoiceDraftFromForm(formData: FormData) {
+export async function saveInternalInvoiceDraftFromForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
   const context = await loadInternalInvoiceContext(formData);
+  const noRedirect = isNoRedirectRequested(formData);
 
   if (!context.invoice) {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_missing'));
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_missing',
+      noRedirect,
+      ok: false,
+    });
   }
 
   if (context.invoice.status !== 'draft') {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_locked'));
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_locked',
+      noRedirect,
+      ok: false,
+    });
   }
 
   const invoiceNumber = getTrimmedString(formData.get('invoice_number'));
   if (!invoiceNumber) {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_required_fields'));
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_required_fields',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        invoice_number: 'Invoice number is required.',
+      },
+    });
   }
 
   const derivedSubtotalCents = await syncInvoiceTotalsFromLineItems({
@@ -851,15 +902,33 @@ export async function saveInternalInvoiceDraftFromForm(formData: FormData) {
 
   if (error) {
     if (error.code === '23505') {
-      redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_number_taken'));
+      return resolveSmallMutationResult({
+        jobId: context.jobId,
+        tab: context.tab,
+        banner: 'internal_invoice_number_taken',
+        noRedirect,
+        ok: false,
+        fieldErrors: {
+          invoice_number: 'Invoice number is already in use.',
+        },
+      });
     }
     throw error;
   }
 
   revalidatePath(`/jobs/${context.jobId}`);
-  revalidatePath('/jobs');
-  revalidatePath('/ops');
-  redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_draft_saved'));
+  if (!noRedirect) {
+    revalidatePath('/jobs');
+    revalidatePath('/ops');
+  }
+
+  return resolveSmallMutationResult({
+    jobId: context.jobId,
+    tab: context.tab,
+    banner: 'internal_invoice_draft_saved',
+    noRedirect,
+    ok: true,
+  });
 }
 
 export async function issueInternalInvoiceFromForm(formData: FormData) {
@@ -1015,7 +1084,8 @@ export async function voidInternalInvoiceFromForm(formData: FormData) {
   redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_voided'));
 }
 
-export async function addInternalInvoiceLineItemFromForm(formData: FormData) {
+export async function addInternalInvoiceLineItemFromForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
+  const noRedirect = isNoRedirectRequested(formData);
   const context = await requireDraftInvoiceContext(formData);
   const invoice = context.invoice!;
 
@@ -1023,7 +1093,16 @@ export async function addInternalInvoiceLineItemFromForm(formData: FormData) {
   try {
     payload = parseLineItemDraftFields(formData);
   } catch {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_line_item_invalid');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_line_item_invalid',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        _form: 'Line item fields are invalid.',
+      },
+    });
   }
 
   const nextSortOrder = (invoice.line_items?.length ?? 0) + 1;
@@ -1048,25 +1127,53 @@ export async function addInternalInvoiceLineItemFromForm(formData: FormData) {
   });
 
   revalidatePath(`/jobs/${context.jobId}`);
-  revalidatePath('/jobs');
-  revalidatePath('/ops');
-  redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_line_item_added'));
+  if (!noRedirect) {
+    revalidatePath('/jobs');
+    revalidatePath('/ops');
+  }
+
+  return resolveSmallMutationResult({
+    jobId: context.jobId,
+    tab: context.tab,
+    banner: 'internal_invoice_line_item_added',
+    noRedirect,
+    ok: true,
+  });
 }
 
-export async function addInternalInvoiceLineItemFromPricebookForm(formData: FormData) {
+export async function addInternalInvoiceLineItemFromPricebookForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
+  const noRedirect = isNoRedirectRequested(formData);
   const context = await requireDraftInvoiceContext(formData);
   const invoice = context.invoice!;
 
   const pricebookItemId = getTrimmedString(formData.get('pricebook_item_id'));
   if (!pricebookItemId) {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_item_missing');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_pricebook_item_missing',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        pricebook_item_id: 'Select a Pricebook item.',
+      },
+    });
   }
 
   let quantityHundredths = 0;
   try {
     quantityHundredths = parseQuantityToHundredths(getTrimmedString(formData.get('quantity')) || '1');
   } catch {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_quantity_invalid');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_pricebook_quantity_invalid',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        quantity: 'Quantity must be greater than zero.',
+      },
+    });
   }
 
   const pricebookItem = await loadScopedPricebookSnapshot({
@@ -1076,23 +1183,47 @@ export async function addInternalInvoiceLineItemFromPricebookForm(formData: Form
   });
 
   if (!pricebookItem?.id) {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_item_not_found');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_pricebook_item_not_found',
+      noRedirect,
+      ok: false,
+    });
   }
 
   if (!pricebookItem.is_active) {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_item_inactive');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_pricebook_item_inactive',
+      noRedirect,
+      ok: false,
+    });
   }
 
   const normalizedItemType = getTrimmedString(pricebookItem.item_type).toLowerCase();
   if (normalizedItemType === 'adjustment') {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_negative_price_deferred');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_pricebook_negative_price_deferred',
+      noRedirect,
+      ok: false,
+    });
   }
 
   let unitPriceCents = 0;
   try {
     unitPriceCents = parseNonNegativeMoneyNumberToCents(pricebookItem.default_unit_price, 'Unit price');
   } catch {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_pricebook_negative_price_deferred');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_pricebook_negative_price_deferred',
+      noRedirect,
+      ok: false,
+    });
   }
 
   const lineSubtotalCents = computeLineSubtotalCents(quantityHundredths, unitPriceCents);
@@ -1126,30 +1257,67 @@ export async function addInternalInvoiceLineItemFromPricebookForm(formData: Form
   });
 
   revalidatePath(`/jobs/${context.jobId}`);
-  revalidatePath('/jobs');
-  revalidatePath('/ops');
-  redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_pricebook_line_item_added'));
+  if (!noRedirect) {
+    revalidatePath('/jobs');
+    revalidatePath('/ops');
+  }
+
+  return resolveSmallMutationResult({
+    jobId: context.jobId,
+    tab: context.tab,
+    banner: 'internal_invoice_pricebook_line_item_added',
+    noRedirect,
+    ok: true,
+  });
 }
 
-export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: FormData) {
+export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
+  const noRedirect = isNoRedirectRequested(formData);
   const context = await requireDraftInvoiceContext(formData);
   const invoice = context.invoice!;
 
   const { selectedIds, malformedIds } = parseSelectedVisitScopeItemIds(formData);
 
   if (malformedIds.length > 0) {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_item_invalid');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_visit_scope_item_invalid',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        visit_scope_item_ids: 'Select valid Visit Scope items.',
+      },
+    });
   }
 
   if (selectedIds.length === 0) {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_item_missing');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_visit_scope_item_missing',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        visit_scope_item_ids: 'Select at least one Visit Scope item.',
+      },
+    });
   }
 
   let quantityHundredths = 100;
   try {
     quantityHundredths = parseQuantityToHundredths(getTrimmedString(formData.get('quantity')) || '1');
   } catch {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_quantity_invalid');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_visit_scope_quantity_invalid',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        quantity: 'Quantity must be greater than zero.',
+      },
+    });
   }
 
   const { data: jobScopeRow, error: jobScopeErr } = await context.supabase
@@ -1160,14 +1328,29 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
 
   if (jobScopeErr) throw jobScopeErr;
   if (!jobScopeRow?.id) {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_item_not_found');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_visit_scope_item_not_found',
+      noRedirect,
+      ok: false,
+    });
   }
 
   let scopeItems: ReturnType<typeof sanitizeVisitScopeItems> = [];
   try {
     scopeItems = sanitizeVisitScopeItems(jobScopeRow.visit_scope_items ?? []);
   } catch {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_item_invalid');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_visit_scope_item_invalid',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        visit_scope_item_ids: 'Visit Scope selection is invalid.',
+      },
+    });
   }
 
   const scopeItemsById = new Map(
@@ -1182,7 +1365,13 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
 
   const missingScopeIds = selectedIds.filter((selectedId) => !scopeItemsById.has(selectedId));
   if (missingScopeIds.length > 0) {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_item_not_found');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_visit_scope_item_not_found',
+      noRedirect,
+      ok: false,
+    });
   }
 
   const existingScopeSourceIds = new Set(
@@ -1194,7 +1383,13 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
 
   const idsToInsert = selectedIds.filter((selectedId) => !existingScopeSourceIds.has(selectedId));
   if (idsToInsert.length === 0) {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_visit_scope_line_item_duplicate');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_visit_scope_line_item_duplicate',
+      noRedirect,
+      ok: false,
+    });
   }
 
   const nextSortOrder = (invoice.line_items?.length ?? 0) + 1;
@@ -1234,34 +1429,76 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
   });
 
   revalidatePath(`/jobs/${context.jobId}`);
-  revalidatePath('/jobs');
-  revalidatePath('/ops');
-
-  if (idsToInsert.length < selectedIds.length) {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_visit_scope_line_item_partial_added'));
+  if (!noRedirect) {
+    revalidatePath('/jobs');
+    revalidatePath('/ops');
   }
 
-  redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_visit_scope_line_item_added'));
+  if (idsToInsert.length < selectedIds.length) {
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_visit_scope_line_item_partial_added',
+      noRedirect,
+      ok: true,
+    });
+  }
+
+  return resolveSmallMutationResult({
+    jobId: context.jobId,
+    tab: context.tab,
+    banner: 'internal_invoice_visit_scope_line_item_added',
+    noRedirect,
+    ok: true,
+  });
 }
 
-export async function updateInternalInvoiceLineItemFromForm(formData: FormData) {
+export async function updateInternalInvoiceLineItemFromForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
+  const noRedirect = isNoRedirectRequested(formData);
   const context = await requireDraftInvoiceContext(formData);
   const invoice = context.invoice!;
   const lineItemId = getTrimmedString(formData.get('line_item_id'));
   if (!lineItemId) {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_line_item_missing');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_line_item_missing',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        line_item_id: 'Line item is missing.',
+      },
+    });
   }
 
   let payload: ReturnType<typeof parseLineItemDraftFields>;
   try {
     payload = parseLineItemDraftFields(formData);
   } catch {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_line_item_invalid');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_line_item_invalid',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        _form: 'Line item fields are invalid.',
+      },
+    });
   }
 
   const targetLineItem = invoice.line_items.find((lineItem) => lineItem.id === lineItemId);
   if (!targetLineItem) {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_line_item_missing');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_line_item_missing',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        line_item_id: 'Line item was not found.',
+      },
+    });
   }
 
   const { error } = await context.supabase
@@ -1283,22 +1520,50 @@ export async function updateInternalInvoiceLineItemFromForm(formData: FormData) 
   });
 
   revalidatePath(`/jobs/${context.jobId}`);
-  revalidatePath('/jobs');
-  revalidatePath('/ops');
-  redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_line_item_saved'));
+  if (!noRedirect) {
+    revalidatePath('/jobs');
+    revalidatePath('/ops');
+  }
+
+  return resolveSmallMutationResult({
+    jobId: context.jobId,
+    tab: context.tab,
+    banner: 'internal_invoice_line_item_saved',
+    noRedirect,
+    ok: true,
+  });
 }
 
-export async function removeInternalInvoiceLineItemFromForm(formData: FormData) {
+export async function removeInternalInvoiceLineItemFromForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
+  const noRedirect = isNoRedirectRequested(formData);
   const context = await requireDraftInvoiceContext(formData);
   const invoice = context.invoice!;
   const lineItemId = getTrimmedString(formData.get('line_item_id'));
   if (!lineItemId) {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_line_item_missing');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_line_item_missing',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        line_item_id: 'Line item is missing.',
+      },
+    });
   }
 
   const targetLineItem = invoice.line_items.find((lineItem) => lineItem.id === lineItemId);
   if (!targetLineItem) {
-    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_line_item_missing');
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_line_item_missing',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        line_item_id: 'Line item was not found.',
+      },
+    });
   }
 
   const { error } = await context.supabase
@@ -1316,9 +1581,18 @@ export async function removeInternalInvoiceLineItemFromForm(formData: FormData) 
   });
 
   revalidatePath(`/jobs/${context.jobId}`);
-  revalidatePath('/jobs');
-  revalidatePath('/ops');
-  redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_line_item_removed'));
+  if (!noRedirect) {
+    revalidatePath('/jobs');
+    revalidatePath('/ops');
+  }
+
+  return resolveSmallMutationResult({
+    jobId: context.jobId,
+    tab: context.tab,
+    banner: 'internal_invoice_line_item_removed',
+    noRedirect,
+    ok: true,
+  });
 }
 
 export async function sendInternalInvoiceEmailFromForm(formData: FormData) {

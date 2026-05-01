@@ -131,6 +131,12 @@ function buildInvoiceFormData() {
   return formData;
 }
 
+function buildInvoiceFormDataNoRedirect() {
+  const formData = buildInvoiceFormData();
+  formData.set('no_redirect', '1');
+  return formData;
+}
+
 type InvoiceMutationEntrypoint =
   | 'createInternalInvoiceDraftFromForm'
   | 'saveInternalInvoiceDraftFromForm'
@@ -247,6 +253,20 @@ describe('internal invoice mutation same-account hardening', () => {
       expect(sendEmailMock).not.toHaveBeenCalled();
     });
   }
+
+  it('keeps authorization redirect behavior unchanged when no_redirect is requested', async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue(null);
+
+    await expect(
+      invokeEntrypoint('addInternalInvoiceLineItemFromForm', buildInvoiceFormDataNoRedirect()),
+    ).rejects.toThrow('banner=not_authorized');
+
+    assertNoDeniedWrites(writeCalls);
+    expect(insertJobEventMock).not.toHaveBeenCalled();
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
 
   it('allows valid trial internal saveInternalInvoiceDraftFromForm past entitlement preflight', async () => {
     const { supabase } = makeAllowSupabaseFixture();

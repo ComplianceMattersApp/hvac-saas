@@ -207,6 +207,21 @@ function manualLineFormData(overrides: Partial<Record<string, string>> = {}) {
   return formData;
 }
 
+function saveDraftFormData(overrides: Partial<Record<string, string>> = {}) {
+  const formData = new FormData();
+  formData.set('job_id', 'job-1');
+  formData.set('tab', 'info');
+  formData.set('invoice_number', 'INV-UPDATED-1');
+  formData.set('invoice_date', '2026-01-01');
+  formData.set('notes', 'Updated notes');
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value != null) formData.set(key, value);
+  }
+
+  return formData;
+}
+
 function pricebookLineFormData(overrides: Partial<Record<string, string>> = {}) {
   const formData = new FormData();
   formData.set('job_id', 'job-1');
@@ -276,6 +291,101 @@ describe('internal invoice line item pricebook plumbing', () => {
     expect(invoiceUpdates).toHaveLength(1);
     expect(invoiceUpdates[0].subtotal_cents).toBe(10000);
     expect(invoiceUpdates[0].total_cents).toBe(10000);
+  });
+
+  it('manual add supports non-redirect mode and narrows revalidation to job detail', async () => {
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalInvoiceLineItemFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    const result = await addInternalInvoiceLineItemFromForm(
+      manualLineFormData({ no_redirect: '1' }),
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      banner: 'internal_invoice_line_item_added',
+      fieldErrors: undefined,
+    });
+    expect(insertedLineItems).toHaveLength(1);
+    expect(invoiceUpdates).toHaveLength(1);
+    expect(revalidatePathMock).toHaveBeenCalledTimes(1);
+    expect(revalidatePathMock).toHaveBeenCalledWith('/jobs/job-1');
+  });
+
+  it('manual add returns clean validation result in non-redirect mode', async () => {
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalInvoiceLineItemFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    const result = await addInternalInvoiceLineItemFromForm(
+      manualLineFormData({ no_redirect: '1', quantity: '0' }),
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      banner: 'internal_invoice_line_item_invalid',
+      fieldErrors: {
+        _form: 'Line item fields are invalid.',
+      },
+    });
+    expect(insertedLineItems).toHaveLength(0);
+    expect(invoiceUpdates).toHaveLength(0);
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('draft save supports non-redirect mode and narrows revalidation to job detail', async () => {
+    const { supabase, invoiceUpdates } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { saveInternalInvoiceDraftFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    const result = await saveInternalInvoiceDraftFromForm(
+      saveDraftFormData({ no_redirect: '1' }),
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      banner: 'internal_invoice_draft_saved',
+      fieldErrors: undefined,
+    });
+    expect(invoiceUpdates).toHaveLength(2);
+    expect(revalidatePathMock).toHaveBeenCalledTimes(1);
+    expect(revalidatePathMock).toHaveBeenCalledWith('/jobs/job-1');
+  });
+
+  it('draft save still redirects in default mode', async () => {
+    const { supabase } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { saveInternalInvoiceDraftFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(saveInternalInvoiceDraftFromForm(saveDraftFormData())).rejects.toThrow(
+      'banner=internal_invoice_draft_saved',
+    );
+  });
+
+  it('draft save returns clean validation result in non-redirect mode', async () => {
+    const { supabase, invoiceUpdates } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { saveInternalInvoiceDraftFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    const result = await saveInternalInvoiceDraftFromForm(
+      saveDraftFormData({ no_redirect: '1', invoice_number: '' }),
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      banner: 'internal_invoice_required_fields',
+      fieldErrors: {
+        invoice_number: 'Invoice number is required.',
+      },
+    });
+    expect(invoiceUpdates).toHaveLength(0);
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
   it('adds selected visit scope items to draft invoice with frozen snapshots and provenance', async () => {

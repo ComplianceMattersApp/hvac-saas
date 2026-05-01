@@ -96,7 +96,9 @@ import {
 } from "@/lib/actions/internal-job-detail-read-boundary";
 
 import JobAttachmentsInternal from "./_components/JobAttachmentsInternal";
-import InternalInvoiceLineItemsTable from "./_components/InternalInvoiceLineItemsTable";
+import InternalInvoiceLineItemsTable, {
+  InternalInvoiceDraftSaveForm,
+} from "./_components/InternalInvoiceLineItemsTable";
 import VisitScopeJobDetailForm from "@/components/jobs/VisitScopeJobDetailForm";
 import {
   buildPromotedCompanionReadModel,
@@ -4032,7 +4034,7 @@ const renderTimelineItem = (e: any, key: string) => {
               </summary>
 
               <div className="mt-3 border-t border-slate-200/80 pt-4">
-                <form action={saveInternalInvoiceDraftFromForm} className="space-y-4">
+                <InternalInvoiceDraftSaveForm action={saveInternalInvoiceDraftFromForm} className="space-y-4">
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="tab" value={tab} />
 
@@ -4145,7 +4147,7 @@ const renderTimelineItem = (e: any, key: string) => {
                       Save Billing Details
                     </SubmitButton>
                   </div>
-                </form>
+                </InternalInvoiceDraftSaveForm>
               </div>
             </details>
           ) : null}

@@ -1,10 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import SubmitButton from '@/components/SubmitButton';
 import type { InternalInvoiceItemType, InternalInvoiceLineItemRecord } from '@/lib/business/internal-invoice';
 
-type ServerFormAction = (formData: FormData) => void | Promise<void>;
+type InternalInvoiceActionResult = {
+  ok: boolean;
+  banner?: string;
+  fieldErrors?: Record<string, string>;
+};
+
+type ServerFormAction = (
+  formData: FormData,
+) => void | InternalInvoiceActionResult | Promise<void | InternalInvoiceActionResult>;
+
+type InlineFeedback = {
+  type: 'success' | 'error';
+  message: string;
+};
 
 type PricebookPickerItem = {
   id: string;
@@ -69,6 +83,95 @@ function formatInternalInvoiceItemType(type?: InternalInvoiceItemType | string |
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
+function invoiceBannerMessage(banner?: string | null) {
+  const normalized = String(banner ?? '').trim().toLowerCase();
+  const messages: Record<string, string> = {
+    internal_invoice_draft_saved: 'Draft invoice saved.',
+    internal_invoice_required_fields: 'Invoice number is required.',
+    internal_invoice_number_taken: 'Invoice number is already in use.',
+    internal_invoice_line_item_added: 'Line item added.',
+    internal_invoice_pricebook_line_item_added: 'Pricebook line item added.',
+    internal_invoice_visit_scope_line_item_added: 'Visit Scope line item added.',
+    internal_invoice_visit_scope_line_item_partial_added: 'Some selected Visit Scope items were already added.',
+    internal_invoice_line_item_saved: 'Line item saved.',
+    internal_invoice_line_item_removed: 'Line item removed.',
+    internal_invoice_line_item_invalid: 'Line item fields are invalid.',
+    internal_invoice_line_item_missing: 'Line item is missing or no longer available.',
+    internal_invoice_pricebook_item_missing: 'Select a Pricebook item.',
+    internal_invoice_pricebook_quantity_invalid: 'Quantity must be greater than zero.',
+    internal_invoice_pricebook_item_not_found: 'Pricebook item is unavailable.',
+    internal_invoice_pricebook_item_inactive: 'Pricebook item is inactive.',
+    internal_invoice_pricebook_negative_price_deferred: 'Adjustment/negative price items are not available here yet.',
+    internal_invoice_visit_scope_item_invalid: 'Visit Scope selection is invalid.',
+    internal_invoice_visit_scope_item_missing: 'Select at least one Visit Scope item.',
+    internal_invoice_visit_scope_quantity_invalid: 'Quantity must be greater than zero.',
+    internal_invoice_visit_scope_item_not_found: 'Visit Scope item is unavailable.',
+    internal_invoice_visit_scope_line_item_duplicate: 'Selected Visit Scope items are already added.',
+    internal_invoice_locked: 'Invoice is locked and cannot be edited.',
+    internal_invoice_line_items_locked: 'Invoice line items are locked.',
+    internal_invoice_missing: 'Invoice was not found.',
+  };
+
+  return messages[normalized] ?? null;
+}
+
+function resolveErrorMessage(result?: InternalInvoiceActionResult | void, fallback = 'Could not save changes.') {
+  const fieldError = result && typeof result === 'object' && result.fieldErrors
+    ? Object.values(result.fieldErrors).find((value) => String(value ?? '').trim().length > 0)
+    : null;
+
+  if (fieldError) return String(fieldError);
+  return invoiceBannerMessage(result && typeof result === 'object' ? result.banner : null) ?? fallback;
+}
+
+export function InternalInvoiceDraftSaveForm(props: {
+  action: ServerFormAction;
+  className?: string;
+  children: ReactNode;
+}) {
+  const { action, className, children } = props;
+  const router = useRouter();
+  const [feedback, setFeedback] = useState<InlineFeedback | null>(null);
+
+  async function submitDraftSave(formData: FormData) {
+    formData.set('no_redirect', '1');
+    const result = await action(formData);
+
+    if (result && typeof result === 'object' && 'ok' in result) {
+      if (!result.ok) {
+        setFeedback({
+          type: 'error',
+          message: resolveErrorMessage(result, 'Could not save draft invoice.'),
+        });
+        return;
+      }
+
+      setFeedback({
+        type: 'success',
+        message: invoiceBannerMessage(result.banner) ?? 'Draft invoice saved.',
+      });
+      router.refresh();
+      return;
+    }
+
+    setFeedback({ type: 'success', message: 'Draft invoice saved.' });
+    router.refresh();
+  }
+
+  return (
+    <form action={submitDraftSave} className={className}>
+      {feedback ? (
+        <div
+          className={`rounded-lg border px-3.5 py-2.5 text-sm ${feedback.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
+      {children}
+    </form>
+  );
+}
+
 export default function InternalInvoiceLineItemsTable({
   jobId,
   tab,
@@ -86,8 +189,10 @@ export default function InternalInvoiceLineItemsTable({
   primaryButtonClass,
   secondaryButtonClass,
 }: InternalInvoiceLineItemsTableProps) {
+  const router = useRouter();
   const [expandedAdditionalRowId, setExpandedAdditionalRowId] = useState<string | null>(null);
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
+  const [feedback, setFeedback] = useState<InlineFeedback | null>(null);
   const [selectedPricebookItemId, setSelectedPricebookItemId] = useState<string>(
     pricebookPickerItems[0]?.id ?? '',
   );
@@ -104,8 +209,97 @@ export default function InternalInvoiceLineItemsTable({
     );
   }
 
+  async function runInlineMutation(params: {
+    formData: FormData;
+    action: ServerFormAction;
+    successFallback: string;
+    errorFallback: string;
+    onSuccess?: (result: InternalInvoiceActionResult | void) => void;
+  }) {
+    const { formData, action, successFallback, errorFallback, onSuccess } = params;
+    formData.set('no_redirect', '1');
+    const result = await action(formData);
+
+    if (result && typeof result === 'object' && 'ok' in result) {
+      if (!result.ok) {
+        setFeedback({
+          type: 'error',
+          message: resolveErrorMessage(result, errorFallback),
+        });
+        return;
+      }
+
+      setFeedback({
+        type: 'success',
+        message: invoiceBannerMessage(result.banner) ?? successFallback,
+      });
+      onSuccess?.(result);
+      router.refresh();
+      return;
+    }
+
+    setFeedback({ type: 'success', message: successFallback });
+    onSuccess?.(result);
+    router.refresh();
+  }
+
+  async function handleAddPricebook(formData: FormData) {
+    await runInlineMutation({
+      formData,
+      action: addPricebookLineItemAction,
+      successFallback: 'Pricebook line item added.',
+      errorFallback: 'Could not add Pricebook line item.',
+    });
+  }
+
+  async function handleAddVisitScope(formData: FormData) {
+    await runInlineMutation({
+      formData,
+      action: addVisitScopeLineItemsAction,
+      successFallback: 'Visit Scope line items added.',
+      errorFallback: 'Could not add Visit Scope line items.',
+      onSuccess: () => setSelectedVisitScopeItemIds([]),
+    });
+  }
+
+  async function handleUpdateLineItem(formData: FormData) {
+    await runInlineMutation({
+      formData,
+      action: updateLineItemAction,
+      successFallback: 'Line item saved.',
+      errorFallback: 'Could not save line item.',
+    });
+  }
+
+  async function handleAddManualLineItem(formData: FormData) {
+    await runInlineMutation({
+      formData,
+      action: addLineItemAction,
+      successFallback: 'Line item added.',
+      errorFallback: 'Could not add line item.',
+      onSuccess: () => setIsAddFormOpen(false),
+    });
+  }
+
+  async function handleRemoveLineItem(formData: FormData) {
+    await runInlineMutation({
+      formData,
+      action: removeLineItemAction,
+      successFallback: 'Line item removed.',
+      errorFallback: 'Could not remove line item.',
+    });
+  }
+
   return (
     <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50/72 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.28)]">
+      {feedback ? (
+        <div
+          className={`mx-5 mt-4 rounded-lg border px-3.5 py-2.5 text-sm ${feedback.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
+
       <div className="hidden grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)_auto] gap-4 border-b border-slate-200/80 bg-white/88 px-5 py-3 md:grid">
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Line Item</div>
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Type</div>
@@ -122,7 +316,7 @@ export default function InternalInvoiceLineItemsTable({
       ) : null}
 
       <div className="divide-y divide-slate-200/80">
-        <form action={addPricebookLineItemAction} className="bg-white/92 px-5 py-5">
+        <form action={handleAddPricebook} className="bg-white/92 px-5 py-5">
           <input type="hidden" name="job_id" value={jobId} />
           <input type="hidden" name="tab" value={tab} />
 
@@ -189,7 +383,7 @@ export default function InternalInvoiceLineItemsTable({
         </form>
 
         {visitScopePickerItems.length > 0 ? (
-          <form action={addVisitScopeLineItemsAction} className="bg-white/92 px-5 py-5">
+          <form action={handleAddVisitScope} className="bg-white/92 px-5 py-5">
             <input type="hidden" name="job_id" value={jobId} />
             <input type="hidden" name="tab" value={tab} />
             <input type="hidden" name="quantity" value="1.00" />
@@ -309,7 +503,7 @@ export default function InternalInvoiceLineItemsTable({
 
           return (
             <div key={lineItem.id} className="bg-white/72">
-              <form action={updateLineItemAction} className="px-5 py-5">
+              <form action={handleUpdateLineItem} className="px-5 py-5">
                 <input type="hidden" name="job_id" value={jobId} />
                 <input type="hidden" name="tab" value={tab} />
                 <input type="hidden" name="line_item_id" value={lineItem.id} />
@@ -419,7 +613,7 @@ export default function InternalInvoiceLineItemsTable({
               </form>
 
               <div className="sr-only">
-                <form id={`remove-line-item-${lineItem.id}`} action={removeLineItemAction}>
+                <form id={`remove-line-item-${lineItem.id}`} action={handleRemoveLineItem}>
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="tab" value={tab} />
                   <input type="hidden" name="line_item_id" value={lineItem.id} />
@@ -430,7 +624,7 @@ export default function InternalInvoiceLineItemsTable({
         })}
 
         {isAddFormOpen ? (
-          <form action={addLineItemAction} className="bg-slate-50/94 px-5 py-5">
+          <form action={handleAddManualLineItem} className="bg-slate-50/94 px-5 py-5">
             <input type="hidden" name="job_id" value={jobId} />
             <input type="hidden" name="tab" value={tab} />
 
