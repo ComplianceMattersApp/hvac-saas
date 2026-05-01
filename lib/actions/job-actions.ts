@@ -2917,7 +2917,7 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
 
   if (!sourceJobId) throw new Error("Missing job_id");
 
-  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: sourceJobId,
     onUnauthorized: () => {
@@ -2928,6 +2928,11 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
         returnToRaw,
       });
     },
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   if (!nextVisitReasonRaw) {
@@ -3198,9 +3203,14 @@ export async function archiveJobFromForm(formData: FormData) {
   if (!job_id) throw new Error("Missing job_id");
 
   const supabase = await createClient();
-  await requireInternalAdminScopedJobAccessOrRedirect({
+  const { internalUser } = await requireInternalAdminScopedJobAccessOrRedirect({
     supabase,
     jobId: job_id,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   // Do the archive and REQUIRE a returned row (proves success)
@@ -8389,9 +8399,14 @@ export async function createRetestJobFromForm(formData: FormData) {
   if (!parentJobId) throw new Error("Missing parent_job_id");
 
   const supabase = await createClient();
-  await requireInternalScopedJobAccessOrRedirect({
+  const { internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: parentJobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   // 1) Load parent job
@@ -8646,9 +8661,14 @@ export async function cancelJobFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required (job_id missing)");
 
   const supabase = await createClient();
-  const { userId } = await requireInternalAdminScopedJobAccessOrRedirect({
+  const { userId, internalUser } = await requireInternalAdminScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   // Read current job state
