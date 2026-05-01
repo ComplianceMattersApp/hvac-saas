@@ -571,7 +571,7 @@ Roadmap guardrail:
 - This does not imply QBO dependency.
 
 Completed RLS / permission hardening slices for the current stabilized baseline:
-- Operational entitlement mutation guard rollout is complete on `sandbox-clean-start` through Slice 16C for active internal operational mutation paths, pending only final validation, docs/source-of-truth closeout, and branch-promotion decision.
+- Operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`. Full validation passed: 89 test files, 1057 tests, TSC_OK. Production smoke confirmed. Two additional test-only mock repairs (`job-ops-waiting-state.test.ts`, `service-case-reconciliation-wiring.test.ts`) were committed during main validation with no product behavior change.
 - Completed guarded operational mutation families include:
   - internal job creation / intake
   - job ops / scheduling / contact

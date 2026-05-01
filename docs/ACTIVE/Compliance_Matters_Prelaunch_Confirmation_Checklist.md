@@ -146,8 +146,11 @@ If any item here conflicts with the active spine, the spine wins.
 - Per-seat billing remains a desired later track, but is not enforced in V1/live launch.
 - Future per-seat work should include seat-limit enforcement, Stripe quantity sync, proration handling, and customer portal quantity rules.
 
-### 2.6.1 Operational entitlement mutation guard rollout closeout (sandbox-ready)
-- Confirmed: operational entitlement mutation guard rollout is complete on `sandbox-clean-start` through Slice 16C for active internal operational mutation paths.
+### 2.6.1 Operational entitlement mutation guard rollout closeout (production-promoted)
+- Confirmed: operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`.
+- Confirmed: full validation passed — 89 test files, 1057 tests, TSC_OK.
+- Confirmed: production smoke passed.
+- Confirmed: two test-only mock repairs committed during main validation (`job-ops-waiting-state.test.ts`, `service-case-reconciliation-wiring.test.ts`); no product behavior change.
 - Confirmed guarded operational mutation families:
   - internal job creation/intake
   - job ops/scheduling/contact
@@ -184,7 +187,7 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: no Stripe tenant customer/work payment execution was introduced by this rollout.
 - Confirmed: no QBO behavior was introduced by this rollout.
 - Confirmed: no schema migration or Supabase data change was part of this rollout.
-- Remaining rollout work is now limited to final validation, docs/source-of-truth closeout, branch-promotion decision, and later dormant legacy intake cleanup.
+- Remaining: dormant legacy `lib/actions/intake-actions.ts` cleanup is a later candidate only; no immediate action required.
 
 ### 2.7 Pricebook invoice-line sourcing promotion confirmation (C1B/C1C)
 - Completed: Pricebook C1B/C1C invoice-line sourcing promotion is production-promoted and production-smoke confirmed.

@@ -875,9 +875,9 @@ migration stabilization process and guardrails
 
 The core operational platform is complete enough to be considered a real working system, not a partial prototype.
 
-16.3 Operational Entitlement Mutation Guard Rollout (Sandbox Closeout Status)
+16.3 Operational Entitlement Mutation Guard Rollout (Production-Promoted)
 
-Operational entitlement mutation guard rollout is complete on `sandbox-clean-start` through Slice 16C, pending final validation, source-of-truth closeout, and branch-promotion decision.
+Operational entitlement mutation guard rollout is complete through Slice 16C and is promoted on `main` at commit `bf38eca`. Full validation passed: 89 test files, 1057 tests, TSC_OK. Production smoke confirmed.
 
 Completed guarded internal operational mutation families:
 
@@ -927,6 +927,7 @@ Rollout boundary confirmations:
 - no QBO behavior was introduced
 - no schema migration or Supabase data change was part of this rollout
 - tenant customer / work payment execution remains deferred
+- two additional test-only mock repairs were committed during main validation (`job-ops-waiting-state.test.ts`, `service-case-reconciliation-wiring.test.ts`); no product behavior change was introduced by those repairs
 
 17. What Is Deferred (Intentional, Not Missing)
 
@@ -943,7 +944,7 @@ Note:
 Payment P1 foundation is closed at the current baseline.
 Tenant customer invoice payment execution and live Pay Now/Charge Card flows remain deferred.
 Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
-Operational entitlement mutation gating for active internal operational mutation paths is no longer open work after Slice 16C; only final validation, source-of-truth closeout, branch-promotion decision, and dormant legacy intake cleanup remain.
+Operational entitlement mutation gating for active internal operational mutation paths is complete and production-promoted on `main` (commit `bf38eca`). Dormant legacy intake cleanup remains a later candidate.
 See Section 19 for current payment-ready status.
 
 18. Internal Business Identity vs Product Brand Identity (Locked)
