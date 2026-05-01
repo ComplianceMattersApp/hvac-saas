@@ -5,6 +5,7 @@ const createAdminClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
 const isInternalAccessErrorMock = vi.fn();
 const createJobMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 const ALLOW_PATH_REACHED = "ALLOW_PATH_REACHED";
 
@@ -63,6 +64,11 @@ vi.mock("@/lib/auth/internal-user", () => ({
 
 vi.mock("@/lib/actions/job-actions", () => ({
   createJob: (...args: unknown[]) => createJobMock(...args),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 function buildSubmission(overrides: Partial<SubmissionRow> = {}): SubmissionRow {
@@ -302,6 +308,11 @@ describe("contractor intake adjudication same-account hardening", () => {
 
     isInternalAccessErrorMock.mockImplementation((error: unknown) => {
       return String((error as Error)?.message ?? "").includes("Active internal user required.");
+    });
+
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
     });
 
     createJobMock.mockResolvedValue({ id: "job-1" });

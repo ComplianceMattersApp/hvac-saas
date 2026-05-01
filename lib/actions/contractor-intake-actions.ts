@@ -12,6 +12,7 @@ import {
   normalizeContractorIntakeProjectType,
   resolveFinalizedContractorIntakeTitle,
 } from "@/lib/utils/contractor-intake-title";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 
 type FinalizationMode = "existing_existing" | "existing_new" | "new_new";
 
@@ -119,8 +120,28 @@ async function loadScopedPendingSubmission(params: {
   return submission;
 }
 
+async function requireOperationalContractorIntakeAdjudicationAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? "").trim(),
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: "entitlement_blocked",
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
+}
+
 async function requireScopedPendingAdjudication(formData: FormData) {
-  const { userId, admin, accountOwnerUserId } = await requireInternalReviewer();
+  const { userId, admin, supabase, accountOwnerUserId } = await requireInternalReviewer();
   const submissionId = normalizeText(formData.get("submission_id"));
 
   if (!isUuid(submissionId)) throw new Error("Invalid submission_id");
@@ -128,6 +149,11 @@ async function requireScopedPendingAdjudication(formData: FormData) {
   const submission = await loadScopedPendingSubmission({
     admin,
     submissionId,
+    accountOwnerUserId,
+  });
+
+  await requireOperationalContractorIntakeAdjudicationAccessOrRedirect({
+    supabase,
     accountOwnerUserId,
   });
 
