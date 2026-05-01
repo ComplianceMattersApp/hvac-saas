@@ -22,11 +22,8 @@ export async function proxy(req: NextRequest) {
   // Allow Stripe webhook to bypass auth — signature verification happens inside the route.
   if (pathname === "/api/stripe/webhook") return NextResponse.next();
 
-  // Allow login + auth routes without a session.
-  const isAuthRoute =
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/auth") ||
-    pathname.startsWith("/set-password");
+  // Allow login, signup, and auth routes without a session.
+  const isAuthRoute = isUnauthedPublicRoute(pathname);
 
   let res = NextResponse.next();
 
@@ -59,6 +56,15 @@ export async function proxy(req: NextRequest) {
   }
 
   return res;
+}
+
+export function isUnauthedPublicRoute(pathname: string) {
+  return (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/signup") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/set-password")
+  );
 }
 
 export const config = {
