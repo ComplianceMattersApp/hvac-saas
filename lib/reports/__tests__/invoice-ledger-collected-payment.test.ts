@@ -179,7 +179,7 @@ describe("Invoice Ledger Collected Payment Reporting", () => {
     expect(row.amountPaidDisplay).toBe("$12.84");
     expect(row.balanceDueDisplay).toBe("$187.16");
     expect(row.paymentStatusLabel).toBe("Partial");
-    expect(row.lastPaymentDateDisplay).toBe("4/25/2026");
+    expect(row.lastPaymentDateDisplay).toBe("04-25-2026");
     expect(row.lastPaymentDateDisplay.includes("T")).toBe(false);
     expect(row.paymentCountDisplay).toBe("2");
   });

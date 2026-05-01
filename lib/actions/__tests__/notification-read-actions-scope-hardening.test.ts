@@ -70,6 +70,10 @@ function makeScopedSupabaseFixture(rows: NotificationRow[]) {
     };
 
     const resolve = () => {
+      if (table === "jobs" || table === "contractors") {
+        return { data: [], error: null };
+      }
+
       if (table !== "notifications") {
         throw new Error(`Unexpected table for select: ${table}`);
       }
