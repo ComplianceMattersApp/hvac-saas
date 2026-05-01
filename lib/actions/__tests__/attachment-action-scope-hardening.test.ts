@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const insertInternalNotificationForEventMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
@@ -17,6 +18,11 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("@/lib/auth/internal-user", () => ({
   requireInternalUser: (...args: unknown[]) => requireInternalUserMock(...args),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock("@/lib/actions/notification-actions", () => ({
@@ -219,6 +225,10 @@ describe("internal attachment same-account hardening", () => {
         is_active: true,
         account_owner_user_id: "owner-1",
       },
+    });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
     });
     insertInternalNotificationForEventMock.mockResolvedValue(undefined);
   });
