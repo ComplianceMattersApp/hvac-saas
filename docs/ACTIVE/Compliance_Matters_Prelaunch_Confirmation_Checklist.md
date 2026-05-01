@@ -443,6 +443,8 @@ If any item here conflicts with the active spine, the spine wins.
 - Production enablement is deferred pending explicit rollout decision.
 - Production migration timing remains a deliberate go-live decision, not automatic.
 - Feature exposure / route visibility decision remains open for production rollout.
+- V1C exposure control is fail-closed by default: `ENABLE_SUPPORT_CONSOLE` must be explicitly enabled to expose `/ops/admin/users/support`.
+- Production support-console enablement requires both decisions together: production support migration apply decision and explicit `ENABLE_SUPPORT_CONSOLE` enablement decision.
 - Tenant/customer-facing support grant visibility remains a later slice.
 - Read-only account overview remains a later slice.
 - Support mutation remains a much-later explicit decision, if ever.

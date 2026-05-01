@@ -47,6 +47,7 @@ describe("support console actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    process.env.ENABLE_SUPPORT_CONSOLE = "true";
 
     createClientMock.mockResolvedValue({});
     requireInternalRoleMock.mockResolvedValue({
@@ -61,6 +62,26 @@ describe("support console actions", () => {
 
     startReadOnlySupportSessionMock.mockResolvedValue({ id: "session-1" });
     endSupportSessionMock.mockResolvedValue({ id: "session-1" });
+  });
+
+  it("blocks start action when support console feature is disabled", async () => {
+    delete process.env.ENABLE_SUPPORT_CONSOLE;
+    const { startSupportSessionFromForm } = await import("@/lib/actions/support-console-actions");
+
+    await expect(startSupportSessionFromForm(buildStartFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/users?notice=support_console_unavailable",
+    );
+    expect(startReadOnlySupportSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks end action when support console feature is disabled", async () => {
+    delete process.env.ENABLE_SUPPORT_CONSOLE;
+    const { endSupportSessionFromForm } = await import("@/lib/actions/support-console-actions");
+
+    await expect(endSupportSessionFromForm(buildEndFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/users?notice=support_console_unavailable",
+    );
+    expect(endSupportSessionMock).not.toHaveBeenCalled();
   });
 
   it("denies non-admin before support session start helper is reached", async () => {

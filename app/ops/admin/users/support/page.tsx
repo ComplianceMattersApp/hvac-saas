@@ -5,6 +5,7 @@ import {
   endSupportSessionFromForm,
   startSupportSessionFromForm,
 } from "@/lib/actions/support-console-actions";
+import { isSupportConsoleEnabled } from "@/lib/support/support-console-exposure";
 import { getSupportConsoleSnapshot } from "@/lib/support/support-console";
 import { createClient } from "@/lib/supabase/server";
 
@@ -80,6 +81,10 @@ export default async function SupportConsolePage({
   const notice = NOTICE_TEXT[String(sp.notice ?? "").trim().toLowerCase()];
 
   const { userId } = await requireAdminOrRedirect();
+  if (!isSupportConsoleEnabled()) {
+    redirect("/ops/admin/users?notice=support_console_unavailable");
+  }
+
   const snapshot = await getSupportConsoleSnapshot({
     actorUserId: userId,
     accountOwnerUserId,

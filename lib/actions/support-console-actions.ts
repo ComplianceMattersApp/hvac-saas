@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireInternalRole } from "@/lib/auth/internal-user";
+import { isSupportConsoleEnabled } from "@/lib/support/support-console-exposure";
 import { createClient } from "@/lib/supabase/server";
 import {
   endSupportSession,
@@ -27,9 +28,17 @@ function withNotice(path: string, notice: string, accountOwnerUserId?: string): 
   return `${url.pathname}${url.search}`;
 }
 
+function supportConsoleUnavailableRedirect(): string {
+  return "/ops/admin/users?notice=support_console_unavailable";
+}
+
 export async function startSupportSessionFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { userId } = await requireInternalRole("admin", { supabase });
+
+  if (!isSupportConsoleEnabled()) {
+    redirect(supportConsoleUnavailableRedirect());
+  }
 
   const accountOwnerUserId = String(formData.get("account_owner_user_id") ?? "").trim();
   const returnTo = safeReturnTo(String(formData.get("return_to") ?? SUPPORT_CONSOLE_PATH));
@@ -57,6 +66,10 @@ export async function startSupportSessionFromForm(formData: FormData): Promise<v
 export async function endSupportSessionFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { userId } = await requireInternalRole("admin", { supabase });
+
+  if (!isSupportConsoleEnabled()) {
+    redirect(supportConsoleUnavailableRedirect());
+  }
 
   const accountOwnerUserId = String(formData.get("account_owner_user_id") ?? "").trim();
   const supportAccessSessionId = String(formData.get("support_access_session_id") ?? "").trim();
