@@ -3911,6 +3911,11 @@ export async function updateJobContractorFromForm(formData: FormData) {
     });
   }
 
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
+  });
+
   if (contractor_id) {
     const scopedContractor = await loadScopedActiveInternalContractorForMutation({
       accountOwnerUserId,
@@ -8054,9 +8059,14 @@ export async function updateJobCustomerFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required");
 
   const supabase = await createClient();
-  await requireInternalScopedJobAccessOrRedirect({
+  const { internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   const customer_first_name = String(formData.get("customer_first_name") || "").trim() || null;
@@ -8089,9 +8099,14 @@ export async function addPublicNoteFromForm(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { userId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   const { data: recentDuplicate, error: duplicateErr } = await supabase
@@ -8138,9 +8153,14 @@ export async function addInternalNoteFromForm(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { userId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   const hasContextFields = !!(context || anchorEventId || anchorEventType);
