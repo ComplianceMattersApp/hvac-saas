@@ -9,6 +9,7 @@ const createAdminClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
 const createJobMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -37,6 +38,11 @@ vi.mock("@/lib/actions/job-actions", async () => {
     createJob: (...args: unknown[]) => createJobMock(...args),
   };
 });
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
+}));
 
 type IntakeSubmissionRow = {
   id: string;
@@ -198,6 +204,11 @@ describe("contractor-originated ECC title handling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
   });
 
   it("direct contractor ECC create uses the structured ECC title instead of freeform contractor title", async () => {

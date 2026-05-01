@@ -9,6 +9,7 @@ const sendEmailMock = vi.fn();
 const createContractorIntakeProposalAwarenessNotificationMock = vi.fn();
 const insertInternalNotificationForEventMock = vi.fn();
 const loadScopedActiveInternalContractorForMutationMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 const ALLOW_PATH_REACHED = "ALLOW_PATH_REACHED";
 
@@ -63,6 +64,11 @@ vi.mock("@/lib/auth/internal-contractor-scope", () => ({
   loadScopedActiveInternalContractorForMutation: (...args: unknown[]) =>
     loadScopedActiveInternalContractorForMutationMock(...args),
   loadScopedInternalContractorForMutation: vi.fn(),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock("@/lib/email/sendEmail", () => ({
@@ -310,7 +316,19 @@ describe("job intake create same-account hardening", () => {
     insertInternalNotificationForEventMock.mockResolvedValue(undefined);
     sendEmailMock.mockResolvedValue(undefined);
     loadScopedActiveInternalContractorForMutationMock.mockResolvedValue({ id: "ctr-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
   });
+
+  function assertNoIntakeCreateWrites(fixture: { writeCalls: Array<{ table: string }> }) {
+    expect(
+      fixture.writeCalls.filter((call) =>
+        ["customers", "locations", "jobs", "job_events", "notifications"].includes(call.table),
+      ),
+    ).toHaveLength(0);
+  }
 
   it("allows same-account internal createJobFromForm to reach authorized create path", async () => {
     const fixture = buildSupabaseFixture({ throwOnJobsInsert: true });
@@ -329,6 +347,124 @@ describe("job intake create same-account hardening", () => {
     expect(
       fixture.writeCalls.filter((call) => ["customers", "locations", "jobs", "job_events"].includes(call.table)),
     ).toContainEqual({ table: "jobs", method: "insert" });
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+    );
+  });
+
+  it("allows internal create when entitlement is valid trial", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: true });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: "allowed_trial",
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(createJobFromForm(buildIntakeFormData())).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    expect(
+      fixture.writeCalls.filter((call) => ["customers", "locations", "jobs", "job_events"].includes(call.table)),
+    ).toContainEqual({ table: "jobs", method: "insert" });
+  });
+
+  it("blocks expired trial internal create before any canonical writes", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: false });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_trial_expired",
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(createJobFromForm(buildIntakeFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
+    );
+
+    assertNoIntakeCreateWrites(fixture);
+  });
+
+  it("blocks null-ended trial internal create before any canonical writes", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: false });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_trial_missing_end",
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(createJobFromForm(buildIntakeFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
+    );
+
+    assertNoIntakeCreateWrites(fixture);
+  });
+
+  it("allows internal create for internal comped entitlement", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: true });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: "allowed_internal_comped",
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(createJobFromForm(buildIntakeFormData())).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    expect(
+      fixture.writeCalls.filter((call) => ["customers", "locations", "jobs", "job_events"].includes(call.table)),
+    ).toContainEqual({ table: "jobs", method: "insert" });
+  });
+
+  it("blocks missing entitlement row internal create before any canonical writes", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: false });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_missing_entitlement",
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(createJobFromForm(buildIntakeFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
+    );
+
+    assertNoIntakeCreateWrites(fixture);
   });
 
   it("rejects internal Service intake with no Visit Scope items", async () => {

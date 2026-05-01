@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import { requireInternalUser } from '@/lib/auth/internal-user';
+import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { createClient } from '@/lib/supabase/server';
 import { laDateTimeToUtcIso } from '@/lib/utils/schedule-la';
 
@@ -57,6 +58,22 @@ async function requireScopedCalendarBlockEvent(params: {
   return existing?.id ? String(existing.id) : null;
 }
 
+async function requireOperationalCalendarBlockEntitlementAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? '').trim(),
+    supabase: params.supabase,
+  });
+  if (access.authorized) return;
+  const search = new URLSearchParams({
+    err: 'entitlement_blocked',
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
+}
+
 export async function createCalendarBlockEventFromForm(formData: FormData) {
   const supabase = await createClient();
   const { userId, internalUser } = await requireInternalUser({ supabase });
@@ -96,6 +113,11 @@ export async function createCalendarBlockEventFromForm(formData: FormData) {
   });
 
   if (!scopedInternalUserId) redirect(withBanner(returnTo, 'calendar_block_user_required'));
+
+  await requireOperationalCalendarBlockEntitlementAccessOrRedirect({
+    supabase: context.supabase,
+    accountOwnerUserId: context.accountOwnerUserId,
+  });
 
   const { error: insertErr } = await supabase
     .from('calendar_events')
@@ -166,6 +188,11 @@ export async function updateCalendarBlockEventFromForm(formData: FormData) {
   });
   if (!scopedInternalUserId) redirect(withBanner(returnTo, 'calendar_block_user_required'));
 
+  await requireOperationalCalendarBlockEntitlementAccessOrRedirect({
+    supabase: context.supabase,
+    accountOwnerUserId: context.accountOwnerUserId,
+  });
+
   const { error: updateErr } = await supabase
     .from('calendar_events')
     .update({
@@ -203,6 +230,11 @@ export async function deleteCalendarBlockEventFromForm(formData: FormData) {
     eventId,
   });
   if (!scopedEventId) redirect(withBanner(returnTo, 'calendar_block_delete_missing'));
+
+  await requireOperationalCalendarBlockEntitlementAccessOrRedirect({
+    supabase: context.supabase,
+    accountOwnerUserId: context.accountOwnerUserId,
+  });
 
   const { error: deleteErr } = await supabase
     .from('calendar_events')

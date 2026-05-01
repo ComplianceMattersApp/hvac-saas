@@ -7,12 +7,33 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { redirect } from "next/navigation"
 
 function toFullName(first?: string | null, last?: string | null) {
   const f = String(first ?? "").trim();
   const l = String(last ?? "").trim();
   return [f, l].filter(Boolean).join(" ").trim();
+}
+
+async function requireOperationalCustomerMutationAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? "").trim(),
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: "entitlement_blocked",
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
 }
 
 async function requireInternalScopedCustomerForMutation(params: {
@@ -38,6 +59,11 @@ async function requireInternalScopedCustomerForMutation(params: {
   if (!scopedCustomer?.id) {
     throw new Error("Customer not found in internal account scope");
   }
+
+  await requireOperationalCustomerMutationAccessOrRedirect({
+    supabase: params.supabase,
+    accountOwnerUserId,
+  });
 
   return { internalUser, accountOwnerUserId, customerId };
 }
@@ -231,6 +257,11 @@ export async function claimNullOwnerCustomer(customerId: string, _formData: Form
   const admin = createAdminClient();
   const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
   if (!accountOwnerUserId) throw new Error("Missing account owner scope");
+
+  await requireOperationalCustomerMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
+  });
 
   const { data: row, error: rowErr } = await admin
     .from("customers")

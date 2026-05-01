@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
 const loadScopedInternalContractorForMutationMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock("next/cache", () => ({
@@ -31,6 +32,11 @@ vi.mock("@/lib/auth/internal-contractor-scope", () => ({
 
 vi.mock("@/lib/actions/contractor-invite-actions", () => ({
   inviteContractor: vi.fn(async () => undefined),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 function makeFormData(values: Record<string, string>) {
@@ -90,6 +96,10 @@ describe("contractor admin edge same-account hardening", () => {
     loadScopedInternalContractorForMutationMock.mockResolvedValue({
       id: "contractor-1",
       owner_user_id: "owner-1",
+    });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
     });
   });
 

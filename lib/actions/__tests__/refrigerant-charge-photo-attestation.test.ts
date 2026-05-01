@@ -20,6 +20,7 @@ const loadScopedInternalEccJobForMutationMock = vi.fn();
 const loadScopedInternalEccTestRunForMutationMock = vi.fn();
 const evaluateEccOpsStatusMock = vi.fn();
 const revalidateEccProjectionConsumersMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
@@ -53,6 +54,11 @@ vi.mock("@/lib/actions/ecc-status", () => ({
   evaluateEccOpsStatus: (...args: unknown[]) => evaluateEccOpsStatusMock(...args),
   revalidateEccProjectionConsumers: (...args: unknown[]) =>
     revalidateEccProjectionConsumersMock(...args),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 /** Build a supabase fixture that captures update() call arguments */
@@ -164,6 +170,10 @@ describe("saveRefrigerantChargeDataFromForm — photo attestation path", () => {
       testRun: { id: "run-1", job_id: "job-1", test_type: "refrigerant_charge", system_id: "sys-1" },
     });
 
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
     evaluateEccOpsStatusMock.mockResolvedValue(undefined);
     revalidateEccProjectionConsumersMock.mockReturnValue(undefined);
   });
@@ -251,6 +261,10 @@ describe("saveRefrigerantChargeDataFromForm — existing numeric path still work
       testRun: { id: "run-1", job_id: "job-1", test_type: "refrigerant_charge", system_id: "sys-1" },
     });
 
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
     evaluateEccOpsStatusMock.mockResolvedValue(undefined);
     revalidateEccProjectionConsumersMock.mockReturnValue(undefined);
   });
@@ -310,6 +324,10 @@ describe("saveRefrigerantChargeDataFromForm — existing exemption path still wo
       testRun: { id: "run-1", job_id: "job-1", test_type: "refrigerant_charge", system_id: "sys-1" },
     });
 
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
     evaluateEccOpsStatusMock.mockResolvedValue(undefined);
     revalidateEccProjectionConsumersMock.mockReturnValue(undefined);
   });
@@ -361,6 +379,10 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
       testRun: { id: "run-1", job_id: "job-1", test_type: "refrigerant_charge", system_id: "sys-1" },
     });
 
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
     evaluateEccOpsStatusMock.mockResolvedValue(undefined);
     revalidateEccProjectionConsumersMock.mockReturnValue(undefined);
   });

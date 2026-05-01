@@ -5,6 +5,7 @@ const requireInternalUserMock = vi.fn();
 const loadScopedInternalJobForMutationMock = vi.fn();
 const loadScopedInternalContractorForMutationMock = vi.fn();
 const loadScopedActiveInternalContractorForMutationMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const refreshMock = vi.fn();
 
@@ -27,6 +28,11 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/auth/internal-user", () => ({
   requireInternalUser: (...args: unknown[]) => requireInternalUserMock(...args),
   requireInternalRole: vi.fn(),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock("@/lib/auth/internal-job-scope", () => ({
@@ -131,6 +137,11 @@ describe("job contractor relink same-account hardening", () => {
         is_active: true,
         account_owner_user_id: "owner-1",
       },
+    });
+
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
     });
 
     loadScopedInternalContractorForMutationMock.mockResolvedValue({ id: "contractor-2" });

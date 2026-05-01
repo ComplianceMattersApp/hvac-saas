@@ -9,6 +9,7 @@ import { setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
 import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-case-reconciliation";
 import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -73,6 +74,26 @@ async function requireInternalScopedServiceCloseoutJob(params: {
   };
 }
 
+async function requireOperationalServiceCloseoutEntitlementAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? "").trim(),
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: "entitlement_blocked",
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
+}
+
 /**
  * Service jobs:
  * - When marked complete -> field_complete = true, status = completed,
@@ -90,6 +111,10 @@ export async function markServiceComplete(jobId: string): Promise<void> {
     jobId,
     select:
       "job_type, ops_status, status, field_complete, service_case_id, service_visit_outcome",
+  });
+  await requireOperationalServiceCloseoutEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   if (job.job_type !== "service") {
@@ -176,6 +201,10 @@ export async function markInvoiceSent(jobId: string): Promise<void> {
     supabase,
     jobId,
     select: "job_type, ops_status, invoice_complete, data_entry_completed_at, service_case_id",
+  });
+  await requireOperationalServiceCloseoutEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   const billingMode = await resolveBillingModeByAccountOwnerId({

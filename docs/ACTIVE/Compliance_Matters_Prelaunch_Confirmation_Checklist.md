@@ -146,6 +146,46 @@ If any item here conflicts with the active spine, the spine wins.
 - Per-seat billing remains a desired later track, but is not enforced in V1/live launch.
 - Future per-seat work should include seat-limit enforcement, Stripe quantity sync, proration handling, and customer portal quantity rules.
 
+### 2.6.1 Operational entitlement mutation guard rollout closeout (sandbox-ready)
+- Confirmed: operational entitlement mutation guard rollout is complete on `sandbox-clean-start` through Slice 16C for active internal operational mutation paths.
+- Confirmed guarded operational mutation families:
+  - internal job creation/intake
+  - job ops/scheduling/contact
+  - closeout/completion
+  - internal invoices/invoice lines/manual payment tracking
+  - notes
+  - calendar block events
+  - contractor report preview/send
+  - attachments
+  - equipment/systems
+  - ECC test-run/test-data
+  - staffing/assignment/contractor relink
+  - remaining job-detail operations
+  - contractor intake adjudication
+  - customer/profile mutations
+  - contractor directory/admin mutations
+  - Pricebook mutations
+- Confirmed server-side entitlement result:
+  - active entitlement is allowed
+  - valid trial is allowed
+  - internal/comped accounts are allowed
+  - expired trial is blocked before writes/side effects
+  - null-ended trial is blocked before writes/side effects
+  - missing entitlement is blocked before writes/side effects
+- Confirmed intentionally accessible setup/recovery/admin paths remain outside internal operational entitlement gating:
+  - company profile
+  - team setup
+  - internal user/admin invite and password recovery
+  - billing/setup recovery
+  - notification read-state
+- Confirmed: external contractor onboarding/invite acceptance remains outside internal operational entitlement gating.
+- Confirmed: `createJob` remains a low-level helper only; active entrypoints are guarded.
+- Confirmed: `lib/actions/intake-actions.ts` remains dormant legacy and is a later cleanup/retirement candidate.
+- Confirmed: no Stripe tenant customer/work payment execution was introduced by this rollout.
+- Confirmed: no QBO behavior was introduced by this rollout.
+- Confirmed: no schema migration or Supabase data change was part of this rollout.
+- Remaining rollout work is now limited to final validation, docs/source-of-truth closeout, branch-promotion decision, and later dormant legacy intake cleanup.
+
 ### 2.7 Pricebook invoice-line sourcing promotion confirmation (C1B/C1C)
 - Completed: Pricebook C1B/C1C invoice-line sourcing promotion is production-promoted and production-smoke confirmed.
 - Completed verification on promoted behavior:

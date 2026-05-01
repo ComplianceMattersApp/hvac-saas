@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock("next/cache", () => ({
@@ -29,6 +30,11 @@ vi.mock("@/lib/auth/internal-user", () => ({
 
 vi.mock("@/lib/actions/contractor-invite-actions", () => ({
   inviteContractor: vi.fn(async () => undefined),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 function makeAdminContractorScopeFixture(ownerUserId: string | null) {
@@ -104,6 +110,10 @@ describe("contractor CRUD same-account hardening", () => {
         is_active: true,
         account_owner_user_id: "owner-1",
       },
+    });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
     });
   });
 

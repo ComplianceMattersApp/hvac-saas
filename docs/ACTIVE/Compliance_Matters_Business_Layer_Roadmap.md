@@ -571,6 +571,38 @@ Roadmap guardrail:
 - This does not imply QBO dependency.
 
 Completed RLS / permission hardening slices for the current stabilized baseline:
+- Operational entitlement mutation guard rollout is complete on `sandbox-clean-start` through Slice 16C for active internal operational mutation paths, pending only final validation, docs/source-of-truth closeout, and branch-promotion decision.
+- Completed guarded operational mutation families include:
+  - internal job creation / intake
+  - job ops / scheduling / contact
+  - closeout / completion
+  - internal invoices / invoice lines / manual payment tracking
+  - notes
+  - calendar block events
+  - contractor report preview / send
+  - attachments
+  - equipment / systems
+  - ECC test-run / test-data mutations
+  - staffing / assignment / contractor relink
+  - remaining job-detail operational mutations
+  - contractor intake adjudication
+  - customer / profile mutations
+  - contractor directory / admin mutations
+  - Pricebook mutations
+- Locked entitlement result for those mutation families:
+  - active entitlement, valid trial, and internal/comped accounts are allowed
+  - expired trial, null-ended trial, and missing entitlement are blocked server-side before writes and side effects
+- Intentional non-operational/exempt paths remain accessible:
+  - company profile
+  - team setup
+  - internal user/admin invite and password recovery
+  - billing/setup recovery
+  - notification read-state
+- External contractor onboarding / invite acceptance remains outside internal operational entitlement gating.
+- `createJob` remains a low-level helper only; active callers are guarded and new active callers must not be added without entitlement gating.
+- `lib/actions/intake-actions.ts` remains dormant legacy and is a later cleanup/retirement candidate, not active rollout work.
+- No Stripe tenant customer payment execution, no QBO behavior, and no schema migration or Supabase data change were introduced by this rollout.
+- Remaining work language in the entitlement area should now be read narrowly as: final validation, source-of-truth closeout, branch-promotion decision, and later dormant-legacy cleanup, not open operational mutation gating.
 - customer/location internal account-owner reconciliation is complete
 - jobs and service_cases were already ahead on account-owner-aware internal read scope; customers and locations have now been reconciled to that same internal account-owner model for internal same-account teammates
 - validated passed for customer list, customer detail, internal `/jobs/new` guided lookup, and location detail for non-owner internal teammates

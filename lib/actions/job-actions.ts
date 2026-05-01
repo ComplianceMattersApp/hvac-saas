@@ -39,6 +39,7 @@ import {
   resolveBillingModeByAccountOwnerId,
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { renderSystemEmailLayout, escapeHtml, resolveAppUrl } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { resolveNotificationAccountOwnerUserId } from "@/lib/notifications/account-owner";
@@ -2126,7 +2127,10 @@ async function requireInternalEccTestsAccess(params: {
       redirect(`/jobs/${jobId}?notice=not_authorized`);
     }
 
-    return scopedRun;
+    return {
+      ...scopedRun,
+      internalUser,
+    };
   }
 
   const scopedJob = await loadScopedInternalEccJobForMutation({
@@ -2138,7 +2142,11 @@ async function requireInternalEccTestsAccess(params: {
     redirect(`/jobs/${jobId}?notice=not_authorized`);
   }
 
-  return { job: scopedJob, testRun: null };
+  return {
+    job: scopedJob,
+    testRun: null,
+    internalUser,
+  };
 }
 
 async function requireInternalEquipmentMutationAccess(params: {
@@ -2163,7 +2171,10 @@ async function requireInternalEquipmentMutationAccess(params: {
       redirect(`/jobs/${jobId}?notice=not_authorized`);
     }
 
-    return scopedEquipment;
+    return {
+      ...scopedEquipment,
+      internalUser,
+    };
   }
 
   const scopedJob = await loadScopedInternalEquipmentJobForMutation({
@@ -2175,7 +2186,11 @@ async function requireInternalEquipmentMutationAccess(params: {
     redirect(`/jobs/${jobId}?notice=not_authorized`);
   }
 
-  return { job: scopedJob, equipment: null };
+  return {
+    job: scopedJob,
+    equipment: null,
+    internalUser,
+  };
 }
 
 /** ✅ Defensive resolver: if form is missing system_id, fall back to run.system_id */
@@ -2211,7 +2226,7 @@ export async function updateJobTypeFromForm(formData: FormData) {
     throw new Error("Missing job_id");
   }
 
-  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId,
   });
@@ -2221,6 +2236,11 @@ export async function updateJobTypeFromForm(formData: FormData) {
   if (!allowed.includes(rawType)) {
     throw new Error("Invalid job type");
   }
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")
@@ -2312,6 +2332,11 @@ export async function updateJobServiceContractFromForm(formData: FormData) {
       returnToRaw,
     });
   }
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   if (String(beforeJob?.job_type ?? "").toLowerCase() !== "service") {
     redirectToJobWithBanner({
@@ -2516,6 +2541,11 @@ export async function updateJobVisitScopeFromForm(formData: FormData) {
     });
   }
 
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
   const nextSummary = sanitizeVisitScopeSummary(formData.get("visit_scope_summary"));
   const nextItemsRaw = String(formData.get("visit_scope_items_json") || "").trim();
   const normalizedNextItemsRaw =
@@ -2672,6 +2702,11 @@ export async function promoteCompanionScopeToServiceJobFromForm(formData: FormDa
         returnToRaw,
       });
     },
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   const itemIndex = Number(itemIndexRaw);
@@ -2891,6 +2926,11 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     onUnauthorized: () => {
       redirectToJobWithBanner({ jobId: sourceJobId, banner: "not_authorized", tabRaw, returnToRaw });
     },
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   if (!nextVisitReasonRaw) {
@@ -3206,9 +3246,14 @@ export async function archiveJobFromForm(formData: FormData) {
   if (!job_id) throw new Error("Missing job_id");
 
   const supabase = await createClient();
-  await requireInternalAdminScopedJobAccessOrRedirect({
+  const { internalUser } = await requireInternalAdminScopedJobAccessOrRedirect({
     supabase,
     jobId: job_id,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   // Do the archive and REQUIRE a returned row (proves success)
@@ -3282,7 +3327,12 @@ export async function addJobEquipmentFromForm(formData: FormData) {
   const notes = String(formData.get("notes") || "").trim() || null;
 
   const supabase = await createClient();
-  await requireInternalEquipmentMutationAccess({ supabase, jobId });
+  const scoped = await requireInternalEquipmentMutationAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // 1) Resolve/Create system for this job + location
   const { data: existingSystem, error: sysFindErr } = await supabase
@@ -3375,7 +3425,16 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
   const notes = String(formData.get("notes") || "").trim() || null;
 
   const supabase = await createClient();
-  await requireInternalEquipmentMutationAccess({ supabase, jobId, equipmentId });
+  const scoped = await requireInternalEquipmentMutationAccess({
+    supabase,
+    jobId,
+    equipmentId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   const { data: existingEquipment, error: equipmentErr } = await supabase
     .from("job_equipment")
@@ -3458,7 +3517,16 @@ export async function deleteJobEquipmentFromForm(formData: FormData) {
   if (!equipmentId) throw new Error("Missing equipment_id");
 
   const supabase = await createClient();
-  await requireInternalEquipmentMutationAccess({ supabase, jobId, equipmentId });
+  const scoped = await requireInternalEquipmentMutationAccess({
+    supabase,
+    jobId,
+    equipmentId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
  const { data: deleted, error: delErr } = await supabase
   .from("job_equipment")
@@ -3498,7 +3566,16 @@ export async function saveEccTestOverrideFromForm(formData: FormData) {
   const testType = allowed.has(testTypeRaw) ? testTypeRaw : "";
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId, testRunId });
+  const scoped = await requireInternalEccTestsAccess({
+    supabase,
+    jobId,
+    testRunId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // Only update override fields, never touch data/computed
   const { data: updated, error } = await supabase
@@ -3701,7 +3778,12 @@ export async function addEccTestRunFromForm(formData: FormData) {
   if (!testType) throw new Error("Missing test_type");
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // Attach to Visit #1 (create it if missing)
   const { data: visitExisting, error: visitFindErr } = await supabase
@@ -3781,7 +3863,16 @@ export async function deleteEccTestRunFromForm(formData: FormData) {
   if (!testRunId) throw new Error("Missing test_run_id");
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId, testRunId });
+  const scoped = await requireInternalEccTestsAccess({
+    supabase,
+    jobId,
+    testRunId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
 const { data: deletedRun, error: delRunErr } = await supabase
   .from("ecc_test_runs")
@@ -3877,6 +3968,11 @@ export async function updateJobContractorFromForm(formData: FormData) {
       returnToRaw,
     });
   }
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
+  });
 
   if (contractor_id) {
     const scopedContractor = await loadScopedActiveInternalContractorForMutation({
@@ -4029,6 +4125,26 @@ async function requireInternalScopedJobAccessOrRedirect(params: {
   return { userId, internalUser, scopedJob };
 }
 
+async function requireOperationalScopedJobMutationAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? "").trim(),
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: "entitlement_blocked",
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
+}
+
 async function requireInternalAdminScopedJobAccessOrRedirect(params: {
   supabase: any;
   jobId: string;
@@ -4077,6 +4193,11 @@ export async function assignJobAssigneeFromForm(formData: FormData) {
     jobId,
   });
 
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
   await ensureActiveAssignmentForUser({
     supabase,
     jobId,
@@ -4117,9 +4238,14 @@ export async function setPrimaryJobAssigneeFromForm(formData: FormData) {
   if (!userId) throw new Error("Missing user_id");
 
   const supabase = await createClient();
-  const { userId: actorUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actorUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   await setPrimaryJobAssignment({
@@ -4152,9 +4278,14 @@ export async function removeJobAssigneeFromForm(formData: FormData) {
   if (!userId) throw new Error("Missing user_id");
 
   const supabase = await createClient();
-  const { userId: actorUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actorUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   await softRemoveJobAssignment({
@@ -4205,6 +4336,17 @@ export async function markRefrigerantChargeExemptFromForm(formData: FormData) {
       : null;
 
   const supabase = await createClient();
+
+  const scoped = await requireInternalEccTestsAccess({
+    supabase,
+    jobId,
+    testRunId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   if (!exemptReason) {
     const systemId = await resolveSystemIdForRun({
@@ -4462,7 +4604,12 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   };
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // 1) Load existing data so we don't wipe fields
   const { data: existingRun, error: loadErr } = await supabase
@@ -4588,7 +4735,12 @@ export async function saveAirflowDataFromForm(formData: FormData) {
   };
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   const { error } = await supabase
     .from("ecc_test_runs")
@@ -4659,7 +4811,16 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
   const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId, testRunId });
+  const scoped = await requireInternalEccTestsAccess({
+    supabase,
+    jobId,
+    testRunId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   const { error } = await supabase
     .from("ecc_test_runs")
@@ -4703,7 +4864,12 @@ export async function completeEccTestRunFromForm(formData: FormData) {
   if (!testRunId) throw new Error("Missing test_run_id");
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // 1) Load the run we are completing (this is the one we must KEEP)
   const { data: run, error: runErr } = await supabase
@@ -4908,7 +5074,12 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
   const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // Get system_id and visit_id
   const systemId = await resolveSystemIdForRun({
@@ -5033,7 +5204,12 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
   };
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // Get system_id and visit_id
   const systemId = await resolveSystemIdForRun({
@@ -5261,7 +5437,12 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
   };
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // Get system_id and visit_id
   const systemId = await resolveSystemIdForRun({
@@ -5345,6 +5526,12 @@ export async function addAlterationCoreTestsFromForm(formData: FormData) {
   if (!systemId) throw new Error("Missing system_id");
 
   const supabase = await createClient();
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // Attach to Visit #1 for now
   const { data: visit, error: visitErr } = await supabase
@@ -5607,6 +5794,32 @@ async function requireOwnerScopedInternalIntakeCreateContext(params: {
   return internalUser;
 }
 
+async function requireOperationalIntakeCreateEntitlementAccess(params: {
+  supabase: any;
+  isContractorUser: boolean;
+  canonicalOwnerUserId: string;
+}) {
+  if (params.isContractorUser) {
+    return;
+  }
+
+  const accountOwnerUserId = String(params.canonicalOwnerUserId ?? "").trim();
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId,
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: "entitlement_blocked",
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
+}
+
 /**
  * CREATE: used by /jobs/new form
  */
@@ -5754,6 +5967,12 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
   await requireOwnerScopedInternalIntakeCreateContext({
     supabase,
     actorUserId: userId,
+    isContractorUser,
+    canonicalOwnerUserId: String(canonicalOwnerUserId ?? ""),
+  });
+
+  await requireOperationalIntakeCreateEntitlementAccess({
+    supabase,
     isContractorUser,
     canonicalOwnerUserId: String(canonicalOwnerUserId ?? ""),
   });
@@ -7016,9 +7235,13 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   console.log("[ADVANCE_STATUS_ENTRY]", { jobId: id, ts: new Date().toISOString() });
 
   const supabase = await createClient();
-  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
+  });
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   // ✅ Read true current status from DB (source of truth)
@@ -7546,10 +7769,14 @@ export async function revertOnTheWayFromForm(formData: FormData) {
     redirect(`/jobs/${id}?${params.toString()}`);
   };
 
-  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
     onUnauthorized: () => redirect(`/jobs/${id}?notice=not_authorized`),
+  });
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   const eligibility = await getOnTheWayUndoEligibilityInternal({
@@ -7642,10 +7869,14 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     redirectToScheduleTarget(banner);
   }
 
-  await requireInternalScopedJobAccessOrRedirect({
+  const { internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
     onUnauthorized: () => redirectToScheduleTarget("not_authorized"),
+  });
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   // Read prior scheduling snapshot so we can log changes
@@ -7863,9 +8094,13 @@ export async function markJobFailedFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required");
 
   const supabase = await createClient();
-  await requireInternalScopedJobAccessOrRedirect({
+  const { internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
+  });
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   await updateJob({ id, status: "failed" });
@@ -7882,9 +8117,14 @@ export async function updateJobCustomerFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required");
 
   const supabase = await createClient();
-  await requireInternalScopedJobAccessOrRedirect({
+  const { internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   const customer_first_name = String(formData.get("customer_first_name") || "").trim() || null;
@@ -7917,9 +8157,14 @@ export async function addPublicNoteFromForm(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { userId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   const { data: recentDuplicate, error: duplicateErr } = await supabase
@@ -7966,9 +8211,14 @@ export async function addInternalNoteFromForm(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { userId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   const hasContextFields = !!(context || anchorEventId || anchorEventType);
@@ -8039,6 +8289,10 @@ export async function completeDataEntryFromForm(formData: FormData) {
   const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
+  });
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
   const billingMode = await resolveBillingModeByAccountOwnerId({
     supabase,
@@ -8196,9 +8450,14 @@ export async function createRetestJobFromForm(formData: FormData) {
   if (!parentJobId) throw new Error("Missing parent_job_id");
 
   const supabase = await createClient();
-  await requireInternalScopedJobAccessOrRedirect({
+  const { internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: parentJobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   // 1) Load parent job
@@ -8453,9 +8712,14 @@ export async function cancelJobFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required (job_id missing)");
 
   const supabase = await createClient();
-  const { userId } = await requireInternalAdminScopedJobAccessOrRedirect({
+  const { userId, internalUser } = await requireInternalAdminScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   // Read current job state

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
 const loadScopedInternalJobForMutationMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -31,6 +32,11 @@ vi.mock("@/lib/auth/internal-job-scope", () => ({
   loadScopedInternalJobForMutation: (...args: unknown[]) =>
     loadScopedInternalJobForMutationMock(...args),
   loadScopedInternalServiceCaseForMutation: vi.fn(),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock("@/lib/actions/job-evaluator", () => ({
@@ -184,6 +190,10 @@ describe("admin terminal job mutation same-account hardening", () => {
     });
 
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
   });
 
   it("allows same-account admin archiveJobFromForm past scoped job preflight", async () => {

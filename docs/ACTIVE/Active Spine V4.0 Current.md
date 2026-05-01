@@ -875,6 +875,59 @@ migration stabilization process and guardrails
 
 The core operational platform is complete enough to be considered a real working system, not a partial prototype.
 
+16.3 Operational Entitlement Mutation Guard Rollout (Sandbox Closeout Status)
+
+Operational entitlement mutation guard rollout is complete on `sandbox-clean-start` through Slice 16C, pending final validation, source-of-truth closeout, and branch-promotion decision.
+
+Completed guarded internal operational mutation families:
+
+- internal job creation / intake
+- job ops / scheduling / contact
+- closeout / completion
+- internal invoices / invoice lines / manual payment tracking
+- notes
+- calendar block events
+- contractor report preview / send
+- attachments
+- equipment / systems
+- ECC test-run / test-data mutations
+- staffing / assignment / contractor relink
+- remaining job-detail operational mutations
+- contractor intake adjudication
+- customer / profile mutations
+- contractor directory / admin mutations
+- Pricebook mutations
+
+Locked server-side entitlement result:
+
+- active entitlement is allowed
+- valid trial with future `trial_ends_at` is allowed
+- internal / comped accounts are allowed
+- expired trial is blocked before operational mutation writes / side effects
+- trial with null `trial_ends_at` is blocked before operational mutation writes / side effects
+- missing entitlement row is blocked before operational mutation writes / side effects
+
+Intentional accessibility that remains outside internal operational entitlement gating:
+
+- company profile
+- team setup
+- internal user / admin invite flows
+- password recovery / billing / setup recovery paths
+- notification read-state mutations
+
+External contractor onboarding / invite acceptance remains outside internal operational entitlement gating.
+
+`createJob` remains a low-level helper only. Active entrypoints that call it are guarded. Do not add new active callers unless the caller applies the operational entitlement gate first.
+
+`lib/actions/intake-actions.ts` remains dormant legacy create flow and should be treated as a later cleanup / retirement candidate rather than an active mutation lane.
+
+Rollout boundary confirmations:
+
+- no Stripe tenant customer payment execution was introduced
+- no QBO behavior was introduced
+- no schema migration or Supabase data change was part of this rollout
+- tenant customer / work payment execution remains deferred
+
 17. What Is Deferred (Intentional, Not Missing)
 
 These are not currently failures of the spine. They are future/business-layer modules.
@@ -890,6 +943,7 @@ Note:
 Payment P1 foundation is closed at the current baseline.
 Tenant customer invoice payment execution and live Pay Now/Charge Card flows remain deferred.
 Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
+Operational entitlement mutation gating for active internal operational mutation paths is no longer open work after Slice 16C; only final validation, source-of-truth closeout, branch-promotion decision, and dormant legacy intake cleanup remain.
 See Section 19 for current payment-ready status.
 
 18. Internal Business Identity vs Product Brand Identity (Locked)

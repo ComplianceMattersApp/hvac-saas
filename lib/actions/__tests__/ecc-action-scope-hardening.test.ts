@@ -4,6 +4,7 @@ const createClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 const loadScopedInternalEccJobForMutationMock = vi.fn();
 const loadScopedInternalEccTestRunForMutationMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const evaluateEccOpsStatusMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
@@ -33,6 +34,11 @@ vi.mock("@/lib/auth/internal-ecc-scope", () => ({
     loadScopedInternalEccJobForMutationMock(...args),
   loadScopedInternalEccTestRunForMutation: (...args: unknown[]) =>
     loadScopedInternalEccTestRunForMutationMock(...args),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock("@/lib/actions/ecc-status", () => ({
@@ -223,6 +229,10 @@ describe("duct leakage override reason — Asbestos", () => {
         account_owner_user_id: "owner-1",
       },
     });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
     evaluateEccOpsStatusMock.mockResolvedValue(undefined);
   });
 
@@ -340,6 +350,10 @@ describe("internal ECC same-account hardening", () => {
         is_active: true,
         account_owner_user_id: "owner-1",
       },
+    });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
     });
     evaluateEccOpsStatusMock.mockResolvedValue(undefined);
   });

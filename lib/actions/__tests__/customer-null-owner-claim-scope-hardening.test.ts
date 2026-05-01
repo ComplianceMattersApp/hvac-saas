@@ -4,6 +4,7 @@ const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -23,6 +24,11 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/auth/internal-user", () => ({
   requireInternalUser: (...args: unknown[]) => requireInternalUserMock(...args),
   isInternalAccessError: vi.fn(() => false),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 type ClaimMode = "allow" | "already-owned" | "missing";
@@ -87,6 +93,10 @@ describe("null-owner customer claim hardening", () => {
         is_active: true,
         account_owner_user_id: "owner-1",
       },
+    });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
     });
   });
 

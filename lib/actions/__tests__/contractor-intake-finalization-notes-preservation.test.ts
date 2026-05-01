@@ -4,6 +4,7 @@ const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
 const createJobMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -32,6 +33,11 @@ vi.mock("@/lib/actions/job-actions", async () => {
     createJob: (...args: unknown[]) => createJobMock(...args),
   };
 });
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
+}));
 
 type IntakeSubmissionRow = {
   id: string;
@@ -210,6 +216,11 @@ describe("contractor intake finalization notes preservation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
 
     createClientMock.mockResolvedValue({
       auth: {

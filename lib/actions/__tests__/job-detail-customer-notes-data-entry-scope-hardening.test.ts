@@ -8,6 +8,7 @@ const evaluateJobOpsStatusMock = vi.fn();
 const healStalePaperworkOpsStatusMock = vi.fn();
 const forceSetOpsStatusMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
@@ -35,6 +36,11 @@ vi.mock("@/lib/auth/internal-job-scope", () => ({
   loadScopedInternalJobForMutation: (...args: unknown[]) =>
     loadScopedInternalJobForMutationMock(...args),
   loadScopedInternalServiceCaseForMutation: vi.fn(),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock("@/lib/business/internal-business-profile", () => ({
@@ -259,6 +265,10 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     evaluateJobOpsStatusMock.mockResolvedValue(undefined);
     healStalePaperworkOpsStatusMock.mockResolvedValue(true);
     forceSetOpsStatusMock.mockResolvedValue(undefined);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
   });
 
   it("allows same-account internal updateJobCustomerFromForm past scoped-job preflight", async () => {
@@ -347,6 +357,9 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1", jobId: "job-1", select: "id" }),
     );
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+    );
     expect(resolveBillingModeByAccountOwnerIdMock).toHaveBeenCalledWith(
       expect.objectContaining({ supabase, accountOwnerUserId: "owner-1" }),
     );
@@ -372,6 +385,99 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
       ]),
     );
     expect(forceSetOpsStatusMock).toHaveBeenCalledWith("job-1", "closed");
+    expect(evaluateJobOpsStatusMock).not.toHaveBeenCalled();
+    expect(healStalePaperworkOpsStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("allows valid trial internal completeDataEntryFromForm past entitlement preflight", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: "allowed_trial",
+    });
+
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
+      "REDIRECT:/jobs/job-1",
+    );
+  });
+
+  it("blocks expired trial internal completeDataEntryFromForm before writes or ops projection work", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_trial_expired",
+    });
+
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
+    );
+
+    expect(writeCalls.filter((call) => ["jobs", "job_events"].includes(call.table))).toHaveLength(0);
+    expect(resolveBillingModeByAccountOwnerIdMock).not.toHaveBeenCalled();
+    expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
+    expect(evaluateJobOpsStatusMock).not.toHaveBeenCalled();
+    expect(healStalePaperworkOpsStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks null-ended trial internal completeDataEntryFromForm before writes or ops projection work", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_trial_missing_end",
+    });
+
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
+    );
+
+    expect(writeCalls.filter((call) => ["jobs", "job_events"].includes(call.table))).toHaveLength(0);
+    expect(resolveBillingModeByAccountOwnerIdMock).not.toHaveBeenCalled();
+    expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
+    expect(evaluateJobOpsStatusMock).not.toHaveBeenCalled();
+    expect(healStalePaperworkOpsStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("allows internal comped completeDataEntryFromForm past entitlement preflight", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: "allowed_internal_comped",
+    });
+
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
+      "REDIRECT:/jobs/job-1",
+    );
+  });
+
+  it("blocks missing entitlement internal completeDataEntryFromForm before writes or ops projection work", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: "blocked_missing_entitlement",
+    });
+
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
+    );
+
+    expect(writeCalls.filter((call) => ["jobs", "job_events"].includes(call.table))).toHaveLength(0);
+    expect(resolveBillingModeByAccountOwnerIdMock).not.toHaveBeenCalled();
+    expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
     expect(evaluateJobOpsStatusMock).not.toHaveBeenCalled();
     expect(healStalePaperworkOpsStatusMock).not.toHaveBeenCalled();
   });

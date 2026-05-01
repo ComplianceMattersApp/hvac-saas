@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { requireInternalUser } from "@/lib/auth/internal-user";
 import {
@@ -8,6 +9,7 @@ import {
   loadScopedInternalJobAttachmentForMutation,
   loadScopedInternalJobAttachmentsForMutation,
 } from "@/lib/auth/internal-attachment-scope";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 
 function safeFileName(name: string) {
@@ -61,7 +63,28 @@ async function assertJobAttachmentUploadAuthority(input: {
     throw new Error("Not authorized to upload attachment for this job");
   }
 
-  return { actorType: "internal" as const };
+  return {
+    actorType: "internal" as const,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  };
+}
+
+async function requireOperationalAttachmentEntitlementAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? "").trim(),
+    supabase: params.supabase,
+  });
+
+  if (!access.authorized) {
+    const search = new URLSearchParams({
+      err: "entitlement_blocked",
+      reason: access.reason,
+    });
+    redirect(`/ops/admin/company-profile?${search.toString()}`);
+  }
 }
 
 async function cleanupJobAttachmentRows(input: {
@@ -188,11 +211,18 @@ export async function createJobAttachmentUploadToken(input: {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) throw new Error("Not authenticated");
 
-  await assertJobAttachmentUploadAuthority({
+  const authority = await assertJobAttachmentUploadAuthority({
     supabase,
     userId: userData.user.id,
     jobId: input.jobId,
   });
+
+  if (authority.actorType === "internal") {
+    await requireOperationalAttachmentEntitlementAccessOrRedirect({
+      supabase,
+      accountOwnerUserId: authority.accountOwnerUserId,
+    });
+  }
 
   const cleanName = safeFileName(input.fileName);
 
@@ -278,6 +308,11 @@ export async function discardInternalJobAttachmentUpload(input: {
     throw new Error("Not authorized to discard attachment for this job");
   }
 
+  await requireOperationalAttachmentEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
   await cleanupJobAttachmentRows({
     supabase,
     adminClient,
@@ -325,6 +360,11 @@ export async function finalizeInternalJobAttachmentUpload(input: {
   if (!scopedAttachments?.job) {
     throw new Error("Not authorized to finalize attachments for this job");
   }
+
+  await requireOperationalAttachmentEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   const verifiedAttachments = await loadVerifiedJobAttachments({
     supabase,
@@ -522,6 +562,11 @@ export async function shareJobAttachmentToContractor(input: {
   if (!scopedAttachment?.attachment) {
     throw new Error("Not authorized to share attachment for this job");
   }
+
+  await requireOperationalAttachmentEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   const attachment = scopedAttachment.attachment as {
     id: string;

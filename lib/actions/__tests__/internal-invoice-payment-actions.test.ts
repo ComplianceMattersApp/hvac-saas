@@ -8,6 +8,7 @@ const resolveInternalInvoiceByJobIdMock = vi.fn();
 const resolveInvoiceCollectedPaymentSummaryMock = vi.fn();
 const insertJobEventMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
@@ -35,6 +36,11 @@ vi.mock('@/lib/auth/internal-job-scope', () => ({
 vi.mock('@/lib/business/internal-business-profile', () => ({
   resolveBillingModeByAccountOwnerId: (...args: unknown[]) =>
     resolveBillingModeByAccountOwnerIdMock(...args),
+}));
+
+vi.mock('@/lib/business/platform-entitlement', () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock('@/lib/business/internal-invoice', () => ({
@@ -137,6 +143,10 @@ describe('recordInternalInvoicePaymentFromForm', () => {
       balanceDueCents: 8000,
       paymentStatus: 'partial',
     });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: 'allowed_active',
+    });
     insertJobEventMock.mockResolvedValue(undefined);
   });
 
@@ -150,6 +160,9 @@ describe('recordInternalInvoicePaymentFromForm', () => {
       'banner=internal_invoice_payment_recorded',
     );
 
+    expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: 'owner-1' }),
+    );
     expect(writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(true);
     expect(insertJobEventMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -250,7 +263,108 @@ describe('recordInternalInvoicePaymentFromForm', () => {
     );
 
     expect(writes).toHaveLength(0);
+    expect(resolveOperationalMutationEntitlementAccessMock).not.toHaveBeenCalled();
     expect(insertJobEventMock).not.toHaveBeenCalled();
+  });
+
+  it('allows valid trial internal invoice payment record', async () => {
+    const { supabase, writes } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: 'allowed_trial',
+    });
+
+    const { recordInternalInvoicePaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(recordInternalInvoicePaymentFromForm(buildFormData())).rejects.toThrow(
+      'banner=internal_invoice_payment_recorded',
+    );
+
+    expect(writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(true);
+  });
+
+  it('blocks expired trial internal invoice payment record before payment writes and job events', async () => {
+    const { supabase, writes } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: 'blocked_trial_expired',
+    });
+
+    const { recordInternalInvoicePaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(recordInternalInvoicePaymentFromForm(buildFormData())).rejects.toThrow(
+      'REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired',
+    );
+
+    expect(writes).toHaveLength(0);
+    expect(resolveBillingModeByAccountOwnerIdMock).not.toHaveBeenCalled();
+    expect(resolveInternalInvoiceByJobIdMock).not.toHaveBeenCalled();
+    expect(resolveInvoiceCollectedPaymentSummaryMock).not.toHaveBeenCalled();
+    expect(insertJobEventMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks null-ended trial internal invoice payment record before payment writes and job events', async () => {
+    const { supabase, writes } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: 'blocked_trial_missing_end',
+    });
+
+    const { recordInternalInvoicePaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(recordInternalInvoicePaymentFromForm(buildFormData())).rejects.toThrow(
+      'REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end',
+    );
+
+    expect(writes).toHaveLength(0);
+    expect(resolveBillingModeByAccountOwnerIdMock).not.toHaveBeenCalled();
+    expect(resolveInternalInvoiceByJobIdMock).not.toHaveBeenCalled();
+    expect(resolveInvoiceCollectedPaymentSummaryMock).not.toHaveBeenCalled();
+    expect(insertJobEventMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('allows internal comped invoice payment record', async () => {
+    const { supabase, writes } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: 'allowed_internal_comped',
+    });
+
+    const { recordInternalInvoicePaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(recordInternalInvoicePaymentFromForm(buildFormData())).rejects.toThrow(
+      'banner=internal_invoice_payment_recorded',
+    );
+
+    expect(writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(true);
+  });
+
+  it('blocks missing entitlement internal invoice payment record before payment writes and job events', async () => {
+    const { supabase, writes } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: 'blocked_missing_entitlement',
+    });
+
+    const { recordInternalInvoicePaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(recordInternalInvoicePaymentFromForm(buildFormData())).rejects.toThrow(
+      'REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement',
+    );
+
+    expect(writes).toHaveLength(0);
+    expect(resolveBillingModeByAccountOwnerIdMock).not.toHaveBeenCalled();
+    expect(resolveInternalInvoiceByJobIdMock).not.toHaveBeenCalled();
+    expect(resolveInvoiceCollectedPaymentSummaryMock).not.toHaveBeenCalled();
+    expect(insertJobEventMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
   it('throws on real DB insert error', async () => {

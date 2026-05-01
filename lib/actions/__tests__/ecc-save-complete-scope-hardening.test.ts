@@ -4,6 +4,7 @@ const createClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 const loadScopedInternalEccJobForMutationMock = vi.fn();
 const loadScopedInternalEccTestRunForMutationMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const evaluateEccOpsStatusMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -32,6 +33,11 @@ vi.mock("@/lib/auth/internal-ecc-scope", () => ({
     loadScopedInternalEccJobForMutationMock(...args),
   loadScopedInternalEccTestRunForMutation: (...args: unknown[]) =>
     loadScopedInternalEccTestRunForMutationMock(...args),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock("@/lib/actions/ecc-status", () => ({
@@ -164,6 +170,11 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     loadScopedInternalEccTestRunForMutationMock.mockResolvedValue({
       job: { id: "job-1", job_type: "ecc" },
       testRun: { id: "run-1", job_id: "job-1", test_type: "duct_leakage", system_id: "system-1" },
+    });
+
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
     });
 
     evaluateEccOpsStatusMock.mockResolvedValue(undefined);

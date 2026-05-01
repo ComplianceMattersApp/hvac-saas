@@ -31,6 +31,7 @@ import {
   resolveBillingModeByAccountOwnerId,
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { resolveAppUrl, renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
@@ -113,6 +114,26 @@ async function requireInternalOpsAccessOrRedirect(
 
     throw error;
   }
+}
+
+async function requireOperationalJobOpsEntitlementAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? "").trim(),
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: "entitlement_blocked",
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
 }
 
 function buildOpsChanges(before: OpsSnapshot, after: OpsSnapshot) {
@@ -491,6 +512,13 @@ export async function generateContractorReportPreview(input: {
   if (!jobId) throw new Error("Missing jobId");
 
   await requireInternalScopedJobUserOrThrow(supabase, jobId);
+  const authz = await requireInternalUser({ supabase });
+
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
+
   const report = await resolveContractorReportForJob({ supabase, jobId });
 
   return {
@@ -516,6 +544,13 @@ export async function sendContractorReport(input: {
   if (!jobId) throw new Error("Missing jobId");
 
   const user = await requireInternalScopedJobUserOrThrow(supabase, jobId);
+  const authz = await requireInternalUser({ supabase, userId: user.id });
+
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
+
   const report = await resolveContractorReportForJob({ supabase, jobId });
 
   const { data: job, error: jobErr } = await supabase
@@ -778,7 +813,11 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
 
   // Read current job snapshot
   const { data: job, error: jobErr } = await supabase
@@ -904,6 +943,10 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
 
   if (!user) redirect("/login");
   const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
   const billingMode = await resolveBillingModeByAccountOwnerId({
     supabase,
     accountOwnerUserId: authz.internalUser.account_owner_user_id,
@@ -1041,7 +1084,11 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from('jobs')
@@ -1366,7 +1413,11 @@ export async function releasePendingInfoAndRecomputeFromForm(formData: FormData)
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
 
   await releasePendingInfoAndRecompute(jobId, "manual_release_pending_info");
 
@@ -1387,7 +1438,11 @@ export async function releaseAndReevaluateFromForm(formData: FormData): Promise<
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
 
   await releaseAndReevaluate(jobId, "job_detail");
 
@@ -1417,7 +1472,11 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
 
   const statusReason =
     typeof statusReasonRaw === "string" && statusReasonRaw.trim()
@@ -1583,11 +1642,16 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
-  const { userId: actingUserId } = await requireInternalOpsAccessOrRedirect(
+  const authz = await requireInternalOpsAccessOrRedirect(
     supabase,
     user.id,
     jobId,
   );
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
+  const actingUserId = authz.userId;
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")
