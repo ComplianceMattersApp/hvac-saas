@@ -907,7 +907,7 @@ keep the initial implementation narrow and identity-focused only
 
 18.3.1 First Owner Onboarding / Account Provisioning V1 (Implemented — Complete)
 
-For V1 launch readiness, first company/account onboarding is invite-only and platform-admin provisioned. This is controlled operator provisioning, not public signup or auth redesign.
+For V1 launch readiness, standard company/account onboarding now supports public self-serve signup at `/signup`, while invite-only platform-admin/operator provisioning remains active for controlled/manual fallback and special-case onboarding.
 
 **Implementation status: V1 complete.** Implemented across four slices:
 - `lib/business/first-owner-provisioning.ts` — idempotent provisioning helper; dry-run / apply modes
@@ -927,9 +927,20 @@ Confirmed V1 sequence:
 - routing seam detects first-owner marker; fails closed if DB anchor rows are missing
 - first owner lands in Admin Center readiness setup flow at `/ops/admin`
 
+Confirmed Self-Serve Onboarding V1 sequence (public path):
+- unauthenticated user opens `/signup`
+- signup submit reuses `lib/business/first-owner-provisioning.ts` and shared invite orchestration in `lib/business/first-owner-invite.ts`
+- fresh email path sends secure setup/invite email and completes `/set-password` -> login flow
+- duplicate/existing email behavior is intentionally neutral in public responses and does not expose account-existence details
+- tenant anchor boundary remains `account_owner_user_id` and no RLS model change was introduced
+
 Operator flag note: because hosted Supabase projects use `.supabase.co`, the provisioning script classifies them as production-like remote targets. `ALLOW_FIRST_OWNER_PROVISIONING=true` enables the tool; `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true` acts as the required explicit remote-target confirmation for hosted Supabase projects (including sandbox). Operators must verify the intended project before running apply. Dry-run should always be run first.
 
-Public self-signup is deferred to a later SaaS growth phase and is not part of V1 launch onboarding unless explicitly pulled forward.
+Public self-serve signup is now part of the active V1 onboarding baseline for standard account creation.
+
+Operator first-owner provisioning remains active as a controlled/manual fallback path, and internal/comped owner provisioning remains operator-controlled (not public).
+
+Initial signup-page first-impression polish is complete and acceptable for current baseline; deeper public-brand/marketing polish remains deferred.
 
 This direction preserves controlled onboarding quality, protects `account_owner_user_id` tenant boundaries, and keeps tenant operational identity separate from global product brand identity.
 
@@ -1420,7 +1431,9 @@ Current position:
   - optional readiness criteria currently include company logo, contractor directory, and platform account status visibility
   - this does not introduce a broad tenant settings system and does not alter onboarding implementation boundaries
   - closeout status: this roadmap area is complete enough to close at the current baseline with Admin Readiness V1 and First Owner Provisioning V1 implemented
-  - public self-signup remains intentionally deferred
+  - public `/signup` self-serve onboarding is implemented and functionally smoked for fresh-email onboarding
+  - duplicate/existing-email public messaging remains intentionally neutral
+  - operator first-owner runbook path remains active/manual fallback, including internal/comped owner provisioning
   - `/ops/admin/internal-users` normal launch UI no longer exposes the Link existing auth user panel; Invite teammate, team setup confirmation, and team member management remain the normal admin surface
   - Stripe Platform Subscription V1 for platform onboarding is implemented and live-smoke confirmed for the platform-account subscription slice
 - Pre-launch priority ordering update:

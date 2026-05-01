@@ -1,13 +1,15 @@
 # First Owner Provisioning Runbook
 
 Status: active operator runbook
-Purpose: safely provision the first account owner in invite-only mode using the V1 provisioning script.
+Purpose: safely provision the first account owner in invite-only mode using the V1 provisioning script, as an active/manual fallback path alongside public self-serve signup.
 
 ## 1. Scope and boundaries
 
 This runbook is for controlled operator onboarding only.
 
-- Not public signup
+- Public self-serve signup at `/signup` is available for standard onboarding.
+- This runbook remains the manual/admin fallback onboarding path.
+- Internal/comped owner provisioning remains operator-controlled (not public self-serve).
 - Not auth redesign
 - Not billing/payment execution work
 

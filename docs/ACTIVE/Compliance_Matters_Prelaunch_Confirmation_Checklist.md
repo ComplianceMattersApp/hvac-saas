@@ -111,7 +111,7 @@ If any item here conflicts with the active spine, the spine wins.
   - no technician-assignment ownership change from calendar drag/drop
 
 ### 2.4 First owner onboarding/provisioning readiness
-- **V1 implemented and browser-smoked.** Invite-only, platform-admin/operator provisioned. Not public signup.
+- **V1 implemented and browser-smoked.** Public self-serve signup exists for standard onboarding at `/signup`, and invite-only platform-admin/operator provisioning remains active/manual fallback.
 - Confirmed: provisioning script (`scripts/provision-first-owner.ts`) requires explicit allow flags for apply mode; defaults to dry-run.
 - Confirmed: provisioning confirms/creates auth user, profile, owner-anchored `internal_users` row, `internal_business_profiles`, `platform_account_entitlements`.
 - Confirmed: internal/comped entitlement support is complete for owner-safe accounts.
@@ -123,7 +123,12 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: first-owner routing seam (`lib/auth/first-owner-routing.ts`) detects marker and confirms all anchor rows before routing; fails closed if any row is missing.
 - Confirmed: first owner acceptance (`/set-password?mode=invite`) routes to `/ops/admin`; Admin Center + Account Setup readiness card renders.
 - Confirmed: normal internal user routing (`/ops`) and contractor routing (`/portal`) branches are preserved.
-- Confirmed: public self-signup remains intentionally deferred for a later SaaS growth phase.
+- Confirmed: Self-Serve Onboarding V1 functional smoke passed (`/signup` load/submit, invite delivery, set-password/login completion, successful login for fresh email).
+- Confirmed: duplicate/existing email public response behavior is intentionally neutral.
+- Confirmed: public self-serve signup does not introduce tenant customer/work payment execution, QBO behavior, or RLS model change.
+- Confirmed: initial signup first-impression polish is acceptable for current baseline; deeper public-brand polish remains deferred.
+- Confirmed: operator runbook path remains active and required for manual/admin fallback onboarding.
+- Confirmed: internal/comped owner provisioning remains operator-controlled and is not a public self-serve path.
 - **Pre-launch operator runbook item:** before onboarding the first real production account, operator must run dry-run first, verify the intended Supabase project, then run apply with both `ALLOW_FIRST_OWNER_PROVISIONING=true` and `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true`. Note: the production-flag is also required for any hosted Supabase project (including sandbox) because `.supabase.co` URLs are classified as production-like remote targets.
 - Runbook reference: `docs/ACTIVE/First_Owner_Provisioning_Runbook.md`.
 

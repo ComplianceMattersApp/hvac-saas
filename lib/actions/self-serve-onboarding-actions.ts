@@ -1,305 +1,40 @@
-import { createAdminClient } from "../lib/supabase/server";
+"use server";
+
+import { createAdminClient } from "@/lib/supabase/server";
 import {
   provisionFirstOwnerAccount,
   type FirstOwnerProvisioningClient,
   type FirstOwnerProvisioningInput,
   type FirstOwnerProvisioningResult,
-} from "../lib/business/first-owner-provisioning";
+} from "@/lib/business/first-owner-provisioning";
 import {
   orchestrateFirstOwnerInvite,
   type FirstOwnerInviteDeps,
-} from "../lib/business/first-owner-invite";
-import type { PricebookSeedInsertRow } from "../lib/business/pricebook-seeding";
-import { resolveInviteRedirectTo } from "../lib/utils/resolve-invite-redirect-to";
-
-type ParsedArgs = {
-  email: string;
-  businessDisplayName: string;
-  ownerDisplayName?: string;
-  supportEmail?: string;
-  supportPhone?: string;
-  defaultBillingMode?: string;
-  entitlementPreset: "standard" | "internal_comped";
-  starterKitVersion: "v1" | "v2" | "v3";
-  resendInvite: boolean;
-  apply: boolean;
-};
-
-type GuardrailError = {
-  code: string;
-  message: string;
-};
-
-type ScriptResult = {
-  mode: "dry_run" | "apply";
-  accountOwnerUserId: string | null;
-  authUserId: string | null;
-  recordsCreated: string[];
-  recordsConfirmed: string[];
-  recordsPatched: string[];
-  pricebookSeeding: FirstOwnerProvisioningResult["pricebookSeeding"];
-  inviteSent: boolean;
-  inviteSkippedReason?: string;
-  warnings: string[];
-  errors: Array<{ code: string; message: string }>;
-};
-
-type AuthUserSummary = {
-  id: string;
-  email: string | null;
-  invitedAt: string | null;
-  emailConfirmedAt: string | null;
-};
-
-type ScriptRunDeps = FirstOwnerInviteDeps & {
-  env: NodeJS.ProcessEnv;
-  provision: (input: FirstOwnerProvisioningInput) => Promise<FirstOwnerProvisioningResult>;
-};
+} from "@/lib/business/first-owner-invite";
+import type { PricebookSeedInsertRow } from "@/lib/business/pricebook-seeding";
+import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
+import type {
+  SelfServeFieldErrors,
+  SelfServeOnboardingDeps,
+  SelfServeOnboardingState,
+} from "@/lib/actions/self-serve-onboarding-state";
 
 function toCleanString(value: unknown) {
   return String(value ?? "").trim();
 }
 
-function toLower(value: unknown) {
+function normalizeEmail(value: unknown) {
   return toCleanString(value).toLowerCase();
 }
 
-function normalizeBooleanFlag(value: string | undefined | null) {
-  return toLower(value) === "true";
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function parseArgValue(argv: string[], key: string): string | undefined {
-  const i = argv.indexOf(key);
-  if (i === -1) return undefined;
-  const next = argv[i + 1];
-  if (!next || next.startsWith("--")) return undefined;
-  return next;
-}
-
-function hasFlag(argv: string[], key: string) {
-  return argv.includes(key);
-}
-
-function isProductionLikeEnvironment(env: NodeJS.ProcessEnv) {
-  const rawUrl = toCleanString(env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL);
-  const nodeEnv = toLower(env.NODE_ENV);
-
-  if (nodeEnv === "production") return true;
-  if (!rawUrl) return true;
-
-  try {
-    const parsed = new URL(rawUrl);
-    const host = toLower(parsed.hostname);
-    if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
-      return false;
-    }
-    if (host.endsWith(".local")) return false;
-    if (host.includes("sandbox") || host.includes("staging") || host.includes("dev")) {
-      return false;
-    }
-
-    return true;
-  } catch {
-    return true;
-  }
-}
-
-function collectGuardrailErrors(params: {
-  apply: boolean;
-  env: NodeJS.ProcessEnv;
-}): GuardrailError[] {
-  const errors: GuardrailError[] = [];
-  const allowProvision = normalizeBooleanFlag(params.env.ALLOW_FIRST_OWNER_PROVISIONING);
-  const allowProductionProvision = normalizeBooleanFlag(
-    params.env.ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING,
-  );
-
-  if (!allowProvision) {
-    errors.push({
-      code: "ALLOW_FLAG_REQUIRED",
-      message:
-        "Provisioning is blocked. Set ALLOW_FIRST_OWNER_PROVISIONING=true to continue.",
-    });
-  }
-
-  if (isProductionLikeEnvironment(params.env) && !allowProductionProvision) {
-    errors.push({
-      code: "PRODUCTION_ALLOW_FLAG_REQUIRED",
-      message:
-        "Production-like target detected. Set ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true to continue.",
-    });
-  }
-
-  if (!params.apply) {
-    // Dry-run is safe and still allowed; this entry is informational-only.
-    return errors;
-  }
-
-  return errors;
-}
-
-export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
-  const email = toCleanString(parseArgValue(argv, "--email"));
-  const businessDisplayName = toCleanString(parseArgValue(argv, "--business-display-name"));
-  const ownerDisplayName = toCleanString(parseArgValue(argv, "--owner-display-name"));
-  const supportEmail = toCleanString(parseArgValue(argv, "--support-email"));
-  const supportPhone = toCleanString(parseArgValue(argv, "--support-phone"));
-  const defaultBillingMode = toCleanString(parseArgValue(argv, "--default-billing-mode"));
-  const entitlementPresetRaw = toCleanString(parseArgValue(argv, "--entitlement-preset")).toLowerCase();
-  const starterKitVersionRaw = toCleanString(parseArgValue(argv, "--starter-kit-version")).toLowerCase();
-  const resendInvite = hasFlag(argv, "--resend-invite");
-  const apply = hasFlag(argv, "--apply");
-
-  if (!email) {
-    throw new Error("Missing required --email");
-  }
-
-  if (!businessDisplayName) {
-    throw new Error("Missing required --business-display-name");
-  }
-
-  const entitlementPreset =
-    entitlementPresetRaw === "internal_comped" || entitlementPresetRaw === "standard"
-      ? entitlementPresetRaw
-      : entitlementPresetRaw
-        ? (() => {
-            throw new Error("Invalid --entitlement-preset (expected: standard|internal_comped)");
-          })()
-        : "standard";
-
-  const starterKitVersion =
-    starterKitVersionRaw === "v1" || starterKitVersionRaw === "v2" || starterKitVersionRaw === "v3"
-      ? starterKitVersionRaw
-      : starterKitVersionRaw
-        ? (() => {
-            throw new Error("Invalid --starter-kit-version (expected: v1|v2|v3)");
-          })()
-        : "v3";
-
+function submittedNeutralState(): SelfServeOnboardingState {
   return {
-    email,
-    businessDisplayName,
-    ownerDisplayName: ownerDisplayName || undefined,
-    supportEmail: supportEmail || undefined,
-    supportPhone: supportPhone || undefined,
-    defaultBillingMode: defaultBillingMode || undefined,
-    entitlementPreset,
-    starterKitVersion,
-    resendInvite,
-    apply,
-  };
-}
-
-export async function runProvisionFirstOwnerScript(
-  args: ParsedArgs,
-  deps: ScriptRunDeps,
-): Promise<ScriptResult> {
-  const mode: ScriptResult["mode"] = args.apply ? "apply" : "dry_run";
-  const guardrailErrors = collectGuardrailErrors({ apply: args.apply, env: deps.env });
-
-  if (guardrailErrors.length > 0) {
-    return {
-      mode,
-      accountOwnerUserId: null,
-      authUserId: null,
-      recordsCreated: [],
-      recordsConfirmed: [],
-      recordsPatched: [],
-      pricebookSeeding: null,
-      inviteSent: false,
-      warnings: [],
-      errors: guardrailErrors,
-    };
-  }
-
-  const provisioning = await deps.provision({
-    targetEmail: args.email,
-    businessDisplayName: args.businessDisplayName,
-    ownerDisplayName: args.ownerDisplayName,
-    supportEmail: args.supportEmail,
-    supportPhone: args.supportPhone,
-    defaultBillingMode: args.defaultBillingMode,
-    entitlementPreset: args.entitlementPreset,
-    starterKitVersion: args.starterKitVersion,
-    dryRun: !args.apply,
-    operatorMetadata: {
-      requestedBy: toCleanString(deps.env.USER || deps.env.USERNAME) || null,
-      note: "first-owner-provisioning-operator-script",
-    },
-  });
-
-  const warnings = [...provisioning.warnings];
-  const errors = provisioning.errors.map((e) => ({ code: e.code, message: e.message }));
-
-  if (provisioning.status === "failed" || errors.length > 0) {
-    return {
-      mode,
-      accountOwnerUserId: provisioning.accountOwnerUserId,
-      authUserId: provisioning.authUserId,
-      recordsCreated: provisioning.recordsCreated,
-      recordsConfirmed: provisioning.recordsConfirmed,
-      recordsPatched: provisioning.recordsPatched,
-      pricebookSeeding: provisioning.pricebookSeeding,
-      inviteSent: false,
-      warnings,
-      errors,
-    };
-  }
-
-  if (!args.apply) {
-    return {
-      mode,
-      accountOwnerUserId: provisioning.accountOwnerUserId,
-      authUserId: provisioning.authUserId,
-      recordsCreated: provisioning.recordsCreated,
-      recordsConfirmed: provisioning.recordsConfirmed,
-      recordsPatched: provisioning.recordsPatched,
-      pricebookSeeding: provisioning.pricebookSeeding,
-      inviteSent: false,
-      inviteSkippedReason: "dry_run",
-      warnings,
-      errors,
-    };
-  }
-
-  const inviteResult = await orchestrateFirstOwnerInvite({
-    apply: args.apply,
-    email: args.email,
-    resendInvite: args.resendInvite,
-    authUserId: provisioning.authUserId,
-    accountOwnerUserId: provisioning.accountOwnerUserId,
-    deps,
-  });
-
-  warnings.push(...inviteResult.warnings);
-
-  if (inviteResult.errors.length > 0) {
-    return {
-      mode,
-      accountOwnerUserId: provisioning.accountOwnerUserId,
-      authUserId: provisioning.authUserId,
-      recordsCreated: provisioning.recordsCreated,
-      recordsConfirmed: provisioning.recordsConfirmed,
-      recordsPatched: provisioning.recordsPatched,
-      pricebookSeeding: provisioning.pricebookSeeding,
-      inviteSent: false,
-      warnings,
-      errors: [...errors, ...inviteResult.errors],
-    };
-  }
-
-  return {
-    mode,
-    accountOwnerUserId: provisioning.accountOwnerUserId,
-    authUserId: provisioning.authUserId,
-    recordsCreated: provisioning.recordsCreated,
-    recordsConfirmed: provisioning.recordsConfirmed,
-    recordsPatched: provisioning.recordsPatched,
-    pricebookSeeding: provisioning.pricebookSeeding,
-    inviteSent: inviteResult.inviteSent,
-    inviteSkippedReason: inviteResult.inviteSkippedReason,
-    warnings,
-    errors,
+    status: "submitted",
+    message: "If eligible, we will email a secure setup link with next steps.",
   };
 }
 
@@ -311,9 +46,7 @@ function createProvisioningClientFromAdmin(admin: any): FirstOwnerProvisioningCl
         const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
         if (error) throw error;
         const users = Array.isArray((data as any)?.users) ? (data as any).users : [];
-        const match = users.find(
-          (u: any) => toLower(u?.email) === toLower(email),
-        );
+        const match = users.find((u: any) => toCleanString(u?.email).toLowerCase() === toCleanString(email).toLowerCase());
         if (match?.id) {
           return {
             id: String(match.id),
@@ -613,15 +346,11 @@ function createProvisioningClientFromAdmin(admin: any): FirstOwnerProvisioningCl
   };
 }
 
-function createRealDeps(): ScriptRunDeps {
+function createRealDeps(): SelfServeOnboardingDeps {
   const admin = createAdminClient();
   const provisioningClient = createProvisioningClientFromAdmin(admin);
 
-  return {
-    env: process.env,
-    provision: async (input) => {
-      return provisionFirstOwnerAccount({ input, client: provisioningClient });
-    },
+  const inviteDeps: FirstOwnerInviteDeps = {
     getAuthUserById: async (userId: string) => {
       const { data, error } = await admin.auth.admin.getUserById(userId);
       if (error) throw error;
@@ -631,8 +360,7 @@ function createRealDeps(): ScriptRunDeps {
         id: String(user.id),
         email: toCleanString(user.email) || null,
         invitedAt: toCleanString(user.invited_at) || null,
-        emailConfirmedAt:
-          toCleanString(user.email_confirmed_at || user.confirmed_at) || null,
+        emailConfirmedAt: toCleanString(user.email_confirmed_at || user.confirmed_at) || null,
       };
     },
     setUserMetadata: async (userId, metadata) => {
@@ -651,48 +379,95 @@ function createRealDeps(): ScriptRunDeps {
     resolveInviteRedirectTo,
     nowIso: () => new Date().toISOString(),
   };
-}
 
-export async function main(argv = process.argv.slice(2)) {
-  const args = parseProvisionFirstOwnerArgs(argv);
-  const result = await runProvisionFirstOwnerScript(args, createRealDeps());
-
-  // Structured non-secret output only.
-  const output = {
-    mode: result.mode,
-    accountOwnerUserId: result.accountOwnerUserId,
-    authUserId: result.authUserId,
-    recordsCreated: result.recordsCreated,
-    recordsConfirmed: result.recordsConfirmed,
-    recordsPatched: result.recordsPatched,
-    pricebookSeeding: result.pricebookSeeding,
-    inviteSent: result.inviteSent,
-    inviteSkippedReason: result.inviteSkippedReason,
-    warnings: result.warnings,
-    errors: result.errors,
+  return {
+    provision: async (input) => provisionFirstOwnerAccount({ input, client: provisioningClient }),
+    invite: async (params) => orchestrateFirstOwnerInvite({ ...params, deps: inviteDeps }),
+    log: (message, details) => {
+      console.warn(message, details ?? {});
+    },
   };
-
-  console.log(JSON.stringify(output, null, 2));
-
-  if (result.errors.length > 0) {
-    process.exitCode = 1;
-  }
 }
 
-if (!process.env.VITEST) {
-  main().catch((error) => {
-    const message = error instanceof Error ? error.message : "Unexpected script failure";
-    console.error(
-      JSON.stringify(
-        {
-          mode: "apply",
-          inviteSent: false,
-          errors: [{ code: "SCRIPT_RUNTIME_FAILURE", message }],
-        },
-        null,
-        2,
-      ),
-    );
-    process.exitCode = 1;
-  });
+export async function submitSelfServeOnboardingForm(
+  _prevState: SelfServeOnboardingState,
+  formData: FormData,
+  deps: SelfServeOnboardingDeps = createRealDeps(),
+): Promise<SelfServeOnboardingState> {
+  const email = normalizeEmail(formData.get("email"));
+  const ownerDisplayName = toCleanString(formData.get("owner_display_name"));
+  const businessDisplayName = toCleanString(formData.get("business_display_name"));
+
+  const fieldErrors: SelfServeFieldErrors = {};
+
+  if (!email || !isValidEmail(email)) {
+    fieldErrors.email = "Enter a valid email address.";
+  }
+
+  if (!ownerDisplayName) {
+    fieldErrors.ownerDisplayName = "Enter the account owner name.";
+  }
+
+  if (!businessDisplayName) {
+    fieldErrors.businessDisplayName = "Enter the business name.";
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return {
+      status: "invalid",
+      message: "Please review the highlighted fields.",
+      fieldErrors,
+    };
+  }
+
+  try {
+    const provisioning = await deps.provision({
+      targetEmail: email,
+      ownerDisplayName,
+      businessDisplayName,
+      entitlementPreset: "standard",
+      starterKitVersion: "v3",
+      dryRun: false,
+      operatorMetadata: {
+        requestedBy: "public_self_serve_signup",
+        note: "self_serve_onboarding_v1",
+      },
+    });
+
+    if (provisioning.status === "failed" || provisioning.errors.length > 0) {
+      deps.log("self-serve onboarding provisioning failed", {
+        email,
+        status: provisioning.status,
+        errorCodes: provisioning.errors.map((error) => error.code),
+      });
+      return submittedNeutralState();
+    }
+
+    const inviteResult = await deps.invite({
+      apply: true,
+      email,
+      resendInvite: false,
+      authUserId: provisioning.authUserId,
+      accountOwnerUserId: provisioning.accountOwnerUserId,
+    });
+
+    if (inviteResult.errors.length > 0) {
+      deps.log("self-serve onboarding invite failed", {
+        email,
+        errorCodes: inviteResult.errors.map((error) => error.code),
+      });
+    }
+
+    return submittedNeutralState();
+  } catch (error) {
+    deps.log("self-serve onboarding unexpected error", {
+      email,
+      message: error instanceof Error ? error.message : String(error),
+    });
+
+    return {
+      status: "error",
+      message: "We could not submit your request right now. Please try again.",
+    };
+  }
 }

@@ -234,7 +234,7 @@ Company profile is not the next unresolved model decision in this roadmap.
 
 **Status: V1 complete.**
 
-For V1 launch readiness, onboarding is invite-only / platform-admin provisioned for first company/account ownership setup. This is controlled operator provisioning, not public signup or auth redesign.
+For the current validated baseline, onboarding now includes public self-serve signup at `/signup` for standard account creation, while invite-only platform-admin/operator provisioning remains supported as a controlled/manual fallback path.
 
 Implemented files:
 - `lib/business/first-owner-provisioning.ts` — idempotent provisioning helper; resolves/creates auth user → profile → `internal_users` → `internal_business_profiles` → `platform_account_entitlements`; dry-run / apply modes
@@ -258,6 +258,13 @@ V1 confirmed sequence:
 - routing seam confirms all anchor rows before routing to `/ops/admin`; fails closed otherwise
 - first owner lands in Admin Center readiness setup flow
 
+Self-Serve Onboarding V1 confirmed sequence:
+- public `/signup` collects owner email, owner display name, and business display name
+- submit reuses existing first-owner provisioning helper and shared first-owner invite orchestration
+- secure setup/invite email delivery is confirmed in functional smoke
+- set-password/login flow is confirmed in functional smoke
+- duplicate/existing email behavior intentionally returns neutral public messaging
+
 Production dry-run smoke confirmation for D2C-3/D2C-4:
 - top-level output `mode` is `dry_run`
 - structured `pricebookSeeding` appears in operator output
@@ -268,20 +275,13 @@ Operator flag note: hosted Supabase projects use `.supabase.co` and are classifi
 
 Why this direction:
 - avoids orphaned tenant/company records
-- prevents uncontrolled public-signup clutter during early launch
+- supports controlled standard self-serve onboarding without exposing account-existence details
 - keeps account-owner boundaries controlled around `account_owner_user_id`
 - keeps support/onboarding quality intentional
 
-Public self-signup is explicitly deferred to a later SaaS growth phase.
-
-Deferred-later public-signup capability may include:
-- start trial
-- email verification
-- company profile creation
-- owner account creation
-- platform entitlement creation
-- readiness-checklist onboarding
-- optional Stripe subscription connection only if separately enabled later
+Operator/manual path clarification:
+- operator runbook path remains active and required for controlled/manual fallback needs
+- internal/comped owner provisioning remains operator-controlled and is not exposed as public self-serve
 
 Packaged-app note:
 - if Compliance Matters is later packaged as an app, authentication still relies on the same server-side account provisioning/auth model; app shell packaging does not replace tenant onboarding or ownership setup.
@@ -314,7 +314,9 @@ Boundaries remain unchanged:
 - `internal_business_profiles` remains tenant operational identity
 - `platform_account_entitlements` remains platform entitlement/status context
 - readiness remains derived packaging state, not a new source-of-truth table
-- public self-signup remains deferred
+- public self-serve signup is implemented and functionally smoked for standard onboarding
+- operator first-owner runbook path remains active/manual fallback
+- initial signup-page first-impression polish is complete and acceptable for current baseline; deeper public-brand polish remains deferred
 - platform subscription billing for onboarding is live-smoke confirmed for the platform account subscription slice
 - internal/comped owner protection is complete; comped owner/internal accounts remain outside Stripe checkout and surface as Internal / Comped with no billing-customer or subscription requirement
 - `/ops/admin/internal-users` normal launch UI no longer exposes the Link existing auth user panel; invite teammate, team setup confirmation, and team member management remain intact
