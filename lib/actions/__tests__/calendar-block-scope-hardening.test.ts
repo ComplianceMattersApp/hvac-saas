@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock("next/cache", () => ({
@@ -20,6 +21,11 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("@/lib/auth/internal-user", () => ({
   requireInternalUser: (...args: unknown[]) => requireInternalUserMock(...args),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock("@/lib/utils/schedule-la", () => ({
@@ -157,6 +163,11 @@ describe("calendar block same-account scope hardening", () => {
         is_active: true,
         account_owner_user_id: "owner-1",
       },
+    });
+
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
     });
   });
 
