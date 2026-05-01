@@ -5,6 +5,7 @@ const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 const isInternalAccessErrorMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -24,6 +25,11 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/auth/internal-user", () => ({
   requireInternalUser: (...args: unknown[]) => requireInternalUserMock(...args),
   isInternalAccessError: (...args: unknown[]) => isInternalAccessErrorMock(...args),
+}));
+
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 function buildFormData(values: Record<string, string>) {
@@ -102,6 +108,10 @@ describe("customer profile upsert same-account hardening", () => {
       },
     });
     isInternalAccessErrorMock.mockReturnValue(false);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
   });
 
   it("allows same-account internal upsertCustomerProfileFromForm and writes customer + jobs snapshots", async () => {
