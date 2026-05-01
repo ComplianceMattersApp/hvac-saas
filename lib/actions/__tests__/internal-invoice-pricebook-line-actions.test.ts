@@ -5,6 +5,7 @@ const requireInternalUserMock = vi.fn();
 const loadScopedInternalJobForMutationMock = vi.fn();
 const resolveBillingModeByAccountOwnerIdMock = vi.fn();
 const resolveInternalInvoiceByJobIdMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
@@ -50,6 +51,11 @@ vi.mock('@/lib/business/internal-business-profile', () => ({
     support_email: null,
     support_phone: null,
   })),
+}));
+
+vi.mock('@/lib/business/platform-entitlement', () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock('@/lib/business/internal-invoice', async () => {
@@ -232,6 +238,11 @@ describe('internal invoice line item pricebook plumbing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: 'allowed_active',
+    });
 
     requireInternalUserMock.mockResolvedValue({
       userId: 'internal-user-1',

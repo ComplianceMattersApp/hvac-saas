@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireInternalRole } from "@/lib/auth/internal-user";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import {
   parsePricebookCategory,
   parsePricebookUnitLabel,
@@ -75,6 +76,26 @@ function validatePriceForType(itemType: string, unitPrice: number) {
   return true;
 }
 
+async function requireOperationalPricebookMutationAccessOrRedirect(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  accountOwnerUserId: string;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: params.accountOwnerUserId,
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: "entitlement_blocked",
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
+}
+
 async function requirePricebookMutationContext() {
   const supabase = await createClient();
   const { internalUser } = await requireInternalRole("admin", { supabase });
@@ -89,6 +110,11 @@ async function requirePricebookMutationContext() {
 
 export async function createPricebookItemFromForm(formData: FormData) {
   const { supabase, accountOwnerUserId } = await requirePricebookMutationContext();
+
+  await requireOperationalPricebookMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
+  });
 
   const itemName = normalizeText(formData.get("item_name"));
   if (!itemName) {
@@ -189,6 +215,11 @@ export async function updatePricebookItemFromForm(formData: FormData) {
     redirect(withNotice("not_found"));
   }
 
+  await requireOperationalPricebookMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
+  });
+
   const { error } = await supabase
     .from("pricebook_items")
     .update({
@@ -231,6 +262,11 @@ export async function setPricebookItemActiveFromForm(formData: FormData) {
   if (existingError || !existing?.id) {
     redirect(withNotice("not_found"));
   }
+
+  await requireOperationalPricebookMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
+  });
 
   const { error } = await supabase
     .from("pricebook_items")
