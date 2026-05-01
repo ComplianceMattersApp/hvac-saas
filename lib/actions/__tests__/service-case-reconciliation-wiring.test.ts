@@ -79,6 +79,13 @@ vi.mock("@/lib/email/sendEmail", () => ({
   sendEmail: vi.fn(async () => undefined),
 }));
 
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: vi.fn(async () => ({
+    authorized: true,
+    reason: "allowed_active",
+  })),
+}));
+
 function makeServiceActionsSupabaseMock() {
   return {
     from(table: string) {

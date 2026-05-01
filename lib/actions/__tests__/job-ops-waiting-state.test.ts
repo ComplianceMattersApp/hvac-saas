@@ -75,6 +75,13 @@ vi.mock("@/lib/actions/job-event-meta", () => ({
   buildMovementEventMeta: vi.fn(() => ({})),
 }));
 
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: vi.fn(async () => ({
+    authorized: true,
+    reason: "allowed_active",
+  })),
+}));
+
 vi.mock("@/lib/portal/resolveContractorIssues", () => ({
   extractFailureReasons: vi.fn(() => []),
   finalRunPass: vi.fn(() => true),
