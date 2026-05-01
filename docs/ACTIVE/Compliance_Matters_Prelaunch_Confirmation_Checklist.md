@@ -423,17 +423,29 @@ If any item here conflicts with the active spine, the spine wins.
 ## 3. Support / customer-operations readiness
 
 ### 3.1 Remote support access model
-- Define a safe way for internal support staff to assist customer accounts remotely.
-- Do not rely on informal tenant-boundary bypass or raw database access as the product answer.
-- Support access must preserve:
-  - tenant isolation
-  - auditability
-  - least privilege
-  - explicit support-session or scoped-access behavior
+- Customer Support / Remote Assistance V1A is implemented, committed, and pushed on `main`.
+- V1A includes `support_users`, `support_account_grants`, `support_access_sessions`, `support_access_audit_events`, resolver/audit helpers, and DB-level session/grant/account consistency invariant.
+- V1A migration `20260501120000_support_access_v1a_foundation.sql` is applied to sandbox only.
+- Production support-access migration/apply remains intentionally deferred.
 
-### 3.2 Internal support operations
-- Confirm support contact/business identity surfaces are ready enough for customer-facing use.
-- Confirm support workflow expectations are documented for launch.
+### 3.2 Support console status and boundaries
+- Customer Support / Remote Assistance V1B support console shell is implemented, committed, and sandbox-smoked.
+- Sandbox smoke confirmed `access_denied`, `session_started`, and `session_ended` audit events.
+- V1B remains read-only only:
+  - support access requires explicit `support_user` + active account grant + active support session
+  - support sessions are account-owner scoped
+  - audit events are required
+  - no impersonation/login-as-customer behavior
+  - no tenant job/customer/invoice browsing surface yet
+  - no support mutation behavior
+
+### 3.3 Deferred production enablement and next support slices
+- Production enablement is deferred pending explicit rollout decision.
+- Production migration timing remains a deliberate go-live decision, not automatic.
+- Feature exposure / route visibility decision remains open for production rollout.
+- Tenant/customer-facing support grant visibility remains a later slice.
+- Read-only account overview remains a later slice.
+- Support mutation remains a much-later explicit decision, if ever.
 
 ---
 

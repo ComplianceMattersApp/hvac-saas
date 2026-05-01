@@ -1945,6 +1945,41 @@ Implementation rule:
 - Existing historical retest_needed rows may be read for compatibility during transition cleanup.
 - Active behavioral model should treat retest_needed as legacy compatibility-only, not a forward state.
 
+3. Customer Support / Remote Assistance (V1A/V1B)
+
+Current confirmed state:
+- V1A support-access foundation is implemented, committed, and pushed on `main`.
+- V1A includes:
+  - `support_users`
+  - `support_account_grants`
+  - `support_access_sessions`
+  - `support_access_audit_events`
+  - support access resolver + support audit helper
+  - DB-level session/grant/account consistency invariant
+- V1A migration is applied to sandbox only.
+- Production support-access migration/apply remains intentionally deferred.
+
+V1B status:
+- V1B support console shell is implemented, committed, and sandbox-smoked.
+- Sandbox smoke confirmed denied/start/end audit behavior (`access_denied`, `session_started`, `session_ended`).
+
+Locked support boundaries:
+- support sessions are read-only only
+- support access requires explicit `support_user` + active grant + active session
+- support sessions are account-owner scoped
+- audit events are required
+- no impersonation/login-as-customer behavior
+- no tenant job/customer/invoice browsing surface yet
+- no support mutation behavior yet
+
+Deferred-later support rollout items:
+- production rollout decision remains explicit and deferred
+- production migration timing remains explicit and deferred
+- production feature exposure / route visibility decision remains open
+- tenant/customer-facing support grant visibility remains later
+- read-only account overview remains later
+- support mutation remains a much later explicit decision, if ever
+
 21. Usage Rule for Future Threads
 
 When starting future work:

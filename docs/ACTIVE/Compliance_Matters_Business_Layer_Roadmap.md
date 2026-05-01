@@ -1466,6 +1466,25 @@ New business modules must not regress:
 - operational dashboard truth
 - external-billing workflow via current Invoice Sent path
 
+### Support access rollout boundary (V1A/V1B)
+- Customer Support / Remote Assistance V1A foundation is implemented, committed, and pushed on `main`.
+- V1A migration is applied to sandbox only; production apply remains intentionally deferred.
+- V1A support-access contract is locked to:
+  - explicit `support_user` + active grant + active session
+  - account-owner scoped sessions
+  - required audit events
+- Customer Support / Remote Assistance V1B support console shell is implemented, committed, and sandbox-smoked.
+- V1B remains read-only only and intentionally does not add:
+  - tenant job/customer/invoice browsing surface
+  - support mutation behavior
+  - impersonation/login-as-customer behavior
+- Future support rollout remains explicit and later-scoped:
+  - production rollout decision and timing
+  - feature exposure / route visibility decision
+  - tenant/customer-facing support grant visibility
+  - read-only account overview
+  - mutation support only as a much later explicit decision, if ever
+
 ---
 
 ## 19. Deferred / later business-layer expansion
