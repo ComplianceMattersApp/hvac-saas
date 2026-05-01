@@ -2162,7 +2162,10 @@ async function requireInternalEquipmentMutationAccess(params: {
       redirect(`/jobs/${jobId}?notice=not_authorized`);
     }
 
-    return scopedEquipment;
+    return {
+      ...scopedEquipment,
+      internalUser,
+    };
   }
 
   const scopedJob = await loadScopedInternalEquipmentJobForMutation({
@@ -2174,7 +2177,11 @@ async function requireInternalEquipmentMutationAccess(params: {
     redirect(`/jobs/${jobId}?notice=not_authorized`);
   }
 
-  return { job: scopedJob, equipment: null };
+  return {
+    job: scopedJob,
+    equipment: null,
+    internalUser,
+  };
 }
 
 /** ✅ Defensive resolver: if form is missing system_id, fall back to run.system_id */
@@ -3240,7 +3247,12 @@ export async function addJobEquipmentFromForm(formData: FormData) {
   const notes = String(formData.get("notes") || "").trim() || null;
 
   const supabase = await createClient();
-  await requireInternalEquipmentMutationAccess({ supabase, jobId });
+  const scoped = await requireInternalEquipmentMutationAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // 1) Resolve/Create system for this job + location
   const { data: existingSystem, error: sysFindErr } = await supabase
@@ -3333,7 +3345,16 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
   const notes = String(formData.get("notes") || "").trim() || null;
 
   const supabase = await createClient();
-  await requireInternalEquipmentMutationAccess({ supabase, jobId, equipmentId });
+  const scoped = await requireInternalEquipmentMutationAccess({
+    supabase,
+    jobId,
+    equipmentId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   const { data: existingEquipment, error: equipmentErr } = await supabase
     .from("job_equipment")
@@ -3416,7 +3437,16 @@ export async function deleteJobEquipmentFromForm(formData: FormData) {
   if (!equipmentId) throw new Error("Missing equipment_id");
 
   const supabase = await createClient();
-  await requireInternalEquipmentMutationAccess({ supabase, jobId, equipmentId });
+  const scoped = await requireInternalEquipmentMutationAccess({
+    supabase,
+    jobId,
+    equipmentId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
  const { data: deleted, error: delErr } = await supabase
   .from("job_equipment")
