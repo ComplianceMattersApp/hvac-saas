@@ -1049,6 +1049,8 @@ const [billingRecipient, setBillingRecipient] = useState<
         message={
           errorCode === "missing_address"
             ? "Could not create job. Service address is required."
+            : errorCode === "contractor_proposal_invalid_input"
+            ? "Could not submit your job. Please complete customer and service address fields and try again."
             : errorCode === "contractor_proposal_submit_failed"
             ? "Could not submit your job. Please try again, or contact us if the issue persists."
             : errorCode === "visit_scope_required"

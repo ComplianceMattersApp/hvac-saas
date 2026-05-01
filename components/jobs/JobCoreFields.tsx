@@ -148,6 +148,7 @@ export default function JobCoreFields({
               type="text"
               name="address_line1"
               className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+              required
             />
           </div>
 
@@ -170,6 +171,8 @@ export default function JobCoreFields({
               required
             />
           </div>
+
+          <input type="hidden" name="state" value="CA" />
         </div>
       )}
 

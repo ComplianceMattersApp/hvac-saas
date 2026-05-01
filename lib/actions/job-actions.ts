@@ -5957,12 +5957,58 @@ if (!isContractorUser) {
   }
 }
 
-const { canonicalOwnerUserId, canonicalWriteClient } =
-  await resolveCanonicalOwner({
+let canonicalOwnerUserId = "";
+let canonicalWriteClient: any = supabase;
+
+try {
+  const resolvedOwner = await resolveCanonicalOwner({
     actorUserId: userId,
     defaultWriteClient: supabase,
     contractorId: isContractorUser ? contractorIdFinal : null,
   });
+
+  canonicalOwnerUserId = String(resolvedOwner.canonicalOwnerUserId ?? "").trim();
+  canonicalWriteClient = resolvedOwner.canonicalWriteClient;
+} catch (error) {
+  if (isContractorUser) {
+    const codeRaw = (error as { code?: unknown; status?: unknown })?.code
+      ?? (error as { status?: unknown })?.status;
+    const errorCode = String(codeRaw ?? "").trim() || "canonical_owner_resolution_failed";
+    const errorMessage = String((error as { message?: unknown })?.message ?? "Unknown contractor owner resolution error")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 240);
+
+    console.error("contractor_proposal_submit_failure", {
+      branch: "createJobFromForm:contractor_proposal",
+      stage: "canonical_owner_resolution",
+      contractor_user_id: userId ?? null,
+      contractor_id: contractorIdFinal ?? null,
+      error_code: errorCode,
+      error_message: errorMessage,
+    });
+
+    redirect("/jobs/new?err=contractor_proposal_submit_failed");
+  }
+
+  throw error;
+}
+
+if (!canonicalOwnerUserId) {
+  if (isContractorUser) {
+    console.error("contractor_proposal_submit_failure", {
+      branch: "createJobFromForm:contractor_proposal",
+      stage: "canonical_owner_resolution",
+      contractor_user_id: userId ?? null,
+      contractor_id: contractorIdFinal ?? null,
+      error_code: "canonical_owner_missing",
+      error_message: "Canonical owner was not resolved for contractor proposal submit",
+    });
+    redirect("/jobs/new?err=contractor_proposal_submit_failed");
+  }
+
+  throw new Error("Canonical owner user id is required");
+}
 
   await requireOwnerScopedInternalIntakeCreateContext({
     supabase,
@@ -6245,7 +6291,19 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     visitScopeItems: visit_scope_items,
   });
 
-  if (!city) throw new Error("City is required");
+  if (!city) {
+    if (isContractorUser) {
+      console.error("contractor_proposal_submit_validation_failed", {
+        branch: "createJobFromForm:contractor_proposal",
+        contractor_user_id: userId,
+        contractor_id: contractorIdFinal,
+        error_code: "missing_city",
+        error_message: "City is required for contractor proposal submission",
+      });
+      redirect("/jobs/new?err=contractor_proposal_invalid_input");
+    }
+    throw new Error("City is required");
+  }
 
   const locationNickname =
     String(formData.get("location_nickname") || "").trim() || null;
@@ -6255,6 +6313,16 @@ const { canonicalOwnerUserId, canonicalWriteClient } =
     null;
 
   if (!existingLocationId && !zip) {
+    if (isContractorUser) {
+      console.error("contractor_proposal_submit_validation_failed", {
+        branch: "createJobFromForm:contractor_proposal",
+        contractor_user_id: userId,
+        contractor_id: contractorIdFinal,
+        error_code: "missing_zip",
+        error_message: "Zip is required for contractor proposal submission",
+      });
+      redirect("/jobs/new?err=contractor_proposal_invalid_input");
+    }
     throw new Error("Zip is required");
   }
 
@@ -6808,7 +6876,73 @@ function canContractorWriteEvent(event_type: string) {
     const proposalContractorId = String(contractorIdFinal ?? "").trim();
     const proposalOwnerUserId = String(canonicalOwnerUserId ?? "").trim();
 
+    function sanitizeProposalErrorForLog(error: unknown) {
+      if (!error) {
+        return {
+          code: null,
+          message: "Unknown contractor proposal submit error",
+        };
+      }
+
+      const maybeError = error as {
+        code?: unknown;
+        status?: unknown;
+        message?: unknown;
+      };
+
+      const codeRaw = maybeError.code ?? maybeError.status;
+      const code = String(codeRaw ?? "").trim() || null;
+      const message = String(
+        maybeError.message ?? (error instanceof Error ? error.message : error),
+      )
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 240);
+
+      return {
+        code,
+        message: message || "Unknown contractor proposal submit error",
+      };
+    }
+
+    function logContractorProposalSubmitFailure(params: {
+      errorCode: string;
+      error: unknown;
+      stage: string;
+      proposalId?: string | null;
+    }) {
+      const sanitized = sanitizeProposalErrorForLog(params.error);
+      console.error("contractor_proposal_submit_failure", {
+        branch: "createJobFromForm:contractor_proposal",
+        stage: params.stage,
+        proposal_id: params.proposalId ?? null,
+        contractor_user_id: submittingUserId || null,
+        contractor_id: proposalContractorId || null,
+        error_code: sanitized.code || params.errorCode,
+        error_message: sanitized.message,
+      });
+    }
+
+    if (!address_line1 || !city || !state || !zip) {
+      console.error("contractor_proposal_submit_validation_failed", {
+        branch: "createJobFromForm:contractor_proposal",
+        contractor_user_id: submittingUserId || null,
+        contractor_id: proposalContractorId || null,
+        error_code: "missing_required_address_fields",
+        error_message:
+          "Contractor proposal requires address_line1, city, state, and zip before insert",
+      });
+      redirect("/jobs/new?err=contractor_proposal_invalid_input");
+    }
+
     if (!submittingUserId || !proposalContractorId || !proposalOwnerUserId) {
+      console.error("contractor_proposal_submit_validation_failed", {
+        branch: "createJobFromForm:contractor_proposal",
+        contractor_user_id: submittingUserId || null,
+        contractor_id: proposalContractorId || null,
+        error_code: "missing_identity_context",
+        error_message: "Missing submitting user, contractor id, or owner context",
+      });
       redirect("/jobs/new?err=contractor_proposal_submit_failed");
     }
 
@@ -6854,7 +6988,12 @@ function canContractorWriteEvent(event_type: string) {
       .single();
 
     if (proposalErr) {
-      throw proposalErr;
+      logContractorProposalSubmitFailure({
+        errorCode: "proposal_insert_failed",
+        error: proposalErr,
+        stage: "proposal_insert",
+      });
+      redirect("/jobs/new?err=contractor_proposal_submit_failed");
     }
 
     const proposalId = String((proposalRow as any)?.id ?? "").trim();
@@ -6866,7 +7005,7 @@ function canContractorWriteEvent(event_type: string) {
       const persistedAttachmentIds: string[] = [];
       const persistedStoragePaths: string[] = [];
 
-      async function rollbackProposalOnAttachmentFailure() {
+      async function cleanupProposalAttachmentsOnFailure() {
         if (persistedAttachmentIds.length > 0) {
           const { error: deleteAttachmentRowsErr } = await proposalWriteClient
             .from("attachments")
@@ -6901,22 +7040,6 @@ function canContractorWriteEvent(event_type: string) {
                   : String((deleteStorageErr as any)?.message ?? "Unknown rollback storage delete error"),
             });
           }
-        }
-
-        const { error: deleteProposalErr } = await proposalWriteClient
-          .from("contractor_intake_submissions")
-          .delete()
-          .eq("id", proposalId)
-          .eq("review_status", "pending");
-
-        if (deleteProposalErr) {
-          console.error("proposal_row_rollback_failed", {
-            proposalId,
-            error:
-              deleteProposalErr instanceof Error
-                ? deleteProposalErr.message
-                : String((deleteProposalErr as any)?.message ?? "Unknown rollback proposal delete error"),
-          });
         }
       }
 
@@ -6958,21 +7081,31 @@ function canContractorWriteEvent(event_type: string) {
           persistedStoragePaths.push(storagePath);
         }
       } catch (error) {
-        console.error("proposal_attachment_persist_failed", {
+        logContractorProposalSubmitFailure({
+          errorCode: "attachment_persist_failed",
+          error,
+          stage: "proposal_attachment_persist",
           proposalId,
-          error: error instanceof Error ? error.message : "Unknown proposal attachment persist error",
         });
-        await rollbackProposalOnAttachmentFailure();
-        redirect("/jobs/new?err=contractor_proposal_submit_failed");
+        await cleanupProposalAttachmentsOnFailure();
       }
 
-      await createContractorIntakeProposalAwarenessNotification({
-        supabase,
-        contractorIntakeSubmissionId: proposalId,
-        accountOwnerUserId: proposalOwnerUserId,
-        actorUserId: submittingUserId,
-        contractorId: proposalContractorId,
-      });
+      try {
+        await createContractorIntakeProposalAwarenessNotification({
+          supabase,
+          contractorIntakeSubmissionId: proposalId,
+          accountOwnerUserId: proposalOwnerUserId,
+          actorUserId: submittingUserId,
+          contractorId: proposalContractorId,
+        });
+      } catch (error) {
+        logContractorProposalSubmitFailure({
+          errorCode: "awareness_notification_failed",
+          error,
+          stage: "internal_awareness_notification",
+          proposalId,
+        });
+      }
 
       try {
         await sendInternalContractorIntakeProposalAlertEmail({

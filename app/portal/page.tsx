@@ -79,6 +79,12 @@ export default async function PortalPage({
       return await requireCurrentContractorPortalContext({ supabase });
     } catch (error) {
       const code = String((error as Error)?.message ?? "").trim().toUpperCase();
+      if (code === "NOT_AUTHENTICATED") {
+        redirect("/login");
+      }
+      if (code === "NOT_CONTRACTOR") {
+        redirect("/ops");
+      }
       if (code === "CONTRACTOR_ARCHIVED") {
         redirect("/login?err=contractor_archived");
       }
