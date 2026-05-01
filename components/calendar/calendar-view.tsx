@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { X } from 'lucide-react';
-import { eachWeekOfInterval, endOfMonth, format as formatDate, parseISO, startOfMonth } from 'date-fns';
+import { endOfMonth, format as formatDate, parseISO, startOfMonth } from 'date-fns';
 
 import CalendarMonthGrid from './CalendarMonthGrid';
 import CalendarDispatchGrid from './CalendarDispatchGrid';
@@ -791,10 +791,19 @@ export async function CalendarView(props: Props) {
   const uiView = normalizeView(props.view);
   const todayDate = todayYmdLA();
   const baseMode: DispatchViewMode = uiView === 'week' ? 'week' : 'day';
+  const anchorForRange = parseISO(normalizeYmd(props.date) ?? todayDate);
+  const monthStartDate = formatDate(startOfMonth(anchorForRange), 'yyyy-MM-dd');
+  const monthEndDate = formatDate(endOfMonth(anchorForRange), 'yyyy-MM-dd');
 
   const data = await getDispatchCalendarData({
     mode: baseMode,
     anchorDate: props.date,
+    ...(uiView === 'month' || uiView === 'list'
+      ? {
+          rangeStartDate: monthStartDate,
+          rangeEndDate: monthEndDate,
+        }
+      : {}),
   });
 
   const activeTech = normalizeCalendarTechFilter(props.tech);
@@ -807,63 +816,25 @@ export async function CalendarView(props: Props) {
   const prefillDate = normalizeYmd(props.prefillDate);
   let canonicalBlockEventsForRange = data.calendarBlockEvents;
 
-  let canonicalDispatchJobsByDay = data.week.days.map((day) => ({
+  let canonicalDispatchJobsByDay = data.range.days.map((day) => ({
     date: day.date,
     jobs: day.jobs,
   }));
 
   let canonicalDispatchJobsForRange: DispatchJob[] =
-    data.mode === 'day' ? data.day.jobs : data.week.days.flatMap((day) => day.jobs);
+    data.range.days.flatMap((day) => day.jobs);
 
   if (uiView === 'month' || uiView === 'list') {
-    const anchor = parseISO(data.anchorDate);
-    const monthStart = startOfMonth(anchor);
-    const monthEnd = endOfMonth(anchor);
-    const weekAnchors = eachWeekOfInterval({ start: monthStart, end: monthEnd });
-
-    const weekResults = await Promise.all(
-      weekAnchors.map((weekDate) =>
-        getDispatchCalendarData({
-          mode: 'week',
-          anchorDate: formatDate(weekDate, 'yyyy-MM-dd'),
-        }),
-      ),
-    );
-
-    const dayMap = new Map<string, DispatchJob[]>();
-    const blockMap = new Map<string, DispatchCalendarBlockEvent>();
-
-    for (const result of weekResults) {
-      for (const day of result.week.days) {
-        const existing = dayMap.get(day.date) ?? [];
-        const merged = new Map(existing.map((job) => [job.id, job]));
-        for (const job of day.jobs) merged.set(job.id, job);
-        dayMap.set(day.date, Array.from(merged.values()));
-      }
-      for (const event of result.calendarBlockEvents) {
-        if (!blockMap.has(event.id)) blockMap.set(event.id, event);
-      }
-    }
-
-    canonicalBlockEventsForRange = Array.from(blockMap.values()).sort((a, b) => {
+    canonicalBlockEventsForRange = [...data.calendarBlockEvents].sort((a, b) => {
       if (a.calendar_date !== b.calendar_date) return a.calendar_date.localeCompare(b.calendar_date);
       if (a.start_time !== b.start_time) return a.start_time.localeCompare(b.start_time);
       return a.title.localeCompare(b.title);
     });
 
-    const monthNumber = anchor.getMonth();
-    const yearNumber = anchor.getFullYear();
-
-    canonicalDispatchJobsByDay = Array.from(dayMap.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, jobs]) => ({
-        date,
-        jobs: jobs.filter((job) => {
-          if (!job.scheduled_date) return false;
-          if (uiView === 'month') return true;
-          const jobDate = parseISO(job.scheduled_date);
-          return jobDate.getMonth() === monthNumber && jobDate.getFullYear() === yearNumber;
-        }),
+    canonicalDispatchJobsByDay = data.range.days
+      .map((day) => ({
+        date: day.date,
+        jobs: day.jobs,
       }))
       .filter((day) => day.jobs.length > 0);
 

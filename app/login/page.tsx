@@ -94,7 +94,7 @@ export default function LoginPage() {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -106,9 +106,21 @@ export default function LoginPage() {
       return;
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    let user = signInData?.user ?? null;
+
+    if (!user) {
+      const {
+        data: userData,
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) {
+        setErrorMsg(userError.message || "Session could not be confirmed.");
+        return;
+      }
+
+      user = userData?.user ?? null;
+    }
 
     if (!user) {
       setErrorMsg("Session could not be confirmed.");

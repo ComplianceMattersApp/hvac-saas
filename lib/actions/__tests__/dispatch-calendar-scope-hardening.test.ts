@@ -152,6 +152,10 @@ function makeCalendarFixture() {
 
   function jobsQuery() {
     let customerIds: string[] = [];
+    let scheduledDateStart: string | null = null;
+    let scheduledDateEnd: string | null = null;
+    let onlyScheduledNull = false;
+    let requireScheduledDate = false;
 
     const query: any = {
       select: vi.fn(() => query),
@@ -161,11 +165,40 @@ function makeCalendarFixture() {
         }
         return query;
       }),
-      is: vi.fn(() => query),
+      is: vi.fn((column: string, value: unknown) => {
+        if (column === "scheduled_date" && value === null) {
+          onlyScheduledNull = true;
+        }
+        return query;
+      }),
+      not: vi.fn((column: string, op: string, value: unknown) => {
+        if (column === "scheduled_date" && op === "is" && value === null) {
+          requireScheduledDate = true;
+        }
+        return query;
+      }),
+      gte: vi.fn((column: string, value: unknown) => {
+        if (column === "scheduled_date") scheduledDateStart = String(value ?? "").trim() || null;
+        return query;
+      }),
+      lte: vi.fn((column: string, value: unknown) => {
+        if (column === "scheduled_date") scheduledDateEnd = String(value ?? "").trim() || null;
+        return query;
+      }),
       order: vi.fn(() => query),
       then: (onFulfilled: (value: { data: JobRow[]; error: null }) => unknown, onRejected?: (reason: unknown) => unknown) => {
         calls.push({ table: "jobs", op: "select", value: [...customerIds] });
-        const data = jobs.filter((row) => customerIds.includes(row.customer_id));
+        const data = jobs.filter((row) => {
+          if (!customerIds.includes(row.customer_id)) return false;
+
+          const scheduledDate = String(row.scheduled_date ?? "").trim();
+          if (onlyScheduledNull && scheduledDate) return false;
+          if (requireScheduledDate && !scheduledDate) return false;
+          if (scheduledDateStart && scheduledDate && scheduledDate < scheduledDateStart) return false;
+          if (scheduledDateEnd && scheduledDate && scheduledDate > scheduledDateEnd) return false;
+
+          return true;
+        });
         return Promise.resolve({ data, error: null }).then(onFulfilled, onRejected);
       },
     };

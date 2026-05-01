@@ -1,13 +1,9 @@
 // app/ops/page
 import Link from "next/link";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/server";
 import ContractorFilter from "./_components/ContractorFilter";
 import { redirect } from "next/navigation";
-import {
-  isInternalAccessError,
-  requireInternalUser,
-} from "@/lib/auth/internal-user";
+import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 
 import {
   formatBusinessDateUS,
@@ -173,41 +169,23 @@ export default async function OpsPage({
   const sort = (sp.sort ?? "").trim() || "default";
   const panel = (sp.panel ?? "").trim().toLowerCase();
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
+  const actorContext = await getRequestActorContext();
+  const supabase = actorContext.supabase;
+  const user = actorContext.user;
 
   const signal = (sp.signal ?? "").trim().toLowerCase() || "";
 
   if (!user) redirect("/login");
 
-  let internalUser: Awaited<ReturnType<typeof requireInternalUser>>["internalUser"];
-
-  try {
-    const internalAccess = await requireInternalUser({
-      supabase,
-      userId: user.id,
-    });
-    internalUser = internalAccess.internalUser;
-  } catch (error) {
-    if (isInternalAccessError(error)) {
-      const { data: cu, error: cuErr } = await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (cuErr) throw cuErr;
-
-      if (cu?.contractor_id) {
-        redirect("/portal");
-      }
-
-      redirect("/login");
-    }
-
-    throw error;
+  if (actorContext.kind === "contractor") {
+    redirect("/portal");
   }
+
+  if (actorContext.kind !== "internal" || !actorContext.internalUser) {
+    redirect("/login");
+  }
+
+  const internalUser = actorContext.internalUser;
 
   const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
     supabase,
@@ -274,46 +252,62 @@ function subtractBusinessDays(date: Date, days: number) {
     .neq("status", "cancelled")
     .is("deleted_at", null);
 
-if (contractor) countsQ = countsQ.eq("contractor_id", contractor);
+  if (contractor) countsQ = countsQ.eq("contractor_id", contractor);
 
-const { data: countRows, error: countsErr } = await countsQ;
-if (countsErr) throw countsErr;
+  // Parents with at least one successfully resolved retest child should leave active unresolved queues.
+  // The parent remains historically failed, but should not stay in active Failed / Attention views.
+  const resolvedRetestChildrenQ = supabase
+    .from("jobs")
+    .select("parent_job_id")
+    .not("parent_job_id", "is", null)
+    .in("ops_status", ["paperwork_required", "invoice_required", "closed"])
+    .is("deleted_at", null);
 
-const counts = new Map<string, number>();
-for (const row of countRows ?? []) {
-  const key = String((row as any).ops_status ?? "");
-  const lifecycle = String((row as any).status ?? "").toLowerCase();
-  if (!key) continue;
-  if ((key === "need_to_schedule" || key === "scheduled") && lifecycle !== "open") continue;
-  counts.set(key, (counts.get(key) ?? 0) + 1);
-}
+  const activeRetestChildrenQ = supabase
+    .from("jobs")
+    .select("parent_job_id, service_case_id, created_at, scheduled_date, window_start, window_end")
+    .not("parent_job_id", "is", null)
+    .is("deleted_at", null)
+    .neq("status", "cancelled")
+    .neq("ops_status", "closed");
 
-// Parents with at least one successfully resolved retest child should leave active unresolved queues.
-// The parent remains historically failed, but should not stay in active Failed / Attention views.
-const { data: resolvedRetestChildren, error: resolvedRetestErr } = await supabase
-  .from("jobs")
-  .select("parent_job_id, ops_status")
-  .not("parent_job_id", "is", null)
-  .in("ops_status", ["paperwork_required", "invoice_required", "closed"])
-  .is("deleted_at", null);
+  const contractorsQ = supabase
+    .from("contractors")
+    .select("id, name")
+    .eq("lifecycle_state", "active")
+    .order("name", { ascending: true });
 
-if (resolvedRetestErr) throw resolvedRetestErr;
+  const [countsRes, resolvedRetestRes, activeRetestRes, contractorsRes] = await Promise.all([
+    countsQ,
+    resolvedRetestChildrenQ,
+    activeRetestChildrenQ,
+    contractorsQ,
+  ]);
 
-const resolvedFailedParentIds = new Set(
-  (resolvedRetestChildren ?? [])
-    .map((r: any) => String(r.parent_job_id ?? "").trim())
-    .filter(Boolean)
-);
+  if (countsRes.error) throw countsRes.error;
+  if (resolvedRetestRes.error) throw resolvedRetestRes.error;
+  if (activeRetestRes.error) throw activeRetestRes.error;
+  if (contractorsRes.error) throw contractorsRes.error;
 
-const { data: activeRetestChildren, error: activeRetestErr } = await supabase
-  .from("jobs")
-  .select("parent_job_id, service_case_id, ops_status, status, created_at, scheduled_date, window_start, window_end")
-  .not("parent_job_id", "is", null)
-  .is("deleted_at", null)
-  .neq("status", "cancelled")
-  .neq("ops_status", "closed");
+  const countRows = countsRes.data ?? [];
+  const resolvedRetestChildren = resolvedRetestRes.data ?? [];
+  const activeRetestChildren = activeRetestRes.data ?? [];
+  const contractors = contractorsRes.data ?? [];
 
-if (activeRetestErr) throw activeRetestErr;
+  const counts = new Map<string, number>();
+  for (const row of countRows ?? []) {
+    const key = String((row as any).ops_status ?? "");
+    const lifecycle = String((row as any).status ?? "").toLowerCase();
+    if (!key) continue;
+    if ((key === "need_to_schedule" || key === "scheduled") && lifecycle !== "open") continue;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const resolvedFailedParentIds = new Set(
+    (resolvedRetestChildren ?? [])
+      .map((r: any) => String(r.parent_job_id ?? "").trim())
+      .filter(Boolean)
+  );
 
 const failedParentIdsWithRetestChild = new Set(
   (activeRetestChildren ?? [])
@@ -375,13 +369,6 @@ function shouldHideFailedParentJob(j: any) {
   return !!serviceCaseId && activeRetestServiceCaseIds.has(serviceCaseId);
 }
 
-
-  // Contractors for filter dropdown
-  const { data: contractors } = await supabase
-    .from("contractors")
-    .select("id, name")
-    .eq("lifecycle_state", "active")
-    .order("name", { ascending: true });
 
   // Common job select (keep lightweight)
  const baseSelect =
@@ -470,12 +457,6 @@ let fieldWorkQ = supabase
 
 fieldWorkQ = applyCommonFilters(fieldWorkQ);
 
-const { data: fieldWorkJobsRaw, error: fieldWorkErr } = await fieldWorkQ;
-if (fieldWorkErr) throw fieldWorkErr;
-const fieldWorkJobs = (fieldWorkJobsRaw ?? []).filter(
-  (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
-);
-
 // 2) UPCOMING (scheduled jobs on/after LA tomorrow)
 let upcomingQ = supabase
   .from("jobs")
@@ -491,12 +472,6 @@ let upcomingQ = supabase
 
 upcomingQ = applyCommonFilters(upcomingQ);
 
-const { data: upcomingJobsRaw, error: upcomingErr } = await upcomingQ;
-if (upcomingErr) throw upcomingErr;
-const upcomingJobs = (upcomingJobsRaw ?? []).filter(
-  (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
-);
-
 
   // 3) CALL LIST preview (need_to_schedule)
   let callListQ = supabase
@@ -511,12 +486,6 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
 
   callListQ = applyCommonFilters(callListQ);
 
-  const { data: callListJobsRaw, error: callListErr } = await callListQ;
-  if (callListErr) throw callListErr;
-  const callListJobs = (callListJobsRaw ?? []).filter(
-    (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
-  );
-
     // 4) CLOSEOUT COMMAND BOARD (derived from field_complete + remaining office obligations)
     let closeoutQ = supabase
       .from("jobs")
@@ -529,12 +498,6 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
       .limit(100);
 
     closeoutQ = applyCommonFilters(closeoutQ);
-
-    const { data: closeoutSourceJobsRaw, error: closeoutErr } = await closeoutQ;
-    if (closeoutErr) throw closeoutErr;
-    const closeoutSourceJobs = (closeoutSourceJobsRaw ?? []).filter(
-      (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
-    );
 
     // 5) EXCEPTIONS: Still Open (scheduled before today in LA and not field-complete)
     let stillOpenQ = supabase
@@ -551,16 +514,10 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
 
     stillOpenQ = applyCommonFilters(stillOpenQ);
 
-    const { data: stillOpenJobsRaw, error: stillOpenErr } = await stillOpenQ;
-    if (stillOpenErr) throw stillOpenErr;
-    const stillOpenJobs = (stillOpenJobsRaw ?? []).filter(
-      (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
-    );
-
     // 6) NEEDS ATTENTION preview (aging-based escalation queue)
     let attentionQ = supabase
       .from("jobs")
-      .select(baseSelect + ", created_at")
+      .select(baseSelect)
       .is("deleted_at", null)
       .or(
         [
@@ -580,13 +537,6 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
 
     attentionQ = applyCommonFilters(attentionQ);
 
-    const { data: attentionJobsRaw, error: attentionErr } = await attentionQ;
-    if (attentionErr) throw attentionErr;
-    const attentionJobs = (attentionJobsRaw ?? []).filter(
-      (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
-    );
-    const attentionCount = attentionJobs.length;
-
   let operationalReportingJobsQ = supabase
     .from("jobs")
     .select(
@@ -597,10 +547,102 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
 
   if (contractor) operationalReportingJobsQ = operationalReportingJobsQ.eq("contractor_id", contractor);
 
-  const { data: operationalReportingJobsRaw, error: operationalReportingJobsErr } = await operationalReportingJobsQ;
-  if (operationalReportingJobsErr) throw operationalReportingJobsErr;
+  // 7) BUCKET list (tabs)
+    let bucketQ = supabase
+      .from("jobs")
+      .select(baseSelect)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(100);
 
-  const operationalReportingJobs = (operationalReportingJobsRaw ?? [])
+    if (bucket === "attention") {
+      bucketQ = bucketQ.or(
+        [
+          `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
+          `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
+          `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
+          `and(ops_status.eq.pending_office_review,created_at.lte.${failedCutoffIso})`,
+        ].join(",")
+      );
+    } else if (bucket === "failed") {
+      bucketQ = bucketQ.in("ops_status", ["failed", "pending_office_review"]);
+    } else if (bucket === "workflow_all") {
+      bucketQ = bucketQ.in("ops_status", [
+        "need_to_schedule",
+        "pending_info",
+        "on_hold",
+        "failed",
+        "pending_office_review",
+      ]);
+    } else if (bucket === "closeout") {
+      bucketQ = bucketQ
+        .eq("field_complete", true)
+        .neq("ops_status", "closed");
+    } else if (bucket === "recent_closed") {
+      bucketQ = bucketQ
+        .eq("ops_status", "closed")
+        .order("created_at", { ascending: false })
+        .limit(15);
+    } else {
+      bucketQ = bucketQ.eq("ops_status", bucket);
+      if (bucket === "need_to_schedule" || bucket === "scheduled") {
+        bucketQ = bucketQ.eq("status", "open");
+      }
+    }
+
+    bucketQ = applyCommonFilters(bucketQ);
+
+    const [
+      fieldWorkRes,
+      upcomingRes,
+      callListRes,
+      closeoutRes,
+      stillOpenRes,
+      attentionRes,
+      operationalReportingJobsRes,
+      bucketRes,
+    ] = await Promise.all([
+      fieldWorkQ,
+      upcomingQ,
+      callListQ,
+      closeoutQ,
+      stillOpenQ,
+      attentionQ,
+      operationalReportingJobsQ,
+      bucketQ,
+    ]);
+
+  if (fieldWorkRes.error) throw fieldWorkRes.error;
+  if (upcomingRes.error) throw upcomingRes.error;
+  if (callListRes.error) throw callListRes.error;
+  if (closeoutRes.error) throw closeoutRes.error;
+  if (stillOpenRes.error) throw stillOpenRes.error;
+  if (attentionRes.error) throw attentionRes.error;
+  if (operationalReportingJobsRes.error) throw operationalReportingJobsRes.error;
+  if (bucketRes.error) throw bucketRes.error;
+
+  const fieldWorkJobs = (fieldWorkRes.data ?? []).filter(
+    (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+  );
+  const upcomingJobs = (upcomingRes.data ?? []).filter(
+    (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+  );
+  const callListJobs = (callListRes.data ?? []).filter(
+    (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+  );
+  const closeoutSourceJobs = (closeoutRes.data ?? []).filter(
+    (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+  );
+  const stillOpenJobs = (stillOpenRes.data ?? []).filter(
+    (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+  );
+  const attentionJobs = (attentionRes.data ?? []).filter(
+    (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+  );
+  const attentionCount = attentionJobs.length;
+
+  const operationalReportingJobs = (operationalReportingJobsRes.data ?? [])
     .filter((job: any) => !shouldHideFailedParentJob(job)) as OperationalReportingJob[];
 
   const reportingServiceCaseIds = Array.from(
@@ -611,19 +653,9 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
     )
   );
 
-  const { data: reportingServiceCases, error: reportingServiceCasesErr } = reportingServiceCaseIds.length
-    ? await supabase
-        .from("service_cases")
-        .select("id, status")
-        .in("id", reportingServiceCaseIds)
-    : { data: [], error: null };
-
-  if (reportingServiceCasesErr) throw reportingServiceCasesErr;
-
-  let throughputEventRows: Array<{ event_type: string | null }> = [];
-
+  let throughputEventsQ: any = null;
   if (!contractor || operationalReportingJobs.length > 0) {
-    let throughputEventsQ = supabase
+    throughputEventsQ = supabase
       .from("job_events")
       .select("event_type")
       .gte("created_at", recentThroughputCutoffIso)
@@ -635,11 +667,23 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
         operationalReportingJobs.map((job) => job.id)
       );
     }
-
-    const { data: throughputEventsRaw, error: throughputEventsErr } = await throughputEventsQ;
-    if (throughputEventsErr) throw throughputEventsErr;
-    throughputEventRows = throughputEventsRaw ?? [];
   }
+
+  const [reportingServiceCasesRes, throughputEventsRes] = await Promise.all([
+    reportingServiceCaseIds.length
+      ? supabase
+          .from("service_cases")
+          .select("id, status")
+          .in("id", reportingServiceCaseIds)
+      : Promise.resolve({ data: [], error: null }),
+    throughputEventsQ ?? Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (reportingServiceCasesRes.error) throw reportingServiceCasesRes.error;
+  if (throughputEventsRes.error) throw throughputEventsRes.error;
+
+  const reportingServiceCases = reportingServiceCasesRes.data ?? [];
+  const throughputEventRows = (throughputEventsRes.data ?? []) as Array<{ event_type: string | null }>;
 
   const recentCreatedCount = throughputEventRows.filter(
     (row) => String(row.event_type ?? "").toLowerCase() === "job_created"
@@ -699,54 +743,7 @@ const upcomingJobs = (upcomingJobsRaw ?? []).filter(
     recentServiceWindowCutoffIso,
   });
 
-  // 7) BUCKET list (tabs)
-    let bucketQ = supabase
-      .from("jobs")
-      .select(baseSelect)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (bucket === "attention") {
-      bucketQ = bucketQ.or(
-        [
-          `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
-          `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
-          `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
-          `and(ops_status.eq.pending_office_review,created_at.lte.${failedCutoffIso})`,
-        ].join(",")
-      );
-    } else if (bucket === "failed") {
-      bucketQ = bucketQ.in("ops_status", ["failed", "pending_office_review"]);
-    } else if (bucket === "workflow_all") {
-      bucketQ = bucketQ.in("ops_status", [
-        "need_to_schedule",
-        "pending_info",
-        "on_hold",
-        "failed",
-        "pending_office_review",
-      ]);
-    } else if (bucket === "closeout") {
-      bucketQ = bucketQ
-        .eq("field_complete", true)
-        .neq("ops_status", "closed");
-    } else if (bucket === "recent_closed") {
-      bucketQ = bucketQ
-        .eq("ops_status", "closed")
-        .order("created_at", { ascending: false })
-        .limit(15);
-    } else {
-      bucketQ = bucketQ.eq("ops_status", bucket);
-      if (bucket === "need_to_schedule" || bucket === "scheduled") {
-        bucketQ = bucketQ.eq("status", "open");
-      }
-    }
-
-    bucketQ = applyCommonFilters(bucketQ);
-
-    const { data: bucketJobsRaw, error: bucketErr } = await bucketQ;
-  if (bucketErr) throw bucketErr;
+  const bucketJobsRaw = bucketRes.data ?? [];
   const bucketJobs = (bucketJobsRaw ?? []).filter(
     (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
   );
@@ -815,7 +812,7 @@ const locationsById = new Map((locRes.data ?? []).map((l: any) => [l.id, l]));
 
 // helpers used in JSX (prefer truth tables, fallback to job snapshot)
 function customerLine(j: any) {
-  const c = j.customer_id ? customersById.get(j.customer_id) : null;
+  const c: any = j.customer_id ? customersById.get(j.customer_id) : null;
   const name =
     (c?.full_name ||
       `${c?.first_name ?? ""} ${c?.last_name ?? ""}`.trim() ||
@@ -836,7 +833,7 @@ function addressLine(j: any) {
 }
 
 function addressParts(j: any) {
-  const l = j.location_id ? locationsById.get(j.location_id) : null;
+  const l: any = j.location_id ? locationsById.get(j.location_id) : null;
 
   return {
     address:
@@ -854,7 +851,7 @@ function addressParts(j: any) {
 }
 
 function customerNameOnly(j: any) {
-  const c = j.customer_id ? customersById.get(j.customer_id) : null;
+  const c: any = j.customer_id ? customersById.get(j.customer_id) : null;
   return (
     c?.full_name ||
     `${c?.first_name ?? ""} ${c?.last_name ?? ""}`.trim() ||
@@ -864,7 +861,7 @@ function customerNameOnly(j: any) {
 }
 
 function customerPhoneOnly(j: any) {
-  const c = j.customer_id ? customersById.get(j.customer_id) : null;
+  const c: any = j.customer_id ? customersById.get(j.customer_id) : null;
   return c?.phone ?? j.customer_phone ?? "";
 }
 
@@ -1191,17 +1188,57 @@ const pendingInfoJobIds = uniqueAllOpenOpsJobs
   .map((j: any) => String(j.id ?? ""))
   .filter(Boolean);
 
-const { data: pendingInfoTransitionEvents, error: pendingInfoTransitionErr } = pendingInfoJobIds.length
-  ? await supabase
-      .from("job_events")
-      .select("job_id, created_at, meta")
-      .in("job_id", pendingInfoJobIds)
-      .eq("event_type", "ops_update")
-      .order("created_at", { ascending: false })
-      .range(0, 5000)
-  : { data: [], error: null };
+const [pendingInfoTransitionRes, activeAssignmentDisplayMap, signalRes, unreadContractorAwarenessNotifications, failedRunsRes] = await Promise.all([
+  pendingInfoJobIds.length
+    ? supabase
+        .from("job_events")
+        .select("job_id, created_at, meta")
+        .in("job_id", pendingInfoJobIds)
+        .eq("event_type", "ops_update")
+        .order("created_at", { ascending: false })
+        .range(0, 5000)
+    : Promise.resolve({ data: [], error: null }),
+  getActiveJobAssignmentDisplayMap({
+    supabase,
+    jobIds: allOpenOpsJobIds,
+  }),
+  allOpenOpsJobIds.length
+    ? supabase
+        .from("job_events")
+        .select("job_id, event_type, created_at, meta")
+        .in("job_id", allOpenOpsJobIds)
+        .in("event_type", [
+          "retest_ready_requested",
+          "contractor_job_created",
+          "contractor_report_sent",
+          "contractor_note",
+          "contractor_correction_submission",
+          "contractor_schedule_updated",
+          "attachment_added",
+          "permit_info_updated",
+        ])
+        .order("created_at", { ascending: false })
+    : Promise.resolve({ data: [], error: null }),
+  listInternalNotifications({
+    limit: 100,
+    onlyUnread: true,
+    filterKey: "contractor_updates",
+  }),
+  allOpenOpsJobIds.length
+    ? supabase
+        .from("ecc_test_runs")
+        .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, created_at")
+        .in("job_id", allOpenOpsJobIds)
+        .eq("is_completed", true)
+        .or("override_pass.eq.false,computed_pass.eq.false")
+    : Promise.resolve({ data: [], error: null }),
+]);
 
-if (pendingInfoTransitionErr) throw pendingInfoTransitionErr;
+if (pendingInfoTransitionRes.error) throw pendingInfoTransitionRes.error;
+if (signalRes.error) throw signalRes.error;
+if (failedRunsRes.error) throw failedRunsRes.error;
+
+const pendingInfoTransitionEvents = pendingInfoTransitionRes.data ?? [];
 
 const pendingInfoSetAtByJob = new Map<string, string>();
 for (const ev of pendingInfoTransitionEvents ?? []) {
@@ -1213,11 +1250,6 @@ for (const ev of pendingInfoTransitionEvents ?? []) {
   if (createdAt) pendingInfoSetAtByJob.set(jobId, createdAt);
 }
 
-const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
-  supabase,
-  jobIds: allOpenOpsJobIds,
-});
-
 function assignmentSummaryForJob(jobId: string) {
   const assignments = activeAssignmentDisplayMap[jobId] ?? [];
   if (!assignments.length) return "Unassigned";
@@ -1228,33 +1260,7 @@ function assignmentSummaryForJob(jobId: string) {
     : primaryAssignee.display_name;
 }
 
-const { data: signalEvents, error: signalErr } = await supabase
-  .from("job_events")
-  .select("job_id, event_type, created_at, meta")
-  .in(
-    "job_id",
-    allOpenOpsJobIds.length
-      ? allOpenOpsJobIds
-      : ["00000000-0000-0000-0000-000000000000"]
-  )
-  .in("event_type", [
-    "retest_ready_requested",
-    "contractor_job_created",
-    "contractor_report_sent",
-    "contractor_note",
-    "contractor_correction_submission",
-    "contractor_schedule_updated",
-    "attachment_added",
-    "permit_info_updated",
-  ])
-  .order("created_at", { ascending: false });
-
-if (signalErr) throw signalErr;
-const unreadContractorAwarenessNotifications = await listInternalNotifications({
-  limit: 100,
-  onlyUnread: true,
-  filterKey: "contractor_updates",
-});
+const signalEvents = signalRes.data ?? [];
 
 const unreadContractorUpdateNotifications = unreadContractorAwarenessNotifications
   .filter((notification) => {
@@ -1267,19 +1273,7 @@ const unreadContractorUpdateNotifications = unreadContractorAwarenessNotificatio
     created_at: String(notification.created_at ?? "").trim(),
   }));
 
-const { data: failedRuns, error: failedRunsErr } = await supabase
-  .from("ecc_test_runs")
-  .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, created_at")
-  .in(
-    "job_id",
-    allOpenOpsJobIds.length
-      ? allOpenOpsJobIds
-      : ["00000000-0000-0000-0000-000000000000"]
-  )
-  .eq("is_completed", true)
-  .or("override_pass.eq.false,computed_pass.eq.false");
-
-if (failedRunsErr) throw failedRunsErr;
+const failedRuns = failedRunsRes.data ?? [];
 
 const latestFailedRunByJob = new Map<string, any>();
 for (const run of failedRuns ?? []) {

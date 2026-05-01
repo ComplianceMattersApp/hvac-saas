@@ -1,8 +1,10 @@
 import { CalendarView } from '@/components/calendar/calendar-view';
 import CalendarResponsiveDefaultView from '@/components/calendar/CalendarResponsiveDefaultView';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 
 import { createClient } from '@/lib/supabase/server';
+import { isLikelyMobileUserAgent, resolveCalendarDefaultView } from '@/lib/utils/calendar-view-default';
 
 function todayYmdLA(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -44,12 +46,14 @@ export default async function CalendarPage({
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const date = String(sp.date ?? '').trim() || todayYmdLA();
   const requestedView = String(sp.view ?? '').trim();
-  const view = requestedView || 'month';
+  const userAgent = (await headers()).get('user-agent');
+  const defaultView = resolveCalendarDefaultView(isLikelyMobileUserAgent(userAgent));
+  const view = requestedView || defaultView;
   const hadExplicitViewParam = requestedView.length > 0;
 
   return (
     <div className="min-h-screen w-full bg-gray-50 px-3 py-4 sm:px-6 sm:py-5">
-      <CalendarResponsiveDefaultView hadExplicitViewParam={hadExplicitViewParam} />
+      <CalendarResponsiveDefaultView hadExplicitViewParam={hadExplicitViewParam} disableAutoReplace={!hadExplicitViewParam} />
       <CalendarView view={view} date={date} banner={sp.banner} job={sp.job} block={sp.block} tech={sp.tech} inspector={sp.inspector} prefillDate={sp.prefill_date} />
     </div>
   );

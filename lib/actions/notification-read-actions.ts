@@ -488,14 +488,22 @@ export async function markAllNotificationsAsRead(): Promise<void> {
   revalidatePath("/", "layout");
 }
 
-export async function getInternalUnreadNotificationCount(): Promise<number> {
-  const { supabase, accountOwnerUserId } = await requireScopedInternalNotificationContext();
+export async function getInternalUnreadNotificationBadgeCount(params: {
+  supabase?: any;
+  accountOwnerUserId?: string | null;
+} = {}): Promise<number> {
+  let supabase = params.supabase;
+  let accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+
+  if (!supabase || !accountOwnerUserId) {
+    const context = await requireScopedInternalNotificationContext();
+    supabase = context.supabase;
+    accountOwnerUserId = context.accountOwnerUserId;
+  }
 
   const { data, error } = await supabase
     .from("notifications")
-    .select(
-      "id, job_id, recipient_type, channel, notification_type, subject, body, payload, status, read_at, created_at"
-    )
+    .select("id, notification_type, payload, read_at, created_at")
     .eq("recipient_type", "internal")
     .eq("account_owner_user_id", accountOwnerUserId)
     .order("created_at", { ascending: false })
@@ -510,9 +518,13 @@ export async function getInternalUnreadNotificationCount(): Promise<number> {
 
   const pendingProposalRows = await filterPendingProposalVisibilityRows(
     supabase,
-    awarenessRows
+    awarenessRows as NotificationRow[]
   );
 
   const visibilityRows = dedupeProposalVisibilityRows(pendingProposalRows);
   return visibilityRows.length;
+}
+
+export async function getInternalUnreadNotificationCount(): Promise<number> {
+  return getInternalUnreadNotificationBadgeCount();
 }

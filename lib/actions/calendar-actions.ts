@@ -40,6 +40,11 @@ export type DispatchJob = {
 export type DispatchCalendarData = {
   mode: DispatchViewMode;
   anchorDate: string;
+  range: {
+    startDate: string;
+    endDate: string;
+    days: Array<{ date: string; jobs: DispatchJob[] }>;
+  };
   day: {
     date: string;
     jobs: DispatchJob[];
@@ -118,6 +123,11 @@ type CalendarEventRow = {
 
 type CustomerScopeRow = {
   id: string | null;
+};
+
+type DispatchDateRange = {
+  startDate: string;
+  endDate: string;
 };
 
 function laTodayYmd(now = new Date()): string {
@@ -251,29 +261,31 @@ function suppressRetestParentRows(rows: JobDispatchRow[], hiddenFailedParentIds:
 
 async function loadScopedDispatchJobRows(params: {
   supabase: any;
-  accountOwnerUserId: string;
+  scopedCustomerIds: string[];
   baseSelect: string;
+  scheduledDateRange?: DispatchDateRange;
+  unscheduledOnly?: boolean;
 }): Promise<JobDispatchRow[]> {
-  const { supabase, accountOwnerUserId, baseSelect } = params;
-
-  const { data: customerRows, error: customerErr } = await supabase
-    .from('customers')
-    .select('id')
-    .eq('owner_user_id', accountOwnerUserId);
-
-  if (customerErr) throw customerErr;
-
-  const scopedCustomerIds = (customerRows ?? [])
-    .map((row: CustomerScopeRow) => String(row?.id ?? '').trim())
-    .filter(Boolean);
+  const { supabase, scopedCustomerIds, baseSelect, scheduledDateRange, unscheduledOnly } = params;
 
   if (!scopedCustomerIds.length) return [];
 
-  const { data: scopedRows, error: scopedErr } = await supabase
+  let query = supabase
     .from('jobs')
     .select(baseSelect)
     .in('customer_id', scopedCustomerIds)
-    .is('deleted_at', null)
+    .is('deleted_at', null);
+
+  if (unscheduledOnly) {
+    query = query.is('scheduled_date', null);
+  } else if (scheduledDateRange) {
+    query = query
+      .not('scheduled_date', 'is', null)
+      .gte('scheduled_date', scheduledDateRange.startDate)
+      .lte('scheduled_date', scheduledDateRange.endDate);
+  }
+
+  const { data: scopedRows, error: scopedErr } = await query
     .order('scheduled_date', { ascending: true })
     .order('window_start', { ascending: true })
     .order('created_at', { ascending: true });
@@ -283,9 +295,83 @@ async function loadScopedDispatchJobRows(params: {
   return (scopedRows ?? []) as JobDispatchRow[];
 }
 
+async function loadScopedCustomerIds(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+}): Promise<string[]> {
+  const { supabase, accountOwnerUserId } = params;
+
+  const { data: customerRows, error: customerErr } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('owner_user_id', accountOwnerUserId);
+
+  if (customerErr) throw customerErr;
+
+  return (customerRows ?? [])
+    .map((row: CustomerScopeRow) => String(row?.id ?? '').trim())
+    .filter(Boolean);
+}
+
+function resolveDispatchDateRange(params: {
+  mode: DispatchViewMode;
+  anchorDate: string;
+  rangeStartDate?: string | null;
+  rangeEndDate?: string | null;
+}): DispatchDateRange {
+  const { mode, anchorDate, rangeStartDate, rangeEndDate } = params;
+
+  let startDate = mode === 'week' ? startOfWeekYmd(anchorDate) : anchorDate;
+  let endDate = mode === 'week' ? addDaysYmd(startDate, 6) : anchorDate;
+
+  const requestedStart = normalizeAnchorDate(rangeStartDate);
+  const requestedEnd = normalizeAnchorDate(rangeEndDate);
+
+  if (String(rangeStartDate ?? '').trim()) startDate = requestedStart;
+  if (String(rangeEndDate ?? '').trim()) endDate = requestedEnd;
+
+  if (startDate > endDate) {
+    return {
+      startDate: endDate,
+      endDate: startDate,
+    };
+  }
+
+  return { startDate, endDate };
+}
+
+function buildRangeDays(params: {
+  startDate: string;
+  endDate: string;
+  jobs: DispatchJob[];
+}) {
+  const { startDate, endDate, jobs } = params;
+  const jobsByDate = new Map<string, DispatchJob[]>();
+
+  for (const job of jobs) {
+    const date = String(job.scheduled_date ?? '').trim();
+    if (!date) continue;
+    const current = jobsByDate.get(date) ?? [];
+    current.push(job);
+    jobsByDate.set(date, current);
+  }
+
+  const days: Array<{ date: string; jobs: DispatchJob[] }> = [];
+  for (let cursor = startDate; cursor <= endDate; cursor = addDaysYmd(cursor, 1)) {
+    days.push({
+      date: cursor,
+      jobs: jobsByDate.get(cursor) ?? [],
+    });
+  }
+
+  return days;
+}
+
 export async function getDispatchCalendarData(params: {
   mode: DispatchViewMode;
   anchorDate?: string | null;
+  rangeStartDate?: string | null;
+  rangeEndDate?: string | null;
 }): Promise<DispatchCalendarData> {
   const supabase = await createClient();
   const { internalUser } = await requireInternalUser({ supabase });
@@ -297,6 +383,12 @@ export async function getDispatchCalendarData(params: {
   const anchorDate = normalizeAnchorDate(params.anchorDate);
   const dispatchAttentionWindowStart = addDaysYmd(laTodayYmd(), -7);
   const dispatchAttentionWindowEnd = addDaysYmd(laTodayYmd(), 21);
+  const dispatchRange = resolveDispatchDateRange({
+    mode,
+    anchorDate,
+    rangeStartDate: params.rangeStartDate,
+    rangeEndDate: params.rangeEndDate,
+  });
 
   const weekStart = startOfWeekYmd(anchorDate);
   const weekEnd = addDaysYmd(weekStart, 6);
@@ -326,12 +418,34 @@ export async function getDispatchCalendarData(params: {
     'deleted_at',
   ].join(', ');
 
-  // Explicitly scope jobs to the actor's account-owner boundary before dataset assembly.
-  const allRows = await loadScopedDispatchJobRows({
+  const scopedCustomerIds = await loadScopedCustomerIds({
     supabase,
     accountOwnerUserId,
-    baseSelect,
   });
+
+  const [scheduledRangeRows, scheduledAttentionRows, unscheduledRows] = await Promise.all([
+    loadScopedDispatchJobRows({
+      supabase,
+      scopedCustomerIds,
+      baseSelect,
+      scheduledDateRange: dispatchRange,
+    }),
+    loadScopedDispatchJobRows({
+      supabase,
+      scopedCustomerIds,
+      baseSelect,
+      scheduledDateRange: {
+        startDate: dispatchAttentionWindowStart,
+        endDate: dispatchAttentionWindowEnd,
+      },
+    }),
+    loadScopedDispatchJobRows({
+      supabase,
+      scopedCustomerIds,
+      baseSelect,
+      unscheduledOnly: true,
+    }),
+  ]);
 
   function isOnHold(job: JobDispatchRow) {
     const ops = String(job.ops_status ?? '').toLowerCase();
@@ -362,8 +476,15 @@ export async function getDispatchCalendarData(params: {
     return row && typeof row.id === 'string' && typeof row.status !== 'undefined' && typeof row.ops_status !== 'undefined';
   }
 
-  // Filter out any rows that are not valid JobDispatchRow
-  const validRows = (allRows ?? []).filter(isJobDispatchRow) as unknown as JobDispatchRow[];
+  const validScheduledRangeRows = (scheduledRangeRows ?? []).filter(isJobDispatchRow) as JobDispatchRow[];
+  const validScheduledAttentionRows = (scheduledAttentionRows ?? []).filter(isJobDispatchRow) as JobDispatchRow[];
+  const validUnscheduledRows = (unscheduledRows ?? []).filter(isJobDispatchRow) as JobDispatchRow[];
+
+  const validRows = [
+    ...validScheduledRangeRows,
+    ...validScheduledAttentionRows,
+    ...validUnscheduledRows,
+  ];
 
   const activeRetestParentIds = new Set(
     validRows
@@ -373,16 +494,27 @@ export async function getDispatchCalendarData(params: {
   );
 
   // Canonical scheduled calendar jobs include historical scheduled rows.
-  const scheduledCalendarRows = validRows.filter((row) => isCalendarScheduled(row));
+  const scheduledCalendarRows = validScheduledRangeRows.filter((row) => isCalendarScheduled(row));
+  const scheduledAttentionCalendarRows = validScheduledAttentionRows.filter((row) => isCalendarScheduled(row));
 
   // Canonical unscheduled active jobs
   const unscheduledActiveRows = suppressRetestParentRows(
-    validRows.filter((row) => isActive(row) && !row.scheduled_date),
+    validUnscheduledRows.filter((row) => isActive(row) && !row.scheduled_date),
     activeRetestParentIds,
   );
 
   // Assignment and event mapping
-  const allJobIds = [...scheduledCalendarRows, ...unscheduledActiveRows].map((row) => String(row?.id ?? '').trim()).filter(Boolean);
+  const allJobIds = Array.from(
+    new Set(
+      [
+        ...scheduledCalendarRows,
+        ...scheduledAttentionCalendarRows,
+        ...unscheduledActiveRows,
+      ]
+        .map((row) => String(row?.id ?? '').trim())
+        .filter(Boolean),
+    ),
+  );
   const assignmentMap = await getActiveJobAssignmentDisplayMap({
     supabase,
     jobIds: allJobIds,
@@ -417,18 +549,28 @@ export async function getDispatchCalendarData(params: {
     mergeJobRow({ row, assignmentMap, latestEventByJob })
   );
 
-  const scheduledAttentionWindowJobs = scheduledCalendarJobs.filter((job) => {
+  const scheduledAttentionJobs = scheduledAttentionCalendarRows.map((row) =>
+    mergeJobRow({ row, assignmentMap, latestEventByJob })
+  );
+
+  const scheduledAttentionWindowJobs = scheduledAttentionJobs.filter((job) => {
     const scheduledDate = String(job.scheduled_date ?? '').trim();
     if (!scheduledDate) return false;
     return scheduledDate >= dispatchAttentionWindowStart && scheduledDate <= dispatchAttentionWindowEnd;
   });
 
-  // Build day/week/month/list from canonical scheduled jobs
+  // Build day/week/range from canonical scheduled jobs
   const dayJobs = scheduledCalendarJobs.filter((job) => String(job.scheduled_date) === anchorDate);
   const weekDays = Array.from({ length: 7 }).map((_, index) => {
     const date = addDaysYmd(weekStart, index);
     const jobs = scheduledCalendarJobs.filter((job) => String(job.scheduled_date ?? '') === date);
     return { date, jobs };
+  });
+
+  const rangeDays = buildRangeDays({
+    startDate: dispatchRange.startDate,
+    endDate: dispatchRange.endDate,
+    jobs: scheduledCalendarJobs,
   });
 
   const assignableUsers = (await getAssignableInternalUsers({
@@ -443,8 +585,8 @@ export async function getDispatchCalendarData(params: {
   const calendarBlockEvents: DispatchCalendarBlockEvent[] = [];
 
   if (assignableUserIds.length) {
-    const blockRangeStart = laDateTimeToUtcIso(weekStart, '00:00');
-    const blockRangeEnd = laDateTimeToUtcIso(addDaysYmd(weekEnd, 1), '00:00');
+    const blockRangeStart = laDateTimeToUtcIso(dispatchRange.startDate, '00:00');
+    const blockRangeEnd = laDateTimeToUtcIso(addDaysYmd(dispatchRange.endDate, 1), '00:00');
 
     const { data: eventRows, error: eventErr } = await supabase
       .from('calendar_events')
@@ -491,6 +633,11 @@ export async function getDispatchCalendarData(params: {
   return {
     mode,
     anchorDate,
+    range: {
+      startDate: dispatchRange.startDate,
+      endDate: dispatchRange.endDate,
+      days: rangeDays,
+    },
     day: {
       date: anchorDate,
       jobs: dayJobs,

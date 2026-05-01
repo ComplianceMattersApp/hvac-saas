@@ -5,9 +5,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import MobileShellMenu from "@/components/layout/MobileShellMenu";
 import UserAccountMenu from "@/components/layout/UserAccountMenu";
-import { getInternalUser } from "@/lib/auth/internal-user";
-import { getInternalUnreadNotificationCount } from "@/lib/actions/notification-read-actions";
-import { createClient } from "@/lib/supabase/server";
+import { getInternalUnreadNotificationBadgeCount } from "@/lib/actions/notification-read-actions";
+import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 const geistSans = Geist({
@@ -34,9 +33,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
+  const actorContext = await getRequestActorContext();
+  const supabase = actorContext.supabase;
+  const user = actorContext.user;
 
   let profileFullName: string | null = null;
 
@@ -56,25 +55,17 @@ export default async function RootLayout({
   let isAdmin = false;
   let unreadNotificationCount = 0;
 
-  if (user) {
-    const [{ data: cu }, internalUser] = await Promise.all([
-      supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      getInternalUser({ supabase, userId: user.id }),
-    ]);
-
-    if (cu?.contractor_id) {
-      homeHref = "/portal";
-      isContractor = true;
-    } else if (internalUser?.is_active) {
-      homeHref = "/ops";
-      isInternalUser = true;
-      isAdmin = internalUser.role === "admin";
-      unreadNotificationCount = await getInternalUnreadNotificationCount();
-    }
+  if (actorContext.kind === "contractor") {
+    homeHref = "/portal";
+    isContractor = true;
+  } else if (actorContext.kind === "internal" && actorContext.internalUser) {
+    homeHref = "/ops";
+    isInternalUser = true;
+    isAdmin = actorContext.internalUser.role === "admin";
+    unreadNotificationCount = await getInternalUnreadNotificationBadgeCount({
+      supabase,
+      accountOwnerUserId: actorContext.accountOwnerUserId,
+    });
   }
 
   const userMetadata = (user?.user_metadata ?? {}) as Record<string, unknown>;

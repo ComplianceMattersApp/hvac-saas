@@ -178,7 +178,11 @@ describe("internal notification readers", () => {
       }),
     );
 
-    const { listInternalNotifications, getInternalUnreadNotificationCount } = await import("@/lib/actions/notification-read-actions");
+    const {
+      listInternalNotifications,
+      getInternalUnreadNotificationCount,
+      getInternalUnreadNotificationBadgeCount,
+    } = await import("@/lib/actions/notification-read-actions");
 
     const notifications = await listInternalNotifications({
       limit: 20,
@@ -186,11 +190,13 @@ describe("internal notification readers", () => {
       filterKey: "new_job_notifications",
     });
     const unreadCount = await getInternalUnreadNotificationCount();
+    const unreadBadgeCount = await getInternalUnreadNotificationBadgeCount();
 
     expect(notifications).toHaveLength(1);
     expect(notifications[0]?.notification_type).toBe("contractor_intake_proposal_submitted");
     expect(notifications[0]?.is_unread).toBe(true);
     expect(unreadCount).toBe(1);
+    expect(unreadBadgeCount).toBe(1);
   });
 
   it("does not drop proposal notifications when proposal status rows are not visible", async () => {
@@ -217,7 +223,11 @@ describe("internal notification readers", () => {
       }),
     );
 
-    const { listInternalNotifications, getInternalUnreadNotificationCount } = await import("@/lib/actions/notification-read-actions");
+    const {
+      listInternalNotifications,
+      getInternalUnreadNotificationCount,
+      getInternalUnreadNotificationBadgeCount,
+    } = await import("@/lib/actions/notification-read-actions");
 
     const notifications = await listInternalNotifications({
       limit: 20,
@@ -225,12 +235,14 @@ describe("internal notification readers", () => {
       filterKey: "new_job_notifications",
     });
     const unreadCount = await getInternalUnreadNotificationCount();
+    const unreadBadgeCount = await getInternalUnreadNotificationBadgeCount();
 
     expect(notifications).toHaveLength(1);
     expect(notifications[0]?.id).toBe("notif-proposal-rls");
     expect(notifications[0]?.notification_type).toBe("contractor_intake_proposal_submitted");
     expect(notifications[0]?.is_unread).toBe(true);
     expect(unreadCount).toBe(1);
+    expect(unreadBadgeCount).toBe(1);
   });
 
   it("excludes a proposal notification from the unread count once its read_at is set", async () => {

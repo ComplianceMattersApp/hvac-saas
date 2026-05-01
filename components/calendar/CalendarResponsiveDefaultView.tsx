@@ -7,13 +7,15 @@ import { resolveCalendarDefaultViewHref } from '@/lib/utils/calendar-view-defaul
 
 type Props = {
   hadExplicitViewParam: boolean;
+  disableAutoReplace?: boolean;
 };
 
 export default function CalendarResponsiveDefaultView(props: Props) {
-  const { hadExplicitViewParam } = props;
+  const { hadExplicitViewParam, disableAutoReplace = false } = props;
   const router = useRouter();
 
   useEffect(() => {
+    if (disableAutoReplace) return;
     if (hadExplicitViewParam) return;
 
     const isMobile = window.matchMedia('(max-width: 767px)').matches;
@@ -24,7 +26,7 @@ export default function CalendarResponsiveDefaultView(props: Props) {
 
     if (!nextHref) return;
     router.replace(nextHref, { scroll: false });
-  }, [hadExplicitViewParam, router]);
+  }, [disableAutoReplace, hadExplicitViewParam, router]);
 
   return null;
 }
