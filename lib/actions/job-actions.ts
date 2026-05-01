@@ -4055,6 +4055,11 @@ export async function assignJobAssigneeFromForm(formData: FormData) {
     jobId,
   });
 
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
   await ensureActiveAssignmentForUser({
     supabase,
     jobId,
@@ -4095,9 +4100,14 @@ export async function setPrimaryJobAssigneeFromForm(formData: FormData) {
   if (!userId) throw new Error("Missing user_id");
 
   const supabase = await createClient();
-  const { userId: actorUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actorUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   await setPrimaryJobAssignment({
@@ -4130,9 +4140,14 @@ export async function removeJobAssigneeFromForm(formData: FormData) {
   if (!userId) throw new Error("Missing user_id");
 
   const supabase = await createClient();
-  const { userId: actorUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actorUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   await softRemoveJobAssignment({
