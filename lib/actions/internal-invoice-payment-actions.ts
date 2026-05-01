@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireInternalUser } from '@/lib/auth/internal-user';
 import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
 import { resolveBillingModeByAccountOwnerId } from '@/lib/business/internal-business-profile';
+import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { resolveInternalInvoiceByJobId } from '@/lib/business/internal-invoice';
 import {
   INTERNAL_INVOICE_PAYMENT_METHODS,
@@ -52,6 +53,26 @@ function normalizePaymentMethod(value: FormDataEntryValue | null | undefined) {
     : null;
 }
 
+async function requireOperationalInternalInvoicePaymentEntitlementAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? '').trim(),
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: 'entitlement_blocked',
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
+}
+
 export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
   const jobId = getTrimmedString(formData.get('job_id'));
   const tab = getTrimmedString(formData.get('tab')) || 'info';
@@ -72,6 +93,11 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
   if (!scopedJob?.id) {
     redirect(buildJobDetailHref(jobId, tab, 'not_authorized'));
   }
+
+  await requireOperationalInternalInvoicePaymentEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   const billingMode = await resolveBillingModeByAccountOwnerId({
     supabase,

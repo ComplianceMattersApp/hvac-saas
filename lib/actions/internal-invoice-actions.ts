@@ -9,6 +9,7 @@ import {
   resolveBillingModeByAccountOwnerId,
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from '@/lib/business/internal-business-profile';
+import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { INTERNAL_INVOICE_EMAIL_NOTIFICATION_TYPE } from '@/lib/business/internal-invoice-delivery';
 import { resolveJobBillingSource } from '@/lib/business/job-billing-source';
 import {
@@ -340,6 +341,26 @@ async function loadScopedPricebookSnapshot(params: {
   return data ?? null;
 }
 
+async function requireOperationalInternalInvoiceEntitlementAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? '').trim(),
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: 'entitlement_blocked',
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
+}
+
 async function loadInternalInvoiceContext(formData: FormData) {
   const jobId =
     getTrimmedString(formData.get('job_id')) ||
@@ -359,6 +380,11 @@ async function loadInternalInvoiceContext(formData: FormData) {
   if (!scopedJob?.id) {
     redirect(buildJobDetailHref(jobId, tab, 'not_authorized'));
   }
+
+  await requireOperationalInternalInvoiceEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   const billingMode = await resolveBillingModeByAccountOwnerId({
     supabase,

@@ -6,6 +6,7 @@ const loadScopedInternalJobForMutationMock = vi.fn();
 const sendEmailMock = vi.fn();
 const resolveBillingModeByAccountOwnerIdMock = vi.fn();
 const insertJobEventMock = vi.fn();
+const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
@@ -52,6 +53,11 @@ vi.mock('@/lib/business/internal-business-profile', () => ({
 vi.mock('@/lib/business/internal-invoice', () => ({
   normalizeInternalInvoiceItemType: vi.fn(() => 'service'),
   resolveInternalInvoiceByJobId: vi.fn(async () => null),
+}));
+
+vi.mock('@/lib/business/platform-entitlement', () => ({
+  resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
+    resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
 vi.mock('@/lib/actions/job-evaluator', () => ({
@@ -132,6 +138,7 @@ type InvoiceMutationEntrypoint =
   | 'voidInternalInvoiceFromForm'
   | 'addInternalInvoiceLineItemFromForm'
   | 'addInternalInvoiceLineItemFromPricebookForm'
+  | 'addInternalInvoiceLineItemsFromVisitScopeForm'
   | 'updateInternalInvoiceLineItemFromForm'
   | 'removeInternalInvoiceLineItemFromForm'
   | 'sendInternalInvoiceEmailFromForm';
@@ -143,6 +150,7 @@ const targetedEntrypoints: InvoiceMutationEntrypoint[] = [
   'voidInternalInvoiceFromForm',
   'addInternalInvoiceLineItemFromForm',
   'addInternalInvoiceLineItemFromPricebookForm',
+  'addInternalInvoiceLineItemsFromVisitScopeForm',
   'updateInternalInvoiceLineItemFromForm',
   'removeInternalInvoiceLineItemFromForm',
   'sendInternalInvoiceEmailFromForm',
@@ -172,6 +180,10 @@ describe('internal invoice mutation same-account hardening', () => {
 
     resolveBillingModeByAccountOwnerIdMock.mockResolvedValue('internal_invoicing');
     sendEmailMock.mockResolvedValue(undefined);
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: 'allowed_active',
+    });
     requireInternalUserMock.mockResolvedValue({
       userId: 'internal-user-1',
       internalUser: {
@@ -196,6 +208,7 @@ describe('internal invoice mutation same-account hardening', () => {
       expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
         expect.objectContaining({ accountOwnerUserId: 'owner-1', jobId: 'job-1' }),
       );
+      expect(resolveOperationalMutationEntitlementAccessMock).not.toHaveBeenCalled();
       assertNoDeniedWrites(writeCalls);
       expect(insertJobEventMock).not.toHaveBeenCalled();
       expect(sendEmailMock).not.toHaveBeenCalled();
@@ -213,6 +226,9 @@ describe('internal invoice mutation same-account hardening', () => {
       expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
         expect.objectContaining({ accountOwnerUserId: 'owner-1', jobId: 'job-1' }),
       );
+      expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+        expect.objectContaining({ accountOwnerUserId: 'owner-1' }),
+      );
     });
 
     it(`denies non-internal ${entrypointName} before invoice/jobs/events/notification writes and email side effects`, async () => {
@@ -225,9 +241,101 @@ describe('internal invoice mutation same-account hardening', () => {
       );
 
       expect(loadScopedInternalJobForMutationMock).not.toHaveBeenCalled();
+      expect(resolveOperationalMutationEntitlementAccessMock).not.toHaveBeenCalled();
       assertNoDeniedWrites(writeCalls);
       expect(insertJobEventMock).not.toHaveBeenCalled();
       expect(sendEmailMock).not.toHaveBeenCalled();
     });
   }
+
+  it('allows valid trial internal saveInternalInvoiceDraftFromForm past entitlement preflight', async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: 'allowed_trial',
+    });
+
+    await expect(
+      invokeEntrypoint('saveInternalInvoiceDraftFromForm', buildInvoiceFormData()),
+    ).rejects.toThrow('ALLOW_PATH_REACHED');
+  });
+
+  it('blocks expired trial internal saveInternalInvoiceDraftFromForm before invoice/jobs/events/notification writes and email side effects', async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: 'blocked_trial_expired',
+    });
+
+    await expect(
+      invokeEntrypoint('saveInternalInvoiceDraftFromForm', buildInvoiceFormData()),
+    ).rejects.toThrow(
+      'REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired',
+    );
+
+    assertNoDeniedWrites(writeCalls);
+    expect(resolveBillingModeByAccountOwnerIdMock).not.toHaveBeenCalled();
+    expect(insertJobEventMock).not.toHaveBeenCalled();
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks null-ended trial internal saveInternalInvoiceDraftFromForm before invoice/jobs/events/notification writes and email side effects', async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: 'blocked_trial_missing_end',
+    });
+
+    await expect(
+      invokeEntrypoint('saveInternalInvoiceDraftFromForm', buildInvoiceFormData()),
+    ).rejects.toThrow(
+      'REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end',
+    );
+
+    assertNoDeniedWrites(writeCalls);
+    expect(resolveBillingModeByAccountOwnerIdMock).not.toHaveBeenCalled();
+    expect(insertJobEventMock).not.toHaveBeenCalled();
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('allows internal comped saveInternalInvoiceDraftFromForm past entitlement preflight', async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: true,
+      reason: 'allowed_internal_comped',
+    });
+
+    await expect(
+      invokeEntrypoint('saveInternalInvoiceDraftFromForm', buildInvoiceFormData()),
+    ).rejects.toThrow('ALLOW_PATH_REACHED');
+  });
+
+  it('blocks missing entitlement internal saveInternalInvoiceDraftFromForm before invoice/jobs/events/notification writes and email side effects', async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+      authorized: false,
+      reason: 'blocked_missing_entitlement',
+    });
+
+    await expect(
+      invokeEntrypoint('saveInternalInvoiceDraftFromForm', buildInvoiceFormData()),
+    ).rejects.toThrow(
+      'REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement',
+    );
+
+    assertNoDeniedWrites(writeCalls);
+    expect(resolveBillingModeByAccountOwnerIdMock).not.toHaveBeenCalled();
+    expect(insertJobEventMock).not.toHaveBeenCalled();
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
 });
