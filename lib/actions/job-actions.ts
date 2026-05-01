@@ -2125,7 +2125,10 @@ async function requireInternalEccTestsAccess(params: {
       redirect(`/jobs/${jobId}?notice=not_authorized`);
     }
 
-    return scopedRun;
+    return {
+      ...scopedRun,
+      internalUser,
+    };
   }
 
   const scopedJob = await loadScopedInternalEccJobForMutation({
@@ -2137,7 +2140,11 @@ async function requireInternalEccTestsAccess(params: {
     redirect(`/jobs/${jobId}?notice=not_authorized`);
   }
 
-  return { job: scopedJob, testRun: null };
+  return {
+    job: scopedJob,
+    testRun: null,
+    internalUser,
+  };
 }
 
 async function requireInternalEquipmentMutationAccess(params: {
@@ -3486,7 +3493,16 @@ export async function saveEccTestOverrideFromForm(formData: FormData) {
   const testType = allowed.has(testTypeRaw) ? testTypeRaw : "";
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId, testRunId });
+  const scoped = await requireInternalEccTestsAccess({
+    supabase,
+    jobId,
+    testRunId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // Only update override fields, never touch data/computed
   const { data: updated, error } = await supabase
@@ -3689,7 +3705,12 @@ export async function addEccTestRunFromForm(formData: FormData) {
   if (!testType) throw new Error("Missing test_type");
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // Attach to Visit #1 (create it if missing)
   const { data: visitExisting, error: visitFindErr } = await supabase
@@ -3769,7 +3790,16 @@ export async function deleteEccTestRunFromForm(formData: FormData) {
   if (!testRunId) throw new Error("Missing test_run_id");
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId, testRunId });
+  const scoped = await requireInternalEccTestsAccess({
+    supabase,
+    jobId,
+    testRunId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
 const { data: deletedRun, error: delRunErr } = await supabase
   .from("ecc_test_runs")
