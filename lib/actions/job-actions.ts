@@ -2224,7 +2224,7 @@ export async function updateJobTypeFromForm(formData: FormData) {
     throw new Error("Missing job_id");
   }
 
-  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId,
   });
@@ -2234,6 +2234,11 @@ export async function updateJobTypeFromForm(formData: FormData) {
   if (!allowed.includes(rawType)) {
     throw new Error("Invalid job type");
   }
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")
