@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireInternalRole } from "@/lib/auth/internal-user";
 import { loadScopedInternalContractorForMutation } from "@/lib/auth/internal-contractor-scope";
 import { inviteContractor } from "@/lib/actions/contractor-invite-actions";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -21,6 +22,26 @@ function withNotice(path: string, notice: ContractorCreateNotice) {
 function normalizeInviteEmail(raw: string | null) {
   const value = String(raw ?? "").trim().toLowerCase();
   return value || null;
+}
+
+async function requireOperationalContractorMutationAccessOrRedirect(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+}) {
+  const access = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId: String(params.accountOwnerUserId ?? "").trim(),
+    supabase: params.supabase,
+  });
+
+  if (access.authorized) {
+    return;
+  }
+
+  const search = new URLSearchParams({
+    err: "entitlement_blocked",
+    reason: access.reason,
+  });
+  redirect(`/ops/admin/company-profile?${search.toString()}`);
 }
 
 async function requireInternalAdminContractorMutationContext(params: {
@@ -94,6 +115,13 @@ export async function createContractorFromForm(formData: FormData) {
   const { internalUser } = await requireInternalRole(["admin", "office"], {
     supabase,
   });
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  if (!accountOwnerUserId) throw new Error("Missing account owner scope");
+
+  await requireOperationalContractorMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
+  });
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) throw new Error("Contractor name is required.");
@@ -127,7 +155,7 @@ export async function createContractorFromForm(formData: FormData) {
       billing_city,
       billing_state,
       billing_zip,
-      owner_user_id: internalUser.account_owner_user_id,
+      owner_user_id: accountOwnerUserId,
     })
     .select("id")
     .single();
@@ -178,6 +206,11 @@ export async function updateContractorFromForm(formData: FormData) {
   });
   if (!scopedContractor?.id) throw new Error("Access denied");
 
+  await requireOperationalContractorMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
+  });
+
   const { error } = await supabase
     .from("contractors")
     .update({
@@ -224,6 +257,11 @@ export async function updateContractorNameAndEmailFromForm(formData: FormData) {
     contractorId: contractor_id,
   });
 
+  await requireOperationalContractorMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
+  });
+
   const { error } = await supabase
     .from("contractors")
     .update({
@@ -250,6 +288,11 @@ export async function createQuickContractorFromForm(formData: FormData) {
   const ownerUserId = resolveScopedOwnerForCreate({
     accountOwnerUserId,
     requestedOwnerUserId: String(formData.get("owner_user_id") ?? "").trim() || null,
+  });
+
+  await requireOperationalContractorMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: ownerUserId,
   });
 
   const { data, error } = await supabase
@@ -287,6 +330,11 @@ export async function archiveContractorFromForm(formData: FormData) {
   await requireScopedContractorEdgeMutation({
     accountOwnerUserId,
     contractorId: contractor_id,
+  });
+
+  await requireOperationalContractorMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
   });
 
   const { error } = await supabase
@@ -333,6 +381,11 @@ export async function unarchiveContractorFromForm(formData: FormData) {
   await requireScopedContractorEdgeMutation({
     accountOwnerUserId,
     contractorId: contractor_id,
+  });
+
+  await requireOperationalContractorMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
   });
 
   const { error } = await supabase
