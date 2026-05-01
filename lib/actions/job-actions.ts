@@ -2326,6 +2326,11 @@ export async function updateJobServiceContractFromForm(formData: FormData) {
     });
   }
 
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
   if (String(beforeJob?.job_type ?? "").toLowerCase() !== "service") {
     redirectToJobWithBanner({
       jobId,
@@ -2529,6 +2534,11 @@ export async function updateJobVisitScopeFromForm(formData: FormData) {
     });
   }
 
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
   const nextSummary = sanitizeVisitScopeSummary(formData.get("visit_scope_summary"));
   const nextItemsRaw = String(formData.get("visit_scope_items_json") || "").trim();
   const normalizedNextItemsRaw =
@@ -2674,7 +2684,7 @@ export async function promoteCompanionScopeToServiceJobFromForm(formData: FormDa
 
   if (!sourceJobId) throw new Error("Missing job_id");
 
-  const { userId: actingUserId } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: sourceJobId,
     onUnauthorized: () => {
@@ -2685,6 +2695,11 @@ export async function promoteCompanionScopeToServiceJobFromForm(formData: FormDa
         returnToRaw,
       });
     },
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
   const itemIndex = Number(itemIndexRaw);
