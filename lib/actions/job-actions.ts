@@ -4259,6 +4259,17 @@ export async function markRefrigerantChargeExemptFromForm(formData: FormData) {
 
   const supabase = await createClient();
 
+  const scoped = await requireInternalEccTestsAccess({
+    supabase,
+    jobId,
+    testRunId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
+
   if (!exemptReason) {
     const systemId = await resolveSystemIdForRun({
       supabase,
@@ -4515,7 +4526,12 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   };
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // 1) Load existing data so we don't wipe fields
   const { data: existingRun, error: loadErr } = await supabase
@@ -4641,7 +4657,12 @@ export async function saveAirflowDataFromForm(formData: FormData) {
   };
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   const { error } = await supabase
     .from("ecc_test_runs")
@@ -4712,7 +4733,16 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
   const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId, testRunId });
+  const scoped = await requireInternalEccTestsAccess({
+    supabase,
+    jobId,
+    testRunId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   const { error } = await supabase
     .from("ecc_test_runs")
@@ -4756,7 +4786,12 @@ export async function completeEccTestRunFromForm(formData: FormData) {
   if (!testRunId) throw new Error("Missing test_run_id");
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // 1) Load the run we are completing (this is the one we must KEEP)
   const { data: run, error: runErr } = await supabase
@@ -4961,7 +4996,12 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
   const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // Get system_id and visit_id
   const systemId = await resolveSystemIdForRun({
@@ -5086,7 +5126,12 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
   };
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // Get system_id and visit_id
   const systemId = await resolveSystemIdForRun({
@@ -5314,7 +5359,12 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
   };
 
   const supabase = await createClient();
-  await requireInternalEccTestsAccess({ supabase, jobId });
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
 
   // Get system_id and visit_id
   const systemId = await resolveSystemIdForRun({
