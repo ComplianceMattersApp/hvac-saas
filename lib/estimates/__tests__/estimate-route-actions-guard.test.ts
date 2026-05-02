@@ -19,14 +19,13 @@ describe("estimate route action guards", () => {
     vi.resetModules();
   });
 
-  it("addLineItemAction returns unavailable when feature flag disabled", async () => {
+  it("addLineItemAction returns unavailable for pricebook-backed add when feature flag disabled", async () => {
     process.env.ENABLE_ESTIMATES = "false";
     const { addLineItemAction } = await import("@/app/estimates/[id]/actions");
 
     const result = await addLineItemAction({
       estimateId: "est-1",
-      itemName: "Line",
-      itemType: "service",
+      sourcePricebookItemId: "pb-1",
       quantity: 1,
       unitPriceCents: 100,
     });
@@ -73,5 +72,30 @@ describe("estimate route action guards", () => {
     expect(result.success).toBe(true);
     expect(addEstimateLineItemMock).toHaveBeenCalledTimes(1);
     expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
+  });
+
+  it("addLineItemAction passes sourcePricebookItemId through when enabled", async () => {
+    process.env.ENABLE_ESTIMATES = "yes";
+    addEstimateLineItemMock.mockResolvedValue({
+      success: true,
+      lineItemId: "line-2",
+      subtotal_cents: 2200,
+      total_cents: 2200,
+    });
+
+    const { addLineItemAction } = await import("@/app/estimates/[id]/actions");
+    await addLineItemAction({
+      estimateId: "est-1",
+      sourcePricebookItemId: "pb-1",
+      quantity: 2,
+      unitPriceCents: 1100,
+    });
+
+    expect(addEstimateLineItemMock).toHaveBeenCalledWith({
+      estimateId: "est-1",
+      sourcePricebookItemId: "pb-1",
+      quantity: 2,
+      unitPriceCents: 1100,
+    });
   });
 });

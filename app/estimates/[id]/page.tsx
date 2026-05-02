@@ -76,6 +76,15 @@ function formatEventType(eventType: string) {
 type CustomerRow = { id: string; full_name: string | null; first_name: string | null; last_name: string | null };
 type LocationRow = { id: string; address_line1: string | null; city: string | null; state: string | null; zip: string | null; nickname: string | null };
 type EventRow = { id: string; event_type: string; meta: Record<string, unknown> | null; user_id: string | null; created_at: string };
+type PricebookPickerRow = {
+  id: string;
+  item_name: string;
+  item_type: string;
+  category: string | null;
+  default_description: string | null;
+  default_unit_price: number;
+  unit_label: string | null;
+};
 
 export default async function EstimateDetailPage({
   params,
@@ -105,6 +114,22 @@ export default async function EstimateDetailPage({
   if (!estimate) notFound();
 
   const isDraft = estimate.status === "draft";
+  let pricebookItems: PricebookPickerRow[] = [];
+
+  if (isDraft) {
+    const { data: pricebookRaw, error: pricebookError } = await supabase
+      .from("pricebook_items")
+      .select("id, item_name, item_type, category, default_description, default_unit_price, unit_label")
+      .eq("account_owner_user_id", internalUser.account_owner_user_id)
+      .eq("is_active", true)
+      .neq("item_type", "adjustment")
+      .gte("default_unit_price", 0)
+      .order("category", { ascending: true })
+      .order("item_name", { ascending: true });
+    if (pricebookError) throw pricebookError;
+
+    pricebookItems = (pricebookRaw ?? []) as PricebookPickerRow[];
+  }
 
   // Load customer and location names for context display
   let customerName: string | null = null;
@@ -330,7 +355,7 @@ export default async function EstimateDetailPage({
         {/* Add line item — draft only */}
         {isDraft && (
           <div className="pt-1">
-            <AddLineItemForm estimateId={estimate.id} />
+            <AddLineItemForm estimateId={estimate.id} pricebookItems={pricebookItems} />
           </div>
         )}
 

@@ -54,6 +54,7 @@ type TableFixture = {
 
 function makeSupabaseClient(tables: Record<string, TableFixture>) {
   const insertedEvents: unknown[] = [];
+  const insertedLineItems: unknown[] = [];
   const updatedEstimates: unknown[] = [];
   const deletedLines: unknown[] = [];
 
@@ -101,6 +102,9 @@ function makeSupabaseClient(tables: Record<string, TableFixture>) {
       if (typeof payload === "object" && payload && "event_type" in (payload as object)) {
         insertedEvents.push(payload);
       }
+      if (typeof payload === "object" && payload && "item_name_snapshot" in (payload as object)) {
+        insertedLineItems.push(payload);
+      }
       return {
         select: vi.fn(() => ({
           single: vi.fn(async () => ({
@@ -137,6 +141,7 @@ function makeSupabaseClient(tables: Record<string, TableFixture>) {
       return makeQueryChain(fixture);
     }),
     _insertedEvents: insertedEvents,
+    _insertedLineItems: insertedLineItems,
     _updatedEstimates: updatedEstimates,
     _deletedLines: deletedLines,
   };
@@ -663,7 +668,7 @@ describe("addEstimateLineItem", () => {
       default_unit_price: 45.0,
       is_active: true,
     };
-    setupLineAdd(pbItem);
+    const { supabase } = setupLineAdd(pbItem);
 
     const result = await addEstimateLineItem({
       estimateId: "est-1",
@@ -672,9 +677,34 @@ describe("addEstimateLineItem", () => {
       unitPriceCents: 4500,
     });
     expect(result.success).toBe(true);
-    // Snapshot is frozen from catalog — no live reference to pricebook at read time
     if (result.success) {
       expect(result.lineItemId).toBe("line-1");
+    }
+
+    const insertedPayload = (supabase as { _insertedLineItems?: Array<Record<string, unknown>> })._insertedLineItems?.[0];
+    expect(insertedPayload).toMatchObject({
+      source_pricebook_item_id: "pb-1",
+      item_name_snapshot: "Refrigerant R-410A (lb)",
+      description_snapshot: "Per pound refrigerant charge",
+      item_type_snapshot: "material",
+      category_snapshot: "refrigerant",
+      unit_label_snapshot: "lb",
+    });
+  });
+
+  it("denies pricebook-backed add when item is inactive or missing", async () => {
+    setupLineAdd(null);
+
+    const result = await addEstimateLineItem({
+      estimateId: "est-1",
+      sourcePricebookItemId: "pb-inactive",
+      quantity: 1,
+      unitPriceCents: 1000,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/inactive/i);
     }
   });
 
