@@ -565,7 +565,7 @@ Reporting / analytics is no longer the active incomplete milestone.
 Payment P1 foundation is closed at the current baseline.
 Out-of-box readiness / business identity / settings packaging is also closed at the current baseline.
 The next natural roadmap area is smaller service-model revisions / service workflow refinement.
-Estimates/quoting V1A-V1H is now implemented to the current guarded internal baseline.
+Estimates/quoting V1A-V1J is now implemented to the current guarded internal baseline.
 Estimates is intentionally not production-live yet because estimate migrations are sandbox-only, production estimate migrations are not applied, production `ENABLE_ESTIMATES` remains disabled, and production `ENABLE_ESTIMATE_EMAIL_SEND` remains disabled.
 V1E internal-only status transitions are complete (`draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`).
 V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
@@ -576,7 +576,10 @@ V1H internal-only estimate communication/send-attempt foundation is complete: mi
 V1I decision artifact is complete as planning-only (no implementation changes): Option B first (generated document/PDF strategy planning before real provider send), Option A later (sandbox-only real provider enablement after document/wording gates are satisfied).
 V1I future email-enable go/no-go gates are documented: approved document wording, approved branding/header/footer, recipient confirmation UX reviewed, communication history wording approved, sandbox-only send smoke plan written, and fail-closed rollback behavior validated.
 V1I future PDF generation/storage go/no-go gates are documented: canonical content model, freeze/version semantics, generation trigger, internal access boundaries, retention/storage policy, and no portal/public exposure.
-V1H did not add real outbound production estimate email, PDF generation/storage, customer approval/e-signature, customer portal estimate visibility, public estimate links/tokens, contractor visibility/authority, estimate-to-job conversion, estimate-to-invoice conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement.
+V1J internal document-template/readiness implementation is complete (commit `ad5d735`): canonical estimate document view model/helper, centralized disclaimer package, revision semantics planning constants (future freeze at send-attempt creation, immutable historical revisions, post-freeze edits require new revision), estimate detail readiness section wired to shared document helper, and print/readiness wording consistency from the shared model.
+V1J does not add persistent revision storage.
+V1J did not add real outbound production estimate email, PDF generation/storage, persistent revision storage, customer approval/e-signature, customer portal estimate visibility, public estimate links/tokens, contractor visibility/authority, estimate-to-job conversion, estimate-to-invoice conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement.
+V1J validation status: `npx vitest run lib/estimates` passed (`123/123`), `npx tsc --noEmit` passed (`TSC_OK`), sent/approved detail smoke passed, and draft-detail smoke is now completed/closed using sandbox draft `EST-20260502-9D58499B` (`/estimates/43aeaa8e-e60e-47d4-8c26-2570600b24df`) with document readiness/disclaimer rendering, draft manual-line editing, draft pricebook picker availability, blocked send copy, communication history rendering, and no email/PDF/customer approval/public link/conversion/payment/customer portal/contractor controls exposed.
 Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Separate pre-launch enablement track:
@@ -1025,12 +1028,12 @@ Older archived Service planning docs are historical only and remain subordinate 
 
 ---
 
-## 9. Estimate v1 (implemented guarded baseline: V1A-V1H)
+## 9. Estimate v1 (implemented guarded baseline: V1A-V1J)
 
 ### Purpose
 Estimate is the proposed commercial scope for solving a problem.
 
-### Current implementation status (V1A-V1H)
+### Current implementation status (V1A-V1J)
 - V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
 - Estimate migrations are applied to sandbox only (`20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`).
 - Production estimate migrations are not applied.
@@ -1079,6 +1082,15 @@ Estimate is the proposed commercial scope for solving a problem.
   - Option A later: sandbox-only real provider enablement after document/wording go/no-go gates
   - go/no-go gates for future sandbox-only email enablement: approved document wording, approved branding/header/footer, recipient confirmation UX reviewed, communication history wording approved, sandbox-only send smoke plan written, fail-closed rollback validated
   - go/no-go gates for future PDF generation/storage: canonical content model, freeze/version semantics, generation trigger, internal access boundaries, retention/storage policy, and no portal/public exposure
+- V1J is implemented as internal document-template/readiness slice:
+  - canonical estimate document view model/helper is implemented
+  - centralized estimate disclaimer package is implemented
+  - revision semantics planning constants are implemented (future freeze at send-attempt creation, immutable historical revisions, post-freeze edits require a new revision)
+  - estimate detail readiness section is implemented and wired to the shared document helper
+  - print/readiness wording now follows shared document model structure
+  - no persistent revision storage yet
+  - no PDF generation/storage yet
+  - automated checks passed (`123/123`, `TSC_OK`), sent/approved smoke passed, and draft-detail smoke is now completed/closed using sandbox draft `EST-20260502-9D58499B` (`/estimates/43aeaa8e-e60e-47d4-8c26-2570600b24df`) with document readiness/disclaimer rendering, draft manual-line editing, draft pricebook picker availability, blocked send copy, communication history rendering, and no email/PDF/customer approval/public link/conversion/payment/customer portal/contractor controls exposed
 
 ### Implemented capabilities (current guarded internal baseline)
 - estimate schema/domain foundation
@@ -1092,6 +1104,7 @@ Estimate is the proposed commercial scope for solving a problem.
 - estimate events for create/line changes where implemented
 - internal-only operator hardening and workflow clarity polish
 - internal-only estimate communication/send-attempt foundation with blocked-attempt recording
+- internal-only document-template/readiness layer driven by shared estimate document model
 
 ### Estimate ownership
 Estimate belongs to:
@@ -1159,6 +1172,7 @@ If the pricebook changes later, old estimates do not change.
 - contractor visibility/authority
 - PDF generation
 - PDF storage
+- persistent revision storage
 - estimate-to-job conversion
 - estimate-to-invoice conversion
 - payment/deposit
@@ -1173,11 +1187,10 @@ If the pricebook changes later, old estimates do not change.
 - production smoke
 - rollback plan by disabling `ENABLE_ESTIMATES`
 
-### Next implementation direction (V1I decision recorded)
-- V1I decision is recorded as planning/decision artifact only; no implementation in this slice.
-- Option B comes first: generated document/PDF strategy planning before real provider enablement.
-- If implementation is approved next, keep it to a very small internal document-template/readiness slice first.
+### Next implementation direction (post-V1J)
+- V1I decision remains recorded and V1J internal document-template/readiness implementation is complete.
 - Option A comes later: sandbox-only real provider enablement after all documented go/no-go gates are satisfied.
+- draft-detail smoke caveat is closed.
 - Do not enable production estimate email sending without an explicit rollout plan.
 - no customer approval, customer/contractor portal authority, email/PDF, conversion, or payment behavior should be implemented without a design pass
 

@@ -438,8 +438,8 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: no schema changes, no migrations, no Supabase commands, and no production data actions were part of this baseline.
 - Confirmed: no Pricebook, invoice, payment, Stripe, QBO, ECC/retest rules, contractor authority, Visit Scope behavior, assignment behavior, scheduling behavior, service-case lifecycle code outside the reconciliation helper, or job creation behavior changed.
 
-### 2.20 Estimates / Quoting V1A-V1H guarded internal baseline confirmation
-- Completed: Estimates/Quoting V1A-V1H is implemented to the current guarded internal baseline.
+### 2.20 Estimates / Quoting V1A-V1J guarded internal baseline confirmation
+- Completed: Estimates/Quoting V1A-V1J is implemented to the current guarded internal baseline.
 - Completed: V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
 - Completed: V1B internal create/read/line server actions are implemented.
 - Completed: V1C internal UI is implemented for `/estimates`, `/estimates/new`, and `/estimates/[id]` with draft creation plus manual line add/remove.
@@ -496,8 +496,16 @@ If any item here conflicts with the active spine, the spine wins.
   - internal access boundaries
   - retention/storage policy
   - no portal/public exposure
-- Completed validation: `npx vitest run lib/estimates` passed (`120 tests`), `npx tsc --noEmit` passed.
-- Completed manual sandbox smoke: passed with `ENABLE_ESTIMATES=true`.
+- Completed: V1J internal document-template/readiness implementation is documented and verified:
+  - canonical estimate document view model/helper is implemented
+  - centralized estimate disclaimer package is implemented
+  - revision semantics planning constants are implemented (future freeze at send-attempt creation, immutable historical revisions, post-freeze edits require a new revision)
+  - estimate detail readiness section is wired to shared document helper
+  - print/readiness wording consistency uses shared document model
+  - no persistent revision storage is implemented yet
+  - no PDF generation/storage is implemented yet
+- Completed validation: `npx vitest run lib/estimates` passed (`123/123`), `npx tsc --noEmit` passed (`TSC_OK`).
+- Completed manual sandbox smoke: sent, approved, and draft estimate detail checks all passed. Draft-detail smoke is now completed/closed using sandbox draft `EST-20260502-9D58499B` (`/estimates/43aeaa8e-e60e-47d4-8c26-2570600b24df`) with document readiness/disclaimer rendering, draft manual-line editing, draft pricebook picker availability, blocked send copy, communication history rendering, and no email/PDF/customer approval/public link/conversion/payment/customer portal/contractor controls exposed.
 - Confirmed: estimate migrations are applied to sandbox only (`20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`).
 - Confirmed: sandbox project ref is `kvpesjdukqwwlgpkzfjm`.
 - Confirmed: production estimate migrations are not applied.
@@ -523,6 +531,7 @@ If any item here conflicts with the active spine, the spine wins.
   - contractor visibility/authority
   - PDF generation
   - PDF storage
+  - persistent revision storage
   - estimate-to-job conversion
   - estimate-to-invoice conversion
   - payment/deposit
@@ -535,10 +544,9 @@ If any item here conflicts with the active spine, the spine wins.
   - production `ENABLE_ESTIMATE_EMAIL_SEND` enablement
   - production smoke
   - rollback plan by disabling `ENABLE_ESTIMATES`
-- Next implementation direction: V1I should be planning-only or implementation-only after a deliberate choice.
-  - V1I decision is now recorded as planning/decision artifact only for this slice
-  - Option B is first (generated document/PDF strategy planning), Option A is later (sandbox-only provider enablement after gates)
-  - if implementation is approved next, keep it to a very small internal document-template/readiness slice
+- Next implementation direction: V1I planning and V1J internal document-template/readiness implementation are both complete.
+  - draft-detail smoke caveat is closed
+  - Option A remains next: sandbox-only provider enablement after documented gates
   - do not enable production estimate email sending without an explicit rollout plan
   - no customer approval, customer portal estimate visibility, contractor visibility/authority, email/PDF, conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement should be implemented without a design pass
 
