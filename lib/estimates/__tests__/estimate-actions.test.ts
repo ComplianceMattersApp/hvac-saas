@@ -247,6 +247,7 @@ const {
   createEstimateDraft,
   addEstimateLineItem,
   removeEstimateLineItem,
+  transitionEstimateStatus,
   getEstimateById,
   listEstimatesByAccount,
 } = await import("@/lib/estimates/estimate-actions");
@@ -619,6 +620,9 @@ describe("listEstimatesByAccount", () => {
 
 describe("addEstimateLineItem", () => {
   beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    process.env.ENABLE_ESTIMATES = "true";
+  });
 
   const draftEstimate = {
     id: "est-1",
@@ -708,26 +712,29 @@ describe("addEstimateLineItem", () => {
     }
   });
 
-  it("denies add line item for non-draft estimate", async () => {
+  it.each(["sent", "approved", "declined", "expired", "cancelled"])(
+    "denies add line item for %s estimate",
+    async (status) => {
     requireInternalUserMock.mockResolvedValue(makeInternalUser());
     createAdminClientMock.mockReturnValue(makeAdminClient({}));
 
-    const sentEstimate = { ...draftEstimate, status: "sent" };
-    const supabase = makeSupabaseClient({ estimates: { select: sentEstimate } });
+      const nonDraftEstimate = { ...draftEstimate, status };
+      const supabase = makeSupabaseClient({ estimates: { select: nonDraftEstimate } });
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await addEstimateLineItem({
-      estimateId: "est-1",
-      itemName: "Some Item",
-      itemType: "service",
-      quantity: 1,
-      unitPriceCents: 1000,
-    });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toMatch(/draft estimates/i);
+      const result = await addEstimateLineItem({
+        estimateId: "est-1",
+        itemName: "Some Item",
+        itemType: "service",
+        quantity: 1,
+        unitPriceCents: 1000,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toMatch(/draft estimates/i);
+      }
     }
-  });
+  );
 
   it("denies add line item for cross-account estimate", async () => {
     requireInternalUserMock.mockResolvedValue(makeInternalUser());
@@ -775,6 +782,9 @@ describe("addEstimateLineItem", () => {
 
 describe("removeEstimateLineItem", () => {
   beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    process.env.ENABLE_ESTIMATES = "true";
+  });
 
   const draftEstimate = {
     id: "est-1",
@@ -846,7 +856,9 @@ describe("removeEstimateLineItem", () => {
     }
   });
 
-  it("denies remove line item from non-draft estimate", async () => {
+  it.each(["sent", "approved", "declined", "expired", "cancelled"])(
+    "denies remove line item from %s estimate",
+    async (status) => {
     requireInternalUserMock.mockResolvedValue(makeInternalUser());
     createAdminClientMock.mockReturnValue(makeAdminClient({}));
 
@@ -858,7 +870,7 @@ describe("removeEstimateLineItem", () => {
             eq: vi.fn(() => ({
               eq: vi.fn(() => ({
                 maybeSingle: vi.fn(async () => ({
-                  data: { ...draftEstimate, status: "approved" },
+                  data: { ...draftEstimate, status },
                   error: null,
                 })),
               })),
@@ -870,15 +882,16 @@ describe("removeEstimateLineItem", () => {
     });
     createClientMock.mockResolvedValue(supabase);
 
-    const result = await removeEstimateLineItem({
-      estimateId: "est-1",
-      lineItemId: "line-1",
-    });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toMatch(/draft estimates/i);
+      const result = await removeEstimateLineItem({
+        estimateId: "est-1",
+        lineItemId: "line-1",
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toMatch(/draft estimates/i);
+      }
     }
-  });
+  );
 
   it("denies contractor/non-internal users at requireInternalUser boundary", async () => {
     requireInternalUserMock.mockRejectedValue(
@@ -889,5 +902,173 @@ describe("removeEstimateLineItem", () => {
     await expect(
       removeEstimateLineItem({ estimateId: "est-1", lineItemId: "line-1" })
     ).rejects.toThrow("Active internal user required.");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// transitionEstimateStatus
+// ---------------------------------------------------------------------------
+
+describe("transitionEstimateStatus", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    process.env.ENABLE_ESTIMATES = "true";
+  });
+
+  function setupTransition(currentStatus: string) {
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createAdminClientMock.mockReturnValue(makeAdminClient({}));
+
+    const supabase = makeSupabaseClient({
+      estimates: {
+        select: {
+          id: "est-1",
+          status: currentStatus,
+          account_owner_user_id: ACCOUNT_OWNER,
+        },
+      },
+      estimate_events: { insert: null },
+    });
+    createClientMock.mockResolvedValue(supabase);
+    return supabase;
+  }
+
+  it("transitions draft -> sent and writes sent_at", async () => {
+    const supabase = setupTransition("draft");
+
+    const result = await transitionEstimateStatus({
+      estimateId: "est-1",
+      nextStatus: "sent",
+    });
+
+    expect(result.success).toBe(true);
+    const updatePayload = (supabase as { _updatedEstimates: Array<Record<string, unknown>> })._updatedEstimates[0];
+    expect(updatePayload.status).toBe("sent");
+    expect(typeof updatePayload.sent_at).toBe("string");
+  });
+
+  it("transitions sent -> approved and writes approved_at", async () => {
+    const supabase = setupTransition("sent");
+    const result = await transitionEstimateStatus({ estimateId: "est-1", nextStatus: "approved" });
+    expect(result.success).toBe(true);
+    const updatePayload = (supabase as { _updatedEstimates: Array<Record<string, unknown>> })._updatedEstimates[0];
+    expect(updatePayload.status).toBe("approved");
+    expect(typeof updatePayload.approved_at).toBe("string");
+  });
+
+  it("transitions sent -> declined and writes declined_at", async () => {
+    const supabase = setupTransition("sent");
+    const result = await transitionEstimateStatus({ estimateId: "est-1", nextStatus: "declined" });
+    expect(result.success).toBe(true);
+    const updatePayload = (supabase as { _updatedEstimates: Array<Record<string, unknown>> })._updatedEstimates[0];
+    expect(updatePayload.status).toBe("declined");
+    expect(typeof updatePayload.declined_at).toBe("string");
+  });
+
+  it("transitions sent -> expired and writes expired_at", async () => {
+    const supabase = setupTransition("sent");
+    const result = await transitionEstimateStatus({ estimateId: "est-1", nextStatus: "expired" });
+    expect(result.success).toBe(true);
+    const updatePayload = (supabase as { _updatedEstimates: Array<Record<string, unknown>> })._updatedEstimates[0];
+    expect(updatePayload.status).toBe("expired");
+    expect(typeof updatePayload.expired_at).toBe("string");
+  });
+
+  it("transitions draft -> cancelled and writes cancelled_at", async () => {
+    const supabase = setupTransition("draft");
+    const result = await transitionEstimateStatus({ estimateId: "est-1", nextStatus: "cancelled" });
+    expect(result.success).toBe(true);
+    const updatePayload = (supabase as { _updatedEstimates: Array<Record<string, unknown>> })._updatedEstimates[0];
+    expect(updatePayload.status).toBe("cancelled");
+    expect(typeof updatePayload.cancelled_at).toBe("string");
+  });
+
+  it("transitions sent -> cancelled and writes cancelled_at", async () => {
+    const supabase = setupTransition("sent");
+    const result = await transitionEstimateStatus({ estimateId: "est-1", nextStatus: "cancelled" });
+    expect(result.success).toBe(true);
+    const updatePayload = (supabase as { _updatedEstimates: Array<Record<string, unknown>> })._updatedEstimates[0];
+    expect(updatePayload.status).toBe("cancelled");
+    expect(typeof updatePayload.cancelled_at).toBe("string");
+  });
+
+  it.each([
+    ["draft", "approved"],
+    ["approved", "declined"],
+    ["declined", "sent"],
+    ["cancelled", "sent"],
+  ])("denies invalid transition %s -> %s", async (from, to) => {
+    setupTransition(from);
+
+    const result = await transitionEstimateStatus({
+      estimateId: "est-1",
+      nextStatus: to as "sent" | "approved" | "declined" | "expired" | "cancelled",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/invalid estimate status transition/i);
+    }
+  });
+
+  it("writes estimate event with previous_status and next_status", async () => {
+    const supabase = setupTransition("sent");
+
+    const result = await transitionEstimateStatus({
+      estimateId: "est-1",
+      nextStatus: "approved",
+    });
+
+    expect(result.success).toBe(true);
+    const eventPayload = (supabase as { _insertedEvents: Array<Record<string, unknown>> })._insertedEvents[0];
+    expect(eventPayload.event_type).toBe("estimate_approved");
+    expect(eventPayload.meta).toMatchObject({
+      previous_status: "sent",
+      next_status: "approved",
+    });
+  });
+
+  it("denies transition for cross-account estimate", async () => {
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createAdminClientMock.mockReturnValue(makeAdminClient({}));
+
+    const supabase = makeSupabaseClient({ estimates: { select: null } });
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await transitionEstimateStatus({
+      estimateId: "est-other",
+      nextStatus: "sent",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/not found in this account/i);
+    }
+  });
+
+  it("denies contractor/non-internal users at requireInternalUser boundary", async () => {
+    requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
+    createClientMock.mockResolvedValue(makeSupabaseClient({}));
+
+    await expect(
+      transitionEstimateStatus({ estimateId: "est-1", nextStatus: "sent" })
+    ).rejects.toThrow("Active internal user required.");
+  });
+
+  it("returns unavailable when ENABLE_ESTIMATES is disabled", async () => {
+    process.env.ENABLE_ESTIMATES = "false";
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(makeSupabaseClient({}));
+
+    const result = await transitionEstimateStatus({
+      estimateId: "est-1",
+      nextStatus: "sent",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Estimates are currently unavailable.",
+    });
+    expect(requireInternalUserMock).not.toHaveBeenCalled();
   });
 });

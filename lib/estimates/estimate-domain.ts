@@ -48,6 +48,25 @@ export function isOpenEstimateStatus(status: EstimateStatus): boolean {
   return ESTIMATE_OPEN_STATUSES.has(status);
 }
 
+export const ESTIMATE_STATUS_TRANSITIONS: Readonly<
+  Record<EstimateStatus, readonly EstimateStatus[]>
+> = {
+  draft:     ["sent", "cancelled"],
+  sent:      ["approved", "declined", "expired", "cancelled"],
+  approved:  [],
+  declined:  [],
+  expired:   [],
+  cancelled: [],
+  converted: [],
+} as const;
+
+export function canTransitionEstimateStatus(
+  currentStatus: EstimateStatus,
+  nextStatus: EstimateStatus
+): boolean {
+  return ESTIMATE_STATUS_TRANSITIONS[currentStatus].includes(nextStatus);
+}
+
 // ---------------------------------------------------------------------------
 // Status timestamp requirements
 // The DB enforces these via CHECK constraints; this mirrors the contract in

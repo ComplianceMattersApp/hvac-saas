@@ -11,7 +11,7 @@ import {
 } from "@/lib/auth/internal-user";
 import { getEstimateById } from "@/lib/estimates/estimate-read";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
-import { removeLineItemFromForm } from "./actions";
+import { removeLineItemFromForm, transitionEstimateStatusAction } from "./actions";
 import AddLineItemForm from "./AddLineItemForm";
 
 export const metadata = { title: "Estimate" };
@@ -73,6 +73,25 @@ function formatEventType(eventType: string) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function statusGuidanceMessage(status: string) {
+  switch (status) {
+    case "sent":
+      return "This estimate is sent. Line editing is locked while awaiting internal outcome.";
+    case "approved":
+      return "This estimate is approved and terminal for V1E.";
+    case "declined":
+      return "This estimate is declined and terminal for V1E.";
+    case "expired":
+      return "This estimate is expired and terminal for V1E.";
+    case "cancelled":
+      return "This estimate is cancelled and terminal for V1E.";
+    case "converted":
+      return "This estimate is converted. Conversion controls are reserved for a later phase.";
+    default:
+      return null;
+  }
+}
+
 type CustomerRow = { id: string; full_name: string | null; first_name: string | null; last_name: string | null };
 type LocationRow = { id: string; address_line1: string | null; city: string | null; state: string | null; zip: string | null; nickname: string | null };
 type EventRow = { id: string; event_type: string; meta: Record<string, unknown> | null; user_id: string | null; created_at: string };
@@ -114,6 +133,8 @@ export default async function EstimateDetailPage({
   if (!estimate) notFound();
 
   const isDraft = estimate.status === "draft";
+  const isSent = estimate.status === "sent";
+  const statusMessage = statusGuidanceMessage(estimate.status);
   let pricebookItems: PricebookPickerRow[] = [];
 
   if (isDraft) {
@@ -240,6 +261,82 @@ export default async function EstimateDetailPage({
         </div>
       </div>
 
+      {/* Status actions (internal + scoped + feature-gated by route access) */}
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">Status Actions</h2>
+            {statusMessage ? (
+              <p className="mt-1 text-sm text-slate-600">{statusMessage}</p>
+            ) : (
+              <p className="mt-1 text-sm text-slate-600">
+                Transition this estimate within the internal V1E lifecycle.
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {isDraft && (
+              <>
+                <form action={transitionEstimateStatusAction.bind(null, { estimateId: estimate.id, nextStatus: "sent" })}>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 transition-[background-color,border-color,transform] hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
+                  >
+                    Mark Sent
+                  </button>
+                </form>
+                <form action={transitionEstimateStatusAction.bind(null, { estimateId: estimate.id, nextStatus: "cancelled" })}>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+                  >
+                    Cancel Estimate
+                  </button>
+                </form>
+              </>
+            )}
+
+            {isSent && (
+              <>
+                <form action={transitionEstimateStatusAction.bind(null, { estimateId: estimate.id, nextStatus: "approved" })}>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-[background-color,border-color,transform] hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 active:translate-y-[0.5px]"
+                  >
+                    Mark Approved
+                  </button>
+                </form>
+                <form action={transitionEstimateStatusAction.bind(null, { estimateId: estimate.id, nextStatus: "declined" })}>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-[background-color,border-color,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
+                  >
+                    Mark Declined
+                  </button>
+                </form>
+                <form action={transitionEstimateStatusAction.bind(null, { estimateId: estimate.id, nextStatus: "expired" })}>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-[background-color,border-color,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px]"
+                  >
+                    Mark Expired
+                  </button>
+                </form>
+                <form action={transitionEstimateStatusAction.bind(null, { estimateId: estimate.id, nextStatus: "cancelled" })}>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+                  >
+                    Cancel Estimate
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Line Items */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -361,7 +458,9 @@ export default async function EstimateDetailPage({
 
         {!isDraft && (
           <p className="text-xs text-slate-400">
-            Line items can only be edited on draft estimates.
+            {isSent
+              ? "Sent estimates cannot be edited. Transition status from the actions panel."
+              : "Line items can only be edited on draft estimates."}
           </p>
         )}
       </div>

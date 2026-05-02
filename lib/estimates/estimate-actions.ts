@@ -18,7 +18,12 @@ import {
   getEstimateById,
   listEstimatesByAccount,
 } from "@/lib/estimates/estimate-read";
-import { isValidEstimateStatus } from "@/lib/estimates/estimate-domain";
+import {
+  canTransitionEstimateStatus,
+  isValidEstimateStatus,
+  type EstimateStatus,
+} from "@/lib/estimates/estimate-domain";
+import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 
 export { getEstimateById, listEstimatesByAccount };
 
@@ -392,4 +397,118 @@ export async function removeEstimateLineItem(params: {
   });
 
   return { success: true, ...totals };
+}
+
+// ---------------------------------------------------------------------------
+// Transition estimate status (V1E internal-only transitions)
+// ---------------------------------------------------------------------------
+
+const ESTIMATE_TRANSITION_EVENT_BY_STATUS = {
+  sent: "estimate_sent",
+  approved: "estimate_approved",
+  declined: "estimate_declined",
+  expired: "estimate_expired",
+  cancelled: "estimate_cancelled",
+} as const;
+
+type AllowedTransitionStatus = keyof typeof ESTIMATE_TRANSITION_EVENT_BY_STATUS;
+
+const ESTIMATE_TIMESTAMP_FIELD_BY_STATUS: Record<AllowedTransitionStatus, string> = {
+  sent: "sent_at",
+  approved: "approved_at",
+  declined: "declined_at",
+  expired: "expired_at",
+  cancelled: "cancelled_at",
+};
+
+export type TransitionEstimateStatusParams = {
+  estimateId: string;
+  nextStatus: AllowedTransitionStatus;
+};
+
+export type TransitionEstimateStatusResult =
+  | {
+      success: true;
+      estimateId: string;
+      previousStatus: EstimateStatus;
+      nextStatus: AllowedTransitionStatus;
+    }
+  | { success: false; error: string };
+
+export async function transitionEstimateStatus(
+  params: TransitionEstimateStatusParams
+): Promise<TransitionEstimateStatusResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+
+  const accountOwnerUserId = internalUser.account_owner_user_id;
+  const userId = internalUser.user_id;
+
+  const estimateId = String(params.estimateId ?? "").trim();
+  if (!estimateId) return { success: false, error: "estimate_id is required." };
+
+  const nextStatus = params.nextStatus;
+  if (!Object.prototype.hasOwnProperty.call(ESTIMATE_TRANSITION_EVENT_BY_STATUS, nextStatus)) {
+    return { success: false, error: "Unsupported target status for V1E transition." };
+  }
+
+  const { data: estimate, error: estimateErr } = await supabase
+    .from("estimates")
+    .select("id, status, account_owner_user_id")
+    .eq("id", estimateId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (estimateErr) throw estimateErr;
+  if (!estimate?.id) {
+    return { success: false, error: "Estimate not found in this account." };
+  }
+
+  const previousStatus = estimate.status;
+  if (!isValidEstimateStatus(previousStatus)) {
+    return { success: false, error: "Estimate has invalid status state." };
+  }
+
+  if (!canTransitionEstimateStatus(previousStatus, nextStatus)) {
+    return {
+      success: false,
+      error: `Invalid estimate status transition: ${previousStatus} -> ${nextStatus}.`,
+    };
+  }
+
+  const nowIso = new Date().toISOString();
+  const timestampField = ESTIMATE_TIMESTAMP_FIELD_BY_STATUS[nextStatus];
+
+  const { error: updateErr } = await supabase
+    .from("estimates")
+    .update({
+      status: nextStatus,
+      [timestampField]: nowIso,
+      updated_by_user_id: userId,
+      updated_at: nowIso,
+    })
+    .eq("id", estimateId);
+
+  if (updateErr) throw updateErr;
+
+  await supabase.from("estimate_events").insert({
+    estimate_id: estimateId,
+    event_type: ESTIMATE_TRANSITION_EVENT_BY_STATUS[nextStatus],
+    meta: {
+      previous_status: previousStatus,
+      next_status: nextStatus,
+    },
+    user_id: userId,
+  });
+
+  return {
+    success: true,
+    estimateId,
+    previousStatus,
+    nextStatus,
+  };
 }
