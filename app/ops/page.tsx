@@ -155,6 +155,7 @@ export default async function OpsPage({
   searchParams?: Promise<{
   bucket?: string;
   contractor?: string;
+  notice?: string;
   q?: string;
   sort?: string;
   signal?: string;
@@ -165,6 +166,7 @@ export default async function OpsPage({
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const bucket = (sp.bucket ?? "need_to_schedule") as BucketKey;
   const contractor = (sp.contractor ?? "").trim() || null;
+  const notice = (sp.notice ?? "").trim().toLowerCase();
   const q = (sp.q ?? "").trim() || null;
   const sort = (sp.sort ?? "").trim() || "default";
   const panel = (sp.panel ?? "").trim().toLowerCase();
@@ -2142,6 +2144,15 @@ function sectionCountPill(count: number, tone: "neutral" | "danger" = "neutral")
 
 return (
   <div className="mx-auto max-w-7xl space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 lg:space-y-4.5">
+    {notice === "estimates_unavailable" ? (
+      <section className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.24)]">
+        <div className="font-semibold">Estimates are not enabled for this environment yet.</div>
+        <div className="mt-1 text-amber-900/85">
+          Internal estimate routes remain fail-closed here until the estimate migration is intentionally applied and the feature flag is explicitly enabled.
+        </div>
+      </section>
+    ) : null}
+
     <section className="relative overflow-hidden rounded-2xl border border-slate-300/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_60%,rgba(239,246,255,0.75))] p-3 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/60 sm:p-3.5">
       <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-28 w-28 rounded-full bg-blue-100/50 blur-3xl" />
       <div className="flex flex-wrap items-center justify-between gap-3">

@@ -9,10 +9,15 @@ import {
   requireInternalUser,
   isInternalAccessError,
 } from "@/lib/auth/internal-user";
+import {
+  formatEstimateEventLabel,
+  formatEstimateEventSummary,
+} from "@/lib/estimates/estimate-activity";
 import { getEstimateById } from "@/lib/estimates/estimate-read";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
-import { removeLineItemFromForm, transitionEstimateStatusAction } from "./actions";
+import { removeLineItemFromForm, transitionEstimateStatusFromForm } from "./actions";
 import AddLineItemForm from "./AddLineItemForm";
+import EstimateStatusActionForm from "./EstimateStatusActionForm";
 
 export const metadata = { title: "Estimate" };
 
@@ -67,24 +72,20 @@ function statusLabel(status: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function formatEventType(eventType: string) {
-  return String(eventType ?? "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 function statusGuidanceMessage(status: string) {
   switch (status) {
+    case "draft":
+      return "Draft is the editable internal proposal state. Adjust line items here before marking it sent.";
     case "sent":
-      return "This estimate is sent. Line editing is locked while awaiting internal outcome.";
+      return "Sent means the proposal is locked from further editing. No customer email, PDF, approval record, invoice, payment, or conversion was created by this status change.";
     case "approved":
-      return "This estimate is approved and terminal for V1E.";
+      return "Approved is terminal for V1. It records internal outcome only and does not create a job, invoice, payment, customer approval record, or conversion.";
     case "declined":
-      return "This estimate is declined and terminal for V1E.";
+      return "Declined is terminal for V1. It records internal outcome only and does not create follow-on commercial or customer-facing records.";
     case "expired":
-      return "This estimate is expired and terminal for V1E.";
+      return "Expired is terminal for V1. It records internal outcome only and does not create follow-on commercial or customer-facing records.";
     case "cancelled":
-      return "This estimate is cancelled and terminal for V1E.";
+      return "Cancelled is terminal for V1. It records internal outcome only and does not create follow-on commercial or customer-facing records.";
     case "converted":
       return "This estimate is converted. Conversion controls are reserved for a later phase.";
     default:
@@ -135,6 +136,11 @@ export default async function EstimateDetailPage({
   const isDraft = estimate.status === "draft";
   const isSent = estimate.status === "sent";
   const statusMessage = statusGuidanceMessage(estimate.status);
+  const statusPanelTitle = isDraft
+    ? "Editable proposal"
+    : isSent
+      ? "Sent and locked"
+      : "Terminal for V1";
   let pricebookItems: PricebookPickerRow[] = [];
 
   if (isDraft) {
@@ -198,12 +204,20 @@ export default async function EstimateDetailPage({
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
       {/* Breadcrumb */}
-      <nav className="text-sm text-slate-500">
-        <Link href="/estimates" className="hover:text-slate-900">
-          Estimates
+      <nav className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
+        <div>
+          <Link href="/estimates" className="hover:text-slate-900">
+            Estimates
+          </Link>
+          <span className="mx-1.5">›</span>
+          <span className="font-mono text-slate-700">{estimate.estimate_number}</span>
+        </div>
+        <Link
+          href="/estimates"
+          className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+        >
+          Back to Estimates
         </Link>
-        <span className="mx-1.5">›</span>
-        <span className="font-mono text-slate-700">{estimate.estimate_number}</span>
       </nav>
 
       {/* Header card */}
@@ -266,6 +280,9 @@ export default async function EstimateDetailPage({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-slate-950">Status Actions</h2>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              {statusPanelTitle}
+            </p>
             {statusMessage ? (
               <p className="mt-1 text-sm text-slate-600">{statusMessage}</p>
             ) : (
@@ -278,59 +295,65 @@ export default async function EstimateDetailPage({
           <div className="flex flex-wrap gap-2">
             {isDraft && (
               <>
-                <form action={transitionEstimateStatusAction.bind(null, { estimateId: estimate.id, nextStatus: "sent" })}>
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 transition-[background-color,border-color,transform] hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
-                  >
-                    Mark Sent
-                  </button>
-                </form>
-                <form action={transitionEstimateStatusAction.bind(null, { estimateId: estimate.id, nextStatus: "cancelled" })}>
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
-                  >
-                    Cancel Estimate
-                  </button>
-                </form>
+                <EstimateStatusActionForm
+                  action={transitionEstimateStatusFromForm}
+                  estimateId={estimate.id}
+                  nextStatus="sent"
+                  label="Mark Sent"
+                  helperText="Locks line editing. No email or PDF is sent in V1F."
+                  confirmMessage="Mark this estimate as Sent? This locks line editing. No customer email or PDF will be sent."
+                  className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 transition-[background-color,border-color,transform] hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
+                />
+                <EstimateStatusActionForm
+                  action={transitionEstimateStatusFromForm}
+                  estimateId={estimate.id}
+                  nextStatus="cancelled"
+                  label="Cancel Estimate"
+                  helperText="Terminal for V1. No conversion or follow-on record is created."
+                  confirmMessage="Cancel this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
+                  className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-[background-color,border-color,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
+                />
               </>
             )}
 
             {isSent && (
               <>
-                <form action={transitionEstimateStatusAction.bind(null, { estimateId: estimate.id, nextStatus: "approved" })}>
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-[background-color,border-color,transform] hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 active:translate-y-[0.5px]"
-                  >
-                    Mark Approved
-                  </button>
-                </form>
-                <form action={transitionEstimateStatusAction.bind(null, { estimateId: estimate.id, nextStatus: "declined" })}>
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-[background-color,border-color,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
-                  >
-                    Mark Declined
-                  </button>
-                </form>
-                <form action={transitionEstimateStatusAction.bind(null, { estimateId: estimate.id, nextStatus: "expired" })}>
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-[background-color,border-color,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px]"
-                  >
-                    Mark Expired
-                  </button>
-                </form>
-                <form action={transitionEstimateStatusAction.bind(null, { estimateId: estimate.id, nextStatus: "cancelled" })}>
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
-                  >
-                    Cancel Estimate
-                  </button>
-                </form>
+                <EstimateStatusActionForm
+                  action={transitionEstimateStatusFromForm}
+                  estimateId={estimate.id}
+                  nextStatus="approved"
+                  label="Mark Approved"
+                  helperText="Terminal for V1. Does not create a job, invoice, payment, or conversion."
+                  confirmMessage="Approve this estimate? This records an internal V1 outcome only and does not create a job, invoice, payment, customer approval, or conversion record."
+                  className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-[background-color,border-color,transform] hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 active:translate-y-[0.5px]"
+                />
+                <EstimateStatusActionForm
+                  action={transitionEstimateStatusFromForm}
+                  estimateId={estimate.id}
+                  nextStatus="declined"
+                  label="Mark Declined"
+                  helperText="Terminal for V1. Stronger confirm because this closes the estimate path."
+                  confirmMessage="Decline this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
+                  className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-[background-color,border-color,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
+                />
+                <EstimateStatusActionForm
+                  action={transitionEstimateStatusFromForm}
+                  estimateId={estimate.id}
+                  nextStatus="expired"
+                  label="Mark Expired"
+                  helperText="Terminal for V1. Use when the proposal should no longer remain active."
+                  confirmMessage="Expire this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
+                  className="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-[background-color,border-color,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px]"
+                />
+                <EstimateStatusActionForm
+                  action={transitionEstimateStatusFromForm}
+                  estimateId={estimate.id}
+                  nextStatus="cancelled"
+                  label="Cancel Estimate"
+                  helperText="Terminal for V1. Use when this proposal should be closed without approval."
+                  confirmMessage="Cancel this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+                />
               </>
             )}
           </div>
@@ -474,8 +497,15 @@ export default async function EstimateDetailPage({
               {events.map((event) => (
                 <div key={event.id} className="px-5 py-3.5">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-sm font-medium text-slate-800">
-                      {formatEventType(event.event_type)}
+                    <div>
+                      <div className="text-sm font-medium text-slate-800">
+                        {formatEstimateEventLabel(event.event_type)}
+                      </div>
+                      {formatEstimateEventSummary(event.event_type, event.meta) ? (
+                        <div className="mt-1 text-xs leading-5 text-slate-500">
+                          {formatEstimateEventSummary(event.event_type, event.meta)}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="shrink-0 text-xs text-slate-400">
                       {formatDateTime(event.created_at)}
