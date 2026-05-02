@@ -438,8 +438,8 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: no schema changes, no migrations, no Supabase commands, and no production data actions were part of this baseline.
 - Confirmed: no Pricebook, invoice, payment, Stripe, QBO, ECC/retest rules, contractor authority, Visit Scope behavior, assignment behavior, scheduling behavior, service-case lifecycle code outside the reconciliation helper, or job creation behavior changed.
 
-### 2.20 Estimates / Quoting V1A-V1F guarded internal baseline confirmation
-- Completed: Estimates/Quoting V1A-V1F is implemented to the current guarded internal baseline.
+### 2.20 Estimates / Quoting V1A-V1G guarded internal baseline confirmation
+- Completed: Estimates/Quoting V1A-V1G is implemented to the current guarded internal baseline.
 - Completed: V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
 - Completed: V1B internal create/read/line server actions are implemented.
 - Completed: V1C internal UI is implemented for `/estimates`, `/estimates/new`, and `/estimates/[id]` with draft creation plus manual line add/remove.
@@ -466,6 +466,12 @@ If any item here conflicts with the active spine, the spine wins.
   - activity feed readability is improved with human-readable labels and transition summaries such as `Draft -> Sent` and `Sent -> Approved`
   - Back to Estimates navigation polish is present on detail pages
   - `/ops?notice=estimates_unavailable` now shows a small internal-safe notice
+- Completed: V1G internal-only presentation and print-readiness polish is implemented:
+  - estimate detail scan hierarchy/readability is improved for estimate number, status, customer/location context, totals, and line items
+  - browser print layout is improved for internal estimate document review
+  - explicit commercial boundary wording is present so `sent` means internal status change only and `approved` means internal outcome only
+  - future-send placeholder wording is explicit: `Estimate sending is not enabled yet.` and `No email or PDF is generated from this action.`
+  - communication history placeholder is read-only with no delivery-tracking claim
 - Completed validation: `npx vitest run lib/estimates` passed (`104 tests`), `npx tsc --noEmit` passed.
 - Completed manual sandbox smoke: passed with `ENABLE_ESTIMATES=true`.
 - Confirmed: V1A migration is applied to sandbox only.
@@ -480,11 +486,13 @@ If any item here conflicts with the active spine, the spine wins.
   - Payment = collected truth only where implemented
   - Pricebook = reusable catalog/default pricing truth
 - Confirmed explicit non-goals remain deferred:
+  - email send execution
   - customer approval
   - customer portal estimate visibility
+  - public estimate links/tokens
   - contractor visibility/authority
-  - estimate email sending
   - PDF generation
+  - PDF storage
   - estimate-to-job conversion
   - estimate-to-invoice conversion
   - payment/deposit
@@ -496,8 +504,8 @@ If any item here conflicts with the active spine, the spine wins.
   - production `ENABLE_ESTIMATES` enablement
   - production smoke
   - rollback plan by disabling `ENABLE_ESTIMATES`
-- Next implementation direction: Estimate presentation/send planning only.
-  - planning first before any email/PDF/customer approval work
+- Next implementation direction: planning for actual estimate send/email/PDF behavior.
+  - planning only first before any implementation work
   - no customer approval, customer portal estimate visibility, contractor visibility/authority, email/PDF, conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement should be implemented without a design pass
 
 ---

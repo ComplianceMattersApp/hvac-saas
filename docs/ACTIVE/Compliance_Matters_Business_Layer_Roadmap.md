@@ -565,12 +565,14 @@ Reporting / analytics is no longer the active incomplete milestone.
 Payment P1 foundation is closed at the current baseline.
 Out-of-box readiness / business identity / settings packaging is also closed at the current baseline.
 The next natural roadmap area is smaller service-model revisions / service workflow refinement.
-Estimates/quoting V1A-V1F is now implemented to the current guarded internal baseline.
+Estimates/quoting V1A-V1G is now implemented to the current guarded internal baseline.
 Estimates is intentionally not production-live yet because production migration is not applied and production `ENABLE_ESTIMATES` remains disabled.
 V1E internal-only status transitions are complete (`draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`).
 V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
 V1E keeps line editing draft-only and hides line-edit controls after `sent`.
 V1F internal-only hardening/operator polish is complete: confirmation UX is clearer, terminal actions use stronger confirmation copy, status wording is more explicit, activity feed readability is improved, operator-facing non-goals are stated directly in the UI, and the disabled-environment notice is clearer on `/ops`.
+V1G internal-only presentation and print-readiness polish is complete on estimate detail: scan hierarchy/readability is improved for estimate number, status, customer/location context, totals, and line-item presentation; print-friendly browser layout is added for internal document review; explicit commercial boundary wording is reinforced; and read-only placeholders for future send/communication history are present without live behavior.
+V1G did not add email send execution, PDF generation/storage, customer approval, customer portal estimate visibility, public estimate links/tokens, contractor visibility/authority, estimate-to-job conversion, estimate-to-invoice conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement.
 Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Separate pre-launch enablement track:
@@ -988,12 +990,13 @@ Next natural roadmap area:
   - Waiting-state labels include Waiting on part, Waiting on customer approval, Estimate needed, Waiting on access, Waiting on information, and Other.
   - Create-next in V1 does not auto-clear source waiting state; explicit/manual release remains required.
   - This refinement advances the service model without introducing parts inventory, estimate automation, service-case-level blocker orchestration, or auto-release behavior.
-  - Estimates/quoting V1A-V1F is implemented to the current guarded internal baseline.
+  - Estimates/quoting V1A-V1G is implemented to the current guarded internal baseline.
   - Production estimates remain intentionally disabled/deferred pending migration apply plus explicit feature-flag enablement.
   - V1E internal-only status transitions are complete (`draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`).
   - V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
   - V1E keeps line editing draft-only and hides line-edit controls after `sent`.
   - V1F internal-only hardening/operator polish is complete: confirmation UX, status wording, activity feed readability, operator clarity around non-goals, and disabled-environment notice polish.
+  - V1G internal-only presentation and print-readiness polish is complete: estimate detail readability is improved for estimate number/status/customer/location/totals/line items, browser print layout is improved for internal document review, commercial boundary wording is explicit, and future-send/communication-history placeholders are read-only only.
 - Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Current deferral reminder:
@@ -1017,12 +1020,12 @@ Older archived Service planning docs are historical only and remain subordinate 
 
 ---
 
-## 9. Estimate v1 (implemented guarded baseline: V1A-V1F)
+## 9. Estimate v1 (implemented guarded baseline: V1A-V1G)
 
 ### Purpose
 Estimate is the proposed commercial scope for solving a problem.
 
-### Current implementation status (V1A-V1F)
+### Current implementation status (V1A-V1G)
 - V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
 - V1A migration is applied to sandbox only.
 - Production estimate migration is not applied.
@@ -1052,6 +1055,12 @@ Estimate is the proposed commercial scope for solving a problem.
   - activity feed labels and transition summaries are more readable (for example `Draft -> Sent`, `Sent -> Approved`)
   - detail/list return navigation is slightly clearer
   - disabled-environment notice polish is present on `/ops?notice=estimates_unavailable`
+- V1G is internal-only presentation and print-readiness polish:
+  - estimate detail scan hierarchy/readability is improved for estimate number, status, customer/location context, totals, and line items
+  - browser print layout is improved for internal estimate document review
+  - explicit commercial boundary wording is present so `sent`/`approved` do not imply email delivery, customer approval records, conversion, or payment execution
+  - future-send controls are placeholder-only with explicit non-enabled wording; no email/PDF behavior is executed
+  - communication history is placeholder-only/read-only with no delivery-tracking claim
 
 ### Implemented capabilities (current guarded internal baseline)
 - estimate schema/domain foundation
@@ -1121,11 +1130,13 @@ If the pricebook changes later, old estimates do not change.
 - Pricebook = reusable catalog/default pricing truth
 
 ### Explicit non-goals still deferred
+- email send execution
 - customer approval
 - customer portal estimate visibility
+- public estimate links/tokens
 - contractor visibility/authority
-- estimate email sending
 - PDF generation
+- PDF storage
 - estimate-to-job conversion
 - estimate-to-invoice conversion
 - payment/deposit
@@ -1140,7 +1151,7 @@ If the pricebook changes later, old estimates do not change.
 - rollback plan by disabling `ENABLE_ESTIMATES`
 
 ### Next implementation direction (planning only)
-- Estimate presentation/send planning first
+- Planning for actual estimate send/email/PDF behavior
 - planning only before implementation of any email/PDF/customer approval behavior
 - no customer approval, customer/contractor portal authority, email/PDF, conversion, or payment behavior should be implemented without a design pass
 
