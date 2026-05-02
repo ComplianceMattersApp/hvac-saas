@@ -1436,9 +1436,12 @@ Current position:
 - Pricebook V1 is no longer fully deferred and is the active product-track continuation area.
 - Pricebook V3 rollout/verification is closed for current scope after this docs closeout.
 - Next product focus remains smaller service-model revisions / service workflow refinement.
-- Estimates/quoting V1A-V1D is implemented to the current guarded internal baseline.
+- Estimates/quoting V1A-V1E is implemented to the current guarded internal baseline.
 - Estimates/quoting is not production-live yet because production migration is not applied and production `ENABLE_ESTIMATES` remains disabled.
-- Next estimates slice is V1E internal-only status transitions (`draft -> sent`, then `sent -> approved|declined|expired|cancelled`).
+- V1E internal-only status transitions are complete: `draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`.
+- V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
+- V1E keeps line editing draft-only and hides line-edit controls after `sent`.
+- Customer approval, customer/contractor portal authority, estimate email/PDF, conversion, and payment behaviors remain deferred.
 - Stripe customer/work payment execution follows service/invoice/estimate workflow readiness unless explicitly pulled forward.
 - Stripe Platform Subscription V1 remains platform/app usage billing only and must not be conflated with tenant customer/work payment execution.
 - Current Pricebook baseline status:
@@ -1759,7 +1762,7 @@ Reporting / analytics baseline is complete enough for the current milestone; rem
 
 The next natural roadmap area is:
 - Pricebook V1 post-promotion refinement from the current production-complete C1B/C1C baseline
-- Estimates/quoting V1A-V1D is implemented as internal-only guarded baseline; production rollout remains deferred
+- Estimates/quoting V1A-V1E is implemented as internal-only guarded baseline; production rollout remains deferred
 
 Pre-launch enablement priority track (separate from product-track sequencing):
 - Stripe enablement for new account users/platform onboarding is elevated for pre-launch readiness.
@@ -1777,7 +1780,7 @@ Current clarification:
 - payment P1 foundation closeout is complete at the current baseline
 - out-of-box readiness / business identity / settings packaging closeout is complete at the current baseline
 - the active product-track roadmap area is Pricebook V1 continuation (with C1B/C1C production-complete, production-promoted, and production-smoke confirmed)
-- estimates/quoting V1A-V1D is implemented for guarded internal baseline and remains intentionally non-production-live
+- estimates/quoting V1A-V1E is implemented for guarded internal baseline and remains intentionally non-production-live
 - customer/location internal account-owner reconciliation is complete inside that milestone
 - notifications internal-awareness write-path hardening is also complete inside that milestone
 - targeted internal same-account job/service-case mutation boundary hardening is also complete inside that milestone

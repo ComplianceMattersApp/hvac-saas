@@ -438,8 +438,8 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: no schema changes, no migrations, no Supabase commands, and no production data actions were part of this baseline.
 - Confirmed: no Pricebook, invoice, payment, Stripe, QBO, ECC/retest rules, contractor authority, Visit Scope behavior, assignment behavior, scheduling behavior, service-case lifecycle code outside the reconciliation helper, or job creation behavior changed.
 
-### 2.20 Estimates / Quoting V1A-V1D guarded internal baseline confirmation
-- Completed: Estimates/Quoting V1A-V1D is implemented to the current guarded internal baseline.
+### 2.20 Estimates / Quoting V1A-V1E guarded internal baseline confirmation
+- Completed: Estimates/Quoting V1A-V1E is implemented to the current guarded internal baseline.
 - Completed: V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
 - Completed: V1B internal create/read/line server actions are implemented.
 - Completed: V1C internal UI is implemented for `/estimates`, `/estimates/new`, and `/estimates/[id]` with draft creation plus manual line add/remove.
@@ -447,6 +447,17 @@ If any item here conflicts with the active spine, the spine wins.
 - Completed: V1D draft-only Pricebook-backed estimate line picker is implemented on estimate detail.
 - Completed: manual estimate line add/remove remains intact alongside Pricebook-backed add/remove.
 - Completed: server-owned frozen snapshots/provenance (`source_pricebook_item_id` and related snapshot fields), subtotal/total recomputation, and estimate create/line-change events (where implemented) are confirmed.
+- Completed: V1E internal-only status transitions are implemented:
+  - `draft -> sent`
+  - `sent -> approved`
+  - `sent -> declined`
+  - `sent -> expired`
+  - `draft -> cancelled`
+  - `sent -> cancelled`
+- Completed: V1E terminal statuses cannot transition further.
+- Completed: V1E transition events include `previous_status` and `next_status`.
+- Completed: V1E sets status timestamps on transition (`sent_at`, `approved_at`, `declined_at`, `expired_at`, `cancelled_at`).
+- Completed: line editing remains draft-only and line-edit controls are hidden after `sent`.
 - Completed validation: `npx vitest run lib/estimates` passed (`76/76`), `npx tsc --noEmit` passed.
 - Confirmed: V1A migration is applied to sandbox only.
 - Confirmed: production estimate migration is not applied.
@@ -475,10 +486,9 @@ If any item here conflicts with the active spine, the spine wins.
   - production `ENABLE_ESTIMATES` enablement
   - production smoke
   - rollback plan by disabling `ENABLE_ESTIMATES`
-- Next implementation slice: Estimates V1E internal-only status transitions:
-  - `draft -> sent`
-  - `sent -> approved|declined|expired|cancelled`
-  - no customer approval, email/PDF, conversion, or payment behavior in V1E
+- Next implementation slice: Estimates V1F internal-only hardening:
+  - transition-confirmation UX polish and event-history readability hardening
+  - no customer approval, customer portal estimate visibility, contractor visibility/authority, email/PDF, conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement in V1F
 
 ---
 
