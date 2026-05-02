@@ -48,6 +48,8 @@ export function formatEstimateEventLabel(eventType: string): string {
       return "Estimate expired";
     case "estimate_cancelled":
       return "Estimate cancelled";
+    case "estimate_send_attempted":
+      return "Send attempt recorded";
     default:
       return String(eventType ?? "")
         .replace(/_/g, " ")
@@ -91,6 +93,22 @@ export function formatEstimateEventSummary(
       return "Expired internally. This estimate is terminal for V1.";
     case "estimate_cancelled":
       return "Cancelled internally. This estimate is terminal for V1.";
+    case "estimate_send_attempted": {
+      const status = String(meta?.attempt_status ?? "").trim();
+      const recipient = String(meta?.recipient_email_snapshot ?? "").trim();
+      if (status === "blocked") {
+        return "Send feature is not enabled. No email was sent.";
+      }
+      if (status === "accepted") {
+        return recipient
+          ? `Accepted by provider. Recipient: ${recipient}. Not the same as delivered or read.`
+          : "Accepted by provider. Not the same as delivered or read.";
+      }
+      if (status === "failed") {
+        return "Provider returned an error. See communication history for details.";
+      }
+      return status ? `Send attempted (${status}).` : "Send attempt recorded.";
+    }
     default:
       return null;
   }

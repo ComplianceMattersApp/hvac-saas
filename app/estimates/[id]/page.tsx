@@ -15,9 +15,11 @@ import {
 } from "@/lib/estimates/estimate-activity";
 import { getEstimateById } from "@/lib/estimates/estimate-read";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
-import { removeLineItemFromForm, transitionEstimateStatusFromForm } from "./actions";
+import { removeLineItemFromForm, transitionEstimateStatusFromForm, sendEstimateFromForm } from "./actions";
 import AddLineItemForm from "./AddLineItemForm";
 import EstimateStatusActionForm from "./EstimateStatusActionForm";
+import SendEstimateForm from "./SendEstimateForm";
+import { isEstimateEmailSendEnabled } from "@/lib/estimates/estimate-exposure";
 
 export const metadata = { title: "Estimate" };
 
@@ -96,6 +98,15 @@ function statusGuidanceMessage(status: string) {
 type CustomerRow = { id: string; full_name: string | null; first_name: string | null; last_name: string | null };
 type LocationRow = { id: string; address_line1: string | null; city: string | null; state: string | null; zip: string | null; nickname: string | null };
 type EventRow = { id: string; event_type: string; meta: Record<string, unknown> | null; user_id: string | null; created_at: string };
+type CommunicationRow = {
+  id: string;
+  recipient_email_snapshot: string;
+  subject_snapshot: string;
+  attempt_status: string;
+  attempt_error: string | null;
+  provider_name: string | null;
+  attempted_at: string;
+};
 type PricebookPickerRow = {
   id: string;
   item_name: string;
@@ -200,6 +211,18 @@ export default async function EstimateDetailPage({
     .order("created_at", { ascending: false })
     .limit(10);
   const events = (eventsRaw ?? []) as EventRow[];
+
+  // Load recent communication attempts (last 10)
+  const { data: commsRaw } = await supabase
+    .from("estimate_communications")
+    .select("id, recipient_email_snapshot, subject_snapshot, attempt_status, attempt_error, provider_name, attempted_at")
+    .eq("estimate_id", id)
+    .eq("account_owner_user_id", internalUser.account_owner_user_id)
+    .order("attempted_at", { ascending: false })
+    .limit(10);
+  const communications = (commsRaw ?? []) as CommunicationRow[];
+
+  const emailSendEnabled = isEstimateEmailSendEnabled();
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6 print:mx-0 print:max-w-none print:space-y-3 print:bg-white print:p-0 print:text-black">
@@ -514,37 +537,76 @@ export default async function EstimateDetailPage({
         )}
       </div>
 
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-4 print:hidden">
-        <h2 className="text-sm font-semibold text-slate-900">Future Send Placeholder</h2>
-        <p className="mt-1 text-sm text-slate-600">Estimate sending is not enabled yet.</p>
-        <p className="mt-1 text-sm text-slate-600">No email or PDF is generated from this action.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            className="inline-flex items-center rounded-lg border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500"
-          >
-            Send Estimate (Not Enabled)
-          </button>
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            className="inline-flex items-center rounded-lg border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500"
-          >
-            Generate PDF (Not Enabled)
-          </button>
+      {/* Send estimate panel — draft and sent estimates only */}
+      {(isDraft || isSent) && (
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
+          <h2 className="text-base font-semibold text-slate-950">Send Estimate</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {isDraft
+              ? "This estimate is still in draft. You can record a send attempt before or after marking it sent."
+              : "This estimate is marked sent. Record a send attempt to log that you shared this estimate."}
+          </p>
+          <div className="mt-3">
+            <SendEstimateForm
+              estimateId={estimate.id}
+              action={sendEstimateFromForm}
+              isEmailSendEnabled={emailSendEnabled}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-4 print:hidden">
-        <h2 className="text-sm font-semibold text-slate-900">Communication History</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Communication history is read-only placeholder content for a future phase.
-        </p>
-        <p className="mt-1 text-sm text-slate-600">
-          Delivery tracking is not available in V1G.
+      {/* Communication history */}
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
+        <h2 className="text-base font-semibold text-slate-950">Communication History</h2>
+        {communications.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">No send attempts recorded for this estimate.</p>
+        ) : (
+          <div className="mt-3 divide-y divide-slate-200/60 overflow-hidden rounded-xl border border-slate-200/80">
+            {communications.map((comm) => (
+              <div key={comm.id} className="px-4 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${
+                          comm.attempt_status === "accepted"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : comm.attempt_status === "blocked"
+                              ? "bg-slate-100 text-slate-600"
+                              : comm.attempt_status === "failed"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {comm.attempt_status}
+                      </span>
+                      {comm.provider_name && (
+                        <span className="text-xs text-slate-500">via {comm.provider_name}</span>
+                      )}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-800">
+                      {comm.recipient_email_snapshot}
+                    </div>
+                    {comm.attempt_error && (
+                      <div className="mt-0.5 text-xs text-red-600">{comm.attempt_error}</div>
+                    )}
+                    {comm.attempt_status === "accepted" && (
+                      <div className="mt-0.5 text-[11px] text-slate-400">
+                        Accepted by provider — not the same as delivered or read
+                      </div>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-xs text-slate-400">
+                    {formatDateTime(comm.attempted_at)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="mt-2 text-[11px] text-slate-400">
+          Delivery tracking is not available in V1H. Accepted by provider does not mean delivered or read.
         </p>
       </div>
 

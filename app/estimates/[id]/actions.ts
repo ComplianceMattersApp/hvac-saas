@@ -11,6 +11,7 @@ import {
   transitionEstimateStatus,
   type AddEstimateLineItemParams,
 } from "@/lib/estimates/estimate-actions";
+import { sendEstimateCommunication } from "@/lib/estimates/estimate-communication";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 
 type TransitionTargetStatus = "sent" | "approved" | "declined" | "expired" | "cancelled";
@@ -88,4 +89,20 @@ export async function transitionEstimateStatusAction(params: {
   if (result.success) {
     revalidatePath(`/estimates/${estimateId}`);
   }
+}
+
+/**
+ * Attempt to send (or record a blocked send attempt for) an estimate.
+ * Reads estimate_id and recipient_email from FormData.
+ * Always records the attempt in estimate_communications.
+ */
+export async function sendEstimateFromForm(formData: FormData) {
+  if (!isEstimatesEnabled()) return;
+
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  const recipientEmail = String(formData.get("recipient_email") ?? "").trim();
+  if (!estimateId || !recipientEmail) return;
+
+  await sendEstimateCommunication({ estimateId, recipientEmail });
+  revalidatePath(`/estimates/${estimateId}`);
 }
