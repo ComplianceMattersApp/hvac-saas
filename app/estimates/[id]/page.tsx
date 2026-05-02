@@ -202,9 +202,9 @@ export default async function EstimateDetailPage({
   const events = (eventsRaw ?? []) as EventRow[];
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6 print:mx-0 print:max-w-none print:space-y-3 print:bg-white print:p-0 print:text-black">
       {/* Breadcrumb */}
-      <nav className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
+      <nav className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500 print:hidden">
         <div>
           <Link href="/estimates" className="hover:text-slate-900">
             Estimates
@@ -221,11 +221,22 @@ export default async function EstimateDetailPage({
       </nav>
 
       {/* Header card */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.18)]">
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.18)] print:rounded-none print:border-slate-300 print:shadow-none">
+        <div className="mb-3 hidden border-b border-slate-200 pb-3 print:block">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Internal Estimate Proposal
+          </div>
+          <div className="mt-1 text-sm text-slate-700">
+            Estimate remains proposed commercial scope for internal review.
+          </div>
+        </div>
+
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs text-slate-400">{estimate.estimate_number}</span>
+              <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-500">
+                {estimate.estimate_number}
+              </span>
               <span
                 className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${statusBadgeClass(estimate.status)}`}
               >
@@ -241,7 +252,7 @@ export default async function EstimateDetailPage({
           </div>
 
           {/* Totals */}
-          <div className="shrink-0 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-right">
+          <div className="shrink-0 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-right print:min-w-[14rem] print:rounded-lg print:border-slate-300 print:bg-white">
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               Total
             </div>
@@ -257,7 +268,7 @@ export default async function EstimateDetailPage({
         </div>
 
         {/* Context */}
-        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slate-600">
+        <div className="mt-4 grid gap-2 border-t border-slate-100 pt-4 text-sm text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6">
           {customerName && (
             <div>
               <span className="font-medium text-slate-700">Customer:</span> {customerName}
@@ -272,11 +283,26 @@ export default async function EstimateDetailPage({
             <span className="font-medium text-slate-700">Created:</span>{" "}
             {formatDate(estimate.created_at)}
           </div>
+          <div>
+            <span className="font-medium text-slate-700">Status:</span> {statusLabel(estimate.status)}
+          </div>
         </div>
       </div>
 
+      <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 text-sm text-slate-700 print:rounded-none print:border-slate-300 print:bg-white print:p-3">
+        <p>
+          Sent means the internal estimate status changed; it does not mean email was delivered.
+        </p>
+        <p className="mt-1">
+          Approved means internally marked approved; it does not create a job, invoice, payment, or customer approval record.
+        </p>
+        <p className="mt-1">
+          Invoice remains billed truth. Payment remains collected truth only where implemented.
+        </p>
+      </div>
+
       {/* Status actions (internal + scoped + feature-gated by route access) */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)]">
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-slate-950">Status Actions</h2>
@@ -361,10 +387,10 @@ export default async function EstimateDetailPage({
       </div>
 
       {/* Line Items */}
-      <div className="space-y-3">
+      <div className="space-y-3 print:space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-950">Line Items</h2>
-          <div className="text-sm text-slate-500">
+          <div className="text-sm text-slate-500 print:text-slate-700">
             {estimate.line_items.length}{" "}
             {estimate.line_items.length === 1 ? "item" : "items"}
           </div>
@@ -377,9 +403,9 @@ export default async function EstimateDetailPage({
               : "No line items on this estimate."}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_14px_30px_-30px_rgba(15,23,42,0.18)]">
+          <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_14px_30px_-30px_rgba(15,23,42,0.18)] print:rounded-none print:border-slate-300 print:shadow-none">
             {/* Column headers */}
-            <div className="hidden grid-cols-[minmax(0,2.5fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)_auto] gap-4 border-b border-slate-200/80 bg-white/88 px-5 py-3 sm:grid">
+            <div className="hidden grid-cols-[minmax(0,2.5fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)_auto] gap-4 border-b border-slate-200/80 bg-white/88 px-5 py-3 sm:grid print:grid print:border-slate-300 print:bg-white print:px-4 print:py-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                 Item
               </div>
@@ -399,8 +425,8 @@ export default async function EstimateDetailPage({
 
             <div className="divide-y divide-slate-200/60">
               {estimate.line_items.map((line, idx) => (
-                <div key={line.id} className="bg-white/80 px-5 py-4">
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,2.5fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)_auto] sm:items-center">
+                <div key={line.id} className="bg-white/80 px-5 py-4 print:break-inside-avoid print:px-4 print:py-3">
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,2.5fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)_auto] sm:items-center print:grid-cols-[minmax(0,2.5fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)]">
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:hidden">
                         Line {idx + 1}
@@ -444,7 +470,7 @@ export default async function EstimateDetailPage({
                     </div>
 
                     {isDraft && (
-                      <div className="flex justify-end">
+                      <div className="flex justify-end print:hidden">
                         <form action={removeLineItemFromForm}>
                           <input type="hidden" name="estimate_id" value={estimate.id} />
                           <input type="hidden" name="line_item_id" value={line.id} />
@@ -463,7 +489,7 @@ export default async function EstimateDetailPage({
             </div>
 
             {/* Total footer */}
-            <div className="flex items-center justify-between border-t border-slate-200/80 bg-slate-50/80 px-5 py-3.5">
+            <div className="flex items-center justify-between border-t border-slate-200/80 bg-slate-50/80 px-5 py-3.5 print:border-slate-300 print:bg-white print:px-4 print:py-2.5">
               <div className="text-sm font-semibold text-slate-700">Total</div>
               <div className="text-lg font-bold tracking-[-0.02em] text-slate-950">
                 {formatCents(estimate.total_cents)}
@@ -474,18 +500,52 @@ export default async function EstimateDetailPage({
 
         {/* Add line item — draft only */}
         {isDraft && (
-          <div className="pt-1">
+          <div className="pt-1 print:hidden">
             <AddLineItemForm estimateId={estimate.id} pricebookItems={pricebookItems} />
           </div>
         )}
 
         {!isDraft && (
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-400 print:hidden">
             {isSent
               ? "Sent estimates cannot be edited. Transition status from the actions panel."
               : "Line items can only be edited on draft estimates."}
           </p>
         )}
+      </div>
+
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-4 print:hidden">
+        <h2 className="text-sm font-semibold text-slate-900">Future Send Placeholder</h2>
+        <p className="mt-1 text-sm text-slate-600">Estimate sending is not enabled yet.</p>
+        <p className="mt-1 text-sm text-slate-600">No email or PDF is generated from this action.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="inline-flex items-center rounded-lg border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500"
+          >
+            Send Estimate (Not Enabled)
+          </button>
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="inline-flex items-center rounded-lg border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500"
+          >
+            Generate PDF (Not Enabled)
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-4 print:hidden">
+        <h2 className="text-sm font-semibold text-slate-900">Communication History</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Communication history is read-only placeholder content for a future phase.
+        </p>
+        <p className="mt-1 text-sm text-slate-600">
+          Delivery tracking is not available in V1G.
+        </p>
       </div>
 
       {/* Estimate Events */}
