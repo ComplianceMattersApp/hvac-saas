@@ -438,8 +438,8 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: no schema changes, no migrations, no Supabase commands, and no production data actions were part of this baseline.
 - Confirmed: no Pricebook, invoice, payment, Stripe, QBO, ECC/retest rules, contractor authority, Visit Scope behavior, assignment behavior, scheduling behavior, service-case lifecycle code outside the reconciliation helper, or job creation behavior changed.
 
-### 2.20 Estimates / Quoting V1A-V1G guarded internal baseline confirmation
-- Completed: Estimates/Quoting V1A-V1G is implemented to the current guarded internal baseline.
+### 2.20 Estimates / Quoting V1A-V1H guarded internal baseline confirmation
+- Completed: Estimates/Quoting V1A-V1H is implemented to the current guarded internal baseline.
 - Completed: V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
 - Completed: V1B internal create/read/line server actions are implemented.
 - Completed: V1C internal UI is implemented for `/estimates`, `/estimates/new`, and `/estimates/[id]` with draft creation plus manual line add/remove.
@@ -472,22 +472,35 @@ If any item here conflicts with the active spine, the spine wins.
   - explicit commercial boundary wording is present so `sent` means internal status change only and `approved` means internal outcome only
   - future-send placeholder wording is explicit: `Estimate sending is not enabled yet.` and `No email or PDF is generated from this action.`
   - communication history placeholder is read-only with no delivery-tracking claim
-- Completed validation: `npx vitest run lib/estimates` passed (`104 tests`), `npx tsc --noEmit` passed.
+- Completed: V1H internal-only estimate communication/send-attempt foundation is implemented:
+  - `estimate_communications` table is introduced as send-attempt/communication truth
+  - internal send-attempt action is implemented with fail-closed `ENABLE_ESTIMATE_EMAIL_SEND`
+  - blocked attempts are recorded when send flag is off
+  - draft/sent estimate detail includes send-attempt UI and communication history
+  - activity feed readability includes `estimate_send_attempted`
+  - no send action is exposed on terminal estimate statuses
+- Completed validation: `npx vitest run lib/estimates` passed (`120 tests`), `npx tsc --noEmit` passed.
 - Completed manual sandbox smoke: passed with `ENABLE_ESTIMATES=true`.
-- Confirmed: V1A migration is applied to sandbox only.
-- Confirmed: production estimate migration is not applied.
+- Confirmed: estimate migrations are applied to sandbox only (`20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`).
+- Confirmed: sandbox project ref is `kvpesjdukqwwlgpkzfjm`.
+- Confirmed: production estimate migrations are not applied.
 - Confirmed: production `ENABLE_ESTIMATES` remains unset/false.
+- Confirmed: production `ENABLE_ESTIMATE_EMAIL_SEND` remains unset/false.
 - Confirmed: production `/estimates` redirects to `/ops?notice=estimates_unavailable` when disabled.
 - Confirmed: estimates nav remains hidden in production while `ENABLE_ESTIMATES` is disabled.
+- Confirmed: estimates are not production-live.
 - Confirmed source-of-truth boundaries remain locked:
+  - `estimate_events` = lifecycle/operator audit truth
+  - `estimate_communications` = send-attempt/communication truth
   - Estimate = proposed commercial scope
   - Visit Scope = operational work scope
   - Invoice = billed commercial scope
   - Payment = collected truth only where implemented
   - Pricebook = reusable catalog/default pricing truth
 - Confirmed explicit non-goals remain deferred:
-  - email send execution
+  - real outbound production estimate email
   - customer approval
+  - customer e-signature
   - customer portal estimate visibility
   - public estimate links/tokens
   - contractor visibility/authority
@@ -502,10 +515,12 @@ If any item here conflicts with the active spine, the spine wins.
 - Production rollout remains a later explicit decision and requires:
   - intentional production migration apply
   - production `ENABLE_ESTIMATES` enablement
+  - production `ENABLE_ESTIMATE_EMAIL_SEND` enablement
   - production smoke
   - rollback plan by disabling `ENABLE_ESTIMATES`
-- Next implementation direction: planning for actual estimate send/email/PDF behavior.
-  - planning only first before any implementation work
+- Next implementation direction: V1I should be planning-only or implementation-only after a deliberate choice.
+  - recommended likely next slice: real email provider enablement in sandbox only or generated PDF planning
+  - do not enable production estimate email sending without an explicit rollout plan
   - no customer approval, customer portal estimate visibility, contractor visibility/authority, email/PDF, conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement should be implemented without a design pass
 
 ---

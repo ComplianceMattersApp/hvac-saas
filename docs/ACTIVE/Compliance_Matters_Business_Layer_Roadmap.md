@@ -565,14 +565,15 @@ Reporting / analytics is no longer the active incomplete milestone.
 Payment P1 foundation is closed at the current baseline.
 Out-of-box readiness / business identity / settings packaging is also closed at the current baseline.
 The next natural roadmap area is smaller service-model revisions / service workflow refinement.
-Estimates/quoting V1A-V1G is now implemented to the current guarded internal baseline.
-Estimates is intentionally not production-live yet because production migration is not applied and production `ENABLE_ESTIMATES` remains disabled.
+Estimates/quoting V1A-V1H is now implemented to the current guarded internal baseline.
+Estimates is intentionally not production-live yet because estimate migrations are sandbox-only, production estimate migrations are not applied, production `ENABLE_ESTIMATES` remains disabled, and production `ENABLE_ESTIMATE_EMAIL_SEND` remains disabled.
 V1E internal-only status transitions are complete (`draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`).
 V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
 V1E keeps line editing draft-only and hides line-edit controls after `sent`.
 V1F internal-only hardening/operator polish is complete: confirmation UX is clearer, terminal actions use stronger confirmation copy, status wording is more explicit, activity feed readability is improved, operator-facing non-goals are stated directly in the UI, and the disabled-environment notice is clearer on `/ops`.
 V1G internal-only presentation and print-readiness polish is complete on estimate detail: scan hierarchy/readability is improved for estimate number, status, customer/location context, totals, and line-item presentation; print-friendly browser layout is added for internal document review; explicit commercial boundary wording is reinforced; and read-only placeholders for future send/communication history are present without live behavior.
-V1G did not add email send execution, PDF generation/storage, customer approval, customer portal estimate visibility, public estimate links/tokens, contractor visibility/authority, estimate-to-job conversion, estimate-to-invoice conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement.
+V1H internal-only estimate communication/send-attempt foundation is complete: migration `20260502120000_estimate_communications_v1h.sql` is applied to sandbox only, fail-closed `ENABLE_ESTIMATE_EMAIL_SEND` is implemented, blocked attempts are recorded when send is disabled, draft/sent detail supports send-attempt UI, communication history reads from `estimate_communications`, activity readability includes `estimate_send_attempted`, and terminal estimate statuses do not expose send action.
+V1H did not add real outbound production estimate email, PDF generation/storage, customer approval/e-signature, customer portal estimate visibility, public estimate links/tokens, contractor visibility/authority, estimate-to-job conversion, estimate-to-invoice conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement.
 Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Separate pre-launch enablement track:
@@ -990,13 +991,14 @@ Next natural roadmap area:
   - Waiting-state labels include Waiting on part, Waiting on customer approval, Estimate needed, Waiting on access, Waiting on information, and Other.
   - Create-next in V1 does not auto-clear source waiting state; explicit/manual release remains required.
   - This refinement advances the service model without introducing parts inventory, estimate automation, service-case-level blocker orchestration, or auto-release behavior.
-  - Estimates/quoting V1A-V1G is implemented to the current guarded internal baseline.
+  - Estimates/quoting V1A-V1H is implemented to the current guarded internal baseline.
   - Production estimates remain intentionally disabled/deferred pending migration apply plus explicit feature-flag enablement.
   - V1E internal-only status transitions are complete (`draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`).
   - V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
   - V1E keeps line editing draft-only and hides line-edit controls after `sent`.
   - V1F internal-only hardening/operator polish is complete: confirmation UX, status wording, activity feed readability, operator clarity around non-goals, and disabled-environment notice polish.
   - V1G internal-only presentation and print-readiness polish is complete: estimate detail readability is improved for estimate number/status/customer/location/totals/line items, browser print layout is improved for internal document review, commercial boundary wording is explicit, and future-send/communication-history placeholders are read-only only.
+  - V1H internal-only communication/send-attempt foundation is complete: `estimate_communications` is now send-attempt truth, blocked-attempt capture is present when `ENABLE_ESTIMATE_EMAIL_SEND` is disabled, and communication history/activity are no longer placeholder-only.
 - Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Current deferral reminder:
@@ -1020,19 +1022,20 @@ Older archived Service planning docs are historical only and remain subordinate 
 
 ---
 
-## 9. Estimate v1 (implemented guarded baseline: V1A-V1G)
+## 9. Estimate v1 (implemented guarded baseline: V1A-V1H)
 
 ### Purpose
 Estimate is the proposed commercial scope for solving a problem.
 
-### Current implementation status (V1A-V1G)
+### Current implementation status (V1A-V1H)
 - V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
-- V1A migration is applied to sandbox only.
-- Production estimate migration is not applied.
+- Estimate migrations are applied to sandbox only (`20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`).
+- Production estimate migrations are not applied.
 - V1B create/read/line server actions are implemented.
 - V1C internal estimates UI is implemented (`/estimates`, `/estimates/new`, `/estimates/[id]`) with draft creation and manual line add/remove.
 - V1C fail-closed `ENABLE_ESTIMATES` guard is implemented.
 - Production `ENABLE_ESTIMATES` remains unset/false; production `/estimates` redirects to `/ops?notice=estimates_unavailable`.
+- Production `ENABLE_ESTIMATE_EMAIL_SEND` remains unset/false.
 - V1D draft-only Pricebook-backed line picker on estimate detail is implemented.
 - V1D preserves manual line add/remove and server-owned Pricebook snapshots/provenance.
 - V1E internal-only status transitions are implemented:
@@ -1061,6 +1064,13 @@ Estimate is the proposed commercial scope for solving a problem.
   - explicit commercial boundary wording is present so `sent`/`approved` do not imply email delivery, customer approval records, conversion, or payment execution
   - future-send controls are placeholder-only with explicit non-enabled wording; no email/PDF behavior is executed
   - communication history is placeholder-only/read-only with no delivery-tracking claim
+- V1H is internal-only estimate communication/send-attempt foundation:
+  - `estimate_communications` table is introduced as send-attempt truth
+  - send-attempt action is internal-only and fail-closed by `ENABLE_ESTIMATE_EMAIL_SEND`
+  - blocked attempts are recorded when send flag is disabled
+  - draft/sent detail supports send-attempt UI and communication history
+  - activity readability includes `estimate_send_attempted`
+  - terminal estimate statuses do not expose send action
 
 ### Implemented capabilities (current guarded internal baseline)
 - estimate schema/domain foundation
@@ -1073,6 +1083,7 @@ Estimate is the proposed commercial scope for solving a problem.
 - subtotal/total recomputation
 - estimate events for create/line changes where implemented
 - internal-only operator hardening and workflow clarity polish
+- internal-only estimate communication/send-attempt foundation with blocked-attempt recording
 
 ### Estimate ownership
 Estimate belongs to:
@@ -1123,6 +1134,8 @@ Required line-item fields:
 If the pricebook changes later, old estimates do not change.
 
 ### Source-of-truth boundaries (locked)
+- `estimate_events` = lifecycle/operator audit truth
+- `estimate_communications` = send-attempt/communication truth
 - Estimate = proposed commercial scope
 - Visit Scope = operational work scope
 - Invoice = billed commercial scope
@@ -1130,8 +1143,9 @@ If the pricebook changes later, old estimates do not change.
 - Pricebook = reusable catalog/default pricing truth
 
 ### Explicit non-goals still deferred
-- email send execution
+- real outbound production estimate email
 - customer approval
+- customer e-signature
 - customer portal estimate visibility
 - public estimate links/tokens
 - contractor visibility/authority
@@ -1147,12 +1161,14 @@ If the pricebook changes later, old estimates do not change.
 ### Production rollout prerequisites (later)
 - intentional production migration apply
 - production `ENABLE_ESTIMATES` enablement
+- production `ENABLE_ESTIMATE_EMAIL_SEND` enablement
 - production smoke
 - rollback plan by disabling `ENABLE_ESTIMATES`
 
-### Next implementation direction (planning only)
-- Planning for actual estimate send/email/PDF behavior
-- planning only before implementation of any email/PDF/customer approval behavior
+### Next implementation direction (V1I deliberate choice)
+- V1I should be planning-only or implementation-only after a deliberate choice.
+- Recommended likely next slice: real email provider enablement in sandbox only or generated PDF planning.
+- Do not enable production estimate email sending without an explicit rollout plan.
 - no customer approval, customer/contractor portal authority, email/PDF, conversion, or payment behavior should be implemented without a design pass
 
 ---
