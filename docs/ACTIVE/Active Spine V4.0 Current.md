@@ -968,6 +968,7 @@ additional dispatch UX micro-polish beyond the current unified drag/drop baselin
 deeper notification prioritization/escalation layers
 broader role model refinement
 future branding/settings/business-profile formalization
+App-store/mobile native distribution remains intentionally deferred for current launch scope; web product launch readiness is the priority baseline.
 
 Note:
 Payment P1 foundation is closed at the current baseline.

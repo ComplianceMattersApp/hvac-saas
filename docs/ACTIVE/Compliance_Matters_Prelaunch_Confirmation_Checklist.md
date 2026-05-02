@@ -589,6 +589,7 @@ If any item here conflicts with the active spine, the spine wins.
 - Tenant/customer-facing support grant visibility remains a later slice.
 - Read-only account overview remains a later slice.
 - Support mutation remains a much-later explicit decision, if ever.
+- App-store/mobile native distribution remains deferred; current launch focus is web/PWA-style readiness, not Apple App Store or Google Play distribution.
 
 ---
 
