@@ -7,6 +7,7 @@ import MobileShellMenu from "@/components/layout/MobileShellMenu";
 import UserAccountMenu from "@/components/layout/UserAccountMenu";
 import { getInternalUnreadNotificationBadgeCount } from "@/lib/actions/notification-read-actions";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
+import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 const geistSans = Geist({
@@ -53,6 +54,7 @@ export default async function RootLayout({
   let isContractor = false;
   let isInternalUser = false;
   let isAdmin = false;
+  const estimatesEnabled = isEstimatesEnabled();
   let unreadNotificationCount = 0;
 
   if (actorContext.kind === "contractor") {
@@ -163,6 +165,14 @@ export default async function RootLayout({
                         My Work
                       </Link>
                     )}
+                    {isInternalUser && estimatesEnabled && (
+                      <Link
+                        href="/estimates"
+                        className={shellUtilityLinkClass}
+                      >
+                        Estimates
+                      </Link>
+                    )}
                     {isInternalUser && (
                       <Link
                         href="/reports"
@@ -188,6 +198,7 @@ export default async function RootLayout({
                     <MobileShellMenu
                       isInternalUser={isInternalUser}
                       isAdmin={isAdmin}
+                      isEstimatesEnabled={estimatesEnabled}
                       unreadNotificationCount={unreadNotificationCount}
                       unreadNotificationBadgeLabel={unreadNotificationBadgeLabel}
                     />

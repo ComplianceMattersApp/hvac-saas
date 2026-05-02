@@ -8,6 +8,7 @@ import LogoutButton from "@/components/auth/LogoutButton";
 type Props = {
   isInternalUser: boolean;
   isAdmin: boolean;
+  isEstimatesEnabled: boolean;
   unreadNotificationCount: number;
   unreadNotificationBadgeLabel: string;
 };
@@ -18,6 +19,7 @@ const mobileMenuItemClass =
 export default function MobileShellMenu({
   isInternalUser,
   isAdmin,
+  isEstimatesEnabled,
   unreadNotificationCount,
   unreadNotificationBadgeLabel,
 }: Props) {
@@ -116,6 +118,15 @@ export default function MobileShellMenu({
               className={mobileMenuItemClass}
             >
               My Work
+            </Link>
+          ) : null}
+          {isInternalUser && isEstimatesEnabled ? (
+            <Link
+              href="/estimates"
+              onClick={() => setOpen(false)}
+              className={mobileMenuItemClass}
+            >
+              Estimates
             </Link>
           ) : null}
           {isInternalUser ? (
