@@ -110,6 +110,26 @@ If any item here conflicts with the active spine, the spine wins.
   - no claim of calendar engine rebuild
   - no technician-assignment ownership change from calendar drag/drop
 
+### 2.3.4 Production contractor intake hotfix closeout (resolved)
+- Confirmed production incident: contractor-reported new work request for 4137 Amberwood Cir, Pleasanton showed an error/disappeared and did not save.
+- Confirmed production read-only verification:
+  - no matching durable row existed in `contractor_intake_submissions`, `jobs`, `customers`, `locations`, `job_events`, or `notifications`
+  - 24-hour production sweep confirmed the failed contractor/company path aligned with the only contractor login activity in that period
+  - no additional silent contractor intake failures were found in that sweep window
+- Confirmed root cause: contractor `/jobs/new` form path did not post `state`, while server-side contractor proposal validation requires `address_line1`, `city`, `state`, and `zip`.
+- Confirmed fix/closeout:
+  - contractor form now posts state
+  - required-address behavior was tightened to match server intake validation
+  - contractor validation/error handling remains clear
+  - side-effect failures after successful proposal save do not erase the saved submission
+- Confirmed boundary remains unchanged:
+  - contractor submissions remain proposed intake data
+  - contractors retain no scheduling/lifecycle authority
+  - internal users retain finalization authority
+- Confirmed no production data repair was possible for the failed Amberwood row because it never persisted.
+- Confirmed contractor resend follow-up was completed and a new production contractor submission/job path succeeded after fix.
+- Confirmed no payment, Stripe, QBO, support-access, RLS model, or tenant-boundary behavior changed.
+
 ### 2.4 First owner onboarding/provisioning readiness
 - **V1 implemented and browser-smoked.** Public self-serve signup exists for standard onboarding at `/signup`, and invite-only platform-admin/operator provisioning remains active/manual fallback.
 - Confirmed: provisioning script (`scripts/provision-first-owner.ts`) requires explicit allow flags for apply mode; defaults to dry-run.
@@ -418,6 +438,48 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: no schema changes, no migrations, no Supabase commands, and no production data actions were part of this baseline.
 - Confirmed: no Pricebook, invoice, payment, Stripe, QBO, ECC/retest rules, contractor authority, Visit Scope behavior, assignment behavior, scheduling behavior, service-case lifecycle code outside the reconciliation helper, or job creation behavior changed.
 
+### 2.20 Estimates / Quoting V1A-V1D guarded internal baseline confirmation
+- Completed: Estimates/Quoting V1A-V1D is implemented to the current guarded internal baseline.
+- Completed: V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
+- Completed: V1B internal create/read/line server actions are implemented.
+- Completed: V1C internal UI is implemented for `/estimates`, `/estimates/new`, and `/estimates/[id]` with draft creation plus manual line add/remove.
+- Completed: fail-closed `ENABLE_ESTIMATES` guard is implemented.
+- Completed: V1D draft-only Pricebook-backed estimate line picker is implemented on estimate detail.
+- Completed: manual estimate line add/remove remains intact alongside Pricebook-backed add/remove.
+- Completed: server-owned frozen snapshots/provenance (`source_pricebook_item_id` and related snapshot fields), subtotal/total recomputation, and estimate create/line-change events (where implemented) are confirmed.
+- Completed validation: `npx vitest run lib/estimates` passed (`76/76`), `npx tsc --noEmit` passed.
+- Confirmed: V1A migration is applied to sandbox only.
+- Confirmed: production estimate migration is not applied.
+- Confirmed: production `ENABLE_ESTIMATES` remains unset/false.
+- Confirmed: production `/estimates` redirects to `/ops?notice=estimates_unavailable` when disabled.
+- Confirmed source-of-truth boundaries remain locked:
+  - Estimate = proposed commercial scope
+  - Visit Scope = operational work scope
+  - Invoice = billed commercial scope
+  - Payment = collected truth only where implemented
+  - Pricebook = reusable catalog/default pricing truth
+- Confirmed explicit non-goals remain deferred:
+  - customer approval
+  - customer portal estimate visibility
+  - contractor visibility/authority
+  - estimate email sending
+  - PDF generation
+  - estimate-to-job conversion
+  - estimate-to-invoice conversion
+  - payment/deposit
+  - Stripe tenant payment behavior
+  - QBO behavior
+  - production estimate feature enablement
+- Production rollout remains a later explicit decision and requires:
+  - intentional production migration apply
+  - production `ENABLE_ESTIMATES` enablement
+  - production smoke
+  - rollback plan by disabling `ENABLE_ESTIMATES`
+- Next implementation slice: Estimates V1E internal-only status transitions:
+  - `draft -> sent`
+  - `sent -> approved|declined|expired|cancelled`
+  - no customer approval, email/PDF, conversion, or payment behavior in V1E
+
 ---
 
 ## 3. Support / customer-operations readiness
@@ -427,6 +489,9 @@ If any item here conflicts with the active spine, the spine wins.
 - V1A includes `support_users`, `support_account_grants`, `support_access_sessions`, `support_access_audit_events`, resolver/audit helpers, and DB-level session/grant/account consistency invariant.
 - V1A migration `20260501120000_support_access_v1a_foundation.sql` is applied to sandbox only.
 - Production support-access migration/apply remains intentionally deferred.
+- V1C exposure control is implemented and fail-closed by default: `ENABLE_SUPPORT_CONSOLE` must be explicitly enabled to expose `/ops/admin/users/support`.
+- Production `ENABLE_SUPPORT_CONSOLE` remains intentionally unset/false.
+- No production support access is live.
 
 ### 3.2 Support console status and boundaries
 - Customer Support / Remote Assistance V1B support console shell is implemented, committed, and sandbox-smoked.
@@ -440,11 +505,17 @@ If any item here conflicts with the active spine, the spine wins.
   - no support mutation behavior
 
 ### 3.3 Deferred production enablement and next support slices
-- Production enablement is deferred pending explicit rollout decision.
-- Production migration timing remains a deliberate go-live decision, not automatic.
-- Feature exposure / route visibility decision remains open for production rollout.
-- V1C exposure control is fail-closed by default: `ENABLE_SUPPORT_CONSOLE` must be explicitly enabled to expose `/ops/admin/users/support`.
-- Production support-console enablement requires both decisions together: production support migration apply decision and explicit `ENABLE_SUPPORT_CONSOLE` enablement decision.
+- Support V1 is intentionally parked from production enablement; this is not unfinished architecture.
+- Production enablement is deferred pending explicit rollout timing/need decision.
+- Do not proceed now with production support migration apply, production support seeding, or production `ENABLE_SUPPORT_CONSOLE` enablement.
+- Production support-console enablement later requires both decisions together: production support migration apply decision and explicit `ENABLE_SUPPORT_CONSOLE` enablement decision.
+- Keep-ready rollout checklist (later, explicit approval only):
+  - production migration approval
+  - production `support_user` seed
+  - one read_only grant
+  - explicit `ENABLE_SUPPORT_CONSOLE` enablement
+  - controlled smoke
+  - rollback by disabling `ENABLE_SUPPORT_CONSOLE`
 - Tenant/customer-facing support grant visibility remains a later slice.
 - Read-only account overview remains a later slice.
 - Support mutation remains a much-later explicit decision, if ever.

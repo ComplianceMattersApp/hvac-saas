@@ -75,6 +75,16 @@ P1 closeout note:
   - `locations.state` is populated where state is captured
   - contractor intake proposal state persists through `proposed_state`
   - this supports invoice billing-state prefill where source data exists
+- Contractor intake production hotfix closeout is complete as a resolved incident note (not a roadmap-direction change):
+  - confirmed incident: contractor request for 4137 Amberwood Cir, Pleasanton failed/disappeared and did not persist
+  - confirmed production read-only sweeps found no matching durable row in `contractor_intake_submissions`, `jobs`, `customers`, `locations`, `job_events`, or `notifications`
+  - confirmed 24-hour production sweep found no additional silent contractor intake failures
+  - root cause was contractor `/jobs/new` form not posting `state` while server proposal validation required `address_line1`, `city`, `state`, and `zip`
+  - fix is deployed: contractor form now posts `state`, required-address behavior aligns with server validation, and post-save side effects do not erase successful submissions
+  - no production data repair was possible for the failed row because it never persisted
+  - contractor was asked to resend; a new production contractor submission path succeeded after fix
+  - contractor intake architecture/boundaries remain unchanged: proposed intake data only, no contractor scheduling/lifecycle authority, internal finalization ownership retained
+  - no payment, Stripe, QBO, support-access, RLS model, or tenant-boundary behavior changed
 - Internal invoice void recovery/replacement behavior is complete:
   - voided internal invoices remain historical
   - voided invoices do not satisfy billed-truth closeout
@@ -555,7 +565,9 @@ Reporting / analytics is no longer the active incomplete milestone.
 Payment P1 foundation is closed at the current baseline.
 Out-of-box readiness / business identity / settings packaging is also closed at the current baseline.
 The next natural roadmap area is smaller service-model revisions / service workflow refinement.
-After service workflow refinement, estimates/quoting is the next planned product track.
+Estimates/quoting V1A-V1D is now implemented to the current guarded internal baseline.
+Estimates is intentionally not production-live yet because production migration is not applied and production `ENABLE_ESTIMATES` remains disabled.
+The next estimates slice is V1E internal-only status transitions (`draft -> sent`, then `sent -> approved|declined|expired|cancelled`).
 Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Separate pre-launch enablement track:
@@ -973,8 +985,9 @@ Next natural roadmap area:
   - Waiting-state labels include Waiting on part, Waiting on customer approval, Estimate needed, Waiting on access, Waiting on information, and Other.
   - Create-next in V1 does not auto-clear source waiting state; explicit/manual release remains required.
   - This refinement advances the service model without introducing parts inventory, estimate automation, service-case-level blocker orchestration, or auto-release behavior.
-- Then estimates/quoting follow as the next planned product track.
-- Estimate Needed may appear as a waiting-state label before full Estimates V1 implementation.
+  - Estimates/quoting V1A-V1D is implemented to the current guarded internal baseline.
+  - Production estimates remain intentionally disabled/deferred pending migration apply plus explicit feature-flag enablement.
+  - Next estimates slice is V1E internal-only status transitions (`draft -> sent`, then `sent -> approved|declined|expired|cancelled`).
 - Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Current deferral reminder:
@@ -998,10 +1011,32 @@ Older archived Service planning docs are historical only and remain subordinate 
 
 ---
 
-## 9. Estimate v1 (planned)
+## 9. Estimate v1 (implemented guarded baseline: V1A-V1D)
 
 ### Purpose
 Estimate is the proposed commercial scope for solving a problem.
+
+### Current implementation status (V1A-V1D)
+- V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
+- V1A migration is applied to sandbox only.
+- Production estimate migration is not applied.
+- V1B create/read/line server actions are implemented.
+- V1C internal estimates UI is implemented (`/estimates`, `/estimates/new`, `/estimates/[id]`) with draft creation and manual line add/remove.
+- V1C fail-closed `ENABLE_ESTIMATES` guard is implemented.
+- Production `ENABLE_ESTIMATES` remains unset/false; production `/estimates` redirects to `/ops?notice=estimates_unavailable`.
+- V1D draft-only Pricebook-backed line picker on estimate detail is implemented.
+- V1D preserves manual line add/remove and server-owned Pricebook snapshots/provenance.
+
+### Implemented capabilities (current guarded internal baseline)
+- estimate schema/domain foundation
+- internal create/read actions
+- internal list/create/detail UI
+- draft estimate creation
+- manual estimate line add/remove
+- Pricebook-backed estimate line picker
+- frozen line snapshots
+- subtotal/total recomputation
+- estimate events for create/line changes where implemented
 
 ### Estimate ownership
 Estimate belongs to:
@@ -1050,6 +1085,37 @@ Required line-item fields:
 
 ### Locked rule
 If the pricebook changes later, old estimates do not change.
+
+### Source-of-truth boundaries (locked)
+- Estimate = proposed commercial scope
+- Visit Scope = operational work scope
+- Invoice = billed commercial scope
+- Payment = collected truth only where implemented
+- Pricebook = reusable catalog/default pricing truth
+
+### Explicit non-goals still deferred
+- customer approval
+- customer portal estimate visibility
+- contractor visibility/authority
+- estimate email sending
+- PDF generation
+- estimate-to-job conversion
+- estimate-to-invoice conversion
+- payment/deposit
+- Stripe tenant payment behavior
+- QBO behavior
+- production estimate feature enablement
+
+### Production rollout prerequisites (later)
+- intentional production migration apply
+- production `ENABLE_ESTIMATES` enablement
+- production smoke
+- rollback plan by disabling `ENABLE_ESTIMATES`
+
+### Next implementation slice (V1E, still internal-only)
+- draft -> sent
+- sent -> approved / declined / expired / cancelled
+- no customer approval, email/PDF, conversion, or payment behavior in V1E
 
 ---
 
@@ -1466,7 +1532,7 @@ New business modules must not regress:
 - operational dashboard truth
 - external-billing workflow via current Invoice Sent path
 
-### Support access rollout boundary (V1A/V1B)
+### Support access rollout boundary (V1A/V1B/V1C)
 - Customer Support / Remote Assistance V1A foundation is implemented, committed, and pushed on `main`.
 - V1A migration is applied to sandbox only; production apply remains intentionally deferred.
 - V1A support-access contract is locked to:
@@ -1474,13 +1540,21 @@ New business modules must not regress:
   - account-owner scoped sessions
   - required audit events
 - Customer Support / Remote Assistance V1B support console shell is implemented, committed, and sandbox-smoked.
+- V1C feature exposure guard is implemented and fail-closed; production `ENABLE_SUPPORT_CONSOLE` remains intentionally unset/false.
 - V1B remains read-only only and intentionally does not add:
   - tenant job/customer/invoice browsing surface
   - support mutation behavior
   - impersonation/login-as-customer behavior
+- No production support access is live.
+- Support V1 is intentionally parked from production enablement; this is not unfinished architecture.
+- Do not proceed now with production support migration apply, production support seeding, or production `ENABLE_SUPPORT_CONSOLE` enablement.
 - Future support rollout remains explicit and later-scoped:
-  - production rollout decision and timing
-  - feature exposure / route visibility decision
+  - production migration approval
+  - production `support_user` seed
+  - one read_only grant
+  - explicit `ENABLE_SUPPORT_CONSOLE` enablement
+  - controlled smoke
+  - rollback by disabling `ENABLE_SUPPORT_CONSOLE`
   - tenant/customer-facing support grant visibility
   - read-only account overview
   - mutation support only as a much later explicit decision, if ever

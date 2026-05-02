@@ -196,6 +196,35 @@ Invalid posted customer/location pairings must not create jobs and must fail saf
 
 Internal intake may create or link canonical customer/location records through this shared flow, using reuse-first linking behavior.
 
+7.7.1 Production contractor intake hotfix closeout (resolved)
+
+Confirmed incident (production):
+
+- A contractor submitted a new work request for 4137 Amberwood Cir, Pleasanton.
+- The request showed an error/disappeared and did not durably save.
+
+Confirmed production read-only findings:
+
+- No matching durable row existed for the failed request in `contractor_intake_submissions`, `jobs`, `customers`, `locations`, `job_events`, or `notifications`.
+- Additional 24-hour production sweep showed this failed path aligned with the only contractor/company login activity in that window; no additional silent failures were found.
+
+Resolved root cause and production hotfix:
+
+- Root cause: contractor `/jobs/new` form path did not post `state`, while server-side contractor proposal validation requires `address_line1`, `city`, `state`, and `zip`.
+- Hotfix: contractor intake form now posts state and contractor address required behavior is aligned with server validation.
+- Contractor validation/error handling remains explicit and fail-safe.
+- Post-insert contractor side-effect failures do not erase a successfully saved contractor intake submission.
+
+Closeout confirmations:
+
+- Contractor intake boundary is unchanged:
+  - contractor submissions remain proposed intake data
+  - contractors do not receive scheduling/lifecycle authority
+  - internal users retain finalization authority
+- No production data repair was possible for the failed Amberwood row because it never persisted.
+- Contractor was asked to resend; a new production contractor submission was successfully created after fix.
+- No payment, Stripe, QBO, support-access, RLS model, or tenant-boundary behavior changed.
+
 7.8 Internal/admin `/jobs/new` flow lock (Phase 2)
 
 Internal/admin `/jobs/new` is a guided workflow, not a flat admin form.
@@ -933,7 +962,7 @@ Rollout boundary confirmations:
 
 These are not currently failures of the spine. They are future/business-layer modules.
 
-price book / quoting
+customer-facing estimate lifecycle, communication, and conversion flows beyond the current internal baseline
 maintenance / agreement systems
 additional dispatch UX micro-polish beyond the current unified drag/drop baseline
 deeper notification prioritization/escalation layers
@@ -1407,7 +1436,9 @@ Current position:
 - Pricebook V1 is no longer fully deferred and is the active product-track continuation area.
 - Pricebook V3 rollout/verification is closed for current scope after this docs closeout.
 - Next product focus remains smaller service-model revisions / service workflow refinement.
-- Estimates/quoting follows service workflow refinement.
+- Estimates/quoting V1A-V1D is implemented to the current guarded internal baseline.
+- Estimates/quoting is not production-live yet because production migration is not applied and production `ENABLE_ESTIMATES` remains disabled.
+- Next estimates slice is V1E internal-only status transitions (`draft -> sent`, then `sent -> approved|declined|expired|cancelled`).
 - Stripe customer/work payment execution follows service/invoice/estimate workflow readiness unless explicitly pulled forward.
 - Stripe Platform Subscription V1 remains platform/app usage billing only and must not be conflated with tenant customer/work payment execution.
 - Current Pricebook baseline status:
@@ -1728,7 +1759,7 @@ Reporting / analytics baseline is complete enough for the current milestone; rem
 
 The next natural roadmap area is:
 - Pricebook V1 post-promotion refinement from the current production-complete C1B/C1C baseline
-- Estimates/quoting remains planned/deferred after Pricebook continuation
+- Estimates/quoting V1A-V1D is implemented as internal-only guarded baseline; production rollout remains deferred
 
 Pre-launch enablement priority track (separate from product-track sequencing):
 - Stripe enablement for new account users/platform onboarding is elevated for pre-launch readiness.
@@ -1746,7 +1777,7 @@ Current clarification:
 - payment P1 foundation closeout is complete at the current baseline
 - out-of-box readiness / business identity / settings packaging closeout is complete at the current baseline
 - the active product-track roadmap area is Pricebook V1 continuation (with C1B/C1C production-complete, production-promoted, and production-smoke confirmed)
-- estimates/quoting remains planned/deferred
+- estimates/quoting V1A-V1D is implemented for guarded internal baseline and remains intentionally non-production-live
 - customer/location internal account-owner reconciliation is complete inside that milestone
 - notifications internal-awareness write-path hardening is also complete inside that milestone
 - targeted internal same-account job/service-case mutation boundary hardening is also complete inside that milestone
@@ -1945,7 +1976,7 @@ Implementation rule:
 - Existing historical retest_needed rows may be read for compatibility during transition cleanup.
 - Active behavioral model should treat retest_needed as legacy compatibility-only, not a forward state.
 
-3. Customer Support / Remote Assistance (V1A/V1B)
+3. Customer Support / Remote Assistance (V1A/V1B/V1C)
 
 Current confirmed state:
 - V1A support-access foundation is implemented, committed, and pushed on `main`.
@@ -1958,6 +1989,9 @@ Current confirmed state:
   - DB-level session/grant/account consistency invariant
 - V1A migration is applied to sandbox only.
 - Production support-access migration/apply remains intentionally deferred.
+- V1C feature exposure guard is implemented and fail-closed: `ENABLE_SUPPORT_CONSOLE` must be explicitly enabled to expose support console routes/actions.
+- Production `ENABLE_SUPPORT_CONSOLE` remains intentionally unset/false.
+- No production support access is live.
 
 V1B status:
 - V1B support console shell is implemented, committed, and sandbox-smoked.
@@ -1971,6 +2005,19 @@ Locked support boundaries:
 - no impersonation/login-as-customer behavior
 - no tenant job/customer/invoice browsing surface yet
 - no support mutation behavior yet
+
+Parked/deferred production enablement decision:
+- Support V1 architecture is complete enough to park; this is not unfinished architecture.
+- Production enablement is intentionally deferred pending better timing and explicit rollout need.
+- Do not proceed now with production support migration apply, production support seeding, or production feature-flag enablement.
+
+Keep-ready rollout checklist (later, explicit approval only):
+- production migration approval
+- production `support_user` seed
+- one read_only grant
+- explicit `ENABLE_SUPPORT_CONSOLE` enablement
+- controlled smoke
+- rollback by disabling `ENABLE_SUPPORT_CONSOLE`
 
 Deferred-later support rollout items:
 - production rollout decision remains explicit and deferred
