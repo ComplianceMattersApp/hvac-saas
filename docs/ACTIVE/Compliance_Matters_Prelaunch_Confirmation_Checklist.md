@@ -47,6 +47,19 @@ If any item here conflicts with the active spine, the spine wins.
   - no live Pay Now/Charge Card/checkout/refund/dispute/payout language appears as active behavior
 
 ### 2.3.1 Launch-readiness catch-up confirmations (completed)
+- Scope vs Line Items / Work Items terminology alignment is complete.
+- Confirmed UI no longer presents free-form scope and structured line items as duplicate concepts on validated core surfaces.
+- Validated surfaces:
+  - internal `/jobs/new`
+  - service `/jobs/[id]`
+  - invoice panel / build-from-work-items path
+  - contractor `/portal/jobs`
+  - contractor new-job/request form (`/jobs/new` in contractor mode)
+- Validation passed:
+  - targeted tests: `npx vitest run lib/jobs/__tests__/visit-scope.test.ts lib/business/__tests__/internal-invoice-line-items-provenance.test.ts` (`2` files passed, `8` tests passed)
+  - TypeScript: `npx tsc --noEmit` (`TSC_OK`)
+  - browser smoke including contractor-authenticated follow-up
+- Confirmed no behavior/schema/Estimate/invoice/Pricebook/payment/support/contractor-authority changes.
 - Service / Visit Scope clarity pass is complete:
   - Service Details vs Visit Scope purpose wording is clarified on job detail
   - Job Title fallback copy is clarified

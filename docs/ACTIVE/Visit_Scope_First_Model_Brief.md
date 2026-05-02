@@ -36,8 +36,22 @@
 	- invoice panel wording now anchors invoice as billed truth while payment entries remain tracking-only
 	- internal invoice void recovery/replacement behavior is in place without changing Visit Scope ownership
 	- invoice report labels are clearer (Send Status, Payment Count) with no calculation changes
+- Scope vs Line Items / Work Items terminology alignment is complete:
+	- operator-facing UI now uses Work Items where users interact with structured Visit Scope
+	- free-form context is labeled Reason for Visit / Dispatch Notes
+	- billing UI uses Invoice Charges where referring to billed commercial rows
+	- internal model remains Visit Scope-first; this was not a schema rename or behavior change
+	- contractor-facing request flow was validated after authenticated contractor smoke
 - Future service-model work should focus on workflow refinement, not a model rebuild.
 - No payment execution, Stripe, QBO, Pricebook seed behavior, or service lifecycle redesign was introduced by A1-A5.
+
+## Canonical language
+
+- Reason for Visit / Dispatch Notes = why we are going
+- Work Items = what belongs to this visit
+- Estimate Lines = proposed commercial scope
+- Invoice Charges = billed commercial truth
+- Pricebook Services / Charges = reusable templates/defaults
 
 ## 1. Model foundation
 

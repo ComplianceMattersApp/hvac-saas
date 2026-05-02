@@ -44,6 +44,19 @@ It extends it.
 - **Invoice** = billed commercial scope
 - **Payment** = money collected against an internal invoice, when payment capability exists
 
+### Scope vs Line Items terminology alignment (completed)
+- The Scope vs Line Items terminology alignment pass is complete.
+- The product model remains:
+  - Job = visit/work record
+  - Visit Scope / Work Items = operational work scope
+  - Estimate Lines = proposed commercial view
+  - Invoice Charges = billed commercial view
+  - Payment = collected truth only where implemented
+  - Pricebook = reusable catalog/default pricing truth
+- First implementation was intentionally wording-only.
+- Future Pricebook enhancement may add default field instructions and allow Pricebook Services / Charges to feed Work Items, Estimate Lines, and Invoice Charges, but that was not implemented in this pass.
+- Maintenance Agreements / Recurring Services should remain modeled later as planned/recurring Work Items with commercial terms, not as billing-first records.
+
 ### Current status note (reporting/truth separation)
 - Internal invoice ledger collected-payment visibility is now implemented for internal invoicing report surfaces (including CSV export) as reporting/tracking only.
 - Separation remains locked:

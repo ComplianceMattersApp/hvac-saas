@@ -1452,6 +1452,19 @@ Current position:
 - V1J internal-only document-template/readiness slice is complete (commit `ad5d735`): canonical document view model/helper is implemented, centralized disclaimer package is implemented, revision semantics planning constants are defined (freeze at send-attempt creation, immutable historical revisions, post-freeze edits require new revision), estimate detail readiness section is wired to the shared document helper, print/readiness wording uses the shared document model, no persistent revision storage is introduced, and no new schema/migration was required.
 - V1J did not add real outbound production estimate email, PDF generation/storage, persistent revision storage, customer approval/e-signature, customer portal estimate visibility, public estimate links/tokens, contractor visibility/authority, estimate-to-job conversion, estimate-to-invoice conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement.
 - Source-of-truth boundaries remain locked: `estimate_events` = lifecycle/operator audit truth, `estimate_communications` = send-attempt/communication truth, Estimate = proposed commercial scope, Visit Scope = operational work scope, Invoice = billed commercial scope, Payment = collected truth only where implemented, Pricebook = reusable catalog/default pricing truth.
+- Scope vs Line Items / Work Items terminology alignment Slice 1 is complete (wording/helper-copy pass only):
+  - user-facing terminology now distinguishes:
+    - Reason for Visit / Dispatch Notes = free-form dispatch/intake context explaining why the visit exists
+    - Work Items = structured operational Visit Scope
+    - Invoice Charges = billed commercial view
+    - Pricebook Service / Charge = reusable catalog item
+  - internal/source-of-truth model remains unchanged:
+    - Visit Scope remains the operational work-definition layer under jobs
+    - invoice line items remain billed/commercial truth
+    - estimate lines remain proposed commercial truth
+    - Pricebook remains reusable catalog/default pricing truth
+  - no schema, behavior, migration, feature flag, Pricebook seed/backfill, Estimate, invoice, payment, support-access, or contractor-authority behavior changed
+  - browser smoke and validation passed across internal `/jobs/new`, service `/jobs/[id]`, invoice panel/build-from-work-items wording, contractor `/portal/jobs`, and contractor `/jobs/new` request flow
 - Customer approval, customer/contractor portal authority, estimate email/PDF, conversion, and payment behaviors remain deferred.
 - V1J validation status: automated checks passed (`npx vitest run lib/estimates` = `123/123`, `npx tsc --noEmit` = `TSC_OK`); sent/approved estimate detail smoke passed; draft-detail smoke is now completed/closed using sandbox draft `EST-20260502-9D58499B` (`/estimates/43aeaa8e-e60e-47d4-8c26-2570600b24df`) and confirmed document readiness rendering, boundary disclaimers, draft manual-line editing, draft pricebook picker availability, blocked send-panel copy, communication history rendering, and absence of email/PDF/customer approval/public link/conversion/payment/customer portal/contractor controls.
 - Next estimate direction: proceed only to sandbox-only provider transport enablement after documented go/no-go gates. Do not enable production estimate email sending without an explicit rollout plan.
