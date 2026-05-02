@@ -13,6 +13,12 @@ import {
   formatEstimateEventLabel,
   formatEstimateEventSummary,
 } from "@/lib/estimates/estimate-activity";
+import {
+  buildEstimateDocumentViewModel,
+  ESTIMATE_DOCUMENT_DISCLAIMERS,
+  ESTIMATE_DOCUMENT_READINESS_GUIDANCE,
+  ESTIMATE_REVISION_PLANNING_DEFAULTS,
+} from "@/lib/estimates/estimate-document";
 import { getEstimateById } from "@/lib/estimates/estimate-read";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { removeLineItemFromForm, transitionEstimateStatusFromForm, sendEstimateFromForm } from "./actions";
@@ -223,6 +229,11 @@ export default async function EstimateDetailPage({
   const communications = (commsRaw ?? []) as CommunicationRow[];
 
   const emailSendEnabled = isEstimateEmailSendEnabled();
+  const documentView = buildEstimateDocumentViewModel({
+    estimate,
+    customerName,
+    locationDisplay,
+  });
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6 print:mx-0 print:max-w-none print:space-y-3 print:bg-white print:p-0 print:text-black">
@@ -233,7 +244,7 @@ export default async function EstimateDetailPage({
             Estimates
           </Link>
           <span className="mx-1.5">›</span>
-          <span className="font-mono text-slate-700">{estimate.estimate_number}</span>
+          <span className="font-mono text-slate-700">{documentView.identity.estimateNumber}</span>
         </div>
         <Link
           href="/estimates"
@@ -258,16 +269,16 @@ export default async function EstimateDetailPage({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-500">
-                {estimate.estimate_number}
+                {documentView.identity.estimateNumber}
               </span>
               <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${statusBadgeClass(estimate.status)}`}
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${statusBadgeClass(documentView.identity.status)}`}
               >
-                {statusLabel(estimate.status)}
+                {documentView.identity.statusLabel}
               </span>
             </div>
             <h1 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">
-              {estimate.title}
+              {documentView.identity.title}
             </h1>
             {estimate.notes && (
               <p className="mt-1.5 text-sm leading-6 text-slate-600">{estimate.notes}</p>
@@ -280,11 +291,11 @@ export default async function EstimateDetailPage({
               Total
             </div>
             <div className="mt-0.5 text-2xl font-bold tracking-[-0.02em] text-slate-950">
-              {formatCents(estimate.total_cents)}
+              {formatCents(documentView.totals.totalCents)}
             </div>
-            {estimate.subtotal_cents !== estimate.total_cents && (
+            {documentView.totals.subtotalCents !== documentView.totals.totalCents && (
               <div className="text-xs text-slate-500">
-                Subtotal {formatCents(estimate.subtotal_cents)}
+                Subtotal {formatCents(documentView.totals.subtotalCents)}
               </div>
             )}
           </div>
@@ -292,35 +303,53 @@ export default async function EstimateDetailPage({
 
         {/* Context */}
         <div className="mt-4 grid gap-2 border-t border-slate-100 pt-4 text-sm text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6">
-          {customerName && (
+          {documentView.context.customerName && (
             <div>
-              <span className="font-medium text-slate-700">Customer:</span> {customerName}
+              <span className="font-medium text-slate-700">Customer:</span> {documentView.context.customerName}
             </div>
           )}
-          {locationDisplay && (
+          {documentView.context.locationDisplay && (
             <div>
-              <span className="font-medium text-slate-700">Location:</span> {locationDisplay}
+              <span className="font-medium text-slate-700">Location:</span> {documentView.context.locationDisplay}
             </div>
           )}
           <div>
             <span className="font-medium text-slate-700">Created:</span>{" "}
-            {formatDate(estimate.created_at)}
+            {formatDate(documentView.lifecycle.createdAt)}
           </div>
+          {documentView.lifecycle.sentAt && (
+            <div>
+              <span className="font-medium text-slate-700">Sent:</span> {formatDate(documentView.lifecycle.sentAt)}
+            </div>
+          )}
           <div>
-            <span className="font-medium text-slate-700">Status:</span> {statusLabel(estimate.status)}
+            <span className="font-medium text-slate-700">Status:</span> {documentView.identity.statusLabel}
           </div>
         </div>
       </div>
 
       <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 text-sm text-slate-700 print:rounded-none print:border-slate-300 print:bg-white print:p-3">
-        <p>
-          Sent means the internal estimate status changed; it does not mean email was delivered.
-        </p>
-        <p className="mt-1">
-          Approved means internally marked approved; it does not create a job, invoice, payment, or customer approval record.
-        </p>
-        <p className="mt-1">
-          Invoice remains billed truth. Payment remains collected truth only where implemented.
+        <h2 className="text-sm font-semibold text-slate-900">Document Readiness</h2>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          {ESTIMATE_DOCUMENT_READINESS_GUIDANCE.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+          <li>
+            {emailSendEnabled
+              ? "Send/email is explicitly enabled for this environment."
+              : "Send/email is currently disabled by feature flag in this environment."}
+          </li>
+        </ul>
+        <h3 className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+          Boundary Disclaimers
+        </h3>
+        <ul className="mt-1 list-disc space-y-1 pl-5 text-xs sm:text-sm">
+          {ESTIMATE_DOCUMENT_DISCLAIMERS.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <p className="mt-2 text-xs text-slate-500">
+          Revision planning defaults: freeze trigger {ESTIMATE_REVISION_PLANNING_DEFAULTS.freezeTrigger}, history {ESTIMATE_REVISION_PLANNING_DEFAULTS.historyPolicy}, post-freeze edits {ESTIMATE_REVISION_PLANNING_DEFAULTS.postFreezeEditPolicy}.
         </p>
       </div>
 
@@ -419,7 +448,7 @@ export default async function EstimateDetailPage({
           </div>
         </div>
 
-        {estimate.line_items.length === 0 ? (
+        {documentView.lines.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-5 py-8 text-center text-sm text-slate-500">
             {isDraft
               ? "No line items yet. Add the first line item below."
@@ -447,7 +476,7 @@ export default async function EstimateDetailPage({
             </div>
 
             <div className="divide-y divide-slate-200/60">
-              {estimate.line_items.map((line, idx) => (
+              {documentView.lines.map((line, idx) => (
                 <div key={line.id} className="bg-white/80 px-5 py-4 print:break-inside-avoid print:px-4 print:py-3">
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,2.5fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)_auto] sm:items-center print:grid-cols-[minmax(0,2.5fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)]">
                     <div>
@@ -455,11 +484,11 @@ export default async function EstimateDetailPage({
                         Line {idx + 1}
                       </div>
                       <div className="font-semibold text-slate-950">
-                        {line.item_name_snapshot}
+                        {line.itemName}
                       </div>
-                      {line.description_snapshot && (
+                      {line.description && (
                         <div className="mt-0.5 text-xs leading-5 text-slate-500">
-                          {line.description_snapshot}
+                          {line.description}
                         </div>
                       )}
                     </div>
@@ -469,7 +498,7 @@ export default async function EstimateDetailPage({
                         Type
                       </div>
                       <div className="text-sm capitalize text-slate-700">
-                        {line.item_type_snapshot}
+                        {line.itemType}
                       </div>
                     </div>
 
@@ -479,7 +508,7 @@ export default async function EstimateDetailPage({
                       </div>
                       <div className="text-sm text-slate-700">
                         {line.quantity % 1 === 0 ? line.quantity : line.quantity.toFixed(2)}{" "}
-                        × {formatCents(line.unit_price_cents)}
+                        × {formatCents(line.unitPriceCents)}
                       </div>
                     </div>
 
@@ -488,7 +517,7 @@ export default async function EstimateDetailPage({
                         Subtotal
                       </div>
                       <div className="font-semibold text-slate-950">
-                        {formatCents(line.line_subtotal_cents)}
+                        {formatCents(line.lineSubtotalCents)}
                       </div>
                     </div>
 
@@ -515,7 +544,7 @@ export default async function EstimateDetailPage({
             <div className="flex items-center justify-between border-t border-slate-200/80 bg-slate-50/80 px-5 py-3.5 print:border-slate-300 print:bg-white print:px-4 print:py-2.5">
               <div className="text-sm font-semibold text-slate-700">Total</div>
               <div className="text-lg font-bold tracking-[-0.02em] text-slate-950">
-                {formatCents(estimate.total_cents)}
+                {formatCents(documentView.totals.totalCents)}
               </div>
             </div>
           </div>
