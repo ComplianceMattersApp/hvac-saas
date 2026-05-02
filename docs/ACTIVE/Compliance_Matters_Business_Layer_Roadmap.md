@@ -573,6 +573,9 @@ V1E keeps line editing draft-only and hides line-edit controls after `sent`.
 V1F internal-only hardening/operator polish is complete: confirmation UX is clearer, terminal actions use stronger confirmation copy, status wording is more explicit, activity feed readability is improved, operator-facing non-goals are stated directly in the UI, and the disabled-environment notice is clearer on `/ops`.
 V1G internal-only presentation and print-readiness polish is complete on estimate detail: scan hierarchy/readability is improved for estimate number, status, customer/location context, totals, and line-item presentation; print-friendly browser layout is added for internal document review; explicit commercial boundary wording is reinforced; and read-only placeholders for future send/communication history are present without live behavior.
 V1H internal-only estimate communication/send-attempt foundation is complete: migration `20260502120000_estimate_communications_v1h.sql` is applied to sandbox only, fail-closed `ENABLE_ESTIMATE_EMAIL_SEND` is implemented, blocked attempts are recorded when send is disabled, draft/sent detail supports send-attempt UI, communication history reads from `estimate_communications`, activity readability includes `estimate_send_attempted`, and terminal estimate statuses do not expose send action.
+V1I decision artifact is complete as planning-only (no implementation changes): Option B first (generated document/PDF strategy planning before real provider send), Option A later (sandbox-only real provider enablement after document/wording gates are satisfied).
+V1I future email-enable go/no-go gates are documented: approved document wording, approved branding/header/footer, recipient confirmation UX reviewed, communication history wording approved, sandbox-only send smoke plan written, and fail-closed rollback behavior validated.
+V1I future PDF generation/storage go/no-go gates are documented: canonical content model, freeze/version semantics, generation trigger, internal access boundaries, retention/storage policy, and no portal/public exposure.
 V1H did not add real outbound production estimate email, PDF generation/storage, customer approval/e-signature, customer portal estimate visibility, public estimate links/tokens, contractor visibility/authority, estimate-to-job conversion, estimate-to-invoice conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement.
 Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
@@ -1071,6 +1074,11 @@ Estimate is the proposed commercial scope for solving a problem.
   - draft/sent detail supports send-attempt UI and communication history
   - activity readability includes `estimate_send_attempted`
   - terminal estimate statuses do not expose send action
+- V1I is decision/planning artifact only (no implementation changes):
+  - Option B first: generated document/PDF strategy planning before real provider send
+  - Option A later: sandbox-only real provider enablement after document/wording go/no-go gates
+  - go/no-go gates for future sandbox-only email enablement: approved document wording, approved branding/header/footer, recipient confirmation UX reviewed, communication history wording approved, sandbox-only send smoke plan written, fail-closed rollback validated
+  - go/no-go gates for future PDF generation/storage: canonical content model, freeze/version semantics, generation trigger, internal access boundaries, retention/storage policy, and no portal/public exposure
 
 ### Implemented capabilities (current guarded internal baseline)
 - estimate schema/domain foundation
@@ -1165,9 +1173,11 @@ If the pricebook changes later, old estimates do not change.
 - production smoke
 - rollback plan by disabling `ENABLE_ESTIMATES`
 
-### Next implementation direction (V1I deliberate choice)
-- V1I should be planning-only or implementation-only after a deliberate choice.
-- Recommended likely next slice: real email provider enablement in sandbox only or generated PDF planning.
+### Next implementation direction (V1I decision recorded)
+- V1I decision is recorded as planning/decision artifact only; no implementation in this slice.
+- Option B comes first: generated document/PDF strategy planning before real provider enablement.
+- If implementation is approved next, keep it to a very small internal document-template/readiness slice first.
+- Option A comes later: sandbox-only real provider enablement after all documented go/no-go gates are satisfied.
 - Do not enable production estimate email sending without an explicit rollout plan.
 - no customer approval, customer/contractor portal authority, email/PDF, conversion, or payment behavior should be implemented without a design pass
 

@@ -479,6 +479,23 @@ If any item here conflicts with the active spine, the spine wins.
   - draft/sent estimate detail includes send-attempt UI and communication history
   - activity feed readability includes `estimate_send_attempted`
   - no send action is exposed on terminal estimate statuses
+- Completed: V1I decision artifact is documented as planning-only (no implementation changes):
+  - Option B first: generated document/PDF strategy planning before real provider enablement
+  - Option A later: sandbox-only real provider enablement after document/wording go/no-go gates are satisfied
+- Completed: V1I go/no-go gates are documented for future sandbox-only email enablement:
+  - approved document wording
+  - approved branding/header/footer
+  - recipient confirmation UX reviewed
+  - communication history wording approved
+  - sandbox-only send smoke plan written
+  - fail-closed rollback validated
+- Completed: V1I go/no-go gates are documented for future PDF generation/storage:
+  - canonical content model
+  - freeze/version semantics
+  - generation trigger
+  - internal access boundaries
+  - retention/storage policy
+  - no portal/public exposure
 - Completed validation: `npx vitest run lib/estimates` passed (`120 tests`), `npx tsc --noEmit` passed.
 - Completed manual sandbox smoke: passed with `ENABLE_ESTIMATES=true`.
 - Confirmed: estimate migrations are applied to sandbox only (`20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`).
@@ -519,7 +536,9 @@ If any item here conflicts with the active spine, the spine wins.
   - production smoke
   - rollback plan by disabling `ENABLE_ESTIMATES`
 - Next implementation direction: V1I should be planning-only or implementation-only after a deliberate choice.
-  - recommended likely next slice: real email provider enablement in sandbox only or generated PDF planning
+  - V1I decision is now recorded as planning/decision artifact only for this slice
+  - Option B is first (generated document/PDF strategy planning), Option A is later (sandbox-only provider enablement after gates)
+  - if implementation is approved next, keep it to a very small internal document-template/readiness slice
   - do not enable production estimate email sending without an explicit rollout plan
   - no customer approval, customer portal estimate visibility, contractor visibility/authority, email/PDF, conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement should be implemented without a design pass
 
