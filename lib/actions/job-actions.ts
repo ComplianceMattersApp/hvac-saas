@@ -7365,8 +7365,18 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   const id =
     String(formData.get("id") || "").trim() ||
     String(formData.get("job_id") || "").trim();
+  const tab = normalizeJobTab(String(formData.get("tab") || ""));
 
   if (!id) throw new Error("Job ID is required");
+
+  const buildJobRedirect = (params: Record<string, string>) => {
+    const query = new URLSearchParams();
+    query.set("tab", tab);
+    for (const [key, value] of Object.entries(params)) {
+      query.set(key, value);
+    }
+    return `/jobs/${id}?${query.toString()}`;
+  };
 
   console.log("[ADVANCE_STATUS_ENTRY]", { jobId: id, ts: new Date().toISOString() });
 
@@ -7434,7 +7444,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
       if (!hasMeaningfulCompletedRun) {
         console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "ecc_test_required", current, next });
-        redirect(`/jobs/${id}?notice=ecc_test_required`);
+        redirect(buildJobRedirect({ notice: "ecc_test_required" }));
       }
     }
   }
@@ -7477,7 +7487,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     if (!hasFullSchedule && !autoScheduleConfirmed) {
       console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "schedule_required", current, next, hasFullSchedule });
-      redirect(`/jobs/${id}?tab=${String(formData.get("tab") || "info")}&schedule_required=1`);
+      redirect(buildJobRedirect({ schedule_required: "1" }));
     }
 
     // PH2-D: resolve acting internal user before any DB write.
@@ -7524,7 +7534,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       revalidatePath(`/ops`);
       revalidatePath(`/portal`);
       revalidatePath(`/portal/jobs/${id}`);
-      redirect(`/jobs/${id}?banner=status_already_updated`);
+      redirect(buildJobRedirect({ banner: "status_already_updated" }));
     }
 
     // Diagnostic re-read: confirm DB write persisted before event inserts.
@@ -7641,7 +7651,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       revalidatePath(`/ops`);
       revalidatePath(`/portal`);
       revalidatePath(`/portal/jobs/${id}`);
-      redirect(`/jobs/${id}?banner=status_already_updated`);
+      redirect(buildJobRedirect({ banner: "status_already_updated" }));
     }
 
     // Diagnostic re-read: confirm DB write persisted before post-update work.
@@ -7885,7 +7895,12 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   revalidatePath(`/portal/jobs/${id}`);
 
   console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_updated", current, next });
-  redirect(`/jobs/${id}?banner=status_updated&refresh=${Date.now()}`);
+  redirect(
+    buildJobRedirect({
+      banner: "status_updated",
+      refresh: Date.now().toString(),
+    })
+  );
 }
 
 export async function revertOnTheWayFromForm(formData: FormData) {
