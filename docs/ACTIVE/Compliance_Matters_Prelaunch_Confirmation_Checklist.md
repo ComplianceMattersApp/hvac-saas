@@ -438,8 +438,8 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: no schema changes, no migrations, no Supabase commands, and no production data actions were part of this baseline.
 - Confirmed: no Pricebook, invoice, payment, Stripe, QBO, ECC/retest rules, contractor authority, Visit Scope behavior, assignment behavior, scheduling behavior, service-case lifecycle code outside the reconciliation helper, or job creation behavior changed.
 
-### 2.20 Estimates / Quoting V1A-V1E guarded internal baseline confirmation
-- Completed: Estimates/Quoting V1A-V1E is implemented to the current guarded internal baseline.
+### 2.20 Estimates / Quoting V1A-V1F guarded internal baseline confirmation
+- Completed: Estimates/Quoting V1A-V1F is implemented to the current guarded internal baseline.
 - Completed: V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
 - Completed: V1B internal create/read/line server actions are implemented.
 - Completed: V1C internal UI is implemented for `/estimates`, `/estimates/new`, and `/estimates/[id]` with draft creation plus manual line add/remove.
@@ -458,11 +458,21 @@ If any item here conflicts with the active spine, the spine wins.
 - Completed: V1E transition events include `previous_status` and `next_status`.
 - Completed: V1E sets status timestamps on transition (`sent_at`, `approved_at`, `declined_at`, `expired_at`, `cancelled_at`).
 - Completed: line editing remains draft-only and line-edit controls are hidden after `sent`.
-- Completed validation: `npx vitest run lib/estimates` passed (`76/76`), `npx tsc --noEmit` passed.
+- Completed: V1F internal-only hardening/operator polish is implemented:
+  - status transition confirmation wording is clearer
+  - terminal/destructive actions use stronger confirmation copy
+  - status panel wording is clearer for draft, sent, and terminal states
+  - operator-facing non-goals are stated directly in the UI (`sent` does not send email/PDF; `approved` does not create job/invoice/payment/conversion/customer approval records)
+  - activity feed readability is improved with human-readable labels and transition summaries such as `Draft -> Sent` and `Sent -> Approved`
+  - Back to Estimates navigation polish is present on detail pages
+  - `/ops?notice=estimates_unavailable` now shows a small internal-safe notice
+- Completed validation: `npx vitest run lib/estimates` passed (`104 tests`), `npx tsc --noEmit` passed.
+- Completed manual sandbox smoke: passed with `ENABLE_ESTIMATES=true`.
 - Confirmed: V1A migration is applied to sandbox only.
 - Confirmed: production estimate migration is not applied.
 - Confirmed: production `ENABLE_ESTIMATES` remains unset/false.
 - Confirmed: production `/estimates` redirects to `/ops?notice=estimates_unavailable` when disabled.
+- Confirmed: estimates nav remains hidden in production while `ENABLE_ESTIMATES` is disabled.
 - Confirmed source-of-truth boundaries remain locked:
   - Estimate = proposed commercial scope
   - Visit Scope = operational work scope
@@ -486,9 +496,9 @@ If any item here conflicts with the active spine, the spine wins.
   - production `ENABLE_ESTIMATES` enablement
   - production smoke
   - rollback plan by disabling `ENABLE_ESTIMATES`
-- Next implementation slice: Estimates V1F internal-only hardening:
-  - transition-confirmation UX polish and event-history readability hardening
-  - no customer approval, customer portal estimate visibility, contractor visibility/authority, email/PDF, conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement in V1F
+- Next implementation direction: Estimate presentation/send planning only.
+  - planning first before any email/PDF/customer approval work
+  - no customer approval, customer portal estimate visibility, contractor visibility/authority, email/PDF, conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement should be implemented without a design pass
 
 ---
 

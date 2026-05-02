@@ -565,11 +565,12 @@ Reporting / analytics is no longer the active incomplete milestone.
 Payment P1 foundation is closed at the current baseline.
 Out-of-box readiness / business identity / settings packaging is also closed at the current baseline.
 The next natural roadmap area is smaller service-model revisions / service workflow refinement.
-Estimates/quoting V1A-V1E is now implemented to the current guarded internal baseline.
+Estimates/quoting V1A-V1F is now implemented to the current guarded internal baseline.
 Estimates is intentionally not production-live yet because production migration is not applied and production `ENABLE_ESTIMATES` remains disabled.
 V1E internal-only status transitions are complete (`draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`).
 V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
 V1E keeps line editing draft-only and hides line-edit controls after `sent`.
+V1F internal-only hardening/operator polish is complete: confirmation UX is clearer, terminal actions use stronger confirmation copy, status wording is more explicit, activity feed readability is improved, operator-facing non-goals are stated directly in the UI, and the disabled-environment notice is clearer on `/ops`.
 Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Separate pre-launch enablement track:
@@ -987,11 +988,12 @@ Next natural roadmap area:
   - Waiting-state labels include Waiting on part, Waiting on customer approval, Estimate needed, Waiting on access, Waiting on information, and Other.
   - Create-next in V1 does not auto-clear source waiting state; explicit/manual release remains required.
   - This refinement advances the service model without introducing parts inventory, estimate automation, service-case-level blocker orchestration, or auto-release behavior.
-  - Estimates/quoting V1A-V1E is implemented to the current guarded internal baseline.
+  - Estimates/quoting V1A-V1F is implemented to the current guarded internal baseline.
   - Production estimates remain intentionally disabled/deferred pending migration apply plus explicit feature-flag enablement.
   - V1E internal-only status transitions are complete (`draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`).
   - V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
   - V1E keeps line editing draft-only and hides line-edit controls after `sent`.
+  - V1F internal-only hardening/operator polish is complete: confirmation UX, status wording, activity feed readability, operator clarity around non-goals, and disabled-environment notice polish.
 - Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Current deferral reminder:
@@ -1015,12 +1017,12 @@ Older archived Service planning docs are historical only and remain subordinate 
 
 ---
 
-## 9. Estimate v1 (implemented guarded baseline: V1A-V1E)
+## 9. Estimate v1 (implemented guarded baseline: V1A-V1F)
 
 ### Purpose
 Estimate is the proposed commercial scope for solving a problem.
 
-### Current implementation status (V1A-V1E)
+### Current implementation status (V1A-V1F)
 - V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
 - V1A migration is applied to sandbox only.
 - Production estimate migration is not applied.
@@ -1041,6 +1043,15 @@ Estimate is the proposed commercial scope for solving a problem.
 - V1E writes estimate transition events with `previous_status` and `next_status`.
 - V1E sets status timestamps on transition (`sent_at`, `approved_at`, `declined_at`, `expired_at`, `cancelled_at`).
 - V1E keeps line editing draft-only and hides line-edit controls after `sent`.
+- V1F is internal-only hardening/operator polish:
+  - status transition confirmation wording is added to reduce accidental clicks
+  - terminal/destructive actions use stronger confirmation copy
+  - detail status panels more clearly describe draft, sent, and terminal states
+  - `sent` clearly states that no email/PDF is sent in V1F
+  - `approved` clearly states that no job, invoice, payment, conversion, or customer approval record is created in V1F
+  - activity feed labels and transition summaries are more readable (for example `Draft -> Sent`, `Sent -> Approved`)
+  - detail/list return navigation is slightly clearer
+  - disabled-environment notice polish is present on `/ops?notice=estimates_unavailable`
 
 ### Implemented capabilities (current guarded internal baseline)
 - estimate schema/domain foundation
@@ -1052,6 +1063,7 @@ Estimate is the proposed commercial scope for solving a problem.
 - frozen line snapshots
 - subtotal/total recomputation
 - estimate events for create/line changes where implemented
+- internal-only operator hardening and workflow clarity polish
 
 ### Estimate ownership
 Estimate belongs to:
@@ -1127,9 +1139,10 @@ If the pricebook changes later, old estimates do not change.
 - production smoke
 - rollback plan by disabling `ENABLE_ESTIMATES`
 
-### Next implementation slice (V1F, still internal-only)
-- transition-confirmation UX polish and audit-log presentation hardening
-- no customer approval, customer/contractor portal authority, email/PDF, conversion, or payment behavior in V1F
+### Next implementation direction (planning only)
+- Estimate presentation/send planning first
+- planning only before implementation of any email/PDF/customer approval behavior
+- no customer approval, customer/contractor portal authority, email/PDF, conversion, or payment behavior should be implemented without a design pass
 
 ---
 
