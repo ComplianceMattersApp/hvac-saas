@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import SubmitButton from "@/components/SubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
 import { archiveJobFromForm } from "@/lib/actions/job-actions";
@@ -92,10 +93,9 @@ import { recordInternalInvoicePaymentFromForm } from "@/lib/actions/internal-inv
 import {
   loadScopedInternalJobDetailReadBoundary,
   resolveJobDetailActor,
-  signScopedInternalJobDetailAttachments,
 } from "@/lib/actions/internal-job-detail-read-boundary";
 
-import JobAttachmentsInternal from "./_components/JobAttachmentsInternal";
+import DeferredJobAttachmentsInternal from "./_components/DeferredJobAttachmentsInternal";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "./_components/InternalInvoiceLineItemsTable";
@@ -271,6 +271,19 @@ function getEventAttachmentCount(meta?: any) {
     return 1;
   }
   return 0;
+}
+
+function JobAttachmentsSectionFallback() {
+  return (
+    <div className="space-y-2" aria-busy="true" aria-live="polite">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div
+          key={index}
+          className="h-14 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
+        />
+      ))}
+    </div>
+  );
 }
 
 function getEventAttachmentLabel(meta?: any) {
@@ -966,27 +979,6 @@ const contractorResponseSubLabel =
     : null;
 
 const onTheWayUndoEligibility = await getOnTheWayUndoEligibility(jobId);
-
-const { data: attachmentRows, error: attachmentErr } = await supabase
-  .from("attachments")
-  .select("id, bucket, storage_path, file_name, content_type, file_size, caption, created_at")
-  .eq("entity_type", "job")
-  .eq("entity_id", jobId)
-  .order("created_at", { ascending: false })
-  .limit(200);
-
-if (attachmentErr) throw new Error(attachmentErr.message);
-
-  // Explicit same-account internal scoped-job preflight: deny before any admin signed URL generation
-  const signedAttachmentResult = await signScopedInternalJobDetailAttachments({
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    jobId,
-    attachmentRows: attachmentRows ?? [],
-  });
-  if (!signedAttachmentResult.authorized) {
-    return notFound();
-  }
-  const attachmentItems = signedAttachmentResult.items;
 
   const sharedNotes = (timelineEvents ?? []).filter((e: any) =>
     ["contractor_note", "public_note", "contractor_correction_submission"].includes(
@@ -4220,8 +4212,8 @@ const renderTimelineItem = (e: any, key: string) => {
       <summary className="cursor-pointer list-none">
         <CollapsibleHeader
           title="Attachments"
-          subtitle={attachmentItems.length ? "Uploaded files and shareable job records." : "No job files uploaded yet."}
-          meta={`${attachmentItems.length} item${attachmentItems.length === 1 ? "" : "s"}`}
+          subtitle="Uploaded files and shareable job records."
+          meta="Deferred"
         />
       </summary>
       <div className={`${workspaceDetailsDividerClass} px-0 pb-0`}>
@@ -4233,10 +4225,12 @@ const renderTimelineItem = (e: any, key: string) => {
             View All Attachments
           </Link>
         </div>
-        <JobAttachmentsInternal
-          jobId={job.id}
-          initialItems={attachmentItems}
-        />
+        <Suspense fallback={<JobAttachmentsSectionFallback />}>
+          <DeferredJobAttachmentsInternal
+            jobId={String(job.id)}
+            accountOwnerUserId={String(internalUser.account_owner_user_id)}
+          />
+        </Suspense>
       </div>
     </details>
 
