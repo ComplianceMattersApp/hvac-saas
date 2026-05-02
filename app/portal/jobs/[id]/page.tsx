@@ -938,12 +938,12 @@ export default async function PortalJobDetailPage({
             ) : (
               <form action={requestRetestReadyFromPortal}>
                 <input type="hidden" name="job_id" value={jobId} />
-                <button
-                  type="submit"
+                <SubmitButton
+                  loadingText="Submitting..."
                   className={portalPrimaryButtonClass}
                 >
                   Retest Ready
-                </button>
+                </SubmitButton>
               </form>
             )}
           </div>
@@ -979,7 +979,7 @@ export default async function PortalJobDetailPage({
               placeholder="Type your note here..."
               className={`${portalInputClass} resize-none`}
             />
-            <SubmitButton className={`${portalPrimaryButtonClass} disabled:opacity-60 disabled:cursor-not-allowed`}>
+            <SubmitButton loadingText="Saving..." className={`${portalPrimaryButtonClass} disabled:opacity-60 disabled:cursor-not-allowed`}>
               Save Note
             </SubmitButton>
           </form>

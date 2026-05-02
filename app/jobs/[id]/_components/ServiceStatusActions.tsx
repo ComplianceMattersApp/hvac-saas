@@ -71,7 +71,7 @@ export default async function ServiceStatusActions({
       <div className={`mt-4 grid grid-cols-1 gap-2 ${isInternalInvoicing ? "" : "sm:grid-cols-2"}`}>
         <form action={completeAction}>
           <SubmitButton
-            loadingText="Updating..."
+            loadingText="Marking complete..."
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50"
           >
             Mark Service Complete → Invoice Required
@@ -81,7 +81,7 @@ export default async function ServiceStatusActions({
         {!isInternalInvoicing ? (
           <form action={invoiceSentAction}>
             <SubmitButton
-              loadingText="Updating..."
+              loadingText="Marking sent..."
               className="w-full rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
             >
               Mark Invoice Sent → Closed

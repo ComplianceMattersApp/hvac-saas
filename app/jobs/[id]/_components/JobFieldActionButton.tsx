@@ -10,7 +10,7 @@ type JobFieldActionButtonProps = {
   hasFullSchedule: boolean;
 };
 
-function FieldActionSubmitButton({ label }: { label: string }) {
+function FieldActionSubmitButton({ label, pendingLabel }: { label: string; pendingLabel: string }) {
   const { pending } = useFormStatus();
 
   return (
@@ -19,7 +19,7 @@ function FieldActionSubmitButton({ label }: { label: string }) {
       disabled={pending}
       className="inline-flex min-h-10 w-full items-center justify-center whitespace-nowrap rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_16px_28px_-20px_rgba(37,99,235,0.42)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_18px_30px_-20px_rgba(37,99,235,0.48)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
     >
-      {pending ? "Updating..." : label}
+      {pending ? pendingLabel : label}
     </button>
   );
 }
@@ -40,6 +40,15 @@ export function JobFieldActionButton({
       : currentStatus === "in_process"
       ? "Mark Job Complete"
       : "—";
+
+  const pendingLabel =
+    currentStatus === "open"
+      ? "Marking on the way..."
+      : currentStatus === "on_the_way"
+      ? "Marking in progress..."
+      : currentStatus === "in_process"
+      ? "Marking complete..."
+      : "Updating...";
 
   if (isDone) {
     return (
@@ -79,7 +88,7 @@ export function JobFieldActionButton({
       <input type="hidden" name="tab" value={tab} />
       <input type="hidden" name="auto_schedule_confirmed" value="0" />
 
-      <FieldActionSubmitButton label={label} />
+      <FieldActionSubmitButton label={label} pendingLabel={pendingLabel} />
     </form>
   );
 }
