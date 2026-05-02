@@ -718,8 +718,8 @@ const [billingRecipient, setBillingRecipient] = useState<
   const showInternalSetupHint =
     isInternalMode && (!internalResolutionReady || (shouldShowRelationshipStep && !relationshipDecisionReady));
   const internalNextStepMessage = !internalResolutionReady
-    ? "Resolve customer and location to unlock job family, relationship review, Visit Scope, scheduling, billing, and optional details."
-    : "Choose the job family and relationship path before defining the Visit Scope for this trip.";
+    ? "Resolve customer and location to unlock job family, relationship review, Work Items, scheduling, billing, and optional details."
+    : "Choose the job family and relationship path before defining the Work Items for this trip.";
   const billingRecipientLabel =
     billingRecipient === "contractor"
       ? "Contractor"
@@ -930,7 +930,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       const nonEmptyItems = visitScopeItems.filter((item) => item.title.trim() || item.details.trim());
       if (nonEmptyItems.length === 0) {
         event.preventDefault();
-        setVisitScopeError("Add at least one structured Visit Scope item before creating a Service job.");
+        setVisitScopeError("Add at least one structured Work Item before creating a Service job.");
         window.requestAnimationFrame(() => {
           visitScopeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         });
@@ -1054,9 +1054,9 @@ const [billingRecipient, setBillingRecipient] = useState<
             : errorCode === "contractor_proposal_submit_failed"
             ? "Could not submit your job. Please try again, or contact us if the issue persists."
             : errorCode === "visit_scope_required"
-            ? "Service jobs require at least one Visit Scope work item."
+            ? "Service jobs require at least one Work Item."
             : errorCode === "visit_scope_invalid"
-            ? "Visit Scope could not be read. Please review the Visit Scope section and try again."
+            ? "Work Items could not be read. Please review the Work Items section and try again."
             : null
         }
         className="mb-5"
@@ -1111,7 +1111,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">Internal job creation</p>
                 <h2 className="mt-2 text-lg font-semibold text-white">Create with confidence, not form fatigue.</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-300">
-                  Resolve the customer and location first, choose the job family, confirm the relationship path, then define the Visit Scope before scheduling or billing.
+                  Resolve the customer and location first, choose the job family, confirm the relationship path, then define Work Items before scheduling or billing.
                 </p>
               </div>
               <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[26rem]">
@@ -1125,7 +1125,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">3</p>
-                  <p className="mt-1 text-sm font-medium text-white">Visit scope, schedule, finish</p>
+                  <p className="mt-1 text-sm font-medium text-white">Work items, schedule, finish</p>
                 </div>
               </div>
             </div>
@@ -1899,7 +1899,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <div>
                     <label className="block text-sm font-medium text-slate-900">Service Details</label>
                     <p className="mt-1 text-xs text-slate-500">
-                      Service Type sets the broader service context. Visit Type sets this trip purpose. Visit Scope below defines the exact work on site.
+                      Service Type sets the broader service context. Visit Type sets this trip purpose. Work Items below define the operational work on site.
                     </p>
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -2203,11 +2203,11 @@ const [billingRecipient, setBillingRecipient] = useState<
               {isInternalMode ? (
                 <div ref={visitScopeSectionRef}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 5</p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Visit scope and job details</h2>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Work Items and job details</h2>
                   <p className="mt-1 text-sm text-slate-500">
                     {jobType === "service"
-                      ? "Capture a short trip summary, then list what belongs in this visit."
-                      : "ECC testing can be created without scope items; add optional companion work context only when this visit also includes service work."}
+                      ? "Capture Reason for Visit / Dispatch Notes, then list Work Items for this visit."
+                      : "ECC testing can be created without work items; add optional companion work context only when this visit also includes service work."}
                   </p>
                 </div>
               ) : (
@@ -2219,12 +2219,17 @@ const [billingRecipient, setBillingRecipient] = useState<
               {isInternalMode ? (
                 <div className={`rounded-2xl border bg-white p-4 shadow-sm space-y-3 ${visitScopeError ? "border-red-300 ring-2 ring-red-100" : "border-slate-200/85"}`}>
                   <div>
-                    <h3 className="text-base font-semibold text-slate-900">Visit Scope</h3>
+                    <h3 className="text-base font-semibold text-slate-900">Work Items</h3>
                     <p className="mt-1 text-sm text-slate-500">
                       {jobType === "service"
-                        ? "Add at least one structured scope item that defines this trip. Summary is optional context."
-                        : "ECC testing does not require Visit Scope items. Add companion work only when this visit also includes service-related work."}
+                        ? "Add at least one structured Work Item that defines what belongs to this visit."
+                        : "ECC testing does not require work items. Add companion work only when this visit also includes service-related work."}
                     </p>
+                    {jobType === "service" ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Work Items define what belongs to this visit. They can help build an invoice later, but they are not billing records.
+                      </p>
+                    ) : null}
                   </div>
                   <VisitScopeBuilder
                     initialSummary={visitScopeSummary}
@@ -2242,7 +2247,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-slate-900">Scope / Job Notes</label>
+                    <label className="block text-sm font-medium text-slate-900">Reason for Visit / Dispatch Notes</label>
                     <textarea
                       rows={8}
                       value={visitScopeSummary}
@@ -2250,7 +2255,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                       placeholder="Describe the requested work, any notes our team should know, and any helpful job context."
                       className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                     />
-                    <p className="text-xs text-slate-500">Use one note box for scope, access details, occupant context, history, and anything else intake review should see.</p>
+                    <p className="text-xs text-slate-500">Reason for Visit explains why this visit exists and gives dispatch context.</p>
                   </div>
 
                   <input type="hidden" name="title" value={visitScopeSummary} />
@@ -2726,7 +2731,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 <p className="mt-1 font-medium text-slate-900">{billingRecipientLabel}</p>
               </div>
               <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Visit Scope</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Work Items</p>
                 <p className="mt-1 font-medium text-slate-900">
                   {visitScopeSummary.trim() || visitScopeItems.find((item) => item.title.trim())?.title.trim() || "Needs review"}
                 </p>

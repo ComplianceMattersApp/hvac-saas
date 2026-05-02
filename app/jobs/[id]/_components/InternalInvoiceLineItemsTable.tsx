@@ -89,26 +89,26 @@ function invoiceBannerMessage(banner?: string | null) {
     internal_invoice_draft_saved: 'Draft invoice saved.',
     internal_invoice_required_fields: 'Invoice number is required.',
     internal_invoice_number_taken: 'Invoice number is already in use.',
-    internal_invoice_line_item_added: 'Line item added.',
-    internal_invoice_pricebook_line_item_added: 'Pricebook line item added.',
-    internal_invoice_visit_scope_line_item_added: 'Visit Scope line item added.',
-    internal_invoice_visit_scope_line_item_partial_added: 'Some selected Visit Scope items were already added.',
-    internal_invoice_line_item_saved: 'Line item saved.',
-    internal_invoice_line_item_removed: 'Line item removed.',
-    internal_invoice_line_item_invalid: 'Line item fields are invalid.',
-    internal_invoice_line_item_missing: 'Line item is missing or no longer available.',
+    internal_invoice_line_item_added: 'Invoice charge added.',
+    internal_invoice_pricebook_line_item_added: 'Pricebook service/charge added.',
+    internal_invoice_visit_scope_line_item_added: 'Work Item charges added.',
+    internal_invoice_visit_scope_line_item_partial_added: 'Some selected Work Items were already added.',
+    internal_invoice_line_item_saved: 'Invoice charge saved.',
+    internal_invoice_line_item_removed: 'Invoice charge removed.',
+    internal_invoice_line_item_invalid: 'Invoice charge fields are invalid.',
+    internal_invoice_line_item_missing: 'Invoice charge is missing or no longer available.',
     internal_invoice_pricebook_item_missing: 'Select a Pricebook item.',
     internal_invoice_pricebook_quantity_invalid: 'Quantity must be greater than zero.',
     internal_invoice_pricebook_item_not_found: 'Pricebook item is unavailable.',
     internal_invoice_pricebook_item_inactive: 'Pricebook item is inactive.',
     internal_invoice_pricebook_negative_price_deferred: 'Adjustment/negative price items are not available here yet.',
-    internal_invoice_visit_scope_item_invalid: 'Visit Scope selection is invalid.',
-    internal_invoice_visit_scope_item_missing: 'Select at least one Visit Scope item.',
+    internal_invoice_visit_scope_item_invalid: 'Work Item selection is invalid.',
+    internal_invoice_visit_scope_item_missing: 'Select at least one Work Item.',
     internal_invoice_visit_scope_quantity_invalid: 'Quantity must be greater than zero.',
-    internal_invoice_visit_scope_item_not_found: 'Visit Scope item is unavailable.',
-    internal_invoice_visit_scope_line_item_duplicate: 'Selected Visit Scope items are already added.',
+    internal_invoice_visit_scope_item_not_found: 'Work Item is unavailable.',
+    internal_invoice_visit_scope_line_item_duplicate: 'Selected Work Items are already added.',
     internal_invoice_locked: 'Invoice is locked and cannot be edited.',
-    internal_invoice_line_items_locked: 'Invoice line items are locked.',
+    internal_invoice_line_items_locked: 'Invoice charges are locked.',
     internal_invoice_missing: 'Invoice was not found.',
   };
 
@@ -247,8 +247,8 @@ export default function InternalInvoiceLineItemsTable({
     await runInlineMutation({
       formData,
       action: addPricebookLineItemAction,
-      successFallback: 'Pricebook line item added.',
-      errorFallback: 'Could not add Pricebook line item.',
+      successFallback: 'Pricebook service/charge added.',
+      errorFallback: 'Could not add Pricebook service/charge.',
     });
   }
 
@@ -256,8 +256,8 @@ export default function InternalInvoiceLineItemsTable({
     await runInlineMutation({
       formData,
       action: addVisitScopeLineItemsAction,
-      successFallback: 'Visit Scope line items added.',
-      errorFallback: 'Could not add Visit Scope line items.',
+      successFallback: 'Work Item charges added.',
+      errorFallback: 'Could not add Work Item charges.',
       onSuccess: () => setSelectedVisitScopeItemIds([]),
     });
   }
@@ -266,8 +266,8 @@ export default function InternalInvoiceLineItemsTable({
     await runInlineMutation({
       formData,
       action: updateLineItemAction,
-      successFallback: 'Line item saved.',
-      errorFallback: 'Could not save line item.',
+      successFallback: 'Invoice charge saved.',
+      errorFallback: 'Could not save invoice charge.',
     });
   }
 
@@ -275,8 +275,8 @@ export default function InternalInvoiceLineItemsTable({
     await runInlineMutation({
       formData,
       action: addLineItemAction,
-      successFallback: 'Line item added.',
-      errorFallback: 'Could not add line item.',
+      successFallback: 'Invoice charge added.',
+      errorFallback: 'Could not add invoice charge.',
       onSuccess: () => setIsAddFormOpen(false),
     });
   }
@@ -285,8 +285,8 @@ export default function InternalInvoiceLineItemsTable({
     await runInlineMutation({
       formData,
       action: removeLineItemAction,
-      successFallback: 'Line item removed.',
-      errorFallback: 'Could not remove line item.',
+      successFallback: 'Invoice charge removed.',
+      errorFallback: 'Could not remove invoice charge.',
     });
   }
 
@@ -301,7 +301,7 @@ export default function InternalInvoiceLineItemsTable({
       ) : null}
 
       <div className="hidden grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)_auto] gap-4 border-b border-slate-200/80 bg-white/88 px-5 py-3 md:grid">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Line Item</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charge</div>
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Type</div>
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Qty</div>
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Unit Price</div>
@@ -311,7 +311,7 @@ export default function InternalInvoiceLineItemsTable({
 
       {lineItems.length === 0 ? (
         <div className="border-b border-dashed border-slate-200 bg-white/72 px-5 py-3.5 text-sm text-slate-600">
-          Start with the first scope line below. Each row becomes the billed scope and the technician-facing work instruction.
+          Start with the first charge below. Each row is an invoice charge and billed record.
         </div>
       ) : null}
 
@@ -324,7 +324,7 @@ export default function InternalInvoiceLineItemsTable({
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add From Pricebook</div>
               <div className="mt-1 text-xs leading-5 text-slate-500">
-                Add an active catalog item as a frozen billed snapshot. Credits/negative adjustments are deferred.
+                Add Pricebook Services / Charges as frozen billed snapshots. Credits/negative adjustments are deferred.
               </div>
             </div>
           </div>
@@ -333,7 +333,7 @@ export default function InternalInvoiceLineItemsTable({
             <>
               <div className="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(6.25rem,0.74fr)_auto] md:items-end">
                 <div>
-                  <label className={workspaceFieldLabelClass}>Pricebook Item</label>
+                  <label className={workspaceFieldLabelClass}>Pricebook Service / Charge</label>
                   <select
                     name="pricebook_item_id"
                     value={selectedPricebookItemId}
@@ -390,9 +390,9 @@ export default function InternalInvoiceLineItemsTable({
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Build Invoice from Visit Scope</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Build Invoice Charges from Work Items</div>
                 <div className="mt-1 text-xs leading-5 text-slate-500">
-                  Add selected scope items as draft invoice lines. Pricing starts at $0.00 and should be reviewed before issuing.
+                  Add selected Work Items as draft invoice charges. Invoice Charges are billed records and should be reviewed before issue.
                 </div>
               </div>
             </div>
@@ -440,15 +440,15 @@ export default function InternalInvoiceLineItemsTable({
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5">
               <div className="text-xs text-slate-500">
                 {eligibleVisitScopeItems.length === 0
-                  ? 'All available Visit Scope items are already on this draft invoice.'
-                  : 'Select one or more scope items to add them as draft invoice lines.'}
+                  ? 'All available Work Items are already on this draft invoice.'
+                  : 'Select one or more Work Items to add them as draft invoice charges.'}
               </div>
               <SubmitButton
                 loadingText="Adding..."
                 className={primaryButtonClass}
                 disabled={selectedVisitScopeItemIds.length === 0}
               >
-                Add Selected Scope Items
+                Add Selected Work Items
               </SubmitButton>
             </div>
           </form>
@@ -511,7 +511,7 @@ export default function InternalInvoiceLineItemsTable({
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Line {index + 1}</div>
-                    <div className="mt-1 text-xs text-slate-500">{isPrimaryRow ? 'Main line item' : 'Editing details'}</div>
+                    <div className="mt-1 text-xs text-slate-500">{isPrimaryRow ? 'Main invoice charge' : 'Editing details'}</div>
                   </div>
                   <div className="flex items-center gap-2">
                     {!isPrimaryRow ? (
@@ -596,17 +596,17 @@ export default function InternalInvoiceLineItemsTable({
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5">
-                  <div className="text-xs text-slate-500">Save after editing this row to keep totals and issued scope in sync.</div>
+                  <div className="text-xs text-slate-500">Save after editing this row to keep totals and issued charges in sync.</div>
                   <div className="flex flex-wrap items-center gap-2">
                     <SubmitButton loadingText="Saving..." className={secondaryButtonClass}>
-                      Save Line Item
+                      Save Charge
                     </SubmitButton>
                     <button
                       type="submit"
                       form={`remove-line-item-${lineItem.id}`}
                       className="inline-flex min-h-9 items-center justify-center rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
                     >
-                      Remove Line Item
+                      Remove Charge
                     </button>
                   </div>
                 </div>
@@ -629,7 +629,7 @@ export default function InternalInvoiceLineItemsTable({
             <input type="hidden" name="tab" value={tab} />
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">+ Add Line Item</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">+ Add Invoice Charge</div>
               <button
                 type="button"
                 onClick={() => setIsAddFormOpen(false)}
@@ -683,15 +683,15 @@ export default function InternalInvoiceLineItemsTable({
                 <textarea
                   name="description_snapshot"
                   className={`${workspaceInputClass} min-h-[5.5rem]`}
-                  placeholder="Optional scope note or technician-facing work detail"
+                  placeholder="Optional charge detail or technician-facing work detail"
                 />
               </div>
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5">
-              <div className="text-xs leading-5 text-slate-500">Add the next scope row when the job needs another billable step, material, or work instruction.</div>
+              <div className="text-xs leading-5 text-slate-500">Add another invoice charge when the job needs another billed step, material, or work instruction.</div>
               <SubmitButton loadingText="Adding..." className={primaryButtonClass}>
-                + Add Line Item
+                + Add Charge
               </SubmitButton>
             </div>
           </form>
@@ -699,15 +699,15 @@ export default function InternalInvoiceLineItemsTable({
           <div className="bg-slate-50/94 px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white/82 px-4 py-3">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">+ Add Line Item</div>
-                <div className="mt-1 text-xs leading-5 text-slate-500">Open a fresh scope row only when you need it, so the table stays compact in the field.</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">+ Add Invoice Charge</div>
+                <div className="mt-1 text-xs leading-5 text-slate-500">Open a fresh charge row only when you need it, so the table stays compact in the field.</div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAddFormOpen(true)}
                 className={primaryButtonClass}
               >
-                + Add Line Item
+                + Add Charge
               </button>
             </div>
           </div>

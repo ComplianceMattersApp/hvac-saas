@@ -344,7 +344,7 @@ export default function AddLineItemForm({
                 id="add_description"
                 name="description"
                 rows={2}
-                placeholder="Optional scope detail or work instruction…"
+                placeholder="Optional estimate line detail or work instruction..."
                 className={inputClass}
               />
             </div>

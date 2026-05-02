@@ -2454,7 +2454,7 @@ const renderTimelineItem = (e: any, key: string) => {
       {banner === "internal_invoice_issue_incomplete" && (
         <FlashBanner
           type="warning"
-          message="Add a billing name and at least one line item with a total greater than $0.00 before issuing this invoice."
+          message="Add a billing name and at least one invoice charge with a total greater than $0.00 before issuing this invoice."
         />
       )}
 
@@ -2573,21 +2573,21 @@ const renderTimelineItem = (e: any, key: string) => {
       {banner === "internal_invoice_line_item_added" && (
         <FlashBanner
           type="success"
-          message="Invoice line item added."
+          message="Invoice charge added."
         />
       )}
 
       {banner === "internal_invoice_line_item_saved" && (
         <FlashBanner
           type="success"
-          message="Invoice line item saved."
+          message="Invoice charge saved."
         />
       )}
 
       {banner === "internal_invoice_line_item_removed" && (
         <FlashBanner
           type="success"
-          message="Invoice line item removed."
+          message="Invoice charge removed."
         />
       )}
 
@@ -2601,21 +2601,21 @@ const renderTimelineItem = (e: any, key: string) => {
       {banner === "internal_invoice_line_item_missing" && (
         <FlashBanner
           type="warning"
-          message="That line item could not be found."
+          message="That invoice charge could not be found."
         />
       )}
 
       {banner === "internal_invoice_line_items_locked" && (
         <FlashBanner
           type="warning"
-          message="Issued and void invoices keep frozen line items and cannot be edited."
+          message="Issued and void invoices keep frozen invoice charges and cannot be edited."
         />
       )}
 
       {banner === "internal_invoice_pricebook_line_item_added" && (
         <FlashBanner
           type="success"
-          message="Pricebook line item added to the draft invoice."
+          message="Pricebook service/charge added to the draft invoice."
         />
       )}
 
@@ -2651,21 +2651,21 @@ const renderTimelineItem = (e: any, key: string) => {
       {banner === "internal_invoice_visit_scope_line_item_added" && (
         <FlashBanner
           type="success"
-          message="Selected Visit Scope items were added to the draft invoice."
+          message="Selected Work Items were added to the draft invoice as invoice charges."
         />
       )}
 
       {banner === "internal_invoice_visit_scope_line_item_partial_added" && (
         <FlashBanner
           type="warning"
-          message="Some selected Visit Scope items were already added. New selections were added to the draft invoice."
+          message="Some selected Work Items were already added. New selections were added to the draft invoice."
         />
       )}
 
       {banner === "internal_invoice_visit_scope_line_item_duplicate" && (
         <FlashBanner
           type="warning"
-          message="Selected Visit Scope items were already on this draft invoice."
+          message="Selected Work Items were already on this draft invoice."
         />
       )}
 
@@ -2674,14 +2674,14 @@ const renderTimelineItem = (e: any, key: string) => {
         banner === "internal_invoice_visit_scope_item_not_found") && (
         <FlashBanner
           type="warning"
-          message="Select valid Visit Scope items from this job to add them to the draft invoice."
+          message="Select valid Work Items from this job to add them to the draft invoice as invoice charges."
         />
       )}
 
       {banner === "internal_invoice_visit_scope_quantity_invalid" && (
         <FlashBanner
           type="warning"
-          message="Visit Scope quantity must be greater than zero."
+          message="Work Item quantity must be greater than zero."
         />
       )}
 
@@ -2709,49 +2709,49 @@ const renderTimelineItem = (e: any, key: string) => {
       {banner === "visit_scope_saved" && (
         <FlashBanner
           type="success"
-          message="Visit Scope saved."
+          message="Work Items saved."
         />
       )}
 
       {banner === "visit_scope_already_saved" && (
         <FlashBanner
           type="warning"
-          message="Visit Scope was already up to date."
+          message="Work Items were already up to date."
         />
       )}
 
       {banner === "visit_scope_required" && (
         <FlashBanner
           type="warning"
-          message="Service jobs require a Visit Scope reason or at least one Visit Scope item."
+          message="Service jobs require a Reason for Visit or at least one Work Item."
         />
       )}
 
       {banner === "visit_scope_payload_invalid" && (
         <FlashBanner
           type="warning"
-          message="Visit Scope items could not be read from the form submission."
+          message="Work Items could not be read from the form submission."
         />
       )}
 
       {banner === "visit_scope_job_read_failed" && (
         <FlashBanner
           type="warning"
-          message="Could not load the job before saving Visit Scope."
+          message="Could not load the job before saving Work Items."
         />
       )}
 
       {banner === "visit_scope_job_update_failed" && (
         <FlashBanner
           type="warning"
-          message="Visit Scope could not be saved to the job record."
+          message="Work Items could not be saved to the job record."
         />
       )}
 
       {banner === "visit_scope_update_failed" && (
         <FlashBanner
           type="warning"
-          message="Visit Scope could not be saved."
+          message="Work Items could not be saved."
         />
       )}
 
@@ -3271,7 +3271,7 @@ const renderTimelineItem = (e: any, key: string) => {
                       <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=info`} />
 
                       <div className="rounded-lg border border-blue-200/80 bg-blue-50/70 px-3 py-2 text-xs leading-5 text-blue-900">
-                        Service details classify the visit. Visit Scope tells the tech what work belongs to this trip.
+                        Service details classify the visit. Work Items tell the team what work belongs to this trip.
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -3309,7 +3309,7 @@ const renderTimelineItem = (e: any, key: string) => {
                       </div>
 
                       <div className="space-y-1">
-                        <label className={workspaceFieldLabelClass}>Visit Reason</label>
+                        <label className={workspaceFieldLabelClass}>Reason for Visit</label>
                         <textarea
                           name="service_visit_reason"
                           defaultValue={String(job.service_visit_reason ?? "")}
@@ -3319,7 +3319,7 @@ const renderTimelineItem = (e: any, key: string) => {
                           required
                         />
                         <p className="text-[11px] leading-5 text-slate-500">
-                          Short reason this visit is needed.
+                          Reason for Visit explains why this visit exists and gives dispatch context.
                         </p>
                       </div>
 
@@ -3425,21 +3425,21 @@ const renderTimelineItem = (e: any, key: string) => {
   <div id="visit-scope-section" className="mt-6 rounded-2xl border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)]">
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit Scope / Work Items</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Items (Visit Scope)</div>
         {job.job_type === "service" ? (
           <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-            {visitScopeCount > 0 ? "Scope set" : "No scope items yet"}
+            {visitScopeCount > 0 ? "Work items set" : "No work items yet"}
           </span>
         ) : null}
       </div>
 
       <div className="text-xs leading-5 text-slate-600">
-        Work items for this trip. These can later be used as invoice candidates.
+        Work Items define what belongs to this visit. They can help build an invoice later, but they are not billing records.
       </div>
 
       <details className="group">
           <summary className="inline-flex min-h-9 cursor-pointer list-none items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
-          {hasVisitScopeDefined ? "Edit Scope" : "Add Scope"}
+          {hasVisitScopeDefined ? "Edit Work Items" : "Add Work Items"}
           </summary>
 
           <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
@@ -3457,7 +3457,7 @@ const renderTimelineItem = (e: any, key: string) => {
       <div className="rounded-xl border border-slate-200/70 bg-white/92 px-4 py-3.5 shadow-[0_10px_20px_-30px_rgba(15,23,42,0.18)]">
       <div className="space-y-3.5">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit brief</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Reason for Visit / Dispatch Notes</div>
           <div className="mt-1 text-sm leading-6 text-slate-900">
             {visitScopeLeadText || "No visit brief saved yet."}
           </div>
@@ -3465,7 +3465,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
         {primaryVisitScopeItems.length > 0 ? (
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Scope for this visit</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Items for this visit</div>
             <div className="mt-2 space-y-2.5">
               {primaryVisitScopeItems.map((item, index) => (
                 <div key={`primary-${index}-${item.title}`} className="space-y-1 border-l-2 border-slate-200 pl-3">
@@ -3572,7 +3572,7 @@ const renderTimelineItem = (e: any, key: string) => {
         </div>
 
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Line Items</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charges</div>
           <div className="mt-1 text-sm font-semibold text-slate-950">
             {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}
           </div>
@@ -3603,7 +3603,7 @@ const renderTimelineItem = (e: any, key: string) => {
             ? "A previous invoice was voided. Start a replacement draft when the corrected billed scope is ready."
             : hasVisitScopeDefined
             ? "Create a draft invoice when the billed scope is ready."
-            : "Visit Scope comes first. Start an invoice later when billing is ready."}
+            : "Work Items come first. Start an invoice later when billing is ready."}
         </div>
         <form action={createInternalInvoiceDraftFromForm} className="mt-3">
           <input type="hidden" name="job_id" value={job.id} />
@@ -3621,8 +3621,8 @@ const renderTimelineItem = (e: any, key: string) => {
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Line Items</div>
-                    <div className="mt-1 text-sm leading-6 text-slate-600">Build billed scope here once billing is ready. Line items remain downstream commercial records rather than the visit-definition layer.</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charges</div>
+                    <div className="mt-1 text-sm leading-6 text-slate-600">Build Invoice Charges here once billing is ready. These remain downstream commercial records rather than the visit-definition layer.</div>
                   </div>
                   <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                     {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}
@@ -3631,7 +3631,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
                 {visitScopeInvoicePickerItems.length === 0 ? (
                   <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-600">
-                    No Visit Scope items are available to add to this draft invoice.
+                    No Work Items are available to add to this draft invoice.
                   </div>
                 ) : null}
 
@@ -3658,7 +3658,7 @@ const renderTimelineItem = (e: any, key: string) => {
             <div className="space-y-4">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Frozen Scope</div>
-                <div className="mt-1 text-sm leading-6 text-slate-600">Issued and void invoices keep the final line items as the billed scope record.</div>
+                <div className="mt-1 text-sm leading-6 text-slate-600">Issued and void invoices keep the final invoice charges as the billed record.</div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className={workspaceSoftCardClass}>
@@ -3687,10 +3687,10 @@ const renderTimelineItem = (e: any, key: string) => {
               ) : null}
 
               <div className={workspaceSoftCardClass}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Frozen Line Items</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Frozen Invoice Charges</div>
                 <div className="mt-3 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/75">
                   <div className="hidden grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)] gap-4 border-b border-slate-200/80 bg-white/85 px-5 py-3 md:grid">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Line Item</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charge</div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Type</div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Qty</div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Unit Price</div>
@@ -3742,7 +3742,7 @@ const renderTimelineItem = (e: any, key: string) => {
                       ))}
                     </div>
                   ) : (
-                    <div className="px-4 py-4 text-sm text-slate-600">No frozen line items were recorded on this invoice.</div>
+                    <div className="px-4 py-4 text-sm text-slate-600">No frozen invoice charges were recorded on this invoice.</div>
                   )}
 
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 bg-white/88 px-5 py-3.5">
@@ -3781,13 +3781,14 @@ const renderTimelineItem = (e: any, key: string) => {
             {internalInvoice.status === "draft" ? (
               <>
                   <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Issue Invoice</div>
-                  <div className="mt-1 text-sm leading-6 text-slate-600">Review recipient, line items, and total. Issue only when this billed invoice record is final. Sending happens after issue and is communication only.</div>
+                  <div className="mt-1 text-sm leading-6 text-slate-600">Review recipient, Invoice Charges, and total. Issue only when this billed invoice record is final. Sending happens after issue and is communication only.</div>
+                  <div className="mt-1 text-sm leading-6 text-slate-600">Invoice Charges are billed records and should be reviewed before issue.</div>
 
                 <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
                   <div><span className="font-semibold text-slate-900">Review recipient:</span> {internalInvoiceRecipientName}</div>
                   <div className="mt-1"><span className="font-semibold text-slate-900">Review email:</span> {String(internalInvoice.billing_email ?? "").trim() || "Not set"}</div>
                   <div className="mt-1"><span className="font-semibold text-slate-900">Review total:</span> {formatCurrencyFromCents(internalInvoice.total_cents)}</div>
-                  <div className="mt-1"><span className="font-semibold text-slate-900">Review scope:</span> {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}</div>
+                  <div className="mt-1"><span className="font-semibold text-slate-900">Review charges:</span> {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}</div>
                 </div>
 
                 <form action={issueInternalInvoiceFromForm} className="mt-3">
@@ -3804,7 +3805,7 @@ const renderTimelineItem = (e: any, key: string) => {
 
                 {!internalInvoiceReadyToIssue ? (
                   <div className="mt-2 text-xs leading-5 text-slate-500">
-                    Cannot issue yet. Complete all of the following: job marked completed, field complete, billing name filled in, and at least one saved line item with total above $0.00.
+                    Cannot issue yet. Complete all of the following: job marked completed, field complete, billing name filled in, and at least one saved invoice charge with total above $0.00.
                   </div>
                 ) : null}
               </>
@@ -3818,7 +3819,7 @@ const renderTimelineItem = (e: any, key: string) => {
                 <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
                   <div className="font-semibold text-slate-900">Payment Tracking</div>
                   <div className="mt-1 leading-6">
-                    Off-platform payment recording only. This tracks collected payment history and does not charge a card or change billed line items.
+                    Off-platform payment recording only. This tracks collected payment history and does not charge a card or change billed invoice charges.
                   </div>
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">

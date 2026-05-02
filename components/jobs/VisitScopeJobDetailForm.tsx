@@ -41,7 +41,7 @@ export default function VisitScopeJobDetailForm({
     const nonEmptyItems = items.filter((item) => item.title.trim() || item.details.trim());
     if (jobType === "service" && !hasVisitScopeContent(summary.trim() || null, nonEmptyItems)) {
       event.preventDefault();
-      setError("Add a visit reason or at least one scope item before saving.");
+      setError("Add a Reason for Visit or at least one Work Item before saving.");
       return;
     }
 
@@ -70,7 +70,7 @@ export default function VisitScopeJobDetailForm({
 
       <div className="flex flex-wrap items-center gap-2">
         <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
-          Save Visit Scope
+          Save Work Items
         </SubmitButton>
       </div>
     </form>

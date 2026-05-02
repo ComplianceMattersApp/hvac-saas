@@ -179,7 +179,7 @@ export default function VisitScopeBuilder({
       <>
       <div className="space-y-1">
         <label className="block text-sm font-medium text-slate-900">
-          {jobType === "service" ? "Job Title" : "Known trip context"}
+          {jobType === "service" ? "Reason for Visit / Dispatch Notes" : "Known trip context"}
         </label>
         <textarea
           name={summaryName}
@@ -188,11 +188,11 @@ export default function VisitScopeBuilder({
           rows={2}
           maxLength={600}
           className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-          placeholder={jobType === "service" ? "The headline for this visit (e.g., 'Diagnose no cooling in upstairs system' or 'Replace refrigerant leak')" : "Optional: add any known context for this ECC trip."}
+          placeholder={jobType === "service" ? "Why this visit exists and key dispatch context (e.g., 'No cooling upstairs - intermittent after 3pm')" : "Optional: add any known context for this ECC trip."}
         />
         <p className="text-xs text-slate-500">
           {jobType === "service"
-            ? "Add a short job title, or leave it blank and the first work item can be used as the visit headline."
+            ? "Reason for Visit explains why this visit exists and gives dispatch context."
             : "Optional. Use this for helpful field context, not to replace the inspection or test type."}
         </p>
         {shouldShowFallbackPreview && fallbackPreviewTitle ? (
@@ -206,11 +206,11 @@ export default function VisitScopeBuilder({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="text-sm font-medium text-slate-900">
-              {jobType === "service" ? "Scope for this trip" : "Optional trip notes"}
+              {jobType === "service" ? "Work Items" : "Optional trip notes"}
             </div>
             <div className="text-xs text-slate-500">
               {jobType === "service"
-                ? "What belongs to this visit and what should be finished before leaving."
+                ? "Work Items define what belongs to this visit. They can help build an invoice later, but they are not billing records."
                 : "Use when you know companion work, field expectations, or a note worth carrying into dispatch."}
             </div>
           </div>
@@ -220,7 +220,7 @@ export default function VisitScopeBuilder({
             disabled={items.length >= VISIT_SCOPE_ITEM_LIMIT}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Add Scope Item
+            Add Work Item
           </button>
         </div>
 
