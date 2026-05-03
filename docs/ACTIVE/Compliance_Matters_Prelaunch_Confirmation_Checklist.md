@@ -649,12 +649,16 @@ If any item here conflicts with the active spine, the spine wins.
   - no impersonation/login-as-customer behavior
   - no tenant job/customer/invoice browsing surface yet
   - no support mutation behavior
+  - no support-side operational writes
+  - no customer-facing support actions
+  - no broad tenant browsing expansion
 
 ### 3.3 Deferred production enablement and next support slices
 - Support V1 is intentionally parked from production enablement; this is not unfinished architecture.
 - Production enablement is deferred pending explicit rollout timing/need decision.
 - Do not proceed now with production support migration apply, production support seeding, or production `ENABLE_SUPPORT_CONSOLE` enablement.
 - Hardening implementation above does not change deferred status: production migration apply, production flag enablement, production support-user/grant setup, and production smoke/rollback remain explicit later decisions.
+- Execution-controlled runbook for later approved enablement is documented at `docs/ACTIVE/Support_Console_Production_Enablement_Runbook.md` and must be committed/used before any production support-console action.
 - Production support-console enablement later requires both decisions together: production support migration apply decision and explicit `ENABLE_SUPPORT_CONSOLE` enablement decision.
 - Keep-ready rollout checklist (later, explicit approval only):
   - production migration approval

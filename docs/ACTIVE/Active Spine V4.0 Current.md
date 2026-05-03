@@ -2104,12 +2104,16 @@ Locked support boundaries:
 - no impersonation/login-as-customer behavior
 - no tenant job/customer/invoice browsing surface yet
 - no support mutation behavior yet
+- no support-side operational writes
+- no customer-facing support actions
+- no broad tenant browsing expansion
 
 Parked/deferred production enablement decision:
 - Support V1 architecture is complete enough to park; this is not unfinished architecture.
 - Production enablement is intentionally deferred pending better timing and explicit rollout need.
 - Do not proceed now with production support migration apply, production support seeding, or production feature-flag enablement.
 - H1-H5 hardening implementation does not change deferment: production migration apply, production feature flag enablement, production support-user/grant setup, controlled smoke, and rollback rehearsal remain explicit later approvals.
+- Execution-controlled runbook is documented at `docs/ACTIVE/Support_Console_Production_Enablement_Runbook.md` and must be committed before any production support-console action.
 
 Keep-ready rollout checklist (later, explicit approval only):
 - production migration approval
