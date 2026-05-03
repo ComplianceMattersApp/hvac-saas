@@ -116,40 +116,53 @@ Completed production-shipped cleanup batch note (current baseline):
 - ECC/test workflow: refrigerant Photo Taken is attestation-only (no upload-proof validation claim), and Asbestos is included as a duct-leakage override suggestion while custom reasons remain supported.
 - This closeout note is baseline alignment only and does not add a new roadmap milestone.
 
-### Launch-readiness performance and responsiveness track (active)
-- Performance work is now part of release readiness, not optional polish.
-- Work Items terminology alignment closeout is complete and already documented.
-- Internal `/jobs/[id]` route has been partially decomposed safely through deferred secondary sections:
-  - attachments
-  - follow-up/customer-attempt history
-  - service-chain panel body/history
-  - add-assignee selector/form
-- Contact-attempt action path cleanup in this batch is complete:
-  - redundant unconditional calendar revalidation removed
-  - job revalidation and return-to revalidation preserved
-  - event/follow-up/banner/`tab=ops` continuity preserved
-- Local diagnostic timing instrumentation is available behind env-gated flags only:
-  - `CONTACT_ATTEMPT_TIMING_DEBUG`
-  - `JOB_DETAIL_TIMING_DEBUG`
-  - flags should remain disabled unless intentionally benchmarking
-- Representative measured improvement from the completed batch:
-  - `serviceCaseServiceChainReads`: about `5966ms` -> about `291ms`
-  - post-contact total job-detail render: about `21826ms` -> about `4510ms`
-  - `assignmentDisplayMapAssignableUsers`: about `716-947ms` -> about `256-362ms`
-  - post-contact render follow-up: about `4510-4529ms` -> about `3911ms`
-  - warm render follow-up: about `3451ms` -> about `2999ms`
-- Remaining concern/backlog is still open:
-  - high-frequency contact actions can still feel around `3-5s`
-  - near-term targets: customer-attempt summary reads, timeline/events dependency reads, contact-action settle path, granular refresh/revalidation mapping, and continued parent-render slimming
-- Performance guardrails for this roadmap area are locked:
-  - preserve `jobs.ops_status` operational projection truth
-  - preserve `job_events` audit truth
-  - preserve billing/invoice truth boundaries
-  - preserve contractor/internal authority boundaries
+### Launch-readiness performance and responsiveness track (active backlog, current pass closed)
+- The recent speed/responsiveness batch was a necessary quality intervention, not a permanent roadmap reorder.
+- Completed closeout baseline from that intervention:
+  - internal `/jobs/[id]` route decomposition and deferred secondary bodies (attachments, follow-up history, service-chain body, add-assignee form, timeline/shared/internal narrative bodies)
+  - customer-attempt summary read slimming
+  - parent read fanout parallelization after scoped boundary and main job load
+  - contact responsiveness hardening (deduped calendar revalidation, action-specific pending feedback, no stuck `Recording...`, contact-section context restoration after redirect)
+  - env-gated diagnostics remain available (`CONTACT_ATTEMPT_TIMING_DEBUG`, `JOB_DETAIL_TIMING_DEBUG`)
+  - measured paths have shown practical warm improvements (job-detail around ~`1.5-2.0s` and contact-action core around ~`1.1-1.4s` on improved paths), with cold variance still present
+- Performance remains active launch-readiness backlog and should continue as measured, surgical slices across:
+  - `/ops`
+  - `/jobs/[id]` first load/recomposition
+  - lifecycle actions
+  - contact actions
+  - `/jobs/new`
+  - calendar
+  - reports
+  - safe partial-settle opportunities
+- Performance should no longer own the entire roadmap unless a specific speed defect is actively harming usability.
+- Speed guardrails remain locked:
+  - do not chase speed by weakening truth boundaries
   - no optimistic final-state UI without explicit approval
   - do not trim revalidation without dependency mapping
-  - do not touch invoice/billing/payment performance paths casually; require separate billing-safe audit
-  - continue audit -> small slice -> benchmark -> commit -> docs update
+  - do not casually alter invoice/billing/payment paths for speed
+  - maintain audit -> small slice -> benchmark -> commit -> docs update
+
+### Resumed pre-launch sequence (post-speed-batch)
+- The planned launch-readiness order is resumed as:
+  1. Performance/responsiveness batch closeout and documentation
+  2. Support Console production readiness planning
+  3. Estimates production readiness planning
+  4. Field-ready installable/PWA access readiness
+  5. Final launch confirmation sweep
+  6. First-owner/operator handoff dry-run
+  7. Controlled tester onboarding
+- Tester pressure must not trigger roadmap panic; controlled tester onboarding remains intentionally queued after readiness checkpoints are acceptably complete.
+
+### Execution discipline and coordination guardrails
+- Preserve truth boundaries while optimizing:
+  - `jobs.ops_status` operational projection truth
+  - `job_events` audit truth
+  - billing/invoice/payment truth boundaries
+  - contractor/internal authority boundaries
+- Keep implementation discipline:
+  - Codex: higher-risk dependency mapping and diff-risk review
+  - VS Agent: surgical implementation and docs updates
+  - ChatGPT: sequencing, guardrails, prompt strategy, and review coordination
 
 ### Priority ordering update (pre-launch)
 - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed in production for the platform account subscription slice.

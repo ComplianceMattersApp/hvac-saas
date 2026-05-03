@@ -3,6 +3,30 @@ Compliance Matters Software — Spine v4.0 (Current Operational Source of Truth)
 Status: ACTIVE SOURCE OF TRUTH
 Purpose: Align future development, audits, and thread handoffs to the current, stabilized system state.
 
+Current Program Status Note (May 2026)
+
+- Performance/responsiveness intervention batch is complete for the current pass and is now treated as closed for this pass.
+- Internal /jobs/[id] responsiveness hardening is complete for the current pass:
+  - route loading/context preservation improvements were shipped
+  - secondary sections were deferred from parent render where safe:
+    - internal attachments
+    - follow-up/customer-attempt history
+    - service-chain detail/history body
+    - add-assignee selector/form
+    - timeline/shared/internal narrative bodies
+  - customer-attempt summary reads were slimmed
+  - parent read fanout was parallelized after scoped boundary and main job load
+- Contact action responsiveness hardening is complete for the current pass:
+  - contact-attempt calendar revalidation dedupe shipped
+  - local timing diagnostics remain available behind `CONTACT_ATTEMPT_TIMING_DEBUG` and `JOB_DETAIL_TIMING_DEBUG`
+  - contact buttons no longer remain stuck on "Recording..."
+  - pending feedback is action-specific for contact quick actions
+  - No Answer and Sent Text return near the contact section after redirect instead of snapping to the top
+  - server-confirmed truth behavior remains unchanged (event writes, redirects, banner, attempt count, `tab=ops` continuity)
+- Practical baseline after this pass has improved materially (warm job-detail paths observed around ~1.5-2.0s and improved contact-action core paths around ~1.1-1.4s on improved runs), while cold-load variance can still be slower.
+- Performance remains an active launch-readiness backlog and does not own the entire roadmap unless a specific speed issue is actively damaging usability.
+- Planned pre-launch spine order is now resumed; controlled tester onboarding remains intentionally held until readiness work is acceptably complete and supportable.
+
 1. System Identity
 
 Compliance Matters Software is an:
