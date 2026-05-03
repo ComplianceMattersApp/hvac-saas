@@ -96,6 +96,7 @@ import {
 } from "@/lib/actions/internal-job-detail-read-boundary";
 
 import DeferredJobAttachmentsInternal from "./_components/DeferredJobAttachmentsInternal";
+import DeferredCustomerAttemptsHistory from "./_components/DeferredCustomerAttemptsHistory";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "./_components/InternalInvoiceLineItemsTable";
@@ -280,6 +281,19 @@ function JobAttachmentsSectionFallback() {
         <div
           key={index}
           className="h-14 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
+        />
+      ))}
+    </div>
+  );
+}
+
+function FollowUpHistorySectionFallback() {
+  return (
+    <div className="space-y-2" aria-busy="true" aria-live="polite">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div
+          key={index}
+          className="h-20 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
         />
       ))}
     </div>
@@ -990,16 +1004,24 @@ const onTheWayUndoEligibility = await getOnTheWayUndoEligibility(jobId);
     (e: any) => String(e?.event_type ?? "") === "internal_note"
   );
 
-  const { data: customerAttempts, error: attemptsErr } = await supabase
+  const { count: customerAttemptCount, error: attemptCountErr } = await supabase
     .from("job_events")
-    .select("created_at, meta, user_id")
+    .select("id", { count: "exact", head: true })
     .eq("job_id", jobId)
+    .eq("event_type", "customer_attempt");
 
+  if (attemptCountErr) throw new Error(attemptCountErr.message);
+
+  const { data: latestCustomerAttempt, error: latestAttemptErr } = await supabase
+    .from("job_events")
+    .select("created_at")
+    .eq("job_id", jobId)
     .eq("event_type", "customer_attempt")
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(1)
+    .maybeSingle();
 
-  if (attemptsErr) throw new Error(attemptsErr.message);
+  if (latestAttemptErr) throw new Error(latestAttemptErr.message);
 
 const contractorId = job.contractor_id ?? null;
 const customerId = job.customer_id ?? null;
@@ -1025,12 +1047,12 @@ const { data: customerBilling } = customerId
   : { data: null };
 
 
-  const attemptCount = customerAttempts?.length ?? 0;
-  const lastAttemptIso =
-    customerAttempts?.[0]?.created_at ? String(customerAttempts[0].created_at) : null;
+  const attemptCount = customerAttemptCount ?? 0;
+  const lastAttemptIso = latestCustomerAttempt?.created_at
+    ? String(latestCustomerAttempt.created_at)
+    : null;
 
   const lastAttemptLabel = lastAttemptIso ? formatDateLAFromIso(lastAttemptIso) : "—";
-  const last3Attempts = (customerAttempts ?? []).slice(0, 25);
 
   const customerName =
   (customerBilling?.full_name ||
@@ -1528,9 +1550,6 @@ const timelineItems = timelineEvents ?? [];
 const timelinePreviewItems = timelineItems.slice(0, 3);
 const timelineOverflowItems = timelineItems.slice(3);
 
-const attemptItems = customerAttempts ?? [];
-const contactPreviewItems = attemptItems.slice(0, 3);
-const contactOverflowItems = attemptItems.slice(3);
 const followUpOwnerLabel = String((job as any).action_required_by ?? "").trim();
 const followUpDateValue = String((job as any).follow_up_date ?? "").trim();
 const followUpDateSummary = followUpDateValue ? displayDateLA(followUpDateValue) : "";
@@ -1551,7 +1570,7 @@ const followUpSummaryText = hasFollowUpReminder
       .filter(Boolean)
       .join(" • ")
   : "No follow-up reminder set yet.";
-const followUpHistorySummaryText = attemptItems.length
+const followUpHistorySummaryText = attemptCount
   ? `Last contact logged ${lastAttemptLabel}.`
   : "No contact attempts logged yet.";
 const serviceChainSummaryText = serviceCaseId
@@ -1600,41 +1619,6 @@ const failureResolutionSummaryText = showRetestSection && showCorrectionReviewRe
   ? "Create a retest visit when a physical return is required."
   : "Resolve this failure through correction review only when a return visit is not needed.";
 const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrectionReviewResolution);
-
-const renderAttemptItem = (a: any, key: string) => {
-  const method = a?.meta?.method ? String(a.meta.method) : "";
-  const result = a?.meta?.result ? String(a.meta.result) : "";
-  const when = a?.created_at ? formatDateTimeLAFromIso(String(a.created_at)) : "—";
-
-  const methodIcon = method === "text" ? "💬" : method === "call" ? "📞" : "📝";
-  const resultLabel =
-    result === "no_answer" ? "No Answer" :
-    result === "sent" ? "Sent" :
-    result === "spoke" ? "Spoke" :
-    (result || "—");
-
-  return (
-    <div key={key} className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3 text-sm shadow-[0_10px_24px_-24px_rgba(15,23,42,0.35)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="text-xs font-medium text-slate-500">{when}</div>
-        <div className="text-xs text-slate-400">
-          {a?.meta?.attempt_number ? `#${String(a.meta.attempt_number)}` : null}
-        </div>
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <span className={infoChipClass}>
-          <span>{methodIcon}</span>
-          <span className="capitalize">{method || "—"}</span>
-        </span>
-
-        <span className={infoChipClass}>
-          {resultLabel}
-        </span>
-      </div>
-    </div>
-  );
-};
 
 const renderTimelineItem = (e: any, key: string) => {
   const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "—";
@@ -4239,33 +4223,18 @@ const renderTimelineItem = (e: any, key: string) => {
         <CollapsibleHeader
           title="Follow-Up History"
           subtitle={followUpHistorySummaryText}
-          meta={`${attemptItems.length} attempt${attemptItems.length === 1 ? "" : "s"}`}
+          meta={`${attemptCount} attempt${attemptCount === 1 ? "" : "s"}`}
         />
       </summary>
 
       <div className={`${workspaceDetailsDividerClass} rounded-xl border border-slate-200/80 bg-white/96 p-4`}>
-        {!attemptItems.length ? (
-          <div className={workspaceEmptyStateClass}>
-            No contact attempts logged yet.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {contactPreviewItems.map((a: any, idx: number) => renderAttemptItem(a, `attempt-preview-${idx}`))}
-
-            {contactOverflowItems.length > 0 ? (
-              <details className="pt-1">
-                <summary className="cursor-pointer text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-4">
-                  Show all attempts ({attemptItems.length})
-                </summary>
-                <div className="mt-2 space-y-2">
-                  {contactOverflowItems.map((a: any, idx: number) =>
-                    renderAttemptItem(a, `attempt-overflow-${idx}`)
-                  )}
-                </div>
-              </details>
-            ) : null}
-          </div>
-        )}
+        <Suspense fallback={<FollowUpHistorySectionFallback />}>
+          <DeferredCustomerAttemptsHistory
+            jobId={String(job.id)}
+            emptyStateClassName={workspaceEmptyStateClass}
+            infoChipClassName={infoChipClass}
+          />
+        </Suspense>
       </div>
     </details>
 
