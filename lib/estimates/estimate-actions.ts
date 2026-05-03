@@ -47,6 +47,10 @@ export type CreateEstimateDraftResult =
 export async function createEstimateDraft(
   params: CreateEstimateDraftParams
 ): Promise<CreateEstimateDraftResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
   const supabase = await createClient();
   const { internalUser } = await requireInternalUser({ supabase });
 

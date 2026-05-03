@@ -260,6 +260,9 @@ describe("createEstimateDraft", () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
+  beforeEach(() => {
+    process.env.ENABLE_ESTIMATES = "true";
+  });
 
   function setupValidCreate() {
     const admin = makeAdminClient({
@@ -488,6 +491,79 @@ describe("createEstimateDraft", () => {
     });
     expect(result.success).toBe(true);
     if (result.success) {
+      expect(result.estimateNumber).toMatch(/^EST-\d{8}-[0-9A-F]{8}$/);
+    }
+  });
+
+  it("returns unavailable when ENABLE_ESTIMATES is false", async () => {
+    process.env.ENABLE_ESTIMATES = "false";
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(makeSupabaseClient({}));
+    createAdminClientMock.mockReturnValue(makeAdminClient({ customerOwnerId: ACCOUNT_OWNER }));
+
+    const result = await createEstimateDraft({
+      customerId: "cust-1",
+      locationId: "loc-1",
+      title: "Quote",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Estimates are currently unavailable.",
+    });
+    expect(requireInternalUserMock).not.toHaveBeenCalled();
+  });
+
+  it("returns unavailable when ENABLE_ESTIMATES is unset", async () => {
+    delete process.env.ENABLE_ESTIMATES;
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(makeSupabaseClient({}));
+    createAdminClientMock.mockReturnValue(makeAdminClient({ customerOwnerId: ACCOUNT_OWNER }));
+
+    const result = await createEstimateDraft({
+      customerId: "cust-1",
+      locationId: "loc-1",
+      title: "Quote",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Estimates are currently unavailable.",
+    });
+    expect(requireInternalUserMock).not.toHaveBeenCalled();
+  });
+
+  it("does not insert to estimates or estimate_events when ENABLE_ESTIMATES is false", async () => {
+    process.env.ENABLE_ESTIMATES = "false";
+    const supabase = makeSupabaseClient({
+      estimates: { insert: { id: "est-new-1" } },
+      estimate_events: { insert: null },
+    });
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createAdminClientMock.mockReturnValue(makeAdminClient({ customerOwnerId: ACCOUNT_OWNER }));
+
+    await createEstimateDraft({
+      customerId: "cust-1",
+      locationId: "loc-1",
+      title: "Quote",
+    });
+
+    expect(supabase.from).not.toHaveBeenCalledWith("estimates");
+    expect(supabase.from).not.toHaveBeenCalledWith("estimate_events");
+  });
+
+  it("succeeds when ENABLE_ESTIMATES is true", async () => {
+    process.env.ENABLE_ESTIMATES = "true";
+    setupValidCreate();
+    const result = await createEstimateDraft({
+      customerId: "cust-1",
+      locationId: "loc-1",
+      title: "HVAC Replacement Quote",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.estimateId).toBe("est-new-1");
       expect(result.estimateNumber).toMatch(/^EST-\d{8}-[0-9A-F]{8}$/);
     }
   });
