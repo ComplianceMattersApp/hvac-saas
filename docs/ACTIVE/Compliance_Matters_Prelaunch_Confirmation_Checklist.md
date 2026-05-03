@@ -143,6 +143,43 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed contractor resend follow-up was completed and a new production contractor submission/job path succeeded after fix.
 - Confirmed no payment, Stripe, QBO, support-access, RLS model, or tenant-boundary behavior changed.
 
+### 2.3.5 Internal job-detail performance and responsiveness readiness (active/open)
+- Performance and responsiveness are active launch-readiness workstreams, not optional polish.
+- Completed in the current batch:
+  - job action submit pending feedback improvements (action-specific pending labels, disabled submit state, clearer immediate response)
+  - route-level loading/context coverage and preserved `tab=ops` lifecycle continuity
+  - deferred internal `/jobs/[id]` secondary sections:
+    - attachments
+    - follow-up/customer-attempt history list
+    - service-chain panel body/history
+    - add-assignee selector/form
+  - contact-attempt path dedupe: redundant unconditional calendar revalidation removed while preserving job/return-to revalidation behavior
+  - timing instrumentation added behind local/env-gated flags:
+    - `CONTACT_ATTEMPT_TIMING_DEBUG`
+    - `JOB_DETAIL_TIMING_DEBUG`
+- Representative observed improvements from this batch:
+  - `serviceCaseServiceChainReads`: about `5966ms` -> about `291ms`
+  - post-contact total job-detail render: about `21826ms` -> about `4510ms`
+  - `assignmentDisplayMapAssignableUsers`: about `716-947ms` -> about `256-362ms`
+  - post-contact render follow-up: about `4510-4529ms` -> about `3911ms`
+  - warm render follow-up: about `3451ms` -> about `2999ms`
+- Still open/not final:
+  - high-frequency field actions (Called / Sent Text / No Answer) can still feel around `3-5s`
+  - keep this prelaunch item open until measured field actions consistently feel fast enough
+  - target UX: immediate visual feedback under `200ms`, simple contact/log actions ideally `1-2s`, under `3s` acceptable
+- Next measured backlog slices:
+  - customer-attempt summary reads
+  - timeline/events dependency map
+  - contact-action settle path
+  - granular refresh/revalidation analysis
+  - stable median benchmarks after each slice
+- Guardrails for this launch-readiness stream:
+  - do not weaken truth to chase speed
+  - no optimistic final-state UI unless separately approved
+  - do not trim revalidation without dependency mapping
+  - avoid casual invoice/billing/payment performance edits without a separate billing-safe audit
+  - continue audit -> small slice -> benchmark -> commit -> docs update
+
 ### 2.4 First owner onboarding/provisioning readiness
 - **V1 implemented and browser-smoked.** Public self-serve signup exists for standard onboarding at `/signup`, and invite-only platform-admin/operator provisioning remains active/manual fallback.
 - Confirmed: provisioning script (`scripts/provision-first-owner.ts`) requires explicit allow flags for apply mode; defaults to dry-run.

@@ -1808,6 +1808,43 @@ Current clarification:
 - the active product-track roadmap area is Pricebook V1 continuation (with C1B/C1C production-complete, production-promoted, and production-smoke confirmed)
 - estimates/quoting V1A-V1H is implemented for guarded internal baseline and remains intentionally non-production-live
 - V1I is documented as decision/planning artifact only (Option B first; Option A later after gates) and does not change current production-disabled posture
+- Work Items terminology alignment is complete and already documented; Job/Visit Scope/Work Items wording now matches the current model across validated internal and contractor-facing surfaces.
+- Internal `/jobs/[id]` responsiveness batch is complete for this pass with deferred secondary sections now in place for:
+  - attachments
+  - follow-up/customer-attempt history
+  - service-chain detail body/history
+  - add-assignee selector/form
+- Contact-attempt path cleanup is complete for this pass:
+  - redundant unconditional calendar revalidation was removed
+  - job revalidation and return-to revalidation behavior remains preserved
+  - contact-attempt writes, follow-up updates, banner behavior, and `tab=ops` continuity remain preserved
+- Local diagnostic timing instrumentation exists and is intentionally env-gated:
+  - `CONTACT_ATTEMPT_TIMING_DEBUG`
+  - `JOB_DETAIL_TIMING_DEBUG`
+  - these flags are benchmarking diagnostics only and should remain disabled unless intentionally profiling
+- Measured responsiveness improvement from this batch (representative):
+  - `serviceCaseServiceChainReads`: about `5966ms` -> about `291ms`
+  - post-contact total job-detail render: about `21826ms` -> about `4510ms`
+  - `assignmentDisplayMapAssignableUsers`: about `716-947ms` -> about `256-362ms`
+  - post-contact render follow-up: about `4510-4529ms` -> about `3911ms`
+  - warm render follow-up: about `3451ms` -> about `2999ms`
+- Remaining speed concern is still open:
+  - high-frequency contact actions (Called / Sent Text / No Answer) can still feel around `3-5s`
+  - target UX remains: immediate feedback under `200ms`, typical settle around `1-2s`, under `3s` acceptable
+- Next speed work should continue as measured slices (not broad refactors), with likely near-term targets:
+  - customer-attempt summary reads
+  - timeline/events dependency reads
+  - contact-action settle path and granular refresh/revalidation mapping
+  - further parent render slimming on `/jobs/[id]`
+- Guardrails for performance work remain locked:
+  - do not chase speed by weakening truth
+  - no optimistic final status/action state without explicit approval
+  - do not trim revalidation without dependency mapping
+  - do not touch invoice/billing/payment performance paths casually; require a separate billing-safe audit
+  - use audit -> small slice -> benchmark -> commit -> docs update
+  - use Codex for higher-risk dependency mapping and diff review
+  - use VS Agent for surgical implementation
+  - keep ChatGPT sequencing guardrails/prompts/review
 - customer/location internal account-owner reconciliation is complete inside that milestone
 - notifications internal-awareness write-path hardening is also complete inside that milestone
 - targeted internal same-account job/service-case mutation boundary hardening is also complete inside that milestone

@@ -116,6 +116,41 @@ Completed production-shipped cleanup batch note (current baseline):
 - ECC/test workflow: refrigerant Photo Taken is attestation-only (no upload-proof validation claim), and Asbestos is included as a duct-leakage override suggestion while custom reasons remain supported.
 - This closeout note is baseline alignment only and does not add a new roadmap milestone.
 
+### Launch-readiness performance and responsiveness track (active)
+- Performance work is now part of release readiness, not optional polish.
+- Work Items terminology alignment closeout is complete and already documented.
+- Internal `/jobs/[id]` route has been partially decomposed safely through deferred secondary sections:
+  - attachments
+  - follow-up/customer-attempt history
+  - service-chain panel body/history
+  - add-assignee selector/form
+- Contact-attempt action path cleanup in this batch is complete:
+  - redundant unconditional calendar revalidation removed
+  - job revalidation and return-to revalidation preserved
+  - event/follow-up/banner/`tab=ops` continuity preserved
+- Local diagnostic timing instrumentation is available behind env-gated flags only:
+  - `CONTACT_ATTEMPT_TIMING_DEBUG`
+  - `JOB_DETAIL_TIMING_DEBUG`
+  - flags should remain disabled unless intentionally benchmarking
+- Representative measured improvement from the completed batch:
+  - `serviceCaseServiceChainReads`: about `5966ms` -> about `291ms`
+  - post-contact total job-detail render: about `21826ms` -> about `4510ms`
+  - `assignmentDisplayMapAssignableUsers`: about `716-947ms` -> about `256-362ms`
+  - post-contact render follow-up: about `4510-4529ms` -> about `3911ms`
+  - warm render follow-up: about `3451ms` -> about `2999ms`
+- Remaining concern/backlog is still open:
+  - high-frequency contact actions can still feel around `3-5s`
+  - near-term targets: customer-attempt summary reads, timeline/events dependency reads, contact-action settle path, granular refresh/revalidation mapping, and continued parent-render slimming
+- Performance guardrails for this roadmap area are locked:
+  - preserve `jobs.ops_status` operational projection truth
+  - preserve `job_events` audit truth
+  - preserve billing/invoice truth boundaries
+  - preserve contractor/internal authority boundaries
+  - no optimistic final-state UI without explicit approval
+  - do not trim revalidation without dependency mapping
+  - do not touch invoice/billing/payment performance paths casually; require separate billing-safe audit
+  - continue audit -> small slice -> benchmark -> commit -> docs update
+
 ### Priority ordering update (pre-launch)
 - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed in production for the platform account subscription slice.
 - Live confirmation includes deployed env, live webhook handling, successful non-owner checkout completion, entitlement sync, and Manage billing availability.
