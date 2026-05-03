@@ -641,6 +641,7 @@ V1J internal document-template/readiness implementation is complete (commit `ad5
 V1J does not add persistent revision storage.
 V1J did not add real outbound production estimate email, PDF generation/storage, persistent revision storage, customer approval/e-signature, customer portal estimate visibility, public estimate links/tokens, contractor visibility/authority, estimate-to-job conversion, estimate-to-invoice conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement.
 V1J validation status: `npx vitest run lib/estimates` passed (`123/123`), `npx tsc --noEmit` passed (`TSC_OK`), sent/approved detail smoke passed, and draft-detail smoke is now completed/closed using sandbox draft `EST-20260502-9D58499B` (`/estimates/43aeaa8e-e60e-47d4-8c26-2570600b24df`) with document readiness/disclaimer rendering, draft manual-line editing, draft pricebook picker availability, blocked send copy, communication history rendering, and no email/PDF/customer approval/public link/conversion/payment/customer portal/contractor controls exposed.
+Production readiness hardening guard is complete and committed: `createEstimateDraft` in `lib/estimates/estimate-actions.ts` now returns `{ success: false, error: "Estimates are currently unavailable." }` as the first statement when `ENABLE_ESTIMATES` is false or unset, running before `createClient`/auth/DB work. This was the sole identified pre-production code blocker from the readiness audit. Validated: `npx vitest run lib/estimates` = `127/127`, `npx tsc --noEmit` = `TSC_OK`. No migrations, Supabase commands, production data, email sends, feature flag enables, RLS/policy changes, or PDF/storage/customer/public/payment/conversion behavior were introduced.
 Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Separate pre-launch enablement track:
@@ -1058,7 +1059,7 @@ Next natural roadmap area:
   - Waiting-state labels include Waiting on part, Waiting on customer approval, Estimate needed, Waiting on access, Waiting on information, and Other.
   - Create-next in V1 does not auto-clear source waiting state; explicit/manual release remains required.
   - This refinement advances the service model without introducing parts inventory, estimate automation, service-case-level blocker orchestration, or auto-release behavior.
-  - Estimates/quoting V1A-V1H is implemented to the current guarded internal baseline.
+  - Estimates/quoting V1A-V1J is implemented to the current guarded internal baseline.
   - Production estimates remain intentionally disabled/deferred pending migration apply plus explicit feature-flag enablement.
   - V1E internal-only status transitions are complete (`draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`).
   - V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
@@ -1242,11 +1243,20 @@ If the pricebook changes later, old estimates do not change.
 - production estimate feature enablement
 
 ### Production rollout prerequisites (later)
-- intentional production migration apply
-- production `ENABLE_ESTIMATES` enablement
-- production `ENABLE_ESTIMATE_EMAIL_SEND` enablement
-- production smoke
-- rollback plan by disabling `ENABLE_ESTIMATES`
+
+The sole pre-production code blocker (missing `createEstimateDraft` flag guard) is now resolved and committed. Remaining prerequisites for internal-only production enablement are:
+
+- governance preflight and all-approver sign-off (Phase A of runbook)
+- sandbox pre-validation with both estimate migrations confirmed healthy (Phase B)
+- intentional production migration apply for both estimate migrations in order (Phase C)
+- disabled-state smoke with schema applied and `ENABLE_ESTIMATES` still off (Phase D)
+- production `ENABLE_ESTIMATES` enablement for internal-only slice (Phase E)
+- internal-only production smoke checklist (Phase F)
+- rollback by disabling `ENABLE_ESTIMATES` if needed (Phase G)
+
+Production `ENABLE_ESTIMATE_EMAIL_SEND` must remain unset/false for the internal-only slice. Real outbound estimate email requires a separate email-enablement runbook after all V1I go/no-go gates are satisfied.
+
+Full procedure: `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`
 
 ### Next implementation direction (post-V1J)
 - V1I decision remains recorded and V1J internal document-template/readiness implementation is complete.

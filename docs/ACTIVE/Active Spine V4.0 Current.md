@@ -1491,6 +1491,9 @@ Current position:
   - browser smoke and validation passed across internal `/jobs/new`, service `/jobs/[id]`, invoice panel/build-from-work-items wording, contractor `/portal/jobs`, and contractor `/jobs/new` request flow
 - Customer approval, customer/contractor portal authority, estimate email/PDF, conversion, and payment behaviors remain deferred.
 - V1J validation status: automated checks passed (`npx vitest run lib/estimates` = `123/123`, `npx tsc --noEmit` = `TSC_OK`); sent/approved estimate detail smoke passed; draft-detail smoke is now completed/closed using sandbox draft `EST-20260502-9D58499B` (`/estimates/43aeaa8e-e60e-47d4-8c26-2570600b24df`) and confirmed document readiness rendering, boundary disclaimers, draft manual-line editing, draft pricebook picker availability, blocked send-panel copy, communication history rendering, and absence of email/PDF/customer approval/public link/conversion/payment/customer portal/contractor controls.
+- Production readiness hardening guard is complete and committed: `createEstimateDraft` in `lib/estimates/estimate-actions.ts` now returns `{ success: false, error: "Estimates are currently unavailable." }` as the first statement when `ENABLE_ESTIMATES` is false or unset, running before `createClient`/auth/DB work. This was the sole identified pre-production code blocker from the readiness audit.
+- Production readiness hardening validation: `npx vitest run lib/estimates` = `127/127`, `npx tsc --noEmit` = `TSC_OK`. Tests confirm: flag-off returns unavailable, no Supabase insert occurs, no estimate_events insert occurs, flag-on valid create still passes. No migrations, Supabase commands, production data actions, email sends, feature flag enables, RLS/policy changes, PDF/storage/customer/public/payment/conversion behavior were introduced.
+- Production readiness hardening runbook is documented at `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`.
 - Next estimate direction: proceed only to sandbox-only provider transport enablement after documented go/no-go gates. Do not enable production estimate email sending without an explicit rollout plan.
 - Stripe customer/work payment execution follows service/invoice/estimate workflow readiness unless explicitly pulled forward.
 - Stripe Platform Subscription V1 remains platform/app usage billing only and must not be conflated with tenant customer/work payment execution.
@@ -1812,7 +1815,7 @@ Reporting / analytics baseline is complete enough for the current milestone; rem
 
 The next natural roadmap area is:
 - Pricebook V1 post-promotion refinement from the current production-complete C1B/C1C baseline
-- Estimates/quoting V1A-V1H is implemented as internal-only guarded baseline; production rollout remains deferred
+- Estimates/quoting V1A-V1J is implemented as internal-only guarded baseline; production rollout remains deferred
 
 Pre-launch enablement priority track (separate from product-track sequencing):
 - Stripe enablement for new account users/platform onboarding is elevated for pre-launch readiness.
@@ -1830,7 +1833,7 @@ Current clarification:
 - payment P1 foundation closeout is complete at the current baseline
 - out-of-box readiness / business identity / settings packaging closeout is complete at the current baseline
 - the active product-track roadmap area is Pricebook V1 continuation (with C1B/C1C production-complete, production-promoted, and production-smoke confirmed)
-- estimates/quoting V1A-V1H is implemented for guarded internal baseline and remains intentionally non-production-live
+- estimates/quoting V1A-V1J is implemented for guarded internal baseline and remains intentionally non-production-live
 - V1I is documented as decision/planning artifact only (Option B first; Option A later after gates) and does not change current production-disabled posture
 - Work Items terminology alignment is complete and already documented; Job/Visit Scope/Work Items wording now matches the current model across validated internal and contractor-facing surfaces.
 - Internal `/jobs/[id]` responsiveness batch is complete for this pass with deferred secondary sections now in place for:
