@@ -96,6 +96,7 @@ import DeferredJobAttachmentsInternal from "./_components/DeferredJobAttachments
 import DeferredCustomerAttemptsHistory from "./_components/DeferredCustomerAttemptsHistory";
 import DeferredServiceChainPanelBody from "./_components/DeferredServiceChainPanelBody";
 import DeferredAddAssigneeForm from "./_components/DeferredAddAssigneeForm";
+import ContactLoggingQuickActions from "./_components/ContactLoggingQuickActions";
 import DeferredTimelineBody from "./_components/DeferredTimelineBody";
 import DeferredSharedNotesBody from "./_components/DeferredSharedNotesBody";
 import DeferredInternalNotesBody from "./_components/DeferredInternalNotesBody";
@@ -1994,31 +1995,13 @@ emitTimingLog({
         ) : null}
       </div>
 
-      <div className="mt-4 border-t border-slate-200/80 pt-4">
-        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Contact Logging</div>
-        <div className="flex flex-wrap gap-2">
-          <form action={logCustomerContactAttemptFromForm}>
-            <input type="hidden" name="job_id" value={job.id} />
-            <input type="hidden" name="method" value="call" />
-            <input type="hidden" name="result" value="no_answer" />
-            <SubmitButton loadingText="Recording..." className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-              No Answer
-            </SubmitButton>
-          </form>
-
-          <form action={logCustomerContactAttemptFromForm}>
-            <input type="hidden" name="job_id" value={job.id} />
-            <input type="hidden" name="method" value="text" />
-            <input type="hidden" name="result" value="sent" />
-            <SubmitButton loadingText="Recording..." className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-              Sent Text
-            </SubmitButton>
-          </form>
-        </div>
-        <div className="mt-2 text-[11px] text-slate-500">
-          {attemptCount} attempt{attemptCount === 1 ? "" : "s"} • last: {lastAttemptLabel}
-        </div>
-      </div>
+      <ContactLoggingQuickActions
+        jobId={String(job.id)}
+        attemptCount={attemptCount}
+        lastAttemptLabel={lastAttemptLabel}
+        action={logCustomerContactAttemptFromForm}
+        buttonClassName="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+      />
 
       <div className="mt-4 border-t border-slate-200/80 pt-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
