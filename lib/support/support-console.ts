@@ -8,6 +8,7 @@ import {
 
 export type SupportConsoleErrorCode =
   | "INVALID_TARGET_ACCOUNT_OWNER"
+  | "SUPPORT_REASON_REQUIRED"
   | "SUPPORT_USER_NOT_FOUND"
   | "SUPPORT_USER_INACTIVE"
   | "SUPPORT_GRANT_NOT_FOUND"
@@ -88,9 +89,18 @@ export type SupportConsoleSnapshot = {
   recentAuditEvents: SupportAuditEventStatus[];
 };
 
+export type SupportOperatorStatus = {
+  authUserId: string;
+  supportUserId: string | null;
+  displayName: string | null;
+  isSupportUserActive: boolean;
+};
+
 export type StartReadOnlySupportSessionInput = {
   actorUserId: string;
   accountOwnerUserId: string;
+  operatorReason: string;
+  reasonCategory?: string | null;
   now?: Date;
   sessionDurationMinutes?: number;
   admin?: any;
@@ -105,6 +115,8 @@ export type EndSupportSessionInput = {
 };
 
 const DEFAULT_SESSION_DURATION_MINUTES = 30;
+const SUPPORT_CONSOLE_ROUTE = "/ops/admin/users/support";
+const ACCOUNT_VIEWED_COOLDOWN_MS = 60 * 1000;
 
 function toIsoDateOrNull(value: string | null | undefined): Date | null {
   const raw = String(value ?? "").trim();
@@ -279,44 +291,122 @@ async function writeDeniedAuditEvent(input: {
   });
 }
 
+export async function getSupportOperatorStatus(input: {
+  actorUserId: string;
+  admin?: any;
+}): Promise<SupportOperatorStatus> {
+  const admin = input.admin ?? createAdminClient();
+  const actorUserId = String(input.actorUserId ?? "").trim();
+  const supportUser = actorUserId ? await getSupportUserByAuthUserId(admin, actorUserId) : null;
+
+  return {
+    authUserId: actorUserId,
+    supportUserId: supportUser?.id ?? null,
+    displayName: supportUser?.display_name ?? null,
+    isSupportUserActive: Boolean(supportUser?.is_active),
+  };
+}
+
+async function hasRecentAccountViewedEvent(input: {
+  admin: any;
+  supportUserId: string;
+  accountOwnerUserId: string;
+  now: Date;
+  cooldownMs?: number;
+}): Promise<boolean> {
+  const cooldownMs = Math.max(1000, Number(input.cooldownMs ?? ACCOUNT_VIEWED_COOLDOWN_MS));
+
+  const { data, error } = await input.admin
+    .from("support_access_audit_events")
+    .select("id, created_at")
+    .eq("event_type", "account_viewed")
+    .eq("support_user_id", input.supportUserId)
+    .eq("account_owner_user_id", input.accountOwnerUserId)
+    .contains("metadata", { route: SUPPORT_CONSOLE_ROUTE })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const createdAt = toIsoDateOrNull(String(data?.created_at ?? "").trim() || null);
+  if (!createdAt) return false;
+
+  return input.now.getTime() - createdAt.getTime() < cooldownMs;
+}
+
+async function recordAccountViewedAuditEvent(input: {
+  admin: any;
+  supportUserId: string;
+  accountOwnerUserId: string;
+  now: Date;
+}) {
+  const isDuplicate = await hasRecentAccountViewedEvent({
+    admin: input.admin,
+    supportUserId: input.supportUserId,
+    accountOwnerUserId: input.accountOwnerUserId,
+    now: input.now,
+  });
+
+  if (isDuplicate) return;
+
+  await recordSupportAccessAuditEvent({
+    admin: input.admin,
+    supportUserId: input.supportUserId,
+    accountOwnerUserId: input.accountOwnerUserId,
+    eventType: "account_viewed",
+    outcome: "info",
+    reasonCode: null,
+    metadata: {
+      source: "support_console_v1b",
+      route: SUPPORT_CONSOLE_ROUTE,
+    },
+  });
+}
+
 export async function getSupportConsoleSnapshot(input: {
   actorUserId: string;
   accountOwnerUserId?: string | null;
+  now?: Date;
   admin?: any;
 }): Promise<SupportConsoleSnapshot> {
   const admin = input.admin ?? createAdminClient();
   const actorUserId = String(input.actorUserId ?? "").trim();
   const accountOwnerUserId = String(input.accountOwnerUserId ?? "").trim() || null;
 
-  const supportUser = actorUserId ? await getSupportUserByAuthUserId(admin, actorUserId) : null;
+  const now = input.now ?? new Date();
+  const operator = await getSupportOperatorStatus({ actorUserId, admin });
 
   let grant: SupportGrantStatus | null = null;
   let session: SupportSessionStatus | null = null;
+  let recentAuditEvents: SupportAuditEventStatus[] = [];
 
-  if (supportUser?.id && accountOwnerUserId) {
+  if (operator.supportUserId && operator.isSupportUserActive && accountOwnerUserId) {
     grant = await getLatestGrant(admin, {
-      supportUserId: supportUser.id,
+      supportUserId: operator.supportUserId,
       accountOwnerUserId,
     });
 
     session = await getLatestActiveSession(admin, {
-      supportUserId: supportUser.id,
+      supportUserId: operator.supportUserId,
       accountOwnerUserId,
+    });
+
+    await recordAccountViewedAuditEvent({
+      admin,
+      supportUserId: operator.supportUserId,
+      accountOwnerUserId,
+      now,
+    });
+
+    recentAuditEvents = await listRecentAuditEvents(admin, {
+      accountOwnerUserId,
+      supportAccessSessionId: session?.id ?? null,
     });
   }
 
-  const recentAuditEvents = await listRecentAuditEvents(admin, {
-    accountOwnerUserId,
-    supportAccessSessionId: session?.id ?? null,
-  });
-
   return {
-    operator: {
-      authUserId: actorUserId,
-      supportUserId: supportUser?.id ?? null,
-      displayName: supportUser?.display_name ?? null,
-      isSupportUserActive: Boolean(supportUser?.is_active),
-    },
+    operator,
     accountOwnerUserId,
     grant,
     session,
@@ -330,11 +420,17 @@ export async function startReadOnlySupportSession(
   const admin = input.admin ?? createAdminClient();
   const actorUserId = String(input.actorUserId ?? "").trim();
   const accountOwnerUserId = String(input.accountOwnerUserId ?? "").trim();
+  const operatorReason = String(input.operatorReason ?? "").trim();
+  const reasonCategory = String(input.reasonCategory ?? "").trim() || null;
   const now = input.now ?? new Date();
   const sessionDurationMinutes = Number(input.sessionDurationMinutes ?? DEFAULT_SESSION_DURATION_MINUTES);
 
   if (!accountOwnerUserId) {
     throw new SupportConsoleError("INVALID_TARGET_ACCOUNT_OWNER", "Target account owner is required.");
+  }
+
+  if (!operatorReason) {
+    throw new SupportConsoleError("SUPPORT_REASON_REQUIRED", "Support session reason is required.");
   }
 
   const supportUser = await getSupportUserByAuthUserId(admin, actorUserId);
@@ -489,6 +585,8 @@ export async function startReadOnlySupportSession(
       source: "support_console_v1b",
       supportAccountGrantId: grant.id,
       sessionExpiresAt: session.expires_at,
+      operator_reason: operatorReason,
+      reason_category: reasonCategory,
     },
   });
 

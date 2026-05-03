@@ -48,6 +48,9 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   password_reset_failed: { tone: "error", message: "Could not send password reset email. Verify reset redirect configuration and try again." },
   invalid_email: { tone: "error", message: "Please provide a valid email address." },
   invalid_invite_target: { tone: "error", message: "Invite target is missing required information." },
+  support_console_unavailable: { tone: "warn", message: "Support Console is currently disabled." },
+  support_console_support_user_required: { tone: "warn", message: "Support Console requires an active support user assignment." },
+  support_console_reason_required: { tone: "warn", message: "A support reason is required before starting a support session." },
 };
 
 function bannerClass(tone: "success" | "warn" | "error") {

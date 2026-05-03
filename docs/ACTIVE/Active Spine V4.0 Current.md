@@ -2087,12 +2087,20 @@ Current confirmed state:
 V1B status:
 - V1B support console shell is implemented, committed, and sandbox-smoked.
 - Sandbox smoke confirmed denied/start/end audit behavior (`access_denied`, `session_started`, `session_ended`).
+- Support Console hardening slice H1-H5 is implemented:
+  - active `support_user` is required before support console page-shell render
+  - non-support admins are redirected back to `/ops/admin/users` with a support-user-required notice
+  - start/end action entry points enforce active `support_user` parity
+  - support session start requires human-entered reason; reason is stored in audit metadata (`operator_reason`)
+  - scoped account load writes `account_viewed` audit event with short-window dedupe
+  - notice handling is polished for support console unavailable and support-user-required flows on `/ops/admin/users`
 
 Locked support boundaries:
 - support sessions are read-only only
 - support access requires explicit `support_user` + active grant + active session
 - support sessions are account-owner scoped
 - audit events are required
+- support start reason is required for audit quality
 - no impersonation/login-as-customer behavior
 - no tenant job/customer/invoice browsing surface yet
 - no support mutation behavior yet
@@ -2101,6 +2109,7 @@ Parked/deferred production enablement decision:
 - Support V1 architecture is complete enough to park; this is not unfinished architecture.
 - Production enablement is intentionally deferred pending better timing and explicit rollout need.
 - Do not proceed now with production support migration apply, production support seeding, or production feature-flag enablement.
+- H1-H5 hardening implementation does not change deferment: production migration apply, production feature flag enablement, production support-user/grant setup, controlled smoke, and rollback rehearsal remain explicit later approvals.
 
 Keep-ready rollout checklist (later, explicit approval only):
 - production migration approval

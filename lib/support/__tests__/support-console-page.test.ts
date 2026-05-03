@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
+const getSupportOperatorStatusMock = vi.fn();
 const getSupportConsoleSnapshotMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -24,6 +25,7 @@ vi.mock("@/lib/auth/internal-user", () => ({
 }));
 
 vi.mock("@/lib/support/support-console", () => ({
+  getSupportOperatorStatus: (...args: unknown[]) => getSupportOperatorStatusMock(...args),
   getSupportConsoleSnapshot: (...args: unknown[]) => getSupportConsoleSnapshotMock(...args),
 }));
 
@@ -60,14 +62,21 @@ describe("support console page exposure", () => {
     getSupportConsoleSnapshotMock.mockResolvedValue({
       operator: {
         authUserId: "admin-1",
-        supportUserId: null,
-        displayName: null,
-        isSupportUserActive: false,
+        supportUserId: "support-user-1",
+        displayName: "Support One",
+        isSupportUserActive: true,
       },
       accountOwnerUserId: "owner-1",
       grant: null,
       session: null,
       recentAuditEvents: [],
+    });
+
+    getSupportOperatorStatusMock.mockResolvedValue({
+      authUserId: "admin-1",
+      supportUserId: "support-user-1",
+      displayName: "Support One",
+      isSupportUserActive: true,
     });
   });
 
@@ -98,5 +107,25 @@ describe("support console page exposure", () => {
         accountOwnerUserId: "owner-1",
       }),
     );
+  });
+
+  it("redirects non-support admin to people and access", async () => {
+    process.env.ENABLE_SUPPORT_CONSOLE = "true";
+    getSupportOperatorStatusMock.mockResolvedValueOnce({
+      authUserId: "admin-1",
+      supportUserId: null,
+      displayName: null,
+      isSupportUserActive: false,
+    });
+
+    const pageModule = await import("@/app/ops/admin/users/support/page");
+
+    await expect(
+      pageModule.default({
+        searchParams: Promise.resolve({ account_owner_user_id: "owner-1" }),
+      }),
+    ).rejects.toThrow("REDIRECT:/ops/admin/users?notice=support_console_support_user_required");
+
+    expect(getSupportConsoleSnapshotMock).not.toHaveBeenCalled();
   });
 });

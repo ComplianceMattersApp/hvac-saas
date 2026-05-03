@@ -6,7 +6,7 @@ import {
   startSupportSessionFromForm,
 } from "@/lib/actions/support-console-actions";
 import { isSupportConsoleEnabled } from "@/lib/support/support-console-exposure";
-import { getSupportConsoleSnapshot } from "@/lib/support/support-console";
+import { getSupportConsoleSnapshot, getSupportOperatorStatus } from "@/lib/support/support-console";
 import { createClient } from "@/lib/supabase/server";
 
 type SearchParams = Promise<{
@@ -18,6 +18,7 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   session_started: { tone: "success", message: "Read-only support session started." },
   session_ended: { tone: "success", message: "Support session ended." },
   invalid_target: { tone: "warn", message: "Enter a valid account owner user id." },
+  reason_required: { tone: "warn", message: "A support reason is required before starting a session." },
   access_denied: { tone: "error", message: "Support session request was denied." },
 };
 
@@ -83,6 +84,11 @@ export default async function SupportConsolePage({
   const { userId } = await requireAdminOrRedirect();
   if (!isSupportConsoleEnabled()) {
     redirect("/ops/admin/users?notice=support_console_unavailable");
+  }
+
+  const operator = await getSupportOperatorStatus({ actorUserId: userId });
+  if (!operator.supportUserId || !operator.isSupportUserActive) {
+    redirect("/ops/admin/users?notice=support_console_support_user_required");
   }
 
   const snapshot = await getSupportConsoleSnapshot({
@@ -203,6 +209,18 @@ export default async function SupportConsolePage({
           <form action={startSupportSessionFromForm}>
             <input type="hidden" name="return_to" value="/ops/admin/users/support" />
             <input type="hidden" name="account_owner_user_id" value={snapshot.accountOwnerUserId ?? ""} />
+            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="operator_reason">
+              Support reason
+            </label>
+            <textarea
+              id="operator_reason"
+              name="operator_reason"
+              required
+              minLength={5}
+              maxLength={500}
+              className="mb-3 min-h-[72px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+              placeholder="Briefly describe why this support session is needed."
+            />
             <button
               type="submit"
               disabled={!snapshot.accountOwnerUserId}

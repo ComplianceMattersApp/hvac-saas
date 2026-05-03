@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
+const getSupportOperatorStatusMock = vi.fn();
 const startReadOnlySupportSessionMock = vi.fn();
 const endSupportSessionMock = vi.fn();
 
@@ -20,6 +21,7 @@ vi.mock("@/lib/auth/internal-user", () => ({
 }));
 
 vi.mock("@/lib/support/support-console", () => ({
+  getSupportOperatorStatus: (...args: unknown[]) => getSupportOperatorStatusMock(...args),
   startReadOnlySupportSession: (...args: unknown[]) => startReadOnlySupportSessionMock(...args),
   endSupportSession: (...args: unknown[]) => endSupportSessionMock(...args),
   isSupportConsoleError: (error: unknown) => {
@@ -32,6 +34,7 @@ function buildStartFormData() {
   const formData = new FormData();
   formData.set("return_to", "/ops/admin/users/support");
   formData.set("account_owner_user_id", "owner-1");
+  formData.set("operator_reason", "Investigating support request context");
   return formData;
 }
 
@@ -62,6 +65,12 @@ describe("support console actions", () => {
 
     startReadOnlySupportSessionMock.mockResolvedValue({ id: "session-1" });
     endSupportSessionMock.mockResolvedValue({ id: "session-1" });
+    getSupportOperatorStatusMock.mockResolvedValue({
+      authUserId: "admin-1",
+      supportUserId: "support-user-1",
+      displayName: "Support One",
+      isSupportUserActive: true,
+    });
   });
 
   it("blocks start action when support console feature is disabled", async () => {
@@ -101,6 +110,11 @@ describe("support console actions", () => {
     await expect(startSupportSessionFromForm(buildStartFormData())).rejects.toThrow(
       "REDIRECT:/ops/admin/users/support?account_owner_user_id=owner-1&notice=session_started",
     );
+    expect(startReadOnlySupportSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operatorReason: "Investigating support request context",
+      }),
+    );
   });
 
   it("redirects with denied notice when support start helper rejects with known error", async () => {
@@ -126,5 +140,49 @@ describe("support console actions", () => {
         supportAccessSessionId: "session-1",
       }),
     );
+  });
+
+  it("blocks start for non-support admin even when feature flag is enabled", async () => {
+    getSupportOperatorStatusMock.mockResolvedValueOnce({
+      authUserId: "admin-1",
+      supportUserId: null,
+      displayName: null,
+      isSupportUserActive: false,
+    });
+
+    const { startSupportSessionFromForm } = await import("@/lib/actions/support-console-actions");
+
+    await expect(startSupportSessionFromForm(buildStartFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/users?notice=support_console_support_user_required",
+    );
+    expect(startReadOnlySupportSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks end for non-support admin even when feature flag is enabled", async () => {
+    getSupportOperatorStatusMock.mockResolvedValueOnce({
+      authUserId: "admin-1",
+      supportUserId: null,
+      displayName: null,
+      isSupportUserActive: false,
+    });
+
+    const { endSupportSessionFromForm } = await import("@/lib/actions/support-console-actions");
+
+    await expect(endSupportSessionFromForm(buildEndFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/users?notice=support_console_support_user_required",
+    );
+    expect(endSupportSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("requires non-empty start reason", async () => {
+    const formData = buildStartFormData();
+    formData.set("operator_reason", "   ");
+
+    const { startSupportSessionFromForm } = await import("@/lib/actions/support-console-actions");
+
+    await expect(startSupportSessionFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/ops/admin/users/support?account_owner_user_id=owner-1&notice=reason_required",
+    );
+    expect(startReadOnlySupportSessionMock).not.toHaveBeenCalled();
   });
 });

@@ -635,10 +635,17 @@ If any item here conflicts with the active spine, the spine wins.
 ### 3.2 Support console status and boundaries
 - Customer Support / Remote Assistance V1B support console shell is implemented, committed, and sandbox-smoked.
 - Sandbox smoke confirmed `access_denied`, `session_started`, and `session_ended` audit events.
+- H1-H5 hardening is implemented on the current code baseline:
+  - support page-shell requires active `support_user`; non-support admins are redirected to `/ops/admin/users` with a dedicated notice
+  - action-layer parity guard requires active `support_user` before start/end handlers proceed
+  - support session start requires a human-entered reason; reason is captured in audit `metadata.operator_reason`
+  - explicit scoped account loads emit `account_viewed` audit events with short-window dedupe to reduce refresh spam
+  - operator-facing notice polish is present on `/ops/admin/users` for disabled console and support-user-required states
 - V1B remains read-only only:
   - support access requires explicit `support_user` + active account grant + active support session
   - support sessions are account-owner scoped
   - audit events are required
+  - support start reason is required for audit quality
   - no impersonation/login-as-customer behavior
   - no tenant job/customer/invoice browsing surface yet
   - no support mutation behavior
@@ -647,6 +654,7 @@ If any item here conflicts with the active spine, the spine wins.
 - Support V1 is intentionally parked from production enablement; this is not unfinished architecture.
 - Production enablement is deferred pending explicit rollout timing/need decision.
 - Do not proceed now with production support migration apply, production support seeding, or production `ENABLE_SUPPORT_CONSOLE` enablement.
+- Hardening implementation above does not change deferred status: production migration apply, production flag enablement, production support-user/grant setup, and production smoke/rollback remain explicit later decisions.
 - Production support-console enablement later requires both decisions together: production support migration apply decision and explicit `ENABLE_SUPPORT_CONSOLE` enablement decision.
 - Keep-ready rollout checklist (later, explicit approval only):
   - production migration approval

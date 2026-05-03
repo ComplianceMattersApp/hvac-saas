@@ -52,10 +52,22 @@ function makeFixture(input: {
   supportUsers?: SupportUser[];
   grants?: SupportGrant[];
   sessions?: SupportSession[];
+  auditEvents?: Array<{
+    id: string;
+    support_user_id: string | null;
+    account_owner_user_id: string | null;
+    support_access_session_id: string | null;
+    event_type: "session_started" | "session_ended" | "access_denied" | "account_viewed";
+    outcome: "allowed" | "denied" | "info";
+    reason_code: string | null;
+    metadata: Record<string, unknown>;
+    created_at: string;
+  }>;
 } = {}) {
   const supportUsers = input.supportUsers ?? [];
   const grants = input.grants ?? [];
   const sessions = [...(input.sessions ?? [])];
+  const auditEvents = [...(input.auditEvents ?? [])];
 
   const admin = {
     from: vi.fn((table: string) => {
@@ -191,11 +203,61 @@ function makeFixture(input: {
       if (table === "support_access_audit_events") {
         const query: any = {
           select: vi.fn(() => query),
-          order: vi.fn(() => query),
+          contains: vi.fn((column: string, value: unknown) => {
+            query.__contains[column] = value;
+            return query;
+          }),
+          order: vi.fn((_column: string, opts?: { ascending?: boolean }) => {
+            query.__ascending = Boolean(opts?.ascending);
+            return query;
+          }),
           limit: vi.fn(() => query),
-          eq: vi.fn(() => query),
-          then: (onFulfilled: (value: any) => unknown) =>
-            Promise.resolve({ data: [], error: null }).then(onFulfilled),
+          eq: vi.fn((column: string, value: unknown) => {
+            query.__filters[column] = value;
+            return query;
+          }),
+          maybeSingle: vi.fn(async () => {
+            const filtered = auditEvents.filter((event) => {
+              for (const [column, value] of Object.entries(query.__filters)) {
+                if ((event as any)[column] !== value) return false;
+              }
+
+              const metadataContains = query.__contains.metadata;
+              if (metadataContains && typeof metadataContains === "object") {
+                for (const [key, expected] of Object.entries(metadataContains as Record<string, unknown>)) {
+                  if ((event.metadata as Record<string, unknown>)[key] !== expected) return false;
+                }
+              }
+
+              return true;
+            });
+
+            const sorted = filtered.sort((a, b) => {
+              if (query.__ascending) return a.created_at.localeCompare(b.created_at);
+              return b.created_at.localeCompare(a.created_at);
+            });
+
+            const row = sorted[0] ?? null;
+            return { data: row, error: null };
+          }),
+          then: (onFulfilled: (value: any) => unknown) => {
+            const filtered = auditEvents.filter((event) => {
+              for (const [column, value] of Object.entries(query.__filters)) {
+                if ((event as any)[column] !== value) return false;
+              }
+              return true;
+            });
+
+            const sorted = filtered.sort((a, b) => {
+              if (query.__ascending) return a.created_at.localeCompare(b.created_at);
+              return b.created_at.localeCompare(a.created_at);
+            });
+
+            return Promise.resolve({ data: sorted, error: null }).then(onFulfilled);
+          },
+          __filters: {} as Record<string, unknown>,
+          __contains: {} as Record<string, unknown>,
+          __ascending: false,
         };
         return query;
       }
@@ -225,6 +287,7 @@ describe("support console session helpers", () => {
       startReadOnlySupportSession({
         actorUserId: "actor-1",
         accountOwnerUserId: "owner-1",
+        operatorReason: "Investigating missing support mapping",
       }),
     ).rejects.toMatchObject({ code: "SUPPORT_USER_NOT_FOUND" });
 
@@ -266,6 +329,7 @@ describe("support console session helpers", () => {
       startReadOnlySupportSession({
         actorUserId: "actor-1",
         accountOwnerUserId: "owner-1",
+        operatorReason: "Investigating grant inactivity",
       }),
     ).rejects.toMatchObject({ code: "SUPPORT_GRANT_INACTIVE" });
 
@@ -303,6 +367,7 @@ describe("support console session helpers", () => {
     const result = await startReadOnlySupportSession({
       actorUserId: "actor-1",
       accountOwnerUserId: "owner-1",
+      operatorReason: "Customer requested troubleshooting assistance",
       now: new Date("2026-05-01T00:00:00.000Z"),
     });
 
@@ -318,6 +383,9 @@ describe("support console session helpers", () => {
       expect.objectContaining({
         eventType: "session_started",
         outcome: "allowed",
+        metadata: expect.objectContaining({
+          operator_reason: "Customer requested troubleshooting assistance",
+        }),
       }),
     );
   });
@@ -364,6 +432,73 @@ describe("support console session helpers", () => {
         eventType: "session_ended",
         outcome: "allowed",
       }),
+    );
+  });
+
+  it("writes account_viewed for explicit scoped support load", async () => {
+    const fixture = makeFixture({
+      supportUsers: [
+        {
+          id: "support-user-1",
+          auth_user_id: "actor-1",
+          is_active: true,
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const { getSupportConsoleSnapshot } = await import("@/lib/support/support-console");
+
+    await getSupportConsoleSnapshot({
+      actorUserId: "actor-1",
+      accountOwnerUserId: "owner-1",
+      now: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(recordSupportAccessAuditEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "account_viewed",
+        supportUserId: "support-user-1",
+        accountOwnerUserId: "owner-1",
+      }),
+    );
+  });
+
+  it("skips duplicate account_viewed audit events within cooldown window", async () => {
+    const fixture = makeFixture({
+      supportUsers: [
+        {
+          id: "support-user-1",
+          auth_user_id: "actor-1",
+          is_active: true,
+        },
+      ],
+      auditEvents: [
+        {
+          id: "evt-1",
+          support_user_id: "support-user-1",
+          account_owner_user_id: "owner-1",
+          support_access_session_id: null,
+          event_type: "account_viewed",
+          outcome: "info",
+          reason_code: null,
+          metadata: { route: "/ops/admin/users/support" },
+          created_at: "2026-05-01T00:00:30.000Z",
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const { getSupportConsoleSnapshot } = await import("@/lib/support/support-console");
+
+    await getSupportConsoleSnapshot({
+      actorUserId: "actor-1",
+      accountOwnerUserId: "owner-1",
+      now: new Date("2026-05-01T00:01:00.000Z"),
+    });
+
+    expect(recordSupportAccessAuditEventMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: "account_viewed" }),
     );
   });
 });
