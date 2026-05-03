@@ -61,7 +61,60 @@ async function requireOperationalContactMutationEntitlementAccessOrRedirect(para
 }
 
 export async function logCustomerContactAttemptFromForm(formData: FormData): Promise<void> {
+  const timingEnabled = process.env.CONTACT_ATTEMPT_TIMING_DEBUG === "true";
+  const actionStartMs = Date.now();
+  let phaseStartMs = actionStartMs;
+  const phaseDurationsMs: Record<string, number> = {};
+  let returnToPresent = false;
+  let returnToRevalidated = false;
+  let escalationInserted = false;
+
+  const completePhase = (phaseName: string) => {
+    if (!timingEnabled) return;
+    const nowMs = Date.now();
+    phaseDurationsMs[phaseName] = nowMs - phaseStartMs;
+    phaseStartMs = nowMs;
+  };
+
+  const setPhaseValue = (phaseName: string, durationMs: number) => {
+    if (!timingEnabled) return;
+    phaseDurationsMs[phaseName] = durationMs;
+  };
+
+  const emitTimingLog = (redirectTarget: string) => {
+    if (!timingEnabled) return;
+    console.info(
+      "[contact-attempt-timing]",
+      JSON.stringify({
+        jobId,
+        method,
+        result,
+        returnToPresent,
+        returnToRevalidated,
+        escalationInserted,
+        totalActionMs: Date.now() - actionStartMs,
+        redirectTarget,
+        phasesMs: {
+          parseInput: phaseDurationsMs.parseInput ?? 0,
+          requireInternalUserAuth: phaseDurationsMs.requireInternalUserAuth ?? 0,
+          scopedJobMutationCheck: phaseDurationsMs.scopedJobMutationCheck ?? 0,
+          entitlementCheck: phaseDurationsMs.entitlementCheck ?? 0,
+          priorCustomerAttemptRead: phaseDurationsMs.priorCustomerAttemptRead ?? 0,
+          jobEventsInsert: phaseDurationsMs.jobEventsInsert ?? 0,
+          jobsFollowUpUpdate: phaseDurationsMs.jobsFollowUpUpdate ?? 0,
+          escalationBreadcrumbInsert: phaseDurationsMs.escalationBreadcrumbInsert ?? 0,
+          revalidateJobPath: phaseDurationsMs.revalidateJobPath ?? 0,
+          conditionalReturnToRevalidate: phaseDurationsMs.conditionalReturnToRevalidate ?? 0,
+          redirectTargetPreparation: phaseDurationsMs.redirectTargetPreparation ?? 0,
+        },
+      }),
+    );
+  };
+
   const supabase = await createClient();
+  if (timingEnabled) {
+    phaseStartMs = Date.now();
+  }
 
   const jobId = String(formData.get("job_id") || "").trim();
   const method = String(formData.get("method") || "").trim() as AttemptMethod;
@@ -71,6 +124,7 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
 
   if (!jobId) throw new Error("Missing job_id");
   if (method !== "call" && method !== "text") throw new Error("Invalid method");
+  completePhase("parseInput");
 
   let actorId = "";
   let accountOwnerUserId = "";
@@ -88,6 +142,7 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
     }
     throw error;
   }
+  completePhase("requireInternalUserAuth");
 
   const scopedJob = await loadScopedInternalJobForMutation({
     accountOwnerUserId,
@@ -98,11 +153,13 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
   if (!scopedJob?.id) {
     redirect(`/jobs/${jobId}?notice=not_authorized`);
   }
+  completePhase("scopedJobMutationCheck");
 
   await requireOperationalContactMutationEntitlementAccessOrRedirect({
     supabase,
     accountOwnerUserId,
   });
+  completePhase("entitlementCheck");
 
   // 1) Get existing attempt count + first attempt date
   const { data: attemptEvents, error: attemptsErr } = await supabase
@@ -113,6 +170,7 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
     .order("created_at", { ascending: true });
 
   if (attemptsErr) throw new Error(attemptsErr.message);
+  completePhase("priorCustomerAttemptRead");
 
   const attemptCountBefore = attemptEvents?.length ?? 0;
   const attemptCountAfter = attemptCountBefore + 1;
@@ -123,19 +181,20 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
       : todayYYYYMMDD();
 
   // 2) Insert the attempt event (CYA)
-const { error: insertErr } = await supabase.from("job_events").insert({
-  job_id: jobId,
-  user_id: actorId,
-  event_type: "customer_attempt",
-  message: "Customer contact attempt logged",
-  meta: {
-    method,
-    result,
-    attempt_number: attemptCountAfter,
-  },
-});
+  const { error: insertErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    user_id: actorId,
+    event_type: "customer_attempt",
+    message: "Customer contact attempt logged",
+    meta: {
+      method,
+      result,
+      attempt_number: attemptCountAfter,
+    },
+  });
 
-if (insertErr) throw new Error(insertErr.message);
+  if (insertErr) throw new Error(insertErr.message);
+  completePhase("jobEventsInsert");
 
   // 3) Auto-set follow-up date based on cadence
   const followUp = nextFollowUpDate(attemptCountAfter);
@@ -149,6 +208,7 @@ if (insertErr) throw new Error(insertErr.message);
     .eq("id", jobId);
 
   if (updateErr) throw new Error(updateErr.message);
+  completePhase("jobsFollowUpUpdate");
 
   // 4) End-of-week escalation breadcrumb (>= 7 days since first attempt)
   const today = todayYYYYMMDD();
@@ -169,17 +229,43 @@ if (insertErr) throw new Error(insertErr.message);
     
 
     if (escErr) throw new Error(escErr.message);
+    escalationInserted = true;
+    completePhase("escalationBreadcrumbInsert");
+  } else {
+    setPhaseValue("escalationBreadcrumbInsert", 0);
   }
 
   revalidatePath(`/jobs/${jobId}`);
+  completePhase("revalidateJobPath");
 
-  if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
+  returnToPresent = returnToRaw.startsWith("/") && !returnToRaw.startsWith("//");
+
+  if (returnToPresent) {
+    const redirectPrepStartMs = Date.now();
     const [pathOnly, searchRaw = ""] = returnToRaw.split("?");
     const search = new URLSearchParams(searchRaw);
     if (successBannerRaw) search.set("banner", successBannerRaw);
-    if (pathOnly) revalidatePath(pathOnly);
-    redirect(`${pathOnly}?${search.toString()}`);
+    setPhaseValue("redirectTargetPreparation", Date.now() - redirectPrepStartMs);
+    if (timingEnabled) {
+      phaseStartMs = Date.now();
+    }
+
+    if (pathOnly) {
+      revalidatePath(pathOnly);
+      returnToRevalidated = true;
+      completePhase("conditionalReturnToRevalidate");
+    } else {
+      setPhaseValue("conditionalReturnToRevalidate", 0);
+    }
+
+    const redirectTarget = `${pathOnly}?${search.toString()}`;
+    emitTimingLog(redirectTarget);
+    redirect(redirectTarget);
   }
 
-  redirect(`/jobs/${jobId}?tab=ops&banner=contact_attempt_logged`);
+  setPhaseValue("conditionalReturnToRevalidate", 0);
+  setPhaseValue("redirectTargetPreparation", 0);
+  const redirectTarget = `/jobs/${jobId}?tab=ops&banner=contact_attempt_logged`;
+  emitTimingLog(redirectTarget);
+  redirect(redirectTarget);
 }
