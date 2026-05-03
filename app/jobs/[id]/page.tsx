@@ -624,6 +624,56 @@ export default async function JobDetailPage({
       ? bannerRaw
       : "";
 
+  const timingEnabled = process.env.JOB_DETAIL_TIMING_DEBUG === "true";
+  const renderStartMs = Date.now();
+  let phaseStartMs = renderStartMs;
+  const phaseDurationsMs: Record<string, number> = {};
+
+  const completePhase = (phaseName: string) => {
+    if (!timingEnabled) return;
+    const nowMs = Date.now();
+    phaseDurationsMs[phaseName] = nowMs - phaseStartMs;
+    phaseStartMs = nowMs;
+  };
+
+  const setPhaseValue = (phaseName: string, durationMs: number) => {
+    if (!timingEnabled) return;
+    phaseDurationsMs[phaseName] = durationMs;
+  };
+
+  const emitTimingLog = (details: {
+    invoicePanelActive: boolean;
+    serviceCaseExists: boolean;
+    timelineChainExists: boolean;
+  }) => {
+    if (!timingEnabled) return;
+    console.info(
+      "[job-detail-timing]",
+      JSON.stringify({
+        jobId,
+        tab,
+        invoicePanelActive: details.invoicePanelActive,
+        serviceCaseExists: details.serviceCaseExists,
+        timelineChainExists: details.timelineChainExists,
+        totalRenderMs: Date.now() - renderStartMs,
+        phasesMs: {
+          authInternalResolution: phaseDurationsMs.authInternalResolution ?? 0,
+          billingModeBusinessIdentity: phaseDurationsMs.billingModeBusinessIdentity ?? 0,
+          scopedJobDetailReadBoundary: phaseDurationsMs.scopedJobDetailReadBoundary ?? 0,
+          mainJobLoad: phaseDurationsMs.mainJobLoad ?? 0,
+          internalInvoiceRead: phaseDurationsMs.internalInvoiceRead ?? 0,
+          invoiceLedgerDeliveryReads: phaseDurationsMs.invoiceLedgerDeliveryReads ?? 0,
+          pricebookPickerRead: phaseDurationsMs.pricebookPickerRead ?? 0,
+          assignmentDisplayMapAssignableUsers: phaseDurationsMs.assignmentDisplayMapAssignableUsers ?? 0,
+          serviceCaseServiceChainReads: phaseDurationsMs.serviceCaseServiceChainReads ?? 0,
+          timelineChainEventsActorMapReads: phaseDurationsMs.timelineChainEventsActorMapReads ?? 0,
+          customerAttemptSummaryReads: phaseDurationsMs.customerAttemptSummaryReads ?? 0,
+          remainingCompositionPrep: phaseDurationsMs.remainingCompositionPrep ?? 0,
+        },
+      }),
+    );
+  };
+
   const showEccNotice = notice === "ecc_test_required";
 
   const supabase = await createClient();
@@ -646,6 +696,7 @@ export default async function JobDetailPage({
   if (actorResolution.kind === "unauthorized") {
     redirect("/login");
   }
+  completePhase("authInternalResolution");
 
   const internalUser = actorResolution.internalUser;
   const contractors = await getContractors(internalUser.account_owner_user_id);
@@ -665,6 +716,7 @@ export default async function JobDetailPage({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
+  completePhase("billingModeBusinessIdentity");
 
   // Explicit same-account internal scoped-job preflight: deny before main job-detail read assembly
   const scopedReadJob = await loadScopedInternalJobDetailReadBoundary({
@@ -674,6 +726,7 @@ export default async function JobDetailPage({
   if (!scopedReadJob?.id) {
     return notFound();
   }
+  completePhase("scopedJobDetailReadBoundary");
 
   const { data: job, error: jobError } = await supabase
     .from("jobs")
@@ -768,6 +821,7 @@ export default async function JobDetailPage({
   if (jobError) throw jobError;
   if (!job) return notFound();
   if (job.deleted_at) redirect("/ops?saved=job_archived");
+  completePhase("mainJobLoad");
 
   const internalInvoice =
     isInternalUser && billingMode === "internal_invoicing"
@@ -778,6 +832,7 @@ export default async function JobDetailPage({
     isInternalUser && billingMode === "internal_invoicing" && !internalInvoice
       ? await resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId })
       : null;
+  completePhase("internalInvoiceRead");
 
   const internalInvoiceEmailDeliveries: InternalInvoiceEmailDeliveryRecord[] =
     isInternalUser && internalInvoice
@@ -796,6 +851,7 @@ export default async function JobDetailPage({
           supabase,
         )
       : null;
+  completePhase("invoiceLedgerDeliveryReads");
 
   let pricebookPickerItems: Array<{
     id: string;
@@ -833,6 +889,7 @@ export default async function JobDetailPage({
       unit_label: String(row?.unit_label ?? "").trim() || null,
     }));
   }
+  completePhase("pricebookPickerRead");
 
   const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
     supabase,
@@ -855,6 +912,7 @@ export default async function JobDetailPage({
   const assignmentCandidates = assignableInternalUsers.filter(
     (row) => !assignedUserIds.has(String(row.user_id ?? "").trim()),
   );
+  completePhase("assignmentDisplayMapAssignableUsers");
 
   // --- Linked Jobs (Parent + Children) ---
 const parentJobId = (job as any).parent_job_id as string | null;
@@ -924,6 +982,7 @@ for (const [rowJobId, run] of latestFailedServiceChainRunByJob.entries()) {
   const primaryReason = String(extractFailureReasons(run)[0] ?? "").trim();
   if (primaryReason) serviceChainFailureReasonByJob.set(rowJobId, primaryReason);
 }
+completePhase("serviceCaseServiceChainReads");
 
 const { data: timelineJobs, error: timelineJobsErr } = await supabase
   .from("jobs")
@@ -964,6 +1023,7 @@ const actorDisplayMap = await resolveUserDisplayMap({
   supabase,
   userIds: timelineActorIds,
 });
+completePhase("timelineChainEventsActorMapReads");
 
 const eventsForCurrentJob = (timelineEvents ?? []).filter(
   (e: any) => String(e?.job_id ?? "") === String(job.id ?? "")
@@ -1022,6 +1082,7 @@ const onTheWayUndoEligibility = await getOnTheWayUndoEligibility(jobId);
     .maybeSingle();
 
   if (latestAttemptErr) throw new Error(latestAttemptErr.message);
+  completePhase("customerAttemptSummaryReads");
 
 const contractorId = job.contractor_id ?? null;
 const customerId = job.customer_id ?? null;
@@ -1308,6 +1369,7 @@ try {
 } catch {
   visitScopeItems = [];
 }
+  completePhase("remainingCompositionPrep");
 const visitScopeCount = visitScopeItems.length;
 const hasVisitScopeDefined = Boolean(visitScopeSummary) || visitScopeCount > 0;
 const visitScopeHeaderPreview = buildVisitScopeReadModel(visitScopeSummary, visitScopeItems, {
@@ -1665,6 +1727,12 @@ const renderTimelineItem = (e: any, key: string) => {
     type === "failure_resolved_by_correction_review" ? "✅" :
     type === "contractor_correction_submission" ? "📎" :
     "📝";
+
+  emitTimingLog({
+    invoicePanelActive: showInternalInvoicePanel,
+    serviceCaseExists: Boolean(serviceCaseId),
+    timelineChainExists: hasDirectNarrativeChain,
+  });
 
   return (
     <div key={key} className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3 text-sm shadow-[0_10px_24px_-24px_rgba(15,23,42,0.35)]">
