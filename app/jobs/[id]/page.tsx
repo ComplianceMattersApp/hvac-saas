@@ -682,6 +682,22 @@ export default async function JobDetailPage({
     phaseDurationsMs[phaseName] = durationMs;
   };
 
+  const timedPhase = async <T,>(phaseName: string, factory: () => Promise<T>) => {
+    const startMs = timingEnabled ? Date.now() : 0;
+    try {
+      const value = await factory();
+      if (timingEnabled) {
+        setPhaseValue(phaseName, Date.now() - startMs);
+      }
+      return value;
+    } catch (error) {
+      if (timingEnabled) {
+        setPhaseValue(phaseName, Date.now() - startMs);
+      }
+      throw error;
+    }
+  };
+
   const emitTimingLog = (details: {
     invoicePanelActive: boolean;
     serviceCaseExists: boolean;
@@ -864,78 +880,267 @@ export default async function JobDetailPage({
   if (job.deleted_at) redirect("/ops?saved=job_archived");
   completePhase("mainJobLoad");
 
-  const internalInvoice =
-    isInternalUser && billingMode === "internal_invoicing"
-      ? await resolveInternalInvoiceByJobId({ supabase, jobId })
-      : null;
+  const parentJobId = (job as any).parent_job_id as string | null;
+  const retestRootId = parentJobId ?? jobId;
+  const serviceCaseId = (job as any).service_case_id as string | null;
+  const contractorId = job.contractor_id ?? null;
+  const customerId = job.customer_id ?? null;
 
-  const latestVoidedInternalInvoice =
-    isInternalUser && billingMode === "internal_invoicing" && !internalInvoice
-      ? await resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId })
-      : null;
-  completePhase("internalInvoiceRead");
+  const internalInvoiceStatePromise = timedPhase("internalInvoiceRead", async () => {
+    const internalInvoice =
+      isInternalUser && billingMode === "internal_invoicing"
+        ? await resolveInternalInvoiceByJobId({ supabase, jobId })
+        : null;
 
-  const internalInvoiceEmailDeliveries: InternalInvoiceEmailDeliveryRecord[] =
-    isInternalUser && internalInvoice
-      ? await resolveInternalInvoiceEmailDeliveries({
+    const latestVoidedInternalInvoice =
+      isInternalUser && billingMode === "internal_invoicing" && !internalInvoice
+        ? await resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId })
+        : null;
+
+    return {
+      internalInvoice,
+      latestVoidedInternalInvoice,
+    };
+  });
+
+  const assignmentDisplayPromise = timedPhase("assignmentDisplayMapAssignableUsers", async () => {
+    return getActiveJobAssignmentDisplayMap({
+      supabase,
+      jobIds: [String(job.id ?? jobId)],
+    });
+  });
+
+  const serviceCaseSummaryPromise = timedPhase("serviceCaseServiceChainReads", async () => {
+    const [{ data: serviceCase, error: serviceCaseErr }, { count: serviceCaseVisitCountRaw, error: serviceCaseVisitCountErr }] = await Promise.all([
+      serviceCaseId
+        ? supabase
+            .from("service_cases")
+            .select("id, case_kind")
+            .eq("id", serviceCaseId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      serviceCaseId
+        ? supabase
+            .from("jobs")
+            .select("id", { count: "exact", head: true })
+            .eq("service_case_id", serviceCaseId)
+            .is("deleted_at", null)
+        : Promise.resolve({ count: 0, error: null }),
+    ]);
+
+    if (serviceCaseErr) throw new Error(serviceCaseErr.message);
+    if (serviceCaseVisitCountErr) throw new Error(serviceCaseVisitCountErr.message);
+
+    return {
+      serviceCase,
+      serviceCaseVisitCountRaw,
+    };
+  });
+
+  const timelineSummaryPromise = timedPhase("timelineChainEventsActorMapReads", async () => {
+    const { data: timelineJobs, error: timelineJobsErr } = await supabase
+      .from("jobs")
+      .select("id")
+      .is("deleted_at", null)
+      .or(`id.eq.${retestRootId},parent_job_id.eq.${retestRootId}`)
+      .limit(50);
+
+    if (timelineJobsErr) throw new Error(timelineJobsErr.message);
+
+    const timelineJobIds = (timelineJobs ?? []).map((j: any) => String(j.id ?? "")).filter(Boolean);
+    const hasDirectNarrativeChain = timelineJobIds.some((id) => id !== jobId);
+    const narrativeScopeJobIds = timelineJobIds.length ? timelineJobIds : [jobId];
+
+    const { data: narrativeSummaryEvents, error: narrativeSummaryEventsErr } = await supabase
+      .from("job_events")
+      .select("job_id, event_type, created_at")
+      .in("job_id", narrativeScopeJobIds)
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (narrativeSummaryEventsErr) throw new Error(narrativeSummaryEventsErr.message);
+
+    const narrativeSummaryWindow = (narrativeSummaryEvents ?? []) as Array<{
+      job_id?: string | null;
+      event_type?: string | null;
+      created_at?: string | null;
+    }>;
+
+    const sharedSummaryWindow = narrativeSummaryWindow.filter((eventRow) =>
+      ["contractor_note", "public_note", "contractor_correction_submission"].includes(String(eventRow?.event_type ?? "")),
+    );
+    const internalSummaryWindow = narrativeSummaryWindow.filter(
+      (eventRow) => String(eventRow?.event_type ?? "") === "internal_note",
+    );
+
+    const contractorResponseEvents = narrativeSummaryWindow
+      .filter((eventRow) => String(eventRow?.job_id ?? "") === jobId)
+      .map((eventRow) => ({
+        event_type: eventRow.event_type,
+        created_at: eventRow.created_at,
+      }));
+
+    return {
+      timelineJobIds,
+      hasDirectNarrativeChain,
+      narrativeScopeJobIds,
+      narrativeSummaryWindow,
+      sharedSummaryWindow,
+      internalSummaryWindow,
+      contractorResponseEvents,
+    };
+  });
+
+  const customerAttemptSummaryPromise = timedPhase("customerAttemptSummaryReads", async () => {
+    const {
+      data: latestCustomerAttemptRows,
+      count: customerAttemptCount,
+      error: customerAttemptSummaryErr,
+    } = await supabase
+      .from("job_events")
+      .select("created_at", { count: "exact" })
+      .eq("job_id", jobId)
+      .eq("event_type", "customer_attempt")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (customerAttemptSummaryErr) throw new Error(customerAttemptSummaryErr.message);
+
+    return {
+      latestCustomerAttempt: latestCustomerAttemptRows?.[0] ?? null,
+      customerAttemptCount,
+    };
+  });
+
+  const onTheWayUndoEligibilityPromise = Promise.resolve(getOnTheWayUndoEligibility(jobId));
+
+  const contractorBillingPromise = contractorId
+    ? supabase
+        .from("contractors")
+        .select(
+          "id, name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip"
+        )
+        .eq("id", contractorId)
+        .maybeSingle()
+    : Promise.resolve({ data: null });
+
+  const customerBillingPromise = customerId
+    ? supabase
+        .from("customers")
+        .select(
+          "id, full_name, first_name, last_name, phone, email, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip"
+        )
+        .eq("id", customerId)
+        .maybeSingle()
+    : Promise.resolve({ data: null });
+
+  const { internalInvoice, latestVoidedInternalInvoice } = await internalInvoiceStatePromise;
+
+  const invoiceKnownReadsPromise = (async () => {
+    if (!(isInternalUser && internalInvoice)) {
+      setPhaseValue("invoiceLedgerDeliveryReads", 0);
+      setPhaseValue("pricebookPickerRead", 0);
+      return {
+        internalInvoiceEmailDeliveries: [] as InternalInvoiceEmailDeliveryRecord[],
+        internalInvoicePaymentLedger: null,
+        pricebookPickerItems: [] as Array<{
+          id: string;
+          item_name: string;
+          item_type: string;
+          category: string | null;
+          default_description: string | null;
+          default_unit_price: number;
+          unit_label: string | null;
+        }>,
+      };
+    }
+
+    const internalInvoiceEmailDeliveriesPromise = timedPhase("invoiceLedgerDeliveryReads", async () => {
+      const [internalInvoiceEmailDeliveries, internalInvoicePaymentLedger] = await Promise.all([
+        resolveInternalInvoiceEmailDeliveries({
           supabase,
           jobId,
           invoiceId: internalInvoice.id,
-        })
-      : [];
-
-  const internalInvoicePaymentLedger =
-    isInternalUser && internalInvoice
-      ? await resolveInvoiceCollectedPaymentLedger(
+        }),
+        resolveInvoiceCollectedPaymentLedger(
           internalUser.account_owner_user_id,
           internalInvoice.id,
           supabase,
-        )
-      : null;
-  completePhase("invoiceLedgerDeliveryReads");
+        ),
+      ]);
 
-  let pricebookPickerItems: Array<{
-    id: string;
-    item_name: string;
-    item_type: string;
-    category: string | null;
-    default_description: string | null;
-    default_unit_price: number;
-    unit_label: string | null;
-  }> = [];
+      return {
+        internalInvoiceEmailDeliveries,
+        internalInvoicePaymentLedger,
+      };
+    });
 
-  if (
-    isInternalUser &&
-    billingMode === "internal_invoicing" &&
-    internalInvoice?.status === "draft"
-  ) {
-    const { data: pricebookRows, error: pricebookRowsErr } = await supabase
-      .from("pricebook_items")
-      .select("id, item_name, item_type, category, default_description, default_unit_price, unit_label")
-      .eq("account_owner_user_id", internalUser.account_owner_user_id)
-      .eq("is_active", true)
-      .in("item_type", ["service", "material", "diagnostic"])
-      .gte("default_unit_price", 0)
-      .order("item_name", { ascending: true });
+    const pricebookPickerItemsPromise = timedPhase("pricebookPickerRead", async () => {
+      if (!(billingMode === "internal_invoicing" && internalInvoice.status === "draft")) {
+        return [] as Array<{
+          id: string;
+          item_name: string;
+          item_type: string;
+          category: string | null;
+          default_description: string | null;
+          default_unit_price: number;
+          unit_label: string | null;
+        }>;
+      }
 
-    if (pricebookRowsErr) throw pricebookRowsErr;
+      const { data: pricebookRows, error: pricebookRowsErr } = await supabase
+        .from("pricebook_items")
+        .select("id, item_name, item_type, category, default_description, default_unit_price, unit_label")
+        .eq("account_owner_user_id", internalUser.account_owner_user_id)
+        .eq("is_active", true)
+        .in("item_type", ["service", "material", "diagnostic"])
+        .gte("default_unit_price", 0)
+        .order("item_name", { ascending: true });
 
-    pricebookPickerItems = (pricebookRows ?? []).map((row: any) => ({
-      id: String(row?.id ?? "").trim(),
-      item_name: String(row?.item_name ?? "").trim(),
-      item_type: String(row?.item_type ?? "").trim(),
-      category: String(row?.category ?? "").trim() || null,
-      default_description: String(row?.default_description ?? "").trim() || null,
-      default_unit_price: Number(row?.default_unit_price ?? 0) || 0,
-      unit_label: String(row?.unit_label ?? "").trim() || null,
-    }));
-  }
-  completePhase("pricebookPickerRead");
+      if (pricebookRowsErr) throw pricebookRowsErr;
 
-  const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
-    supabase,
-    jobIds: [String(job.id ?? jobId)],
-  });
+      return (pricebookRows ?? []).map((row: any) => ({
+        id: String(row?.id ?? "").trim(),
+        item_name: String(row?.item_name ?? "").trim(),
+        item_type: String(row?.item_type ?? "").trim(),
+        category: String(row?.category ?? "").trim() || null,
+        default_description: String(row?.default_description ?? "").trim() || null,
+        default_unit_price: Number(row?.default_unit_price ?? 0) || 0,
+        unit_label: String(row?.unit_label ?? "").trim() || null,
+      }));
+    });
+
+    const [invoiceLedgerDeliveryReads, pricebookPickerItems] = await Promise.all([
+      internalInvoiceEmailDeliveriesPromise,
+      pricebookPickerItemsPromise,
+    ]);
+
+    return {
+      internalInvoiceEmailDeliveries: invoiceLedgerDeliveryReads.internalInvoiceEmailDeliveries,
+      internalInvoicePaymentLedger: invoiceLedgerDeliveryReads.internalInvoicePaymentLedger,
+      pricebookPickerItems,
+    };
+  })();
+
+  const [
+    activeAssignmentDisplayMap,
+    serviceCaseSummary,
+    timelineSummary,
+    customerAttemptSummary,
+    onTheWayUndoEligibility,
+    { data: contractorBilling },
+    { data: customerBilling },
+    invoiceKnownReads,
+  ] = await Promise.all([
+    assignmentDisplayPromise,
+    serviceCaseSummaryPromise,
+    timelineSummaryPromise,
+    customerAttemptSummaryPromise,
+    onTheWayUndoEligibilityPromise,
+    contractorBillingPromise,
+    customerBillingPromise,
+    invoiceKnownReadsPromise,
+  ]);
 
   const assignedTeam =
     activeAssignmentDisplayMap[String(job.id ?? jobId)] ?? [];
@@ -944,143 +1149,46 @@ export default async function JobDetailPage({
     .map((row) => String(row.user_id ?? "").trim())
     .filter(Boolean);
 
-  completePhase("assignmentDisplayMapAssignableUsers");
+  const { serviceCase, serviceCaseVisitCountRaw } = serviceCaseSummary;
+  const {
+    timelineJobIds,
+    hasDirectNarrativeChain,
+    narrativeScopeJobIds,
+    narrativeSummaryWindow,
+    sharedSummaryWindow,
+    internalSummaryWindow,
+    contractorResponseEvents,
+  } = timelineSummary;
 
-  // --- Linked Jobs (Parent + Children) ---
-const parentJobId = (job as any).parent_job_id as string | null;
-const retestRootId = parentJobId ?? jobId;
+  const contractorResponseTracking = resolveContractorResponseTracking((contractorResponseEvents ?? []) as any[]);
 
-// --- Service Chain (full case history) ---
-const serviceCaseId = (job as any).service_case_id as string | null;
-
-const { data: serviceCase, error: serviceCaseErr } = serviceCaseId
-  ? await supabase
-      .from("service_cases")
-      .select("id, case_kind")
-      .eq("id", serviceCaseId)
-      .maybeSingle()
-  : { data: null, error: null };
-
-if (serviceCaseErr) throw new Error(serviceCaseErr.message);
-
-const { count: serviceCaseVisitCountRaw, error: serviceCaseVisitCountErr } = serviceCaseId
-  ? await supabase
-      .from("jobs")
-      .select("id", { count: "exact", head: true })
-      .eq("service_case_id", serviceCaseId)
-      .is("deleted_at", null)
-  : { count: 0, error: null };
-
-if (serviceCaseVisitCountErr) throw new Error(serviceCaseVisitCountErr.message);
-completePhase("serviceCaseServiceChainReads");
-
-const { data: timelineJobs, error: timelineJobsErr } = await supabase
-  .from("jobs")
-  .select("id")
-  .is("deleted_at", null)
-  .or(`id.eq.${retestRootId},parent_job_id.eq.${retestRootId}`)
-  .limit(50);
-
-if (timelineJobsErr) throw new Error(timelineJobsErr.message);
-
-const timelineJobIds = (timelineJobs ?? []).map((j: any) => String(j.id ?? "")).filter(Boolean);
-const hasDirectNarrativeChain = timelineJobIds.some((id) => id !== jobId);
-
-const narrativeScopeJobIds = timelineJobIds.length ? timelineJobIds : [jobId];
-
-const { data: narrativeSummaryEvents, error: narrativeSummaryEventsErr } = await supabase
-  .from("job_events")
-  .select("job_id, event_type, created_at")
-  .in("job_id", narrativeScopeJobIds)
-  .order("created_at", { ascending: false })
-  .limit(200);
-if (narrativeSummaryEventsErr) throw new Error(narrativeSummaryEventsErr.message);
-completePhase("timelineChainEventsActorMapReads");
-
-const narrativeSummaryWindow = (narrativeSummaryEvents ?? []) as Array<{
-  job_id?: string | null;
-  event_type?: string | null;
-  created_at?: string | null;
-}>;
-
-const sharedSummaryWindow = narrativeSummaryWindow.filter((eventRow) =>
-  ["contractor_note", "public_note", "contractor_correction_submission"].includes(String(eventRow?.event_type ?? "")),
-);
-const internalSummaryWindow = narrativeSummaryWindow.filter(
-  (eventRow) => String(eventRow?.event_type ?? "") === "internal_note",
-);
-
-const contractorResponseEvents = narrativeSummaryWindow
-  .filter((eventRow) => String(eventRow?.job_id ?? "") === jobId)
-  .map((eventRow) => ({
-    event_type: eventRow.event_type,
-    created_at: eventRow.created_at,
-  }));
-
-const contractorResponseTracking = resolveContractorResponseTracking((contractorResponseEvents ?? []) as any[]);
-
-const contractorResponseLabel = contractorResponseTracking.latestReportSentAt
-  ? contractorResponseTracking.waitingOnContractor
-    ? "Waiting on contractor"
-    : contractorResponseTracking.hasContractorResponse && contractorResponseTracking.lastResponseType === "note"
-    ? "Contractor responded"
-    : contractorResponseTracking.hasContractorResponse && contractorResponseTracking.lastResponseType === "correction"
-    ? "Correction submitted"
-    : contractorResponseTracking.hasContractorResponse && contractorResponseTracking.lastResponseType === "retest"
-    ? "Retest requested"
-    : contractorResponseTracking.hasContractorResponse
-    ? "Contractor responded"
-    : null
-  : null;
-
-const contractorResponseSubLabel =
-  contractorResponseTracking.latestReportSentAt &&
-  contractorResponseTracking.hasContractorResponse &&
-  contractorResponseTracking.awaitingInternalReview
-    ? "Awaiting internal review"
+  const contractorResponseLabel = contractorResponseTracking.latestReportSentAt
+    ? contractorResponseTracking.waitingOnContractor
+      ? "Waiting on contractor"
+      : contractorResponseTracking.hasContractorResponse && contractorResponseTracking.lastResponseType === "note"
+      ? "Contractor responded"
+      : contractorResponseTracking.hasContractorResponse && contractorResponseTracking.lastResponseType === "correction"
+      ? "Correction submitted"
+      : contractorResponseTracking.hasContractorResponse && contractorResponseTracking.lastResponseType === "retest"
+      ? "Retest requested"
+      : contractorResponseTracking.hasContractorResponse
+      ? "Contractor responded"
+      : null
     : null;
 
-const onTheWayUndoEligibility = await getOnTheWayUndoEligibility(jobId);
+  const contractorResponseSubLabel =
+    contractorResponseTracking.latestReportSentAt &&
+    contractorResponseTracking.hasContractorResponse &&
+    contractorResponseTracking.awaitingInternalReview
+      ? "Awaiting internal review"
+      : null;
 
+  const { latestCustomerAttempt, customerAttemptCount } = customerAttemptSummary;
   const {
-    data: latestCustomerAttemptRows,
-    count: customerAttemptCount,
-    error: customerAttemptSummaryErr,
-  } = await supabase
-    .from("job_events")
-    .select("created_at", { count: "exact" })
-    .eq("job_id", jobId)
-    .eq("event_type", "customer_attempt")
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  if (customerAttemptSummaryErr) throw new Error(customerAttemptSummaryErr.message);
-
-  const latestCustomerAttempt = latestCustomerAttemptRows?.[0] ?? null;
-  completePhase("customerAttemptSummaryReads");
-
-const contractorId = job.contractor_id ?? null;
-const customerId = job.customer_id ?? null;
-
-const { data: contractorBilling } = contractorId
-  ? await supabase
-      .from("contractors")
-      .select(
-        "id, name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip"
-      )
-      .eq("id", contractorId)
-      .maybeSingle()
-  : { data: null };
-
-const { data: customerBilling } = customerId
-  ? await supabase
-      .from("customers")
-      .select(
-        "id, full_name, first_name, last_name, phone, email, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip"
-      )
-      .eq("id", customerId)
-      .maybeSingle()
-  : { data: null };
+    internalInvoiceEmailDeliveries,
+    internalInvoicePaymentLedger,
+    pricebookPickerItems,
+  } = invoiceKnownReads;
 
 
   const attemptCount = customerAttemptCount ?? 0;
@@ -1432,7 +1540,7 @@ const internalInvoiceRecipientContact = [
 const internalInvoiceHasNotes = String(internalInvoice?.notes ?? "").trim().length > 0;
 const latestInternalInvoiceEmailDelivery = internalInvoiceEmailDeliveries[0] ?? null;
 const latestSuccessfulInternalInvoiceEmailDelivery =
-  internalInvoiceEmailDeliveries.find((delivery) => delivery.status === "sent") ?? null;
+  internalInvoiceEmailDeliveries.find((delivery: InternalInvoiceEmailDeliveryRecord) => delivery.status === "sent") ?? null;
 const lastInternalInvoiceSentLabel = latestSuccessfulInternalInvoiceEmailDelivery?.sentAt
   ? formatDateTimeLAFromIso(String(latestSuccessfulInternalInvoiceEmailDelivery.sentAt))
   : "";
@@ -3860,7 +3968,7 @@ emitTimingLog({
               </div>
 
               <div className="mt-4 space-y-3">
-                {internalInvoiceEmailDeliveries.map((delivery) => (
+                {internalInvoiceEmailDeliveries.map((delivery: InternalInvoiceEmailDeliveryRecord) => (
                   <div key={delivery.id} className="rounded-lg border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-700">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="font-semibold text-slate-900">
