@@ -53,7 +53,6 @@ import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import {
   getActiveJobAssignmentDisplayMap,
-  resolveUserDisplayMap,
 } from "@/lib/staffing/human-layer";
 import {
   type BillingMode,
@@ -97,6 +96,9 @@ import DeferredJobAttachmentsInternal from "./_components/DeferredJobAttachments
 import DeferredCustomerAttemptsHistory from "./_components/DeferredCustomerAttemptsHistory";
 import DeferredServiceChainPanelBody from "./_components/DeferredServiceChainPanelBody";
 import DeferredAddAssigneeForm from "./_components/DeferredAddAssigneeForm";
+import DeferredTimelineBody from "./_components/DeferredTimelineBody";
+import DeferredSharedNotesBody from "./_components/DeferredSharedNotesBody";
+import DeferredInternalNotesBody from "./_components/DeferredInternalNotesBody";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "./_components/InternalInvoiceLineItemsTable";
@@ -307,6 +309,32 @@ function ServiceChainPanelBodyFallback() {
         <div
           key={index}
           className="h-24 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
+        />
+      ))}
+    </div>
+  );
+}
+
+function NarrativeNotesBodyFallback() {
+  return (
+    <div className="space-y-2" aria-busy="true" aria-live="polite">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div
+          key={index}
+          className="h-20 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
+        />
+      ))}
+    </div>
+  );
+}
+
+function NarrativeTimelineBodyFallback() {
+  return (
+    <div className="space-y-2" aria-busy="true" aria-live="polite">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div
+          key={index}
+          className="h-28 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
         />
       ))}
     </div>
@@ -958,40 +986,38 @@ if (timelineJobsErr) throw new Error(timelineJobsErr.message);
 const timelineJobIds = (timelineJobs ?? []).map((j: any) => String(j.id ?? "")).filter(Boolean);
 const hasDirectNarrativeChain = timelineJobIds.some((id) => id !== jobId);
 
-// --- Unified Timeline (job_events) ---
-const { data: timelineEvents, error: tlErr } = await supabase
+const narrativeScopeJobIds = timelineJobIds.length ? timelineJobIds : [jobId];
+
+const { data: narrativeSummaryEvents, error: narrativeSummaryEventsErr } = await supabase
   .from("job_events")
-  .select("id, job_id, created_at, event_type, message, meta, user_id")
-  .in("job_id", timelineJobIds.length ? timelineJobIds : [jobId])
+  .select("job_id, event_type, created_at")
+  .in("job_id", narrativeScopeJobIds)
   .order("created_at", { ascending: false })
   .limit(200);
-if (tlErr) throw new Error(tlErr.message);
-
-const timelineActorIds = Array.from(
-  new Set(
-    (timelineEvents ?? [])
-      .flatMap((e: any) => {
-        const meta = e?.meta && typeof e.meta === "object" && !Array.isArray(e.meta) ? e.meta : null;
-        return [
-          String(e?.user_id ?? "").trim(),
-          String(meta?.actor_user_id ?? "").trim(),
-        ];
-      })
-      .filter(Boolean),
-  ),
-);
-
-const actorDisplayMap = await resolveUserDisplayMap({
-  supabase,
-  userIds: timelineActorIds,
-});
+if (narrativeSummaryEventsErr) throw new Error(narrativeSummaryEventsErr.message);
 completePhase("timelineChainEventsActorMapReads");
 
-const eventsForCurrentJob = (timelineEvents ?? []).filter(
-  (e: any) => String(e?.job_id ?? "") === String(job.id ?? "")
+const narrativeSummaryWindow = (narrativeSummaryEvents ?? []) as Array<{
+  job_id?: string | null;
+  event_type?: string | null;
+  created_at?: string | null;
+}>;
+
+const sharedSummaryWindow = narrativeSummaryWindow.filter((eventRow) =>
+  ["contractor_note", "public_note", "contractor_correction_submission"].includes(String(eventRow?.event_type ?? "")),
+);
+const internalSummaryWindow = narrativeSummaryWindow.filter(
+  (eventRow) => String(eventRow?.event_type ?? "") === "internal_note",
 );
 
-const contractorResponseTracking = resolveContractorResponseTracking(eventsForCurrentJob as any[]);
+const contractorResponseEvents = narrativeSummaryWindow
+  .filter((eventRow) => String(eventRow?.job_id ?? "") === jobId)
+  .map((eventRow) => ({
+    event_type: eventRow.event_type,
+    created_at: eventRow.created_at,
+  }));
+
+const contractorResponseTracking = resolveContractorResponseTracking((contractorResponseEvents ?? []) as any[]);
 
 const contractorResponseLabel = contractorResponseTracking.latestReportSentAt
   ? contractorResponseTracking.waitingOnContractor
@@ -1015,16 +1041,6 @@ const contractorResponseSubLabel =
     : null;
 
 const onTheWayUndoEligibility = await getOnTheWayUndoEligibility(jobId);
-
-  const sharedNotes = (timelineEvents ?? []).filter((e: any) =>
-    ["contractor_note", "public_note", "contractor_correction_submission"].includes(
-      String(e?.event_type ?? "")
-    )
-  );
-
-  const internalNotes = (timelineEvents ?? []).filter(
-    (e: any) => String(e?.event_type ?? "") === "internal_note"
-  );
 
   const {
     data: latestCustomerAttemptRows,
@@ -1567,9 +1583,9 @@ const equipmentSummaryLabel =
     ? `${equipmentCount} item(s) linked to this job`
     : "No equipment on file yet.";
 
-const timelineItems = timelineEvents ?? [];
-const timelinePreviewItems = timelineItems.slice(0, 3);
-const timelineOverflowItems = timelineItems.slice(3);
+const timelineEventCount = narrativeSummaryWindow.length;
+const sharedNotesCount = sharedSummaryWindow.length;
+const internalNotesCount = internalSummaryWindow.length;
 
 const followUpOwnerLabel = String((job as any).action_required_by ?? "").trim();
 const followUpDateValue = String((job as any).follow_up_date ?? "").trim();
@@ -1600,9 +1616,9 @@ const serviceChainSummaryText = serviceCaseId
 const eccSummaryText = job.ecc_test_runs?.length
   ? "Recorded test history with direct workspace access."
   : "No ECC runs recorded yet.";
-const latestSharedNoteAt = sharedNotes[0]?.created_at ? formatDateLAFromIso(String(sharedNotes[0].created_at)) : "";
-const latestInternalNoteAt = internalNotes[0]?.created_at ? formatDateLAFromIso(String(internalNotes[0].created_at)) : "";
-const latestTimelineAt = timelineItems[0]?.created_at ? formatDateTimeLAFromIso(String(timelineItems[0].created_at)) : "";
+const latestSharedNoteAt = sharedSummaryWindow[0]?.created_at ? formatDateLAFromIso(String(sharedSummaryWindow[0].created_at)) : "";
+const latestInternalNoteAt = internalSummaryWindow[0]?.created_at ? formatDateLAFromIso(String(internalSummaryWindow[0].created_at)) : "";
+const latestTimelineAt = narrativeSummaryWindow[0]?.created_at ? formatDateTimeLAFromIso(String(narrativeSummaryWindow[0].created_at)) : "";
 const sharedNotesTitle = hasDirectNarrativeChain ? "Shared Notes Across Job Chain" : "Shared Notes";
 const internalNotesTitle = hasDirectNarrativeChain ? "Internal Notes Across Job Chain" : "Internal Notes";
 const timelineTitle = hasDirectNarrativeChain ? "Job Chain Timeline" : "Timeline";
@@ -1640,154 +1656,11 @@ const failureResolutionSummaryText = showRetestSection && showCorrectionReviewRe
   ? "Create a retest visit when a physical return is required."
   : "Resolve this failure through correction review only when a return visit is not needed.";
 const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrectionReviewResolution);
-
-const renderTimelineItem = (e: any, key: string) => {
-  const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "—";
-  const type = String(e?.event_type ?? "");
-  const meta = e?.meta ?? {};
-  const actorUserId = String(meta?.actor_user_id ?? e?.user_id ?? "").trim();
-  const actorDisplayName = actorUserId ? actorDisplayMap[actorUserId] ?? "User" : "";
-  const detailText = formatTimelineDetail(type, meta, e?.message);
-  const title = ["public_note", "contractor_note", "contractor_correction_submission"].includes(type)
-    ? formatSharedHistoryHeading(type, meta)
-    : formatTimelineEvent(type, meta, e?.message);
-
-  const icon =
-    type === "job_created" ? "🆕" :
-    type === "intake_submitted" ? "📥" :
-    type === "retest_created" ? "🔁" :
-    type === "customer_attempt" ? "📞" :
-    type === "status_changed" ? "🔄" :
-    type === "on_my_way" ? "🚗" :
-    type === "on_the_way_reverted" ? "↩️" :
-    type === "job_started" ? "🛠️" :
-    type === "job_completed" ? "🏁" :
-    type === "job_failed" ? "❌" :
-    type === "job_passed" ? "✅" :
-    type === "scheduled" ? "📅" :
-    type === "unscheduled" ? "🗓️" :
-    type === "retest_scheduled" ? "📅" :
-    type === "retest_started" ? "🛠️" :
-    type === "retest_passed" ? "✅" :
-    type === "retest_failed" ? "❌" :
-    type === "schedule_updated" ? "🕒" :
-    type === "contractor_note" ? "💬" :
-    type === "public_note" ? "💬" :
-    type === "internal_note" ? "📝" :
-    type === "internal_invoice_drafted" ? "🧾" :
-    type === "internal_invoice_issued" ? "🧾" :
-    type === "internal_invoice_voided" ? "⛔" :
-    type === "internal_invoice_email_sent" ? "✉️" :
-    type === "internal_invoice_email_resent" ? "📨" :
-    type === "internal_invoice_email_failed" ? "⚠️" :
-    type === "payment_recorded" ? "💵" :
-    type === "companion_scope_promoted" ? "🔀" :
-    type === "created_from_companion_scope" ? "🧰" :
-    type === "failure_resolved_by_correction_review" ? "✅" :
-    type === "contractor_correction_submission" ? "📎" :
-    "📝";
-
-  emitTimingLog({
-    invoicePanelActive: showInternalInvoicePanel,
-    serviceCaseExists: Boolean(serviceCaseId),
-    timelineChainExists: hasDirectNarrativeChain,
-  });
-
-  return (
-    <div key={key} className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3 text-sm shadow-[0_10px_24px_-24px_rgba(15,23,42,0.35)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="text-xs font-medium text-slate-500">{when}</div>
-        <div className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-xs text-slate-500">{icon}</div>
-      </div>
-
-      <div className="mt-2 font-medium text-slate-950">
-        {title}
-      </div>
-
-      {detailText ? (
-        <div className="mt-1 text-sm leading-6 text-slate-700">
-          {detailText}
-        </div>
-      ) : null}
-
-      {actorDisplayName ? (
-        <div className="mt-1 text-xs text-slate-500">By {actorDisplayName}</div>
-      ) : null}
-
-      {type === "retest_created" && meta?.child_job_id ? (
-        <div className="mt-1 text-sm">
-          Retest:{" "}
-          <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
-            View linked retest
-          </Link>
-        </div>
-      ) : null}
-
-      {type === "retest_created" && meta?.parent_job_id ? (
-        <div className="mt-1 text-sm">
-          Original:{" "}
-          <Link className="underline" href={`/jobs/${String(meta.parent_job_id)}?tab=ops`}>
-            View original job
-          </Link>
-        </div>
-      ) : null}
-
-      {type === "retest_passed" && meta?.child_job_id ? (
-        <div className="mt-1 text-sm">
-          Resolved by retest:{" "}
-          <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
-            View retest job
-          </Link>
-        </div>
-      ) : null}
-
-      {type === "retest_scheduled" && meta?.child_job_id ? (
-        <div className="mt-1 text-sm">
-          Retest scheduled:{" "}
-          <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
-            View retest job
-          </Link>
-        </div>
-      ) : null}
-
-      {type === "retest_started" && meta?.child_job_id ? (
-        <div className="mt-1 text-sm">
-          Active retest:{" "}
-          <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
-            View retest job
-          </Link>
-        </div>
-      ) : null}
-
-      {type === "retest_failed" && meta?.child_job_id ? (
-        <div className="mt-1 text-sm">
-          Retest failed again:{" "}
-          <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
-            View retest job
-          </Link>
-        </div>
-      ) : null}
-
-      {type === "companion_scope_promoted" && meta?.promoted_service_job_id ? (
-        <div className="mt-1 text-sm">
-          Service follow-up:{" "}
-          <Link className="underline" href={`/jobs/${String(meta.promoted_service_job_id)}?tab=info`}>
-            View service job
-          </Link>
-        </div>
-      ) : null}
-
-      {type === "created_from_companion_scope" && meta?.source_job_id ? (
-        <div className="mt-1 text-sm">
-          Source ECC job:{" "}
-          <Link className="underline" href={`/jobs/${String(meta.source_job_id)}?tab=info`}>
-            View source job
-          </Link>
-        </div>
-      ) : null}
-    </div>
-  );
-};
+emitTimingLog({
+  invoicePanelActive: showInternalInvoicePanel,
+  serviceCaseExists: Boolean(serviceCaseId),
+  timelineChainExists: hasDirectNarrativeChain,
+});
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-[88rem] space-y-5 overflow-x-hidden p-4 sm:p-6">
@@ -4430,7 +4303,7 @@ const renderTimelineItem = (e: any, key: string) => {
         {/* Shared Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} meta={`${sharedNotes.length} note${sharedNotes.length === 1 ? "" : "s"}`} metaTone={sharedNotes.length > 0 ? "note-highlight" : "default"} />
+            <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} meta={`${sharedNotesCount} note${sharedNotesCount === 1 ? "" : "s"}`} metaTone={sharedNotesCount > 0 ? "note-highlight" : "default"} />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -4456,59 +4329,21 @@ const renderTimelineItem = (e: any, key: string) => {
     </div>
   </form>
 
-  <div className="space-y-3">
-    {sharedNotes.length ? (
-      sharedNotes.map((e: any, idx: number) => {
-        const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "—";
-        const type = String(e?.event_type ?? "");
-        const meta = e?.meta ?? {};
-        const noteText = getEventNoteText(meta);
-        const attachmentLabel = getEventAttachmentLabel(meta);
-
-        return (
-          <div key={idx} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="text-xs text-slate-500">{when}</div>
-              <div className="text-xs font-medium text-slate-500">
-                {type === "contractor_note"
-                  ? "Contractor"
-                  : type === "public_note"
-                  ? "Internal (shared)"
-                  : type === "contractor_correction_submission"
-                  ? "Correction submission"
-                  : "Shared"}
-              </div>
-            </div>
-
-            <div className="mt-2 text-sm font-medium text-slate-950">
-              {formatSharedHistoryHeading(type, meta)}
-            </div>
-
-            {noteText ? (
-              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
-                {noteText}
-              </div>
-            ) : null}
-
-            {attachmentLabel ? (
-              <div className="mt-2 inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
-                {attachmentLabel}
-              </div>
-            ) : null}
-          </div>
-        );
-      })
-    ) : (
-      <div className={workspaceEmptyStateClass}>{hasDirectNarrativeChain ? "No shared notes in this direct retest chain yet." : "No shared notes yet."}</div>
-    )}
-  </div>
+  <Suspense fallback={<NarrativeNotesBodyFallback />}>
+    <DeferredSharedNotesBody
+      jobId={String(job.id)}
+      timelineJobIds={narrativeScopeJobIds}
+      hasDirectNarrativeChain={hasDirectNarrativeChain}
+      emptyStateClassName={workspaceEmptyStateClass}
+    />
+  </Suspense>
           </div>
         </details>
 
         {/* Internal Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} meta={`${internalNotes.length} note${internalNotes.length === 1 ? "" : "s"}`} metaTone={internalNotes.length > 0 ? "note-highlight" : "default"} />
+            <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} meta={`${internalNotesCount} note${internalNotesCount === 1 ? "" : "s"}`} metaTone={internalNotesCount > 0 ? "note-highlight" : "default"} />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -4534,33 +4369,14 @@ const renderTimelineItem = (e: any, key: string) => {
     </div>
   </form>
 
-  <div className="space-y-3">
-    {internalNotes.length ? (
-      internalNotes.map((e: any, idx: number) => {
-        const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "—";
-        const meta = e?.meta ?? {};
-        const noteText = getEventNoteText(meta);
-
-        return (
-          <div key={idx} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
-            <div className="text-xs text-slate-500">{when}</div>
-
-            <div className="mt-2 text-sm font-medium text-slate-950">
-              Internal note
-            </div>
-
-            {noteText ? (
-              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
-                {noteText}
-              </div>
-            ) : null}
-          </div>
-        );
-      })
-    ) : (
-      <div className={workspaceEmptyStateClass}>{hasDirectNarrativeChain ? "No internal notes in this direct retest chain yet." : "No internal notes yet."}</div>
-    )}
-  </div>
+  <Suspense fallback={<NarrativeNotesBodyFallback />}>
+    <DeferredInternalNotesBody
+      jobId={String(job.id)}
+      timelineJobIds={narrativeScopeJobIds}
+      hasDirectNarrativeChain={hasDirectNarrativeChain}
+      emptyStateClassName={workspaceEmptyStateClass}
+    />
+  </Suspense>
           </div>
         </details>
 
@@ -4635,33 +4451,19 @@ const renderTimelineItem = (e: any, key: string) => {
             <CollapsibleHeader
               title={timelineTitle}
               subtitle={timelineSummaryText}
-              meta={`${timelineItems.length} event(s)`}
+              meta={`${timelineEventCount} event(s)`}
             />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
-    {timelineItems.length ? (
-      <>
-        {timelinePreviewItems.map((e: any, idx: number) =>
-          renderTimelineItem(e, `timeline-preview-${idx}`)
-        )}
-
-        {timelineOverflowItems.length > 0 ? (
-          <details className="pt-1">
-            <summary className="cursor-pointer text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-4">
-              Show all timeline entries ({timelineItems.length})
-            </summary>
-            <div className="mt-2 space-y-2">
-              {timelineOverflowItems.map((e: any, idx: number) =>
-                renderTimelineItem(e, `timeline-overflow-${idx}`)
-              )}
-            </div>
-          </details>
-        ) : null}
-      </>
-    ) : (
-      <div className={workspaceEmptyStateClass}>{hasDirectNarrativeChain ? "No timeline events in this direct retest chain yet." : "No timeline events yet."}</div>
-    )}
+    <Suspense fallback={<NarrativeTimelineBodyFallback />}>
+      <DeferredTimelineBody
+        jobId={String(job.id)}
+        timelineJobIds={narrativeScopeJobIds}
+        hasDirectNarrativeChain={hasDirectNarrativeChain}
+        emptyStateClassName={workspaceEmptyStateClass}
+      />
+    </Suspense>
           </div>
         </details>
       </div>
