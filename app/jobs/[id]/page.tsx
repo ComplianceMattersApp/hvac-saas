@@ -10,7 +10,6 @@ import { archiveJobFromForm } from "@/lib/actions/job-actions";
 import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import {
   getContractors,
-  assignJobAssigneeFromForm,
   setPrimaryJobAssigneeFromForm,
   removeJobAssigneeFromForm,
   updateJobCustomerFromForm,
@@ -53,7 +52,6 @@ import { resolveContractorResponseTracking } from "@/lib/portal/resolveContracto
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import {
-  getAssignableInternalUsers,
   getActiveJobAssignmentDisplayMap,
   resolveUserDisplayMap,
 } from "@/lib/staffing/human-layer";
@@ -97,6 +95,8 @@ import {
 
 import DeferredJobAttachmentsInternal from "./_components/DeferredJobAttachmentsInternal";
 import DeferredCustomerAttemptsHistory from "./_components/DeferredCustomerAttemptsHistory";
+import DeferredServiceChainPanelBody from "./_components/DeferredServiceChainPanelBody";
+import DeferredAddAssigneeForm from "./_components/DeferredAddAssigneeForm";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "./_components/InternalInvoiceLineItemsTable";
@@ -294,6 +294,19 @@ function FollowUpHistorySectionFallback() {
         <div
           key={index}
           className="h-20 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
+        />
+      ))}
+    </div>
+  );
+}
+
+function ServiceChainPanelBodyFallback() {
+  return (
+    <div className="space-y-2" aria-busy="true" aria-live="polite">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div
+          key={index}
+          className="h-24 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
         />
       ))}
     </div>
@@ -899,19 +912,10 @@ export default async function JobDetailPage({
   const assignedTeam =
     activeAssignmentDisplayMap[String(job.id ?? jobId)] ?? [];
 
-  const assignableInternalUsers = isInternalUser
-    ? await getAssignableInternalUsers({ supabase })
-    : [];
+  const assignedUserIds = assignedTeam
+    .map((row) => String(row.user_id ?? "").trim())
+    .filter(Boolean);
 
-  const assignedUserIds = new Set(
-    assignedTeam
-      .map((row) => String(row.user_id ?? "").trim())
-      .filter(Boolean),
-  );
-
-  const assignmentCandidates = assignableInternalUsers.filter(
-    (row) => !assignedUserIds.has(String(row.user_id ?? "").trim()),
-  );
   completePhase("assignmentDisplayMapAssignableUsers");
 
   // --- Linked Jobs (Parent + Children) ---
@@ -931,57 +935,15 @@ const { data: serviceCase, error: serviceCaseErr } = serviceCaseId
 
 if (serviceCaseErr) throw new Error(serviceCaseErr.message);
 
-const { data: serviceChainJobs, error: serviceChainErr } = serviceCaseId
+const { count: serviceCaseVisitCountRaw, error: serviceCaseVisitCountErr } = serviceCaseId
   ? await supabase
       .from("jobs")
-      .select(
-        "id, title, status, ops_status, job_type, created_at, scheduled_date, window_start, window_end, parent_job_id"
-      )
+      .select("id", { count: "exact", head: true })
       .eq("service_case_id", serviceCaseId)
       .is("deleted_at", null)
-      .order("created_at", { ascending: true })
-      .limit(50)
-  : { data: [], error: null };
+  : { count: 0, error: null };
 
-if (serviceChainErr) throw new Error(serviceChainErr.message);
-
-const serviceChainJobIds = (serviceChainJobs ?? []).map((j: any) => j.id);
-
-const { data: serviceChainRuns, error: serviceChainRunsErr } =
-  serviceChainJobIds.length > 0
-    ? await supabase
-        .from("ecc_test_runs")
-        .select(
-          "id, job_id, created_at, test_type, computed, computed_pass, override_pass, is_completed"
-        )
-        .in("job_id", serviceChainJobIds)
-        .eq("is_completed", true)
-        .order("created_at", { ascending: false })
-    : { data: [], error: null };
-
-if (serviceChainRunsErr) throw new Error(serviceChainRunsErr.message);
-
-const latestServiceChainRunByJob = new Map<string, any>();
-const latestFailedServiceChainRunByJob = new Map<string, any>();
-
-for (const run of serviceChainRuns ?? []) {
-  // because we ordered newest first,
-  // the first run we see for a job is the newest one
-  const rowJobId = String(run.job_id ?? "").trim();
-  if (!rowJobId) continue;
-  if (!latestServiceChainRunByJob.has(rowJobId)) {
-    latestServiceChainRunByJob.set(rowJobId, run);
-  }
-  if (finalRunPass(run) === false && !latestFailedServiceChainRunByJob.has(rowJobId)) {
-    latestFailedServiceChainRunByJob.set(rowJobId, run);
-  }
-}
-
-const serviceChainFailureReasonByJob = new Map<string, string>();
-for (const [rowJobId, run] of latestFailedServiceChainRunByJob.entries()) {
-  const primaryReason = String(extractFailureReasons(run)[0] ?? "").trim();
-  if (primaryReason) serviceChainFailureReasonByJob.set(rowJobId, primaryReason);
-}
+if (serviceCaseVisitCountErr) throw new Error(serviceCaseVisitCountErr.message);
 completePhase("serviceCaseServiceChainReads");
 
 const { data: timelineJobs, error: timelineJobsErr } = await supabase
@@ -1592,7 +1554,7 @@ const permitDateLabel = permitDateValue ? displayDateLA(permitDateValue) : "";
 const permitDetailCount = Number(Boolean(permitNumber)) + Number(Boolean(permitJurisdiction)) + Number(Boolean(permitDateValue));
 const hasPermitDetails = permitDetailCount > 0;
 
-const serviceCaseVisitCount = serviceChainJobs?.length ?? 0;
+const serviceCaseVisitCount = serviceCaseVisitCountRaw ?? 0;
 const equipmentItems = Array.isArray(job.job_equipment) ? job.job_equipment : [];
 const equipmentCount = equipmentItems.length;
 const outdoorEquipment = equipmentItems.find((eq: any) => {
@@ -2136,39 +2098,21 @@ const renderTimelineItem = (e: any, key: string) => {
         )}
 
         {isInternalUser ? (
-          <form action={assignJobAssigneeFromForm} className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <input type="hidden" name="job_id" value={job.id} />
-            <input type="hidden" name="tab" value={tab} />
-            <select
-              name="user_id"
-              className={`${workspaceInputClass} w-full min-w-0 sm:w-auto sm:min-w-[14rem]`}
-              required
-              defaultValue=""
-              disabled={assignmentCandidates.length === 0}
-            >
-              <option value="" disabled>
-                {assignmentCandidates.length === 0 ? "No available assignees" : "Select assignee"}
-              </option>
-              {assignmentCandidates.map((candidate) => (
-                <option key={candidate.user_id} value={candidate.user_id}>
-                  {candidate.display_name}
-                </option>
-              ))}
-            </select>
-
-            <label className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
-              <input type="checkbox" name="make_primary" value="1" className="h-3.5 w-3.5" />
-              Set as primary
-            </label>
-
-            <SubmitButton
-              loadingText="Assigning..."
-              disabled={assignmentCandidates.length === 0}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-            >
-              Assign
-            </SubmitButton>
-          </form>
+          <Suspense
+            fallback={
+              <div className="mt-3 flex min-w-0 animate-pulse flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <div className="h-10 w-full rounded-lg bg-slate-100 sm:w-56" />
+                <div className="h-4 w-28 rounded bg-slate-100" />
+                <div className="h-10 w-full rounded-lg bg-slate-100 sm:w-20" />
+              </div>
+            }
+          >
+            <DeferredAddAssigneeForm
+              jobId={String(job.id)}
+              tab={tab}
+              assignedUserIds={assignedUserIds}
+            />
+          </Suspense>
         ) : null}
       </div>
     </div>
@@ -4328,80 +4272,15 @@ const renderTimelineItem = (e: any, key: string) => {
           <div className={workspaceEmptyStateClass}>
             This job is not attached to a service case yet.
           </div>
-        ) : !serviceChainJobs || serviceChainJobs.length === 0 ? (
-          <div className={workspaceEmptyStateClass}>
-            No visits found in this service case.
-          </div>
         ) : (
-          <div className="max-h-96 space-y-2 overflow-auto pr-1 sm:max-h-none sm:overflow-visible sm:pr-0">
-            {serviceChainJobs.map((visit: any, idx: number) => {
-              const visitId = String(visit.id ?? "").trim();
-              const isCurrent = visit.id === jobId;
-              const visitLabel = serviceChainVisitLabel(visit, idx);
-              const failureReason = serviceChainFailureReasonByJob.get(visitId) ?? "";
-              const win =
-                visit.scheduled_date && visit.window_start && visit.window_end
-                  ? `${formatTimeDisplay(visit.window_start)}–${formatTimeDisplay(visit.window_end)}`
-                  : null;
-
-              return (
-                <div
-                  key={visit.id}
-                  className={[
-                    "rounded-xl border p-3.5 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.35)]",
-                    isCurrent ? "border-slate-900/90 bg-slate-50" : "border-slate-200/80 bg-white",
-                  ].join(" ")}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm font-semibold text-slate-950">
-                          {visitLabel}
-                          {isCurrent && (
-                            <span className="text-blue-600"> • Active</span>
-                          )}
-                        </div>
-                        <span
-                          className={[
-                            "inline-flex rounded-md px-2 py-1 text-xs font-semibold",
-                            serviceChainBadgeClass(visit.ops_status, isCurrent),
-                          ].join(" ")}
-                        >
-                          {formatOpsStatusLabel(visit.ops_status)}
-                        </span>
-                      </div>
-
-                      <div className="mt-1 text-sm text-slate-800">
-                        {normalizeRetestLinkedJobTitle(visit.title) || "Untitled Job"}
-                      </div>
-
-                      <div className="mt-1 text-xs text-slate-500">
-                        Created:{" "}
-                        {visit.created_at ? formatDateLAFromIso(String(visit.created_at)) : "—"}
-                        {visit.scheduled_date ? ` • Scheduled: ${formatBusinessDateUS(String(visit.scheduled_date))}` : ""}
-                        {win ? ` • ${win}` : ""}
-                      </div>
-                      {isFailedFamilyOpsStatus(visit.ops_status) && failureReason ? (
-                        <div className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs text-rose-900">
-                          <span className="font-semibold uppercase tracking-[0.08em] text-rose-700">Reason:</span>{" "}
-                          {failureReason}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    {!isCurrent ? (
-                      <Link
-                        href={`/jobs/${visit.id}?tab=ops`}
-                        className="text-sm font-medium text-blue-700 underline decoration-blue-200 underline-offset-4"
-                      >
-                        View Job
-                      </Link>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <Suspense fallback={<ServiceChainPanelBodyFallback />}>
+            <DeferredServiceChainPanelBody
+              accountOwnerUserId={String(internalUser.account_owner_user_id)}
+              currentJobId={String(jobId)}
+              serviceCaseId={String(serviceCaseId)}
+              emptyStateClassName={workspaceEmptyStateClass}
+            />
+          </Suspense>
         )}
       </div>
     </details>
