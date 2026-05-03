@@ -172,7 +172,6 @@ if (insertErr) throw new Error(insertErr.message);
   }
 
   revalidatePath(`/jobs/${jobId}`);
-  revalidatePath(`/calendar`);
 
   if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
     const [pathOnly, searchRaw = ""] = returnToRaw.split("?");
