@@ -1026,24 +1026,21 @@ const onTheWayUndoEligibility = await getOnTheWayUndoEligibility(jobId);
     (e: any) => String(e?.event_type ?? "") === "internal_note"
   );
 
-  const { count: customerAttemptCount, error: attemptCountErr } = await supabase
+  const {
+    data: latestCustomerAttemptRows,
+    count: customerAttemptCount,
+    error: customerAttemptSummaryErr,
+  } = await supabase
     .from("job_events")
-    .select("id", { count: "exact", head: true })
-    .eq("job_id", jobId)
-    .eq("event_type", "customer_attempt");
-
-  if (attemptCountErr) throw new Error(attemptCountErr.message);
-
-  const { data: latestCustomerAttempt, error: latestAttemptErr } = await supabase
-    .from("job_events")
-    .select("created_at")
+    .select("created_at", { count: "exact" })
     .eq("job_id", jobId)
     .eq("event_type", "customer_attempt")
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
 
-  if (latestAttemptErr) throw new Error(latestAttemptErr.message);
+  if (customerAttemptSummaryErr) throw new Error(customerAttemptSummaryErr.message);
+
+  const latestCustomerAttempt = latestCustomerAttemptRows?.[0] ?? null;
   completePhase("customerAttemptSummaryReads");
 
 const contractorId = job.contractor_id ?? null;
