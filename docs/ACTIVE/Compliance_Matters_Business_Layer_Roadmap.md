@@ -1256,11 +1256,11 @@ The sole pre-production code blocker (missing `createEstimateDraft` flag guard) 
 
 Production `ENABLE_ESTIMATE_EMAIL_SEND` must remain unset/false for the internal-only slice. Real outbound estimate email requires a separate email-enablement runbook after all V1I go/no-go gates are satisfied.
 
-Full procedure: `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`
+Full procedure: hardened committed production execution runbook (`df9870f`) at `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`; this remains planning/runbook readiness only and does not itself execute production enablement.
 
 ### Next implementation direction (post-V1J)
 - V1I decision remains recorded and V1J internal document-template/readiness implementation is complete.
-- Option A comes later: sandbox-only real provider enablement after all documented go/no-go gates are satisfied.
+- Any production estimate enablement remains a future explicit execution decision under the hardened runbook gates; Option A comes later as sandbox-only real provider enablement after all documented go/no-go gates are satisfied.
 - draft-detail smoke caveat is closed.
 - Do not enable production estimate email sending without an explicit rollout plan.
 - no customer approval, customer/contractor portal authority, email/PDF, conversion, or payment behavior should be implemented without a design pass

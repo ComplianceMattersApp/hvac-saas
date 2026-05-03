@@ -192,7 +192,7 @@ If any item here conflicts with the active spine, the spine wins.
 - Pre-launch sequence is explicitly resumed in this order:
   1. Performance/responsiveness batch closeout and documentation
   2. Support Console production-readiness planning (controlled, read-only, audited, careful flag-enable planning, no impersonation, no tenant mutation unless explicitly approved later)
-  3. Estimates production-readiness planning (internal production-enablement decision only; migration/feature-flag/smoke/rollback plan required)
+  3. Estimates production-readiness planning (internal production-enablement decision only; migration/feature-flag/smoke/rollback plan required) — readiness audit complete, production readiness hardening guard committed, internal-only enablement runbook drafted; production enablement requires explicit gate approval per `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`
   4. Field-ready installable/PWA access readiness (web/PWA-style readiness; app-store/native remains deferred)
   5. Final launch confirmation sweep (intake, internal job creation, scheduling, field lifecycle, invoice-tracking honesty, reports, flags, disabled/deferred features, production smoke)
   6. First-owner/operator handoff dry-run (owner setup, operator checklist, account readiness, support readiness, launch operations)
@@ -573,7 +573,10 @@ If any item here conflicts with the active spine, the spine wins.
   - print/readiness wording consistency uses shared document model
   - no persistent revision storage is implemented yet
   - no PDF generation/storage is implemented yet
-- Completed validation: `npx vitest run lib/estimates` passed (`123/123`), `npx tsc --noEmit` passed (`TSC_OK`).
+- Completed validation (V1J baseline): `npx vitest run lib/estimates` passed (`123/123`), `npx tsc --noEmit` passed (`TSC_OK`).
+- Completed production readiness hardening guard: `createEstimateDraft` in `lib/estimates/estimate-actions.ts` now returns `{ success: false, error: "Estimates are currently unavailable." }` as the first statement when `ENABLE_ESTIMATES` is false or unset, running before `createClient`/auth/DB work. This was the sole identified pre-production code blocker from the readiness audit.
+- Completed production readiness hardening validation: `npx vitest run lib/estimates` passed (`127/127`), `npx tsc --noEmit` passed (`TSC_OK`). Tests confirm flag-off returns unavailable with no DB insert, no estimate_events insert, and flag-on valid create still passing. No migrations, Supabase commands, production data, email sends, feature flag enables, RLS/policy changes, or PDF/storage/customer/public/payment/conversion behavior were introduced.
+- Completed: internal-only production execution runbook is hardened and committed (`df9870f`) at `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`; this remains planning/runbook readiness only and did not execute migrations, flags, or production enablement.
 - Completed manual sandbox smoke: sent, approved, and draft estimate detail checks all passed. Draft-detail smoke is now completed/closed using sandbox draft `EST-20260502-9D58499B` (`/estimates/43aeaa8e-e60e-47d4-8c26-2570600b24df`) with document readiness/disclaimer rendering, draft manual-line editing, draft pricebook picker availability, blocked send copy, communication history rendering, and no email/PDF/customer approval/public link/conversion/payment/customer portal/contractor controls exposed.
 - Confirmed: estimate migrations are applied to sandbox only (`20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`).
 - Confirmed: sandbox project ref is `kvpesjdukqwwlgpkzfjm`.
@@ -607,12 +610,17 @@ If any item here conflicts with the active spine, the spine wins.
   - Stripe tenant payment behavior
   - QBO behavior
   - production estimate feature enablement
-- Production rollout remains a later explicit decision and requires:
-  - intentional production migration apply
-  - production `ENABLE_ESTIMATES` enablement
-  - production `ENABLE_ESTIMATE_EMAIL_SEND` enablement
-  - production smoke
-  - rollback plan by disabling `ENABLE_ESTIMATES`
+- Production rollout remains a later explicit decision. The sole pre-production code blocker (missing `createEstimateDraft` flag guard) is now resolved and committed.
+- Internal-only production enablement requires, in order:
+  - governance preflight (Phase A of runbook)
+  - sandbox pre-validation with both migrations confirmed healthy (Phase B)
+  - intentional production migration apply for both estimate migrations (Phase C)
+  - disabled-state smoke confirmation with schema applied and flag still off (Phase D)
+  - production `ENABLE_ESTIMATES` enablement for internal-only slice only (Phase E)
+  - internal-only production smoke checklist (Phase F)
+  - rollback by disabling `ENABLE_ESTIMATES` if needed (Phase G)
+- Production `ENABLE_ESTIMATE_EMAIL_SEND` must remain unset/false for the internal-only slice. Real outbound estimate email requires a separate email-enablement runbook after all V1I go/no-go gates are satisfied.
+- Full procedure is documented in the hardened committed runbook (`df9870f`) at `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`; next step remains a future explicit production execution decision, not automatic enablement.
 - Next implementation direction: V1I planning and V1J internal document-template/readiness implementation are both complete.
   - draft-detail smoke caveat is closed
   - Option A remains next: sandbox-only provider enablement after documented gates
