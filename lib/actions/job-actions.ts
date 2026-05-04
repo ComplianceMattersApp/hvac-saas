@@ -3157,19 +3157,17 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
     .maybeSingle();
 
   if (jobErr) throw jobErr;
-  if (!job?.id) throw new Error("Job not found.");
-
-  if (String(job.contractor_id ?? "") !== String(cu.contractor_id ?? "")) {
-    throw new Error("You do not have access to this job.");
+  if (!job?.id || String(job.contractor_id ?? "") !== String(cu.contractor_id ?? "")) {
+    throw new Error("Job not found.");
   }
 
   const jobType = String(job.job_type ?? "").trim().toLowerCase();
   if (jobType !== "ecc") {
-    redirect(`/portal/jobs/${jobId}`);
+    redirect(`/portal/jobs/${jobId}?banner=retest_ready_requires_ecc`);
   }
 
   if (String(job.ops_status ?? "").toLowerCase() !== "failed") {
-    redirect(`/portal/jobs/${jobId}`);
+    redirect(`/portal/jobs/${jobId}?banner=retest_ready_not_failed`);
   }
 
   const { data: openRetestChild, error: childErr } = await supabase

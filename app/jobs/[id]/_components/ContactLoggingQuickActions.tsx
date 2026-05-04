@@ -54,6 +54,10 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
   const { jobId, attemptCount, lastAttemptLabel, action, buttonClassName } = props;
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const returnTo = useMemo(() => {
+    const search = searchParams.toString();
+    return search ? `${pathname}?${search}` : pathname;
+  }, [pathname, searchParams]);
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const restoreKey = `${CONTACT_LOGGING_RESTORE_KEY_PREFIX}${jobId}`;
   const banner = searchParams.get("banner");
@@ -85,6 +89,8 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
           <input type="hidden" name="job_id" value={jobId} />
           <input type="hidden" name="method" value="call" />
           <input type="hidden" name="result" value="no_answer" />
+          <input type="hidden" name="return_to" value={returnTo} />
+          <input type="hidden" name="success_banner" value="contact_attempt_logged" />
           <ContactLoggingSubmitButton
             label="No Answer"
             buttonClassName={buttonClassName}
@@ -96,6 +102,8 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
           <input type="hidden" name="job_id" value={jobId} />
           <input type="hidden" name="method" value="text" />
           <input type="hidden" name="result" value="sent" />
+          <input type="hidden" name="return_to" value={returnTo} />
+          <input type="hidden" name="success_banner" value="contact_attempt_logged" />
           <ContactLoggingSubmitButton
             label="Sent Text"
             buttonClassName={buttonClassName}

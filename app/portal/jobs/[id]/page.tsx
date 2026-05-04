@@ -727,6 +727,14 @@ export default async function PortalJobDetailPage({
         <FlashBanner type="warning" message="This submission was already received." />
       ) : null}
 
+      {banner === "retest_ready_requires_ecc" ? (
+        <FlashBanner type="warning" message="Retest Ready is only available for ECC jobs." />
+      ) : null}
+
+      {banner === "retest_ready_not_failed" ? (
+        <FlashBanner type="warning" message="Retest Ready is only available when this job is currently marked failed." />
+      ) : null}
+
       {banner === "invalid_request" ? (
         <FlashBanner type="warning" message="That action could not be completed. Please open the job again and try once more." />
       ) : null}

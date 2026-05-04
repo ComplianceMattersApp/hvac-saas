@@ -11,6 +11,59 @@ import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope"
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 type AttemptMethod = "call" | "text";
 
+function resolveSafeLocalReturnTo(raw: string): string | null {
+  const value = String(raw ?? "").trim();
+  if (!value) return null;
+
+  let decodedValue: string;
+  try {
+    decodedValue = decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+
+  if (!decodedValue.startsWith("/")) return null;
+  if (decodedValue.startsWith("//")) return null;
+  if (/[\u0000-\u001F\u007F-\u009F]/.test(decodedValue)) return null;
+  if (decodedValue.includes("\\")) return null;
+
+  let parsed: URL;
+  let decodedParsed: URL;
+  try {
+    parsed = new URL(value, "http://localhost");
+    decodedParsed = new URL(decodedValue, "http://localhost");
+  } catch {
+    return null;
+  }
+
+  if (parsed.origin !== "http://localhost") return null;
+  if (decodedParsed.origin !== "http://localhost") return null;
+
+  const pathOnly = parsed.pathname || "";
+  const decodedPathOnly = decodedParsed.pathname || "";
+  if (!pathOnly.startsWith("/")) return null;
+  if (!decodedPathOnly.startsWith("/")) return null;
+  if (
+    decodedPathOnly === "/login" ||
+    decodedPathOnly.startsWith("/login/") ||
+    decodedPathOnly === "/signup" ||
+    decodedPathOnly.startsWith("/signup/") ||
+    decodedPathOnly.startsWith("/auth") ||
+    decodedPathOnly === "/set-password" ||
+    decodedPathOnly.startsWith("/set-password/")
+  ) {
+    return null;
+  }
+
+  return `${pathOnly}${parsed.search}`;
+}
+
+function normalizeSuccessBanner(raw: string): string {
+  const value = String(raw ?? "").trim();
+  if (!value) return "contact_attempt_logged";
+  return /^[a-z0-9_]+$/i.test(value) ? value : "contact_attempt_logged";
+}
+
 function addDays(dateYYYYMMDD: string, days: number) {
   const [y, m, d] = dateYYYYMMDD.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
@@ -121,6 +174,8 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
   const result = String(formData.get("result") || "").trim() || "no_answer";
   const returnToRaw = String(formData.get("return_to") || "").trim();
   const successBannerRaw = String(formData.get("success_banner") || "").trim();
+  const safeReturnTo = resolveSafeLocalReturnTo(returnToRaw);
+  const successBanner = normalizeSuccessBanner(successBannerRaw);
 
   if (!jobId) throw new Error("Missing job_id");
   if (method !== "call" && method !== "text") throw new Error("Invalid method");
@@ -238,13 +293,13 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
   revalidatePath(`/jobs/${jobId}`);
   completePhase("revalidateJobPath");
 
-  returnToPresent = returnToRaw.startsWith("/") && !returnToRaw.startsWith("//");
+  returnToPresent = !!safeReturnTo;
 
   if (returnToPresent) {
     const redirectPrepStartMs = Date.now();
-    const [pathOnly, searchRaw = ""] = returnToRaw.split("?");
+    const [pathOnly, searchRaw = ""] = String(safeReturnTo ?? "").split("?");
     const search = new URLSearchParams(searchRaw);
-    if (successBannerRaw) search.set("banner", successBannerRaw);
+    search.set("banner", successBanner);
     setPhaseValue("redirectTargetPreparation", Date.now() - redirectPrepStartMs);
     if (timingEnabled) {
       phaseStartMs = Date.now();
@@ -265,7 +320,7 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
 
   setPhaseValue("conditionalReturnToRevalidate", 0);
   setPhaseValue("redirectTargetPreparation", 0);
-  const redirectTarget = `/jobs/${jobId}?tab=ops&banner=contact_attempt_logged`;
+  const redirectTarget = `/jobs/${jobId}?tab=ops&banner=${encodeURIComponent(successBanner)}`;
   emitTimingLog(redirectTarget);
   redirect(redirectTarget);
 }
