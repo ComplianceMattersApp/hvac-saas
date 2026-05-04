@@ -591,6 +591,59 @@ type JobSearchParams = {
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
+type TimingPhaseRecorder = (phaseName: string, durationMs: number) => void;
+
+type TimedJobLocationPreviewProps = {
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  className?: string;
+  showAddressFooter?: boolean;
+  timingEnabled: boolean;
+  onPhaseTiming: TimingPhaseRecorder;
+};
+
+async function TimedJobLocationPreview({
+  timingEnabled,
+  onPhaseTiming,
+  ...previewProps
+}: TimedJobLocationPreviewProps) {
+  const startedAt = timingEnabled ? Date.now() : 0;
+  try {
+    return await JobLocationPreview(previewProps);
+  } finally {
+    if (timingEnabled) {
+      onPhaseTiming("jobLocationPreviewBlocking", Date.now() - startedAt);
+    }
+  }
+}
+
+async function TimedServiceStatusActions({
+  jobId,
+  billingMode,
+  timingEnabled,
+  onPhaseTiming,
+}: {
+  jobId: string;
+  billingMode: BillingMode;
+  timingEnabled: boolean;
+  onPhaseTiming: TimingPhaseRecorder;
+}) {
+  const startedAt = timingEnabled ? Date.now() : 0;
+  try {
+    return await ServiceStatusActions({
+      jobId,
+      billingMode,
+    });
+  } finally {
+    if (timingEnabled) {
+      onPhaseTiming("serviceStatusActionsBlocking", Date.now() - startedAt);
+    }
+  }
+}
+
 const workspacePanelClass =
   "rounded-2xl border border-slate-200/90 bg-white shadow-[0_16px_36px_-28px_rgba(15,23,42,0.28)]";
 const workspaceSectionClass = `${workspacePanelClass} p-5 sm:p-6`;
@@ -668,15 +721,7 @@ export default async function JobDetailPage({
 
   const timingEnabled = process.env.JOB_DETAIL_TIMING_DEBUG === "true";
   const renderStartMs = Date.now();
-  let phaseStartMs = renderStartMs;
   const phaseDurationsMs: Record<string, number> = {};
-
-  const completePhase = (phaseName: string) => {
-    if (!timingEnabled) return;
-    const nowMs = Date.now();
-    phaseDurationsMs[phaseName] = nowMs - phaseStartMs;
-    phaseStartMs = nowMs;
-  };
 
   const setPhaseValue = (phaseName: string, durationMs: number) => {
     if (!timingEnabled) return;
@@ -699,34 +744,72 @@ export default async function JobDetailPage({
     }
   };
 
+  const recordBlockingPhase: TimingPhaseRecorder = (phaseName, durationMs) => {
+    setPhaseValue(phaseName, durationMs);
+  };
+
+  const hasScheduleRequiredParam = (() => {
+    const raw = sp.schedule_required;
+    if (Array.isArray(raw)) return raw.some((v) => String(v ?? "").trim().length > 0);
+    return String(raw ?? "").trim().length > 0;
+  })();
+
+  const tabLabel = ["info", "ops", "tests"].includes(String(tab)) ? String(tab) : "other";
+
   const emitTimingLog = (details: {
     invoicePanelActive: boolean;
     serviceCaseExists: boolean;
     timelineChainExists: boolean;
+    actorKind: string;
   }) => {
     if (!timingEnabled) return;
+    const invoiceReadAggregateMs =
+      (phaseDurationsMs.invoiceRecordLinesRead ?? 0) +
+      (phaseDurationsMs.invoiceDeliveryPaymentLedgerRead ?? 0) +
+      (phaseDurationsMs.invoicePricebookRead ?? 0);
+
+    const totalRenderMs = Date.now() - renderStartMs;
+
     console.info(
       "[job-detail-timing]",
       JSON.stringify({
         jobId,
-        tab,
-        invoicePanelActive: details.invoicePanelActive,
-        serviceCaseExists: details.serviceCaseExists,
-        timelineChainExists: details.timelineChainExists,
-        totalRenderMs: Date.now() - renderStartMs,
+        routeLabels: {
+          tab: tabLabel,
+          hasNotice: Boolean(notice),
+          hasBanner: Boolean(banner),
+          hasScheduleRequired: hasScheduleRequiredParam,
+          isEccNoticeBranch: showEccNotice,
+          actorKind: details.actorKind,
+          invoicePanelActive: details.invoicePanelActive,
+          serviceCaseExists: details.serviceCaseExists,
+          timelineChainExists: details.timelineChainExists,
+        },
         phasesMs: {
-          authInternalResolution: phaseDurationsMs.authInternalResolution ?? 0,
-          billingModeBusinessIdentity: phaseDurationsMs.billingModeBusinessIdentity ?? 0,
-          scopedJobDetailReadBoundary: phaseDurationsMs.scopedJobDetailReadBoundary ?? 0,
-          mainJobLoad: phaseDurationsMs.mainJobLoad ?? 0,
-          internalInvoiceRead: phaseDurationsMs.internalInvoiceRead ?? 0,
-          invoiceLedgerDeliveryReads: phaseDurationsMs.invoiceLedgerDeliveryReads ?? 0,
-          pricebookPickerRead: phaseDurationsMs.pricebookPickerRead ?? 0,
-          assignmentDisplayMapAssignableUsers: phaseDurationsMs.assignmentDisplayMapAssignableUsers ?? 0,
-          serviceCaseServiceChainReads: phaseDurationsMs.serviceCaseServiceChainReads ?? 0,
-          timelineChainEventsActorMapReads: phaseDurationsMs.timelineChainEventsActorMapReads ?? 0,
-          customerAttemptSummaryReads: phaseDurationsMs.customerAttemptSummaryReads ?? 0,
-          remainingCompositionPrep: phaseDurationsMs.remainingCompositionPrep ?? 0,
+          createClient: phaseDurationsMs.createClient ?? 0,
+          authGetUser: phaseDurationsMs.authGetUser ?? 0,
+          actorRoleResolution: phaseDurationsMs.actorRoleResolution ?? 0,
+          sameAccountScopedJobBoundary: phaseDurationsMs.sameAccountScopedJobBoundary ?? 0,
+          mainJobRead: phaseDurationsMs.mainJobRead ?? 0,
+          contractorsRead: phaseDurationsMs.contractorsRead ?? 0,
+          businessProfileReads: phaseDurationsMs.businessProfileReads ?? 0,
+          assignmentDisplaySummary: phaseDurationsMs.assignmentDisplaySummary ?? 0,
+          serviceChainSummary: phaseDurationsMs.serviceChainSummary ?? 0,
+          timelineSummary: phaseDurationsMs.timelineSummary ?? 0,
+          customerAttemptSummary: phaseDurationsMs.customerAttemptSummary ?? 0,
+          undoEligibility: phaseDurationsMs.undoEligibility ?? 0,
+          billingCustomerContractorReads: phaseDurationsMs.billingCustomerContractorReads ?? 0,
+          invoiceReads: invoiceReadAggregateMs,
+          eccPayloadReads: phaseDurationsMs.eccPayloadReads ?? 0,
+          jobLocationPreviewBlocking: phaseDurationsMs.jobLocationPreviewBlocking ?? 0,
+          serviceStatusActionsBlocking: phaseDurationsMs.serviceStatusActionsBlocking ?? 0,
+          compositionPrep: phaseDurationsMs.compositionPrep ?? 0,
+          totalServerRenderBeforeResponse: totalRenderMs,
+        },
+        invoiceReadSubphasesMs: {
+          invoiceRecordLinesRead: phaseDurationsMs.invoiceRecordLinesRead ?? 0,
+          invoiceDeliveryPaymentLedgerRead: phaseDurationsMs.invoiceDeliveryPaymentLedgerRead ?? 0,
+          invoicePricebookRead: phaseDurationsMs.invoicePricebookRead ?? 0,
         },
       }),
     );
@@ -734,18 +817,20 @@ export default async function JobDetailPage({
 
   const showEccNotice = notice === "ecc_test_required";
 
-  const supabase = await createClient();
+  const supabase = await timedPhase("createClient", () => createClient());
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await timedPhase("authGetUser", () => supabase.auth.getUser());
 
   if (!user) redirect("/login");
 
-  const actorResolution = await resolveJobDetailActor({
-    supabase,
-    userId: user.id,
-  });
+  const actorResolution = await timedPhase("actorRoleResolution", () =>
+    resolveJobDetailActor({
+      supabase,
+      userId: user.id,
+    }),
+  );
 
   if (actorResolution.kind === "contractor") {
     redirect(`/portal/jobs/${jobId}`);
@@ -754,10 +839,11 @@ export default async function JobDetailPage({
   if (actorResolution.kind === "unauthorized") {
     redirect("/login");
   }
-  completePhase("authInternalResolution");
 
   const internalUser = actorResolution.internalUser;
-  const contractors = await getContractors(internalUser.account_owner_user_id);
+  const contractors = await timedPhase("contractorsRead", () =>
+    getContractors(internalUser.account_owner_user_id),
+  );
 
   let isInternalUser = true;
   let isInternalAdmin = false;
@@ -765,30 +851,39 @@ export default async function JobDetailPage({
   let billingMode: BillingMode = "external_billing";
 
   isInternalAdmin = internalUser.role === "admin";
-  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
+  const { internalBusinessIdentity, resolvedBillingMode } = await timedPhase("businessProfileReads", async () => {
+    const resolvedBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+    const resolvedBillingMode = await resolveBillingModeByAccountOwnerId({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+
+    return {
+      internalBusinessIdentity: resolvedBusinessIdentity,
+      resolvedBillingMode,
+    };
   });
   internalBusinessDisplayName = internalBusinessIdentity.display_name;
-  billingMode = await resolveBillingModeByAccountOwnerId({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-  });
-  completePhase("billingModeBusinessIdentity");
+  billingMode = resolvedBillingMode;
 
   // Explicit same-account internal scoped-job preflight: deny before main job-detail read assembly
-  const scopedReadJob = await loadScopedInternalJobDetailReadBoundary({
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    jobId,
-  });
+  const scopedReadJob = await timedPhase("sameAccountScopedJobBoundary", () =>
+    loadScopedInternalJobDetailReadBoundary({
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobId,
+    }),
+  );
   if (!scopedReadJob?.id) {
     return notFound();
   }
-  completePhase("scopedJobDetailReadBoundary");
 
-  const { data: job, error: jobError } = await supabase
-    .from("jobs")
-    .select(`
+  const { data: job, error: jobError } = await timedPhase("mainJobRead", async () =>
+    supabase
+      .from("jobs")
+      .select(`
       customer_id,
       location_id,
        service_case_id,
@@ -872,14 +967,15 @@ export default async function JobDetailPage({
         updated_at
       )
     `)
-    .eq("id", jobId)
+      .eq("id", jobId)
 
-    .single();
+      .single(),
+  );
 
   if (jobError) throw jobError;
   if (!job) return notFound();
   if (job.deleted_at) redirect("/ops?saved=job_archived");
-  completePhase("mainJobLoad");
+  setPhaseValue("eccPayloadReads", phaseDurationsMs.mainJobRead ?? 0);
 
   const parentJobId = (job as any).parent_job_id as string | null;
   const retestRootId = parentJobId ?? jobId;
@@ -887,7 +983,7 @@ export default async function JobDetailPage({
   const contractorId = job.contractor_id ?? null;
   const customerId = job.customer_id ?? null;
 
-  const internalInvoiceStatePromise = timedPhase("internalInvoiceRead", async () => {
+  const internalInvoiceStatePromise = timedPhase("invoiceRecordLinesRead", async () => {
     const internalInvoice =
       isInternalUser && billingMode === "internal_invoicing"
         ? await resolveInternalInvoiceByJobId({ supabase, jobId })
@@ -904,14 +1000,14 @@ export default async function JobDetailPage({
     };
   });
 
-  const assignmentDisplayPromise = timedPhase("assignmentDisplayMapAssignableUsers", async () => {
+  const assignmentDisplayPromise = timedPhase("assignmentDisplaySummary", async () => {
     return getActiveJobAssignmentDisplayMap({
       supabase,
       jobIds: [String(job.id ?? jobId)],
     });
   });
 
-  const serviceCaseSummaryPromise = timedPhase("serviceCaseServiceChainReads", async () => {
+  const serviceCaseSummaryPromise = timedPhase("serviceChainSummary", async () => {
     const [{ data: serviceCase, error: serviceCaseErr }, { count: serviceCaseVisitCountRaw, error: serviceCaseVisitCountErr }] = await Promise.all([
       serviceCaseId
         ? supabase
@@ -938,7 +1034,7 @@ export default async function JobDetailPage({
     };
   });
 
-  const timelineSummaryPromise = timedPhase("timelineChainEventsActorMapReads", async () => {
+  const timelineSummaryPromise = timedPhase("timelineSummary", async () => {
     const { data: timelineJobs, error: timelineJobsErr } = await supabase
       .from("jobs")
       .select("id")
@@ -992,7 +1088,7 @@ export default async function JobDetailPage({
     };
   });
 
-  const customerAttemptSummaryPromise = timedPhase("customerAttemptSummaryReads", async () => {
+  const customerAttemptSummaryPromise = timedPhase("customerAttemptSummary", async () => {
     const {
       data: latestCustomerAttemptRows,
       count: customerAttemptCount,
@@ -1013,7 +1109,9 @@ export default async function JobDetailPage({
     };
   });
 
-  const onTheWayUndoEligibilityPromise = Promise.resolve(getOnTheWayUndoEligibility(jobId));
+  const onTheWayUndoEligibilityPromise = timedPhase("undoEligibility", async () =>
+    getOnTheWayUndoEligibility(jobId),
+  );
 
   const contractorBillingPromise = contractorId
     ? supabase
@@ -1034,6 +1132,18 @@ export default async function JobDetailPage({
         .eq("id", customerId)
         .maybeSingle()
     : Promise.resolve({ data: null });
+
+  const billingPartyReadsPromise = () => timedPhase("billingCustomerContractorReads", async () => {
+    const [contractorResult, customerResult] = await Promise.all([
+      contractorBillingPromise,
+      customerBillingPromise,
+    ]);
+
+    return {
+      contractorBilling: contractorResult.data,
+      customerBilling: customerResult.data,
+    };
+  });
 
   const { internalInvoice, latestVoidedInternalInvoice } = await internalInvoiceStatePromise;
 
@@ -1056,7 +1166,7 @@ export default async function JobDetailPage({
       };
     }
 
-    const internalInvoiceEmailDeliveriesPromise = timedPhase("invoiceLedgerDeliveryReads", async () => {
+    const internalInvoiceEmailDeliveriesPromise = timedPhase("invoiceDeliveryPaymentLedgerRead", async () => {
       const [internalInvoiceEmailDeliveries, internalInvoicePaymentLedger] = await Promise.all([
         resolveInternalInvoiceEmailDeliveries({
           supabase,
@@ -1076,7 +1186,7 @@ export default async function JobDetailPage({
       };
     });
 
-    const pricebookPickerItemsPromise = timedPhase("pricebookPickerRead", async () => {
+    const pricebookPickerItemsPromise = timedPhase("invoicePricebookRead", async () => {
       if (!(billingMode === "internal_invoicing" && internalInvoice.status === "draft")) {
         return [] as Array<{
           id: string;
@@ -1129,8 +1239,7 @@ export default async function JobDetailPage({
     timelineSummary,
     customerAttemptSummary,
     onTheWayUndoEligibility,
-    { data: contractorBilling },
-    { data: customerBilling },
+    billingPartyReads,
     invoiceKnownReads,
   ] = await Promise.all([
     assignmentDisplayPromise,
@@ -1138,10 +1247,13 @@ export default async function JobDetailPage({
     timelineSummaryPromise,
     customerAttemptSummaryPromise,
     onTheWayUndoEligibilityPromise,
-    contractorBillingPromise,
-    customerBillingPromise,
+    billingPartyReadsPromise(),
     invoiceKnownReadsPromise,
   ]);
+
+  const contractorBilling = billingPartyReads.contractorBilling;
+  const customerBilling = billingPartyReads.customerBilling;
+  const compositionPrepStartedAt = Date.now();
 
   const assignedTeam =
     activeAssignmentDisplayMap[String(job.id ?? jobId)] ?? [];
@@ -1453,7 +1565,7 @@ try {
 } catch {
   visitScopeItems = [];
 }
-  completePhase("remainingCompositionPrep");
+  setPhaseValue("compositionPrep", Date.now() - compositionPrepStartedAt);
 const visitScopeCount = visitScopeItems.length;
 const hasVisitScopeDefined = Boolean(visitScopeSummary) || visitScopeCount > 0;
 const visitScopeHeaderPreview = buildVisitScopeReadModel(visitScopeSummary, visitScopeItems, {
@@ -1765,11 +1877,16 @@ const failureResolutionSummaryText = showRetestSection && showCorrectionReviewRe
   ? "Create a retest visit when a physical return is required."
   : "Resolve this failure through correction review only when a return visit is not needed.";
 const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrectionReviewResolution);
-emitTimingLog({
-  invoicePanelActive: showInternalInvoicePanel,
-  serviceCaseExists: Boolean(serviceCaseId),
-  timelineChainExists: hasDirectNarrativeChain,
-});
+
+  const JobDetailTimingLog = () => {
+    emitTimingLog({
+      invoicePanelActive: showInternalInvoicePanel,
+      serviceCaseExists: Boolean(serviceCaseId),
+      timelineChainExists: hasDirectNarrativeChain,
+      actorKind: "internal",
+    });
+    return null;
+  };
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-[88rem] space-y-5 overflow-x-hidden p-4 sm:p-6">
@@ -2086,7 +2203,7 @@ emitTimingLog({
         </div>
       </div>
       <div className="w-full flex-1 overflow-hidden bg-slate-100">
-        <JobLocationPreview
+        <TimedJobLocationPreview
           addressLine1={serviceAddressLine1}
           addressLine2={serviceAddressLine2}
           city={serviceCity}
@@ -2094,6 +2211,8 @@ emitTimingLog({
           zip={serviceZip}
           showAddressFooter
           className="flex h-full flex-col [&>div:last-child]:!mt-auto [&>div:last-child]:pt-3"
+          timingEnabled={timingEnabled}
+          onPhaseTiming={recordBlockingPhase}
         />
       </div>
     </div>
@@ -4375,7 +4494,12 @@ emitTimingLog({
         ) : null}
       </div>
 
-      <ServiceStatusActions jobId={job.id} billingMode={billingMode} />
+      <TimedServiceStatusActions
+        jobId={job.id}
+        billingMode={billingMode}
+        timingEnabled={timingEnabled}
+        onPhaseTiming={recordBlockingPhase}
+      />
 
       {job.job_notes ? (
         <div className={`${workspacePanelClass} p-4 text-gray-900`}>
@@ -4645,6 +4769,9 @@ emitTimingLog({
     </div>
   </>
 ) : null}
+
+{timingEnabled ? <JobDetailTimingLog /> : null}
+
     </div>
   </div>
   </div>
