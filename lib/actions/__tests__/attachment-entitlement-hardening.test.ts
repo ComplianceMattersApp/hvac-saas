@@ -54,6 +54,7 @@ function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
   const writes: Array<{ table: string; op: string }> = [];
   const storageOps: Array<{ op: "createSignedUploadUrl" | "createSignedUrl" | "remove"; path: string }> = [];
   const deletedAttachmentIds: string[] = [];
+  const updatedAttachmentIds: string[] = [];
   const attachmentRows = options.attachments ?? [
     {
       id: "attachment-1",
@@ -96,6 +97,17 @@ function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
             writes.push({ table, op: "insert" });
             return Promise.resolve({ data: values, error: null });
           }),
+          update: vi.fn(() => ({
+            eq: vi.fn((_idColumn: string, idValue: unknown) => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(async () => {
+                  writes.push({ table, op: "update" });
+                  updatedAttachmentIds.push(String(idValue ?? "").trim());
+                  return { error: null };
+                }),
+              })),
+            })),
+          })),
           select: vi.fn(() => ({
             eq: vi.fn((column: string, value: unknown) => ({
               eq: vi.fn((nextColumn: string, nextValue: unknown) => ({
@@ -179,7 +191,7 @@ function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
     },
   };
 
-  return { supabase, adminClient, writes, storageOps, deletedAttachmentIds };
+  return { supabase, adminClient, writes, storageOps, deletedAttachmentIds, updatedAttachmentIds };
 }
 
 describe("attachment entitlement hardening", () => {
@@ -632,6 +644,124 @@ describe("attachment entitlement hardening", () => {
 
       expect(fixture.deletedAttachmentIds).toHaveLength(0);
       expect(fixture.storageOps).toHaveLength(0);
+    });
+  });
+
+  describe("updateInternalJobAttachmentCaption", () => {
+    it("allows active account attachment title updates", async () => {
+      const fixture = makeAttachmentMutationFixture({
+        attachments: [
+          {
+            id: "attachment-2",
+            entity_type: "job",
+            entity_id: "job-1",
+            bucket: "attachments",
+            storage_path: "job/job-1/attachment-2-proof.pdf",
+            file_name: "proof.pdf",
+            caption: "Old title",
+          },
+        ],
+      });
+      createClientMock.mockResolvedValue(fixture.supabase);
+      createAdminClientMock.mockReturnValue(fixture.adminClient);
+      loadScopedInternalJobAttachmentForMutationMock.mockResolvedValueOnce({
+        attachment: {
+          id: "attachment-2",
+          file_name: "proof.pdf",
+          caption: "Old title",
+        },
+      });
+
+      const { updateInternalJobAttachmentCaption } = await import("@/lib/actions/attachment-actions");
+
+      await updateInternalJobAttachmentCaption({
+        jobId: "job-1",
+        attachmentId: "attachment-2",
+        caption: "Corrected title",
+      });
+
+      expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+        expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+      );
+      expect(fixture.updatedAttachmentIds).toEqual(["attachment-2"]);
+      expect(fixture.writes.some((w) => w.table === "attachments" && w.op === "update")).toBe(true);
+      expect(fixture.writes.some((w) => w.table === "job_events" && w.op === "insert")).toBe(true);
+      expect(revalidatePathMock).toHaveBeenCalledWith("/jobs/job-1");
+    });
+
+    it("blocks missing entitlement attachment title updates before writes", async () => {
+      const fixture = makeAttachmentMutationFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+      createAdminClientMock.mockReturnValue(fixture.adminClient);
+      resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+        authorized: false,
+        reason: "blocked_missing_entitlement",
+      });
+
+      const { updateInternalJobAttachmentCaption } = await import("@/lib/actions/attachment-actions");
+
+      await expect(
+        updateInternalJobAttachmentCaption({
+          jobId: "job-1",
+          attachmentId: "attachment-1",
+          caption: "Corrected title",
+        }),
+      ).rejects.toThrow(
+        "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
+      );
+
+      expect(fixture.updatedAttachmentIds).toHaveLength(0);
+      expect(fixture.writes.some((w) => w.table === "job_events" && w.op === "insert")).toBe(false);
+      expect(revalidatePathMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("deleteInternalJobAttachment", () => {
+    it("allows active account finalized attachment delete", async () => {
+      const fixture = makeAttachmentMutationFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+      createAdminClientMock.mockReturnValue(fixture.adminClient);
+
+      const { deleteInternalJobAttachment } = await import("@/lib/actions/attachment-actions");
+
+      await deleteInternalJobAttachment({
+        jobId: "job-1",
+        attachmentId: "attachment-1",
+      });
+
+      expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
+        expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+      );
+      expect(fixture.deletedAttachmentIds).toEqual(["attachment-1"]);
+      expect(fixture.storageOps.some((op) => op.op === "remove")).toBe(true);
+      expect(fixture.writes.some((w) => w.table === "job_events" && w.op === "insert")).toBe(true);
+      expect(revalidatePathMock).toHaveBeenCalledWith("/jobs/job-1");
+    });
+
+    it("blocks missing entitlement finalized attachment delete before writes", async () => {
+      const fixture = makeAttachmentMutationFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+      createAdminClientMock.mockReturnValue(fixture.adminClient);
+      resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({
+        authorized: false,
+        reason: "blocked_missing_entitlement",
+      });
+
+      const { deleteInternalJobAttachment } = await import("@/lib/actions/attachment-actions");
+
+      await expect(
+        deleteInternalJobAttachment({
+          jobId: "job-1",
+          attachmentId: "attachment-1",
+        }),
+      ).rejects.toThrow(
+        "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
+      );
+
+      expect(fixture.deletedAttachmentIds).toHaveLength(0);
+      expect(fixture.storageOps).toHaveLength(0);
+      expect(fixture.writes.some((w) => w.table === "job_events" && w.op === "insert")).toBe(false);
+      expect(revalidatePathMock).not.toHaveBeenCalled();
     });
   });
 

@@ -21,7 +21,14 @@ type AttachmentStorageRow = {
   bucket: string | null;
   storage_path: string | null;
   file_name: string | null;
+  caption?: string | null;
 };
+
+function sanitizeAttachmentCaption(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim().replace(/\s+/g, " ");
+  if (!normalized) return null;
+  return normalized.slice(0, 160);
+}
 
 async function assertJobAttachmentUploadAuthority(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
@@ -319,6 +326,174 @@ export async function discardInternalJobAttachmentUpload(input: {
     jobId,
     attachmentIds: [attachmentId],
   });
+}
+
+export async function updateInternalJobAttachmentCaption(input: {
+  jobId: string;
+  attachmentId: string;
+  caption?: string | null;
+}) {
+  const jobId = String(input.jobId ?? "").trim();
+  const attachmentId = String(input.attachmentId ?? "").trim();
+
+  if (!jobId) throw new Error("Missing jobId");
+  if (!attachmentId) throw new Error("Missing attachmentId");
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr) throw userErr;
+  if (!user) throw new Error("Not authenticated");
+
+  const { internalUser } = await requireInternalUser({ supabase, userId: user.id });
+  const normalizedCaption = sanitizeAttachmentCaption(input.caption);
+
+  const scopedAttachment = await loadScopedInternalJobAttachmentForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    attachmentId,
+    attachmentSelect: "file_name, caption",
+  });
+
+  if (!scopedAttachment?.attachment) {
+    throw new Error("Not authorized to update attachment title for this job");
+  }
+
+  await requireOperationalAttachmentEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const attachment = scopedAttachment.attachment as {
+    file_name?: string | null;
+    caption?: string | null;
+  };
+  const previousCaption = sanitizeAttachmentCaption(attachment.caption);
+
+  if (previousCaption === normalizedCaption) {
+    return {
+      attachmentId,
+      caption: normalizedCaption,
+    };
+  }
+
+  const { error: updateErr } = await supabase
+    .from("attachments")
+    .update({ caption: normalizedCaption })
+    .eq("id", attachmentId)
+    .eq("entity_type", "job")
+    .eq("entity_id", jobId);
+
+  if (updateErr) throw new Error(updateErr.message);
+
+  const nextLabel = normalizedCaption ?? "Untitled";
+  const previousLabel = previousCaption ?? "Untitled";
+  const fileName = String(attachment.file_name ?? "Attachment").trim() || "Attachment";
+
+  const { error: evErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "attachment_title_updated",
+    user_id: user.id,
+    message: `Attachment title updated to \"${nextLabel}\"`,
+    meta: {
+      source: "internal",
+      attachment_ids: [attachmentId],
+      file_names: [fileName],
+      note: nextLabel,
+      previous_caption: previousLabel,
+      caption: normalizedCaption,
+    },
+  });
+
+  if (evErr) throw new Error(evErr.message);
+
+  revalidateInternalAttachmentConsumers(jobId);
+
+  return {
+    attachmentId,
+    caption: normalizedCaption,
+  };
+}
+
+export async function deleteInternalJobAttachment(input: {
+  jobId: string;
+  attachmentId: string;
+}) {
+  const jobId = String(input.jobId ?? "").trim();
+  const attachmentId = String(input.attachmentId ?? "").trim();
+
+  if (!jobId) throw new Error("Missing jobId");
+  if (!attachmentId) throw new Error("Missing attachmentId");
+
+  const supabase = await createClient();
+  const adminClient = createAdminClient();
+
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr) throw userErr;
+  if (!user) throw new Error("Not authenticated");
+
+  const { internalUser } = await requireInternalUser({ supabase, userId: user.id });
+
+  const scopedAttachment = await loadScopedInternalJobAttachmentForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    attachmentId,
+    attachmentSelect: "file_name, caption",
+  });
+
+  if (!scopedAttachment?.attachment) {
+    throw new Error("Not authorized to delete attachment for this job");
+  }
+
+  await requireOperationalAttachmentEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const attachment = scopedAttachment.attachment as {
+    file_name?: string | null;
+    caption?: string | null;
+  };
+  const caption = sanitizeAttachmentCaption(attachment.caption);
+  const fileName = String(attachment.file_name ?? "Attachment").trim() || "Attachment";
+
+  await cleanupJobAttachmentRows({
+    supabase,
+    adminClient,
+    jobId,
+    attachmentIds: [attachmentId],
+  });
+
+  const removedLabel = caption || fileName;
+  const { error: evErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "attachment_deleted",
+    user_id: user.id,
+    message: `Attachment deleted: ${removedLabel}`,
+    meta: {
+      source: "internal",
+      attachment_ids: [attachmentId],
+      file_names: [fileName],
+      note: removedLabel,
+      caption,
+    },
+  });
+
+  if (evErr) throw new Error(evErr.message);
+
+  revalidateInternalAttachmentConsumers(jobId);
+
+  return {
+    attachmentId,
+  };
 }
 
 export async function finalizeInternalJobAttachmentUpload(input: {

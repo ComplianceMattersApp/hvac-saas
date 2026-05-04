@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   createJobAttachmentUploadToken,
+  deleteInternalJobAttachment,
   discardInternalJobAttachmentUpload,
   finalizeInternalJobAttachmentUpload,
   shareJobAttachmentToContractor,
+  updateInternalJobAttachmentCaption,
 } from "@/lib/actions/attachment-actions";
 
 type Item = {
@@ -85,6 +87,9 @@ export default function JobAttachmentsInternal({
   const [ok, setOk] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingCaption, setEditingCaption] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [failedPreviewIds, setFailedPreviewIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -208,6 +213,69 @@ export default function JobAttachmentsInternal({
     }
   }
 
+  function beginEdit(attachment: Item) {
+    setError(null);
+    setOk(null);
+    setEditingId(attachment.id);
+    setEditingCaption(String(attachment.caption ?? ""));
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditingCaption("");
+  }
+
+  async function saveCaption(attachment: Item) {
+    setError(null);
+    setOk(null);
+
+    startTransition(async () => {
+      try {
+        await updateInternalJobAttachmentCaption({
+          jobId,
+          attachmentId: attachment.id,
+          caption: editingCaption.trim() || null,
+        });
+        setEditingId(null);
+        setEditingCaption("");
+        setOk(`Updated title for "${attachment.file_name}".`);
+        router.refresh();
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Could not update title");
+      }
+    });
+  }
+
+  async function removeAttachment(attachment: Item) {
+    const confirmed = window.confirm(
+      `Delete "${attachment.file_name}"? This removes the file from this job.`
+    );
+    if (!confirmed) return;
+
+    setError(null);
+    setOk(null);
+    setDeletingId(attachment.id);
+
+    startTransition(async () => {
+      try {
+        await deleteInternalJobAttachment({
+          jobId,
+          attachmentId: attachment.id,
+        });
+        if (editingId === attachment.id) {
+          setEditingId(null);
+          setEditingCaption("");
+        }
+        setOk(`Deleted "${attachment.file_name}".`);
+        router.refresh();
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Could not delete attachment");
+      } finally {
+        setDeletingId(null);
+      }
+    });
+  }
+
   return (
     <div className="mb-6 overflow-hidden rounded-xl border border-slate-200/80 bg-white/96 text-gray-900 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-4 py-3">
@@ -290,6 +358,8 @@ export default function JobAttachmentsInternal({
                   !!a.signedUrl &&
                   !failedPreviewIds.has(a.id);
                 const isShared = sharedAttachmentIds.has(a.id);
+                const isEditing = editingId === a.id;
+                const isDeleting = deletingId === a.id;
                 const createdLabel = formatAttachmentDate(a.created_at);
                 const sizeLabel = formatFileSize(a.file_size);
                 const typeLabel = fileTypeLabel(a.content_type, a.file_name);
@@ -372,7 +442,39 @@ export default function JobAttachmentsInternal({
                         ) : null}
                       </div>
 
-                      {a.caption ? (
+                      {isEditing ? (
+                        <div className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                          <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                            Attachment Title
+                          </label>
+                          <input
+                            value={editingCaption}
+                            onChange={(event) => setEditingCaption(event.target.value)}
+                            maxLength={160}
+                            placeholder="Add a title for this attachment"
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
+                            disabled={isPending}
+                          />
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => saveCaption(a)}
+                              disabled={isPending}
+                              className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-black disabled:opacity-50"
+                            >
+                              {isPending ? "Saving..." : "Save Title"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEdit}
+                              disabled={isPending}
+                              className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : a.caption ? (
                         <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2">
                           <div className="line-clamp-2 text-sm text-slate-700">
                             {a.caption}
@@ -383,8 +485,26 @@ export default function JobAttachmentsInternal({
                       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
                         <button
                           type="button"
+                          onClick={() => beginEdit(a)}
+                          disabled={isPending || isDeleting}
+                          className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          {isEditing ? "Editing..." : a.caption ? "Edit Title" : "Add Title"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(a)}
+                          disabled={isPending || isDeleting}
+                          className="inline-flex min-h-10 items-center justify-center rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {isDeleting ? "Deleting..." : "Delete"}
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={() => shareToContractor(a)}
-                          disabled={isPending || sharingId === a.id || isShared}
+                          disabled={isPending || isDeleting || sharingId === a.id || isShared}
                           className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
                         >
                           {isShared

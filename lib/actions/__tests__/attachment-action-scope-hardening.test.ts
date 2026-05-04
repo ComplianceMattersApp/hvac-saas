@@ -129,6 +129,7 @@ function makeSessionClientFixture(fixture: {
   const insertedAttachments: Array<Record<string, unknown>> = [];
   const deletedAttachmentIds: string[] = [];
   const insertedJobEvents: Array<Record<string, unknown>> = [];
+  const updatedAttachments: Array<{ values: Record<string, unknown>; ids: string[] }> = [];
 
   const supabase = {
     auth: {
@@ -160,6 +161,29 @@ function makeSessionClientFixture(fixture: {
           insert(values: Record<string, unknown>) {
             insertedAttachments.push(values);
             return Promise.resolve({ error: null });
+          },
+          update(values: Record<string, unknown>) {
+            return {
+              eq: vi.fn((idColumn: string, idValue: unknown) => ({
+                eq: vi.fn((typeColumn: string, typeValue: unknown) => ({
+                  eq: vi.fn((entityColumn: string, entityValue: unknown) => {
+                    updatedAttachments.push({
+                      values,
+                      ids: (fixture.attachments ?? [])
+                        .filter((attachment) => {
+                          return (
+                            String((attachment as any)?.[idColumn] ?? "") === String(idValue ?? "") &&
+                            String((attachment as any)?.[typeColumn] ?? "") === String(typeValue ?? "") &&
+                            String((attachment as any)?.[entityColumn] ?? "") === String(entityValue ?? "")
+                          );
+                        })
+                        .map((attachment) => String((attachment as any)?.id ?? "").trim()),
+                    });
+                    return Promise.resolve({ error: null });
+                  }),
+                })),
+              })),
+            };
           },
           select: vi.fn(() => ({
             eq: vi.fn((column: string, value: unknown) => ({
@@ -210,6 +234,7 @@ function makeSessionClientFixture(fixture: {
     insertedAttachments,
     deletedAttachmentIds,
     insertedJobEvents,
+    updatedAttachments,
   };
 }
 
@@ -486,7 +511,6 @@ describe("internal attachment same-account hardening", () => {
         attachments,
       }),
     );
-
     const { shareJobAttachmentToContractor } = await import("@/lib/actions/attachment-actions");
 
     await expect(
@@ -497,5 +521,101 @@ describe("internal attachment same-account hardening", () => {
     ).rejects.toThrow("Not authorized to share attachment for this job");
 
     expect(insertedJobEvents).toHaveLength(0);
+  });
+
+  it("allows same-account internal attachment title updates", async () => {
+    const attachments = [
+      {
+        id: "attachment-7",
+        entity_type: "job",
+        entity_id: "job-9",
+        bucket: "attachments",
+        storage_path: "job/job-9/attachment-7-proof.pdf",
+        file_name: "proof.pdf",
+        caption: "Old title",
+      },
+    ];
+    const { supabase, updatedAttachments, insertedJobEvents } = makeSessionClientFixture({ attachments });
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(
+      makeAdminClientFixture({
+        job: { id: "job-9", customer_id: "cust-9" },
+        customerInScope: true,
+        attachments,
+      }),
+    );
+
+    const { updateInternalJobAttachmentCaption } = await import("@/lib/actions/attachment-actions");
+
+    const result = await updateInternalJobAttachmentCaption({
+      jobId: "job-9",
+      attachmentId: "attachment-7",
+      caption: "Corrected title",
+    });
+
+    expect(result).toEqual({
+      attachmentId: "attachment-7",
+      caption: "Corrected title",
+    });
+    expect(updatedAttachments).toEqual([
+      {
+        values: { caption: "Corrected title" },
+        ids: ["attachment-7"],
+      },
+    ]);
+    expect(insertedJobEvents).toHaveLength(1);
+    expect(insertedJobEvents[0]).toMatchObject({
+      job_id: "job-9",
+      event_type: "attachment_title_updated",
+      user_id: "internal-user-1",
+      meta: expect.objectContaining({
+        attachment_ids: ["attachment-7"],
+        note: "Corrected title",
+        previous_caption: "Old title",
+      }),
+    });
+  });
+
+  it("allows same-account internal finalized attachment delete", async () => {
+    const attachments = [
+      {
+        id: "attachment-8",
+        entity_type: "job",
+        entity_id: "job-10",
+        bucket: "attachments",
+        storage_path: "job/job-10/attachment-8-proof.pdf",
+        file_name: "proof.pdf",
+        caption: "Wrong photo",
+      },
+    ];
+    const { supabase, deletedAttachmentIds, insertedJobEvents } = makeSessionClientFixture({ attachments });
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(
+      makeAdminClientFixture({
+        job: { id: "job-10", customer_id: "cust-10" },
+        customerInScope: true,
+        attachments,
+      }),
+    );
+
+    const { deleteInternalJobAttachment } = await import("@/lib/actions/attachment-actions");
+
+    const result = await deleteInternalJobAttachment({
+      jobId: "job-10",
+      attachmentId: "attachment-8",
+    });
+
+    expect(result).toEqual({ attachmentId: "attachment-8" });
+    expect(deletedAttachmentIds).toEqual(["attachment-8"]);
+    expect(insertedJobEvents).toHaveLength(1);
+    expect(insertedJobEvents[0]).toMatchObject({
+      job_id: "job-10",
+      event_type: "attachment_deleted",
+      user_id: "internal-user-1",
+      meta: expect.objectContaining({
+        attachment_ids: ["attachment-8"],
+        note: "Wrong photo",
+      }),
+    });
   });
 });
