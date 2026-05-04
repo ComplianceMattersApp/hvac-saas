@@ -7881,15 +7881,6 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     if (next === "in_process") {
       // PH2-E: person-level arrival event, additive to legacy visit-level start.
       // Order is intentional for downstream consumers: tech_arrived -> job_started.
-      const {
-        data: { user },
-        error: userErr,
-      } = await supabase.auth.getUser();
-
-      if (userErr) throw userErr;
-
-      const actingUserId = user?.id ?? null;
-
       let assignmentId: string | null = null;
       if (actingUserId) {
         const { data: activeAssignment, error: assignmentErr } = await _ftTimeSubphase(
@@ -7956,15 +7947,6 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
       if (lifecycleEventType) {
         if (lifecycleEventType === "job_completed") {
-          const {
-            data: { user },
-            error: userErr,
-          } = await supabase.auth.getUser();
-
-          if (userErr) throw userErr;
-
-          const actingUserId = user?.id ?? null;
-
           let assignmentId: string | null = null;
           if (actingUserId) {
             const { data: activeAssignment, error: assignmentErr } = await _ftTimeSubphase(
