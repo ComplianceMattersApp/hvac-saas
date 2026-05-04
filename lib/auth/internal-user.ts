@@ -35,7 +35,22 @@ export function isInternalAccessError(
 type InternalUserLookupParams = {
   supabase?: any;
   userId?: string | null;
+  timing?: (phase: string, elapsedMs: number) => void;
 };
+
+async function timeInternalUserPhase<T>(
+  timing: ((phase: string, elapsedMs: number) => void) | undefined,
+  phase: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  if (!timing) return work();
+  const startedAt = Date.now();
+  try {
+    return await work();
+  } finally {
+    timing(phase, Date.now() - startedAt);
+  }
+}
 
 function parseInternalRole(value: unknown): InternalRole | null {
   if (value === "admin" || value === "office" || value === "tech") {
@@ -55,7 +70,9 @@ export async function getInternalUser(
     const {
       data: { user },
       error,
-    } = await supabase.auth.getUser();
+    } = await timeInternalUserPhase(params.timing, "auth.getUser", async () =>
+      supabase.auth.getUser(),
+    );
 
     if (error) throw error;
     userId = user?.id ?? null;
@@ -63,11 +80,16 @@ export async function getInternalUser(
 
   if (!userId) return null;
 
-  const { data, error } = await supabase
-    .from("internal_users")
-    .select("user_id, role, is_active, account_owner_user_id, created_by")
-    .eq("user_id", userId)
-    .maybeSingle();
+  const { data, error } = await timeInternalUserPhase(
+    params.timing,
+    "internalUserLookup",
+    async () =>
+      supabase
+        .from("internal_users")
+        .select("user_id, role, is_active, account_owner_user_id, created_by")
+        .eq("user_id", userId)
+        .maybeSingle(),
+  );
 
   if (error) throw error;
   if (!data?.user_id || !data?.account_owner_user_id) return null;
@@ -94,7 +116,9 @@ export async function requireInternalUser(
     const {
       data: { user },
       error,
-    } = await supabase.auth.getUser();
+    } = await timeInternalUserPhase(params.timing, "auth.getUser", async () =>
+      supabase.auth.getUser(),
+    );
 
     if (error) throw error;
     userId = user?.id ?? null;
@@ -104,7 +128,11 @@ export async function requireInternalUser(
     throw new InternalAccessError("AUTH_REQUIRED", "Authentication required.");
   }
 
-  const internalUser = await getInternalUser({ supabase, userId });
+  const internalUser = await getInternalUser({
+    supabase,
+    userId,
+    timing: params.timing,
+  });
 
   if (!internalUser?.is_active) {
     throw new InternalAccessError(

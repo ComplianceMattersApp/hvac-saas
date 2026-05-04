@@ -308,6 +308,8 @@ export async function insertJobEvent(params: {
   if (error) throw error;
 }
 
+type FieldActionTimingRecorder = (phase: string, elapsedMs: number) => void;
+
 async function getOnTheWayUndoEligibilityInternal(params: {
   supabase: any;
   jobId: string;
@@ -1495,8 +1497,17 @@ async function addJobAssignment(params: {
   assignedBy: string;
   accountOwnerUserId?: string | null;
   isPrimary?: boolean;
+  timing?: FieldActionTimingRecorder;
 }): Promise<JobAssignment> {
-  const { supabase, jobId, userId, assignedBy, accountOwnerUserId = null, isPrimary = false } = params;
+  const {
+    supabase,
+    jobId,
+    userId,
+    assignedBy,
+    accountOwnerUserId = null,
+    isPrimary = false,
+    timing,
+  } = params;
 
   await assertAssignableInternalUser({
     supabase,
@@ -1504,6 +1515,7 @@ async function addJobAssignment(params: {
     accountOwnerUserId,
   });
 
+  const assignmentInsertStartedAt = timing ? Date.now() : 0;
   const { data, error } = await supabase
     .from("job_assignments")
     .insert({
@@ -1517,9 +1529,11 @@ async function addJobAssignment(params: {
       "id, job_id, user_id, assigned_by, is_active, is_primary, created_at, removed_at, removed_by"
     )
     .single();
+  if (timing) timing("assignmentInsertSlowPath", Date.now() - assignmentInsertStartedAt);
 
   if (error) throw error;
 
+  const assignmentEventStartedAt = timing ? Date.now() : 0;
   await insertJobEvent({
     supabase,
     jobId,
@@ -1533,6 +1547,7 @@ async function addJobAssignment(params: {
     },
     userId: assignedBy,
   });
+  if (timing) timing("assignmentAddedEventInsert", Date.now() - assignmentEventStartedAt);
 
   return data as JobAssignment;
 }
@@ -1664,10 +1679,12 @@ async function ensureActiveAssignmentForUser(params: {
   userId: string;
   actorUserId: string;
   accountOwnerUserId?: string | null;
+  timing?: FieldActionTimingRecorder;
 }): Promise<JobAssignment> {
-  const { supabase, jobId, userId, actorUserId, accountOwnerUserId = null } = params;
+  const { supabase, jobId, userId, actorUserId, accountOwnerUserId = null, timing } = params;
 
   // Fast path: active row already exists
+  const existingCheckStartedAt = timing ? Date.now() : 0;
   const { data: existing, error: selectErr } = await supabase
     .from("job_assignments")
     .select(
@@ -1677,6 +1694,7 @@ async function ensureActiveAssignmentForUser(params: {
     .eq("user_id", userId)
     .eq("is_active", true)
     .maybeSingle();
+  if (timing) timing("assignmentExistingFastPathCheck", Date.now() - existingCheckStartedAt);
 
   if (selectErr) throw selectErr;
   if (existing) return existing as JobAssignment;
@@ -1692,6 +1710,7 @@ async function ensureActiveAssignmentForUser(params: {
       assignedBy: actorUserId,
       accountOwnerUserId,
       isPrimary: false,
+      timing,
     });
   } catch (addErr: any) {
     if (addErr?.code === "23505") {
@@ -4147,15 +4166,18 @@ async function requireInternalScopedJobAccessOrRedirect(params: {
   supabase: any;
   jobId: string;
   onUnauthorized?: () => void;
+  timing?: FieldActionTimingRecorder;
 }) {
   const jobId = String(params.jobId ?? "").trim();
   const { userId, internalUser } = await requireInternalUser({
     supabase: params.supabase,
+    timing: params.timing,
   });
   const scopedJob = await loadScopedInternalJobForMutation({
     accountOwnerUserId: internalUser.account_owner_user_id,
     jobId,
     select: "id",
+    timing: params.timing,
   });
 
   if (!scopedJob?.id) {
@@ -4171,10 +4193,12 @@ async function requireInternalScopedJobAccessOrRedirect(params: {
 async function requireOperationalScopedJobMutationAccessOrRedirect(params: {
   supabase: any;
   accountOwnerUserId: string | null | undefined;
+  timing?: FieldActionTimingRecorder;
 }) {
   const access = await resolveOperationalMutationEntitlementAccess({
     accountOwnerUserId: String(params.accountOwnerUserId ?? "").trim(),
     supabase: params.supabase,
+    timing: params.timing,
   });
 
   if (access.authorized) {
@@ -7426,11 +7450,28 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   const _ftStart = Date.now();
   let _ftPhaseStart = _ftStart;
   const _ftPhases: Record<string, number> = {};
+  const _ftSubphases: Record<string, number> = {};
   const _ftCompletePhase = (name: string) => {
     if (!_ftEnabled) return;
     const now = Date.now();
     _ftPhases[name] = now - _ftPhaseStart;
     _ftPhaseStart = now;
+  };
+  const _ftRecordSubphase = (name: string, elapsedMs: number) => {
+    if (!_ftEnabled) return;
+    _ftSubphases[name] = (_ftSubphases[name] ?? 0) + elapsedMs;
+  };
+  const _ftTimeSubphase = async <T,>(
+    name: string,
+    work: () => Promise<T>,
+  ): Promise<T> => {
+    if (!_ftEnabled) return work();
+    const startedAt = Date.now();
+    try {
+      return await work();
+    } finally {
+      _ftRecordSubphase(name, Date.now() - startedAt);
+    }
   };
   const _ftEmit = (branch: string, target: string) => {
     if (!_ftEnabled) return;
@@ -7451,6 +7492,39 @@ export async function advanceJobStatusFromForm(formData: FormData) {
           eventBreadcrumb: _ftPhases.eventBreadcrumb ?? 0,
           revalidation: _ftPhases.revalidation ?? 0,
         },
+        subphasesMs: {
+          "authActorScope.auth.getUser": _ftSubphases["authActorScope.auth.getUser"] ?? 0,
+          "authActorScope.internalUserLookup": _ftSubphases["authActorScope.internalUserLookup"] ?? 0,
+          "authActorScope.scopedJobLookup": _ftSubphases["authActorScope.scopedJobLookup"] ?? 0,
+          "authActorScope.customerOwnershipLookup": _ftSubphases["authActorScope.customerOwnershipLookup"] ?? 0,
+          "authActorScope.entitlementLookup": _ftSubphases["authActorScope.entitlementLookup"] ?? 0,
+          "statusWrite.scheduleSnapshotRead": _ftSubphases["statusWrite.scheduleSnapshotRead"] ?? 0,
+          "statusWrite.assignmentExistingFastPathCheck": _ftSubphases["statusWrite.assignmentExistingFastPathCheck"] ?? 0,
+          "statusWrite.assignmentInsertSlowPath": _ftSubphases["statusWrite.assignmentInsertSlowPath"] ?? 0,
+          "statusWrite.assignmentAddedEventInsert": _ftSubphases["statusWrite.assignmentAddedEventInsert"] ?? 0,
+          "statusWrite.guardedJobsUpdate": _ftSubphases["statusWrite.guardedJobsUpdate"] ?? 0,
+          "eventBreadcrumb.diagnosticJobReread": _ftSubphases["eventBreadcrumb.diagnosticJobReread"] ?? 0,
+          "eventBreadcrumb.assignmentRead.in_process": _ftSubphases["eventBreadcrumb.assignmentRead.in_process"] ?? 0,
+          "eventBreadcrumb.assignmentRead.completed": _ftSubphases["eventBreadcrumb.assignmentRead.completed"] ?? 0,
+          "eventBreadcrumb.insertJobEvent.on_my_way": _ftSubphases["eventBreadcrumb.insertJobEvent.on_my_way"] ?? 0,
+          "eventBreadcrumb.insertJobEvent.schedule_updated": _ftSubphases["eventBreadcrumb.insertJobEvent.schedule_updated"] ?? 0,
+          "eventBreadcrumb.insertJobEvent.tech_arrived": _ftSubphases["eventBreadcrumb.insertJobEvent.tech_arrived"] ?? 0,
+          "eventBreadcrumb.insertJobEvent.job_started": _ftSubphases["eventBreadcrumb.insertJobEvent.job_started"] ?? 0,
+          "eventBreadcrumb.insertJobEvent.job_completed": _ftSubphases["eventBreadcrumb.insertJobEvent.job_completed"] ?? 0,
+          "eventBreadcrumb.insertJobEvent.ops_update": _ftSubphases["eventBreadcrumb.insertJobEvent.ops_update"] ?? 0,
+          "eventBreadcrumb.insertJobEvent.lifecycle": _ftSubphases["eventBreadcrumb.insertJobEvent.lifecycle"] ?? 0,
+          "eventBreadcrumb.linkedRetestRead": _ftSubphases["eventBreadcrumb.linkedRetestRead"] ?? 0,
+          "eventBreadcrumb.insertJobEvent.retest_started_child": _ftSubphases["eventBreadcrumb.insertJobEvent.retest_started_child"] ?? 0,
+          "eventBreadcrumb.insertJobEvent.retest_started_parent": _ftSubphases["eventBreadcrumb.insertJobEvent.retest_started_parent"] ?? 0,
+          "eccEvaluation.jobRead": _ftSubphases["eccEvaluation.jobRead"] ?? 0,
+          "eccEvaluation.systemsRead": _ftSubphases["eccEvaluation.systemsRead"] ?? 0,
+          "eccEvaluation.equipmentRead": _ftSubphases["eccEvaluation.equipmentRead"] ?? 0,
+          "eccEvaluation.eccTestRunsRead": _ftSubphases["eccEvaluation.eccTestRunsRead"] ?? 0,
+          "eccEvaluation.correctionEventLookup": _ftSubphases["eccEvaluation.correctionEventLookup"] ?? 0,
+          "eccEvaluation.opsStatus.read": _ftSubphases["eccEvaluation.opsStatus.read"] ?? 0,
+          "eccEvaluation.opsStatus.update": _ftSubphases["eccEvaluation.opsStatus.update"] ?? 0,
+          "eccEvaluation.opsStatus.reread": _ftSubphases["eccEvaluation.opsStatus.reread"] ?? 0,
+        },
       }),
     );
   };
@@ -7463,10 +7537,16 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
+    timing: _ftEnabled
+      ? (name, elapsedMs) => _ftRecordSubphase(`authActorScope.${name}`, elapsedMs)
+      : undefined,
   });
   await requireOperationalScopedJobMutationAccessOrRedirect({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
+    timing: _ftEnabled
+      ? (name, elapsedMs) => _ftRecordSubphase(`authActorScope.${name}`, elapsedMs)
+      : undefined,
   });
   _ftCompletePhase("authActorScope");
 
@@ -7538,11 +7618,15 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     const autoScheduleConfirmed =
       String(formData.get("auto_schedule_confirmed") || "").trim() === "1";
 
-    const { data: scheduleSnapshot, error: scheduleErr } = await supabase
-      .from("jobs")
-      .select("scheduled_date, window_start, window_end")
-      .eq("id", id)
-      .single();
+    const { data: scheduleSnapshot, error: scheduleErr } = await _ftTimeSubphase(
+      "statusWrite.scheduleSnapshotRead",
+      async () =>
+        supabase
+          .from("jobs")
+          .select("scheduled_date, window_start, window_end")
+          .eq("id", id)
+          .single(),
+    );
 
     if (scheduleErr) throw scheduleErr;
 
@@ -7583,6 +7667,9 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       jobId: id,
       userId: actingUserId,
       actorUserId: actingUserId,
+      timing: _ftEnabled
+        ? (name, elapsedMs) => _ftRecordSubphase(`statusWrite.${name}`, elapsedMs)
+        : undefined,
     });
 
     const updatePayload: Record<string, any> = {
@@ -7596,14 +7683,18 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       updatePayload.window_end = toLocalTime(plusTwoHours);
     }
 
-    const { data: onTheWayApplied, error: updErr } = await supabase
-      .from("jobs")
-      .update(updatePayload)
-      .eq("id", id)
-      .eq("status", current)
-      .is("on_the_way_at", null)
-      .select("id")
-      .maybeSingle();
+    const { data: onTheWayApplied, error: updErr } = await _ftTimeSubphase(
+      "statusWrite.guardedJobsUpdate",
+      async () =>
+        supabase
+          .from("jobs")
+          .update(updatePayload)
+          .eq("id", id)
+          .eq("status", current)
+          .is("on_the_way_at", null)
+          .select("id")
+          .maybeSingle(),
+    );
 
     if (updErr) throw updErr;
 
@@ -7624,49 +7715,56 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     }
 
     // Diagnostic re-read: confirm DB write persisted before event inserts.
-    const { data: rereadOtw } = await supabase.from("jobs").select("status").eq("id", id).single();
+    const { data: rereadOtw } = await _ftTimeSubphase(
+      "eventBreadcrumb.diagnosticJobReread",
+      async () => supabase.from("jobs").select("status").eq("id", id).single(),
+    );
     console.log("[ADVANCE_STATUS_REREAD]", { jobId: id, branch: "on_the_way_stamp", status_after_update: rereadOtw?.status ?? null });
 
     try {
       // Keep on_my_way close to user intent in event order.
       // assignment_added (if any) -> on_my_way -> schedule_updated (if any)
-      await insertJobEvent({
-        supabase,
-        jobId: id,
-        event_type: "on_my_way",
-        meta: {
-          ...buildMovementEventMeta({
-            from: current,
-            to: next,
-            trigger: "field_action",
-            sourceAction: "advance_job_status_from_form",
-          }),
-          auto_schedule_applied: !hasFullSchedule && autoScheduleConfirmed,
-          actor_user_id: actingUserId,
-          assignment_id: actingAssignment.id,
-        },
-        userId: actingUserId,
-      });
-
-      if (!hasFullSchedule && autoScheduleConfirmed) {
-        await insertJobEvent({
+      await _ftTimeSubphase("eventBreadcrumb.insertJobEvent.on_my_way", async () =>
+        insertJobEvent({
           supabase,
           jobId: id,
-          event_type: "schedule_updated",
+          event_type: "on_my_way",
           meta: {
-            before: {
-              scheduled_date: scheduleSnapshot?.scheduled_date ?? null,
-              window_start: scheduleSnapshot?.window_start ?? null,
-              window_end: scheduleSnapshot?.window_end ?? null,
-            },
-            after: {
-              scheduled_date: updatePayload.scheduled_date,
-              window_start: updatePayload.window_start,
-              window_end: updatePayload.window_end,
-            },
-            source: "auto_schedule_on_the_way",
+            ...buildMovementEventMeta({
+              from: current,
+              to: next,
+              trigger: "field_action",
+              sourceAction: "advance_job_status_from_form",
+            }),
+            auto_schedule_applied: !hasFullSchedule && autoScheduleConfirmed,
+            actor_user_id: actingUserId,
+            assignment_id: actingAssignment.id,
           },
-        });
+          userId: actingUserId,
+        }),
+      );
+
+      if (!hasFullSchedule && autoScheduleConfirmed) {
+        await _ftTimeSubphase("eventBreadcrumb.insertJobEvent.schedule_updated", async () =>
+          insertJobEvent({
+            supabase,
+            jobId: id,
+            event_type: "schedule_updated",
+            meta: {
+              before: {
+                scheduled_date: scheduleSnapshot?.scheduled_date ?? null,
+                window_start: scheduleSnapshot?.window_start ?? null,
+                window_end: scheduleSnapshot?.window_end ?? null,
+              },
+              after: {
+                scheduled_date: updatePayload.scheduled_date,
+                window_start: updatePayload.window_start,
+                window_end: updatePayload.window_end,
+              },
+              source: "auto_schedule_on_the_way",
+            },
+          }),
+        );
       }
     } catch (ancillaryError) {
       console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
@@ -7717,13 +7815,17 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       }
     }
 
-    const { data: transitionApplied, error: updErr } = await supabase
-      .from("jobs")
-      .update(updatePayload)
-      .eq("id", id)
-      .eq("status", current)
-      .select("id")
-      .maybeSingle();
+    const { data: transitionApplied, error: updErr } = await _ftTimeSubphase(
+      "statusWrite.guardedJobsUpdate",
+      async () =>
+        supabase
+          .from("jobs")
+          .update(updatePayload)
+          .eq("id", id)
+          .eq("status", current)
+          .select("id")
+          .maybeSingle(),
+    );
 
     if (updErr) throw updErr;
 
@@ -7744,7 +7846,10 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     }
 
     // Diagnostic re-read: confirm DB write persisted before post-update work.
-    const { data: rereadElse } = await supabase.from("jobs").select("status").eq("id", id).single();
+    const { data: rereadElse } = await _ftTimeSubphase(
+      "eventBreadcrumb.diagnosticJobReread",
+      async () => supabase.from("jobs").select("status").eq("id", id).single(),
+    );
     console.log("[ADVANCE_STATUS_REREAD]", { jobId: id, branch: "else", status_after_update: rereadElse?.status ?? null });
 
     // ECC canonical resolution:
@@ -7759,7 +7864,11 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       if (jt2Err) throw jt2Err;
 
       if ((jt2?.job_type ?? "").toLowerCase() === "ecc") {
-        await evaluateEccOpsStatus(id);
+        await evaluateEccOpsStatus(id, {
+          timing: _ftEnabled
+            ? (name, elapsedMs) => _ftRecordSubphase(`eccEvaluation.${name}`, elapsedMs)
+            : undefined,
+        });
       }
     }
     _ftCompletePhase("eccEvaluation");
@@ -7783,13 +7892,17 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
       let assignmentId: string | null = null;
       if (actingUserId) {
-        const { data: activeAssignment, error: assignmentErr } = await supabase
-          .from("job_assignments")
-          .select("id")
-          .eq("job_id", id)
-          .eq("user_id", actingUserId)
-          .eq("is_active", true)
-          .maybeSingle();
+        const { data: activeAssignment, error: assignmentErr } = await _ftTimeSubphase(
+          "eventBreadcrumb.assignmentRead.in_process",
+          async () =>
+            supabase
+              .from("job_assignments")
+              .select("id")
+              .eq("job_id", id)
+              .eq("user_id", actingUserId)
+              .eq("is_active", true)
+              .maybeSingle(),
+        );
 
         if (assignmentErr) throw assignmentErr;
         assignmentId = String(activeAssignment?.id ?? "").trim() || null;
@@ -7809,21 +7922,25 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       };
 
       try {
-        await insertJobEvent({
-          supabase,
-          jobId: id,
-          event_type: "tech_arrived",
-          meta: transitionMeta,
-          userId: actingUserId,
-        });
+        await _ftTimeSubphase("eventBreadcrumb.insertJobEvent.tech_arrived", async () =>
+          insertJobEvent({
+            supabase,
+            jobId: id,
+            event_type: "tech_arrived",
+            meta: transitionMeta,
+            userId: actingUserId,
+          }),
+        );
 
-        await insertJobEvent({
-          supabase,
-          jobId: id,
-          event_type: "job_started",
-          meta: transitionMeta,
-          userId: actingUserId,
-        });
+        await _ftTimeSubphase("eventBreadcrumb.insertJobEvent.job_started", async () =>
+          insertJobEvent({
+            supabase,
+            jobId: id,
+            event_type: "job_started",
+            meta: transitionMeta,
+            userId: actingUserId,
+          }),
+        );
       } catch (ancillaryError) {
         console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
           jobId: id,
@@ -7850,54 +7967,62 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
           let assignmentId: string | null = null;
           if (actingUserId) {
-            const { data: activeAssignment, error: assignmentErr } = await supabase
-              .from("job_assignments")
-              .select("id")
-              .eq("job_id", id)
-              .eq("user_id", actingUserId)
-              .eq("is_active", true)
-              .maybeSingle();
+            const { data: activeAssignment, error: assignmentErr } = await _ftTimeSubphase(
+              "eventBreadcrumb.assignmentRead.completed",
+              async () =>
+                supabase
+                  .from("job_assignments")
+                  .select("id")
+                  .eq("job_id", id)
+                  .eq("user_id", actingUserId)
+                  .eq("is_active", true)
+                  .maybeSingle(),
+            );
 
             if (assignmentErr) throw assignmentErr;
             assignmentId = String(activeAssignment?.id ?? "").trim() || null;
           }
 
           try {
-            await insertJobEvent({
-              supabase,
-              jobId: id,
-              event_type: lifecycleEventType,
-              meta: {
-                ...buildMovementEventMeta({
-                  from: current,
-                  to: next,
-                  trigger: "field_action",
-                  sourceAction: "advance_job_status_from_form",
-                }),
-                actor_user_id: actingUserId,
-                ...(assignmentId ? { assignment_id: assignmentId } : {}),
-              },
-              userId: actingUserId,
-            });
-
-            if (completedJobType && completedJobType !== "ecc") {
-              await insertJobEvent({
+            await _ftTimeSubphase("eventBreadcrumb.insertJobEvent.job_completed", async () =>
+              insertJobEvent({
                 supabase,
                 jobId: id,
-                event_type: "ops_update",
+                event_type: lifecycleEventType,
                 meta: {
-                  changes: [
-                    { field: "status", from: current, to: next },
-                    { field: "field_complete", from: beforeFieldComplete, to: true },
-                    { field: "field_complete_at", from: beforeFieldCompleteAt, to: completedAt },
-                    { field: "ops_status", from: beforeOpsStatus, to: "invoice_required" },
-                  ],
-                  source: "advance_job_status_from_form",
+                  ...buildMovementEventMeta({
+                    from: current,
+                    to: next,
+                    trigger: "field_action",
+                    sourceAction: "advance_job_status_from_form",
+                  }),
                   actor_user_id: actingUserId,
                   ...(assignmentId ? { assignment_id: assignmentId } : {}),
                 },
                 userId: actingUserId,
-              });
+              }),
+            );
+
+            if (completedJobType && completedJobType !== "ecc") {
+              await _ftTimeSubphase("eventBreadcrumb.insertJobEvent.ops_update", async () =>
+                insertJobEvent({
+                  supabase,
+                  jobId: id,
+                  event_type: "ops_update",
+                  meta: {
+                    changes: [
+                      { field: "status", from: current, to: next },
+                      { field: "field_complete", from: beforeFieldComplete, to: true },
+                      { field: "field_complete_at", from: beforeFieldCompleteAt, to: completedAt },
+                      { field: "ops_status", from: beforeOpsStatus, to: "invoice_required" },
+                    ],
+                    source: "advance_job_status_from_form",
+                    actor_user_id: actingUserId,
+                    ...(assignmentId ? { assignment_id: assignmentId } : {}),
+                  },
+                  userId: actingUserId,
+                }),
+              );
             }
           } catch (ancillaryError) {
             console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
@@ -7911,17 +8036,19 @@ export async function advanceJobStatusFromForm(formData: FormData) {
           }
         } else {
           try {
-            await insertJobEvent({
-              supabase,
-              jobId: id,
-              event_type: lifecycleEventType,
-              meta: buildMovementEventMeta({
-                from: current,
-                to: next,
-                trigger: "field_action",
-                sourceAction: "advance_job_status_from_form",
+            await _ftTimeSubphase("eventBreadcrumb.insertJobEvent.lifecycle", async () =>
+              insertJobEvent({
+                supabase,
+                jobId: id,
+                event_type: lifecycleEventType,
+                meta: buildMovementEventMeta({
+                  from: current,
+                  to: next,
+                  trigger: "field_action",
+                  sourceAction: "advance_job_status_from_form",
+                }),
               }),
-            });
+            );
           } catch (ancillaryError) {
             console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
               jobId: id,
@@ -7939,11 +8066,15 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     // Retest-specific lifecycle breadcrumb:
     // if this job is a linked retest child and it enters in_process,
     // log retest_started on BOTH the child and the parent.
-    const { data: linkedJob, error: linkedErr } = await supabase
-      .from("jobs")
-      .select("parent_job_id")
-      .eq("id", id)
-      .maybeSingle();
+    const { data: linkedJob, error: linkedErr } = await _ftTimeSubphase(
+      "eventBreadcrumb.linkedRetestRead",
+      async () =>
+        supabase
+          .from("jobs")
+          .select("parent_job_id")
+          .eq("id", id)
+          .maybeSingle(),
+    );
 
     if (linkedErr) throw linkedErr;
 
@@ -7951,19 +8082,23 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     if (parentJobId && next === "in_process") {
       try {
-        await insertJobEvent({
-          supabase,
-          jobId: id,
-          event_type: "retest_started",
-          meta: { parent_job_id: parentJobId },
-        });
+        await _ftTimeSubphase("eventBreadcrumb.insertJobEvent.retest_started_child", async () =>
+          insertJobEvent({
+            supabase,
+            jobId: id,
+            event_type: "retest_started",
+            meta: { parent_job_id: parentJobId },
+          }),
+        );
 
-        await insertJobEvent({
-          supabase,
-          jobId: parentJobId,
-          event_type: "retest_started",
-          meta: { child_job_id: id },
-        });
+        await _ftTimeSubphase("eventBreadcrumb.insertJobEvent.retest_started_parent", async () =>
+          insertJobEvent({
+            supabase,
+            jobId: parentJobId,
+            event_type: "retest_started",
+            meta: { child_job_id: id },
+          }),
+        );
       } catch (ancillaryError) {
         console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
           jobId: id,

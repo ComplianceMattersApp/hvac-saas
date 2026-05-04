@@ -97,6 +97,20 @@ const BLOCKED_BILLING_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([
   "cancelled",
 ]);
 
+async function timeEntitlementPhase<T>(
+  timing: ((phase: string, elapsedMs: number) => void) | undefined,
+  phase: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  if (!timing) return work();
+  const startedAt = Date.now();
+  try {
+    return await work();
+  } finally {
+    timing(phase, Date.now() - startedAt);
+  }
+}
+
 function hasInternalCompedNotesMarker(value: unknown): boolean {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (!normalized) return false;
@@ -253,6 +267,7 @@ export async function resolveOperationalMutationEntitlementAccess(params: {
   accountOwnerUserId: string;
   supabase: any;
   now?: Date;
+  timing?: (phase: string, elapsedMs: number) => void;
 }): Promise<OperationalMutationEntitlementDecision> {
   const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
   if (!accountOwnerUserId) {
@@ -263,21 +278,26 @@ export async function resolveOperationalMutationEntitlementAccess(params: {
   }
 
   const nowMs = (params.now ?? new Date()).getTime();
-  const { data, error } = await params.supabase
-    .from("platform_account_entitlements")
-    .select(
-      [
-        "entitlement_status",
-        "seat_limit",
-        "trial_ends_at",
-        "notes",
-        "stripe_customer_id",
-        "stripe_subscription_id",
-        "stripe_subscription_status",
-      ].join(", "),
-    )
-    .eq("account_owner_user_id", accountOwnerUserId)
-    .maybeSingle();
+  const { data, error } = await timeEntitlementPhase(
+    params.timing,
+    "entitlementLookup",
+    async () =>
+      params.supabase
+        .from("platform_account_entitlements")
+        .select(
+          [
+            "entitlement_status",
+            "seat_limit",
+            "trial_ends_at",
+            "notes",
+            "stripe_customer_id",
+            "stripe_subscription_id",
+            "stripe_subscription_status",
+          ].join(", "),
+        )
+        .eq("account_owner_user_id", accountOwnerUserId)
+        .maybeSingle(),
+  );
 
   if (error) {
     return {

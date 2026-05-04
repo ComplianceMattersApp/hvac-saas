@@ -32,14 +32,39 @@ export type SetOpsStatusResult = {
   manualLockPrevented: boolean;
 };
 
-export async function setOpsStatusIfNotManual(jobId: string, nextStatus: OpsStatus): Promise<SetOpsStatusResult> {
+type OpsStatusTimingRecorder = (phase: string, elapsedMs: number) => void;
+
+async function timeOpsStatusPhase<T>(
+  timing: OpsStatusTimingRecorder | undefined,
+  phase: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  if (!timing) return work();
+  const startedAt = Date.now();
+  try {
+    return await work();
+  } finally {
+    timing(phase, Date.now() - startedAt);
+  }
+}
+
+export async function setOpsStatusIfNotManual(
+  jobId: string,
+  nextStatus: OpsStatus,
+  options: { timing?: OpsStatusTimingRecorder } = {},
+): Promise<SetOpsStatusResult> {
   const supabase = await createClient();
 
-  const { data: job, error: jobErr } = await supabase
-    .from("jobs")
-    .select("id, ops_status")
-    .eq("id", jobId)
-    .single();
+  const { data: job, error: jobErr } = await timeOpsStatusPhase(
+    options.timing,
+    "read",
+    async () =>
+      supabase
+        .from("jobs")
+        .select("id, ops_status")
+        .eq("id", jobId)
+        .single(),
+  );
 
   if (jobErr) throw new Error(jobErr.message);
 
@@ -74,18 +99,28 @@ export async function setOpsStatusIfNotManual(jobId: string, nextStatus: OpsStat
     return unchangedResult;
   }
 
-  const { error: upErr } = await supabase
-    .from("jobs")
-    .update({ ops_status: nextStatus })
-    .eq("id", jobId);
+  const { error: upErr } = await timeOpsStatusPhase(
+    options.timing,
+    "update",
+    async () =>
+      supabase
+        .from("jobs")
+        .update({ ops_status: nextStatus })
+        .eq("id", jobId),
+  );
 
   if (upErr) throw new Error(upErr.message);
 
-  const { data: after, error: afterErr } = await supabase
-    .from("jobs")
-    .select("ops_status")
-    .eq("id", jobId)
-    .single();
+  const { data: after, error: afterErr } = await timeOpsStatusPhase(
+    options.timing,
+    "reread",
+    async () =>
+      supabase
+        .from("jobs")
+        .select("ops_status")
+        .eq("id", jobId)
+        .single(),
+  );
 
   if (afterErr) throw new Error(afterErr.message);
 
@@ -103,9 +138,18 @@ export async function setOpsStatusIfNotManual(jobId: string, nextStatus: OpsStat
   return result;
 }
 
-export async function forceSetOpsStatus(jobId: string, nextStatus: OpsStatus): Promise<void> {
+export async function forceSetOpsStatus(
+  jobId: string,
+  nextStatus: OpsStatus,
+  options: { timing?: OpsStatusTimingRecorder } = {},
+): Promise<void> {
   const supabase = await createClient();
 
-  const { error } = await supabase.from("jobs").update({ ops_status: nextStatus }).eq("id", jobId);
+  const { error } = await timeOpsStatusPhase(
+    options.timing,
+    "update",
+    async () =>
+      supabase.from("jobs").update({ ops_status: nextStatus }).eq("id", jobId),
+  );
   if (error) throw new Error(error.message);
 }

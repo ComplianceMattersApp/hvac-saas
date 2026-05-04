@@ -19,6 +19,22 @@ const RESOLVED_ECC_PRE_FIELD_STATUSES: ReadonlySet<OpsStatus> = new Set([
   "scheduled",
 ]);
 
+type EccTimingRecorder = (phase: string, elapsedMs: number) => void;
+
+async function timeEccPhase<T>(
+  timing: EccTimingRecorder | undefined,
+  phase: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  if (!timing) return work();
+  const startedAt = Date.now();
+  try {
+    return await work();
+  } finally {
+    timing(phase, Date.now() - startedAt);
+  }
+}
+
 function resolveEccCloseoutStatus(job: any): OpsStatus {
   const resolvedNextStatus = resolveOpsStatus({
     status: job.status ?? null,
@@ -47,8 +63,9 @@ async function applyResolvedEccCloseoutStatus(params: {
   currentOps: string;
   resolvedNextStatus: OpsStatus;
   reason: string;
+  timing?: EccTimingRecorder;
 }) {
-  const { jobId, currentOps, resolvedNextStatus, reason } = params;
+  const { jobId, currentOps, resolvedNextStatus, reason, timing } = params;
 
   if (ECC_HARD_LOCKS.has(currentOps)) {
     console.error("[ECC_EVAL]", {
@@ -76,7 +93,11 @@ async function applyResolvedEccCloseoutStatus(params: {
   }
 
   if (resolvedNextStatus === "paperwork_required") {
-    const setResult = await setOpsStatusIfNotManual(jobId, resolvedNextStatus);
+    const setResult = await setOpsStatusIfNotManual(jobId, resolvedNextStatus, {
+      timing: timing
+        ? (phase, elapsedMs) => timing(`opsStatus.${phase}`, elapsedMs)
+        : undefined,
+    });
     console.error("[ECC_EVAL]", {
       jobId,
       current_ops_status: currentOps,
@@ -88,7 +109,11 @@ async function applyResolvedEccCloseoutStatus(params: {
     return;
   }
 
-  await forceSetOpsStatus(jobId, resolvedNextStatus);
+  await forceSetOpsStatus(jobId, resolvedNextStatus, {
+    timing: timing
+      ? (phase, elapsedMs) => timing(`opsStatus.${phase}`, elapsedMs)
+      : undefined,
+  });
   console.error("[ECC_EVAL]", {
     jobId,
     current_ops_status: currentOps,
@@ -115,14 +140,22 @@ const ECC_HARD_LOCKS = new Set<string>(["pending_info", "on_hold"]);
  * - ECC resolution must come from completed ecc_test_runs.
  * - Required tests are resolved PER SYSTEM using the ECC scenario engine.
  */
-export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
+export async function evaluateEccOpsStatus(
+  jobId: string,
+  options: { timing?: EccTimingRecorder } = {},
+): Promise<void> {
   const supabase = await createClient();
 
-  const { data: job, error: jobErr } = await supabase
-  .from("jobs")
-  .select("id, status, job_type, project_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end")
-  .eq("id", jobId)
-  .single();
+  const { data: job, error: jobErr } = await timeEccPhase(
+    options.timing,
+    "jobRead",
+    async () =>
+      supabase
+        .from("jobs")
+        .select("id, status, job_type, project_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end")
+        .eq("id", jobId)
+        .single(),
+  );
 
   if (jobErr) throw new Error(jobErr.message);
   if (!job) {
@@ -142,10 +175,11 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
 
   const isFieldComplete = Boolean((job as any)?.field_complete);
 
-  const { data: systems, error: sysErr } = await supabase
-    .from("job_systems")
-    .select("id")
-    .eq("job_id", jobId);
+  const { data: systems, error: sysErr } = await timeEccPhase(
+    options.timing,
+    "systemsRead",
+    async () => supabase.from("job_systems").select("id").eq("job_id", jobId),
+  );
 
   if (sysErr) throw new Error(sysErr.message);
 
@@ -153,17 +187,27 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
     .map((s) => String(s.id || "").trim())
     .filter(Boolean);
 
-  const { data: equipmentRows, error: eqErr } = await supabase
-    .from("job_equipment")
-    .select("system_id, component_type, equipment_role")
-    .eq("job_id", jobId);
+  const { data: equipmentRows, error: eqErr } = await timeEccPhase(
+    options.timing,
+    "equipmentRead",
+    async () =>
+      supabase
+        .from("job_equipment")
+        .select("system_id, component_type, equipment_role")
+        .eq("job_id", jobId),
+  );
 
   if (eqErr) throw new Error(eqErr.message);
 
-  const { data: runs, error: runsErr } = await supabase
-    .from("ecc_test_runs")
-    .select("id, system_id, test_type, is_completed, computed_pass, override_pass, data, computed")
-    .eq("job_id", jobId);
+  const { data: runs, error: runsErr } = await timeEccPhase(
+    options.timing,
+    "eccTestRunsRead",
+    async () =>
+      supabase
+        .from("ecc_test_runs")
+        .select("id, system_id, test_type, is_completed, computed_pass, override_pass, data, computed")
+        .eq("job_id", jobId),
+  );
 
   if (runsErr) throw new Error(runsErr.message);
 
@@ -212,6 +256,7 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
         currentOps: String(job.ops_status ?? ""),
         resolvedNextStatus: resolveEccCloseoutStatus(job),
         reason: "field_complete_no_required_tests",
+        timing: options.timing,
       });
       return;
     }
@@ -261,13 +306,18 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
 
   if (anyRequiredFail) {
     const currentOps = job.ops_status ?? "";
-    const { data: correctionResolutionEvent, error: correctionResolutionErr } = await supabase
-      .from("job_events")
-      .select("id")
-      .eq("job_id", jobId)
-      .eq("event_type", "failure_resolved_by_correction_review")
-      .limit(1)
-      .maybeSingle();
+    const { data: correctionResolutionEvent, error: correctionResolutionErr } = await timeEccPhase(
+      options.timing,
+      "correctionEventLookup",
+      async () =>
+        supabase
+          .from("job_events")
+          .select("id")
+          .eq("job_id", jobId)
+          .eq("event_type", "failure_resolved_by_correction_review")
+          .limit(1)
+          .maybeSingle(),
+    );
 
     if (correctionResolutionErr) throw new Error(correctionResolutionErr.message);
 
@@ -284,7 +334,11 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
           final_ops_status: currentOps,
         });
       } else {
-        await forceSetOpsStatus(jobId, resolvedNextStatus as OpsStatus);
+        await forceSetOpsStatus(jobId, resolvedNextStatus as OpsStatus, {
+          timing: options.timing
+            ? (phase, elapsedMs) => options.timing?.(`opsStatus.${phase}`, elapsedMs)
+            : undefined,
+        });
         console.error("[ECC_EVAL]", {
           jobId,
           current_ops_status: currentOps,
@@ -307,7 +361,11 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
         final_ops_status: currentOps,
       });
     } else {
-      await forceSetOpsStatus(jobId, "failed");
+      await forceSetOpsStatus(jobId, "failed", {
+        timing: options.timing
+          ? (phase, elapsedMs) => options.timing?.(`opsStatus.${phase}`, elapsedMs)
+          : undefined,
+      });
       console.error("[ECC_EVAL]", {
         jobId,
         current_ops_status: currentOps,
@@ -335,12 +393,17 @@ export async function evaluateEccOpsStatus(jobId: string): Promise<void> {
       currentOps: String(job.ops_status ?? ""),
       resolvedNextStatus: resolveEccCloseoutStatus(job),
       reason: "all_required_passed",
+      timing: options.timing,
     });
     return;
   }
 
   if (isFieldComplete) {
-    const setResult = await setOpsStatusIfNotManual(jobId, "paperwork_required");
+    const setResult = await setOpsStatusIfNotManual(jobId, "paperwork_required", {
+      timing: options.timing
+        ? (phase, elapsedMs) => options.timing?.(`opsStatus.${phase}`, elapsedMs)
+        : undefined,
+    });
     console.error("[ECC_EVAL]", {
       jobId,
       current_ops_status: job.ops_status ?? null,
