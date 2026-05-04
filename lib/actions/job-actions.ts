@@ -3128,7 +3128,41 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   if (!jobId) throw new Error("Missing job_id");
 
+  // Slice-4A: measurement-only timing (FIELD_ACTION_TIMING_DEBUG=true to enable; no behavior change)
+  const _ftEnabled = process.env.FIELD_ACTION_TIMING_DEBUG === "true";
+  const _ftStart = Date.now();
+  let _ftPhaseStart = _ftStart;
+  const _ftPhases: Record<string, number> = {};
+  const _ftCompletePhase = (name: string) => {
+    if (!_ftEnabled) return;
+    const now = Date.now();
+    _ftPhases[name] = now - _ftPhaseStart;
+    _ftPhaseStart = now;
+  };
+  const _ftEmit = (branch: string, target: string) => {
+    if (!_ftEnabled) return;
+    console.info(
+      "[retest-ready-timing]",
+      JSON.stringify({
+        jobId,
+        branch,
+        totalMs: Date.now() - _ftStart,
+        redirectTarget: target,
+        phasesMs: {
+          parseInput: _ftPhases.parseInput ?? 0,
+          contractorAuth: _ftPhases.contractorAuth ?? 0,
+          jobOwnershipRead: _ftPhases.jobOwnershipRead ?? 0,
+          ineligibleDuplicateChecks: _ftPhases.ineligibleDuplicateChecks ?? 0,
+          eventNotificationWrite: _ftPhases.eventNotificationWrite ?? 0,
+          revalidation: _ftPhases.revalidation ?? 0,
+        },
+      }),
+    );
+  };
+
   const supabase = await createClient();
+  if (_ftEnabled) _ftPhaseStart = Date.now(); // exclude createClient overhead; parseInput was trivial
+  _ftCompletePhase("parseInput");
 
   const {
     data: { user },
@@ -3148,6 +3182,7 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
   if (!cu?.contractor_id) {
     throw new Error("Only contractor users can request retest readiness.");
   }
+  _ftCompletePhase("contractorAuth");
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
@@ -3160,13 +3195,16 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
   if (!job?.id || String(job.contractor_id ?? "") !== String(cu.contractor_id ?? "")) {
     throw new Error("Job not found.");
   }
+  _ftCompletePhase("jobOwnershipRead");
 
   const jobType = String(job.job_type ?? "").trim().toLowerCase();
   if (jobType !== "ecc") {
+    _ftEmit("guard:not_ecc", `/portal/jobs/${jobId}?banner=retest_ready_requires_ecc`);
     redirect(`/portal/jobs/${jobId}?banner=retest_ready_requires_ecc`);
   }
 
   if (String(job.ops_status ?? "").toLowerCase() !== "failed") {
+    _ftEmit("guard:not_failed", `/portal/jobs/${jobId}?banner=retest_ready_not_failed`);
     redirect(`/portal/jobs/${jobId}?banner=retest_ready_not_failed`);
   }
 
@@ -3182,6 +3220,7 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
 
   if (childErr) throw childErr;
   if (openRetestChild?.id) {
+    _ftEmit("guard:open_retest_exists", `/portal/jobs/${jobId}?banner=retest_ready_already_received`);
     redirect(`/portal/jobs/${jobId}?banner=retest_ready_already_received`);
   }
 
@@ -3197,9 +3236,12 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
   if (reqErr) throw reqErr;
 
   if (existingRequest?.id) {
+    _ftCompletePhase("ineligibleDuplicateChecks");
+    _ftEmit("guard:duplicate_request", `/portal/jobs/${jobId}?banner=retest_ready_already_received`);
     revalidatePath(`/portal/jobs/${jobId}`);
     redirect(`/portal/jobs/${jobId}?banner=retest_ready_already_received`);
   }
+  _ftCompletePhase("ineligibleDuplicateChecks");
 
   await insertJobEvent({
     supabase,
@@ -3228,12 +3270,15 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
       next_action: "create_retest_job",
     },
   });
+  _ftCompletePhase("eventNotificationWrite");
 
   revalidatePath("/ops");
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/portal/jobs/${jobId}`);
   revalidatePath("/portal");
+  _ftCompletePhase("revalidation");
 
+  _ftEmit("success", `/portal/jobs/${jobId}?banner=retest_ready_requested`);
   redirect(`/portal/jobs/${jobId}?banner=retest_ready_requested`);
 }
 
@@ -7376,9 +7421,45 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     return `/jobs/${id}?${query.toString()}`;
   };
 
+  // Slice-4A: measurement-only timing (FIELD_ACTION_TIMING_DEBUG=true to enable; no behavior change)
+  const _ftEnabled = process.env.FIELD_ACTION_TIMING_DEBUG === "true";
+  const _ftStart = Date.now();
+  let _ftPhaseStart = _ftStart;
+  const _ftPhases: Record<string, number> = {};
+  const _ftCompletePhase = (name: string) => {
+    if (!_ftEnabled) return;
+    const now = Date.now();
+    _ftPhases[name] = now - _ftPhaseStart;
+    _ftPhaseStart = now;
+  };
+  const _ftEmit = (branch: string, target: string) => {
+    if (!_ftEnabled) return;
+    console.info(
+      "[advance-status-timing]",
+      JSON.stringify({
+        jobId: id,
+        branch,
+        totalMs: Date.now() - _ftStart,
+        redirectTarget: target,
+        phasesMs: {
+          parseInput: _ftPhases.parseInput ?? 0,
+          authActorScope: _ftPhases.authActorScope ?? 0,
+          jobRead: _ftPhases.jobRead ?? 0,
+          guardEccPrecondition: _ftPhases.guardEccPrecondition ?? 0,
+          statusWrite: _ftPhases.statusWrite ?? 0,
+          eccEvaluation: _ftPhases.eccEvaluation ?? 0,
+          eventBreadcrumb: _ftPhases.eventBreadcrumb ?? 0,
+          revalidation: _ftPhases.revalidation ?? 0,
+        },
+      }),
+    );
+  };
+
   console.log("[ADVANCE_STATUS_ENTRY]", { jobId: id, ts: new Date().toISOString() });
 
   const supabase = await createClient();
+  if (_ftEnabled) _ftPhaseStart = Date.now(); // exclude createClient overhead
+  _ftCompletePhase("parseInput");
   const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
@@ -7387,6 +7468,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
+  _ftCompletePhase("authActorScope");
 
   // ✅ Read true current status from DB (source of truth)
   const { data: job, error: jobErr } = await supabase
@@ -7399,6 +7481,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
   const current = (job?.status || "open") as JobStatus;
   console.log("[ADVANCE_STATUS_DB_READ]", { jobId: id, current, on_the_way_at: job?.on_the_way_at ?? null });
+  _ftCompletePhase("jobRead");
 
   const nextMap: Record<JobStatus, JobStatus> = {
     open: "on_the_way",
@@ -7442,10 +7525,12 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
       if (!hasMeaningfulCompletedRun) {
         console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "ecc_test_required", current, next });
+        _ftEmit("guard:ecc_test_required", buildJobRedirect({ notice: "ecc_test_required" }));
         redirect(buildJobRedirect({ notice: "ecc_test_required" }));
       }
     }
   }
+  _ftCompletePhase("guardEccPrecondition");
 
     // ✅ stamp only first time entering on_the_way
   if (next === "on_the_way" && !job?.on_the_way_at) {
@@ -7485,6 +7570,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     if (!hasFullSchedule && !autoScheduleConfirmed) {
       console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "schedule_required", current, next, hasFullSchedule });
+      _ftEmit("guard:schedule_required", buildJobRedirect({ schedule_required: "1" }));
       redirect(buildJobRedirect({ schedule_required: "1" }));
     }
 
@@ -7522,11 +7608,13 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     if (updErr) throw updErr;
 
     console.log("[ADVANCE_STATUS_UPDATED]", { jobId: id, branch: "on_the_way_stamp", applied: !!onTheWayApplied?.id, returnedId: onTheWayApplied?.id ?? null });
+    _ftCompletePhase("statusWrite");
 
     // Concurrency hardening: if another request already advanced this job,
     // do not emit duplicate transition events on this stale request.
     if (!onTheWayApplied?.id) {
       console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_already_updated", branch: "on_the_way_stamp", current, next });
+      _ftEmit("no-op:status_already_updated", buildJobRedirect({ banner: "status_already_updated" }));
       revalidatePath(`/jobs/${id}`);
       revalidatePath(`/jobs`);
       revalidatePath(`/ops`);
@@ -7591,6 +7679,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       });
     }
     console.log("[ADVANCE_STATUS_OTW_BRANCH_END]", { jobId: id, note: "on_the_way branch completed — no redirect issued from this code path" });
+    _ftCompletePhase("eventBreadcrumb");
   } else {
     console.log("[ADVANCE_STATUS_BRANCH]", { jobId: id, branch: "else", current, next });
     const updatePayload: Record<string, any> = { status: next };
@@ -7639,11 +7728,13 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     if (updErr) throw updErr;
 
     console.log("[ADVANCE_STATUS_UPDATED]", { jobId: id, branch: "else", applied: !!transitionApplied?.id, returnedId: transitionApplied?.id ?? null });
+    _ftCompletePhase("statusWrite");
 
     // Concurrency/no-op hardening: stale retries should not emit duplicate
     // lifecycle events when a parallel request already moved status forward.
     if (!transitionApplied?.id) {
       console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_already_updated", branch: "else", current, next });
+      _ftEmit("no-op:status_already_updated", buildJobRedirect({ banner: "status_already_updated" }));
       revalidatePath(`/jobs/${id}`);
       revalidatePath(`/jobs`);
       revalidatePath(`/ops`);
@@ -7671,6 +7762,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
         await evaluateEccOpsStatus(id);
       }
     }
+    _ftCompletePhase("eccEvaluation");
 
     const lifecycleEventMap: Partial<Record<JobStatus, string>> = {
       on_the_way: "on_my_way",
@@ -7883,6 +7975,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
         });
       }
     }
+    _ftCompletePhase("eventBreadcrumb");
   }
 
   console.log("[ADVANCE_STATUS_PREREVALIDATE]", { jobId: id, current, next });
@@ -7891,8 +7984,10 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   revalidatePath(`/ops`);
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${id}`);
+  _ftCompletePhase("revalidation");
 
   console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_updated", current, next });
+  _ftEmit("success", buildJobRedirect({ banner: "status_updated" }));
   redirect(
     buildJobRedirect({
       banner: "status_updated",
