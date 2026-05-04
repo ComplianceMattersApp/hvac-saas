@@ -1099,26 +1099,7 @@ export default async function JobDetailPage({
     };
   });
 
-  const customerAttemptSummaryPromise = timedPhase("customerAttemptSummary", async () => {
-    const {
-      data: latestCustomerAttemptRows,
-      count: customerAttemptCount,
-      error: customerAttemptSummaryErr,
-    } = await supabase
-      .from("job_events")
-      .select("created_at", { count: "exact" })
-      .eq("job_id", jobId)
-      .eq("event_type", "customer_attempt")
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (customerAttemptSummaryErr) throw new Error(customerAttemptSummaryErr.message);
-
-    return {
-      latestCustomerAttempt: latestCustomerAttemptRows?.[0] ?? null,
-      customerAttemptCount,
-    };
-  });
+  setPhaseValue("customerAttemptSummary", 0);
 
   const onTheWayUndoEligibilityPromise = timedPhase("undoEligibility", async () =>
     getOnTheWayUndoEligibility(jobId),
@@ -1268,14 +1249,12 @@ export default async function JobDetailPage({
     activeAssignmentDisplayMap,
     serviceCaseSummary,
     timelineSummary,
-    customerAttemptSummary,
     onTheWayUndoEligibility,
     billingPartyReads,
   ] = await Promise.all([
     assignmentDisplayPromise,
     serviceCaseSummaryPromise,
     timelineSummaryPromise,
-    customerAttemptSummaryPromise,
     onTheWayUndoEligibilityPromise,
     billingPartyReadsPromise(),
   ]);
@@ -1325,13 +1304,8 @@ export default async function JobDetailPage({
       ? "Awaiting internal review"
       : null;
 
-  const { latestCustomerAttempt, customerAttemptCount } = customerAttemptSummary;
-  const attemptCount = customerAttemptCount ?? 0;
-  const lastAttemptIso = latestCustomerAttempt?.created_at
-    ? String(latestCustomerAttempt.created_at)
-    : null;
-
-  const lastAttemptLabel = lastAttemptIso ? formatDateLAFromIso(lastAttemptIso) : "—";
+  const attemptCount: number | null = null;
+  const lastAttemptLabel = "Recent attempts loading";
 
   const customerName =
   (customerBilling?.full_name ||
@@ -1729,9 +1703,7 @@ const followUpSummaryText = hasFollowUpReminder
       .filter(Boolean)
       .join(" • ")
   : "No follow-up reminder set yet.";
-const followUpHistorySummaryText = attemptCount
-  ? `Last contact logged ${lastAttemptLabel}.`
-  : "No contact attempts logged yet.";
+const followUpHistorySummaryText = "Follow-up history loads below";
 const serviceChainSummaryText = serviceCaseId
   ? "Visit history across the linked service case."
   : "No linked service case yet.";
@@ -4364,7 +4336,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <CollapsibleHeader
           title="Follow-Up History"
           subtitle={followUpHistorySummaryText}
-          meta={`${attemptCount} attempt${attemptCount === 1 ? "" : "s"}`}
+          meta="Recent attempts loading"
         />
       </summary>
 

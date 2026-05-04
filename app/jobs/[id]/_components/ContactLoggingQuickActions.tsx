@@ -6,8 +6,8 @@ import { useFormStatus } from "react-dom";
 
 type ContactLoggingQuickActionsProps = {
   jobId: string;
-  attemptCount: number;
-  lastAttemptLabel: string;
+  attemptCount?: number | null;
+  lastAttemptLabel?: string | null;
   action: (formData: FormData) => void | Promise<void>;
   buttonClassName: string;
 };
@@ -81,6 +81,11 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
     });
   }, [banner, pathname, restoreKey, searchParams]);
 
+  const hasAttemptSummary = typeof attemptCount === "number" && Number.isFinite(attemptCount);
+  const summaryText = hasAttemptSummary
+    ? `${attemptCount} attempt${attemptCount === 1 ? "" : "s"} • last: ${String(lastAttemptLabel ?? "—").trim() || "—"}`
+    : "Recent attempts loading";
+
   return (
     <div ref={sectionRef} id="contact-logging" className="mt-4 border-t border-slate-200/80 pt-4 scroll-mt-24">
       <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Contact Logging</div>
@@ -112,7 +117,7 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
         </form>
       </div>
       <div className="mt-2 text-[11px] text-slate-500">
-        {attemptCount} attempt{attemptCount === 1 ? "" : "s"} • last: {lastAttemptLabel}
+        {summaryText}
       </div>
     </div>
   );
