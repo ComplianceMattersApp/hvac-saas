@@ -65,6 +65,7 @@ import {
   type InternalInvoiceEmailDeliveryRecord,
 } from "@/lib/business/internal-invoice-delivery";
 import {
+  normalizeInternalInvoiceStatus,
   type InternalInvoiceItemType,
   resolveLatestVoidedInternalInvoiceByJobId,
   resolveInternalInvoiceByJobId,
@@ -763,10 +764,6 @@ export default async function JobDetailPage({
     actorKind: string;
   }) => {
     if (!timingEnabled) return;
-    const invoiceReadAggregateMs =
-      (phaseDurationsMs.invoiceRecordLinesRead ?? 0) +
-      (phaseDurationsMs.invoiceDeliveryPaymentLedgerRead ?? 0) +
-      (phaseDurationsMs.invoicePricebookRead ?? 0);
 
     const totalRenderMs = Date.now() - renderStartMs;
 
@@ -799,17 +796,13 @@ export default async function JobDetailPage({
           customerAttemptSummary: phaseDurationsMs.customerAttemptSummary ?? 0,
           undoEligibility: phaseDurationsMs.undoEligibility ?? 0,
           billingCustomerContractorReads: phaseDurationsMs.billingCustomerContractorReads ?? 0,
-          invoiceReads: invoiceReadAggregateMs,
+          immediateInvoiceTruthRead: phaseDurationsMs.immediateInvoiceTruthRead ?? 0,
+          deferredInvoicePanelRead: phaseDurationsMs.deferredInvoicePanelRead ?? 0,
           eccPayloadReads: phaseDurationsMs.eccPayloadReads ?? 0,
           jobLocationPreviewBlocking: phaseDurationsMs.jobLocationPreviewBlocking ?? 0,
           serviceStatusActionsBlocking: phaseDurationsMs.serviceStatusActionsBlocking ?? 0,
           compositionPrep: phaseDurationsMs.compositionPrep ?? 0,
           totalServerRenderBeforeResponse: totalRenderMs,
-        },
-        invoiceReadSubphasesMs: {
-          invoiceRecordLinesRead: phaseDurationsMs.invoiceRecordLinesRead ?? 0,
-          invoiceDeliveryPaymentLedgerRead: phaseDurationsMs.invoiceDeliveryPaymentLedgerRead ?? 0,
-          invoicePricebookRead: phaseDurationsMs.invoicePricebookRead ?? 0,
         },
       }),
     );
@@ -930,7 +923,7 @@ export default async function JobDetailPage({
       billing_email,
       billing_phone,
       billing_address_line1,
-      billing_address_line2, 
+      billing_address_line2,
       billing_city,
       billing_state,
       billing_zip,
@@ -983,20 +976,38 @@ export default async function JobDetailPage({
   const contractorId = job.contractor_id ?? null;
   const customerId = job.customer_id ?? null;
 
-  const internalInvoiceStatePromise = timedPhase("invoiceRecordLinesRead", async () => {
-    const internalInvoice =
-      isInternalUser && billingMode === "internal_invoicing"
-        ? await resolveInternalInvoiceByJobId({ supabase, jobId })
-        : null;
+  const immediateInvoiceTruthPromise = timedPhase("immediateInvoiceTruthRead", async () => {
+    if (!(isInternalUser && billingMode === "internal_invoicing")) {
+      return {
+        internalInvoiceTruth: null as {
+          status: InternalInvoiceStatus;
+          invoice_number: string;
+          issued_at: string | null;
+        } | null,
+      };
+    }
 
-    const latestVoidedInternalInvoice =
-      isInternalUser && billingMode === "internal_invoicing" && !internalInvoice
-        ? await resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId })
-        : null;
+    const { data: invoiceTruthRow, error: invoiceTruthErr } = await supabase
+      .from("internal_invoices")
+      .select("id, status, invoice_number, issued_at")
+      .eq("job_id", jobId)
+      .neq("status", "void")
+      .maybeSingle();
+
+    if (invoiceTruthErr) throw invoiceTruthErr;
+
+    if (!invoiceTruthRow) {
+      return {
+        internalInvoiceTruth: null,
+      };
+    }
 
     return {
-      internalInvoice,
-      latestVoidedInternalInvoice,
+      internalInvoiceTruth: {
+          status: normalizeInternalInvoiceStatus(invoiceTruthRow.status),
+          invoice_number: String(invoiceTruthRow.invoice_number ?? "").trim(),
+        issued_at: invoiceTruthRow.issued_at ?? null,
+      },
     };
   });
 
@@ -1145,29 +1156,53 @@ export default async function JobDetailPage({
     };
   });
 
-  const { internalInvoice, latestVoidedInternalInvoice } = await internalInvoiceStatePromise;
+  const { internalInvoiceTruth } = await immediateInvoiceTruthPromise;
 
-  const invoiceKnownReadsPromise = (async () => {
-    if (!(isInternalUser && internalInvoice)) {
-      setPhaseValue("invoiceLedgerDeliveryReads", 0);
-      setPhaseValue("pricebookPickerRead", 0);
-      return {
-        internalInvoiceEmailDeliveries: [] as InternalInvoiceEmailDeliveryRecord[],
-        internalInvoicePaymentLedger: null,
-        pricebookPickerItems: [] as Array<{
-          id: string;
-          item_name: string;
-          item_type: string;
-          category: string | null;
-          default_description: string | null;
-          default_unit_price: number;
-          unit_label: string | null;
-        }>,
-      };
-    }
+  const loadDeferredInvoicePanelData = async () => {
+    const deferredStartMs = timingEnabled ? Date.now() : 0;
+    try {
+      if (!(isInternalUser && billingMode === "internal_invoicing")) {
+        return {
+          internalInvoice: null as Awaited<ReturnType<typeof resolveInternalInvoiceByJobId>>,
+          latestVoidedInternalInvoice: null as Awaited<ReturnType<typeof resolveLatestVoidedInternalInvoiceByJobId>>,
+          internalInvoiceEmailDeliveries: [] as InternalInvoiceEmailDeliveryRecord[],
+          internalInvoicePaymentLedger: null as Awaited<ReturnType<typeof resolveInvoiceCollectedPaymentLedger>> | null,
+          pricebookPickerItems: [] as Array<{
+            id: string;
+            item_name: string;
+            item_type: string;
+            category: string | null;
+            default_description: string | null;
+            default_unit_price: number;
+            unit_label: string | null;
+          }>,
+        };
+      }
 
-    const internalInvoiceEmailDeliveriesPromise = timedPhase("invoiceDeliveryPaymentLedgerRead", async () => {
-      const [internalInvoiceEmailDeliveries, internalInvoicePaymentLedger] = await Promise.all([
+      const internalInvoice = await resolveInternalInvoiceByJobId({ supabase, jobId });
+      const latestVoidedInternalInvoice = !internalInvoice
+        ? await resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId })
+        : null;
+
+      if (!internalInvoice) {
+        return {
+          internalInvoice,
+          latestVoidedInternalInvoice,
+          internalInvoiceEmailDeliveries: [] as InternalInvoiceEmailDeliveryRecord[],
+          internalInvoicePaymentLedger: null as Awaited<ReturnType<typeof resolveInvoiceCollectedPaymentLedger>> | null,
+          pricebookPickerItems: [] as Array<{
+            id: string;
+            item_name: string;
+            item_type: string;
+            category: string | null;
+            default_description: string | null;
+            default_unit_price: number;
+            unit_label: string | null;
+          }>,
+        };
+      }
+
+      const [internalInvoiceEmailDeliveries, internalInvoicePaymentLedger, pricebookPickerItems] = await Promise.all([
         resolveInternalInvoiceEmailDeliveries({
           supabase,
           jobId,
@@ -1178,60 +1213,56 @@ export default async function JobDetailPage({
           internalInvoice.id,
           supabase,
         ),
+        (async () => {
+          if (!(billingMode === "internal_invoicing" && internalInvoice.status === "draft")) {
+            return [] as Array<{
+              id: string;
+              item_name: string;
+              item_type: string;
+              category: string | null;
+              default_description: string | null;
+              default_unit_price: number;
+              unit_label: string | null;
+            }>;
+          }
+
+          const { data: pricebookRows, error: pricebookRowsErr } = await supabase
+            .from("pricebook_items")
+            .select("id, item_name, item_type, category, default_description, default_unit_price, unit_label")
+            .eq("account_owner_user_id", internalUser.account_owner_user_id)
+            .eq("is_active", true)
+            .in("item_type", ["service", "material", "diagnostic"])
+            .gte("default_unit_price", 0)
+            .order("item_name", { ascending: true });
+
+          if (pricebookRowsErr) throw pricebookRowsErr;
+
+          return (pricebookRows ?? []).map((row: any) => ({
+            id: String(row?.id ?? "").trim(),
+            item_name: String(row?.item_name ?? "").trim(),
+            item_type: String(row?.item_type ?? "").trim(),
+            category: String(row?.category ?? "").trim() || null,
+            default_description: String(row?.default_description ?? "").trim() || null,
+            default_unit_price: Number(row?.default_unit_price ?? 0) || 0,
+            unit_label: String(row?.unit_label ?? "").trim() || null,
+          }));
+        })(),
       ]);
 
       return {
+        internalInvoice,
+        latestVoidedInternalInvoice,
         internalInvoiceEmailDeliveries,
         internalInvoicePaymentLedger,
+        pricebookPickerItems,
       };
-    });
-
-    const pricebookPickerItemsPromise = timedPhase("invoicePricebookRead", async () => {
-      if (!(billingMode === "internal_invoicing" && internalInvoice.status === "draft")) {
-        return [] as Array<{
-          id: string;
-          item_name: string;
-          item_type: string;
-          category: string | null;
-          default_description: string | null;
-          default_unit_price: number;
-          unit_label: string | null;
-        }>;
+    } finally {
+      if (timingEnabled) {
+        const deferredElapsedMs = Date.now() - deferredStartMs;
+        setPhaseValue("deferredInvoicePanelRead", deferredElapsedMs);
       }
-
-      const { data: pricebookRows, error: pricebookRowsErr } = await supabase
-        .from("pricebook_items")
-        .select("id, item_name, item_type, category, default_description, default_unit_price, unit_label")
-        .eq("account_owner_user_id", internalUser.account_owner_user_id)
-        .eq("is_active", true)
-        .in("item_type", ["service", "material", "diagnostic"])
-        .gte("default_unit_price", 0)
-        .order("item_name", { ascending: true });
-
-      if (pricebookRowsErr) throw pricebookRowsErr;
-
-      return (pricebookRows ?? []).map((row: any) => ({
-        id: String(row?.id ?? "").trim(),
-        item_name: String(row?.item_name ?? "").trim(),
-        item_type: String(row?.item_type ?? "").trim(),
-        category: String(row?.category ?? "").trim() || null,
-        default_description: String(row?.default_description ?? "").trim() || null,
-        default_unit_price: Number(row?.default_unit_price ?? 0) || 0,
-        unit_label: String(row?.unit_label ?? "").trim() || null,
-      }));
-    });
-
-    const [invoiceLedgerDeliveryReads, pricebookPickerItems] = await Promise.all([
-      internalInvoiceEmailDeliveriesPromise,
-      pricebookPickerItemsPromise,
-    ]);
-
-    return {
-      internalInvoiceEmailDeliveries: invoiceLedgerDeliveryReads.internalInvoiceEmailDeliveries,
-      internalInvoicePaymentLedger: invoiceLedgerDeliveryReads.internalInvoicePaymentLedger,
-      pricebookPickerItems,
-    };
-  })();
+    }
+  };
 
   const [
     activeAssignmentDisplayMap,
@@ -1240,7 +1271,6 @@ export default async function JobDetailPage({
     customerAttemptSummary,
     onTheWayUndoEligibility,
     billingPartyReads,
-    invoiceKnownReads,
   ] = await Promise.all([
     assignmentDisplayPromise,
     serviceCaseSummaryPromise,
@@ -1248,7 +1278,6 @@ export default async function JobDetailPage({
     customerAttemptSummaryPromise,
     onTheWayUndoEligibilityPromise,
     billingPartyReadsPromise(),
-    invoiceKnownReadsPromise,
   ]);
 
   const contractorBilling = billingPartyReads.contractorBilling;
@@ -1297,13 +1326,6 @@ export default async function JobDetailPage({
       : null;
 
   const { latestCustomerAttempt, customerAttemptCount } = customerAttemptSummary;
-  const {
-    internalInvoiceEmailDeliveries,
-    internalInvoicePaymentLedger,
-    pricebookPickerItems,
-  } = invoiceKnownReads;
-
-
   const attemptCount = customerAttemptCount ?? 0;
   const lastAttemptIso = latestCustomerAttempt?.created_at
     ? String(latestCustomerAttempt.created_at)
@@ -1455,7 +1477,7 @@ function serviceChainBadgeClass(opsStatus?: string | null, isCurrent?: boolean) 
 
   return "bg-gray-100 text-gray-700";
 }
-    
+
 function formatBillingAddress(a: {
   billing_address_line1?: string | null;
   billing_address_line2?: string | null;
@@ -1486,7 +1508,7 @@ const isFailedUnresolved =
 const billingState = buildJobBillingStateReadModel({
   billingMode,
   invoiceComplete: job.invoice_complete,
-  internalInvoice,
+  internalInvoice: internalInvoiceTruth,
 });
 
 const closeoutProjectionJob = {
@@ -1545,11 +1567,6 @@ const showInternalInvoicePanel =
   isInternalUser &&
   billingState.internalInvoicePanelEnabled;
 
-const showReplacementInvoicePrompt =
-  showInternalInvoicePanel &&
-  !internalInvoice &&
-  !!latestVoidedInternalInvoice;
-
 const visitScopeSummary = sanitizeVisitScopeSummary((job as any).visit_scope_summary);
 let visitScopeItems = [] as Array<{
   id?: string;
@@ -1590,122 +1607,6 @@ const visitScopeBadgeSubtext = visitScopeBadgeItemCount > 0
     ? "Summary added"
     : null
   : visitScopeHeaderPreview.lead || null;
-
-const internalInvoiceBillingAddress = internalInvoice
-  ? formatBillingAddress({
-      billing_address_line1: internalInvoice.billing_address_line1,
-      billing_address_line2: internalInvoice.billing_address_line2,
-      billing_city: internalInvoice.billing_city,
-      billing_state: internalInvoice.billing_state,
-      billing_zip: internalInvoice.billing_zip,
-    })
-  : [];
-
-const internalInvoiceLineItemCount = internalInvoice?.line_items?.length ?? 0;
-const existingVisitScopeInvoiceSourceIds = new Set(
-  (internalInvoice?.line_items ?? [])
-    .filter((lineItem) => lineItem.source_kind === "visit_scope")
-    .map((lineItem) => sanitizeVisitScopeItemId(lineItem.source_visit_scope_item_id))
-    .filter(Boolean) as string[],
-);
-const rawVisitScopeRows = Array.isArray((job as any).visit_scope_items)
-  ? (job as any).visit_scope_items
-  : [];
-const visitScopeInvoicePickerItems = rawVisitScopeRows
-  .map((rawRow: any) => {
-    const persistedItemId = sanitizeVisitScopeItemId(rawRow?.id);
-    if (!persistedItemId) return null;
-
-    let sanitizedRowItems: Array<{
-      title: string;
-      details: string | null;
-      kind: "primary" | "companion_service";
-    }> = [];
-    try {
-      sanitizedRowItems = sanitizeVisitScopeItems([rawRow]);
-    } catch {
-      return null;
-    }
-
-    const sanitizedRow = sanitizedRowItems[0];
-    if (!sanitizedRow) return null;
-
-    return {
-      id: persistedItemId,
-      title: sanitizedRow.title,
-      details: sanitizedRow.details,
-      kind: sanitizedRow.kind,
-      alreadyAdded: existingVisitScopeInvoiceSourceIds.has(persistedItemId),
-    };
-  })
-  .filter(Boolean) as Array<{
-    id: string;
-    title: string;
-    details: string | null;
-    kind: "primary" | "companion_service";
-    alreadyAdded: boolean;
-  }>;
-const internalInvoiceRecipientName = String(internalInvoice?.billing_name ?? "").trim() || "Billing recipient not set";
-const internalInvoiceRecipientContact = [
-  String(internalInvoice?.billing_email ?? "").trim(),
-  String(internalInvoice?.billing_phone ?? "").trim(),
-].filter(Boolean);
-const internalInvoiceHasNotes = String(internalInvoice?.notes ?? "").trim().length > 0;
-const latestInternalInvoiceEmailDelivery = internalInvoiceEmailDeliveries[0] ?? null;
-const latestSuccessfulInternalInvoiceEmailDelivery =
-  internalInvoiceEmailDeliveries.find((delivery: InternalInvoiceEmailDeliveryRecord) => delivery.status === "sent") ?? null;
-const lastInternalInvoiceSentLabel = latestSuccessfulInternalInvoiceEmailDelivery?.sentAt
-  ? formatDateTimeLAFromIso(String(latestSuccessfulInternalInvoiceEmailDelivery.sentAt))
-  : "";
-const internalInvoiceEmailButtonLabel = latestSuccessfulInternalInvoiceEmailDelivery ? "Send Again" : "Send Invoice Email";
-const internalInvoiceSendTargetDefault =
-  String(latestInternalInvoiceEmailDelivery?.recipientEmail ?? internalInvoice?.billing_email ?? "").trim();
-const internalInvoiceSendTargetMissing = internalInvoiceSendTargetDefault.length === 0;
-const internalInvoicePaymentRows: InternalInvoicePaymentRow[] = internalInvoicePaymentLedger?.rows ?? [];
-const internalInvoicePaymentSummary = internalInvoicePaymentLedger?.summary ?? {
-  invoiceId: String(internalInvoice?.id ?? ""),
-  invoiceTotalCents: Number(internalInvoice?.total_cents ?? 0) || 0,
-  amountPaidCents: 0,
-  balanceDueCents: Number(internalInvoice?.total_cents ?? 0) || 0,
-  paymentStatus: "unpaid" as const,
-};
-const internalInvoicePaymentStatusLabel =
-  internalInvoicePaymentSummary.paymentStatus === "paid"
-    ? "Paid"
-    : internalInvoicePaymentSummary.paymentStatus === "partial"
-      ? "Partially Paid"
-      : "Unpaid";
-const internalInvoicePaymentStatusChipClass =
-  internalInvoicePaymentSummary.paymentStatus === "paid"
-    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-    : internalInvoicePaymentSummary.paymentStatus === "partial"
-      ? "border-amber-200 bg-amber-50 text-amber-800"
-      : "border-slate-200 bg-slate-50 text-slate-700";
-
-const internalInvoiceReadyToIssue =
-  internalInvoice != null &&
-  internalInvoice.status === "draft" &&
-  String(job.status ?? "").toLowerCase() === "completed" &&
-  isFieldComplete &&
-  internalInvoiceLineItemCount > 0 &&
-  String(internalInvoice.billing_name ?? "").trim().length > 0 &&
-  Number(internalInvoice.total_cents ?? 0) > 0;
-
-const internalInvoiceStatusChipClass =
-  billingState.statusTone === "emerald"
-    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-    : billingState.statusTone === "rose"
-      ? "border-rose-200 bg-rose-50 text-rose-700"
-      : billingState.statusTone === "amber"
-        ? "border-amber-200 bg-amber-50 text-amber-800"
-        : "border-slate-200 bg-slate-50 text-slate-700";
-
-const issuedInvoiceStatusMessage =
-  internalInvoice?.status === "issued"
-    ? job.job_type === "ecc" && !job.certs_complete
-      ? `Issued ${internalInvoice.issued_at ? displayDateLA(internalInvoice.issued_at) : ""}. Billing is satisfied, but certs are still open before this job can fully close.`
-      : `Issued ${internalInvoice.issued_at ? displayDateLA(internalInvoice.issued_at) : ""}. The job's billing-closeout requirement is currently satisfied.`
-    : "";
 
 const canShowReleaseAndReevaluate = [
   "pending_info",
@@ -1877,6 +1778,751 @@ const failureResolutionSummaryText = showRetestSection && showCorrectionReviewRe
   ? "Create a retest visit when a physical return is required."
   : "Resolve this failure through correction review only when a return visit is not needed.";
 const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrectionReviewResolution);
+
+  const DeferredInternalInvoicePanel = async () => {
+    const {
+      internalInvoice,
+      latestVoidedInternalInvoice,
+      internalInvoiceEmailDeliveries,
+      internalInvoicePaymentLedger,
+      pricebookPickerItems,
+    } = await loadDeferredInvoicePanelData();
+
+    const showReplacementInvoicePrompt =
+      showInternalInvoicePanel &&
+      !internalInvoice &&
+      !!latestVoidedInternalInvoice;
+
+    const internalInvoiceBillingAddress = internalInvoice
+      ? formatBillingAddress({
+          billing_address_line1: internalInvoice.billing_address_line1,
+          billing_address_line2: internalInvoice.billing_address_line2,
+          billing_city: internalInvoice.billing_city,
+          billing_state: internalInvoice.billing_state,
+          billing_zip: internalInvoice.billing_zip,
+        })
+      : [];
+
+    const internalInvoiceLineItemCount = internalInvoice?.line_items?.length ?? 0;
+    const existingVisitScopeInvoiceSourceIds = new Set(
+      (internalInvoice?.line_items ?? [])
+        .filter((lineItem) => lineItem.source_kind === "visit_scope")
+        .map((lineItem) => sanitizeVisitScopeItemId(lineItem.source_visit_scope_item_id))
+        .filter(Boolean) as string[],
+    );
+    const rawVisitScopeRows = Array.isArray((job as any).visit_scope_items)
+      ? (job as any).visit_scope_items
+      : [];
+    const visitScopeInvoicePickerItems = rawVisitScopeRows
+      .map((rawRow: any) => {
+        const persistedItemId = sanitizeVisitScopeItemId(rawRow?.id);
+        if (!persistedItemId) return null;
+
+        let sanitizedRowItems: Array<{
+          title: string;
+          details: string | null;
+          kind: "primary" | "companion_service";
+        }> = [];
+        try {
+          sanitizedRowItems = sanitizeVisitScopeItems([rawRow]);
+        } catch {
+          return null;
+        }
+
+        const sanitizedRow = sanitizedRowItems[0];
+        if (!sanitizedRow) return null;
+
+        return {
+          id: persistedItemId,
+          title: sanitizedRow.title,
+          details: sanitizedRow.details,
+          kind: sanitizedRow.kind,
+          alreadyAdded: existingVisitScopeInvoiceSourceIds.has(persistedItemId),
+        };
+      })
+      .filter(Boolean) as Array<{
+        id: string;
+        title: string;
+        details: string | null;
+        kind: "primary" | "companion_service";
+        alreadyAdded: boolean;
+      }>;
+    const internalInvoiceRecipientName = String(internalInvoice?.billing_name ?? "").trim() || "Billing recipient not set";
+    const internalInvoiceRecipientContact = [
+      String(internalInvoice?.billing_email ?? "").trim(),
+      String(internalInvoice?.billing_phone ?? "").trim(),
+    ].filter(Boolean);
+    const internalInvoiceHasNotes = String(internalInvoice?.notes ?? "").trim().length > 0;
+    const latestInternalInvoiceEmailDelivery = internalInvoiceEmailDeliveries[0] ?? null;
+    const latestSuccessfulInternalInvoiceEmailDelivery =
+      internalInvoiceEmailDeliveries.find((delivery: InternalInvoiceEmailDeliveryRecord) => delivery.status === "sent") ?? null;
+    const lastInternalInvoiceSentLabel = latestSuccessfulInternalInvoiceEmailDelivery?.sentAt
+      ? formatDateTimeLAFromIso(String(latestSuccessfulInternalInvoiceEmailDelivery.sentAt))
+      : "";
+    const internalInvoiceEmailButtonLabel = latestSuccessfulInternalInvoiceEmailDelivery ? "Send Again" : "Send Invoice Email";
+    const internalInvoiceSendTargetDefault =
+      String(latestInternalInvoiceEmailDelivery?.recipientEmail ?? internalInvoice?.billing_email ?? "").trim();
+    const internalInvoiceSendTargetMissing = internalInvoiceSendTargetDefault.length === 0;
+    const internalInvoicePaymentRows: InternalInvoicePaymentRow[] = internalInvoicePaymentLedger?.rows ?? [];
+    const internalInvoicePaymentSummary = internalInvoicePaymentLedger?.summary ?? {
+      invoiceId: String(internalInvoice?.id ?? ""),
+      invoiceTotalCents: Number(internalInvoice?.total_cents ?? 0) || 0,
+      amountPaidCents: 0,
+      balanceDueCents: Number(internalInvoice?.total_cents ?? 0) || 0,
+      paymentStatus: "unpaid" as const,
+    };
+    const internalInvoicePaymentStatusLabel =
+      internalInvoicePaymentSummary.paymentStatus === "paid"
+        ? "Paid"
+        : internalInvoicePaymentSummary.paymentStatus === "partial"
+          ? "Partially Paid"
+          : "Unpaid";
+    const internalInvoicePaymentStatusChipClass =
+      internalInvoicePaymentSummary.paymentStatus === "paid"
+        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+        : internalInvoicePaymentSummary.paymentStatus === "partial"
+          ? "border-amber-200 bg-amber-50 text-amber-800"
+          : "border-slate-200 bg-slate-50 text-slate-700";
+
+    const internalInvoiceReadyToIssue =
+      internalInvoice != null &&
+      internalInvoice.status === "draft" &&
+      String(job.status ?? "").toLowerCase() === "completed" &&
+      isFieldComplete &&
+      internalInvoiceLineItemCount > 0 &&
+      String(internalInvoice.billing_name ?? "").trim().length > 0 &&
+      Number(internalInvoice.total_cents ?? 0) > 0;
+
+    const internalInvoiceStatusChipClass =
+      billingState.statusTone === "emerald"
+        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+        : billingState.statusTone === "rose"
+          ? "border-rose-200 bg-rose-50 text-rose-700"
+          : billingState.statusTone === "amber"
+            ? "border-amber-200 bg-amber-50 text-amber-800"
+            : "border-slate-200 bg-slate-50 text-slate-700";
+
+    const issuedInvoiceStatusMessage =
+      internalInvoice?.status === "issued"
+        ? job.job_type === "ecc" && !job.certs_complete
+          ? `Issued ${internalInvoice.issued_at ? displayDateLA(internalInvoice.issued_at) : ""}. Billing is satisfied, but certs are still open before this job can fully close.`
+          : `Issued ${internalInvoice.issued_at ? displayDateLA(internalInvoice.issued_at) : ""}. The job's billing-closeout requirement is currently satisfied.`
+        : "";
+
+    return (
+      <div id="internal-invoice-panel" className={`mt-6 scroll-mt-24 rounded-2xl p-5 ${hasVisitScopeDefined ? "border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_20px_40px_-30px_rgba(15,23,42,0.28)]" : "border border-slate-200/70 bg-slate-50/75 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.18)]"}`}>
+        <div className={`rounded-xl p-4 ${hasVisitScopeDefined ? "border border-slate-200/80 bg-white/92 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.22)]" : "border border-slate-200/70 bg-white/70"}`}>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice</div>
+              <div className="mt-1 text-sm font-semibold text-slate-950">
+                {internalInvoice ? internalInvoice.invoice_number : "Not started"}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Date</div>
+              <div className="mt-1 text-sm font-semibold text-slate-950">
+                {internalInvoice ? displayDateLA(internalInvoice.invoice_date) : "Will auto-fill on draft"}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Status</div>
+              <div className="mt-1">
+                <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] ${internalInvoiceStatusChipClass}`}>
+                  {internalInvoice ? formatInternalInvoiceStatus(internalInvoice.status) : billingState.statusLabel}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charges</div>
+              <div className="mt-1 text-sm font-semibold text-slate-950">
+                {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Derived Total</div>
+              <div className="mt-1 text-sm font-semibold text-slate-950">
+                {formatCurrencyFromCents(internalInvoice?.total_cents ?? 0)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {!internalInvoice ? (
+          <div className={`mt-4 rounded-xl border border-dashed px-4 py-4 ${hasVisitScopeDefined ? "border-slate-300 bg-slate-50/80" : "border-slate-200 bg-white/65"}`}>
+            {showReplacementInvoicePrompt ? (
+              <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50/80 px-3.5 py-3 text-sm leading-6 text-rose-800">
+                <div className="font-semibold text-rose-900">Create Replacement Invoice</div>
+                <div className="mt-1">
+                  The voided invoice remains in history. A replacement draft creates a new active invoice for this job.
+                </div>
+              </div>
+            ) : null}
+
+            <div className="text-sm leading-6 text-slate-700">
+              {showReplacementInvoicePrompt
+                ? "A previous invoice was voided. Start a replacement draft when the corrected billed scope is ready."
+                : hasVisitScopeDefined
+                ? "Create a draft invoice when the billed scope is ready."
+                : "Work Items come first. Start an invoice later when billing is ready."}
+            </div>
+            <form action={createInternalInvoiceDraftFromForm} className="mt-3">
+              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="tab" value={tab} />
+              <SubmitButton loadingText="Creating..." className={hasVisitScopeDefined ? primaryButtonClass : secondaryButtonClass}>
+                {showReplacementInvoicePrompt ? "Create Replacement Invoice" : "Create Draft Invoice"}
+              </SubmitButton>
+            </form>
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.28fr)_minmax(18rem,0.72fr)]">
+            <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.24)]">
+              {internalInvoice.status === "draft" ? (
+                <div className="space-y-5">
+                  <div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charges</div>
+                        <div className="mt-1 text-sm leading-6 text-slate-600">Build Invoice Charges here once billing is ready. These remain downstream commercial records rather than the visit-definition layer.</div>
+                      </div>
+                      <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                        {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}
+                      </div>
+                    </div>
+
+                    {visitScopeInvoicePickerItems.length === 0 ? (
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-600">
+                        No Work Items are available to add to this draft invoice.
+                      </div>
+                    ) : null}
+
+                    <InternalInvoiceLineItemsTable
+                      jobId={job.id}
+                      tab={tab}
+                      lineItems={internalInvoice.line_items}
+                      totalCents={internalInvoice.total_cents}
+                      addLineItemAction={addInternalInvoiceLineItemFromForm}
+                      addPricebookLineItemAction={addInternalInvoiceLineItemFromPricebookForm}
+                      addVisitScopeLineItemsAction={addInternalInvoiceLineItemsFromVisitScopeForm}
+                      updateLineItemAction={updateInternalInvoiceLineItemFromForm}
+                      removeLineItemAction={removeInternalInvoiceLineItemFromForm}
+                      pricebookPickerItems={pricebookPickerItems}
+                      visitScopePickerItems={visitScopeInvoicePickerItems}
+                      workspaceFieldLabelClass={workspaceFieldLabelClass}
+                      workspaceInputClass={workspaceInputClass}
+                      primaryButtonClass={primaryButtonClass}
+                      secondaryButtonClass={secondaryButtonClass}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Frozen Scope</div>
+                    <div className="mt-1 text-sm leading-6 text-slate-600">Issued and void invoices keep the final invoice charges as the billed record.</div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className={workspaceSoftCardClass}>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Number</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-950">{internalInvoice.invoice_number}</div>
+                    </div>
+                    <div className={workspaceSoftCardClass}>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Date</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-950">{displayDateLA(internalInvoice.invoice_date)}</div>
+                    </div>
+                    <div className={workspaceSoftCardClass}>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Subtotal</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-950">{formatCurrencyFromCents(internalInvoice.subtotal_cents)}</div>
+                    </div>
+                    <div className={workspaceSoftCardClass}>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Total</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-950">{formatCurrencyFromCents(internalInvoice.total_cents)}</div>
+                    </div>
+                  </div>
+
+                  {internalInvoice.notes ? (
+                    <div className={workspaceSoftCardClass}>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Notes</div>
+                      <div className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{internalInvoice.notes}</div>
+                    </div>
+                  ) : null}
+
+                  <div className={workspaceSoftCardClass}>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Frozen Invoice Charges</div>
+                    <div className="mt-3 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/75">
+                      <div className="hidden grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)] gap-4 border-b border-slate-200/80 bg-white/85 px-5 py-3 md:grid">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charge</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Type</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Qty</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Unit Price</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Subtotal</div>
+                      </div>
+
+                      {internalInvoiceLineItemCount > 0 ? (
+                        <div className="divide-y divide-slate-200/80">
+                          {internalInvoice.line_items.map((lineItem, index) => (
+                            <div key={lineItem.id} className="bg-white/72 px-5 py-5">
+                              <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                                Line {index + 1}
+                              </div>
+
+                              <div className="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)] md:items-start">
+                                <div>
+                                  <div className={workspaceFieldLabelClass}>Item Name</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-950">{lineItem.item_name_snapshot}</div>
+                                </div>
+
+                                <div>
+                                  <div className={workspaceFieldLabelClass}>Type</div>
+                                  <div className="mt-1 text-sm text-slate-700">{formatInternalInvoiceItemType(lineItem.item_type_snapshot)}</div>
+                                </div>
+
+                                <div>
+                                  <div className={workspaceFieldLabelClass}>Quantity</div>
+                                  <div className="mt-1 text-sm text-slate-700">{formatDecimalInput(lineItem.quantity)}</div>
+                                </div>
+
+                                <div>
+                                  <div className={workspaceFieldLabelClass}>Unit Price</div>
+                                  <div className="mt-1 text-sm text-slate-700">{formatCurrencyFromAmount(lineItem.unit_price)}</div>
+                                </div>
+
+                                <div>
+                                  <div className={workspaceFieldLabelClass}>Subtotal</div>
+                                  <div className="mt-1 text-sm font-semibold text-slate-950">{formatCurrencyFromAmount(lineItem.line_subtotal)}</div>
+                                </div>
+
+                                <div className="md:col-span-5">
+                                  <div className={workspaceFieldLabelClass}>Description / Work Instruction</div>
+                                  <div className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+                                    {lineItem.description_snapshot ? lineItem.description_snapshot : "No additional work instruction recorded."}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="px-4 py-4 text-sm text-slate-600">No frozen invoice charges were recorded on this invoice.</div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 bg-white/88 px-5 py-3.5">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Final Total</div>
+                        <div className="text-sm font-semibold text-slate-950">{formatCurrencyFromCents(internalInvoice.total_cents)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {internalInvoice.status === "void" && internalInvoice.void_reason ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm leading-6 text-rose-800">
+                      <span className="font-semibold">Void reason:</span> {internalInvoice.void_reason}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50/78 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.24)]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Billing Recipient</div>
+                <div className="mt-2 text-sm font-semibold text-slate-900">{internalInvoiceRecipientName}</div>
+                {internalInvoiceRecipientContact.length > 0 ? (
+                  <div className="mt-1 text-sm text-slate-600">{internalInvoiceRecipientContact.join(" • ")}</div>
+                ) : null}
+                {internalInvoiceBillingAddress.length > 0 ? (
+                  <div className="mt-2 text-sm leading-6 text-slate-600">{internalInvoiceBillingAddress.join(", ")}</div>
+                ) : null}
+              </div>
+
+              <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.24)]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Actions</div>
+                <div className="mt-2 rounded-lg border border-blue-200/80 bg-blue-50/70 px-3.5 py-3 text-sm leading-6 text-blue-900">
+                  This invoice records billed work for this job. Payment entries are tracking-only and do not charge a card.
+                </div>
+                {internalInvoice.status === "draft" ? (
+                  <>
+                      <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Issue Invoice</div>
+                      <div className="mt-1 text-sm leading-6 text-slate-600">Review recipient, Invoice Charges, and total. Issue only when this billed invoice record is final. Sending happens after issue and is communication only.</div>
+                      <div className="mt-1 text-sm leading-6 text-slate-600">Invoice Charges are billed records and should be reviewed before issue.</div>
+
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
+                      <div><span className="font-semibold text-slate-900">Review recipient:</span> {internalInvoiceRecipientName}</div>
+                      <div className="mt-1"><span className="font-semibold text-slate-900">Review email:</span> {String(internalInvoice.billing_email ?? "").trim() || "Not set"}</div>
+                      <div className="mt-1"><span className="font-semibold text-slate-900">Review total:</span> {formatCurrencyFromCents(internalInvoice.total_cents)}</div>
+                      <div className="mt-1"><span className="font-semibold text-slate-900">Review charges:</span> {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}</div>
+                    </div>
+
+                    <form action={issueInternalInvoiceFromForm} className="mt-3">
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="tab" value={tab} />
+                      <SubmitButton
+                        loadingText="Issuing..."
+                        className={darkButtonClass}
+                        disabled={!internalInvoiceReadyToIssue}
+                      >
+                        Issue Invoice
+                      </SubmitButton>
+                    </form>
+
+                    {!internalInvoiceReadyToIssue ? (
+                      <div className="mt-2 text-xs leading-5 text-slate-500">
+                        Cannot issue yet. Complete all of the following: job marked completed, field complete, billing name filled in, and at least one saved invoice charge with total above $0.00.
+                      </div>
+                    ) : null}
+                  </>
+                ) : internalInvoice.status === "issued" ? (
+                  <>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Issue Invoice</div>
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50/75 px-3.5 py-3 text-sm leading-6 text-emerald-900">
+                      {issuedInvoiceStatusMessage}
+                    </div>
+
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
+                      <div className="font-semibold text-slate-900">Payment Tracking</div>
+                      <div className="mt-1 leading-6">
+                        Off-platform payment recording only. This tracks collected payment history and does not charge a card or change billed invoice charges.
+                      </div>
+
+                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Payment Status</div>
+                          <div className="mt-1">
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${internalInvoicePaymentStatusChipClass}`}>
+                              {internalInvoicePaymentStatusLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Amount Paid</div>
+                          <div className="mt-1 text-sm font-semibold text-slate-900">
+                            {formatCurrencyFromCents(internalInvoicePaymentSummary.amountPaidCents)}
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Balance Due</div>
+                          <div className="mt-1 text-sm font-semibold text-slate-900">
+                            {formatCurrencyFromCents(internalInvoicePaymentSummary.balanceDueCents)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <form action={recordInternalInvoicePaymentFromForm} className="mt-3 space-y-3">
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="tab" value={tab} />
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className={workspaceFieldLabelClass}>Amount</label>
+                            <input
+                              name="payment_amount"
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              className={workspaceInputClass}
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className={workspaceFieldLabelClass}>Payment Method</label>
+                            <select name="payment_method" className={workspaceInputClass} defaultValue="" required>
+                              <option value="" disabled>
+                                Select method
+                              </option>
+                              <option value="cash">Cash</option>
+                              <option value="check">Check</option>
+                              <option value="ach_off_platform">ACH (Off-Platform)</option>
+                              <option value="card_off_platform">Card (Off-Platform)</option>
+                              <option value="bank_transfer">Bank Transfer</option>
+                              <option value="other">Other</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className={workspaceFieldLabelClass}>Reference</label>
+                            <input
+                              name="received_reference"
+                              placeholder="Check # or confirmation"
+                              className={workspaceInputClass}
+                            />
+                          </div>
+
+                          <div>
+                            <label className={workspaceFieldLabelClass}>Payment recorded note</label>
+                            <input
+                              name="notes"
+                              placeholder="Optional note"
+                              className={workspaceInputClass}
+                            />
+                          </div>
+                        </div>
+
+                        <SubmitButton
+                          loadingText="Recording..."
+                          className={darkButtonClass}
+                          disabled={internalInvoicePaymentSummary.balanceDueCents <= 0}
+                        >
+                          Record Payment
+                        </SubmitButton>
+                      </form>
+
+                      {internalInvoicePaymentRows.length > 0 ? (
+                        <div className="mt-3 space-y-2">
+                          {internalInvoicePaymentRows.slice(0, 6).map((payment) => (
+                            <div key={payment.id} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5 text-sm text-slate-700">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="font-semibold text-slate-900">Payment recorded</div>
+                                <div className="text-xs text-slate-500">{formatDateTimeLAFromIso(payment.paid_at)}</div>
+                              </div>
+                              <div className="mt-1">
+                                {formatCurrencyFromCents(payment.amount_cents)} • {String(payment.payment_method).replace(/_/g, " ")}
+                              </div>
+                              {payment.received_reference ? (
+                                <div className="mt-1 text-xs text-slate-500">Reference: {payment.received_reference}</div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
+                      <div className="font-semibold text-slate-900">Send / Resend</div>
+                      <div className="mt-1 leading-6">Send the already-issued invoice to the billing recipient. Resending is communication only and does not create a second invoice or alter billed truth.</div>
+
+                      <form action={sendInternalInvoiceEmailFromForm} className="mt-3 space-y-3">
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="tab" value={tab} />
+
+                        <div>
+                          <label className={workspaceFieldLabelClass}>Send To</label>
+                          <input
+                            type="email"
+                            name="recipient_email"
+                            defaultValue={internalInvoiceSendTargetDefault}
+                            placeholder="billing@example.com"
+                            className={workspaceInputClass}
+                          />
+                        </div>
+
+                        <SubmitButton
+                          loadingText="Sending..."
+                          className={darkButtonClass}
+                        >
+                          {internalInvoiceEmailButtonLabel}
+                        </SubmitButton>
+                      </form>
+
+                      {internalInvoiceSendTargetMissing ? (
+                        <div className="mt-2 text-xs leading-5 text-amber-700">
+                          Add a billing email first. Sending is available only after issue and with a recipient email.
+                        </div>
+                      ) : lastInternalInvoiceSentLabel ? (
+                        <div className="mt-2 text-xs leading-5 text-slate-500">
+                          Last sent {lastInternalInvoiceSentLabel} to {latestSuccessfulInternalInvoiceEmailDelivery?.recipientEmail ?? internalInvoiceSendTargetDefault}.
+                        </div>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50/75 px-3.5 py-3 text-sm leading-6 text-rose-800">
+                    This invoice is void and no longer satisfies billing closeout.
+                  </div>
+                )}
+
+                {internalInvoice.status !== "void" ? (
+                  <form action={voidInternalInvoiceFromForm} className="mt-4 space-y-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Void Invoice</div>
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="tab" value={tab} />
+                    <div>
+                      <label className={workspaceFieldLabelClass}>Void Reason</label>
+                      <textarea name="void_reason" className={`${workspaceInputClass} min-h-[5rem]`} />
+                    </div>
+                    <SubmitButton
+                      loadingText="Voiding..."
+                      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
+                    >
+                      Void Invoice
+                    </SubmitButton>
+                  </form>
+                ) : null}
+              </div>
+
+              {internalInvoiceEmailDeliveries.length > 0 ? (
+                <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.24)]">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Delivery History</div>
+                      <div className="mt-1 text-sm leading-6 text-slate-600">Operator-facing send attempts for this invoice.</div>
+                    </div>
+                    <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      {internalInvoiceEmailDeliveries.length} attempt{internalInvoiceEmailDeliveries.length === 1 ? "" : "s"}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    {internalInvoiceEmailDeliveries.map((delivery: InternalInvoiceEmailDeliveryRecord) => (
+                      <div key={delivery.id} className="rounded-lg border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-700">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="font-semibold text-slate-900">
+                            {delivery.attemptKind === "resent" ? "Resent" : "Sent"} attempt #{delivery.attemptNumber}
+                          </div>
+                          <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${delivery.status === "sent" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : delivery.status === "failed" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+                            {delivery.status}
+                          </span>
+                        </div>
+                        <div className="mt-1">Recipient: {delivery.recipientEmail || "Not recorded"}</div>
+                        <div className="mt-1">Recorded: {delivery.sentAt ? formatDateTimeLAFromIso(delivery.sentAt) : delivery.createdAt ? formatDateTimeLAFromIso(delivery.createdAt) : "—"}</div>
+                        {delivery.errorDetail ? (
+                          <div className="mt-1 text-rose-700">Delivery note: {delivery.errorDetail}</div>
+                        ) : delivery.note ? (
+                          <div className="mt-1 text-slate-500">{delivery.note}</div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {internalInvoice.status === "draft" ? (
+                <details className="group rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.24)] [&[open]_.disclosure-icon]:rotate-90">
+                  <summary className="cursor-pointer list-none">
+                    <CollapsibleHeader
+                      title="Edit Billing Details"
+                      subtitle={internalInvoiceHasNotes ? "Billing/contact details and notes." : "Billing/contact details are available here when you need them."}
+                    />
+                  </summary>
+
+                  <div className="mt-3 border-t border-slate-200/80 pt-4">
+                    <InternalInvoiceDraftSaveForm action={saveInternalInvoiceDraftFromForm} className="space-y-4">
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="tab" value={tab} />
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className={workspaceFieldLabelClass}>Invoice #</label>
+                          <input
+                            name="invoice_number"
+                            defaultValue={String(internalInvoice.invoice_number ?? "")}
+                            className={workspaceInputClass}
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className={workspaceFieldLabelClass}>Invoice Date</label>
+                          <input
+                            type="date"
+                            name="invoice_date"
+                            defaultValue={dateToDateInput(internalInvoice.invoice_date)}
+                            className={workspaceInputClass}
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className={workspaceFieldLabelClass}>Billing Name</label>
+                          <input
+                            name="billing_name"
+                            defaultValue={String(internalInvoice.billing_name ?? "")}
+                            className={workspaceInputClass}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={workspaceFieldLabelClass}>Billing Email</label>
+                          <input
+                            name="billing_email"
+                            defaultValue={String(internalInvoice.billing_email ?? "")}
+                            className={workspaceInputClass}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={workspaceFieldLabelClass}>Billing Phone</label>
+                          <input
+                            name="billing_phone"
+                            defaultValue={String(internalInvoice.billing_phone ?? "")}
+                            className={workspaceInputClass}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={workspaceFieldLabelClass}>Address Line 1</label>
+                          <input
+                            name="billing_address_line1"
+                            defaultValue={String(internalInvoice.billing_address_line1 ?? "")}
+                            className={workspaceInputClass}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={workspaceFieldLabelClass}>Address Line 2</label>
+                          <input
+                            name="billing_address_line2"
+                            defaultValue={String(internalInvoice.billing_address_line2 ?? "")}
+                            className={workspaceInputClass}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={workspaceFieldLabelClass}>City</label>
+                          <input
+                            name="billing_city"
+                            defaultValue={String(internalInvoice.billing_city ?? "")}
+                            className={workspaceInputClass}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={workspaceFieldLabelClass}>State</label>
+                          <input
+                            name="billing_state"
+                            defaultValue={String(internalInvoice.billing_state ?? "")}
+                            className={workspaceInputClass}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={workspaceFieldLabelClass}>ZIP</label>
+                          <input
+                            name="billing_zip"
+                            defaultValue={String(internalInvoice.billing_zip ?? "")}
+                            className={workspaceInputClass}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className={workspaceFieldLabelClass}>Notes</label>
+                        <textarea
+                          name="notes"
+                          defaultValue={String(internalInvoice.notes ?? "")}
+                          className={`${workspaceInputClass} min-h-[5.25rem]`}
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <SubmitButton loadingText="Saving..." className={secondaryButtonClass}>
+                          Save Billing Details
+                        </SubmitButton>
+                      </div>
+                    </InternalInvoiceDraftSaveForm>
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const JobDetailTimingLog = () => {
     emitTimingLog({
@@ -3031,7 +3677,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           This job is missing a full schedule. If you continue, the system will auto-fill today with a
           2-hour window starting now.
         </div>
-      )}  
+      )}
 
       {job.status === "completed" && job.ops_status !== "closed" ? (() => {
       const ops = job.ops_status;
@@ -3094,7 +3740,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             : null;
 
       if (!meta) return null;
-                    
+
       return (
         <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50/90 p-3.5 text-amber-900">
           <div className="text-sm font-semibold">{meta.title}</div>
@@ -3106,7 +3752,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     })() : null}
 
       {/* Single-workspace context (tab query preserved for compatibility) */}
-     
+
           <details className={`${workspaceDetailsClass} mb-6`}>
             <summary className="cursor-pointer list-none">
               <CollapsibleHeader
@@ -3455,8 +4101,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
 
       {/* Info workspace */}
-
-    
 {showExternalDataEntryPrompt ? (
   <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-amber-950 shadow-[0_12px_24px_-22px_rgba(180,83,9,0.35)]">
     <div className="mb-2 font-semibold">
@@ -3613,617 +4257,22 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 ) : null}
 
 {showInternalInvoicePanel ? (
-  <div id="internal-invoice-panel" className={`mt-6 scroll-mt-24 rounded-2xl p-5 ${hasVisitScopeDefined ? "border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_20px_40px_-30px_rgba(15,23,42,0.28)]" : "border border-slate-200/70 bg-slate-50/75 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.18)]"}`}>
-    <div className={`rounded-xl p-4 ${hasVisitScopeDefined ? "border border-slate-200/80 bg-white/92 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.22)]" : "border border-slate-200/70 bg-white/70"}`}>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice</div>
-          <div className="mt-1 text-sm font-semibold text-slate-950">
-            {internalInvoice ? internalInvoice.invoice_number : "Not started"}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Date</div>
-          <div className="mt-1 text-sm font-semibold text-slate-950">
-            {internalInvoice ? displayDateLA(internalInvoice.invoice_date) : "Will auto-fill on draft"}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Status</div>
-          <div className="mt-1">
-            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] ${internalInvoiceStatusChipClass}`}>
-              {internalInvoice ? formatInternalInvoiceStatus(internalInvoice.status) : billingState.statusLabel}
-            </span>
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charges</div>
-          <div className="mt-1 text-sm font-semibold text-slate-950">
-            {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Derived Total</div>
-          <div className="mt-1 text-sm font-semibold text-slate-950">
-            {formatCurrencyFromCents(internalInvoice?.total_cents ?? 0)}
-          </div>
+  <Suspense
+    fallback={
+      <div id="internal-invoice-panel" className={`mt-6 scroll-mt-24 rounded-2xl border border-slate-200/70 bg-slate-50/75 p-5 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.18)]`}>
+        <div className="space-y-3" aria-busy="true" aria-live="polite">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-20 animate-pulse rounded-xl border border-slate-200/70 bg-white/80"
+            />
+          ))}
         </div>
       </div>
-    </div>
-
-    {!internalInvoice ? (
-      <div className={`mt-4 rounded-xl border border-dashed px-4 py-4 ${hasVisitScopeDefined ? "border-slate-300 bg-slate-50/80" : "border-slate-200 bg-white/65"}`}>
-        {showReplacementInvoicePrompt ? (
-          <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50/80 px-3.5 py-3 text-sm leading-6 text-rose-800">
-            <div className="font-semibold text-rose-900">Create Replacement Invoice</div>
-            <div className="mt-1">
-              The voided invoice remains in history. A replacement draft creates a new active invoice for this job.
-            </div>
-          </div>
-        ) : null}
-
-        <div className="text-sm leading-6 text-slate-700">
-          {showReplacementInvoicePrompt
-            ? "A previous invoice was voided. Start a replacement draft when the corrected billed scope is ready."
-            : hasVisitScopeDefined
-            ? "Create a draft invoice when the billed scope is ready."
-            : "Work Items come first. Start an invoice later when billing is ready."}
-        </div>
-        <form action={createInternalInvoiceDraftFromForm} className="mt-3">
-          <input type="hidden" name="job_id" value={job.id} />
-          <input type="hidden" name="tab" value={tab} />
-          <SubmitButton loadingText="Creating..." className={hasVisitScopeDefined ? primaryButtonClass : secondaryButtonClass}>
-            {showReplacementInvoicePrompt ? "Create Replacement Invoice" : "Create Draft Invoice"}
-          </SubmitButton>
-        </form>
-      </div>
-    ) : (
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.28fr)_minmax(18rem,0.72fr)]">
-        <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.24)]">
-          {internalInvoice.status === "draft" ? (
-            <div className="space-y-5">
-              <div>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charges</div>
-                    <div className="mt-1 text-sm leading-6 text-slate-600">Build Invoice Charges here once billing is ready. These remain downstream commercial records rather than the visit-definition layer.</div>
-                  </div>
-                  <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}
-                  </div>
-                </div>
-
-                {visitScopeInvoicePickerItems.length === 0 ? (
-                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs text-slate-600">
-                    No Work Items are available to add to this draft invoice.
-                  </div>
-                ) : null}
-
-                <InternalInvoiceLineItemsTable
-                  jobId={job.id}
-                  tab={tab}
-                  lineItems={internalInvoice.line_items}
-                  totalCents={internalInvoice.total_cents}
-                  addLineItemAction={addInternalInvoiceLineItemFromForm}
-                  addPricebookLineItemAction={addInternalInvoiceLineItemFromPricebookForm}
-                  addVisitScopeLineItemsAction={addInternalInvoiceLineItemsFromVisitScopeForm}
-                  updateLineItemAction={updateInternalInvoiceLineItemFromForm}
-                  removeLineItemAction={removeInternalInvoiceLineItemFromForm}
-                  pricebookPickerItems={pricebookPickerItems}
-                  visitScopePickerItems={visitScopeInvoicePickerItems}
-                  workspaceFieldLabelClass={workspaceFieldLabelClass}
-                  workspaceInputClass={workspaceInputClass}
-                  primaryButtonClass={primaryButtonClass}
-                  secondaryButtonClass={secondaryButtonClass}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Frozen Scope</div>
-                <div className="mt-1 text-sm leading-6 text-slate-600">Issued and void invoices keep the final invoice charges as the billed record.</div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className={workspaceSoftCardClass}>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Number</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950">{internalInvoice.invoice_number}</div>
-                </div>
-                <div className={workspaceSoftCardClass}>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Date</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950">{displayDateLA(internalInvoice.invoice_date)}</div>
-                </div>
-                <div className={workspaceSoftCardClass}>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Subtotal</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950">{formatCurrencyFromCents(internalInvoice.subtotal_cents)}</div>
-                </div>
-                <div className={workspaceSoftCardClass}>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Total</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950">{formatCurrencyFromCents(internalInvoice.total_cents)}</div>
-                </div>
-              </div>
-
-              {internalInvoice.notes ? (
-                <div className={workspaceSoftCardClass}>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Notes</div>
-                  <div className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{internalInvoice.notes}</div>
-                </div>
-              ) : null}
-
-              <div className={workspaceSoftCardClass}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Frozen Invoice Charges</div>
-                <div className="mt-3 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/75">
-                  <div className="hidden grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)] gap-4 border-b border-slate-200/80 bg-white/85 px-5 py-3 md:grid">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charge</div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Type</div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Qty</div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Unit Price</div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Subtotal</div>
-                  </div>
-
-                  {internalInvoiceLineItemCount > 0 ? (
-                    <div className="divide-y divide-slate-200/80">
-                      {internalInvoice.line_items.map((lineItem, index) => (
-                        <div key={lineItem.id} className="bg-white/72 px-5 py-5">
-                          <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                            Line {index + 1}
-                          </div>
-
-                          <div className="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)] md:items-start">
-                            <div>
-                              <div className={workspaceFieldLabelClass}>Item Name</div>
-                              <div className="mt-1 text-sm font-semibold text-slate-950">{lineItem.item_name_snapshot}</div>
-                            </div>
-
-                            <div>
-                              <div className={workspaceFieldLabelClass}>Type</div>
-                              <div className="mt-1 text-sm text-slate-700">{formatInternalInvoiceItemType(lineItem.item_type_snapshot)}</div>
-                            </div>
-
-                            <div>
-                              <div className={workspaceFieldLabelClass}>Quantity</div>
-                              <div className="mt-1 text-sm text-slate-700">{formatDecimalInput(lineItem.quantity)}</div>
-                            </div>
-
-                            <div>
-                              <div className={workspaceFieldLabelClass}>Unit Price</div>
-                              <div className="mt-1 text-sm text-slate-700">{formatCurrencyFromAmount(lineItem.unit_price)}</div>
-                            </div>
-
-                            <div>
-                              <div className={workspaceFieldLabelClass}>Subtotal</div>
-                              <div className="mt-1 text-sm font-semibold text-slate-950">{formatCurrencyFromAmount(lineItem.line_subtotal)}</div>
-                            </div>
-
-                            <div className="md:col-span-5">
-                              <div className={workspaceFieldLabelClass}>Description / Work Instruction</div>
-                              <div className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                                {lineItem.description_snapshot ? lineItem.description_snapshot : "No additional work instruction recorded."}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="px-4 py-4 text-sm text-slate-600">No frozen invoice charges were recorded on this invoice.</div>
-                  )}
-
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 bg-white/88 px-5 py-3.5">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Final Total</div>
-                    <div className="text-sm font-semibold text-slate-950">{formatCurrencyFromCents(internalInvoice.total_cents)}</div>
-                  </div>
-                </div>
-              </div>
-
-              {internalInvoice.status === "void" && internalInvoice.void_reason ? (
-                <div className="rounded-lg border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm leading-6 text-rose-800">
-                  <span className="font-semibold">Void reason:</span> {internalInvoice.void_reason}
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <div className="rounded-xl border border-slate-200/80 bg-slate-50/78 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.24)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Billing Recipient</div>
-            <div className="mt-2 text-sm font-semibold text-slate-900">{internalInvoiceRecipientName}</div>
-            {internalInvoiceRecipientContact.length > 0 ? (
-              <div className="mt-1 text-sm text-slate-600">{internalInvoiceRecipientContact.join(" • ")}</div>
-            ) : null}
-            {internalInvoiceBillingAddress.length > 0 ? (
-              <div className="mt-2 text-sm leading-6 text-slate-600">{internalInvoiceBillingAddress.join(", ")}</div>
-            ) : null}
-          </div>
-
-          <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.24)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Actions</div>
-            <div className="mt-2 rounded-lg border border-blue-200/80 bg-blue-50/70 px-3.5 py-3 text-sm leading-6 text-blue-900">
-              This invoice records billed work for this job. Payment entries are tracking-only and do not charge a card.
-            </div>
-            {internalInvoice.status === "draft" ? (
-              <>
-                  <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Issue Invoice</div>
-                  <div className="mt-1 text-sm leading-6 text-slate-600">Review recipient, Invoice Charges, and total. Issue only when this billed invoice record is final. Sending happens after issue and is communication only.</div>
-                  <div className="mt-1 text-sm leading-6 text-slate-600">Invoice Charges are billed records and should be reviewed before issue.</div>
-
-                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
-                  <div><span className="font-semibold text-slate-900">Review recipient:</span> {internalInvoiceRecipientName}</div>
-                  <div className="mt-1"><span className="font-semibold text-slate-900">Review email:</span> {String(internalInvoice.billing_email ?? "").trim() || "Not set"}</div>
-                  <div className="mt-1"><span className="font-semibold text-slate-900">Review total:</span> {formatCurrencyFromCents(internalInvoice.total_cents)}</div>
-                  <div className="mt-1"><span className="font-semibold text-slate-900">Review charges:</span> {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}</div>
-                </div>
-
-                <form action={issueInternalInvoiceFromForm} className="mt-3">
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <input type="hidden" name="tab" value={tab} />
-                  <SubmitButton
-                    loadingText="Issuing..."
-                    className={darkButtonClass}
-                    disabled={!internalInvoiceReadyToIssue}
-                  >
-                    Issue Invoice
-                  </SubmitButton>
-                </form>
-
-                {!internalInvoiceReadyToIssue ? (
-                  <div className="mt-2 text-xs leading-5 text-slate-500">
-                    Cannot issue yet. Complete all of the following: job marked completed, field complete, billing name filled in, and at least one saved invoice charge with total above $0.00.
-                  </div>
-                ) : null}
-              </>
-            ) : internalInvoice.status === "issued" ? (
-              <>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Issue Invoice</div>
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50/75 px-3.5 py-3 text-sm leading-6 text-emerald-900">
-                  {issuedInvoiceStatusMessage}
-                </div>
-
-                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
-                  <div className="font-semibold text-slate-900">Payment Tracking</div>
-                  <div className="mt-1 leading-6">
-                    Off-platform payment recording only. This tracks collected payment history and does not charge a card or change billed invoice charges.
-                  </div>
-
-                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Payment Status</div>
-                      <div className="mt-1">
-                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${internalInvoicePaymentStatusChipClass}`}>
-                          {internalInvoicePaymentStatusLabel}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Amount Paid</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-900">
-                        {formatCurrencyFromCents(internalInvoicePaymentSummary.amountPaidCents)}
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Balance Due</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-900">
-                        {formatCurrencyFromCents(internalInvoicePaymentSummary.balanceDueCents)}
-                      </div>
-                    </div>
-                  </div>
-
-                  <form action={recordInternalInvoicePaymentFromForm} className="mt-3 space-y-3">
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <input type="hidden" name="tab" value={tab} />
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className={workspaceFieldLabelClass}>Amount</label>
-                        <input
-                          name="payment_amount"
-                          inputMode="decimal"
-                          placeholder="0.00"
-                          className={workspaceInputClass}
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className={workspaceFieldLabelClass}>Payment Method</label>
-                        <select name="payment_method" className={workspaceInputClass} defaultValue="" required>
-                          <option value="" disabled>
-                            Select method
-                          </option>
-                          <option value="cash">Cash</option>
-                          <option value="check">Check</option>
-                          <option value="ach_off_platform">ACH (Off-Platform)</option>
-                          <option value="card_off_platform">Card (Off-Platform)</option>
-                          <option value="bank_transfer">Bank Transfer</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className={workspaceFieldLabelClass}>Reference</label>
-                        <input
-                          name="received_reference"
-                          placeholder="Check # or confirmation"
-                          className={workspaceInputClass}
-                        />
-                      </div>
-
-                      <div>
-                        <label className={workspaceFieldLabelClass}>Payment recorded note</label>
-                        <input
-                          name="notes"
-                          placeholder="Optional note"
-                          className={workspaceInputClass}
-                        />
-                      </div>
-                    </div>
-
-                    <SubmitButton
-                      loadingText="Recording..."
-                      className={darkButtonClass}
-                      disabled={internalInvoicePaymentSummary.balanceDueCents <= 0}
-                    >
-                      Record Payment
-                    </SubmitButton>
-                  </form>
-
-                  {internalInvoicePaymentRows.length > 0 ? (
-                    <div className="mt-3 space-y-2">
-                      {internalInvoicePaymentRows.slice(0, 6).map((payment) => (
-                        <div key={payment.id} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5 text-sm text-slate-700">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="font-semibold text-slate-900">Payment recorded</div>
-                            <div className="text-xs text-slate-500">{formatDateTimeLAFromIso(payment.paid_at)}</div>
-                          </div>
-                          <div className="mt-1">
-                            {formatCurrencyFromCents(payment.amount_cents)} • {String(payment.payment_method).replace(/_/g, " ")}
-                          </div>
-                          {payment.received_reference ? (
-                            <div className="mt-1 text-xs text-slate-500">Reference: {payment.received_reference}</div>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
-                  <div className="font-semibold text-slate-900">Send / Resend</div>
-                  <div className="mt-1 leading-6">Send the already-issued invoice to the billing recipient. Resending is communication only and does not create a second invoice or alter billed truth.</div>
-
-                  <form action={sendInternalInvoiceEmailFromForm} className="mt-3 space-y-3">
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <input type="hidden" name="tab" value={tab} />
-
-                    <div>
-                      <label className={workspaceFieldLabelClass}>Send To</label>
-                      <input
-                        type="email"
-                        name="recipient_email"
-                        defaultValue={internalInvoiceSendTargetDefault}
-                        placeholder="billing@example.com"
-                        className={workspaceInputClass}
-                      />
-                    </div>
-
-                    <SubmitButton
-                      loadingText="Sending..."
-                      className={darkButtonClass}
-                    >
-                      {internalInvoiceEmailButtonLabel}
-                    </SubmitButton>
-                  </form>
-
-                  {internalInvoiceSendTargetMissing ? (
-                    <div className="mt-2 text-xs leading-5 text-amber-700">
-                      Add a billing email first. Sending is available only after issue and with a recipient email.
-                    </div>
-                  ) : lastInternalInvoiceSentLabel ? (
-                    <div className="mt-2 text-xs leading-5 text-slate-500">
-                      Last sent {lastInternalInvoiceSentLabel} to {latestSuccessfulInternalInvoiceEmailDelivery?.recipientEmail ?? internalInvoiceSendTargetDefault}.
-                    </div>
-                  ) : null}
-                </div>
-              </>
-            ) : (
-              <div className="rounded-lg border border-rose-200 bg-rose-50/75 px-3.5 py-3 text-sm leading-6 text-rose-800">
-                This invoice is void and no longer satisfies billing closeout.
-              </div>
-            )}
-
-            {internalInvoice.status !== "void" ? (
-              <form action={voidInternalInvoiceFromForm} className="mt-4 space-y-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Void Invoice</div>
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="tab" value={tab} />
-                <div>
-                  <label className={workspaceFieldLabelClass}>Void Reason</label>
-                  <textarea name="void_reason" className={`${workspaceInputClass} min-h-[5rem]`} />
-                </div>
-                <SubmitButton
-                  loadingText="Voiding..."
-                  className="inline-flex min-h-10 items-center justify-center rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
-                >
-                  Void Invoice
-                </SubmitButton>
-              </form>
-            ) : null}
-          </div>
-
-          {internalInvoiceEmailDeliveries.length > 0 ? (
-            <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.24)]">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Delivery History</div>
-                  <div className="mt-1 text-sm leading-6 text-slate-600">Operator-facing send attempts for this invoice.</div>
-                </div>
-                <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  {internalInvoiceEmailDeliveries.length} attempt{internalInvoiceEmailDeliveries.length === 1 ? "" : "s"}
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {internalInvoiceEmailDeliveries.map((delivery: InternalInvoiceEmailDeliveryRecord) => (
-                  <div key={delivery.id} className="rounded-lg border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-700">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="font-semibold text-slate-900">
-                        {delivery.attemptKind === "resent" ? "Resent" : "Sent"} attempt #{delivery.attemptNumber}
-                      </div>
-                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${delivery.status === "sent" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : delivery.status === "failed" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
-                        {delivery.status}
-                      </span>
-                    </div>
-                    <div className="mt-1">Recipient: {delivery.recipientEmail || "Not recorded"}</div>
-                    <div className="mt-1">Recorded: {delivery.sentAt ? formatDateTimeLAFromIso(delivery.sentAt) : delivery.createdAt ? formatDateTimeLAFromIso(delivery.createdAt) : "—"}</div>
-                    {delivery.errorDetail ? (
-                      <div className="mt-1 text-rose-700">Delivery note: {delivery.errorDetail}</div>
-                    ) : delivery.note ? (
-                      <div className="mt-1 text-slate-500">{delivery.note}</div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {internalInvoice.status === "draft" ? (
-            <details className="group rounded-xl border border-slate-200/80 bg-white/96 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.24)] [&[open]_.disclosure-icon]:rotate-90">
-              <summary className="cursor-pointer list-none">
-                <CollapsibleHeader
-                  title="Edit Billing Details"
-                  subtitle={internalInvoiceHasNotes ? "Billing/contact details and notes." : "Billing/contact details are available here when you need them."}
-                />
-              </summary>
-
-              <div className="mt-3 border-t border-slate-200/80 pt-4">
-                <InternalInvoiceDraftSaveForm action={saveInternalInvoiceDraftFromForm} className="space-y-4">
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <input type="hidden" name="tab" value={tab} />
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className={workspaceFieldLabelClass}>Invoice #</label>
-                      <input
-                        name="invoice_number"
-                        defaultValue={String(internalInvoice.invoice_number ?? "")}
-                        className={workspaceInputClass}
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className={workspaceFieldLabelClass}>Invoice Date</label>
-                      <input
-                        type="date"
-                        name="invoice_date"
-                        defaultValue={dateToDateInput(internalInvoice.invoice_date)}
-                        className={workspaceInputClass}
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className={workspaceFieldLabelClass}>Billing Name</label>
-                      <input
-                        name="billing_name"
-                        defaultValue={String(internalInvoice.billing_name ?? "")}
-                        className={workspaceInputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={workspaceFieldLabelClass}>Billing Email</label>
-                      <input
-                        name="billing_email"
-                        defaultValue={String(internalInvoice.billing_email ?? "")}
-                        className={workspaceInputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={workspaceFieldLabelClass}>Billing Phone</label>
-                      <input
-                        name="billing_phone"
-                        defaultValue={String(internalInvoice.billing_phone ?? "")}
-                        className={workspaceInputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={workspaceFieldLabelClass}>Address Line 1</label>
-                      <input
-                        name="billing_address_line1"
-                        defaultValue={String(internalInvoice.billing_address_line1 ?? "")}
-                        className={workspaceInputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={workspaceFieldLabelClass}>Address Line 2</label>
-                      <input
-                        name="billing_address_line2"
-                        defaultValue={String(internalInvoice.billing_address_line2 ?? "")}
-                        className={workspaceInputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={workspaceFieldLabelClass}>City</label>
-                      <input
-                        name="billing_city"
-                        defaultValue={String(internalInvoice.billing_city ?? "")}
-                        className={workspaceInputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={workspaceFieldLabelClass}>State</label>
-                      <input
-                        name="billing_state"
-                        defaultValue={String(internalInvoice.billing_state ?? "")}
-                        className={workspaceInputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={workspaceFieldLabelClass}>ZIP</label>
-                      <input
-                        name="billing_zip"
-                        defaultValue={String(internalInvoice.billing_zip ?? "")}
-                        className={workspaceInputClass}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={workspaceFieldLabelClass}>Notes</label>
-                    <textarea
-                      name="notes"
-                      defaultValue={String(internalInvoice.notes ?? "")}
-                      className={`${workspaceInputClass} min-h-[5.25rem]`}
-                    />
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <SubmitButton loadingText="Saving..." className={secondaryButtonClass}>
-                      Save Billing Details
-                    </SubmitButton>
-                  </div>
-                </InternalInvoiceDraftSaveForm>
-              </div>
-            </details>
-          ) : null}
-        </div>
-      </div>
-    )}
-  </div>
+    }
+  >
+    <DeferredInternalInvoicePanel />
+  </Suspense>
 ) : null}
 
 
@@ -4776,5 +4825,5 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   </div>
   </div>
   );
-  
+
 }
