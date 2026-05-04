@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import { createClient } from "../../lib/supabase/client";
+import { resolveSafeAuthReturnPath } from "@/lib/auth/auth-return-path";
 
 async function resolveLoginDestination(supabase: ReturnType<typeof createClient>, userId: string) {
   const { data: contractorUser, error: contractorError } = await supabase
@@ -87,6 +88,7 @@ export default function LoginPage() {
     String(searchParams.get("err") ?? "").trim().toLowerCase() === "contractor_archived"
       ? "Contractor portal access has been archived. Contact your administrator for reactivation."
       : null;
+  const nextPath = searchParams.get("next");
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -134,7 +136,14 @@ export default function LoginPage() {
       return;
     }
 
-    router.push(destination);
+    const actorKind = destination === "/portal" ? "contractor" : "internal";
+    const resumePath = resolveSafeAuthReturnPath({
+      actorKind,
+      candidateNext: nextPath,
+      fallbackPath: destination,
+    });
+
+    router.push(resumePath);
     router.refresh();
   }
 

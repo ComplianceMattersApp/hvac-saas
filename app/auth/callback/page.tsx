@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { resolveSafeAuthReturnPath } from "@/lib/auth/auth-return-path";
 
 async function waitForSessionCommit(supabase: ReturnType<typeof createClient>) {
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -55,6 +56,7 @@ export default function AuthCallbackPage() {
         const code = queryParams.get("code");
         const tokenHash = queryParams.get("token_hash");
         const queryType = queryParams.get("type");
+        const nextPath = queryParams.get("next");
 
         // Determine flow type
         const hasHashTokens = !!(hashAccessToken && hashRefreshToken);
@@ -85,7 +87,7 @@ export default function AuthCallbackPage() {
           }
 
           // Other hash flows: route by role
-          await routeByRole(supabase, router, setStatus);
+          await routeByRole(supabase, router, setStatus, nextPath);
           return;
         }
 
@@ -121,7 +123,7 @@ export default function AuthCallbackPage() {
             return;
           }
           setStatus("Finishing sign-in...");
-          await routeByRole(supabase, router, setStatus);
+          await routeByRole(supabase, router, setStatus, nextPath);
           return;
         }
 
@@ -147,7 +149,7 @@ export default function AuthCallbackPage() {
           }
 
           setStatus("Finishing sign-in...");
-          await routeByRole(supabase, router, setStatus);
+          await routeByRole(supabase, router, setStatus, nextPath);
           return;
         }
 
@@ -183,7 +185,8 @@ export default function AuthCallbackPage() {
 async function routeByRole(
   supabase: any,
   router: any,
-  setStatus: (s: string) => void
+  setStatus: (s: string) => void,
+  nextPath: string | null
 ) {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) {
@@ -204,9 +207,19 @@ async function routeByRole(
 
   if (contractorData?.contractor_id && contractorLifecycleState === "active") {
     setStatus("Redirecting...");
-    router.push("/portal");
+    const resumePath = resolveSafeAuthReturnPath({
+      actorKind: "contractor",
+      candidateNext: nextPath,
+      fallbackPath: "/portal",
+    });
+    router.push(resumePath);
   } else {
     setStatus("Redirecting...");
-    router.push("/ops");
+    const resumePath = resolveSafeAuthReturnPath({
+      actorKind: "internal",
+      candidateNext: nextPath,
+      fallbackPath: "/ops",
+    });
+    router.push(resumePath);
   }
 }
