@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -25,8 +25,24 @@ export const metadata: Metadata = {
     default: "Compliance Matters",
     template: "%s | Compliance Matters",
   },
+  applicationName: "Compliance Matters",
   description: "Compliance Matters ECC & Operations Software",
   manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "CM Software",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0f1f35",
 };
 
 export default async function RootLayout({

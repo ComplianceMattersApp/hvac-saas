@@ -993,6 +993,7 @@ deeper notification prioritization/escalation layers
 broader role model refinement
 future branding/settings/business-profile formalization
 App-store/mobile native distribution remains intentionally deferred for current launch scope; web product launch readiness is the priority baseline.
+Field-ready installable/PWA access readiness V1 Slice 1 is limited to metadata/installability baseline hardening only (manifest/layout metadata coherence and home-screen launch QA checklist). Service worker/offline caching remains deferred to a separate planned slice.
 
 Note:
 Payment P1 foundation is closed at the current baseline.

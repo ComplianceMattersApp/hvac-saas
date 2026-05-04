@@ -199,6 +199,26 @@ If any item here conflicts with the active spine, the spine wins.
   7. Controlled tester onboarding only after the above are acceptably complete
 - Tester remains in the wings intentionally and is not to be treated as a public launch trigger.
 
+### 2.3.7 Field-ready installable/PWA access readiness V1 (Slice 1 baseline hardening)
+- Completed scope for this slice is web/PWA metadata/installability baseline hardening only (`app/manifest.ts`, `app/layout.tsx`), with no auth/routing/data/server-action/source-of-truth behavior changes.
+- Current posture remains web-first app-like install readiness.
+- Native app-store distribution remains intentionally deferred.
+- Service worker/offline caching remains intentionally deferred to a separate planned slice.
+- Chromium install prompt readiness may still require a future service-worker slice and is not implemented here.
+- iOS install flow remains manual Add to Home Screen guidance (no automatic browser install prompt path).
+
+Mobile home-screen launch QA checklist (Slice 1):
+- [ ] Unauthenticated home-screen launch routes cleanly to `/login`.
+- [ ] Authenticated internal user launch routes correctly to `/ops`.
+- [ ] Authenticated contractor user launch routes correctly to `/portal`.
+- [ ] First-owner/admin invite acceptance routing is unchanged (`/set-password?mode=invite` -> `/ops/admin` after anchor checks).
+- [ ] `/ops` remains reachable and mobile-safe.
+- [ ] `/jobs/[id]` remains reachable and mobile-safe.
+- [ ] `/jobs/new` remains reachable and mobile-safe.
+- [ ] `/calendar` remains reachable and mobile-safe.
+- [ ] `/portal` remains reachable and mobile-safe.
+- [ ] `/portal/jobs/[id]` remains reachable and mobile-safe.
+
 ### 2.4 First owner onboarding/provisioning readiness
 - **V1 implemented and browser-smoked.** Public self-serve signup exists for standard onboarding at `/signup`, and invite-only platform-admin/operator provisioning remains active/manual fallback.
 - Confirmed: provisioning script (`scripts/provision-first-owner.ts`) requires explicit allow flags for apply mode; defaults to dry-run.
