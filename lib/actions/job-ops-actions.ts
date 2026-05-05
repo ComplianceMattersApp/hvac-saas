@@ -352,7 +352,6 @@ function buildContractorReportEmailHtml(args: {
 
   const ctaSection = portalUrl
     ? `
-      <p style="margin: 16px 0 10px 0;">Review and submit your response in the portal.</p>
       <p style="margin: 0 0 8px 0;">
         <a href="${escapeHtml(portalUrl)}" style="display: inline-block; background: #0f172a; color: #ffffff; text-decoration: none; padding: 10px 14px; border-radius: 6px; font-weight: 600;">Open Contractor Portal</a>
       </p>
@@ -373,6 +372,10 @@ function buildContractorReportEmailHtml(args: {
 
   return renderSystemEmailLayout({
     title: "ECC Test Report",
+    centerHeader: true,
+    logoWidthPx: 110,
+    logoMarginBottomPx: 10,
+    titleMarginBottomPx: 10,
     bodyHtml: `
       <p style="margin: 0 0 10px 0;"><strong>Status:</strong> Issues identified</p>
       <p style="margin: 0 0 12px 0; font-size: 13px; color: #475569;">${escapeHtml(args.title)}</p>
