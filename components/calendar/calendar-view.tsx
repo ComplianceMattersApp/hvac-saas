@@ -1107,6 +1107,21 @@ export async function CalendarView(props: Props) {
                       Save Block
                     </SubmitButton>
                   </form>
+                  <details className="group mt-2 border-t border-slate-200 pt-2">
+                    <summary className="flex cursor-pointer list-none items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-red-700 transition hover:bg-red-100 [&::-webkit-details-marker]:hidden">
+                      Delete Block
+                    </summary>
+                    <div className="mt-2 rounded-xl border border-red-200 bg-red-50/80 p-3">
+                      <p className="text-[12px] font-medium text-red-800">Delete this calendar block? This cannot be undone.</p>
+                      <form action={deleteCalendarBlockEventFromForm} className="mt-2">
+                        <input type="hidden" name="event_id" value={selectedBlock.id} />
+                        <input type="hidden" name="return_to" value={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })} />
+                        <SubmitButton className="w-full rounded-xl bg-red-600 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-red-700" loadingText="Deleting...">
+                          Confirm Delete
+                        </SubmitButton>
+                      </form>
+                    </div>
+                  </details>
                 </div>
               </div>
             ) : (uiView === 'day' || uiView === 'week' || uiView === 'month') ? (
