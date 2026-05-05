@@ -5,6 +5,8 @@ const requireInternalUserMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const loadScopedInternalJobForMutationMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const extractFailureReasonsMock = vi.fn();
+const finalRunPassMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -64,12 +66,24 @@ vi.mock("@/lib/actions/job-event-meta", () => ({
 }));
 
 vi.mock("@/lib/portal/resolveContractorIssues", () => ({
-  extractFailureReasons: vi.fn(() => ["Test failure reason"]),
-  finalRunPass: vi.fn(() => true),
+  extractFailureReasons: (...args: unknown[]) => extractFailureReasonsMock(...args),
+  finalRunPass: (...args: unknown[]) => finalRunPassMock(...args),
 }));
 
-function makeContractorReportFixture() {
+function makeContractorReportFixture(options?: {
+  eccRuns?: Array<Record<string, unknown>>;
+}) {
   const writes: Array<{ table: string; op: string }> = [];
+  const insertedJobEvents: any[] = [];
+  const eccRuns = options?.eccRuns ?? [
+    {
+      created_at: "2026-04-20T10:00:00Z",
+      computed: true,
+      computed_pass: false,
+      override_pass: null,
+      is_completed: true,
+    },
+  ];
 
   const supabase = {
     auth: {
@@ -112,8 +126,9 @@ function makeContractorReportFixture() {
 
       if (table === "job_events") {
         return {
-          insert: vi.fn(() => {
+          insert: vi.fn((payload: any) => {
             writes.push({ table, op: "insert" });
+            insertedJobEvents.push(payload);
             return {
               select: vi.fn(() => ({
                 single: vi.fn(async () => ({
@@ -148,15 +163,7 @@ function makeContractorReportFixture() {
               eq: vi.fn(() => ({
                 order: vi.fn(() => ({
                   limit: vi.fn(async () => ({
-                    data: [
-                      {
-                        created_at: "2026-04-20T10:00:00Z",
-                        computed: true,
-                        computed_pass: false,
-                        override_pass: null,
-                        is_completed: true,
-                      },
-                    ],
+                    data: eccRuns,
                     error: null,
                   })),
                 })),
@@ -170,7 +177,7 @@ function makeContractorReportFixture() {
     }),
   };
 
-  return { supabase, writes };
+  return { supabase, writes, insertedJobEvents };
 }
 
 describe("contractor report entitlement hardening", () => {
@@ -196,6 +203,8 @@ describe("contractor report entitlement hardening", () => {
       authorized: true,
       reason: "allowed_active",
     });
+    extractFailureReasonsMock.mockImplementation((run: any) => run?.__reasons ?? ["Test failure reason"]);
+    finalRunPassMock.mockImplementation((run: any) => run?.__pass ?? true);
   });
 
   describe("generateContractorReportPreview", () => {
@@ -300,6 +309,80 @@ describe("contractor report entitlement hardening", () => {
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
       );
     });
+
+    it("aggregates all failed completed ECC reasons with stable dedupe order", async () => {
+      const { supabase } = makeContractorReportFixture({
+        eccRuns: [
+          {
+            created_at: "2026-04-20T10:00:00Z",
+            computed: true,
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Airflow below required (900 CFM)", "Shared duplicate reason"],
+          },
+          {
+            created_at: "2026-04-19T10:00:00Z",
+            computed: true,
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Duct leakage above threshold", "Shared duplicate reason"],
+          },
+          {
+            created_at: "2026-04-18T10:00:00Z",
+            computed: true,
+            computed_pass: false,
+            override_pass: true,
+            is_completed: true,
+            __pass: true,
+            __reasons: ["Refrigerant weather exception"],
+          },
+        ],
+      });
+      createClientMock.mockResolvedValue(supabase);
+
+      const { generateContractorReportPreview } = await import(
+        "@/lib/actions/job-ops-actions"
+      );
+
+      const preview = await generateContractorReportPreview({ jobId: "job-1" });
+
+      expect(preview.reasons).toEqual([
+        "Airflow below required (900 CFM)",
+        "Shared duplicate reason",
+        "Duct leakage above threshold",
+      ]);
+      expect(preview.reasons).not.toContain("Refrigerant weather exception");
+      expect(preview.contractor_failure_summary_v1.what_needs_correction).toEqual(preview.reasons);
+    });
+
+    it("falls back when failed runs provide no specific reasons", async () => {
+      const { supabase } = makeContractorReportFixture({
+        eccRuns: [
+          {
+            created_at: "2026-04-20T10:00:00Z",
+            computed: true,
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: [],
+          },
+        ],
+      });
+      createClientMock.mockResolvedValue(supabase);
+
+      const { generateContractorReportPreview } = await import(
+        "@/lib/actions/job-ops-actions"
+      );
+
+      const preview = await generateContractorReportPreview({ jobId: "job-1" });
+
+      expect(preview.reasons).toEqual(["Test failed. Please review and correct."]);
+    });
   });
 
   describe("sendContractorReport", () => {
@@ -320,6 +403,59 @@ describe("contractor report entitlement hardening", () => {
       expect(result.ok).toBe(true);
       expect(writes.some((w) => w.table === "job_events" && w.op === "insert")).toBe(true);
       expect(revalidatePathMock).toHaveBeenCalled();
+    });
+
+    it("uses the same aggregated reasons in preview and send paths", async () => {
+      const fixture = makeContractorReportFixture({
+        eccRuns: [
+          {
+            created_at: "2026-04-20T10:00:00Z",
+            computed: true,
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Airflow below required (900 CFM)"],
+          },
+          {
+            created_at: "2026-04-19T10:00:00Z",
+            computed: true,
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Duct leakage above threshold"],
+          },
+          {
+            created_at: "2026-04-18T10:00:00Z",
+            computed: true,
+            computed_pass: false,
+            override_pass: true,
+            is_completed: true,
+            __pass: true,
+            __reasons: ["Refrigerant weather exception"],
+          },
+        ],
+      });
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { generateContractorReportPreview, sendContractorReport } = await import(
+        "@/lib/actions/job-ops-actions"
+      );
+
+      const preview = await generateContractorReportPreview({ jobId: "job-1" });
+      await sendContractorReport({ jobId: "job-1" });
+
+      const sentEvent = fixture.insertedJobEvents.find(
+        (payload) => payload?.event_type === "contractor_report_sent",
+      );
+
+      expect(preview.reasons).toEqual([
+        "Airflow below required (900 CFM)",
+        "Duct leakage above threshold",
+      ]);
+      expect(sentEvent?.meta?.reasons).toEqual(preview.reasons);
+      expect(sentEvent?.meta?.reasons).not.toContain("Refrigerant weather exception");
     });
 
     it("allows valid trial report send", async () => {

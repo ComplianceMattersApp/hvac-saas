@@ -424,12 +424,17 @@ async function resolveContractorReportForJob(params: {
 
     if (runsErr) throw new Error(runsErr.message);
 
-    const failedRun = (runs ?? []).find((r: any) => finalRunPass(r) === false) ?? null;
-    const extracted = failedRun ? extractFailureReasons(failedRun) : [];
-    const reasons =
-      extracted.length > 0
-        ? extracted
+    const failedRuns = (runs ?? []).filter((r: any) => finalRunPass(r) === false);
+    const extractedReasons: string[] = failedRuns.flatMap((run: any) =>
+      extractFailureReasons(run)
+        .map((reason) => String(reason).trim())
+        .filter(Boolean),
+    );
+    const reasons: string[] =
+      extractedReasons.length > 0
+        ? Array.from(new Set(extractedReasons))
         : ["Test failed. Please review and correct."];
+    const latestFailedRun = failedRuns[0] ?? null;
 
     const nextStep = "Correct the issue and submit your response in the contractor portal.";
     const title = "FAILED TEST";
@@ -447,7 +452,7 @@ async function resolveContractorReportForJob(params: {
       location_text: locationText,
       customer_name: customerName,
       contractor_name: contractorName,
-      service_date_text: formatServiceDateText(job, failedRun?.created_at ?? null),
+      service_date_text: formatServiceDateText(job, latestFailedRun?.created_at ?? null),
       reasons,
       next_step: nextStep,
       contractor_failure_summary_v1: summary,

@@ -1,4 +1,4 @@
-# Compliance Matters Software — Pre-Launch Confirmation Checklist
+﻿# Compliance Matters Software â€” Pre-Launch Confirmation Checklist
 
 **Status:** ACTIVE PRE-LAUNCH PLANNING SUPPORT DOC  
 **Authority:** Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md`  
@@ -192,7 +192,7 @@ If any item here conflicts with the active spine, the spine wins.
 - Pre-launch sequence is explicitly resumed in this order:
   1. Performance/responsiveness batch closeout and documentation
   2. Support Console production-readiness planning (controlled, read-only, audited, careful flag-enable planning, no impersonation, no tenant mutation unless explicitly approved later)
-  3. Estimates production-readiness planning (internal production-enablement decision only; migration/feature-flag/smoke/rollback plan required) — readiness audit complete, production readiness hardening guard committed, internal-only enablement runbook drafted; production enablement requires explicit gate approval per `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`
+  3. Estimates production-readiness planning (internal production-enablement decision only; migration/feature-flag/smoke/rollback plan required) â€” readiness audit complete, production readiness hardening guard committed, internal-only enablement runbook drafted; production enablement requires explicit gate approval per `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`
   4. Field-ready installable/PWA access readiness (web/PWA-style readiness; app-store/native remains deferred)
   5. Final launch confirmation sweep (intake, internal job creation, scheduling, field lifecycle, invoice-tracking honesty, reports, flags, disabled/deferred features, production smoke)
   6. First-owner/operator handoff dry-run (owner setup, operator checklist, account readiness, support readiness, launch operations)
@@ -219,6 +219,26 @@ Mobile home-screen launch QA checklist (Slice 1):
 - [ ] `/portal` remains reachable and mobile-safe.
 - [ ] `/portal/jobs/[id]` remains reachable and mobile-safe.
 
+
+### 2.3.8 Dispatch calendar block edit/delete hardening and production RLS object-drift closeout (resolved)
+- Confirmed production incident: calendar block edit showed false success (date unchanged) before app hardening; after app hardening commit `6aa814e`, editing a visible production calendar block showed "That calendar block no longer exists" banner because production `calendar_events_internal_update_scope` UPDATE policy was missing.
+- Confirmed production read-only verification:
+  - Direct `pg_policies` inspection found `public.calendar_events` had SELECT, INSERT, DELETE policies but no UPDATE policy.
+  - Migration history showed `202604041730_calendar_events_block_delete_policy.sql` as applied, yet the UPDATE policy object was absent — confirmed production RLS object drift.
+  - Sandbox appeared aligned; object drift was production-specific.
+- Confirmed app fix (commit `6aa814e`):
+  - `updateCalendarBlockEventFromForm` and `deleteCalendarBlockEventFromForm` now require a returned row `id` via `.select('id').maybeSingle()`.
+  - Zero-row update/delete now redirects with `calendar_block_update_missing` / `calendar_block_delete_missing` banner instead of silently claiming success.
+  - 9 scope-hardening tests pass; TypeScript check clean.
+- Confirmed production RLS fix:
+  - Targeted SQL patch applied through Supabase Dashboard SQL Editor, restoring only `calendar_events_internal_update_scope`.
+  - No `supabase db push` used. No migration history modified. No support/estimate deferred migrations applied.
+- Confirmed Delete Block UI:
+  - `deleteCalendarBlockEventFromForm` wired to two-step confirmation control in edit block panel (`components/calendar/calendar-view.tsx`).
+  - Native `<details>`/`<summary>` disclosure used for confirmation; no client component introduced.
+- Confirmed production smoke passed: mistaken block deleted, date change on remaining block persisted.
+- Confirmed no schema migration, RLS model, tenant boundary, or payment behavior changed.
+- Pre-launch guardrail added: for production readiness, sample-check critical RLS-controlled tables by direct `pg_policies` inspection, not migration list alone. Migration history entry does not guarantee database object existence.
 ### 2.4 First owner onboarding/provisioning readiness
 - **V1 implemented and browser-smoked.** Public self-serve signup exists for standard onboarding at `/signup`, and invite-only platform-admin/operator provisioning remains active/manual fallback.
 - Confirmed: provisioning script (`scripts/provision-first-owner.ts`) requires explicit allow flags for apply mode; defaults to dry-run.
@@ -262,7 +282,7 @@ Mobile home-screen launch QA checklist (Slice 1):
 
 ### 2.6.1 Operational entitlement mutation guard rollout closeout (production-promoted)
 - Confirmed: operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`.
-- Confirmed: full validation passed — 89 test files, 1057 tests, TSC_OK.
+- Confirmed: full validation passed â€” 89 test files, 1057 tests, TSC_OK.
 - Confirmed: production smoke passed.
 - Confirmed: two test-only mock repairs committed during main validation (`job-ops-waiting-state.test.ts`, `service-case-reconciliation-wiring.test.ts`); no product behavior change.
 - Confirmed guarded operational mutation families:

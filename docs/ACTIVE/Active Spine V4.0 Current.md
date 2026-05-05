@@ -1,4 +1,4 @@
-Compliance Matters Software — Spine v4.0 (Current Operational Source of Truth)
+﻿Compliance Matters Software — Spine v4.0 (Current Operational Source of Truth)
 
 Status: ACTIVE SOURCE OF TRUTH
 Purpose: Align future development, audits, and thread handoffs to the current, stabilized system state.
@@ -248,6 +248,39 @@ Closeout confirmations:
 - No production data repair was possible for the failed Amberwood row because it never persisted.
 - Contractor was asked to resend; a new production contractor submission was successfully created after fix.
 - No payment, Stripe, QBO, support-access, RLS model, or tenant-boundary behavior changed.
+
+7.7.2 Dispatch calendar block edit/delete hardening and production RLS object-drift closeout (resolved)
+
+Confirmed incidents (production):
+
+- Calendar block edit showed false success (date did not change) before app hardening.
+- After app hardening commit `6aa814e`, editing a visible production calendar block showed banner "That calendar block no longer exists" instead of false success.
+- Calendar block had no UI control to delete a block.
+
+Confirmed production read-only findings:
+
+- Direct `pg_policies` inspection of production (`ornrnvxtwwtulohqwxop`) found object drift: migration history recorded `202604041730_calendar_events_block_delete_policy.sql` as applied, but `public.calendar_events` was missing the `calendar_events_internal_update_scope` UPDATE policy.
+- Production had SELECT, INSERT, and DELETE policies present; UPDATE policy object was absent despite migration history entry.
+- Sandbox (`kvpesjdukqwwlgpkzfjm`) appeared aligned and did not exhibit the missing UPDATE policy.
+
+Resolved root cause and production corrections:
+
+- Root cause (app): update/delete server actions used `.update().eq().eq()` without `.select('id').maybeSingle()`. PostgREST returns no error and no affected-rows signal under `Prefer: return=minimal`. Zero-row updates were treated as success.
+- App fix (commit `6aa814e`): `updateCalendarBlockEventFromForm` and `deleteCalendarBlockEventFromForm` now require a returned row `id`; redirect to `calendar_block_update_missing` / `calendar_block_delete_missing` banner if none returned.
+- Root cause (production): `calendar_events_internal_update_scope` UPDATE RLS policy was missing from production, causing every authenticated UPDATE to be rejected with 0 rows affected regardless of row existence.
+- Production fix: targeted SQL patch applied through Supabase Dashboard SQL Editor, restoring only `calendar_events_internal_update_scope`. No `supabase db push` was used. Migration history was not modified. No support/estimate deferred migrations were applied.
+- Delete Block UI: `deleteCalendarBlockEventFromForm` action wired to a two-step confirmation control in the edit block panel (`components/calendar/calendar-view.tsx`). Native `<details>`/`<summary>` disclosure used for zero-JS confirmation without client component.
+
+Closeout confirmations:
+
+- Production post-check confirmed all four `calendar_events` policies present: SELECT, INSERT, UPDATE, DELETE.
+- Production smoke passed: user deleted mistaken block, changed date on remaining block; both changes persisted.
+- No schema migration, `supabase db push`, migration-history repair, or support/estimate deferred migration was applied.
+- No RLS model, tenant boundary, or payment behavior changed.
+
+Future guardrail (recorded here):
+
+- If an RLS-protected action shows visible/readable rows but update/delete affects zero rows, verify actual `pg_policies` object state directly before assuming app code or migration history is correct. Migration history entry does not guarantee database object existence.
 
 7.8 Internal/admin `/jobs/new` flow lock (Phase 2)
 
