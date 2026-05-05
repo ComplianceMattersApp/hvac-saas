@@ -455,10 +455,7 @@ async function resolveContractorReportForJob(params: {
     );
     const latestFailedRun = failedRuns[0] ?? null;
 
-    const nextStep =
-      reasons.length === 1
-        ? "Correct the issue and submit your response in the contractor portal."
-        : "Correct the listed issues and submit your response in the contractor portal.";
+    const nextStep = "Review and submit your response in the portal.";
     const title = "FAILED TEST";
     const summary = buildContractorFailureSummaryV1({
       reportKind: "failed",
