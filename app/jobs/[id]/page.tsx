@@ -48,8 +48,6 @@ import { JobFieldActionButton } from "./_components/JobFieldActionButton";
 import UnscheduleButton from "./_components/UnscheduleButton";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import ContractorReportPanel from "./_components/ContractorReportPanel";
-import { resolveContractorResponseTracking } from "@/lib/portal/resolveContractorIssues";
-import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import {
   getActiveJobAssignmentDisplayMap,
@@ -1045,6 +1043,10 @@ export default async function JobDetailPage({
     };
   });
 
+  // Slice 5D: only the cheap chain-job-ID discovery remains on the blocking path.
+  // The 200-row job_events summary read has been removed from first-paint.
+  // DeferredTimelineBody / DeferredSharedNotesBody / DeferredInternalNotesBody
+  // remain authoritative and stream the full job_events corpus below the fold.
   const timelineSummaryPromise = timedPhase("timelineSummary", async () => {
     const { data: timelineJobs, error: timelineJobsErr } = await supabase
       .from("jobs")
@@ -1059,43 +1061,10 @@ export default async function JobDetailPage({
     const hasDirectNarrativeChain = timelineJobIds.some((id) => id !== jobId);
     const narrativeScopeJobIds = timelineJobIds.length ? timelineJobIds : [jobId];
 
-    const { data: narrativeSummaryEvents, error: narrativeSummaryEventsErr } = await supabase
-      .from("job_events")
-      .select("job_id, event_type, created_at")
-      .in("job_id", narrativeScopeJobIds)
-      .order("created_at", { ascending: false })
-      .limit(200);
-
-    if (narrativeSummaryEventsErr) throw new Error(narrativeSummaryEventsErr.message);
-
-    const narrativeSummaryWindow = (narrativeSummaryEvents ?? []) as Array<{
-      job_id?: string | null;
-      event_type?: string | null;
-      created_at?: string | null;
-    }>;
-
-    const sharedSummaryWindow = narrativeSummaryWindow.filter((eventRow) =>
-      ["contractor_note", "public_note", "contractor_correction_submission"].includes(String(eventRow?.event_type ?? "")),
-    );
-    const internalSummaryWindow = narrativeSummaryWindow.filter(
-      (eventRow) => String(eventRow?.event_type ?? "") === "internal_note",
-    );
-
-    const contractorResponseEvents = narrativeSummaryWindow
-      .filter((eventRow) => String(eventRow?.job_id ?? "") === jobId)
-      .map((eventRow) => ({
-        event_type: eventRow.event_type,
-        created_at: eventRow.created_at,
-      }));
-
     return {
       timelineJobIds,
       hasDirectNarrativeChain,
       narrativeScopeJobIds,
-      narrativeSummaryWindow,
-      sharedSummaryWindow,
-      internalSummaryWindow,
-      contractorResponseEvents,
     };
   });
 
@@ -1275,34 +1244,12 @@ export default async function JobDetailPage({
     timelineJobIds,
     hasDirectNarrativeChain,
     narrativeScopeJobIds,
-    narrativeSummaryWindow,
-    sharedSummaryWindow,
-    internalSummaryWindow,
-    contractorResponseEvents,
   } = timelineSummary;
 
-  const contractorResponseTracking = resolveContractorResponseTracking((contractorResponseEvents ?? []) as any[]);
-
-  const contractorResponseLabel = contractorResponseTracking.latestReportSentAt
-    ? contractorResponseTracking.waitingOnContractor
-      ? "Waiting on contractor"
-      : contractorResponseTracking.hasContractorResponse && contractorResponseTracking.lastResponseType === "note"
-      ? "Contractor responded"
-      : contractorResponseTracking.hasContractorResponse && contractorResponseTracking.lastResponseType === "correction"
-      ? "Correction submitted"
-      : contractorResponseTracking.hasContractorResponse && contractorResponseTracking.lastResponseType === "retest"
-      ? "Retest requested"
-      : contractorResponseTracking.hasContractorResponse
-      ? "Contractor responded"
-      : null
-    : null;
-
-  const contractorResponseSubLabel =
-    contractorResponseTracking.latestReportSentAt &&
-    contractorResponseTracking.hasContractorResponse &&
-    contractorResponseTracking.awaitingInternalReview
-      ? "Awaiting internal review"
-      : null;
+  // Slice 5D: contractor response label is deferred — no first-paint job_events read.
+  // ContractorReportPanel generate/send actions are unchanged.
+  const contractorResponseLabel: string | null = null;
+  const contractorResponseSubLabel: string | null = null;
 
   const attemptCount: number | null = null;
   const lastAttemptLabel = "Recent attempts loading";
@@ -1679,9 +1626,6 @@ const equipmentSummaryLabel =
     ? `${equipmentCount} item(s) linked to this job`
     : "No equipment on file yet.";
 
-const timelineEventCount = narrativeSummaryWindow.length;
-const sharedNotesCount = sharedSummaryWindow.length;
-const internalNotesCount = internalSummaryWindow.length;
 
 const followUpOwnerLabel = String((job as any).action_required_by ?? "").trim();
 const followUpDateValue = String((job as any).follow_up_date ?? "").trim();
@@ -1710,33 +1654,13 @@ const serviceChainSummaryText = serviceCaseId
 const eccSummaryText = job.ecc_test_runs?.length
   ? "Recorded test history with direct workspace access."
   : "No ECC runs recorded yet.";
-const latestSharedNoteAt = sharedSummaryWindow[0]?.created_at ? formatDateLAFromIso(String(sharedSummaryWindow[0].created_at)) : "";
-const latestInternalNoteAt = internalSummaryWindow[0]?.created_at ? formatDateLAFromIso(String(internalSummaryWindow[0].created_at)) : "";
-const latestTimelineAt = narrativeSummaryWindow[0]?.created_at ? formatDateTimeLAFromIso(String(narrativeSummaryWindow[0].created_at)) : "";
+// Slice 5D: section titles still use chain metadata (cheap); counts/dates deferred.
 const sharedNotesTitle = hasDirectNarrativeChain ? "Shared Notes Across Job Chain" : "Shared Notes";
 const internalNotesTitle = hasDirectNarrativeChain ? "Internal Notes Across Job Chain" : "Internal Notes";
 const timelineTitle = hasDirectNarrativeChain ? "Job Chain Timeline" : "Timeline";
-const sharedNotesSummaryText = latestSharedNoteAt
-  ? hasDirectNarrativeChain
-    ? `Latest shared chain activity ${latestSharedNoteAt}.`
-    : `Latest shared activity ${latestSharedNoteAt}.`
-  : hasDirectNarrativeChain
-  ? "No shared note activity in this direct retest chain yet."
-  : "No shared note activity yet.";
-const internalNotesSummaryText = latestInternalNoteAt
-  ? hasDirectNarrativeChain
-    ? `Latest internal chain note ${latestInternalNoteAt}.`
-    : `Latest internal note ${latestInternalNoteAt}.`
-  : hasDirectNarrativeChain
-  ? "No internal note activity in this direct retest chain yet."
-  : "No internal note activity yet.";
-const timelineSummaryText = latestTimelineAt
-  ? hasDirectNarrativeChain
-    ? `Latest chain activity ${latestTimelineAt}.`
-    : `Latest activity ${latestTimelineAt}.`
-  : hasDirectNarrativeChain
-  ? "No activity recorded in this direct retest chain yet."
-  : "No activity recorded yet.";
+const sharedNotesSummaryText = "Notes stream below.";
+const internalNotesSummaryText = "Notes stream below.";
+const timelineSummaryText = "History loads below.";
 
 const showRetestSection =
   ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
@@ -4539,7 +4463,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {/* Shared Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} meta={`${sharedNotesCount} note${sharedNotesCount === 1 ? "" : "s"}`} metaTone={sharedNotesCount > 0 ? "note-highlight" : "default"} />
+            <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} meta="Notes load below" />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -4579,7 +4503,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {/* Internal Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} meta={`${internalNotesCount} note${internalNotesCount === 1 ? "" : "s"}`} metaTone={internalNotesCount > 0 ? "note-highlight" : "default"} />
+            <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} meta="Notes load below" />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -4687,7 +4611,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <CollapsibleHeader
               title={timelineTitle}
               subtitle={timelineSummaryText}
-              meta={`${timelineEventCount} event(s)`}
+              meta="History loads below"
             />
           </summary>
 
