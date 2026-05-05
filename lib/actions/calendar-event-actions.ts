@@ -193,7 +193,7 @@ export async function updateCalendarBlockEventFromForm(formData: FormData) {
     accountOwnerUserId: context.accountOwnerUserId,
   });
 
-  const { error: updateErr } = await supabase
+  const { data: updatedEvent, error: updateErr } = await supabase
     .from('calendar_events')
     .update({
       title,
@@ -204,9 +204,12 @@ export async function updateCalendarBlockEventFromForm(formData: FormData) {
     })
     .eq('id', scopedEventId)
     .eq('owner_user_id', context.accountOwnerUserId)
-    .eq('event_type', 'block');
+    .eq('event_type', 'block')
+    .select('id')
+    .maybeSingle();
 
   if (updateErr) throw updateErr;
+  if (!updatedEvent?.id) redirect(withBanner(returnTo, 'calendar_block_update_missing'));
 
   revalidatePath('/calendar');
   redirect(withBanner(returnTo, 'calendar_block_updated'));
@@ -236,14 +239,17 @@ export async function deleteCalendarBlockEventFromForm(formData: FormData) {
     accountOwnerUserId: context.accountOwnerUserId,
   });
 
-  const { error: deleteErr } = await supabase
+  const { data: deletedEvent, error: deleteErr } = await supabase
     .from('calendar_events')
     .delete()
     .eq('id', scopedEventId)
     .eq('owner_user_id', context.accountOwnerUserId)
-    .eq('event_type', 'block');
+    .eq('event_type', 'block')
+    .select('id')
+    .maybeSingle();
 
   if (deleteErr) throw deleteErr;
+  if (!deletedEvent?.id) redirect(withBanner(returnTo, 'calendar_block_delete_missing'));
 
   revalidatePath('/calendar');
   redirect(withBanner(returnTo, 'calendar_block_deleted'));

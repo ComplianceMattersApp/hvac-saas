@@ -49,18 +49,23 @@ function makeCalendarBlockFixture(options?: {
   accountOwnerUserId?: string;
   assigneeOwnerUserId?: string | null;
   existingEventOwnerUserId?: string | null;
+  updateAffectsRow?: boolean;
+  deleteAffectsRow?: boolean;
 }) {
   const accountOwnerUserId = String(options?.accountOwnerUserId ?? "owner-1");
   const assigneeOwnerUserId = options?.assigneeOwnerUserId ?? accountOwnerUserId;
   const existingEventOwnerUserId = options?.existingEventOwnerUserId ?? accountOwnerUserId;
+  const updateAffectsRow = options?.updateAffectsRow ?? true;
+  const deleteAffectsRow = options?.deleteAffectsRow ?? true;
 
   const calendarEventWrites: CalendarEventWrite[] = [];
 
-  function makeMutationResult() {
+  function makeMutationResult(params: { id: string | null }) {
+    const result = params.id ? { id: params.id } : null;
     const query: any = {
       eq: vi.fn(() => query),
-      then: (onFulfilled: (value: { error: null }) => unknown, onRejected?: (reason: unknown) => unknown) =>
-        Promise.resolve({ error: null }).then(onFulfilled, onRejected),
+      select: vi.fn(() => query),
+      maybeSingle: vi.fn(async () => ({ data: result, error: null })),
     };
     return query;
   }
@@ -130,11 +135,11 @@ function makeCalendarBlockFixture(options?: {
           }),
           update: vi.fn((payload: Record<string, unknown>) => {
             calendarEventWrites.push({ method: "update", payload });
-            return makeMutationResult();
+            return makeMutationResult({ id: updateAffectsRow ? "event-1" : null });
           }),
           delete: vi.fn(() => {
             calendarEventWrites.push({ method: "delete" });
-            return makeMutationResult();
+            return makeMutationResult({ id: deleteAffectsRow ? "event-1" : null });
           }),
         };
       }
@@ -248,6 +253,49 @@ describe("calendar block same-account scope hardening", () => {
         }),
       ),
     ).rejects.toThrow("REDIRECT:/calendar?banner=calendar_block_deleted");
+
+    expect(fixture.calendarEventWrites).toHaveLength(1);
+    expect(fixture.calendarEventWrites[0]).toMatchObject({ method: "delete" });
+  });
+
+  it("does not report update success when scoped update returns no row", async () => {
+    const fixture = makeCalendarBlockFixture({ updateAffectsRow: false });
+    createClientMock.mockResolvedValue(fixture.supabase);
+
+    const { updateCalendarBlockEventFromForm } = await import("@/lib/actions/calendar-event-actions");
+
+    await expect(
+      updateCalendarBlockEventFromForm(
+        makeFormData({
+          return_to: "/calendar",
+          event_id: "event-1",
+          internal_user_id: "internal-user-2",
+          date: "2026-04-24",
+          start_time: "12:00",
+          end_time: "13:30",
+          title: "Updated Block",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/calendar?banner=calendar_block_update_missing");
+
+    expect(fixture.calendarEventWrites).toHaveLength(1);
+    expect(fixture.calendarEventWrites[0]).toMatchObject({ method: "update" });
+  });
+
+  it("does not report delete success when scoped delete returns no row", async () => {
+    const fixture = makeCalendarBlockFixture({ deleteAffectsRow: false });
+    createClientMock.mockResolvedValue(fixture.supabase);
+
+    const { deleteCalendarBlockEventFromForm } = await import("@/lib/actions/calendar-event-actions");
+
+    await expect(
+      deleteCalendarBlockEventFromForm(
+        makeFormData({
+          return_to: "/calendar",
+          event_id: "event-1",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/calendar?banner=calendar_block_delete_missing");
 
     expect(fixture.calendarEventWrites).toHaveLength(1);
     expect(fixture.calendarEventWrites[0]).toMatchObject({ method: "delete" });
