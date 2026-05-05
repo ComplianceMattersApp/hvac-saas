@@ -106,6 +106,118 @@ export function extractFailureReasons(run: any): string[] {
   return Array.from(new Set(warnings));
 }
 
+export type ContractorFailureDetail = {
+  headline: string;
+  detail_lines: string[];
+};
+
+function safeNum(val: unknown): number | null {
+  if (typeof val !== "number" || !Number.isFinite(val)) return null;
+  return val;
+}
+
+export function extractFailureDetails(run: any): ContractorFailureDetail[] {
+  const computed = run?.computed ?? null;
+  if (!computed) return [];
+
+  const testType = String(run?.test_type ?? "").trim().toLowerCase();
+
+  if (testType === "airflow") {
+    const required = safeNum(computed.required_total_cfm);
+    const measured = safeNum(computed.measured_total_cfm);
+    if (required == null || measured == null || measured >= required) return [];
+    const diff = required - measured;
+    const pct = (diff / required) * 100;
+    return [
+      {
+        headline: "Airflow failed",
+        detail_lines: [
+          `Required minimum: ${Math.round(required)} CFM`,
+          `Measured: ${Math.round(measured)} CFM`,
+          `Difference: ${Math.round(diff)} CFM below required (${pct.toFixed(1)}% below target)`,
+        ],
+      },
+    ];
+  }
+
+  if (testType === "duct_leakage") {
+    const maxCfm = safeNum(computed.max_leakage_cfm);
+    const measuredCfm = safeNum(computed.measured_duct_leakage_cfm);
+    const pctAllowedDisplay = safeNum(computed.leakage_percent_allowed_display);
+    const baseCfm = safeNum(computed.base_airflow_cfm);
+    if (maxCfm == null || measuredCfm == null || measuredCfm <= maxCfm) return [];
+    const diff = measuredCfm - maxCfm;
+    const lines: string[] = [];
+    if (pctAllowedDisplay != null) {
+      lines.push(`Allowed maximum: ${Math.round(maxCfm)} CFM (${pctAllowedDisplay.toFixed(1)}%)`);
+    } else {
+      lines.push(`Allowed maximum: ${Math.round(maxCfm)} CFM`);
+    }
+    lines.push(`Measured: ${Math.round(measuredCfm)} CFM`);
+    if (baseCfm != null && baseCfm > 0) {
+      const actualPct = (measuredCfm / baseCfm) * 100;
+      lines.push(`Actual leakage: ${actualPct.toFixed(1)}%`);
+      if (pctAllowedDisplay != null) {
+        const pctDiff = actualPct - pctAllowedDisplay;
+        lines.push(
+          `Difference: ${Math.round(diff)} CFM over limit, ${pctDiff.toFixed(1)} percentage points above the ${pctAllowedDisplay.toFixed(1)}% standard`,
+        );
+      } else {
+        const pctOver = (diff / maxCfm) * 100;
+        lines.push(`Difference: ${Math.round(diff)} CFM over limit (${pctOver.toFixed(1)}% over maximum)`);
+      }
+    } else {
+      const pctOver = (diff / maxCfm) * 100;
+      lines.push(`Difference: ${Math.round(diff)} CFM over limit (${pctOver.toFixed(1)}% over maximum)`);
+    }
+    return [{ headline: "Duct leakage failed", detail_lines: lines }];
+  }
+
+  if (testType === "refrigerant_charge") {
+    const rules = computed.rules ?? {};
+    const subcoolTolerance = safeNum(rules.subcool_tolerance_f);
+    const superheatMax = safeNum(rules.superheat_max_f);
+    const measuredSubcool = safeNum(computed.measured_subcool_f);
+    const subcoolDelta = safeNum(computed.subcool_delta_f);
+    const measuredSuperheat = safeNum(computed.measured_superheat_f);
+    const details: ContractorFailureDetail[] = [];
+
+    if (
+      measuredSubcool != null &&
+      subcoolDelta != null &&
+      subcoolTolerance != null &&
+      Math.abs(subcoolDelta) > subcoolTolerance
+    ) {
+      const targetSubcool = measuredSubcool - subcoolDelta;
+      details.push({
+        headline: "Refrigerant charge failed – Subcooling",
+        detail_lines: [
+          `Target subcooling: ${targetSubcool.toFixed(1)}°F`,
+          `Allowed range: ±${subcoolTolerance.toFixed(1)}°F`,
+          `Measured: ${measuredSubcool.toFixed(1)}°F`,
+          `Difference: ${Math.abs(subcoolDelta).toFixed(1)}°F outside allowed range`,
+        ],
+      });
+    }
+
+    if (measuredSuperheat != null && superheatMax != null && measuredSuperheat >= superheatMax) {
+      const diff = measuredSuperheat - superheatMax;
+      details.push({
+        headline: "Refrigerant charge failed – Superheat",
+        detail_lines: [
+          `Maximum allowed superheat: ${superheatMax.toFixed(1)}°F`,
+          `Measured: ${measuredSuperheat.toFixed(1)}°F`,
+          `Difference: ${diff.toFixed(1)}°F over limit`,
+        ],
+      });
+    }
+
+    return details;
+  }
+
+  return [];
+}
+
 function inProgressHeadline(opsStatus: string): string {
   if (opsStatus === "need_to_schedule") return "Waiting for scheduling";
   if (opsStatus === "scheduled") return "Scheduled";

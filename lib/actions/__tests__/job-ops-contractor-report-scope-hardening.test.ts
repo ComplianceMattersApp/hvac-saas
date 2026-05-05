@@ -65,6 +65,7 @@ vi.mock("@/lib/actions/job-event-meta", () => ({
 vi.mock("@/lib/portal/resolveContractorIssues", () => ({
   extractFailureReasons: vi.fn(() => []),
   finalRunPass: vi.fn(() => true),
+  extractFailureDetails: vi.fn(() => []),
 }));
 
 function makeDenySupabaseFixture() {
