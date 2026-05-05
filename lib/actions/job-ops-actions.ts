@@ -311,32 +311,144 @@ function buildContractorFailureSummaryV1(args: {
 }
 
 function buildContractorReportEmailHtml(args: {
-  bodyText: string;
+  title: string;
+  customerName: string;
+  locationText: string;
+  serviceDateText: string;
+  contractorName: string | null;
+  reasons: string[];
+  failureDetails: ContractorFailureDetail[];
+  nextStep: string;
+  contractorSummary?: string | null;
+  contractorNote?: string | null;
   portalJobUrl?: string | null;
   supportDisplayName: string;
   supportPhone?: string | null;
   supportEmail?: string | null;
 }) {
-  const bodyHtml = escapeHtml(args.bodyText).replace(/\n/g, "<br />");
+  const summary = String(args.contractorSummary ?? "").trim();
+  const note = String(args.contractorNote ?? "").trim();
   const portalUrl = String(args.portalJobUrl ?? "").trim();
   const supportDetails = [args.supportPhone, args.supportEmail].filter(Boolean).join(" • ");
   const supportLine = supportDetails
     ? `${escapeHtml(args.supportDisplayName)} (${escapeHtml(supportDetails)})`
     : escapeHtml(args.supportDisplayName);
 
-  const portalSection = portalUrl
-    ? `<p style="margin-top:16px;">Open your job in the portal: <a href="${escapeHtml(portalUrl)}">${escapeHtml(portalUrl)}</a></p>`
+  const issuesHtml = args.failureDetails.length > 0
+    ? args.failureDetails
+        .map((detail) => {
+          const lines = detail.detail_lines
+            .map((line) => `<li style="margin: 0 0 4px 0;">${escapeHtml(line)}</li>`)
+            .join("");
+          return `
+            <div style="border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; padding: 12px; margin: 0 0 10px 0;">
+              <div style="margin: 0 0 6px 0; font-weight: 700; color: #0f172a;">${escapeHtml(detail.headline)}</div>
+              <ul style="margin: 0; padding-left: 18px; color: #334155;">${lines}</ul>
+            </div>
+          `;
+        })
+        .join("")
+    : `<ul style="margin: 0; padding-left: 18px; color: #334155;">${args.reasons
+        .map((reason) => `<li style="margin: 0 0 4px 0;">${escapeHtml(reason)}</li>`)
+        .join("")}</ul>`;
+
+  const ctaSection = portalUrl
+    ? `
+      <p style="margin: 16px 0 10px 0;">Review and submit your response in the portal.</p>
+      <p style="margin: 0 0 8px 0;">
+        <a href="${escapeHtml(portalUrl)}" style="display: inline-block; background: #0f172a; color: #ffffff; text-decoration: none; padding: 10px 14px; border-radius: 6px; font-weight: 600;">Open Contractor Portal</a>
+      </p>
+      <p style="margin: 0; font-size: 13px; color: #475569;">If the button does not open, copy and paste this link: ${escapeHtml(portalUrl)}</p>
+    `
+    : `
+      <p style="margin: 16px 0 0 0;">Review and submit your response in the portal.</p>
+      <p style="margin: 8px 0 0 0;">Please open your contractor portal to review and respond.</p>
+    `;
+
+  const summaryBlock = summary
+    ? `<p style="margin: 14px 0 0 0;"><strong>Summary:</strong><br />${escapeHtml(summary).replace(/\n/g, "<br />")}</p>`
+    : "";
+
+  const noteBlock = note
+    ? `<p style="margin: 14px 0 0 0;"><strong>Additional Note:</strong><br />${escapeHtml(note).replace(/\n/g, "<br />")}</p>`
     : "";
 
   return renderSystemEmailLayout({
-    title: `${args.supportDisplayName} Report`,
+    title: "ECC Test Report",
     bodyHtml: `
-      <p style="margin: 0 0 12px 0;">Please review and address the report details below.</p>
-      <div style="white-space: normal;">${bodyHtml}</div>
-      ${portalSection}
-      <p style="margin: 16px 0 0 0;">If you need help, contact ${supportLine}.</p>
+      <p style="margin: 0 0 10px 0;"><strong>Status:</strong> Issues identified</p>
+      <p style="margin: 0 0 12px 0; font-size: 13px; color: #475569;">${escapeHtml(args.title)}</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 14px 0; border-collapse: collapse; width: 100%; font-size: 14px;">
+        <tr><td style="padding: 2px 0; color: #475569; width: 160px;">Customer</td><td style="padding: 2px 0; color: #0f172a; font-weight: 600;">${escapeHtml(args.customerName)}</td></tr>
+        <tr><td style="padding: 2px 0; color: #475569;">Location</td><td style="padding: 2px 0; color: #0f172a; font-weight: 600;">${escapeHtml(args.locationText)}</td></tr>
+        <tr><td style="padding: 2px 0; color: #475569;">Service / Test Date</td><td style="padding: 2px 0; color: #0f172a; font-weight: 600;">${escapeHtml(args.serviceDateText)}</td></tr>
+        <tr><td style="padding: 2px 0; color: #475569;">Contractor</td><td style="padding: 2px 0; color: #0f172a; font-weight: 600;">${escapeHtml(args.contractorName ?? "Not assigned")}</td></tr>
+      </table>
+      <h3 style="margin: 0 0 10px 0; font-size: 16px; line-height: 1.4; color: #111827;">Issues Identified</h3>
+      ${issuesHtml}
+      <h3 style="margin: 14px 0 6px 0; font-size: 16px; line-height: 1.4; color: #111827;">Next Step</h3>
+      <p style="margin: 0;">${escapeHtml(args.nextStep)}</p>
+      ${summaryBlock}
+      ${noteBlock}
+      ${ctaSection}
+      <p style="margin: 16px 0 0 0; font-size: 13px; color: #475569;">Sent by ${escapeHtml(args.supportDisplayName)}.</p>
+      <p style="margin: 6px 0 0 0; font-size: 13px; color: #475569;">Support: ${supportLine}</p>
     `,
   });
+}
+
+function buildContractorReportEmailText(args: {
+  title: string;
+  customerName: string;
+  locationText: string;
+  serviceDateText: string;
+  contractorName: string | null;
+  reasons: string[];
+  failureDetails: ContractorFailureDetail[];
+  nextStep: string;
+  contractorSummary?: string | null;
+  contractorNote?: string | null;
+  portalJobUrl?: string | null;
+  supportDisplayName: string;
+  supportPhone?: string | null;
+  supportEmail?: string | null;
+}) {
+  const summary = String(args.contractorSummary ?? "").trim();
+  const note = String(args.contractorNote ?? "").trim();
+  const portalUrl = String(args.portalJobUrl ?? "").trim();
+  const supportDetails = [args.supportPhone, args.supportEmail].filter(Boolean).join(" • ");
+  const issueBlock = args.failureDetails.length > 0
+    ? args.failureDetails
+        .map((detail) => [detail.headline, ...detail.detail_lines.map((line) => `- ${line}`)].join("\n"))
+        .join("\n\n")
+    : args.reasons.map((reason) => `- ${reason}`).join("\n");
+
+  const sections = [
+    "ECC TEST REPORT",
+    "Status: Issues identified",
+    args.title,
+    `Customer: ${args.customerName}`,
+    `Location: ${args.locationText}`,
+    `Service / Test Date: ${args.serviceDateText}`,
+    `Contractor: ${args.contractorName ?? "Not assigned"}`,
+    `Issues Identified:\n${issueBlock}`,
+    `Next Step:\n${args.nextStep}`,
+  ];
+
+  if (summary) sections.push(`Summary:\n${summary}`);
+  if (note) sections.push(`Additional Note:\n${note}`);
+  if (portalUrl) {
+    sections.push(`Open Contractor Portal:\n${portalUrl}`);
+  } else {
+    sections.push("Please open your contractor portal to review and respond.");
+  }
+
+  sections.push(`Sent by ${args.supportDisplayName}.`);
+  if (supportDetails) {
+    sections.push(`Support: ${supportDetails}`);
+  }
+
+  return sections.join("\n\n");
 }
 
 async function requireInternalUserOrThrow(supabase: any) {
@@ -666,7 +778,8 @@ export async function sendContractorReport(input: {
   const supportEmail = internalBusinessIdentity.support_email;
   const customerName = String(report.customer_name ?? "").trim() || "Customer";
   const jobAddress = String(report.location_text ?? "").trim() || "Location not available";
-  const subject = `${supportDisplayName} Report – ${customerName} – ${jobAddress}`;
+  const subjectContext = jobAddress !== "Location not available" ? jobAddress : customerName;
+  const subject = `Action Requested: ECC Test Report for ${subjectContext}`;
 
   if (!contractorEmail) {
     await insertContractorReportEmailDeliveryNotification({
@@ -694,7 +807,32 @@ export async function sendContractorReport(input: {
   const appUrl = resolveAppUrl();
   const portalJobUrl = appUrl ? `${appUrl}/portal/jobs/${jobId}` : null;
   const emailHtml = buildContractorReportEmailHtml({
-    bodyText: bodyText,
+    title: report.title,
+    customerName: report.customer_name,
+    locationText: report.location_text,
+    serviceDateText: report.service_date_text,
+    contractorName: report.contractor_name,
+    reasons: report.reasons,
+    failureDetails: report.failure_details,
+    nextStep: report.next_step,
+    contractorSummary: contractorFailureSummary.contractor_safe_summary,
+    contractorNote,
+    portalJobUrl,
+    supportDisplayName,
+    supportPhone,
+    supportEmail,
+  });
+  const emailText = buildContractorReportEmailText({
+    title: report.title,
+    customerName: report.customer_name,
+    locationText: report.location_text,
+    serviceDateText: report.service_date_text,
+    contractorName: report.contractor_name,
+    reasons: report.reasons,
+    failureDetails: report.failure_details,
+    nextStep: report.next_step,
+    contractorSummary: contractorFailureSummary.contractor_safe_summary,
+    contractorNote,
     portalJobUrl,
     supportDisplayName,
     supportPhone,
@@ -719,6 +857,7 @@ export async function sendContractorReport(input: {
         to: contractorEmail,
         subject,
         html: emailHtml,
+        text: emailText,
       });
 
       await markContractorReportEmailDeliveryNotification({

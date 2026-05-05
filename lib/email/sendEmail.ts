@@ -4,6 +4,7 @@ type SendEmailArgs = {
   to: string | string[];
   subject: string;
   html: string;
+  text?: string;
 };
 
 function requireResendApiKey() {
@@ -18,7 +19,7 @@ function resolveFromAddress() {
   return "Compliance Matters <reports@mail.compliancemattersca.com>";
 }
 
-export async function sendEmail({ to, subject, html }: SendEmailArgs) {
+export async function sendEmail({ to, subject, html, text }: SendEmailArgs) {
   const resend = new Resend(requireResendApiKey());
   const recipients = Array.isArray(to) ? to : [to];
 
@@ -27,6 +28,7 @@ export async function sendEmail({ to, subject, html }: SendEmailArgs) {
     to: recipients,
     subject,
     html,
+    ...(typeof text === "string" && text.trim().length > 0 ? { text } : {}),
   });
 
   if (result.error) {

@@ -8,6 +8,7 @@ const revalidatePathMock = vi.fn();
 const extractFailureReasonsMock = vi.fn();
 const finalRunPassMock = vi.fn();
 const extractFailureDetailsMock = vi.fn();
+const sendEmailMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -54,12 +55,14 @@ vi.mock("@/lib/business/internal-business-profile", () => ({
 
 vi.mock("@/lib/email/layout", () => ({
   resolveAppUrl: vi.fn(() => "http://localhost:3000"),
-  renderSystemEmailLayout: vi.fn(() => "<html></html>"),
+  renderSystemEmailLayout: vi.fn((args: { title?: string | null; bodyHtml: string }) =>
+    `<html><h1>${String(args?.title ?? "")}</h1>${String(args?.bodyHtml ?? "")}</html>`,
+  ),
   escapeHtml: vi.fn((value: string) => value),
 }));
 
 vi.mock("@/lib/email/sendEmail", () => ({
-  sendEmail: vi.fn(async () => ({})),
+  sendEmail: (...args: unknown[]) => sendEmailMock(...args),
 }));
 
 vi.mock("@/lib/actions/job-event-meta", () => ({
@@ -216,6 +219,7 @@ describe("contractor report entitlement hardening", () => {
     extractFailureDetailsMock.mockImplementation((run: any) =>
       Array.isArray(run?.__details) ? run.__details : [],
     );
+    sendEmailMock.mockResolvedValue({});
   });
 
   describe("generateContractorReportPreview", () => {
@@ -469,6 +473,17 @@ describe("contractor report entitlement hardening", () => {
       expect(sentEvent?.meta?.report_render_version).toBe("contractor_failure_report_v2");
       expect(sentEvent?.meta?.failure_details).toEqual([]);
       expect(sentEvent?.meta?.reasons).not.toContain("Refrigerant weather exception");
+
+      expect(sendEmailMock).toHaveBeenCalledTimes(1);
+      const emailArgs = sendEmailMock.mock.calls[0]?.[0];
+      expect(emailArgs?.subject).toContain("Action Requested: ECC Test Report for");
+      expect(emailArgs?.html).toContain("ECC Test Report");
+      expect(emailArgs?.html).toContain("Open Contractor Portal");
+      expect(emailArgs?.html).toContain("http://localhost:3000/portal/jobs/job-1");
+      expect(emailArgs?.text).toContain("ECC TEST REPORT");
+      expect(emailArgs?.text).toContain("Open Contractor Portal:");
+      expect(emailArgs?.text).toContain("http://localhost:3000/portal/jobs/job-1");
+      expect(emailArgs?.text).toContain("Review and submit your response in the portal.");
     });
 
     it("allows valid trial report send", async () => {
@@ -836,6 +851,12 @@ describe("contractor report entitlement hardening", () => {
       expect(sentEvent?.meta?.body_text).toContain("Airflow failed");
       expect(sentEvent?.meta?.body_text).toContain("Duct leakage failed");
       expect(sentEvent?.meta?.next_step).toBe(preview.next_step);
+
+      const emailArgs = sendEmailMock.mock.calls[0]?.[0];
+      expect(emailArgs?.text).toContain("Airflow failed");
+      expect(emailArgs?.text).toContain("Duct leakage failed");
+      expect(emailArgs?.text).not.toContain("Weather exception");
+      expect(emailArgs?.html).toContain("Issues Identified");
     });
   });
 });
