@@ -116,6 +116,26 @@ Completed production-shipped cleanup batch note (current baseline):
 - ECC/test workflow: refrigerant Photo Taken is attestation-only (no upload-proof validation claim), and Asbestos is included as a duct-leakage override suggestion while custom reasons remain supported.
 - This closeout note is baseline alignment only and does not add a new roadmap milestone.
 
+Contractor report current-scope closeout note (completed):
+- Contractor Report current-scope delivery is complete and professional enough for current launch scope.
+- Failed ECC contractor reports aggregate all failed completed ECC runs for the job and include enriched contractor-actionable details (baseline, measured value, variance) with corrected duct-leakage percentage logic.
+- Airflow and duct leakage failures both render when both are failed.
+- Refrigerant Charge pass override/weather exception remains excluded from contractor failure issues.
+- Preview is sectioned into report type, what failed, next step, and additional note.
+- Next-step wording is neutral and aligned: "Review and submit your response in the portal."
+- Send flow supports recipient override (default contractor email), server-side recipient validation, and recorded actual/default/overridden recipient metadata.
+- Sent snapshot hardening is complete in `contractor_report_sent` metadata: `report_render_version`, `failure_details`, `reasons`, `next_step`, `body_text`, and recipient metadata.
+- Professional HTML email delivery with true plain-text fallback and contractor portal CTA is implemented.
+- contractor_report_sent remains audit/history truth in `job_events`; outbound contractor report send does not create internal notification-table records.
+- Notification-table delivery tracking was removed from this send path because it was nonessential and could block delivery under notifications RLS.
+- PDF generation/attachment remains deferred.
+
+Branch workflow update (active discipline):
+- The old `sandbox-clean-start` Git branch is retired because it became stale/diverged from current `main` and posed revert risk.
+- `main` is the current production truth.
+- Use short-lived feature branches from current `main`, validate, merge, and retire after use.
+- Supabase sandbox remains usable; only the stale Git branch was retired.
+
 ### Launch-readiness performance and responsiveness track (active backlog, current pass closed)
 - The recent speed/responsiveness batch was a necessary quality intervention, not a permanent roadmap reorder.
 - Completed closeout baseline from that intervention:

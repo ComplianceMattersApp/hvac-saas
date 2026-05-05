@@ -26,6 +26,24 @@ Current Program Status Note (May 2026)
 - Practical baseline after this pass has improved materially (warm job-detail paths observed around ~1.5-2.0s and improved contact-action core paths around ~1.1-1.4s on improved runs), while cold-load variance can still be slower.
 - Performance remains an active launch-readiness backlog and does not own the entire roadmap unless a specific speed issue is actively damaging usability.
 - Planned pre-launch spine order is now resumed; controlled tester onboarding remains intentionally held until readiness work is acceptably complete and supportable.
+- Contractor Report current-scope delivery is complete and accepted for current launch scope quality:
+  - failed ECC contractor reports aggregate all failed completed ECC runs for the job
+  - enriched contractor-actionable failure details are included (baseline, measured value, variance), including corrected duct-leakage percentage logic
+  - Refrigerant Charge pass override/weather exception remains excluded from contractor failure issues
+  - preview is sectioned into report, failure, next-step, and note cards
+  - next-step wording is now neutral: "Review and submit your response in the portal."
+  - send flow supports recipient override (default contractor email, server-side recipient validation, and recorded actual/default/overridden recipient metadata)
+  - sent snapshots preserve `report_render_version`, `failure_details`, `reasons`, `next_step`, `body_text`, and recipient metadata in `contractor_report_sent`
+  - professional HTML email delivery, true plain-text fallback, and contractor portal CTA are implemented
+  - contractor_report_sent remains audit/history truth in `job_events` and does not create internal notification-table records for outbound contractor report sends
+  - notification-table delivery tracking was removed from this send path because it was nonessential and could block delivery under RLS
+  - PDF generation/attachment remains deferred
+  - final smoke passed for report generation, recipient override send, and received email quality
+- Branch workflow update:
+  - the old `sandbox-clean-start` Git branch is retired due to stale/diverged risk
+  - `main` is current production truth
+  - use short-lived feature branches from current `main`, merge back only after validation, then retire the branch
+  - Supabase sandbox environment remains usable; only the stale Git branch was retired
 
 1. System Identity
 

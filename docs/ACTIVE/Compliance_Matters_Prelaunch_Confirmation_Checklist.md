@@ -667,6 +667,27 @@ Mobile home-screen launch QA checklist (Slice 1):
   - do not enable production estimate email sending without an explicit rollout plan
   - no customer approval, customer portal estimate visibility, contractor visibility/authority, email/PDF, conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement should be implemented without a design pass
 
+### 2.21 Contractor report delivery current-scope closeout (completed)
+- Contractor Report current-scope delivery is complete. Failed ECC contractor reports now aggregate all failed completed ECC runs for the job and render contractor-actionable details including baseline, measured value, variance, and corrected duct-leakage percentage logic.
+- Airflow and duct leakage failures are both included when both are failed.
+- Refrigerant Charge pass override/weather exception remains excluded from contractor failure issues.
+- The preview is sectioned into report, failure, next-step, and note cards.
+- Next-step wording is neutral and aligned across preview/send: "Review and submit your response in the portal."
+- The send flow supports a recipient override field that defaults to the contractor email, validates recipient server-side, and records actual/default/overridden recipient metadata.
+- Sent report snapshots preserve `report_render_version`, `failure_details`, `reasons`, `next_step`, `body_text`, and recipient metadata in the `contractor_report_sent` job_event.
+- Professional HTML email delivery, true plain-text fallback, and contractor portal CTA are implemented.
+- contractor_report_sent remains audit/history truth in `job_events` and does not create internal notification-table records for outbound contractor report sends.
+- Notification-table delivery tracking was removed from this send path because it was nonessential and was able to block delivery under notifications RLS.
+- This contractor report path is now professional enough for current launch scope.
+- PDF generation/attachment remains deferred.
+- Final smoke passed (report generation, recipient override send, received email quality/header).
+
+### 2.22 Branch workflow discipline update (active)
+- Branch workflow update: the old `sandbox-clean-start` Git branch has been retired because it became stale/diverged from current `main` and posed a risk of reverting completed work.
+- Going forward, `main` is the current production truth.
+- Focused work should use short-lived branches created from current `main`, merged back only after validation, then retired.
+- The Supabase sandbox environment remains usable; only the stale Git branch was retired.
+
 ---
 
 ## 3. Support / customer-operations readiness
