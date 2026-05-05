@@ -466,6 +466,8 @@ describe("contractor report entitlement hardening", () => {
         "Duct leakage above threshold",
       ]);
       expect(sentEvent?.meta?.reasons).toEqual(preview.reasons);
+      expect(sentEvent?.meta?.report_render_version).toBe("contractor_failure_report_v2");
+      expect(sentEvent?.meta?.failure_details).toEqual([]);
       expect(sentEvent?.meta?.reasons).not.toContain("Refrigerant weather exception");
     });
 
@@ -829,8 +831,11 @@ describe("contractor report entitlement hardening", () => {
 
       expect(preview.failure_details).toHaveLength(2);
       expect(sentEvent?.meta?.reasons).toEqual(preview.reasons);
+      expect(sentEvent?.meta?.failure_details).toEqual(preview.failure_details);
+      expect(sentEvent?.meta?.report_render_version).toBe("contractor_failure_report_v2");
       expect(sentEvent?.meta?.body_text).toContain("Airflow failed");
       expect(sentEvent?.meta?.body_text).toContain("Duct leakage failed");
+      expect(sentEvent?.meta?.next_step).toBe(preview.next_step);
     });
   });
 });

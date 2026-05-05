@@ -623,6 +623,7 @@ export async function sendContractorReport(input: {
       meta: {
         report_kind: report.report_kind,
         report_version: 1,
+        report_render_version: "contractor_failure_report_v2",
         sent_at_iso: sentAtIso,
         generated_from: {
           ops_status: report.ops_status,
@@ -632,6 +633,7 @@ export async function sendContractorReport(input: {
         contractor_name: report.contractor_name,
         service_date_text: report.service_date_text,
         reasons: report.reasons,
+        failure_details: report.failure_details,
         contractor_failure_summary_v1: contractorFailureSummary,
         contractor_note: contractorNote,
         next_step: report.next_step,
