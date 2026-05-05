@@ -245,7 +245,7 @@ describe("contractor intake submit hotfix", () => {
     const { createJobFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(createJobFromForm(buildContractorProposalFormData())).rejects.toThrow(
-      "REDIRECT:/jobs/new?err=contractor_proposal_submitted",
+      "REDIRECT:/jobs/new?err=contractor_proposal_submitted&proposal_id=proposal-1",
     );
 
     expect(fixture.proposalInsertPayloads).toHaveLength(1);
@@ -318,7 +318,7 @@ describe("contractor intake submit hotfix", () => {
     const { createJobFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(createJobFromForm(buildContractorProposalFormData())).rejects.toThrow(
-      "REDIRECT:/jobs/new?err=contractor_proposal_submitted",
+      "REDIRECT:/jobs/new?err=contractor_proposal_submitted&proposal_id=proposal-1",
     );
 
     expect(fixture.proposalInsertPayloads).toHaveLength(1);
@@ -341,7 +341,7 @@ describe("contractor intake submit hotfix", () => {
     // Simulate stale bundle: state field not posted at all
     await expect(
       createJobFromForm(buildContractorProposalFormData({ state: "" })),
-    ).rejects.toThrow("REDIRECT:/jobs/new?err=contractor_proposal_submitted");
+    ).rejects.toThrow("REDIRECT:/jobs/new?err=contractor_proposal_submitted&proposal_id=proposal-1");
 
     expect(fixture.proposalInsertPayloads).toHaveLength(1);
     expect(fixture.proposalInsertPayloads[0]).toEqual(

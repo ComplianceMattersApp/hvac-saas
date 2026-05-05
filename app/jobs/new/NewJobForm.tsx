@@ -4,10 +4,16 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { createJobFromForm, getInternalIntakeRelationshipContext } from "@/lib/actions";
+import {
+  createContractorProposalAttachmentUploadToken,
+  createJobFromForm,
+  finalizeContractorProposalAttachments,
+  getInternalIntakeRelationshipContext,
+} from "@/lib/actions";
 import JobCoreFields from "@/components/jobs/JobCoreFields";
 import ActionFeedback from "@/components/ui/ActionFeedback";
 import VisitScopeBuilder, { type VisitScopeDraftItem } from "@/components/jobs/VisitScopeBuilder";
+import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client";
 import {
   createVisitScopeItemId,
   sanitizeVisitScopeItemId,
@@ -86,6 +92,15 @@ type EquipmentSystem = {
 };
 
 const DRAFT_KEY = "cm:newjob:draft:v1";
+const CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_COUNT = 8;
+const CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const CONTRACTOR_PROPOSAL_ATTACHMENT_ALLOWED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+]);
+const CONTRACTOR_PROPOSAL_ATTACHMENT_ALLOWED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "pdf"]);
 
 type NewJobDraft = {
   windowStart?: string;
@@ -192,6 +207,31 @@ function normalizeLocationText(value: string | null | undefined) {
     .trim();
 }
 
+function parseFileExtension(fileName: string) {
+  const normalized = String(fileName ?? "").trim().toLowerCase();
+  if (!normalized.includes(".")) return "";
+  const parts = normalized.split(".");
+  return String(parts.at(-1) ?? "").trim();
+}
+
+function validateContractorAttachmentFile(file: File) {
+  const mime = String(file.type ?? "").trim().toLowerCase();
+  const extension = parseFileExtension(file.name);
+
+  if (file.size <= 0) return "One or more files are empty.";
+  if (file.size > CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_FILE_SIZE_BYTES) {
+    return "Each file must be 10MB or smaller.";
+  }
+
+  const mimeAllowed = CONTRACTOR_PROPOSAL_ATTACHMENT_ALLOWED_MIME_TYPES.has(mime);
+  const extensionAllowed = CONTRACTOR_PROPOSAL_ATTACHMENT_ALLOWED_EXTENSIONS.has(extension);
+  if (!mimeAllowed || !extensionAllowed) {
+    return "Only JPG, PNG, WEBP, and PDF files are allowed.";
+  }
+
+  return null;
+}
+
 function formatLocationContext(location: LocationLookupRow | null | undefined) {
   if (!location) return "No saved address yet";
   const address = String(location.address_line1 ?? "").trim() || "Address";
@@ -280,6 +320,7 @@ export default function NewJobForm({
   locationLookupRows = [],
   myContractor,
   errorCode,
+  submittedProposalId,
   customerContextMode = false,
   customerContextSource = null,
 }: {
@@ -290,6 +331,7 @@ export default function NewJobForm({
   locationLookupRows?: LocationLookupRow[];
   myContractor?: MyContractor;
   errorCode?: string | null;
+  submittedProposalId?: string | null;
   customerContextMode?: boolean;
   customerContextSource?: string | null;
 }) {
@@ -375,6 +417,10 @@ const [billingRecipient, setBillingRecipient] = useState<
   const [relationshipContext, setRelationshipContext] = useState<RelationshipContext>(EMPTY_RELATIONSHIP_CONTEXT);
   const [relationshipError, setRelationshipError] = useState<string | null>(null);
   const [isRelationshipPending, startRelationshipTransition] = useTransition();
+  const [isAttachmentUploading, startAttachmentUploadTransition] = useTransition();
+  const [proposalAttachmentError, setProposalAttachmentError] = useState<string | null>(null);
+  const [proposalAttachmentSuccess, setProposalAttachmentSuccess] = useState<string | null>(null);
+  const contractorAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const submitLockedRef = useRef(false);
   const relationshipRequestRef = useRef(0);
   const createNewCustomerCardRef = useRef<HTMLDivElement | null>(null);
@@ -993,6 +1039,100 @@ const [billingRecipient, setBillingRecipient] = useState<
       canSubmit ? "bg-slate-900 hover:bg-slate-800 active:scale-[0.99]" : "bg-slate-400"
     }`;
 
+  function uploadProposalAttachments() {
+    if (!submittedProposalId) {
+      setProposalAttachmentError("Proposal was submitted, but attachment upload is temporarily unavailable.");
+      return;
+    }
+
+    const selectedFiles = Array.from(contractorAttachmentInputRef.current?.files ?? []);
+    if (!selectedFiles.length) {
+      setProposalAttachmentError("Select at least one file to upload.");
+      setProposalAttachmentSuccess(null);
+      return;
+    }
+
+    if (selectedFiles.length > CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_COUNT) {
+      setProposalAttachmentError(`You can upload up to ${CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_COUNT} files at a time.`);
+      setProposalAttachmentSuccess(null);
+      return;
+    }
+
+    for (const file of selectedFiles) {
+      const validationError = validateContractorAttachmentFile(file);
+      if (validationError) {
+        setProposalAttachmentError(validationError);
+        setProposalAttachmentSuccess(null);
+        return;
+      }
+    }
+
+    setProposalAttachmentError(null);
+    setProposalAttachmentSuccess(null);
+
+    startAttachmentUploadTransition(() => {
+      void (async () => {
+        try {
+          const supabase = createBrowserSupabaseClient();
+          const uploadDrafts: Array<{
+            attachmentId: string;
+            path: string;
+            fileName: string;
+            contentType: string;
+            fileSize: number;
+          }> = [];
+
+          for (const file of selectedFiles) {
+            const token = await createContractorProposalAttachmentUploadToken({
+              submissionId: submittedProposalId,
+              fileName: file.name,
+              contentType: file.type,
+              fileSize: file.size,
+            });
+
+            const { error: uploadErr } = await supabase.storage
+              .from("attachments")
+              .uploadToSignedUrl(token.path, token.token, file, {
+                upsert: false,
+              });
+
+            if (uploadErr) {
+              throw new Error("File upload failed. Please try again.");
+            }
+
+            uploadDrafts.push({
+              attachmentId: token.attachmentId,
+              path: token.path,
+              fileName: token.fileName,
+              contentType: token.contentType,
+              fileSize: token.fileSize,
+            });
+          }
+
+          const finalized = await finalizeContractorProposalAttachments({
+            submissionId: submittedProposalId,
+            uploads: uploadDrafts,
+          });
+
+          if (contractorAttachmentInputRef.current) {
+            contractorAttachmentInputRef.current.value = "";
+          }
+          setProposalAttachmentSuccess(
+            finalized.count === 1
+              ? "1 attachment uploaded."
+              : `${finalized.count} attachments uploaded.`,
+          );
+          setProposalAttachmentError(null);
+          router.refresh();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Could not upload files.";
+          setProposalAttachmentError(message);
+          setProposalAttachmentSuccess(null);
+        }
+      })();
+    });
+  }
+
   // Contractor post-submit success panel
   if (isContractorMode && errorCode === "contractor_proposal_submitted") {
     return (
@@ -1002,7 +1142,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-emerald-100 text-lg font-bold text-emerald-700" aria-hidden="true" />
             <div>
               <h1 className="text-lg font-semibold text-slate-900">Job submitted</h1>
-              <p className="text-sm text-slate-600">Your submission has been received.</p>
+              <p className="text-sm text-slate-600">Your submission has been received and is now under review.</p>
             </div>
           </div>
           <div className="rounded-xl border border-emerald-200 bg-white px-4 py-4 space-y-3">
@@ -1021,6 +1161,32 @@ const [billingRecipient, setBillingRecipient] = useState<
                 You&apos;ll hear from us to confirm next steps.
               </li>
             </ol>
+          </div>
+          <div className="rounded-xl border border-emerald-200 bg-white px-4 py-4 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Attachments (optional)</p>
+            <p className="text-sm text-slate-600">
+              Your proposal is already saved. You can add photos or PDFs now without affecting your submission.
+            </p>
+            <input
+              ref={contractorAttachmentInputRef}
+              type="file"
+              multiple
+              accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+              className="w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700"
+            />
+            <p className="text-xs text-slate-500">
+              Max {CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_COUNT} files, 10MB each. Allowed: JPG, PNG, WEBP, PDF.
+            </p>
+            <ActionFeedback type="warning" message={proposalAttachmentError} />
+            <ActionFeedback type="success" message={proposalAttachmentSuccess} />
+            <button
+              type="button"
+              onClick={uploadProposalAttachments}
+              disabled={isAttachmentUploading || !submittedProposalId}
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-all duration-150 hover:bg-slate-800 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isAttachmentUploading ? "Uploading..." : "Upload Attachments"}
+            </button>
           </div>
           <div className="pt-1 text-center">
             <a href="/portal" className="text-sm font-medium text-slate-700 underline underline-offset-2 hover:text-slate-900">
@@ -2656,11 +2822,15 @@ const [billingRecipient, setBillingRecipient] = useState<
               <div className="rounded-2xl border border-slate-200/85 bg-white p-4 shadow-sm">
                 <div>
                 <h2 className="text-base font-semibold text-slate-900">Photos (optional)</h2>
-                <p className="mt-0.5 text-xs text-slate-500">Equipment photos, permit copies, or site images. JPG, PNG, or PDF.</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Equipment photos, permit copies, or site images. JPG, PNG, WEBP, or PDF.
+                  {isContractorMode ? " Files upload after proposal submit." : ""}
+                </p>
                 </div>
                 <input
                   type="file"
-                  name="photos"
+                  name={isContractorMode ? undefined : "photos"}
+                  accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
                   multiple
                   className="mt-3 w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700"
                 />

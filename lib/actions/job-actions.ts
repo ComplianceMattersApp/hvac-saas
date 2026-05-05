@@ -126,6 +126,119 @@ type IntakeRelationshipJobSummary = {
   created_at: string | null;
 };
 
+type ContractorProposalAttachmentUploadDraft = {
+  attachmentId: string;
+  path: string;
+  fileName: string;
+  contentType: string;
+  fileSize: number;
+};
+
+const CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_COUNT = 8;
+const CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const CONTRACTOR_PROPOSAL_ATTACHMENT_ALLOWED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+]);
+const CONTRACTOR_PROPOSAL_ATTACHMENT_ALLOWED_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "pdf",
+]);
+
+function safeProposalAttachmentFileName(raw: string) {
+  const cleaned = String(raw ?? "").trim().replace(/[^\w.\- ()]/g, "_");
+  return cleaned || "intake-upload";
+}
+
+function parseFileExtension(fileName: string) {
+  const normalized = String(fileName ?? "").trim().toLowerCase();
+  if (!normalized.includes(".")) return "";
+  const parts = normalized.split(".");
+  return String(parts.at(-1) ?? "").trim();
+}
+
+function normalizeContentType(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function validateContractorProposalAttachmentMetadata(input: {
+  fileName: string;
+  contentType: string;
+  fileSize: number;
+}) {
+  const fileName = String(input.fileName ?? "").trim();
+  const contentType = normalizeContentType(input.contentType);
+  const fileSize = Number(input.fileSize ?? 0);
+  const extension = parseFileExtension(fileName);
+
+  if (!fileName) return "File name is required.";
+  if (!Number.isFinite(fileSize) || fileSize <= 0) return "File is empty or invalid.";
+  if (fileSize > CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_FILE_SIZE_BYTES) {
+    return `File exceeds the ${Math.floor(CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_FILE_SIZE_BYTES / (1024 * 1024))}MB size limit.`;
+  }
+
+  const mimeAllowed = CONTRACTOR_PROPOSAL_ATTACHMENT_ALLOWED_MIME_TYPES.has(contentType);
+  const extensionAllowed = CONTRACTOR_PROPOSAL_ATTACHMENT_ALLOWED_EXTENSIONS.has(extension);
+
+  if (!mimeAllowed || !extensionAllowed) {
+    return "Only JPG, PNG, WEBP, and PDF files are allowed.";
+  }
+
+  return null;
+}
+
+async function loadScopedPendingContractorProposalForAttachment(input: {
+  submissionId: string;
+  supabase: any;
+  admin: any;
+}) {
+  const submissionId = String(input.submissionId ?? "").trim();
+  if (!submissionId) throw new Error("Missing submissionId");
+
+  const { data: userData, error: userErr } = await input.supabase.auth.getUser();
+  if (userErr) throw new Error(userErr.message);
+
+  const submittingUserId = String(userData?.user?.id ?? "").trim();
+  if (!submittingUserId) throw new Error("Not authenticated");
+
+  const { data: membership, error: membershipErr } = await input.supabase
+    .from("contractor_users")
+    .select("contractor_id")
+    .eq("user_id", submittingUserId)
+    .maybeSingle();
+
+  if (membershipErr) throw new Error(membershipErr.message);
+
+  const contractorId = String((membership as { contractor_id?: unknown } | null)?.contractor_id ?? "").trim();
+  if (!contractorId) throw new Error("Not authorized to upload proposal attachments");
+
+  const { data: submissionRow, error: submissionErr } = await input.admin
+    .from("contractor_intake_submissions")
+    .select("id, contractor_id, review_status")
+    .eq("id", submissionId)
+    .eq("contractor_id", contractorId)
+    .maybeSingle();
+
+  if (submissionErr) throw submissionErr;
+  if (!submissionRow?.id) throw new Error("Proposal not found");
+
+  const reviewStatus = String((submissionRow as { review_status?: unknown }).review_status ?? "").trim().toLowerCase();
+  if (reviewStatus && reviewStatus !== "pending") {
+    throw new Error("Attachments can only be added while proposal is under review.");
+  }
+
+  return {
+    submissionId,
+    contractorId,
+    submittingUserId,
+  };
+}
+
 export type InternalIntakeRelationshipContext = {
   activeJobs: IntakeRelationshipJobSummary[];
   recentJobs: IntakeRelationshipJobSummary[];
@@ -5887,6 +6000,195 @@ async function requireOperationalIntakeCreateEntitlementAccess(params: {
   redirect(`/ops/admin/company-profile?${search.toString()}`);
 }
 
+export async function createContractorProposalAttachmentUploadToken(input: {
+  submissionId: string;
+  fileName: string;
+  contentType: string;
+  fileSize: number;
+}) {
+  const supabase = await createClient();
+  const admin = createAdminClient();
+
+  const fileName = safeProposalAttachmentFileName(input.fileName);
+  const contentType = normalizeContentType(input.contentType);
+  const fileSize = Number(input.fileSize ?? 0);
+
+  const metadataError = validateContractorProposalAttachmentMetadata({
+    fileName,
+    contentType,
+    fileSize,
+  });
+  if (metadataError) {
+    throw new Error(metadataError);
+  }
+
+  const scoped = await loadScopedPendingContractorProposalForAttachment({
+    submissionId: input.submissionId,
+    supabase,
+    admin,
+  });
+
+  const { count: existingAttachmentCount, error: countErr } = await admin
+    .from("attachments")
+    .select("id", { count: "exact", head: true })
+    .eq("entity_type", "contractor_intake_submission")
+    .eq("entity_id", scoped.submissionId);
+
+  if (countErr) throw countErr;
+
+  if ((existingAttachmentCount ?? 0) >= CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_COUNT) {
+    throw new Error(`You can upload up to ${CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_COUNT} files per proposal.`);
+  }
+
+  const attachmentId = crypto.randomUUID();
+  const storagePath = `contractor-intake/${scoped.submissionId}/${attachmentId}-${fileName}`;
+
+  const { data: signedUploadData, error: signedUploadErr } = await admin.storage
+    .from("attachments")
+    .createSignedUploadUrl(storagePath);
+
+  if (signedUploadErr) {
+    throw new Error("Could not prepare file upload. Please try again.");
+  }
+
+  const token = String((signedUploadData as { token?: unknown } | null)?.token ?? "").trim();
+  const path = String((signedUploadData as { path?: unknown } | null)?.path ?? storagePath).trim();
+  if (!token || !path) {
+    throw new Error("Could not prepare file upload. Please try again.");
+  }
+
+  return {
+    attachmentId,
+    token,
+    path,
+    bucket: "attachments",
+    fileName,
+    contentType,
+    fileSize,
+  };
+}
+
+export async function finalizeContractorProposalAttachments(input: {
+  submissionId: string;
+  uploads: ContractorProposalAttachmentUploadDraft[];
+}) {
+  const supabase = await createClient();
+  const admin = createAdminClient();
+
+  const scoped = await loadScopedPendingContractorProposalForAttachment({
+    submissionId: input.submissionId,
+    supabase,
+    admin,
+  });
+
+  const uploads = Array.isArray(input.uploads)
+    ? input.uploads.map((item) => ({
+        attachmentId: String(item?.attachmentId ?? "").trim(),
+        path: String(item?.path ?? "").trim(),
+        fileName: safeProposalAttachmentFileName(String(item?.fileName ?? "")),
+        contentType: normalizeContentType(item?.contentType),
+        fileSize: Number(item?.fileSize ?? 0),
+      }))
+    : [];
+
+  if (!uploads.length) {
+    throw new Error("Select at least one file to upload.");
+  }
+
+  if (uploads.length > CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_COUNT) {
+    throw new Error(`You can upload up to ${CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_COUNT} files per proposal.`);
+  }
+
+  const uniqueById = new Map<string, ContractorProposalAttachmentUploadDraft>();
+  const expectedPrefix = `contractor-intake/${scoped.submissionId}/`;
+  for (const upload of uploads) {
+    if (!upload.attachmentId) throw new Error("Upload session is missing attachmentId.");
+
+    const expectedPath = `${expectedPrefix}${upload.attachmentId}-${upload.fileName}`;
+    if (!upload.path || upload.path !== expectedPath) {
+      throw new Error("Upload session is invalid for this proposal.");
+    }
+
+    const metadataError = validateContractorProposalAttachmentMetadata({
+      fileName: upload.fileName,
+      contentType: upload.contentType,
+      fileSize: upload.fileSize,
+    });
+    if (metadataError) throw new Error(metadataError);
+
+    uniqueById.set(upload.attachmentId, upload);
+  }
+
+  const dedupedUploads = Array.from(uniqueById.values());
+
+  const { count: existingAttachmentCount, error: countErr } = await admin
+    .from("attachments")
+    .select("id", { count: "exact", head: true })
+    .eq("entity_type", "contractor_intake_submission")
+    .eq("entity_id", scoped.submissionId);
+
+  if (countErr) throw countErr;
+
+  if ((existingAttachmentCount ?? 0) + dedupedUploads.length > CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_COUNT) {
+    throw new Error(`You can upload up to ${CONTRACTOR_PROPOSAL_ATTACHMENT_MAX_COUNT} files per proposal.`);
+  }
+
+  for (const upload of dedupedUploads) {
+    const { data: signedUrlData, error: signedUrlErr } = await admin.storage
+      .from("attachments")
+      .createSignedUrl(upload.path, 60);
+
+    const signedUrl = String((signedUrlData as { signedUrl?: unknown } | null)?.signedUrl ?? "").trim();
+    if (signedUrlErr || !signedUrl) {
+      throw new Error("Uploaded files could not be verified. Please try again.");
+    }
+  }
+
+  const attachmentRows = dedupedUploads.map((upload) => ({
+    id: upload.attachmentId,
+    entity_type: "contractor_intake_submission",
+    entity_id: scoped.submissionId,
+    bucket: "attachments",
+    storage_path: upload.path,
+    file_name: upload.fileName,
+    content_type: upload.contentType,
+    file_size: upload.fileSize,
+    caption: null,
+  }));
+
+  try {
+    const { error: insertErr } = await admin.from("attachments").insert(attachmentRows);
+    if (insertErr) throw insertErr;
+  } catch (error) {
+    const cleanupPaths = dedupedUploads.map((upload) => upload.path);
+    const { error: cleanupErr } = await admin.storage.from("attachments").remove(cleanupPaths);
+    if (cleanupErr) {
+      console.error("proposal_attachment_storage_cleanup_failed", {
+        submissionId: scoped.submissionId,
+        error: cleanupErr instanceof Error ? cleanupErr.message : "Unknown storage cleanup error",
+      });
+    }
+
+    console.error("proposal_attachment_finalize_insert_failed", {
+      submissionId: scoped.submissionId,
+      error: error instanceof Error ? error.message : "Unknown attachment insert error",
+    });
+
+    throw new Error("Files uploaded but could not be attached to this proposal. Please try again.");
+  }
+
+  revalidatePath("/ops/admin/contractor-intake-submissions");
+  revalidatePath(`/ops/admin/contractor-intake-submissions/${scoped.submissionId}`);
+  revalidatePath("/portal");
+  revalidatePath("/portal/jobs");
+  revalidatePath(`/portal/intake-submissions/${scoped.submissionId}`);
+
+  return {
+    count: dedupedUploads.length,
+    attachmentIds: dedupedUploads.map((upload) => upload.attachmentId),
+  };
+}
+
 /**
  * CREATE: used by /jobs/new form
  */
@@ -7022,14 +7324,6 @@ function canContractorWriteEvent(event_type: string) {
     });
 
     const proposalWriteClient = createAdminClient();
-    const uploadedProposalFiles = formData
-      .getAll("photos")
-      .filter((value): value is File => value instanceof File && value.size > 0);
-
-    function safeProposalFileName(raw: string) {
-      const cleaned = String(raw ?? "").trim().replace(/[^\w.\- ()]/g, "_");
-      return cleaned || "intake-upload";
-    }
 
     const { data: proposalRow, error: proposalErr } = await proposalWriteClient
       .from("contractor_intake_submissions")
@@ -7072,94 +7366,6 @@ function canContractorWriteEvent(event_type: string) {
     }
 
     if (proposalId) {
-      const persistedAttachmentIds: string[] = [];
-      const persistedStoragePaths: string[] = [];
-
-      async function cleanupProposalAttachmentsOnFailure() {
-        if (persistedAttachmentIds.length > 0) {
-          const { error: deleteAttachmentRowsErr } = await proposalWriteClient
-            .from("attachments")
-            .delete()
-            .eq("entity_type", "contractor_intake_submission")
-            .eq("entity_id", proposalId)
-            .in("id", persistedAttachmentIds);
-
-          if (deleteAttachmentRowsErr) {
-            console.error("proposal_attachment_row_rollback_failed", {
-              proposalId,
-              error:
-                deleteAttachmentRowsErr instanceof Error
-                  ? deleteAttachmentRowsErr.message
-                  : String((deleteAttachmentRowsErr as any)?.message ?? "Unknown rollback row delete error"),
-            });
-          }
-        }
-
-        if (persistedStoragePaths.length > 0) {
-          const uniquePaths = Array.from(new Set(persistedStoragePaths));
-          const { error: deleteStorageErr } = await proposalWriteClient.storage
-            .from("attachments")
-            .remove(uniquePaths);
-
-          if (deleteStorageErr) {
-            console.error("proposal_attachment_storage_rollback_failed", {
-              proposalId,
-              error:
-                deleteStorageErr instanceof Error
-                  ? deleteStorageErr.message
-                  : String((deleteStorageErr as any)?.message ?? "Unknown rollback storage delete error"),
-            });
-          }
-        }
-      }
-
-      try {
-        for (const file of uploadedProposalFiles) {
-          const attachmentId = crypto.randomUUID();
-          const safeName = safeProposalFileName(file.name);
-          const storagePath = `contractor-intake/${proposalId}/${attachmentId}-${safeName}`;
-          const contentType = String(file.type ?? "").trim() || "application/octet-stream";
-
-          const buffer = Buffer.from(await file.arrayBuffer());
-          const { error: uploadErr } = await proposalWriteClient.storage
-            .from("attachments")
-            .upload(storagePath, buffer, {
-              contentType,
-              upsert: false,
-            });
-
-          if (uploadErr) throw uploadErr;
-
-          const { error: attachmentRowErr } = await proposalWriteClient.from("attachments").insert({
-            id: attachmentId,
-            entity_type: "contractor_intake_submission",
-            entity_id: proposalId,
-            bucket: "attachments",
-            storage_path: storagePath,
-            file_name: safeName,
-            content_type: contentType,
-            file_size: file.size,
-            caption: null,
-          });
-
-          if (attachmentRowErr) {
-            await proposalWriteClient.storage.from("attachments").remove([storagePath]);
-            throw attachmentRowErr;
-          }
-
-          persistedAttachmentIds.push(attachmentId);
-          persistedStoragePaths.push(storagePath);
-        }
-      } catch (error) {
-        logContractorProposalSubmitFailure({
-          errorCode: "attachment_persist_failed",
-          error,
-          stage: "proposal_attachment_persist",
-          proposalId,
-        });
-        await cleanupProposalAttachmentsOnFailure();
-      }
-
       try {
         await createContractorIntakeProposalAwarenessNotification({
           supabase,
@@ -7196,7 +7402,7 @@ function canContractorWriteEvent(event_type: string) {
     revalidatePath("/ops/admin/contractor-intake-submissions");
     revalidatePath("/portal");
     revalidatePath("/portal/jobs");
-    redirect("/jobs/new?err=contractor_proposal_submitted");
+    redirect(`/jobs/new?err=contractor_proposal_submitted&proposal_id=${encodeURIComponent(proposalId)}`);
   }
 
   // If no service address, bounce back (your existing behavior)
