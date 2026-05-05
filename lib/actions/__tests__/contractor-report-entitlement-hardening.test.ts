@@ -433,6 +433,9 @@ describe("contractor report entitlement hardening", () => {
       expect(result.ok).toBe(true);
       expect(writes.some((w) => w.table === "job_events" && w.op === "insert")).toBe(true);
       expect(insertInternalNotificationForEventMock).not.toHaveBeenCalled();
+      expect(findExistingContractorReportEmailDeliveryMock).not.toHaveBeenCalled();
+      expect(insertContractorReportEmailDeliveryNotificationMock).not.toHaveBeenCalled();
+      expect(markContractorReportEmailDeliveryNotificationMock).not.toHaveBeenCalled();
       expect(revalidatePathMock).toHaveBeenCalled();
     });
 
@@ -493,6 +496,9 @@ describe("contractor report entitlement hardening", () => {
       expect(sentEvent?.meta?.recipient_overridden).toBe(false);
       expect(sentEvent?.meta?.reasons).not.toContain("Refrigerant weather exception");
       expect(insertInternalNotificationForEventMock).not.toHaveBeenCalled();
+      expect(findExistingContractorReportEmailDeliveryMock).not.toHaveBeenCalled();
+      expect(insertContractorReportEmailDeliveryNotificationMock).not.toHaveBeenCalled();
+      expect(markContractorReportEmailDeliveryNotificationMock).not.toHaveBeenCalled();
 
       expect(sendEmailMock).toHaveBeenCalledTimes(1);
       const emailArgs = sendEmailMock.mock.calls[0]?.[0];
@@ -631,6 +637,9 @@ describe("contractor report entitlement hardening", () => {
       expect(sentEvent?.meta?.default_recipient_email).toBe("contractor@test.com");
       expect(sentEvent?.meta?.recipient_overridden).toBe(true);
       expect(insertInternalNotificationForEventMock).not.toHaveBeenCalled();
+      expect(findExistingContractorReportEmailDeliveryMock).not.toHaveBeenCalled();
+      expect(insertContractorReportEmailDeliveryNotificationMock).not.toHaveBeenCalled();
+      expect(markContractorReportEmailDeliveryNotificationMock).not.toHaveBeenCalled();
     });
 
     it("uses default recipient when recipient is unchanged or omitted", async () => {

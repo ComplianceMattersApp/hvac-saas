@@ -22,10 +22,7 @@ import {
 } from "@/lib/auth/internal-user";
 import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope";
 import {
-  findExistingContractorReportEmailDelivery,
-  insertContractorReportEmailDeliveryNotification,
   insertInternalNotificationForEvent,
-  markContractorReportEmailDeliveryNotification,
 } from "@/lib/actions/notification-actions";
 import {
   resolveBillingModeByAccountOwnerId,
@@ -799,12 +796,6 @@ export async function sendContractorReport(input: {
   const subjectContext = jobAddress !== "Location not available" ? jobAddress : customerName;
   const subject = `Action Requested: ECC Test Report for ${subjectContext}`;
 
-  const dedupeKey = `email:contractor_report:${eventId}:${recipientEmail}`;
-  const existingDelivery = await findExistingContractorReportEmailDelivery({
-    supabase,
-    dedupeKey,
-  });
-
   const appUrl = resolveAppUrl();
   const portalJobUrl = appUrl ? `${appUrl}/portal/jobs/${jobId}` : null;
   const emailHtml = buildContractorReportEmailHtml({
@@ -840,44 +831,16 @@ export async function sendContractorReport(input: {
     supportEmail,
   });
 
-  if (!existingDelivery?.id) {
-    const deliveryRow = await insertContractorReportEmailDeliveryNotification({
-      supabase,
-      jobId,
-      contractorId: String(job.contractor_id ?? "").trim() || null,
-      recipientEmail,
-      eventId,
-      dedupeKey,
+  try {
+    await sendEmail({
+      to: recipientEmail,
       subject,
-      body: bodyText,
-      status: "queued",
+      html: emailHtml,
+      text: emailText,
     });
-
-    try {
-      await sendEmail({
-        to: recipientEmail,
-        subject,
-        html: emailHtml,
-        text: emailText,
-      });
-
-      await markContractorReportEmailDeliveryNotification({
-        supabase,
-        notificationId: deliveryRow.id,
-        status: "sent",
-      });
-    } catch (error) {
-      const errMessage = error instanceof Error ? error.message : "Unknown transport error";
-
-      await markContractorReportEmailDeliveryNotification({
-        supabase,
-        notificationId: deliveryRow.id,
-        status: "failed",
-        errorDetail: errMessage,
-      });
-
-      throw new Error(`Failed to send contractor report email: ${errMessage}`);
-    }
+  } catch (error) {
+    const errMessage = error instanceof Error ? error.message : "Unknown transport error";
+    throw new Error(`Failed to send contractor report email: ${errMessage}`);
   }
 
   revalidatePath(`/jobs/${jobId}`);
