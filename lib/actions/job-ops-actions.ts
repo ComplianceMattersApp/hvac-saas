@@ -28,7 +28,13 @@ import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/plat
 import { resolveAppUrl, renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
-import { extractFailureReasons, finalRunPass } from "@/lib/portal/resolveContractorIssues";
+import {
+  extractFailureDetails,
+  extractFailureReasons,
+  finalRunPass,
+  type ContractorFailureDetail,
+} from "@/lib/portal/resolveContractorIssues";
+export type { ContractorFailureDetail } from "@/lib/portal/resolveContractorIssues";
 
 const OPS_STATUSES = [
   "need_to_schedule",
@@ -164,6 +170,7 @@ export type ContractorReportPreview = {
   contractor_name: string | null;
   service_date_text: string;
   reasons: string[];
+  failure_details: ContractorFailureDetail[];
   next_step: string;
   body_text: string;
   contractor_failure_summary_v1: ContractorFailureSummaryV1;
@@ -236,19 +243,28 @@ function buildReportBody(args: {
   title: string;
   locationText: string;
   reasons: string[];
+  failureDetails?: ContractorFailureDetail[];
   nextStep: string;
   contractorSummary?: string | null;
   contractorNote?: string | null;
 }) {
-  const reasonLabel = args.reasons.length === 1 ? "Reason" : "Reasons";
-  const reasonsBlock = args.reasons.map((r) => `- ${r}`).join("\n");
   const summary = String(args.contractorSummary ?? "").trim();
   const note = String(args.contractorNote ?? "").trim();
+
+  let contentBlock: string;
+  if (args.failureDetails && args.failureDetails.length > 0) {
+    contentBlock = args.failureDetails
+      .map((d) => `${d.headline}\n${d.detail_lines.join("\n")}`)
+      .join("\n\n");
+  } else {
+    const reasonLabel = args.reasons.length === 1 ? "Reason" : "Reasons";
+    contentBlock = `${reasonLabel}:\n${args.reasons.map((r) => `- ${r}`).join("\n")}`;
+  }
 
   const sections = [
     args.title,
     `Location: ${args.locationText}`,
-    `${reasonLabel}:\n${reasonsBlock}`,
+    contentBlock,
     `Next Step:\n${args.nextStep}`,
   ];
 
@@ -408,7 +424,7 @@ async function resolveContractorReportForJob(params: {
   if (opsStatus === "failed") {
     const { data: runs, error: runsErr } = await supabase
       .from("ecc_test_runs")
-      .select("created_at, computed, computed_pass, override_pass, is_completed")
+      .select("created_at, test_type, computed, computed_pass, override_pass, is_completed")
       .eq("job_id", jobId)
       .eq("is_completed", true)
       .order("created_at", { ascending: false })
@@ -416,12 +432,20 @@ async function resolveContractorReportForJob(params: {
 
     if (runsErr) throw new Error(runsErr.message);
 
-    const failedRun = (runs ?? []).find((r: any) => finalRunPass(r) === false) ?? null;
-    const extracted = failedRun ? extractFailureReasons(failedRun) : [];
-    const reasons =
-      extracted.length > 0
-        ? extracted
+    const failedRuns = (runs ?? []).filter((r: any) => finalRunPass(r) === false);
+    const extractedReasons: string[] = failedRuns.flatMap((run: any) =>
+      extractFailureReasons(run)
+        .map((reason) => String(reason).trim())
+        .filter(Boolean),
+    );
+    const reasons: string[] =
+      extractedReasons.length > 0
+        ? Array.from(new Set(extractedReasons))
         : ["Test failed. Please review and correct."];
+    const failureDetails: ContractorFailureDetail[] = failedRuns.flatMap((run: any) =>
+      extractFailureDetails(run),
+    );
+    const latestFailedRun = failedRuns[0] ?? null;
 
     const nextStep = "Correct the issue and submit your response in the contractor portal.";
     const title = "FAILED TEST";
@@ -439,14 +463,16 @@ async function resolveContractorReportForJob(params: {
       location_text: locationText,
       customer_name: customerName,
       contractor_name: contractorName,
-      service_date_text: formatServiceDateText(job, failedRun?.created_at ?? null),
+      service_date_text: formatServiceDateText(job, latestFailedRun?.created_at ?? null),
       reasons,
+      failure_details: failureDetails,
       next_step: nextStep,
       contractor_failure_summary_v1: summary,
       body_text: buildReportBody({
         title,
         locationText,
         reasons,
+        failureDetails,
         nextStep,
         contractorSummary: summary.contractor_safe_summary,
       }),
@@ -477,6 +503,7 @@ async function resolveContractorReportForJob(params: {
     contractor_name: contractorName,
     service_date_text: formatServiceDateText(job),
     reasons,
+    failure_details: [],
     next_step: nextStep,
     contractor_failure_summary_v1: summary,
     body_text: buildReportBody({
@@ -520,6 +547,7 @@ export async function generateContractorReportPreview(input: {
     contractor_name: report.contractor_name,
     service_date_text: report.service_date_text,
     reasons: report.reasons,
+    failure_details: report.failure_details,
     next_step: report.next_step,
     contractor_failure_summary_v1: report.contractor_failure_summary_v1,
     body_text: report.body_text,
@@ -572,6 +600,7 @@ export async function sendContractorReport(input: {
     title: report.title,
     locationText: report.location_text,
     reasons: report.reasons,
+    failureDetails: report.failure_details,
     nextStep: report.next_step,
     contractorSummary: contractorFailureSummary.contractor_safe_summary,
     contractorNote,

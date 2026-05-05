@@ -5,6 +5,9 @@ const requireInternalUserMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const loadScopedInternalJobForMutationMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const extractFailureReasonsMock = vi.fn();
+const finalRunPassMock = vi.fn();
+const extractFailureDetailsMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -64,12 +67,26 @@ vi.mock("@/lib/actions/job-event-meta", () => ({
 }));
 
 vi.mock("@/lib/portal/resolveContractorIssues", () => ({
-  extractFailureReasons: vi.fn(() => ["Test failure reason"]),
-  finalRunPass: vi.fn(() => true),
+  extractFailureReasons: (...args: unknown[]) => extractFailureReasonsMock(...args),
+  finalRunPass: (...args: unknown[]) => finalRunPassMock(...args),
+  extractFailureDetails: (...args: unknown[]) => extractFailureDetailsMock(...args),
 }));
 
-function makeContractorReportFixture() {
+function makeContractorReportFixture(options?: {
+  eccRuns?: Array<Record<string, unknown>>;
+}) {
   const writes: Array<{ table: string; op: string }> = [];
+  const insertedJobEvents: any[] = [];
+  const eccRuns = options?.eccRuns ?? [
+    {
+      created_at: "2026-04-20T10:00:00Z",
+      test_type: "airflow",
+      computed: { required_total_cfm: 900, measured_total_cfm: 840, failures: [], warnings: [] },
+      computed_pass: false,
+      override_pass: null,
+      is_completed: true,
+    },
+  ];
 
   const supabase = {
     auth: {
@@ -112,8 +129,9 @@ function makeContractorReportFixture() {
 
       if (table === "job_events") {
         return {
-          insert: vi.fn(() => {
+          insert: vi.fn((payload: any) => {
             writes.push({ table, op: "insert" });
+            insertedJobEvents.push(payload);
             return {
               select: vi.fn(() => ({
                 single: vi.fn(async () => ({
@@ -148,15 +166,7 @@ function makeContractorReportFixture() {
               eq: vi.fn(() => ({
                 order: vi.fn(() => ({
                   limit: vi.fn(async () => ({
-                    data: [
-                      {
-                        created_at: "2026-04-20T10:00:00Z",
-                        computed: true,
-                        computed_pass: false,
-                        override_pass: null,
-                        is_completed: true,
-                      },
-                    ],
+                    data: eccRuns,
                     error: null,
                   })),
                 })),
@@ -170,7 +180,7 @@ function makeContractorReportFixture() {
     }),
   };
 
-  return { supabase, writes };
+  return { supabase, writes, insertedJobEvents };
 }
 
 describe("contractor report entitlement hardening", () => {
@@ -196,6 +206,16 @@ describe("contractor report entitlement hardening", () => {
       authorized: true,
       reason: "allowed_active",
     });
+
+    extractFailureReasonsMock.mockImplementation((run: any) =>
+      Array.isArray(run?.__reasons) ? run.__reasons : ["Test failure reason"],
+    );
+    finalRunPassMock.mockImplementation((run: any) =>
+      typeof run?.__pass === "boolean" ? run.__pass : true,
+    );
+    extractFailureDetailsMock.mockImplementation((run: any) =>
+      Array.isArray(run?.__details) ? run.__details : [],
+    );
   });
 
   describe("generateContractorReportPreview", () => {
@@ -422,6 +442,268 @@ describe("contractor report entitlement hardening", () => {
 
       expect(writes).toHaveLength(0);
       expect(revalidatePathMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("failure_details enrichment", () => {
+    it("airflow failure detail includes baseline, measured, difference, percent below", async () => {
+      const airflowDetail = {
+        headline: "Airflow failed",
+        detail_lines: [
+          "Required minimum: 900 CFM",
+          "Measured: 840 CFM",
+          "Difference: 60 CFM below required (6.7% below target)",
+        ],
+      };
+      const { supabase } = makeContractorReportFixture({
+        eccRuns: [
+          {
+            created_at: "2026-04-20T10:00:00Z",
+            test_type: "airflow",
+            computed: { required_total_cfm: 900, measured_total_cfm: 840, failures: [], warnings: [] },
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Airflow below required (900 CFM)"],
+            __details: [airflowDetail],
+          },
+        ],
+      });
+      createClientMock.mockResolvedValue(supabase);
+
+      const { generateContractorReportPreview } = await import("@/lib/actions/job-ops-actions");
+
+      const preview = await generateContractorReportPreview({ jobId: "job-1" });
+
+      expect(preview.failure_details).toHaveLength(1);
+      expect(preview.failure_details[0].headline).toBe("Airflow failed");
+      expect(preview.failure_details[0].detail_lines).toContain("Required minimum: 900 CFM");
+      expect(preview.failure_details[0].detail_lines).toContain("Measured: 840 CFM");
+      expect(preview.failure_details[0].detail_lines[2]).toMatch(/60 CFM below required/);
+    });
+
+    it("duct leakage failure detail includes max, measured, actual leakage percent, difference", async () => {
+      const ductDetail = {
+        headline: "Duct leakage failed",
+        detail_lines: [
+          "Allowed maximum: 120 CFM (10.0%)",
+          "Measured: 405 CFM",
+          "Actual leakage: 33.8%",
+          "Difference: 285 CFM over limit, 23.8 percentage points above the 10.0% standard",
+        ],
+      };
+      const { supabase } = makeContractorReportFixture({
+        eccRuns: [
+          {
+            created_at: "2026-04-20T10:00:00Z",
+            test_type: "duct_leakage",
+            computed: { max_leakage_cfm: 120, measured_duct_leakage_cfm: 405, failures: [], warnings: [] },
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Duct leakage above max (120 CFM)"],
+            __details: [ductDetail],
+          },
+        ],
+      });
+      createClientMock.mockResolvedValue(supabase);
+
+      const { generateContractorReportPreview } = await import("@/lib/actions/job-ops-actions");
+
+      const preview = await generateContractorReportPreview({ jobId: "job-1" });
+
+      expect(preview.failure_details).toHaveLength(1);
+      expect(preview.failure_details[0].headline).toBe("Duct leakage failed");
+      expect(preview.failure_details[0].detail_lines[0]).toMatch(/120 CFM/);
+      expect(preview.failure_details[0].detail_lines[1]).toMatch(/405 CFM/);
+    });
+
+    it("airflow + duct leakage both appear in failure_details", async () => {
+      const { supabase } = makeContractorReportFixture({
+        eccRuns: [
+          {
+            created_at: "2026-04-20T10:00:00Z",
+            test_type: "airflow",
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Airflow below required (900 CFM)"],
+            __details: [{ headline: "Airflow failed", detail_lines: ["Required minimum: 900 CFM", "Measured: 840 CFM", "Difference: 60 CFM below required (6.7% below target)"] }],
+          },
+          {
+            created_at: "2026-04-19T10:00:00Z",
+            test_type: "duct_leakage",
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Duct leakage above max (120 CFM)"],
+            __details: [{ headline: "Duct leakage failed", detail_lines: ["Allowed maximum: 120 CFM (10.0%)", "Measured: 405 CFM"] }],
+          },
+        ],
+      });
+      createClientMock.mockResolvedValue(supabase);
+
+      const { generateContractorReportPreview } = await import("@/lib/actions/job-ops-actions");
+
+      const preview = await generateContractorReportPreview({ jobId: "job-1" });
+
+      const headlines = preview.failure_details.map((d) => d.headline);
+      expect(headlines).toContain("Airflow failed");
+      expect(headlines).toContain("Duct leakage failed");
+      expect(preview.reasons).toHaveLength(2);
+    });
+
+    it("refrigerant subcool failure detail includes target, range, measured, difference", async () => {
+      const subcoolDetail = {
+        headline: "Refrigerant charge failed – Subcooling",
+        detail_lines: [
+          "Target subcooling: 10.0°F",
+          "Allowed range: ±2.0°F",
+          "Measured: 15.0°F",
+          "Difference: 3.0°F outside allowed range",
+        ],
+      };
+      const { supabase } = makeContractorReportFixture({
+        eccRuns: [
+          {
+            created_at: "2026-04-20T10:00:00Z",
+            test_type: "refrigerant_charge",
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Subcool not within ±2F of target"],
+            __details: [subcoolDetail],
+          },
+        ],
+      });
+      createClientMock.mockResolvedValue(supabase);
+
+      const { generateContractorReportPreview } = await import("@/lib/actions/job-ops-actions");
+
+      const preview = await generateContractorReportPreview({ jobId: "job-1" });
+
+      expect(preview.failure_details[0].headline).toBe("Refrigerant charge failed – Subcooling");
+      expect(preview.failure_details[0].detail_lines).toContain("Target subcooling: 10.0°F");
+      expect(preview.failure_details[0].detail_lines).toContain("Allowed range: ±2.0°F");
+    });
+
+    it("refrigerant superheat failure detail includes limit, measured, difference", async () => {
+      const superheatDetail = {
+        headline: "Refrigerant charge failed – Superheat",
+        detail_lines: [
+          "Maximum allowed superheat: 25.0°F",
+          "Measured: 30.0°F",
+          "Difference: 5.0°F over limit",
+        ],
+      };
+      const { supabase } = makeContractorReportFixture({
+        eccRuns: [
+          {
+            created_at: "2026-04-20T10:00:00Z",
+            test_type: "refrigerant_charge",
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Superheat >= 25F"],
+            __details: [superheatDetail],
+          },
+        ],
+      });
+      createClientMock.mockResolvedValue(supabase);
+
+      const { generateContractorReportPreview } = await import("@/lib/actions/job-ops-actions");
+
+      const preview = await generateContractorReportPreview({ jobId: "job-1" });
+
+      expect(preview.failure_details[0].headline).toBe("Refrigerant charge failed – Superheat");
+      expect(preview.failure_details[0].detail_lines[0]).toMatch(/25/);
+    });
+
+    it("pass override / weather exception run contributes no failure_details", async () => {
+      const { supabase } = makeContractorReportFixture({
+        eccRuns: [
+          {
+            created_at: "2026-04-20T10:00:00Z",
+            test_type: "airflow",
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Airflow below required (900 CFM)"],
+            __details: [{ headline: "Airflow failed", detail_lines: ["Required minimum: 900 CFM"] }],
+          },
+          {
+            created_at: "2026-04-19T10:00:00Z",
+            test_type: "refrigerant_charge",
+            computed_pass: false,
+            override_pass: true,
+            is_completed: true,
+            __pass: true,
+            __reasons: ["Weather exception"],
+            __details: [{ headline: "Refrigerant charge failed – Subcooling", detail_lines: ["Should not appear"] }],
+          },
+        ],
+      });
+      createClientMock.mockResolvedValue(supabase);
+
+      const { generateContractorReportPreview } = await import("@/lib/actions/job-ops-actions");
+
+      const preview = await generateContractorReportPreview({ jobId: "job-1" });
+
+      const headlines = preview.failure_details.map((d) => d.headline);
+      expect(headlines).not.toContain("Refrigerant charge failed – Subcooling");
+      expect(headlines).toContain("Airflow failed");
+      expect(preview.reasons).not.toContain("Weather exception");
+    });
+
+    it("preview and send share the same failure_details via the resolver", async () => {
+      const fixture = makeContractorReportFixture({
+        eccRuns: [
+          {
+            created_at: "2026-04-20T10:00:00Z",
+            test_type: "airflow",
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Airflow below required (900 CFM)"],
+            __details: [{ headline: "Airflow failed", detail_lines: ["Required minimum: 900 CFM", "Measured: 840 CFM"] }],
+          },
+          {
+            created_at: "2026-04-19T10:00:00Z",
+            test_type: "duct_leakage",
+            computed_pass: false,
+            override_pass: null,
+            is_completed: true,
+            __pass: false,
+            __reasons: ["Duct leakage above max (120 CFM)"],
+            __details: [{ headline: "Duct leakage failed", detail_lines: ["Allowed maximum: 120 CFM (10.0%)"] }],
+          },
+        ],
+      });
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { generateContractorReportPreview, sendContractorReport } = await import(
+        "@/lib/actions/job-ops-actions"
+      );
+
+      const preview = await generateContractorReportPreview({ jobId: "job-1" });
+      await sendContractorReport({ jobId: "job-1" });
+
+      const sentEvent = fixture.insertedJobEvents.find(
+        (payload) => payload?.event_type === "contractor_report_sent",
+      );
+
+      expect(preview.failure_details).toHaveLength(2);
+      expect(sentEvent?.meta?.reasons).toEqual(preview.reasons);
+      expect(sentEvent?.meta?.body_text).toContain("Airflow failed");
+      expect(sentEvent?.meta?.body_text).toContain("Duct leakage failed");
     });
   });
 });

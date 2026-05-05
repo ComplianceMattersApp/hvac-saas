@@ -5,6 +5,7 @@ import {
   generateContractorReportPreview,
   sendContractorReport,
   type ContractorReportPreview,
+  type ContractorFailureDetail,
 } from "@/lib/actions/job-ops-actions";
 import ActionFeedback from "@/components/ui/ActionFeedback";
 
@@ -158,11 +159,26 @@ export default function ContractorReportPanel({
 
             <div className="mt-2">
               <div className="font-medium">{summaryLabels.explanationLabel}</div>
-              <ul className="list-disc pl-5">
-                {preview.reasons.map((reason, idx) => (
-                  <li key={`${reason}-${idx}`}>{reason}</li>
-                ))}
-              </ul>
+              {preview.failure_details && preview.failure_details.length > 0 ? (
+                <div className="mt-1 space-y-2.5">
+                  {preview.failure_details.map((detail: ContractorFailureDetail, idx: number) => (
+                    <div key={idx}>
+                      <div className="text-sm font-semibold text-slate-800">{detail.headline}</div>
+                      <ul className="mt-0.5 list-none space-y-0.5 pl-2">
+                        {detail.detail_lines.map((line: string, lineIdx: number) => (
+                          <li key={lineIdx} className="text-sm text-slate-700">{line}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <ul className="list-disc pl-5">
+                  {preview.reasons.map((reason, idx) => (
+                    <li key={`${reason}-${idx}`}>{reason}</li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div className="mt-2"><span className="font-medium">Next Step:</span> {preview.next_step}</div>
