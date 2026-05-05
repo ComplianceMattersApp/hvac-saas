@@ -376,6 +376,10 @@ function buildContractorReportEmailHtml(args: {
 
   return renderSystemEmailLayout({
     title: "ECC Test Report",
+    centerHeader: true,
+    logoWidthPx: 110,
+    logoMarginBottomPx: 10,
+    titleMarginBottomPx: 10,
     bodyHtml: `
       <p style="margin: 0 0 10px 0;"><strong>Status:</strong> Issues identified</p>
       <p style="margin: 0 0 12px 0; font-size: 13px; color: #475569;">${escapeHtml(args.title)}</p>

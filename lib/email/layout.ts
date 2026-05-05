@@ -19,16 +19,34 @@ function resolveLogoUrl() {
   return `${appUrl}/cm-logo.png`;
 }
 
-export function renderSystemEmailLayout(args: { title?: string | null; bodyHtml: string }) {
+export function renderSystemEmailLayout(args: {
+  title?: string | null;
+  bodyHtml: string;
+  logoWidthPx?: number;
+  centerHeader?: boolean;
+  logoMarginBottomPx?: number;
+  titleMarginBottomPx?: number;
+}) {
   const title = String(args.title ?? "").trim();
   const logoUrl = resolveLogoUrl();
+  const logoWidthPx = Number.isFinite(Number(args.logoWidthPx))
+    ? Math.max(48, Math.min(260, Number(args.logoWidthPx)))
+    : 220;
+  const centerHeader = Boolean(args.centerHeader);
+  const logoMarginBottomPx = Number.isFinite(Number(args.logoMarginBottomPx))
+    ? Math.max(0, Math.min(40, Number(args.logoMarginBottomPx)))
+    : 16;
+  const titleMarginBottomPx = Number.isFinite(Number(args.titleMarginBottomPx))
+    ? Math.max(0, Math.min(40, Number(args.titleMarginBottomPx)))
+    : 12;
+  const headerAlign = centerHeader ? "center" : "left";
 
   const logoBlock = logoUrl
-    ? `<div style="margin-bottom: 16px;"><img src="${escapeHtml(logoUrl)}" alt="Compliance Matters logo" width="220" height="220" style="width: 220px; max-width: 100%; height: auto; display: block;" /></div>`
+    ? `<div style="margin-bottom: ${logoMarginBottomPx}px; text-align: ${headerAlign};"><img src="${escapeHtml(logoUrl)}" alt="Compliance Matters logo" width="${logoWidthPx}" height="${logoWidthPx}" style="width: ${logoWidthPx}px; max-width: 100%; height: auto; display: inline-block;" /></div>`
     : "";
 
   const titleBlock = title
-    ? `<h2 style="margin: 0 0 12px 0; font-size: 20px; line-height: 1.3; color: #111827;">${escapeHtml(title)}</h2>`
+    ? `<h2 style="margin: 0 0 ${titleMarginBottomPx}px 0; font-size: 20px; line-height: 1.3; color: #111827; text-align: ${headerAlign};">${escapeHtml(title)}</h2>`
     : "";
 
   return `
