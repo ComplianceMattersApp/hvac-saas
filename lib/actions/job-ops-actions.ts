@@ -176,6 +176,7 @@ export type ContractorReportPreview = {
   location_text: string;
   customer_name: string;
   contractor_name: string | null;
+  default_recipient_email: string | null;
   service_date_text: string;
   reasons: string[];
   failure_details: ContractorFailureDetail[];
@@ -510,7 +511,7 @@ async function resolveContractorReportForJob(params: {
       city,
       job_address,
       locations:location_id (address_line1, city, state, zip),
-      contractors:contractor_id (name)
+      contractors:contractor_id (name, email)
       `
     )
     .eq("id", jobId)
@@ -538,6 +539,8 @@ async function resolveContractorReportForJob(params: {
 
   const contractorName =
     String((job as any)?.contractors?.name ?? "").trim() || null;
+  const defaultRecipientEmail =
+    String((job as any)?.contractors?.email ?? "").trim().toLowerCase() || null;
 
   const locationText = formatLocationText(job);
 
@@ -583,6 +586,7 @@ async function resolveContractorReportForJob(params: {
       location_text: locationText,
       customer_name: customerName,
       contractor_name: contractorName,
+      default_recipient_email: defaultRecipientEmail,
       service_date_text: formatServiceDateText(job, latestFailedRun?.created_at ?? null),
       reasons,
       failure_details: failureDetails,
@@ -621,6 +625,7 @@ async function resolveContractorReportForJob(params: {
     location_text: locationText,
     customer_name: customerName,
     contractor_name: contractorName,
+    default_recipient_email: defaultRecipientEmail,
     service_date_text: formatServiceDateText(job),
     reasons,
     failure_details: [],
@@ -665,6 +670,7 @@ export async function generateContractorReportPreview(input: {
     location_text: report.location_text,
     customer_name: report.customer_name,
     contractor_name: report.contractor_name,
+    default_recipient_email: report.default_recipient_email,
     service_date_text: report.service_date_text,
     reasons: report.reasons,
     failure_details: report.failure_details,
@@ -676,6 +682,7 @@ export async function generateContractorReportPreview(input: {
 
 export async function sendContractorReport(input: {
   jobId: string;
+  recipientEmail?: string | null;
   contractorSummary?: string | null;
   contractorNote?: string | null;
 }): Promise<{ ok: true; alreadySent?: boolean }> {
@@ -708,6 +715,22 @@ export async function sendContractorReport(input: {
 
   const contractorSummary = sanitizeContractorSummary(input.contractorSummary);
   const contractorNote = sanitizeContractorNote(input.contractorNote);
+  const defaultRecipientEmail = String((job as any)?.contractors?.email ?? "").trim().toLowerCase();
+  const submittedRecipientEmail = String(input.recipientEmail ?? "").trim().toLowerCase();
+  const recipientEmail = submittedRecipientEmail || defaultRecipientEmail;
+
+  if (!recipientEmail) {
+    throw new Error("Cannot send contractor report email: recipient email is required.");
+  }
+
+  const isValidRecipientEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail);
+  if (!isValidRecipientEmail) {
+    throw new Error("Cannot send contractor report email: recipient email is invalid.");
+  }
+
+  const recipientOverridden =
+    submittedRecipientEmail.length > 0 && submittedRecipientEmail !== defaultRecipientEmail;
+
   const sentAtIso = new Date().toISOString();
   const contractorFailureSummary = buildContractorFailureSummaryV1({
     reportKind: report.report_kind,
@@ -743,6 +766,9 @@ export async function sendContractorReport(input: {
         customer_name: report.customer_name,
         location_text: report.location_text,
         contractor_name: report.contractor_name,
+        recipient_email: recipientEmail,
+        default_recipient_email: defaultRecipientEmail || null,
+        recipient_overridden: recipientOverridden,
         service_date_text: report.service_date_text,
         reasons: report.reasons,
         failure_details: report.failure_details,
@@ -767,7 +793,6 @@ export async function sendContractorReport(input: {
     actorUserId: user.id,
   });
 
-  const contractorEmail = String((job as any)?.contractors?.email ?? "").trim().toLowerCase();
   const accountOwnerUserId = String((job as any)?.contractors?.owner_user_id ?? "").trim();
   const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
     supabase,
@@ -781,24 +806,7 @@ export async function sendContractorReport(input: {
   const subjectContext = jobAddress !== "Location not available" ? jobAddress : customerName;
   const subject = `Action Requested: ECC Test Report for ${subjectContext}`;
 
-  if (!contractorEmail) {
-    await insertContractorReportEmailDeliveryNotification({
-      supabase,
-      jobId,
-      contractorId: String(job.contractor_id ?? "").trim() || null,
-      recipientEmail: null,
-      eventId,
-      dedupeKey: null,
-      subject,
-      body: "Contractor report email was not sent because contractor email is missing.",
-      status: "failed",
-      errorDetail: "missing_contractor_email",
-    });
-
-    throw new Error("Cannot send contractor report email: contractor email is missing.");
-  }
-
-  const dedupeKey = `email:contractor_report:${eventId}:${contractorEmail}`;
+  const dedupeKey = `email:contractor_report:${eventId}:${recipientEmail}`;
   const existingDelivery = await findExistingContractorReportEmailDelivery({
     supabase,
     dedupeKey,
@@ -844,7 +852,7 @@ export async function sendContractorReport(input: {
       supabase,
       jobId,
       contractorId: String(job.contractor_id ?? "").trim() || null,
-      recipientEmail: contractorEmail,
+      recipientEmail,
       eventId,
       dedupeKey,
       subject,
@@ -854,7 +862,7 @@ export async function sendContractorReport(input: {
 
     try {
       await sendEmail({
-        to: contractorEmail,
+        to: recipientEmail,
         subject,
         html: emailHtml,
         text: emailText,

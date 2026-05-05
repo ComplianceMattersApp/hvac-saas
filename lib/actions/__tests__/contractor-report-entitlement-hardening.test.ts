@@ -77,6 +77,7 @@ vi.mock("@/lib/portal/resolveContractorIssues", () => ({
 
 function makeContractorReportFixture(options?: {
   eccRuns?: Array<Record<string, unknown>>;
+  contractorEmail?: string | null;
 }) {
   const writes: Array<{ table: string; op: string }> = [];
   const insertedJobEvents: any[] = [];
@@ -118,7 +119,7 @@ function makeContractorReportFixture(options?: {
                   customer_first_name: "Test",
                   customer_last_name: "Customer",
                   contractors: {
-                    email: "contractor@test.com",
+                    email: options?.contractorEmail ?? "contractor@test.com",
                     owner_user_id: "owner-1",
                     name: "Test Contractor",
                   },
@@ -238,6 +239,7 @@ describe("contractor report entitlement hardening", () => {
       );
       expect(preview).toBeDefined();
       expect(preview.title).toBeDefined();
+      expect(preview.default_recipient_email).toBe("contractor@test.com");
     });
 
     it("allows valid trial preview generation", async () => {
@@ -472,10 +474,14 @@ describe("contractor report entitlement hardening", () => {
       expect(sentEvent?.meta?.reasons).toEqual(preview.reasons);
       expect(sentEvent?.meta?.report_render_version).toBe("contractor_failure_report_v2");
       expect(sentEvent?.meta?.failure_details).toEqual([]);
+      expect(sentEvent?.meta?.recipient_email).toBe("contractor@test.com");
+      expect(sentEvent?.meta?.default_recipient_email).toBe("contractor@test.com");
+      expect(sentEvent?.meta?.recipient_overridden).toBe(false);
       expect(sentEvent?.meta?.reasons).not.toContain("Refrigerant weather exception");
 
       expect(sendEmailMock).toHaveBeenCalledTimes(1);
       const emailArgs = sendEmailMock.mock.calls[0]?.[0];
+      expect(emailArgs?.to).toBe("contractor@test.com");
       expect(emailArgs?.subject).toContain("Action Requested: ECC Test Report for");
       expect(emailArgs?.html).toContain("ECC Test Report");
       expect(emailArgs?.html).toContain("Open Contractor Portal");
@@ -586,6 +592,78 @@ describe("contractor report entitlement hardening", () => {
 
       expect(writes).toHaveLength(0);
       expect(revalidatePathMock).not.toHaveBeenCalled();
+    });
+
+    it("uses submitted recipient override when provided", async () => {
+      const fixture = makeContractorReportFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { sendContractorReport } = await import("@/lib/actions/job-ops-actions");
+
+      await sendContractorReport({
+        jobId: "job-1",
+        recipientEmail: "alt-contact@test.com",
+      });
+
+      expect(sendEmailMock).toHaveBeenCalledTimes(1);
+      const emailArgs = sendEmailMock.mock.calls[0]?.[0];
+      expect(emailArgs?.to).toBe("alt-contact@test.com");
+
+      const sentEvent = fixture.insertedJobEvents.find(
+        (payload) => payload?.event_type === "contractor_report_sent",
+      );
+      expect(sentEvent?.meta?.recipient_email).toBe("alt-contact@test.com");
+      expect(sentEvent?.meta?.default_recipient_email).toBe("contractor@test.com");
+      expect(sentEvent?.meta?.recipient_overridden).toBe(true);
+    });
+
+    it("uses default recipient when recipient is unchanged or omitted", async () => {
+      const fixture = makeContractorReportFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { sendContractorReport } = await import("@/lib/actions/job-ops-actions");
+
+      await sendContractorReport({
+        jobId: "job-1",
+      });
+
+      expect(sendEmailMock).toHaveBeenCalledTimes(1);
+      const emailArgs = sendEmailMock.mock.calls[0]?.[0];
+      expect(emailArgs?.to).toBe("contractor@test.com");
+    });
+
+    it("rejects invalid recipient email before sendEmail is called", async () => {
+      const fixture = makeContractorReportFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { sendContractorReport } = await import("@/lib/actions/job-ops-actions");
+
+      await expect(
+        sendContractorReport({
+          jobId: "job-1",
+          recipientEmail: "not-an-email",
+        }),
+      ).rejects.toThrow("Cannot send contractor report email: recipient email is invalid.");
+
+      expect(sendEmailMock).not.toHaveBeenCalled();
+      expect(fixture.writes.filter((w) => w.table === "job_events")).toHaveLength(0);
+    });
+
+    it("rejects blank recipient when no default contractor email exists", async () => {
+      const fixture = makeContractorReportFixture({ contractorEmail: "" });
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { sendContractorReport } = await import("@/lib/actions/job-ops-actions");
+
+      await expect(
+        sendContractorReport({
+          jobId: "job-1",
+          recipientEmail: "   ",
+        }),
+      ).rejects.toThrow("Cannot send contractor report email: recipient email is required.");
+
+      expect(sendEmailMock).not.toHaveBeenCalled();
+      expect(fixture.writes.filter((w) => w.table === "job_events")).toHaveLength(0);
     });
   });
 

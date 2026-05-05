@@ -43,6 +43,7 @@ export default function ContractorReportPanel({
   contractorResponseSubLabel?: string | null;
 }) {
   const [preview, setPreview] = useState<ContractorReportPreview | null>(null);
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [contractorNote, setContractorNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -62,6 +63,7 @@ export default function ContractorReportPanel({
       try {
         const nextPreview = await generateContractorReportPreview({ jobId });
         setPreview(nextPreview);
+        setRecipientEmail(nextPreview.default_recipient_email ?? "");
         setContractorNote("");
         setSent(false);
       } catch (e) {
@@ -85,6 +87,7 @@ export default function ContractorReportPanel({
       try {
         const result = await sendContractorReport({
           jobId,
+          recipientEmail,
           contractorNote,
         });
 
@@ -92,7 +95,12 @@ export default function ContractorReportPanel({
         setSent(true);
       } catch (e) {
         console.error("sendContractorReport failed", e);
-        setError(contractorReportErrorMessage("send"));
+        const msg = e instanceof Error ? String(e.message ?? "").trim() : "";
+        if (msg.toLowerCase().includes("recipient email")) {
+          setError(msg);
+        } else {
+          setError(contractorReportErrorMessage("send"));
+        }
       } finally {
         setLastAction(null);
       }
@@ -219,6 +227,20 @@ export default function ContractorReportPanel({
 
           {/* Additional Note block */}
           <div className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3">
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              Send report to
+            </label>
+            <input
+              type="email"
+              value={recipientEmail}
+              onChange={(e) => setRecipientEmail(e.target.value)}
+              placeholder="contractor@example.com"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            />
+            <p className="mt-1.5 text-xs text-slate-500">
+              Defaults to the contractor email. Edit if this report should go to a different contact.
+            </p>
+
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
               Additional Note to Contractor <span className="normal-case font-normal text-slate-400">(optional)</span>
             </label>
