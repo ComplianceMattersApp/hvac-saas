@@ -786,13 +786,6 @@ export async function sendContractorReport(input: {
   const eventId = String(insertedEvent?.id ?? "").trim();
   if (!eventId) throw new Error("Failed to capture contractor_report_sent event id");
 
-  await insertInternalNotificationForEvent({
-    supabase,
-    jobId,
-    eventType: "contractor_report_sent",
-    actorUserId: user.id,
-  });
-
   const accountOwnerUserId = String((job as any)?.contractors?.owner_user_id ?? "").trim();
   const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
     supabase,

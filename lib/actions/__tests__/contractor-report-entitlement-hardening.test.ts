@@ -9,6 +9,10 @@ const extractFailureReasonsMock = vi.fn();
 const finalRunPassMock = vi.fn();
 const extractFailureDetailsMock = vi.fn();
 const sendEmailMock = vi.fn();
+const findExistingContractorReportEmailDeliveryMock = vi.fn();
+const insertContractorReportEmailDeliveryNotificationMock = vi.fn();
+const insertInternalNotificationForEventMock = vi.fn();
+const markContractorReportEmailDeliveryNotificationMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -39,10 +43,14 @@ vi.mock("@/lib/business/platform-entitlement", () => ({
 }));
 
 vi.mock("@/lib/actions/notification-actions", () => ({
-  findExistingContractorReportEmailDelivery: vi.fn(async () => null),
-  insertContractorReportEmailDeliveryNotification: vi.fn(async () => ({ id: "notif-1" })),
-  insertInternalNotificationForEvent: vi.fn(async () => ({})),
-  markContractorReportEmailDeliveryNotification: vi.fn(async () => ({})),
+  findExistingContractorReportEmailDelivery: (...args: unknown[]) =>
+    findExistingContractorReportEmailDeliveryMock(...args),
+  insertContractorReportEmailDeliveryNotification: (...args: unknown[]) =>
+    insertContractorReportEmailDeliveryNotificationMock(...args),
+  insertInternalNotificationForEvent: (...args: unknown[]) =>
+    insertInternalNotificationForEventMock(...args),
+  markContractorReportEmailDeliveryNotification: (...args: unknown[]) =>
+    markContractorReportEmailDeliveryNotificationMock(...args),
 }));
 
 vi.mock("@/lib/business/internal-business-profile", () => ({
@@ -210,6 +218,11 @@ describe("contractor report entitlement hardening", () => {
       authorized: true,
       reason: "allowed_active",
     });
+
+    findExistingContractorReportEmailDeliveryMock.mockResolvedValue(null);
+    insertContractorReportEmailDeliveryNotificationMock.mockResolvedValue({ id: "notif-1" });
+    insertInternalNotificationForEventMock.mockResolvedValue({});
+    markContractorReportEmailDeliveryNotificationMock.mockResolvedValue({});
 
     extractFailureReasonsMock.mockImplementation((run: any) =>
       Array.isArray(run?.__reasons) ? run.__reasons : ["Test failure reason"],
@@ -419,6 +432,7 @@ describe("contractor report entitlement hardening", () => {
       );
       expect(result.ok).toBe(true);
       expect(writes.some((w) => w.table === "job_events" && w.op === "insert")).toBe(true);
+      expect(insertInternalNotificationForEventMock).not.toHaveBeenCalled();
       expect(revalidatePathMock).toHaveBeenCalled();
     });
 
@@ -478,6 +492,7 @@ describe("contractor report entitlement hardening", () => {
       expect(sentEvent?.meta?.default_recipient_email).toBe("contractor@test.com");
       expect(sentEvent?.meta?.recipient_overridden).toBe(false);
       expect(sentEvent?.meta?.reasons).not.toContain("Refrigerant weather exception");
+      expect(insertInternalNotificationForEventMock).not.toHaveBeenCalled();
 
       expect(sendEmailMock).toHaveBeenCalledTimes(1);
       const emailArgs = sendEmailMock.mock.calls[0]?.[0];
@@ -615,6 +630,7 @@ describe("contractor report entitlement hardening", () => {
       expect(sentEvent?.meta?.recipient_email).toBe("alt-contact@test.com");
       expect(sentEvent?.meta?.default_recipient_email).toBe("contractor@test.com");
       expect(sentEvent?.meta?.recipient_overridden).toBe(true);
+      expect(insertInternalNotificationForEventMock).not.toHaveBeenCalled();
     });
 
     it("uses default recipient when recipient is unchanged or omitted", async () => {
