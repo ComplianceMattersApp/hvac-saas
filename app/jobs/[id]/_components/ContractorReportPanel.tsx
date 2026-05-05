@@ -142,59 +142,93 @@ export default function ContractorReportPanel({
       </div>
 
       {preview ? (
-        <div className="space-y-3">
-          <div className="rounded-xl border border-slate-200/80 bg-slate-50/72 px-3.5 py-3 text-sm">
-            <div className="mb-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Report Type</div>
-              <div className="mt-1 font-medium text-slate-950">{preview.title}</div>
-              <div className="mt-1 text-xs text-slate-500">
-                {preview.reasons.length} reason{preview.reasons.length === 1 ? "" : "s"} • {preview.service_date_text}
+        <div className="space-y-3 text-sm">
+          {/* Meta block */}
+          <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 px-3.5 py-3">
+            <div className="mb-2.5 border-b border-slate-200/70 pb-2.5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Report Type</div>
+              <div className="mt-0.5 font-semibold text-slate-950">{preview.title}</div>
+              <div className="mt-0.5 text-xs text-slate-500">
+                {preview.reasons.length} issue{preview.reasons.length === 1 ? "" : "s"} identified &middot; {preview.service_date_text}
               </div>
             </div>
+            <div className="space-y-0.5 text-slate-700">
+              <div><span className="font-medium text-slate-900">Customer:</span> {preview.customer_name}</div>
+              <div><span className="font-medium text-slate-900">Location:</span> {preview.location_text}</div>
+              <div><span className="font-medium text-slate-900">Contractor:</span> {preview.contractor_name ?? "Not assigned"}</div>
+              <div><span className="font-medium text-slate-900">Service / Test Date:</span> {preview.service_date_text}</div>
+            </div>
+          </div>
 
-            <div><span className="font-medium">Customer:</span> {preview.customer_name}</div>
-            <div><span className="font-medium">Location:</span> {preview.location_text}</div>
-            <div><span className="font-medium">Contractor:</span> {preview.contractor_name ?? "Not assigned"}</div>
-            <div><span className="font-medium">Service/Test Date:</span> {preview.service_date_text}</div>
-
-            <div className="mt-2">
-              <div className="font-medium">{summaryLabels.explanationLabel}</div>
-              {preview.failure_details && preview.failure_details.length > 0 ? (
-                <div className="mt-1 space-y-2.5">
-                  {preview.failure_details.map((detail: ContractorFailureDetail, idx: number) => (
-                    <div key={idx}>
-                      <div className="text-sm font-semibold text-slate-800">{detail.headline}</div>
-                      <ul className="mt-0.5 list-none space-y-0.5 pl-2">
-                        {detail.detail_lines.map((line: string, lineIdx: number) => (
-                          <li key={lineIdx} className="text-sm text-slate-700">{line}</li>
-                        ))}
-                      </ul>
+          {/* What Failed block */}
+          <div className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              {summaryLabels.explanationLabel}
+            </div>
+            {preview.failure_details && preview.failure_details.length > 0 ? (
+              <div className="space-y-2.5">
+                {preview.failure_details.map((detail: ContractorFailureDetail, idx: number) => {
+                  // Last line is typically the "Difference / status" summary line
+                  const metricLines = detail.detail_lines.slice(0, -1);
+                  const summaryLine = detail.detail_lines[detail.detail_lines.length - 1] ?? null;
+                  return (
+                    <div
+                      key={idx}
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5"
+                    >
+                      <div className="mb-1.5 font-semibold text-red-700">{detail.headline}</div>
+                      <div className="space-y-0.5 text-slate-700">
+                        {metricLines.map((line: string, lineIdx: number) => {
+                          const colonIdx = line.indexOf(":");
+                          if (colonIdx > -1) {
+                            const label = line.slice(0, colonIdx).trim();
+                            const value = line.slice(colonIdx + 1).trim();
+                            return (
+                              <div key={lineIdx} className="flex gap-1">
+                                <span className="min-w-[10rem] shrink-0 text-slate-500">{label}:</span>
+                                <span className="font-medium text-slate-900">{value}</span>
+                              </div>
+                            );
+                          }
+                          return <div key={lineIdx}>{line}</div>;
+                        })}
+                      </div>
+                      {summaryLine ? (
+                        <div className="mt-2 border-t border-slate-200 pt-1.5 text-xs font-medium text-red-600">
+                          {summaryLine}
+                        </div>
+                      ) : null}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <ul className="list-disc pl-5">
-                  {preview.reasons.map((reason, idx) => (
-                    <li key={`${reason}-${idx}`}>{reason}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <ul className="list-disc pl-5 text-slate-700">
+                {preview.reasons.map((reason, idx) => (
+                  <li key={`${reason}-${idx}`}>{reason}</li>
+                ))}
+              </ul>
+            )}
+          </div>
 
-            <div className="mt-2"><span className="font-medium">Next Step:</span> {preview.next_step}</div>
+          {/* Next Step block */}
+          <div className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3">
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Next Step</div>
+            <div className="text-slate-700">{preview.next_step}</div>
+          </div>
 
-            <div className="mt-3">
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Additional Note to Contractor (Optional)
-              </label>
-              <textarea
-                value={contractorNote}
-                onChange={(e) => setContractorNote(e.target.value)}
-                rows={3}
-                placeholder="Optional note included in the contractor report"
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"
-              />
-            </div>
+          {/* Additional Note block */}
+          <div className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3">
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              Additional Note to Contractor <span className="normal-case font-normal text-slate-400">(optional)</span>
+            </label>
+            <textarea
+              value={contractorNote}
+              onChange={(e) => setContractorNote(e.target.value)}
+              rows={3}
+              placeholder="Optional note included in the contractor report"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            />
           </div>
         </div>
       ) : (
