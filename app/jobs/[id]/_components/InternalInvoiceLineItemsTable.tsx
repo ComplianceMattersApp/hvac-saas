@@ -309,67 +309,8 @@ export default function InternalInvoiceLineItemsTable({
       ) : null}
 
       <div className="divide-y divide-slate-200/80">
-        <form action={handleAddPricebook} className="bg-white/92 px-5 py-5">
-          <input type="hidden" name="job_id" value={jobId} />
-          <input type="hidden" name="tab" value={tab} />
-
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Secondary Path: Add From Pricebook</div>
-              <div className="mt-1 text-xs leading-5 text-slate-500">
-                Use Pricebook when a billed charge was not already captured as a Work Item. Added rows are draft Invoice Charges you can review before issue. Credits/negative adjustments are deferred.
-              </div>
-            </div>
-          </div>
-
-          {pricebookPickerItems.length > 0 ? (
-            <>
-              <PricebookLineEntryFields
-                items={pricebookPickerItems}
-                selectedItemId={selectedPricebookItemId}
-                onSelectedItemIdChange={setSelectedPricebookItemId}
-                itemFieldName="pricebook_item_id"
-                quantityFieldName="quantity"
-                itemLabel="Pricebook Service / Charge"
-                quantityLabel="Quantity"
-                itemSelectId="invoice_pricebook_item_id"
-                quantityInputId="invoice_pricebook_quantity"
-                labelClassName={workspaceFieldLabelClass}
-                inputClassName={workspaceInputClass}
-                quantityDefaultValue="1.00"
-                gridClassName="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(6.25rem,0.74fr)_auto] md:items-end"
-                actionSlotClassName="md:self-end"
-                actionSlot={
-                  <SubmitButton loadingText="Adding..." className={primaryButtonClass}>
-                    Add Pricebook Item
-                  </SubmitButton>
-                }
-                renderSelectedItem={(selectedPricebookItem) => (
-                  <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      <span>{formatInternalInvoiceItemType(selectedPricebookItem.item_type)}</span>
-                      {selectedPricebookItem.category ? <span>• {selectedPricebookItem.category}</span> : null}
-                      {selectedPricebookItem.unit_label ? <span>• Unit: {selectedPricebookItem.unit_label}</span> : null}
-                    </div>
-                    <div className="mt-2 text-sm font-semibold text-slate-900">
-                      Default Unit Price: {formatCurrencyFromAmount(selectedPricebookItem.default_unit_price)}
-                    </div>
-                    {selectedPricebookItem.default_description ? (
-                      <div className="mt-1 text-sm leading-6 text-slate-600">{selectedPricebookItem.default_description}</div>
-                    ) : null}
-                  </div>
-                )}
-              />
-            </>
-          ) : (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm leading-6 text-amber-900">
-              No active non-credit Pricebook items are available for draft invoice adds yet.
-            </div>
-          )}
-        </form>
-
         {visitScopePickerItems.length > 0 ? (
-          <form action={handleAddVisitScope} className="bg-white/92 px-5 py-5">
+          <form action={handleAddVisitScope} className="bg-sky-50/50 px-5 py-5">
             <input type="hidden" name="job_id" value={jobId} />
             <input type="hidden" name="tab" value={tab} />
             <input type="hidden" name="quantity" value="1.00" />
@@ -378,7 +319,7 @@ export default function InternalInvoiceLineItemsTable({
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">Recommended Path: Build Invoice Charges from Work Items</div>
                 <div className="mt-1 text-xs leading-5 text-slate-500">
-                  Start from the Work Items already captured for this visit. Imported items become draft Invoice Charges you can review and edit before issuing.
+                  Start from the Work Items already captured for this visit. Imported items become draft Invoice Charges for review before issue.
                 </div>
                 <div className="mt-1 text-xs leading-5 text-slate-500">
                   Imported Work Items start as draft Invoice Charges with Qty 1.00 and Unit Price $0.00. Review and edit pricing before issuing.
@@ -445,6 +386,65 @@ export default function InternalInvoiceLineItemsTable({
             </div>
           </form>
         ) : null}
+
+        <form action={handleAddPricebook} className="bg-white/92 px-5 py-5">
+          <input type="hidden" name="job_id" value={jobId} />
+          <input type="hidden" name="tab" value={tab} />
+
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Fallback Path: Add From Pricebook</div>
+              <div className="mt-1 text-xs leading-5 text-slate-500">
+                Use Pricebook only when a billed charge was not already captured as a Work Item. Added rows are draft Invoice Charges for review before issue. Credits and negative adjustments remain deferred.
+              </div>
+            </div>
+          </div>
+
+          {pricebookPickerItems.length > 0 ? (
+            <>
+              <PricebookLineEntryFields
+                items={pricebookPickerItems}
+                selectedItemId={selectedPricebookItemId}
+                onSelectedItemIdChange={setSelectedPricebookItemId}
+                itemFieldName="pricebook_item_id"
+                quantityFieldName="quantity"
+                itemLabel="Pricebook Service / Charge"
+                quantityLabel="Quantity"
+                itemSelectId="invoice_pricebook_item_id"
+                quantityInputId="invoice_pricebook_quantity"
+                labelClassName={workspaceFieldLabelClass}
+                inputClassName={workspaceInputClass}
+                quantityDefaultValue="1.00"
+                gridClassName="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(6.25rem,0.74fr)_auto] md:items-end"
+                actionSlotClassName="md:self-end"
+                actionSlot={
+                  <SubmitButton loadingText="Adding..." className={primaryButtonClass}>
+                    Add Pricebook Item
+                  </SubmitButton>
+                }
+                renderSelectedItem={(selectedPricebookItem) => (
+                  <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      <span>{formatInternalInvoiceItemType(selectedPricebookItem.item_type)}</span>
+                      {selectedPricebookItem.category ? <span>• {selectedPricebookItem.category}</span> : null}
+                      {selectedPricebookItem.unit_label ? <span>• Unit: {selectedPricebookItem.unit_label}</span> : null}
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-900">
+                      Default Unit Price: {formatCurrencyFromAmount(selectedPricebookItem.default_unit_price)}
+                    </div>
+                    {selectedPricebookItem.default_description ? (
+                      <div className="mt-1 text-sm leading-6 text-slate-600">{selectedPricebookItem.default_description}</div>
+                    ) : null}
+                  </div>
+                )}
+              />
+            </>
+          ) : (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm leading-6 text-amber-900">
+              No active non-credit Pricebook items are available for draft invoice adds yet.
+            </div>
+          )}
+        </form>
 
         {lineItems.map((lineItem, index) => {
           const isPrimaryRow = index === 0;
@@ -681,7 +681,7 @@ export default function InternalInvoiceLineItemsTable({
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5">
-              <div className="text-xs leading-5 text-slate-500">Add another invoice charge when the job needs another billed step, material, or work instruction.</div>
+              <div className="text-xs leading-5 text-slate-500">Use a manual charge only for billed exceptions not already covered by Work Items or Pricebook.</div>
               <SubmitButton loadingText="Adding..." className={primaryButtonClass}>
                 + Add Charge
               </SubmitButton>
@@ -692,7 +692,7 @@ export default function InternalInvoiceLineItemsTable({
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white/82 px-4 py-3">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">+ Add Invoice Charge</div>
-                <div className="mt-1 text-xs leading-5 text-slate-500">Open a fresh charge row only when you need it, so the table stays compact in the field.</div>
+                <div className="mt-1 text-xs leading-5 text-slate-500">Open a fresh charge row only for billed exceptions not already covered by Work Items or Pricebook.</div>
               </div>
               <button
                 type="button"
