@@ -57,6 +57,9 @@ export default function InterruptStateFields(props: Props) {
         <option value="on_hold">On Hold</option>
         <option value="waiting">Waiting</option>
       </select>
+      <p className="mt-2 text-xs text-slate-600">
+        Interrupt State captures why work is paused/cannot proceed. It does not replace Work Items / Visit Scope.
+      </p>
 
       {interruptState === "waiting" ? (
         <>

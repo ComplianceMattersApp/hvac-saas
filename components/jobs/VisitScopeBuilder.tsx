@@ -213,6 +213,11 @@ export default function VisitScopeBuilder({
                 ? "Work Items define what belongs to this visit. They can help build an invoice later, but they are not billing records."
                 : "Use when you know companion work, field expectations, or a note worth carrying into dispatch."}
             </div>
+            {jobType === "service" ? (
+              <div className="mt-1 text-xs text-slate-600">
+                Scope first: confirm the work for this visit, then complete closeout and billing.
+              </div>
+            ) : null}
           </div>
           <button
             type="button"

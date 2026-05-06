@@ -2039,6 +2039,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 <div className="mt-2 rounded-lg border border-blue-200/80 bg-blue-50/70 px-3.5 py-3 text-sm leading-6 text-blue-900">
                   This invoice records billed work for this job. Payment entries are tracking-only and do not charge a card.
                 </div>
+                <div className="mt-2 rounded-lg border border-slate-200/80 bg-slate-50/75 px-3.5 py-3 text-sm leading-6 text-slate-700">
+                  Invoice Charges are billed truth. Work Items are operational scope for the visit and are not billing records.
+                </div>
                 {internalInvoice.status === "draft" ? (
                   <>
                       <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Issue Invoice</div>
@@ -2805,7 +2808,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Next Service Action</div>
-          <div className="mt-1 text-sm font-semibold text-slate-900">Track what happens next for this service case.</div>
+          <div className="mt-1 text-sm font-semibold text-slate-900">Continue this service chain when another visit is required.</div>
         </div>
         {serviceCaseVisitCount > 1 ? (
           <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
@@ -2845,7 +2848,10 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             className={workspaceInputClass}
           />
           <p className="text-xs leading-5 text-slate-600">
-            Use this when this problem needs another trip, return visit, part install, callback, or follow-up repair.
+            Next visit continues the same service chain. Work Items remain per-visit and should be reviewed for the new visit.
+          </p>
+          <p className="text-xs leading-5 text-slate-500">
+            No automatic Work Item copy-forward is applied in this action.
           </p>
         </div>
 
@@ -2896,7 +2902,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
 
     <div className="mt-2 text-xs leading-5 text-slate-600">
-      Scope first: confirm the work for this visit, then complete closeout and billing.
+      Start with the Work Items for this visit. Closeout and billing come after the work is ready.
     </div>
 
     {showInternalInvoicingPlaceholder && String(job.ops_status ?? "").toLowerCase() !== "closed" ? (
@@ -4032,6 +4038,12 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 {isInternalUser ? (
   <div id="visit-scope-section" className="mt-6 rounded-2xl border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)]">
     <div className="space-y-3">
+      {job.job_type === "service" ? (
+        <div className="rounded-xl border border-blue-200/80 bg-blue-50/75 px-3.5 py-3 text-sm leading-6 text-blue-900">
+          Start with the Work Items for this visit. Closeout and billing come after the work is ready.
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Items (Visit Scope)</div>
         {job.job_type === "service" ? (
@@ -4365,6 +4377,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-800">
             Waiting
           </div>
+          <div className="mt-2 text-xs leading-5 text-amber-900/90">
+            Waiting State explains why progress is paused. It does not replace Work Items / Visit Scope.
+          </div>
           {activeWaitingState.blockerReason ? (
             <div className="mt-2 text-sm text-amber-900">{activeWaitingState.blockerReason}</div>
           ) : null}
@@ -4413,6 +4428,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   {currentInterruptState ? (
     <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-700">
       <div className="font-semibold text-slate-900">Current Interrupt Detail</div>
+      <div className="mt-1 text-xs leading-5 text-slate-600">
+        This pause reason is operational context only and does not replace Work Items / Visit Scope.
+      </div>
       <div className="mt-1">
         {currentInterruptReasonText
           ? (currentInterruptState === "waiting"
