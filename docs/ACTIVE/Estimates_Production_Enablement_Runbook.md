@@ -20,6 +20,7 @@ This runbook defines how internal-only production Estimates enablement must be e
 - All estimate routes redirect to `/ops?notice=estimates_unavailable` in production.
 - Estimates nav remains hidden in production while `ENABLE_ESTIMATES` is disabled.
 - The sole pre-production code blocker (missing `createEstimateDraft` fail-closed flag check) is now resolved and committed.
+- Estimate Detail Wording + Internal Scaffolding Collapse closeout is complete on the guarded internal baseline and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries.
 
 ### Locked internal-only boundaries for this runbook
 
@@ -30,6 +31,7 @@ The following are explicitly out of scope for this runbook and must not be enabl
 - PDF generation or storage
 - persistent revision storage
 - customer approval or e-signature
+- customer decline or request-change workflow
 - customer portal estimate visibility
 - public estimate links or tokens
 - contractor visibility or authority
