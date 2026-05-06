@@ -98,6 +98,18 @@ P1 closeout note:
   - contractor was asked to resend; a new production contractor submission path succeeded after fix
   - contractor intake architecture/boundaries remain unchanged: proposed intake data only, no contractor scheduling/lifecycle authority, internal finalization ownership retained
   - no payment, Stripe, QBO, support-access, RLS model, or tenant-boundary behavior changed
+- Contractor intake attachment resilience V1 is complete as a resolved follow-up to the missing-state incident:
+  - follow-up issue: contractor intake still failed only when documents/photos were attached
+  - root cause/risk: file bytes were being sent through the initial Next Server Action for contractor `/jobs/new`; large photos/PDFs could exceed the request body parser limit before `createJobFromForm` ran, leaving no durable `contractor_intake_submissions` row
+  - fix shipped in `70d1ee3` (`Harden contractor intake attachments`): initial contractor proposal submit is text-only/durable-first; the proposal row persists before attachment upload; attachments upload afterward through signed-upload/finalize scoped to the saved pending proposal
+  - finalize requires valid signed path shape and verifies the uploaded storage object exists before inserting attachment rows
+  - server-side validation covers file count, size, MIME/type, and extension
+  - attachment DB insert failure attempts storage cleanup
+  - attachment failure never deletes, rolls back, or hides the saved proposal
+  - notification/email side-effect failures remain best-effort and do not erase saved proposals
+  - boundaries remain unchanged: proposed intake data only, no contractor scheduling/lifecycle authority, internal finalization ownership retained, and no canonical customer/location/job creation until internal finalization
+  - no payment, Stripe, QBO, support-access, RLS model, or tenant-boundary behavior changed
+  - validation passed: `npx.cmd tsc --noEmit`; targeted Vitest contractor intake hotfix + attachment resilience tests, 2 files / 10 tests
 - Internal invoice void recovery/replacement behavior is complete:
   - voided internal invoices remain historical
   - voided invoices do not satisfy billed-truth closeout
@@ -139,15 +151,24 @@ Branch workflow update (active discipline):
 ### Launch-readiness performance and responsiveness track (active backlog, current pass closed)
 - The recent speed/responsiveness batch was a necessary quality intervention, not a permanent roadmap reorder.
 - Completed closeout baseline from that intervention:
+  - field action timing instrumentation
+  - job detail render timing instrumentation
   - internal `/jobs/[id]` route decomposition and deferred secondary bodies (attachments, follow-up history, service-chain body, add-assignee form, timeline/shared/internal narrative bodies)
-  - customer-attempt summary read slimming
+  - internal invoice secondary-detail deferral: immediate billing/closeout truth remains first-paint, while full invoice detail/lines/delivery/payment/pricebook panel data streams later
+  - customer-attempt summary deferral (`ab95b8b`): `customerAttemptSummary` is now `0ms` on measured first-paint renders, contact actions remain immediate, no false "0 attempts" display is shown, and Follow-Up History remains authoritative/deferred
+  - timeline summary first-paint softening (`7037ad8`): blocking 200-row `job_events` parent read was removed from first paint; shared/internal notes and timeline header counts/latest-date subtitles use neutral "loads below" copy; deferred timeline/shared/internal note bodies remain authoritative and still read `job_events` after streaming; `ContractorReportPanel` generate/send behavior is unchanged
   - parent read fanout parallelization after scoped boundary and main job load
   - contact responsiveness hardening (deduped calendar revalidation, action-specific pending feedback, no stuck `Recording...`, contact-section context restoration after redirect)
   - env-gated diagnostics remain available (`CONTACT_ATTEMPT_TIMING_DEBUG`, `JOB_DETAIL_TIMING_DEBUG`)
-  - measured paths have shown practical warm improvements (job-detail around ~`1.5-2.0s` and contact-action core around ~`1.1-1.4s` on improved paths), with cold variance still present
+  - measured paths have shown practical warm improvements; latest local `/jobs/[id]` smoke showed steady-state renders commonly around ~`1.45-2.47s`, `timelineSummary` usually around ~`183-384ms` after softening, and `customerAttemptSummary` stayed `0ms`, with cold/backend/Supabase variance still present
 - Performance remains active launch-readiness backlog and should continue as measured, surgical slices across:
   - `/ops`
   - `/jobs/[id]` first load/recomposition
+  - `mainJobRead`/`eccPayloadReads` spike risk
+  - `assignmentDisplaySummary` spike risk
+  - `serviceChainSummary` spike risk
+  - invoice truth/detail split monitoring
+  - broader backend/read variance audit territory
   - lifecycle actions
   - contact actions
   - `/jobs/new`
@@ -157,6 +178,7 @@ Branch workflow update (active discipline):
 - Performance should no longer own the entire roadmap unless a specific speed defect is actively harming usability.
 - Speed guardrails remain locked:
   - do not chase speed by weakening truth boundaries
+  - do not weaken auth/scope/source-of-truth/event/audit/revalidation just to chase speed
   - no optimistic final-state UI without explicit approval
   - do not trim revalidation without dependency mapping
   - do not casually alter invoice/billing/payment paths for speed
@@ -164,7 +186,7 @@ Branch workflow update (active discipline):
 
 ### Resumed pre-launch sequence (post-speed-batch)
 - The planned launch-readiness order is resumed as:
-  1. Performance/responsiveness batch closeout and documentation
+  1. Performance/responsiveness batch closeout and documentation (closed for the current pass)
   2. Support Console production readiness planning
   3. Estimates production readiness planning
   4. Field-ready installable/PWA access readiness
@@ -172,6 +194,16 @@ Branch workflow update (active discipline):
   6. First-owner/operator handoff dry-run
   7. Controlled tester onboarding
 - Tester pressure must not trigger roadmap panic; controlled tester onboarding remains intentionally queued after readiness checkpoints are acceptably complete.
+- Support Console and Estimates production enablement remain parked behind their runbooks.
+- Tenant customer payment execution remains deferred.
+- QBO remains optional downstream/last-last.
+- Resume broader launch-readiness sequencing after this docs closeout.
+
+### Future notifications/signals backlog
+- Future feature: tech dispatch phone notifications.
+- When a tech is assigned/dispatched to a job, the tech should receive a phone notification.
+- Include a later user-facing preference/toggle so techs can turn dispatch notifications on/off.
+- This is not part of the current performance closeout and was not implemented in this thread.
 
 ### Execution discipline and coordination guardrails
 - Preserve truth boundaries while optimizing:

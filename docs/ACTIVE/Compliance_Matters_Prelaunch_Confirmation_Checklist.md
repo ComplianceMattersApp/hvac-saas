@@ -143,9 +143,33 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed contractor resend follow-up was completed and a new production contractor submission/job path succeeded after fix.
 - Confirmed no payment, Stripe, QBO, support-access, RLS model, or tenant-boundary behavior changed.
 
+### 2.3.4.1 Contractor intake attachment resilience closeout (resolved)
+- Follow-up issue after the prior missing-state hotfix: contractor intake still failed only when documents/photos were attached.
+- Confirmed root cause/risk: file bytes were being sent through the initial Next Server Action for contractor `/jobs/new`; large photos/PDFs could exceed the request body parser limit before `createJobFromForm` ran, resulting in no durable `contractor_intake_submissions` row.
+- Confirmed fix shipped in `70d1ee3` (`Harden contractor intake attachments`):
+  - initial contractor proposal submit is now text-only and durable-first
+  - `contractor_intake_submissions` row persists before attachment upload
+  - attachments upload afterward through a separate signed-upload/finalize flow scoped to the saved pending proposal
+  - finalize requires valid signed path shape and verifies uploaded storage object exists before inserting attachment rows
+  - server-side validation includes file count, size, MIME/type, and extension
+  - attachment DB insert failure attempts storage cleanup
+  - attachment failure never deletes, rolls back, or hides the proposal
+  - notification/email side-effect failures remain best-effort and do not erase saved proposals
+- Confirmed boundary remains unchanged:
+  - contractor submissions remain proposed intake data
+  - contractors retain no scheduling/lifecycle authority
+  - internal users retain finalization authority
+  - no canonical customer/location/job creation occurs until internal finalization
+  - no payment, Stripe, QBO, support-access, RLS model, or tenant-boundary behavior changed
+- Validation:
+  - `npx.cmd tsc --noEmit` passed
+  - targeted Vitest passed: contractor intake hotfix + attachment resilience tests, 2 files / 10 tests
+
 ### 2.3.5 Performance/responsiveness closeout (current pass) and active backlog
 - The focused performance/responsiveness intervention batch is complete for the current pass and is now closed for this pass.
 - Completed/current baseline from this pass:
+  - field action timing instrumentation
+  - job detail render timing instrumentation
   - internal `/jobs/[id]` first-paint/recomposition improvements
   - route loading/context preservation improvements
   - deferred secondary section bodies moved out of parent render path:
@@ -154,7 +178,19 @@ If any item here conflicts with the active spine, the spine wins.
     - service-chain detail/history body
     - add-assignee selector/form
     - timeline/shared/internal narrative bodies
-  - customer-attempt summary read was slimmed
+  - internal invoice secondary-detail deferral:
+    - immediate billing/closeout truth remains first-paint
+    - full invoice detail/lines/delivery/payment/pricebook panel data streams later
+  - customer-attempt summary deferral:
+    - `customerAttemptSummary` is now `0ms` on measured first-paint renders
+    - contact actions remain immediate
+    - no false "0 attempts" display is shown
+    - Follow-Up History remains authoritative and deferred
+  - timeline summary softening:
+    - blocking 200-row `job_events` parent read was removed from first paint
+    - shared/internal notes and timeline header counts/latest-date subtitles were replaced with neutral "loads below" copy
+    - `DeferredTimelineBody`, `DeferredSharedNotesBody`, and `DeferredInternalNotesBody` remain authoritative and still read `job_events` after streaming
+    - `ContractorReportPanel` generate/send behavior is unchanged; first-paint contractor response labels were display-softened only
   - internal job-detail parent read fanout was parallelized after scoped boundary and main job load
   - contact-attempt calendar revalidation dedupe completed
   - timing instrumentation remains behind env-gated flags:
@@ -166,18 +202,25 @@ If any item here conflicts with the active spine, the spine wins.
   - event write truth, redirects, revalidation behavior, banner behavior, attempt counts, and `tab=ops` continuity remain preserved
 - Current practical baseline note:
   - earlier severe spikes were reduced significantly
-  - warm job-detail render paths have been observed around roughly `1.5-2.0s` on improved paths
+  - latest local `/jobs/[id]` smoke showed steady-state renders commonly around roughly `1.45-2.47s`
+  - `timelineSummary` usually measured around roughly `183-384ms` after softening
+  - `customerAttemptSummary` stayed `0ms`
   - contact-action core timings have been observed around roughly `1.1-1.4s` on improved paths
-  - cold loads can still be slower
+  - cold/backend/Supabase variance can still cause spikes
 - Performance is not done forever and remains an active launch-readiness backlog:
   - app-wide route speed
   - `/ops` first impression
   - `/jobs/[id]` first load and recomposition
+  - `mainJobRead`/`eccPayloadReads` spike risk
+  - `assignmentDisplaySummary` spike risk
+  - `serviceChainSummary` spike risk
+  - invoice truth/detail split monitoring
   - lifecycle buttons (On the Way / Work in Progress / Complete)
   - contact actions
   - `/jobs/new`
   - calendar
   - reports
+  - broader backend/read variance audit territory
   - reducing full-page recomposition where safe
   - future inline/partial settle patterns where appropriate
 - Performance no longer blocks all roadmap movement by default; next speed work must be measured, surgical, and intentionally queued.
@@ -187,10 +230,11 @@ If any item here conflicts with the active spine, the spine wins.
   - do not trim revalidation without dependency mapping
   - do not casually alter invoice/billing/payment performance paths
   - continue audit -> small slice -> benchmark -> commit -> docs update
+  - do not weaken auth/scope/source-of-truth/event/audit/revalidation just to chase speed
 
 ### 2.3.6 Resumed pre-launch execution order (active)
 - Pre-launch sequence is explicitly resumed in this order:
-  1. Performance/responsiveness batch closeout and documentation
+  1. Performance/responsiveness batch closeout and documentation (closed for the current pass)
   2. Support Console production-readiness planning (controlled, read-only, audited, careful flag-enable planning, no impersonation, no tenant mutation unless explicitly approved later)
   3. Estimates production-readiness planning (internal production-enablement decision only; migration/feature-flag/smoke/rollback plan required) â€” readiness audit complete, production readiness hardening guard committed, internal-only enablement runbook drafted; production enablement requires explicit gate approval per `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`
   4. Field-ready installable/PWA access readiness (web/PWA-style readiness; app-store/native remains deferred)
@@ -198,6 +242,8 @@ If any item here conflicts with the active spine, the spine wins.
   6. First-owner/operator handoff dry-run (owner setup, operator checklist, account readiness, support readiness, launch operations)
   7. Controlled tester onboarding only after the above are acceptably complete
 - Tester remains in the wings intentionally and is not to be treated as a public launch trigger.
+- Support Console and Estimates production enablement remain parked behind their runbooks; tenant customer payment execution remains deferred; QBO remains optional downstream/last-last.
+- Resume broader launch-readiness sequencing after this docs closeout without treating tester pressure as a launch trigger.
 
 ### 2.3.7 Field-ready installable/PWA access readiness V1 (Slice 1 baseline hardening)
 - Completed scope for this slice is web/PWA metadata/installability baseline hardening only (`app/manifest.ts`, `app/layout.tsx`), with no auth/routing/data/server-action/source-of-truth behavior changes.
@@ -744,6 +790,12 @@ Mobile home-screen launch QA checklist (Slice 1):
 ---
 
 ## 4. Deferred but pinned hardening items
+
+### 4.0 Future notification backlog
+- Future feature: tech dispatch phone notifications.
+- When a tech is assigned/dispatched to a job, the tech should receive a phone notification.
+- Include a later user-facing preference/toggle so techs can turn dispatch notifications on/off.
+- This is not part of the current performance closeout and was not implemented in this thread.
 
 ### 4.1 `pg_trgm` in `public`
 - Current advisor warning is acknowledged and intentionally deferred.

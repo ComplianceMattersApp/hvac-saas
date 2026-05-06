@@ -7,6 +7,8 @@ Current Program Status Note (May 2026)
 
 - Performance/responsiveness intervention batch is complete for the current pass and is now treated as closed for this pass.
 - Internal /jobs/[id] responsiveness hardening is complete for the current pass:
+  - field action timing instrumentation shipped
+  - job detail render timing instrumentation shipped
   - route loading/context preservation improvements were shipped
   - secondary sections were deferred from parent render where safe:
     - internal attachments
@@ -14,7 +16,9 @@ Current Program Status Note (May 2026)
     - service-chain detail/history body
     - add-assignee selector/form
     - timeline/shared/internal narrative bodies
-  - customer-attempt summary reads were slimmed
+  - internal invoice secondary-detail deferral shipped; immediate billing/closeout truth remains first-paint, while full invoice detail/lines/delivery/payment/pricebook panel data streams later
+  - customer-attempt summary reads were deferred; measured first-paint `customerAttemptSummary` is now `0ms`, contact actions remain immediate, no false "0 attempts" display is shown, and Follow-Up History remains authoritative after streaming
+  - timeline summary first-paint was softened; the blocking 200-row parent `job_events` read was removed, header counts/latest-date subtitles were replaced with neutral "loads below" copy, and deferred timeline/shared/internal note bodies remain authoritative after streaming
   - parent read fanout was parallelized after scoped boundary and main job load
 - Contact action responsiveness hardening is complete for the current pass:
   - contact-attempt calendar revalidation dedupe shipped
@@ -23,9 +27,9 @@ Current Program Status Note (May 2026)
   - pending feedback is action-specific for contact quick actions
   - No Answer and Sent Text return near the contact section after redirect instead of snapping to the top
   - server-confirmed truth behavior remains unchanged (event writes, redirects, banner, attempt count, `tab=ops` continuity)
-- Practical baseline after this pass has improved materially (warm job-detail paths observed around ~1.5-2.0s and improved contact-action core paths around ~1.1-1.4s on improved runs), while cold-load variance can still be slower.
+- Practical baseline after this pass has improved materially: latest local `/jobs/[id]` smoke showed steady-state renders commonly around ~1.45-2.47s, `timelineSummary` usually around ~183-384ms after softening, and `customerAttemptSummary` stayed `0ms`; cold/backend/Supabase variance can still cause spikes.
 - Performance remains an active launch-readiness backlog and does not own the entire roadmap unless a specific speed issue is actively damaging usability.
-- Planned pre-launch spine order is now resumed; controlled tester onboarding remains intentionally held until readiness work is acceptably complete and supportable.
+- Planned pre-launch spine order is now resumed after this docs closeout; Support Console and Estimates production enablement remain parked behind their runbooks, tenant customer payment execution remains deferred, QBO remains optional downstream/last-last, and controlled tester onboarding remains intentionally held until readiness work is acceptably complete and supportable.
 - Contractor Report current-scope delivery is complete and accepted for current launch scope quality:
   - failed ECC contractor reports aggregate all failed completed ECC runs for the job
   - enriched contractor-actionable failure details are included (baseline, measured value, variance), including corrected duct-leakage percentage logic
@@ -266,6 +270,41 @@ Closeout confirmations:
 - No production data repair was possible for the failed Amberwood row because it never persisted.
 - Contractor was asked to resend; a new production contractor submission was successfully created after fix.
 - No payment, Stripe, QBO, support-access, RLS model, or tenant-boundary behavior changed.
+
+7.7.1.1 Contractor intake attachment resilience closeout (resolved)
+
+Follow-up issue after the missing-state hotfix:
+
+- Contractors could still see intake submission failures only when documents/photos were attached.
+
+Resolved root cause/risk:
+
+- File bytes were being sent through the initial Next Server Action for contractor `/jobs/new`.
+- Large photos/PDFs could exceed the request body parser limit before `createJobFromForm` ran, which meant no durable `contractor_intake_submissions` row existed yet.
+
+Fix shipped in commit `70d1ee3` (`Harden contractor intake attachments`):
+
+- Initial contractor proposal submit is now text-only and durable-first.
+- `contractor_intake_submissions` persists before attachment upload.
+- Attachments upload afterward through a separate signed-upload/finalize flow scoped to the saved pending proposal.
+- Finalize requires valid signed path shape and verifies the uploaded storage object exists before inserting attachment rows.
+- Server-side validation covers file count, file size, MIME/type, and extension.
+- Attachment DB insert failure attempts storage cleanup.
+- Attachment failure never deletes, rolls back, or hides the saved proposal.
+- Notification/email side-effect failures remain best-effort and do not erase saved proposals.
+
+Boundaries unchanged:
+
+- Contractor submissions remain proposed intake data.
+- Contractors do not gain scheduling/lifecycle authority.
+- Internal users retain finalization authority.
+- No canonical customer/location/job creation occurs until internal finalization.
+- No payment, Stripe, QBO, support-access, RLS model, or tenant-boundary behavior changed.
+
+Validation:
+
+- `npx.cmd tsc --noEmit` passed.
+- Targeted Vitest passed for contractor intake hotfix + attachment resilience tests: 2 files / 10 tests.
 
 7.7.2 Dispatch calendar block edit/delete hardening and production RLS object-drift closeout (resolved)
 
@@ -821,6 +860,13 @@ Meaning:
 - correction submission is a distinct contractor response type
 - it should remain distinct in both `job_events` and internal awareness/notification handling
 - upload separation is deferred intentionally to avoid drifting downstream response behavior
+
+11.9 Future notification backlog
+
+- Future feature: tech dispatch phone notifications.
+- When a tech is assigned/dispatched to a job, the tech should receive a phone notification.
+- Include a later user-facing preference/toggle so techs can turn dispatch notifications on/off.
+- This was not implemented in the current performance closeout.
 
 12. Ops Workspace Principles (Locked)
 12.1 Page philosophy
@@ -1893,6 +1939,20 @@ Current clarification:
   - follow-up/customer-attempt history
   - service-chain detail body/history
   - add-assignee selector/form
+  - timeline/shared/internal narrative bodies
+- Internal invoice secondary-detail deferral is complete for this pass:
+  - immediate billing/closeout truth remains first-paint
+  - full invoice detail/lines/delivery/payment/pricebook panel data streams later
+- Customer-attempt summary deferral is complete:
+  - measured first-paint `customerAttemptSummary` is now `0ms`
+  - contact actions remain immediate
+  - no false "0 attempts" display is shown
+  - Follow-Up History remains authoritative and deferred
+- Timeline summary first-paint softening is complete:
+  - blocking 200-row `job_events` parent read was removed from first paint
+  - shared/internal notes and timeline header counts/latest-date subtitles were replaced with neutral "loads below" copy
+  - `DeferredTimelineBody`, `DeferredSharedNotesBody`, and `DeferredInternalNotesBody` remain authoritative and still read `job_events` after streaming
+  - `ContractorReportPanel` generate/send behavior is unchanged; first-paint contractor response labels were display-softened only
 - Contact-attempt path cleanup is complete for this pass:
   - redundant unconditional calendar revalidation was removed
   - job revalidation and return-to revalidation behavior remains preserved
@@ -1907,12 +1967,24 @@ Current clarification:
   - `assignmentDisplayMapAssignableUsers`: about `716-947ms` -> about `256-362ms`
   - post-contact render follow-up: about `4510-4529ms` -> about `3911ms`
   - warm render follow-up: about `3451ms` -> about `2999ms`
-- Remaining speed concern is still open:
-  - high-frequency contact actions (Called / Sent Text / No Answer) can still feel around `3-5s`
-  - target UX remains: immediate feedback under `200ms`, typical settle around `1-2s`, under `3s` acceptable
+- Latest practical `/jobs/[id]` local smoke baseline:
+  - steady-state renders commonly around ~1.45-2.47s
+  - `timelineSummary` usually around ~183-384ms after softening
+  - `customerAttemptSummary` stayed `0ms`
+  - cold/backend/Supabase variance can still cause spikes
+- Remaining performance backlog:
+  - `mainJobRead`/`eccPayloadReads` can still spike
+  - `assignmentDisplaySummary` can spike
+  - `serviceChainSummary` can spike
+  - invoice truth/detail split should continue to be monitored
+  - broader backend/read variance remains future audit territory
+  - high-frequency contact actions still need ongoing measured attention where they feel slow
 - Next speed work should continue as measured slices (not broad refactors), with likely near-term targets:
-  - customer-attempt summary reads
-  - timeline/events dependency reads
+  - `/ops` first impression
+  - `/jobs/new`
+  - calendar
+  - reports
+  - safe partial-settle patterns
   - contact-action settle path and granular refresh/revalidation mapping
   - further parent render slimming on `/jobs/[id]`
 - Guardrails for performance work remain locked:
