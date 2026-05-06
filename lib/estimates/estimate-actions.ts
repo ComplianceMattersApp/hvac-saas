@@ -228,7 +228,8 @@ export async function addEstimateLineItem(
   const rawPricebookId = params.sourcePricebookItemId?.trim() || null;
 
   if (rawPricebookId) {
-    // Pricebook-backed: freeze snapshot from catalog at add time
+    // Pricebook-backed: preserve source provenance and use submitted values as editable defaults,
+    // falling back to catalog values when fields are omitted.
     const pbItem = await loadScopedPricebookItemForEstimate({
       pricebookItemId: rawPricebookId,
       accountOwnerUserId,
@@ -239,11 +240,18 @@ export async function addEstimateLineItem(
     }
 
     sourcePricebookItemId = pbItem.id;
-    itemNameSnapshot = pbItem.item_name;
-    descriptionSnapshot = pbItem.default_description;
-    itemTypeSnapshot = pbItem.item_type;
-    categorySnapshot = pbItem.category;
-    unitLabelSnapshot = pbItem.unit_label;
+    itemNameSnapshot = String(params.itemName ?? "").trim() || pbItem.item_name;
+    itemTypeSnapshot = String(params.itemType ?? "").trim() || pbItem.item_type;
+    descriptionSnapshot = params.description?.trim() ?? pbItem.default_description;
+    categorySnapshot = params.category?.trim() ?? pbItem.category;
+    unitLabelSnapshot = params.unitLabel?.trim() ?? pbItem.unit_label;
+
+    if (!itemNameSnapshot) {
+      return { success: false, error: "item_name is required for pricebook line items." };
+    }
+    if (!itemTypeSnapshot) {
+      return { success: false, error: "item_type is required for pricebook line items." };
+    }
   } else {
     // Manual line item: caller must supply name/type
     itemNameSnapshot = String(params.itemName ?? "").trim();

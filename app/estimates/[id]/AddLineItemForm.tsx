@@ -4,7 +4,7 @@
 // Compliance Matters: Client component for adding a manual line item to a draft estimate.
 // Calls addLineItemAction server action; refreshes RSC on success via router.refresh().
 
-import { useState, useTransition, useRef } from "react";
+import { useEffect, useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { addLineItemAction } from "./actions";
 import PricebookLineEntryFields, {
@@ -43,6 +43,43 @@ export default function AddLineItemForm({
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const [selectedPricebookId, setSelectedPricebookId] = useState("");
+  const [pricebookDraft, setPricebookDraft] = useState({
+    itemName: "",
+    description: "",
+    itemType: "service",
+    category: "",
+    unitLabel: "",
+    quantity: "1.00",
+    unitPriceDollars: "0.00",
+  });
+
+  useEffect(() => {
+    if (!selectedPricebookId) {
+      setPricebookDraft({
+        itemName: "",
+        description: "",
+        itemType: "service",
+        category: "",
+        unitLabel: "",
+        quantity: "1.00",
+        unitPriceDollars: "0.00",
+      });
+      return;
+    }
+
+    const selected = pricebookItems.find((item) => item.id === selectedPricebookId);
+    if (!selected) return;
+
+    setPricebookDraft({
+      itemName: selected.item_name,
+      description: selected.default_description ?? "",
+      itemType: selected.item_type || "service",
+      category: selected.category ?? "",
+      unitLabel: selected.unit_label ?? "",
+      quantity: "1.00",
+      unitPriceDollars: Number(selected.default_unit_price ?? 0).toFixed(2),
+    });
+  }, [selectedPricebookId, pricebookItems]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -94,15 +131,34 @@ export default function AddLineItemForm({
     const formElement = e.currentTarget;
     const fd = new FormData(formElement);
     const sourcePricebookItemId = String(fd.get("source_pricebook_item_id") ?? "").trim();
+    const itemName = String(fd.get("pricebook_item_name") ?? "").trim();
+    const description = String(fd.get("pricebook_description") ?? "").trim() || null;
+    const itemType = String(fd.get("pricebook_item_type") ?? "").trim();
+    const category = String(fd.get("pricebook_category") ?? "").trim() || null;
+    const unitLabel = String(fd.get("pricebook_unit_label") ?? "").trim() || null;
     const quantityStr = String(fd.get("pricebook_quantity") ?? "1");
+    const unitPriceStr = String(fd.get("pricebook_unit_price_dollars") ?? "0");
 
     const quantity = parseFloat(quantityStr);
+    const unitPriceCents = Math.round(parseFloat(unitPriceStr) * 100);
     if (!sourcePricebookItemId) {
       setError("Select a Pricebook item.");
       return;
     }
+    if (!itemName) {
+      setError("Item name is required.");
+      return;
+    }
+    if (!itemType) {
+      setError("Item type is required.");
+      return;
+    }
     if (!Number.isFinite(quantity) || quantity <= 0) {
       setError("Quantity must be a positive number.");
+      return;
+    }
+    if (!Number.isFinite(unitPriceCents) || unitPriceCents < 0) {
+      setError("Unit price must be 0 or greater.");
       return;
     }
 
@@ -117,8 +173,13 @@ export default function AddLineItemForm({
       const result = await addLineItemAction({
         estimateId,
         sourcePricebookItemId,
+        itemName,
+        description,
+        itemType,
+        category,
+        unitLabel,
         quantity,
-        unitPriceCents: Math.round(Number(item.default_unit_price ?? 0) * 100),
+        unitPriceCents,
       });
       if (result.success) {
         formElement.reset();
@@ -182,6 +243,7 @@ export default function AddLineItemForm({
           ) : (
             <form onSubmit={handlePricebookSubmit} className="space-y-3">
               <PricebookLineEntryFields
+                key={selectedPricebookId || "pricebook-empty"}
                 items={pricebookItems}
                 selectedItemId={selectedPricebookId}
                 onSelectedItemIdChange={setSelectedPricebookId}
@@ -196,7 +258,7 @@ export default function AddLineItemForm({
                 quantityInputType="number"
                 quantityStep="0.01"
                 quantityMin="0.01"
-                quantityDefaultValue="1"
+                quantityDefaultValue={pricebookDraft.quantity}
                 includeEmptyOption
                 emptyOptionLabel="Select an item..."
                 renderSelectedItem={(selectedPricebookItem) => (
@@ -216,6 +278,115 @@ export default function AddLineItemForm({
                   </div>
                 )}
               />
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label htmlFor="add_pricebook_item_name" className={labelClass}>
+                    Item Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="add_pricebook_item_name"
+                    name="pricebook_item_name"
+                    type="text"
+                    required
+                    value={pricebookDraft.itemName}
+                    onChange={(event) =>
+                      setPricebookDraft((prev) => ({ ...prev, itemName: event.target.value }))
+                    }
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="add_pricebook_item_type" className={labelClass}>
+                    Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="add_pricebook_item_type"
+                    name="pricebook_item_type"
+                    required
+                    value={pricebookDraft.itemType}
+                    onChange={(event) =>
+                      setPricebookDraft((prev) => ({ ...prev, itemType: event.target.value }))
+                    }
+                    className={inputClass}
+                  >
+                    {ITEM_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="add_pricebook_unit_price" className={labelClass}>
+                    Unit Price ($) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="add_pricebook_unit_price"
+                    name="pricebook_unit_price_dollars"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={pricebookDraft.unitPriceDollars}
+                    onChange={(event) =>
+                      setPricebookDraft((prev) => ({ ...prev, unitPriceDollars: event.target.value }))
+                    }
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="add_pricebook_category" className={labelClass}>
+                    Category
+                  </label>
+                  <input
+                    id="add_pricebook_category"
+                    name="pricebook_category"
+                    type="text"
+                    value={pricebookDraft.category}
+                    onChange={(event) =>
+                      setPricebookDraft((prev) => ({ ...prev, category: event.target.value }))
+                    }
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="add_pricebook_unit_label" className={labelClass}>
+                    Unit Label
+                  </label>
+                  <input
+                    id="add_pricebook_unit_label"
+                    name="pricebook_unit_label"
+                    type="text"
+                    value={pricebookDraft.unitLabel}
+                    onChange={(event) =>
+                      setPricebookDraft((prev) => ({ ...prev, unitLabel: event.target.value }))
+                    }
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label htmlFor="add_pricebook_description" className={labelClass}>
+                    Description
+                  </label>
+                  <textarea
+                    id="add_pricebook_description"
+                    name="pricebook_description"
+                    rows={2}
+                    value={pricebookDraft.description}
+                    onChange={(event) =>
+                      setPricebookDraft((prev) => ({ ...prev, description: event.target.value }))
+                    }
+                    className={inputClass}
+                  />
+                </div>
+              </div>
 
               <div className="flex justify-end">
                 <button
