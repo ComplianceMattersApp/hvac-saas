@@ -85,7 +85,7 @@ export default function SendEstimateForm({
 
       <p className="text-[11px] text-slate-400">
         {isEmailSendEnabled
-          ? 'Accepted by provider does not mean delivered or read. No customer approval, PDF, invoice, or conversion is created.'
+          ? 'Accepted by provider does not mean delivered or read. No lifecycle status change, customer approval, PDF, invoice, or conversion is created.'
           : 'No email or PDF is generated from this action.'}
       </p>
     </form>

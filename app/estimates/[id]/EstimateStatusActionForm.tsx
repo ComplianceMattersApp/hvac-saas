@@ -34,7 +34,7 @@ export default function EstimateStatusActionForm({
       <button type="submit" className={className}>
         {label}
       </button>
-      {helperText ? <p className="max-w-48 text-[11px] leading-4 text-slate-500">{helperText}</p> : null}
+      {helperText ? <p className="max-w-64 text-[11px] leading-4 text-slate-500">{helperText}</p> : null}
     </form>
   );
 }

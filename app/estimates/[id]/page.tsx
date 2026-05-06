@@ -328,30 +328,40 @@ export default async function EstimateDetailPage({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 text-sm text-slate-700 print:rounded-none print:border-slate-300 print:bg-white print:p-3">
-        <h2 className="text-sm font-semibold text-slate-900">Document Readiness</h2>
-        <ul className="mt-2 list-disc space-y-1 pl-5">
-          {ESTIMATE_DOCUMENT_READINESS_GUIDANCE.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-          <li>
-            {emailSendEnabled
-              ? "Send/email is explicitly enabled for this environment."
-              : "Send/email is currently disabled by feature flag in this environment."}
-          </li>
-        </ul>
-        <h3 className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-          Boundary Disclaimers
-        </h3>
-        <ul className="mt-1 list-disc space-y-1 pl-5 text-xs sm:text-sm">
-          {ESTIMATE_DOCUMENT_DISCLAIMERS.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-        <p className="mt-2 text-xs text-slate-500">
-          Revision planning defaults: freeze trigger {ESTIMATE_REVISION_PLANNING_DEFAULTS.freezeTrigger}, history {ESTIMATE_REVISION_PLANNING_DEFAULTS.historyPolicy}, post-freeze edits {ESTIMATE_REVISION_PLANNING_DEFAULTS.postFreezeEditPolicy}.
-        </p>
-      </div>
+      <details className="rounded-2xl border border-slate-200/80 bg-slate-50/70 text-sm text-slate-700 print:hidden">
+        <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-slate-900 marker:content-none">
+          <span className="flex items-center justify-between gap-3">
+            <span>Internal Readiness Notes</span>
+            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+              Expand
+            </span>
+          </span>
+        </summary>
+        <div className="border-t border-slate-200/80 px-4 pb-4 pt-3">
+          <h2 className="text-sm font-semibold text-slate-900">Document Readiness</h2>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {ESTIMATE_DOCUMENT_READINESS_GUIDANCE.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+            <li>
+              {emailSendEnabled
+                ? "Send/email is explicitly enabled for this environment."
+                : "Send/email is currently disabled by feature flag in this environment."}
+            </li>
+          </ul>
+          <h3 className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Boundary Disclaimers
+          </h3>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-xs sm:text-sm">
+            {ESTIMATE_DOCUMENT_DISCLAIMERS.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-slate-500">
+            Revision planning defaults: freeze trigger {ESTIMATE_REVISION_PLANNING_DEFAULTS.freezeTrigger}, history {ESTIMATE_REVISION_PLANNING_DEFAULTS.historyPolicy}, post-freeze edits {ESTIMATE_REVISION_PLANNING_DEFAULTS.postFreezeEditPolicy}.
+          </p>
+        </div>
+      </details>
 
       {/* Status actions (internal + scoped + feature-gated by route access) */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
@@ -377,8 +387,8 @@ export default async function EstimateDetailPage({
                   action={transitionEstimateStatusFromForm}
                   estimateId={estimate.id}
                   nextStatus="sent"
-                  label="Mark Sent"
-                  helperText="Locks line editing. No email or PDF is sent in V1F."
+                  label="Mark Sent Manually"
+                  helperText="Updates the estimate status only. This does not send an email or PDF."
                   confirmMessage="Mark this estimate as Sent? This locks line editing. No customer email or PDF will be sent."
                   className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 transition-[background-color,border-color,transform] hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
                 />
@@ -574,6 +584,9 @@ export default async function EstimateDetailPage({
             {isDraft
               ? "This estimate is still in draft. You can record a send attempt before or after marking it sent."
               : "This estimate is marked sent. Record a send attempt to log that you shared this estimate."}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Records an estimate communication attempt. This does not change the estimate lifecycle status.
           </p>
           <div className="mt-3">
             <SendEstimateForm
