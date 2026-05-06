@@ -706,6 +706,17 @@ Mobile home-screen launch QA checklist (Slice 1):
   - no import default values changed
   - no schema/migration/Supabase/production-data/RLS/policy/auth/feature-flag/issue-send/payment/Visit Scope/Pricebook/estimate/Stripe tenant payment/QBO behavior changed
   - validation passed: `npx.cmd tsc --noEmit`; targeted tests (`2` files / `24` tests); browser smoke confirmed helper copy visibility, successful Work Item import, unchanged qty `1.00` and unit price `$0.00` defaults, editability preserved, and unchanged issue gate/issue behavior
+- Completed: Invoice Panel Hierarchy Polish V1 is implemented and verified on draft internal invoice panel (`2cc5d58`).
+  - draft invoice builder now visually matches the Work Item-first billing model
+  - Work Item import now appears before `Add From Pricebook`
+  - Work Item import remains the clear recommended path
+  - `Add From Pricebook` now reads as a fallback path for charges not already captured as Work Items
+  - manual `+ Add Charge` now reads as an exception/fallback path
+  - flow reinforcement is explicit: Work Items first, Pricebook fallback, manual exception path
+  - Work Items remain the operational work record; Invoice Charges remain reviewed billed copies used for the invoice
+  - no server-action/payload/hidden-field/import-default/pricing/schema/migration/Supabase/production-data/RLS/policy/auth/feature-flag/issue-send-payment/Visit Scope/Pricebook/estimate/Stripe tenant payment/QBO behavior changed
+  - no smarter pricing, no Pricebook text matching, and no persisted Work Item provenance fields were introduced
+  - validation passed: `npx.cmd tsc --noEmit`; targeted tests (`2` files / `24` tests); browser smoke confirmed Work Item import order/recommended emphasis, Pricebook fallback wording, manual exception/fallback wording, unchanged Qty `1.00` + Unit Price `$0.00` import defaults, unchanged editability, unchanged direct Pricebook add/manual add success, and unchanged issue gate behavior
 - Completed: Pricebook-assisted Work Item Creation V1 is implemented and verified (`6145f16`).
   - Work Item builder now includes optional `Start from Pricebook template` assist.
   - Template selection prefills Work Item `title` from Pricebook `item_name` and Work Item `details` from Pricebook `default_description`.

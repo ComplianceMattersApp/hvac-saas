@@ -66,6 +66,12 @@ It extends it.
   - exact helper copy: `Imported Work Items start as draft Invoice Charges with Qty 1.00 and Unit Price $0.00. Review and edit pricing before issuing.`
   - Work Item-first billing flow is reinforced: Work Items remain operational work scope, imported Work Items become draft Invoice Charges, and Invoice Charges remain reviewed billed copies before issue
   - existing transfer mechanics remain unchanged (`source_kind = visit_scope`, `source_visit_scope_item_id` preserved, `quantity = 1.00`, `unit_price = 0.00`)
+- Invoice Panel Hierarchy Polish V1 is now implemented (`2cc5d58`) as UI-only layout/copy hierarchy refinement:
+  - Work Item import now renders before `Add From Pricebook` in the draft invoice builder
+  - Work Item import remains the explicit recommended path
+  - `Add From Pricebook` now reads as fallback for charges not already captured as Work Items
+  - manual `+ Add Charge` now reads as an exception/fallback path
+  - transfer mechanics and defaults remain unchanged (`source_kind = visit_scope`, `source_visit_scope_item_id` preserved, `quantity = 1.00`, `unit_price = 0.00`)
 - This V1 assist preserves source-of-truth boundaries:
   - Pricebook = reusable defaults/templates
   - Visit Scope / Work Items = operational work scope
@@ -79,11 +85,18 @@ It extends it.
   - no invoice issue/send/payment behavior change
   - no Visit Scope, Pricebook, estimate, Stripe tenant payment, or QBO behavior change
   - no automatic pricing, no Pricebook text matching, and no persisted Work Item provenance
+- The hierarchy-polish refinement preserves the same boundaries and guardrails:
+  - no schema or migration change
+  - no Supabase command or production data action
+  - no RLS/policy/auth or feature-flag change
+  - no invoice issue/send/payment behavior change
+  - no Visit Scope, Pricebook, estimate, Stripe tenant payment, or QBO behavior change
+  - no automatic pricing, no Pricebook text matching, and no persisted Work Item provenance
 - Deferred follow-on remains explicit and unimplemented:
   - persisted Pricebook provenance on Work Items
   - smarter defaulting/pricing from Work Items to draft Invoice Charges
   - Work Item commercial fields
-  - broader invoice panel polish
+  - broader invoice panel density cleanup
 - Maintenance Agreements / Recurring Services should remain modeled later as planned/recurring Work Items with commercial terms, not as billing-first records.
 
 ### Current status note (reporting/truth separation)
