@@ -53,6 +53,12 @@ type ContractorMembershipRow = {
     | null;
 };
 
+type PricebookTemplateRow = {
+  id: string | null;
+  item_name: string | null;
+  default_description: string | null;
+};
+
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
@@ -89,6 +95,11 @@ export default async function NewJobPage(props: {
   }
 
   let contractors: Array<{ id: string; name: string }> = [];
+  let pricebookTemplateItems: Array<{
+    id: string;
+    item_name: string;
+    default_description: string | null;
+  }> = [];
   if (!myContractor?.id) {
     const { data: contractorRows, error } = await supabase
       .from("contractors")
@@ -98,6 +109,34 @@ export default async function NewJobPage(props: {
 
     if (error) throw new Error(error.message);
     contractors = contractorRows ?? [];
+
+    const { data: internalUserRow, error: internalUserErr } = await supabase
+      .from("internal_users")
+      .select("account_owner_user_id, is_active")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (internalUserErr) throw new Error(internalUserErr.message);
+
+    const accountOwnerUserId = String(internalUserRow?.account_owner_user_id ?? "").trim();
+    if (accountOwnerUserId && internalUserRow?.is_active !== false) {
+      const { data: pricebookRows, error: pricebookRowsErr } = await supabase
+        .from("pricebook_items")
+        .select("id, item_name, default_description")
+        .eq("account_owner_user_id", accountOwnerUserId)
+        .eq("is_active", true)
+        .order("item_name", { ascending: true });
+
+      if (pricebookRowsErr) throw new Error(pricebookRowsErr.message);
+
+      pricebookTemplateItems = (pricebookRows as PricebookTemplateRow[] | null ?? [])
+        .map((row) => ({
+          id: String(row?.id ?? "").trim(),
+          item_name: String(row?.item_name ?? "").trim(),
+          default_description: String(row?.default_description ?? "").trim() || null,
+        }))
+        .filter((row) => row.id && row.item_name);
+    }
   }
 
   const sp = props.searchParams ? await props.searchParams : undefined;
@@ -178,6 +217,7 @@ export default async function NewJobPage(props: {
       submittedProposalId={submittedProposalId}
       customerContextMode={customerContextMode}
       customerContextSource={customerContextMode ? "customer" : null}
+      pricebookTemplateItems={pricebookTemplateItems}
     />
   );
 }

@@ -1106,6 +1106,25 @@ export default async function JobDetailPage({
     };
   });
 
+  const visitScopePricebookTemplatesPromise = timedPhase("visitScopePricebookTemplatesRead", async () => {
+    const { data: pricebookRows, error: pricebookRowsErr } = await supabase
+      .from("pricebook_items")
+      .select("id, item_name, default_description")
+      .eq("account_owner_user_id", internalUser.account_owner_user_id)
+      .eq("is_active", true)
+      .order("item_name", { ascending: true });
+
+    if (pricebookRowsErr) throw pricebookRowsErr;
+
+    return (pricebookRows ?? [])
+      .map((row: any) => ({
+        id: String(row?.id ?? "").trim(),
+        item_name: String(row?.item_name ?? "").trim(),
+        default_description: String(row?.default_description ?? "").trim() || null,
+      }))
+      .filter((row) => row.id && row.item_name);
+  });
+
   const { internalInvoiceTruth } = await immediateInvoiceTruthPromise;
 
   const loadDeferredInvoicePanelData = async () => {
@@ -1220,12 +1239,14 @@ export default async function JobDetailPage({
     timelineSummary,
     onTheWayUndoEligibility,
     billingPartyReads,
+    visitScopePricebookTemplates,
   ] = await Promise.all([
     assignmentDisplayPromise,
     serviceCaseSummaryPromise,
     timelineSummaryPromise,
     onTheWayUndoEligibilityPromise,
     billingPartyReadsPromise(),
+    visitScopePricebookTemplatesPromise,
   ]);
 
   const contractorBilling = billingPartyReads.contractorBilling;
@@ -4069,6 +4090,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               tab={tab}
               initialSummary={visitScopeSummary}
               initialItems={visitScopeItems}
+              pricebookTemplateItems={visitScopePricebookTemplates}
               primaryButtonClass={primaryButtonClass}
             />
           </div>

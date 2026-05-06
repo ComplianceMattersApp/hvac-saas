@@ -12,7 +12,10 @@ import {
 } from "@/lib/actions";
 import JobCoreFields from "@/components/jobs/JobCoreFields";
 import ActionFeedback from "@/components/ui/ActionFeedback";
-import VisitScopeBuilder, { type VisitScopeDraftItem } from "@/components/jobs/VisitScopeBuilder";
+import VisitScopeBuilder, {
+  type VisitScopeDraftItem,
+  type VisitScopePricebookTemplateItem,
+} from "@/components/jobs/VisitScopeBuilder";
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client";
 import {
   createVisitScopeItemId,
@@ -323,6 +326,7 @@ export default function NewJobForm({
   submittedProposalId,
   customerContextMode = false,
   customerContextSource = null,
+  pricebookTemplateItems = [],
 }: {
   contractors: Contractor[];
   existingCustomer?: ExistingCustomer | null;
@@ -334,6 +338,7 @@ export default function NewJobForm({
   submittedProposalId?: string | null;
   customerContextMode?: boolean;
   customerContextSource?: string | null;
+  pricebookTemplateItems?: VisitScopePricebookTemplateItem[];
 }) {
 
   const isContractorMode = Boolean(myContractor?.id);
@@ -2401,6 +2406,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                     initialSummary={visitScopeSummary}
                     initialItems={visitScopeItems}
                     jobType={jobType}
+                    pricebookTemplateItems={pricebookTemplateItems}
                     resetKey={visitScopeResetKey}
                     onSummaryChange={setVisitScopeSummary}
                     onItemsChange={setVisitScopeItems}

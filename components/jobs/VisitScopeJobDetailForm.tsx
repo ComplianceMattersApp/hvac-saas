@@ -6,7 +6,10 @@ import {
   hasVisitScopeContent,
   type VisitScopeItem,
 } from "@/lib/jobs/visit-scope";
-import VisitScopeBuilder, { type VisitScopeDraftItem } from "@/components/jobs/VisitScopeBuilder";
+import VisitScopeBuilder, {
+  type VisitScopeDraftItem,
+  type VisitScopePricebookTemplateItem,
+} from "@/components/jobs/VisitScopeBuilder";
 import SubmitButton from "@/components/SubmitButton";
 
 type Props = {
@@ -15,6 +18,7 @@ type Props = {
   tab?: string;
   initialSummary?: string | null;
   initialItems?: VisitScopeItem[];
+  pricebookTemplateItems?: VisitScopePricebookTemplateItem[];
   primaryButtonClass: string;
 };
 
@@ -24,6 +28,7 @@ export default function VisitScopeJobDetailForm({
   tab = "info",
   initialSummary = "",
   initialItems = [],
+  pricebookTemplateItems = [],
   primaryButtonClass,
 }: Props) {
   const [summary, setSummary] = useState(String(initialSummary ?? ""));
@@ -58,6 +63,7 @@ export default function VisitScopeJobDetailForm({
         initialSummary={initialSummary}
         initialItems={initialItems}
         jobType={jobType}
+        pricebookTemplateItems={pricebookTemplateItems}
         onSummaryChange={setSummary}
         onItemsChange={setItems}
       />

@@ -15,10 +15,17 @@ export type VisitScopeDraftItem = Omit<VisitScopeItem, "details"> & {
   details: string;
 };
 
+export type VisitScopePricebookTemplateItem = {
+  id: string;
+  item_name: string;
+  default_description: string | null;
+};
+
 type Props = {
   initialSummary?: string | null;
   initialItems?: VisitScopeItem[];
   jobType: "ecc" | "service";
+  pricebookTemplateItems?: VisitScopePricebookTemplateItem[];
   summaryName?: string;
   itemsName?: string;
   resetKey?: string | number;
@@ -65,6 +72,7 @@ export default function VisitScopeBuilder({
   initialSummary = "",
   initialItems = [],
   jobType,
+  pricebookTemplateItems = [],
   summaryName = "visit_scope_summary",
   itemsName = "visit_scope_items_json",
   resetKey,
@@ -73,17 +81,31 @@ export default function VisitScopeBuilder({
 }: Props) {
   const [summary, setSummary] = useState(String(initialSummary ?? ""));
   const [items, setItems] = useState<VisitScopeDraftItem[]>(() => toDraftItems(initialItems, jobType));
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [showEccOptionalScope, setShowEccOptionalScope] = useState(() => {
     const seededItems = toDraftItems(initialItems, jobType);
     const hasSummary = String(initialSummary ?? "").trim().length > 0;
     return jobType === "service" || hasSummary || seededItems.length > 0;
   });
 
+  const availablePricebookTemplates = useMemo(
+    () =>
+      (Array.isArray(pricebookTemplateItems) ? pricebookTemplateItems : [])
+        .map((item) => ({
+          id: String(item.id ?? "").trim(),
+          item_name: String(item.item_name ?? "").trim(),
+          default_description: String(item.default_description ?? "").trim() || null,
+        }))
+        .filter((item) => item.id && item.item_name),
+    [pricebookTemplateItems],
+  );
+
   useEffect(() => {
     const seededItems = toDraftItems(initialItems, jobType);
     const hasSummary = String(initialSummary ?? "").trim().length > 0;
     setSummary(String(initialSummary ?? ""));
     setItems(seededItems);
+    setSelectedTemplateId("");
     setShowEccOptionalScope(jobType === "service" || hasSummary || seededItems.length > 0);
   }, [jobType, resetKey]);
 
@@ -158,6 +180,45 @@ export default function VisitScopeBuilder({
     });
   }
 
+  function applyPricebookTemplate() {
+    if (!selectedTemplateId) return;
+
+    const selectedTemplate = availablePricebookTemplates.find((item) => item.id === selectedTemplateId);
+    if (!selectedTemplate) return;
+
+    setItems((prev) => {
+      const targetIndex = prev.findIndex(
+        (item) => item.title.trim().length === 0 && item.details.trim().length === 0,
+      );
+
+      if (targetIndex >= 0) {
+        return prev.map((item, index) =>
+          index === targetIndex
+            ? {
+                ...item,
+                title: selectedTemplate.item_name,
+                details: selectedTemplate.default_description ?? "",
+              }
+            : item,
+        );
+      }
+
+      if (prev.length >= VISIT_SCOPE_ITEM_LIMIT) {
+        return prev;
+      }
+
+      return [
+        ...prev,
+        {
+          id: createVisitScopeItemId(),
+          title: selectedTemplate.item_name,
+          details: selectedTemplate.default_description ?? "",
+          kind: "primary",
+        },
+      ];
+    });
+  }
+
   return (
     <div className="space-y-3">
       {jobType === "ecc" && !showEccOptionalScope ? (
@@ -218,7 +279,41 @@ export default function VisitScopeBuilder({
                 Scope first: confirm the work for this visit, then complete closeout and billing.
               </div>
             ) : null}
+            {availablePricebookTemplates.length > 0 ? (
+              <div className="mt-1 text-xs text-slate-600">
+                Pricebook is a starting template. Work Item is the actual work for this visit. Invoice Charges are reviewed billed copies created later.
+              </div>
+            ) : null}
           </div>
+          {availablePricebookTemplates.length > 0 ? (
+            <div className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 sm:max-w-lg">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                Start from Pricebook template
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <select
+                  value={selectedTemplateId}
+                  onChange={(event) => setSelectedTemplateId(event.target.value)}
+                  className="min-w-[14rem] flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
+                >
+                  <option value="">Select a template...</option>
+                  {availablePricebookTemplates.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.item_name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={applyPricebookTemplate}
+                  disabled={!selectedTemplateId}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Use Template
+                </button>
+              </div>
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={addItem}
