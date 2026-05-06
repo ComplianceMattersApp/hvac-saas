@@ -515,6 +515,11 @@ It feeds:
 
 Estimate/quoting expansion remains planned/deferred follow-on work after current Pricebook continuation and does not change the locked backfill boundaries above.
 
+Shared Pricebook Entry UI Primitive V1 is complete for current internal estimate/invoice drafting continuity:
+- estimate draft line entry and draft invoice line entry now follow the same Pricebook-style entry pattern for reusable selection and manual entry
+- this is a UI/presentation consolidation only and does not change schema, provenance ownership, RLS/policy, invoice immutability, payment behavior, Visit Scope ownership, or production estimate gating
+- targeted validation passed; current guardrails remain intact
+
 ### Pricebook item ownership
 Pricebook owns reusable definitions, not transactional history.
 
@@ -694,6 +699,13 @@ V1J does not add persistent revision storage.
 V1J did not add real outbound production estimate email, PDF generation/storage, persistent revision storage, customer approval/e-signature, customer portal estimate visibility, public estimate links/tokens, contractor visibility/authority, estimate-to-job conversion, estimate-to-invoice conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement.
 V1J validation status: `npx vitest run lib/estimates` passed (`123/123`), `npx tsc --noEmit` passed (`TSC_OK`), sent/approved detail smoke passed, and draft-detail smoke is now completed/closed using sandbox draft `EST-20260502-9D58499B` (`/estimates/43aeaa8e-e60e-47d4-8c26-2570600b24df`) with document readiness/disclaimer rendering, draft manual-line editing, draft pricebook picker availability, blocked send copy, communication history rendering, and no email/PDF/customer approval/public link/conversion/payment/customer portal/contractor controls exposed.
 Production readiness hardening guard is complete and committed: `createEstimateDraft` in `lib/estimates/estimate-actions.ts` now returns `{ success: false, error: "Estimates are currently unavailable." }` as the first statement when `ENABLE_ESTIMATES` is false or unset, running before `createClient`/auth/DB work. This was the sole identified pre-production code blocker from the readiness audit. Validated: `npx vitest run lib/estimates` = `127/127`, `npx tsc --noEmit` = `TSC_OK`. No migrations, Supabase commands, production data, email sends, feature flag enables, RLS/policy changes, or PDF/storage/customer/public/payment/conversion behavior were introduced.
+- Shared Pricebook Entry UI Primitive V1 closeout should be treated as a supporting baseline for the estimate track, not as a production-enablement milestone.
+- Future estimate/customer-facing roadmap notes after this closeout:
+  - the contractor report current-scope closeout is the current quality benchmark for future estimate presentation polish and customer-facing document tone
+  - future workflow polish should make `Send Estimate` and `Mark Sent Manually` clearly distinct actions so communication attempts do not read as lifecycle transitions
+  - future customer-centered estimate entry and history should surface from customer profile/history, reporting, and standard nav only when the estimate track is intentionally promoted beyond the guarded internal baseline
+  - future reporting/conversion work may include estimate reporting, estimate-to-job/invoice handoff, and multi-option quoting, but those remain deferred
+  - future payment/deposit work remains a separate deferred track and must not be implied by estimate polish or document readiness work
 Stripe customer/work payment execution follows service/invoice/estimate readiness unless explicitly pulled forward.
 
 Separate pre-launch enablement track:

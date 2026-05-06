@@ -672,7 +672,11 @@ Mobile home-screen launch QA checklist (Slice 1):
   - print/readiness wording consistency uses shared document model
   - no persistent revision storage is implemented yet
   - no PDF generation/storage is implemented yet
+- Completed: Shared Pricebook Entry UI Primitive V1 closeout is confirmed for current internal estimate/invoice drafting continuity.
+  - estimate draft line entry and draft invoice line entry now use the same clean Pricebook-style entry pattern for reusable selection and manual line entry
+  - this is UI consolidation only; schema, migrations, RLS/policy, server ownership, estimate lifecycle truth, invoice immutability, Visit Scope ownership, payment behavior, and production estimate gating are unchanged
 - Completed validation (V1J baseline): `npx vitest run lib/estimates` passed (`123/123`), `npx tsc --noEmit` passed (`TSC_OK`).
+- Completed validation (Shared Pricebook Entry UI Primitive V1 closeout): targeted validation passed and no new production/runbook/payment boundary was introduced.
 - Completed production readiness hardening guard: `createEstimateDraft` in `lib/estimates/estimate-actions.ts` now returns `{ success: false, error: "Estimates are currently unavailable." }` as the first statement when `ENABLE_ESTIMATES` is false or unset, running before `createClient`/auth/DB work. This was the sole identified pre-production code blocker from the readiness audit.
 - Completed production readiness hardening validation: `npx vitest run lib/estimates` passed (`127/127`), `npx tsc --noEmit` passed (`TSC_OK`). Tests confirm flag-off returns unavailable with no DB insert, no estimate_events insert, and flag-on valid create still passing. No migrations, Supabase commands, production data, email sends, feature flag enables, RLS/policy changes, or PDF/storage/customer/public/payment/conversion behavior were introduced.
 - Completed: internal-only production execution runbook is hardened and committed (`df9870f`) at `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`; this remains planning/runbook readiness only and did not execute migrations, flags, or production enablement.
@@ -725,6 +729,11 @@ Mobile home-screen launch QA checklist (Slice 1):
   - Option A remains next: sandbox-only provider enablement after documented gates
   - do not enable production estimate email sending without an explicit rollout plan
   - no customer approval, customer portal estimate visibility, contractor visibility/authority, email/PDF, conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, or production estimate enablement should be implemented without a design pass
+- Future roadmap notes recorded for later design only; not implemented by this closeout:
+  - future estimate polish should target the same professional clarity standard already reached by contractor report delivery
+  - future workflow wording should separate `Send Estimate` from `Mark Sent Manually` more explicitly
+  - future customer-centered estimate access/history may extend into customer profile/history, reporting, and standard nav once the guarded internal baseline is intentionally advanced
+  - future estimate reporting, conversion, multi-option quoting, and payment/deposit work remain deferred design tracks
 
 ### 2.21 Contractor report delivery current-scope closeout (completed)
 - Contractor Report current-scope delivery is complete. Failed ECC contractor reports now aggregate all failed completed ECC runs for the job and render contractor-actionable details including baseline, measured value, variance, and corrected duct-leakage percentage logic.

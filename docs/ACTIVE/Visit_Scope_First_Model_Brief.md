@@ -191,6 +191,12 @@ approved estimate scope if present
 completed job scope if no approved estimate exists
 manual office creation as fallback
 
+Pricebook-backed drafting should stay aligned to that boundary:
+
+- reusable Pricebook entries may prefill defaults into draft Estimate Lines or draft Invoice Charges
+- those draft transactional rows remain editable records owned by the estimate/invoice workflow, not live catalog pointers
+- Visit Scope / Work Items remain the operational layer and should not be renamed into commercial truth
+
 That is already the locked business roadmap direction.
 
 So the conceptual chain is:
@@ -247,6 +253,7 @@ Make the top of the job page scope-first, not invoice-first
 
 11. Future work still deferred
 
+- Shared Pricebook Entry UI Primitive V1 is complete for estimate/invoice draft entry continuity only; this does not change Visit Scope ownership, lifecycle, or source-of-truth boundaries
 - completion/billable toggles on Visit Scope items are not implemented yet
 - Pricebook-backed Visit Scope defaults are not implemented yet
 - normalized Visit Scope item table redesign is not implemented yet
@@ -255,3 +262,4 @@ Make the top of the job page scope-first, not invoice-first
 - Future backlog: Line Item Source Consolidation / Pricebook-style Entry.
 	- Long-term direction should reduce duplicate/similar line-item entry paths and favor selecting from Pricebook or adding manual line items through the same clean Pricebook-like entry pattern.
 	- Preserve the boundary between Work Items, Estimate Lines, and Invoice Charges.
+	- Future customer-centered estimate/invoice history, reporting views, conversion flows, and top-nav/profile access should layer on top of that boundary rather than collapsing Work Items into commercial rows.
