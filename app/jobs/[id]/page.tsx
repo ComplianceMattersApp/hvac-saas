@@ -1904,7 +1904,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charges</div>
-                        <div className="mt-1 text-sm leading-6 text-slate-600">Build Invoice Charges here once billing is ready. These remain downstream commercial records rather than the visit-definition layer.</div>
+                        <div className="mt-1 text-sm leading-6 text-slate-600">Build Invoice Charges here when billing is ready. Work Items stay focused on the visit work, and these charge lines stay focused on billing for this invoice.</div>
                       </div>
                       <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                         {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}
@@ -2061,7 +2061,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   This invoice records billed work for this job. Payment entries are tracking-only and do not charge a card.
                 </div>
                 <div className="mt-2 rounded-lg border border-slate-200/80 bg-slate-50/75 px-3.5 py-3 text-sm leading-6 text-slate-700">
-                  Invoice Charges are billed truth. Work Items are operational scope for the visit and are not billing records.
+                  Work Items capture the visit work. Invoice Charges are the billing lines you review before issue.
                 </div>
                 {internalInvoice.status === "draft" ? (
                   <>
@@ -2213,7 +2213,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
                     <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
                       <div className="font-semibold text-slate-900">Send / Resend</div>
-                      <div className="mt-1 leading-6">Send the already-issued invoice to the billing recipient. Resending is communication only and does not create a second invoice or alter billed truth.</div>
+                      <div className="mt-1 leading-6">Send the already-issued invoice to the billing recipient. Resending is communication only and does not create a second invoice or change the saved charge lines.</div>
 
                       <form action={sendInternalInvoiceEmailFromForm} className="mt-3 space-y-3">
                         <input type="hidden" name="job_id" value={job.id} />

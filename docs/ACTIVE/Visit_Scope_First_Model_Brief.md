@@ -203,6 +203,8 @@ Pricebook-backed drafting should stay aligned to that boundary:
 - This clarification reinforces the locked boundary without changing mechanics: Work Items remain the operational work record, imported Work Items become draft Invoice Charges, Invoice Charges remain reviewed/edited billed copies before issue, no automatic pricing or Pricebook text matching was introduced, and no persisted Work Item provenance was added.
 - Invoice Panel Hierarchy Polish V1 is complete as copy/layout-only refinement on the same draft internal invoice panel (`2cc5d58`): Work Item import now appears before `Add From Pricebook`, Work Item import remains the clear recommended path, `Add From Pricebook` now reads as a fallback path, and manual `+ Add Charge` now reads as an exception/fallback path.
 - This hierarchy refinement preserves the same locked boundary and behavior: Work Items remain the operational work record, Invoice Charges remain reviewed billed copies for the invoice, imported defaults remain qty `1.00` and unit price `$0.00`, and no action/payload/schema/pricing/auth/payment/Pricebook/estimate/Stripe tenant payment/QBO behavior changed.
+- Work Item-first Flow Copy Density Polish V1 is complete as a tiny copy/layout-only pass: helper language in the Work Item-first invoice flow is now less technical and more field-service friendly while preserving the same behavior, boundaries, and defaults.
+- The Work Item-first billing mini-phase is considered closed unless a later visual review finds a clear issue.
 - Pricebook-assisted Work Item Creation V1 is complete (`6145f16`) with model boundaries preserved:
 	- Work Item builder now includes optional `Start from Pricebook template` assist in both intake and job detail edit surfaces.
 	- Template selection now prefills Work Item `title` from Pricebook `item_name` and Work Item `details` from Pricebook `default_description`.
@@ -212,6 +214,12 @@ Pricebook-backed drafting should stay aligned to that boundary:
 	- Validation passed: `npx.cmd tsc --noEmit`, targeted tests (`4` files / `76` tests), and browser smoke (intake prefill/edit/save, job-detail template assist, Work Item import to draft Invoice Charges, and direct draft invoice Add From Pricebook path).
 - Work Item Import Defaults Clarification V1 validation passed: `npx.cmd tsc --noEmit`; targeted tests (`2` files / `24` tests); and browser smoke confirming the helper copy appeared near Work Item import, imported Work Items still created draft Invoice Charges at qty `1.00` and unit price `$0.00`, imported charges remained editable, and issue behavior did not change.
 - Invoice Panel Hierarchy Polish V1 validation passed: `npx.cmd tsc --noEmit`; targeted tests (`2` files / `24` tests); and browser smoke confirming Work Item import rendered before Pricebook add, Work Item import remained recommended, Pricebook add remained fallback, manual add remained exception/fallback, import/pricebook/manual add paths all still worked, and issue behavior did not change.
+- Work Item-first Flow Copy Density Polish V1 validation passed: `npx.cmd tsc --noEmit`; targeted tests (`2` files / `24` tests); and browser smoke confirming desktop + narrow/mobile-ish rendering, no horizontal overflow on the inspected invoice surface, Work Item path still first, Pricebook fallback still present, manual add still exception/fresh-charge path, imported rows still rendered, and no behavior changes.
+
+Future end-of-road UX review note (deferred):
+- If job detail remains too dense after broader completion, evaluate a job-owned billing workspace route such as `/jobs/[id]/billing` or `/jobs/[id]/invoice`.
+- This is not current implementation work and is not an immediate roadmap commitment.
+- Any future route should remain job-owned and preserve job context, Work Item import behavior, issue/send/payment boundaries, permissions, and source-of-truth ownership while reusing existing invoice components where practical.
 
 That is already the locked business roadmap direction.
 

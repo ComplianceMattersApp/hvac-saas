@@ -304,7 +304,7 @@ export default function InternalInvoiceLineItemsTable({
 
       {lineItems.length === 0 ? (
         <div className="border-b border-dashed border-slate-200 bg-white/72 px-5 py-3.5 text-sm text-slate-600">
-          Start with the first charge below. Each row is an invoice charge and billed record.
+          Start with the first charge below. Each row is a billing line for this invoice.
         </div>
       ) : null}
 
@@ -319,13 +319,10 @@ export default function InternalInvoiceLineItemsTable({
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">Recommended Path: Build Invoice Charges from Work Items</div>
                 <div className="mt-1 text-xs leading-5 text-slate-500">
-                  Start from the Work Items already captured for this visit. Imported items become draft Invoice Charges for review before issue.
+                  Start from the Work Items already captured for this visit. Imported items become draft charges for this invoice.
                 </div>
                 <div className="mt-1 text-xs leading-5 text-slate-500">
                   Imported Work Items start as draft Invoice Charges with Qty 1.00 and Unit Price $0.00. Review and edit pricing before issuing.
-                </div>
-                <div className="mt-1 text-xs leading-5 text-slate-600">
-                  Work Items remain the operational work record. Invoice Charges are the billed copy used for this invoice.
                 </div>
               </div>
             </div>
@@ -374,7 +371,7 @@ export default function InternalInvoiceLineItemsTable({
               <div className="text-xs text-slate-500">
                 {eligibleVisitScopeItems.length === 0
                   ? 'All available Work Items are already on this draft invoice.'
-                  : 'Select one or more Work Items to add them as draft invoice charges.'}
+                  : 'Select one or more Work Items to add as draft charges.'}
               </div>
               <SubmitButton
                 loadingText="Adding..."

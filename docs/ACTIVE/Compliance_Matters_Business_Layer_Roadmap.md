@@ -72,6 +72,10 @@ It extends it.
   - `Add From Pricebook` now reads as fallback for charges not already captured as Work Items
   - manual `+ Add Charge` now reads as an exception/fallback path
   - transfer mechanics and defaults remain unchanged (`source_kind = visit_scope`, `source_visit_scope_item_id` preserved, `quantity = 1.00`, `unit_price = 0.00`)
+- Work Item-first Flow Copy Density Polish V1 is now implemented as a tiny UI-only copy/layout refinement:
+  - invoice/work-item helper language is trimmed and less technical
+  - Work Item path remains primary, Pricebook remains fallback, manual add remains exception/fresh-charge path
+  - behavior, transfer mechanics, and defaults remain unchanged
 - This V1 assist preserves source-of-truth boundaries:
   - Pricebook = reusable defaults/templates
   - Visit Scope / Work Items = operational work scope
@@ -92,11 +96,19 @@ It extends it.
   - no invoice issue/send/payment behavior change
   - no Visit Scope, Pricebook, estimate, Stripe tenant payment, or QBO behavior change
   - no automatic pricing, no Pricebook text matching, and no persisted Work Item provenance
+- The copy-density refinement preserves the same boundaries and guardrails:
+  - no schema or migration change
+  - no Supabase command or production data action
+  - no RLS/policy/auth or feature-flag change
+  - no invoice issue/send/payment behavior change
+  - no Visit Scope, Pricebook, estimate, Stripe tenant payment, or QBO behavior change
+  - no automatic pricing, no persisted provenance, and no truth-layer collapse
 - Deferred follow-on remains explicit and unimplemented:
   - persisted Pricebook provenance on Work Items
   - smarter defaulting/pricing from Work Items to draft Invoice Charges
   - Work Item commercial fields
   - broader invoice panel density cleanup
+- Future end-of-road UX review option (deferred and not current implementation): evaluate whether billing/invoice work should move into a job-owned workspace route such as `/jobs/[id]/billing` or `/jobs/[id]/invoice` only if job detail remains too dense after broader completion; do not split into disconnected invoice pages; preserve job context, Work Item import behavior, issue/send/payment boundaries, permissions, source-of-truth ownership, and existing invoice components where practical.
 - Maintenance Agreements / Recurring Services should remain modeled later as planned/recurring Work Items with commercial terms, not as billing-first records.
 
 ### Current status note (reporting/truth separation)

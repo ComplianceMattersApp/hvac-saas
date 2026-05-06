@@ -717,6 +717,15 @@ Mobile home-screen launch QA checklist (Slice 1):
   - no server-action/payload/hidden-field/import-default/pricing/schema/migration/Supabase/production-data/RLS/policy/auth/feature-flag/issue-send-payment/Visit Scope/Pricebook/estimate/Stripe tenant payment/QBO behavior changed
   - no smarter pricing, no Pricebook text matching, and no persisted Work Item provenance fields were introduced
   - validation passed: `npx.cmd tsc --noEmit`; targeted tests (`2` files / `24` tests); browser smoke confirmed Work Item import order/recommended emphasis, Pricebook fallback wording, manual exception/fallback wording, unchanged Qty `1.00` + Unit Price `$0.00` import defaults, unchanged editability, unchanged direct Pricebook add/manual add success, and unchanged issue gate behavior
+- Completed: Work Item-first Flow Copy Density Polish V1 is implemented and verified as a tiny copy/layout-only pass.
+  - invoice/work-item helper language is now less technical and more field-service friendly
+  - Work Item path remains primary
+  - Pricebook remains fallback
+  - manual add remains exception/fresh-charge path
+  - imported Work Items still become draft charges reviewed before issue
+  - explicit non-changes held: no server-action/payload/hidden-field/import-default/pricing/schema/migration/Supabase/production-data/RLS/policy/auth/feature-flag/issue-send-payment/Visit Scope/Pricebook/estimate/Stripe tenant payment/QBO behavior changes; no automatic pricing; no persisted provenance changes
+  - validation passed: `npx.cmd tsc --noEmit`; targeted tests (`2` files / `24` tests); browser smoke confirmed desktop and narrow/mobile-ish render, no horizontal overflow on inspected invoice surface, Work Item path/fallback/manual sections and imported rows still rendered, and no behavior drift
+- Future end-of-road UX review note (deferred, not current implementation): if job detail remains too dense after broader completion, evaluate a job-owned billing workspace such as `/jobs/[id]/billing` or `/jobs/[id]/invoice` while preserving job context, Work Item import behavior, issue/send/payment boundaries, permissions, source-of-truth ownership, and existing invoice components where practical.
 - Completed: Pricebook-assisted Work Item Creation V1 is implemented and verified (`6145f16`).
   - Work Item builder now includes optional `Start from Pricebook template` assist.
   - Template selection prefills Work Item `title` from Pricebook `item_name` and Work Item `details` from Pricebook `default_description`.
