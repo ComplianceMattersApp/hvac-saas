@@ -315,9 +315,9 @@ export default function InternalInvoiceLineItemsTable({
 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add From Pricebook</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Secondary Path: Add From Pricebook</div>
               <div className="mt-1 text-xs leading-5 text-slate-500">
-                Add Pricebook Services / Charges as frozen billed snapshots. Credits/negative adjustments are deferred.
+                Use Pricebook when a billed charge was not already captured as a Work Item. Added rows are draft Invoice Charges you can review before issue. Credits/negative adjustments are deferred.
               </div>
             </div>
           </div>
@@ -376,9 +376,12 @@ export default function InternalInvoiceLineItemsTable({
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Build Invoice Charges from Work Items</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">Recommended Path: Build Invoice Charges from Work Items</div>
                 <div className="mt-1 text-xs leading-5 text-slate-500">
-                  Add selected Work Items as draft invoice charges. Invoice Charges are billed records and should be reviewed before issue.
+                  Start from the Work Items already captured for this visit. Imported items become draft Invoice Charges you can review and edit before issuing.
+                </div>
+                <div className="mt-1 text-xs leading-5 text-slate-600">
+                  Work Items remain the operational work record. Invoice Charges are the billed copy used for this invoice.
                 </div>
               </div>
             </div>
