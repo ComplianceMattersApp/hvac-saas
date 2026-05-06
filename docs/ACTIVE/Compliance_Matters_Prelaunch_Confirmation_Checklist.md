@@ -694,6 +694,22 @@ Mobile home-screen launch QA checklist (Slice 1):
   - boundary copy now explicitly states Work Items remain operational record while Invoice Charges remain billed copy
   - `Add From Pricebook` remains available as a secondary/fallback path
   - no action/payload or behavior changes were introduced for Work Item import, Pricebook add, manual line handling, or issue/send/payment flows
+- Completed: Pricebook-assisted Work Item Creation V1 is implemented and verified (`6145f16`).
+  - Work Item builder now includes optional `Start from Pricebook template` assist.
+  - Template selection prefills Work Item `title` from Pricebook `item_name` and Work Item `details` from Pricebook `default_description`.
+  - Prefill behavior is create-or-prefill: fills existing blank Work Item when available, otherwise creates a new row within existing limits.
+  - Work Items remain fully editable after template prefill.
+  - Work Items continue saving through existing `visit_scope_items_json` payload.
+  - Assist is available in both intake and job-detail Work Item editing.
+  - Work Item-first boundary is reinforced: Pricebook helps start operational work records; Invoice Charges remain reviewed billed copies created later.
+  - Guardrails held:
+    - no schema or migration change
+    - no Supabase command or production data action
+    - no RLS/policy/auth or feature-flag change
+    - no persisted Work Item provenance fields
+    - no persisted Pricebook id/price/category/unit label/billing type on Work Items
+    - no server-action behavior expansion beyond existing Work Item JSON submission
+    - no invoice/payment/estimate/Stripe tenant payment/QBO behavior change
 - Completed: Shared Pricebook Entry UI Primitive V1 closeout is confirmed for current internal estimate/invoice drafting continuity.
   - estimate draft line entry and draft invoice line entry now use the same clean Pricebook-style entry pattern for reusable selection and manual line entry
   - this is UI consolidation only; schema, migrations, RLS/policy, server ownership, estimate lifecycle truth, invoice immutability, Visit Scope ownership, payment behavior, and production estimate gating are unchanged
@@ -701,6 +717,7 @@ Mobile home-screen launch QA checklist (Slice 1):
 - Completed validation (Estimate Detail Wording + Internal Scaffolding Collapse): `npx.cmd tsc --noEmit` passed; `npx.cmd vitest run lib/estimates` passed (`7` files / `127` tests).
 - Completed validation (Estimate Pricebook Editable Defaults V1): `npx.cmd tsc --noEmit` passed; `npx.cmd vitest run lib/estimates` passed (`7` files / `127` tests).
 - Completed validation (Work Item-first Invoice Builder Clarity V1): `npx.cmd tsc --noEmit` passed; targeted tests passed (`npx.cmd vitest run lib/actions/__tests__/internal-invoice-pricebook-line-actions.test.ts lib/business/__tests__/internal-invoice-line-items-provenance.test.ts` = `2` files / `24` tests).
+- Completed validation (Pricebook-assisted Work Item Creation V1): `npx.cmd tsc --noEmit` passed; targeted tests passed (`npx.cmd vitest run lib/jobs/__tests__/visit-scope.test.ts lib/actions/__tests__/job-intake-create-scope-hardening.test.ts lib/actions/__tests__/internal-invoice-pricebook-line-actions.test.ts lib/actions/__tests__/internal-invoice-scope-hardening.test.ts` = `4` files / `76` tests).
 - Completed validation (Shared Pricebook Entry UI Primitive V1 closeout): targeted validation passed and no new production/runbook/payment boundary was introduced.
 - Completed production readiness hardening guard: `createEstimateDraft` in `lib/estimates/estimate-actions.ts` now returns `{ success: false, error: "Estimates are currently unavailable." }` as the first statement when `ENABLE_ESTIMATES` is false or unset, running before `createClient`/auth/DB work. This was the sole identified pre-production code blocker from the readiness audit.
 - Completed production readiness hardening validation: `npx vitest run lib/estimates` passed (`127/127`), `npx tsc --noEmit` passed (`TSC_OK`). Tests confirm flag-off returns unavailable with no DB insert, no estimate_events insert, and flag-on valid create still passing. No migrations, Supabase commands, production data, email sends, feature flag enables, RLS/policy changes, or PDF/storage/customer/public/payment/conversion behavior were introduced.
@@ -731,6 +748,19 @@ Mobile home-screen launch QA checklist (Slice 1):
   - remove charge worked
   - no persistent feature breakage observed
   - transient dev-session navigation/request churn was observed and not treated as a blocker for this copy/UX slice
+- Completed browser smoke (Pricebook-assisted Work Item Creation V1):
+  - intake flow rendered `Start from Pricebook template`
+  - selected `Airflow Diagnostic` template
+  - Work Item title/details prefilled from template defaults
+  - title/details were edited and saved through job creation
+  - edited Work Item appeared on job detail
+  - job-detail Edit Work Items also supported template assist
+  - selected `Service Call` template and saved a second Work Item
+  - created draft invoice successfully
+  - imported Work Items into draft Invoice Charges successfully
+  - imported charge remained editable
+  - direct `Add Pricebook Item` invoice path still worked
+  - no invoice/payment/estimate/conversion behavior drift observed
 - Confirmed: estimate migrations are applied to sandbox only (`20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`).
 - Confirmed: sandbox project ref is `kvpesjdukqwwlgpkzfjm`.
 - Confirmed: production estimate migrations are not applied.

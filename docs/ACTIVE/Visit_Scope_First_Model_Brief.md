@@ -199,6 +199,13 @@ Pricebook-backed drafting should stay aligned to that boundary:
 - Estimate Pricebook Editable Defaults V1 is complete for draft estimate pre-add behavior: selected Pricebook values now prefill editable estimate draft fields before add while preserving `source_pricebook_item_id` provenance; this did not change Visit Scope ownership, invoice behavior, or post-add estimate editing.
 - Work Item-first Invoice Builder Clarity V1 is complete as copy/UX-only polish on draft internal invoice panel: Work Item import is now explicitly presented as the recommended path when Work Items exist, helper copy now states Work Items already captured for the visit can become draft Invoice Charges for review/edit before issue, boundary copy now explicitly preserves operational-vs-billed truth, and Pricebook add remains available as secondary/fallback.
 - This slice did not change Work Item-to-invoice transfer mechanics (`source_kind = visit_scope`, `source_visit_scope_item_id` preserved, default `quantity = 1.00`, default `unit_price = 0.00`) and did not change manual line behavior, issue/send/payment behavior, Visit Scope behavior, Pricebook behavior, estimate behavior, Stripe tenant payment behavior, or QBO behavior.
+- Pricebook-assisted Work Item Creation V1 is complete (`6145f16`) with model boundaries preserved:
+	- Work Item builder now includes optional `Start from Pricebook template` assist in both intake and job detail edit surfaces.
+	- Template selection now prefills Work Item `title` from Pricebook `item_name` and Work Item `details` from Pricebook `default_description`.
+	- Behavior is create-or-prefill: fills an existing blank Work Item when available, otherwise creates a new Work Item row within existing limits.
+	- Work Items remain fully editable after template prefill and continue saving through existing `visit_scope_items_json` submission.
+	- No Pricebook commercial/provenance fields are persisted onto Work Items in this slice.
+	- Validation passed: `npx.cmd tsc --noEmit`, targeted tests (`4` files / `76` tests), and browser smoke (intake prefill/edit/save, job-detail template assist, Work Item import to draft Invoice Charges, and direct draft invoice Add From Pricebook path).
 
 That is already the locked business roadmap direction.
 
@@ -258,7 +265,7 @@ Make the top of the job page scope-first, not invoice-first
 
 - Shared Pricebook Entry UI Primitive V1 is complete for estimate/invoice draft entry continuity only; this does not change Visit Scope ownership, lifecycle, or source-of-truth boundaries
 - completion/billable toggles on Visit Scope items are not implemented yet
-- Pricebook-backed Visit Scope defaults are not implemented yet
+- Pricebook-assisted Work Item template prefill is implemented for title/details only; persisted provenance and commercial-field carryover are not implemented
 - normalized Visit Scope item table redesign is not implemented yet
 - estimate-first/full estimate flow integration remains future work
 - automatic billing from Visit Scope without operator review is not implemented
@@ -275,6 +282,8 @@ Make the top of the job page scope-first, not invoice-first
 	- avoid duplicate entry
 
 	Future work remains deferred and not implemented by this slice:
-	- Pricebook -> Work Item assisted creation
+	- persisted Pricebook provenance on Work Items
+	- smarter defaulting/pricing from Work Items into draft Invoice Charges
+	- Work Item commercial fields
 	- smarter defaults for downstream commercial drafting
 	- broader invoice panel polish beyond this clarity pass

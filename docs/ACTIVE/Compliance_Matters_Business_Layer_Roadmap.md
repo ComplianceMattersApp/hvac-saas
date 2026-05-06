@@ -54,7 +54,24 @@ It extends it.
   - Payment = collected truth only where implemented
   - Pricebook = reusable catalog/default pricing truth
 - First implementation was intentionally wording-only.
-- Future Pricebook enhancement may add default field instructions and allow Pricebook Services / Charges to feed Work Items, Estimate Lines, and Invoice Charges, but that was not implemented in this pass.
+- Pricebook-assisted Work Item Creation V1 is now implemented (`6145f16`) as a UI-only operational assist:
+  - optional `Start from Pricebook template` control in Work Item builder
+  - Work Item `title` prefill from Pricebook `item_name`
+  - Work Item `details` prefill from Pricebook `default_description`
+  - create-or-prefill behavior (fill blank Work Item when available, otherwise add a new row within existing limits)
+  - Work Item save path remains existing `visit_scope_items_json` submission
+  - assist is available in intake and job-detail Work Item edit surfaces
+- This V1 assist preserves source-of-truth boundaries:
+  - Pricebook = reusable defaults/templates
+  - Visit Scope / Work Items = operational work scope
+  - Invoice Charges = billed commercial view
+  - Estimate Lines = proposed commercial view
+  - Payments = collected truth where implemented
+- Deferred follow-on remains explicit and unimplemented:
+  - persisted Pricebook provenance on Work Items
+  - smarter defaulting/pricing from Work Items to draft Invoice Charges
+  - Work Item commercial fields
+  - broader invoice panel polish
 - Maintenance Agreements / Recurring Services should remain modeled later as planned/recurring Work Items with commercial terms, not as billing-first records.
 
 ### Current status note (reporting/truth separation)

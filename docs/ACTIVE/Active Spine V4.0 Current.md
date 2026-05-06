@@ -13,6 +13,17 @@ Current Program Status Note (May 2026)
   - Invoice language remains downstream: Invoice Charges are billed truth; Work Items are operational scope, not billing records.
   - No schema, RLS, lifecycle, billing, payment, estimate, support console, or contractor-authority behavior changed.
 
+- Pricebook-assisted Work Item Creation V1 is complete (`6145f16`):
+  - Work Item builder now includes optional `Start from Pricebook template` assist.
+  - Template selection prefills Work Item `title` from Pricebook `item_name` and Work Item `details` from Pricebook `default_description`.
+  - Prefill behavior is create-or-prefill: fills an existing blank Work Item when available; otherwise creates a new Work Item row within existing item limits.
+  - Work Items remain fully editable after prefill and continue saving through existing `visit_scope_items_json` payload submission.
+  - Template assist is available in both internal job intake and job-detail Work Item editing.
+  - Product boundary is preserved: Pricebook starts the work record, Work Item remains operational truth for the visit, Invoice Charges remain reviewed billed copies created later.
+  - Validation is complete: `npx.cmd tsc --noEmit` passed; targeted tests passed (`4` files / `76` tests); browser smoke passed for intake prefill/edit/save, job-detail assist reuse, Work Item -> draft Invoice Charge import/edit, and direct Pricebook -> draft Invoice Charge add.
+  - Guardrails remain unchanged: no schema/migration/Supabase command/production data action/RLS/policy/auth/feature-flag change; no Work Item provenance fields persisted; no Pricebook id/price/category/unit label/billing type persisted to Work Items; no invoice/payment/estimate/Stripe/QBO behavior change.
+  - Deferred follow-on remains explicit: persisted Pricebook provenance on Work Items, smarter downstream defaulting/pricing from Work Items to Invoice Charges, Work Item commercial fields, and broader invoice panel polish.
+
 - Performance/responsiveness intervention batch is complete for the current pass and is now treated as closed for this pass.
 - Internal /jobs/[id] responsiveness hardening is complete for the current pass:
   - field action timing instrumentation shipped
