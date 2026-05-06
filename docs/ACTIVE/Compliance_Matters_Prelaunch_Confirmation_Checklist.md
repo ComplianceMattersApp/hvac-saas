@@ -253,6 +253,19 @@ If any item here conflicts with the active spine, the spine wins.
 - Chromium install prompt readiness may still require a future service-worker slice and is not implemented here.
 - iOS install flow remains manual Add to Home Screen guidance (no automatic browser install prompt path).
 
+### 2.3.8 Service Workflow / Visit Scope Field Experience V1 Slice 1 (completed)
+- Service job detail now uses clearer field-first Work Items guidance.
+- Prior "confirm the work" helper wording was replaced to avoid implying a required validation action.
+- Waiting/Interrupt State copy now clarifies that waiting explains why work is paused and does not replace Work Items / Visit Scope.
+- Create Next Service Visit copy now clarifies service-chain continuation, per-visit Work Items, and no automatic copy-forward.
+- Invoice language remains downstream: Invoice Charges are billed truth; Work Items are operational scope, not billing records.
+- No schema, RLS, lifecycle, billing, payment, estimate, support console, or contractor-authority behavior changed.
+
+Roadmap-forward note:
+- Future backlog: Line Item Source Consolidation / Pricebook-style Entry.
+- Long-term direction should reduce duplicate/similar line-item entry paths and favor selecting from Pricebook or adding manual line items through the same clean Pricebook-like entry pattern.
+- Preserve the boundary between Work Items, Estimate Lines, and Invoice Charges.
+
 Mobile home-screen launch QA checklist (Slice 1):
 - [ ] Unauthenticated home-screen launch routes cleanly to `/login`.
 - [ ] Authenticated internal user launch routes correctly to `/ops`.

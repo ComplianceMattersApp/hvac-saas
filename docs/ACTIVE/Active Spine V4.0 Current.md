@@ -5,6 +5,14 @@ Purpose: Align future development, audits, and thread handoffs to the current, s
 
 Current Program Status Note (May 2026)
 
+- Service Workflow / Visit Scope Field Experience V1 Slice 1 is complete:
+  - Service job detail now uses clearer field-first Work Items guidance.
+  - Prior "confirm the work" helper wording was replaced to avoid implying a required validation action.
+  - Waiting/Interrupt State copy now clarifies that waiting explains why work is paused and does not replace Work Items / Visit Scope.
+  - Create Next Service Visit copy now clarifies service-chain continuation, per-visit Work Items, and no automatic copy-forward.
+  - Invoice language remains downstream: Invoice Charges are billed truth; Work Items are operational scope, not billing records.
+  - No schema, RLS, lifecycle, billing, payment, estimate, support console, or contractor-authority behavior changed.
+
 - Performance/responsiveness intervention batch is complete for the current pass and is now treated as closed for this pass.
 - Internal /jobs/[id] responsiveness hardening is complete for the current pass:
   - field action timing instrumentation shipped

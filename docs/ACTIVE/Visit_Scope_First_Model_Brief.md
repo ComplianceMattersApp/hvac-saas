@@ -4,6 +4,14 @@
 
 ## Current status (baseline)
 
+- Service Workflow / Visit Scope Field Experience V1 Slice 1 is complete:
+	- Service job detail now uses clearer field-first Work Items guidance.
+	- Prior "confirm the work" helper wording was replaced to avoid implying a required validation action.
+	- Waiting/Interrupt State copy now clarifies that waiting explains why work is paused and does not replace Work Items / Visit Scope.
+	- Create Next Service Visit copy now clarifies service-chain continuation, per-visit Work Items, and no automatic copy-forward.
+	- Invoice language remains downstream: Invoice Charges are billed truth; Work Items are operational scope, not billing records.
+	- No schema, RLS, lifecycle, billing, payment, estimate, support console, or contractor-authority behavior changed.
+
 - Job detail is already mostly Visit Scope-first.
 - A helper line was added to reinforce workflow priority: "Scope first: confirm the work for this visit, then complete closeout and billing."
 - A1-A5 Visit Scope -> invoice bridge is production-promoted on main.
@@ -244,3 +252,6 @@ Make the top of the job page scope-first, not invoice-first
 - normalized Visit Scope item table redesign is not implemented yet
 - estimate-first/full estimate flow integration remains future work
 - automatic billing from Visit Scope without operator review is not implemented
+- Future backlog: Line Item Source Consolidation / Pricebook-style Entry.
+	- Long-term direction should reduce duplicate/similar line-item entry paths and favor selecting from Pricebook or adding manual line items through the same clean Pricebook-like entry pattern.
+	- Preserve the boundary between Work Items, Estimate Lines, and Invoice Charges.
