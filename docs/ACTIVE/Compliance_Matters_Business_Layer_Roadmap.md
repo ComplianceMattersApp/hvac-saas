@@ -61,12 +61,24 @@ It extends it.
   - create-or-prefill behavior (fill blank Work Item when available, otherwise add a new row within existing limits)
   - Work Item save path remains existing `visit_scope_items_json` submission
   - assist is available in intake and job-detail Work Item edit surfaces
+- Work Item Import Defaults Clarification V1 is now implemented (`8f79e07`) as UI-only invoice-panel clarification:
+  - Work Item import helper copy now explicitly states the current conservative draft-charge defaults
+  - exact helper copy: `Imported Work Items start as draft Invoice Charges with Qty 1.00 and Unit Price $0.00. Review and edit pricing before issuing.`
+  - Work Item-first billing flow is reinforced: Work Items remain operational work scope, imported Work Items become draft Invoice Charges, and Invoice Charges remain reviewed billed copies before issue
+  - existing transfer mechanics remain unchanged (`source_kind = visit_scope`, `source_visit_scope_item_id` preserved, `quantity = 1.00`, `unit_price = 0.00`)
 - This V1 assist preserves source-of-truth boundaries:
   - Pricebook = reusable defaults/templates
   - Visit Scope / Work Items = operational work scope
   - Invoice Charges = billed commercial view
   - Estimate Lines = proposed commercial view
   - Payments = collected truth where implemented
+- The import-defaults clarification preserves the same boundaries and guardrails:
+  - no schema or migration change
+  - no Supabase command or production data action
+  - no RLS/policy/auth or feature-flag change
+  - no invoice issue/send/payment behavior change
+  - no Visit Scope, Pricebook, estimate, Stripe tenant payment, or QBO behavior change
+  - no automatic pricing, no Pricebook text matching, and no persisted Work Item provenance
 - Deferred follow-on remains explicit and unimplemented:
   - persisted Pricebook provenance on Work Items
   - smarter defaulting/pricing from Work Items to draft Invoice Charges

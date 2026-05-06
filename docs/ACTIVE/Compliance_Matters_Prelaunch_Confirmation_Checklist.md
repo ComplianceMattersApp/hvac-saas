@@ -694,6 +694,18 @@ Mobile home-screen launch QA checklist (Slice 1):
   - boundary copy now explicitly states Work Items remain operational record while Invoice Charges remain billed copy
   - `Add From Pricebook` remains available as a secondary/fallback path
   - no action/payload or behavior changes were introduced for Work Item import, Pricebook add, manual line handling, or issue/send/payment flows
+- Completed: Work Item Import Defaults Clarification V1 is implemented and verified on draft internal invoice panel (`8f79e07`).
+  - helper copy now explicitly states the current conservative defaults for imported Work Items
+  - exact copy added: `Imported Work Items start as draft Invoice Charges with Qty 1.00 and Unit Price $0.00. Review and edit pricing before issuing.`
+  - Work Item-first billing flow is reinforced: Work Items remain the operational work record, imported Work Items become draft Invoice Charges, and Invoice Charges remain reviewed/edited billed copies before issue
+  - no smarter pricing was introduced
+  - no Pricebook text matching was introduced
+  - no persisted Work Item provenance fields were added
+  - no server-action behavior changed
+  - no payloads or hidden fields changed
+  - no import default values changed
+  - no schema/migration/Supabase/production-data/RLS/policy/auth/feature-flag/issue-send/payment/Visit Scope/Pricebook/estimate/Stripe tenant payment/QBO behavior changed
+  - validation passed: `npx.cmd tsc --noEmit`; targeted tests (`2` files / `24` tests); browser smoke confirmed helper copy visibility, successful Work Item import, unchanged qty `1.00` and unit price `$0.00` defaults, editability preserved, and unchanged issue gate/issue behavior
 - Completed: Pricebook-assisted Work Item Creation V1 is implemented and verified (`6145f16`).
   - Work Item builder now includes optional `Start from Pricebook template` assist.
   - Template selection prefills Work Item `title` from Pricebook `item_name` and Work Item `details` from Pricebook `default_description`.

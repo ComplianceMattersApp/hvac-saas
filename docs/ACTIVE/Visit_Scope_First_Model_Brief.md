@@ -199,6 +199,8 @@ Pricebook-backed drafting should stay aligned to that boundary:
 - Estimate Pricebook Editable Defaults V1 is complete for draft estimate pre-add behavior: selected Pricebook values now prefill editable estimate draft fields before add while preserving `source_pricebook_item_id` provenance; this did not change Visit Scope ownership, invoice behavior, or post-add estimate editing.
 - Work Item-first Invoice Builder Clarity V1 is complete as copy/UX-only polish on draft internal invoice panel: Work Item import is now explicitly presented as the recommended path when Work Items exist, helper copy now states Work Items already captured for the visit can become draft Invoice Charges for review/edit before issue, boundary copy now explicitly preserves operational-vs-billed truth, and Pricebook add remains available as secondary/fallback.
 - This slice did not change Work Item-to-invoice transfer mechanics (`source_kind = visit_scope`, `source_visit_scope_item_id` preserved, default `quantity = 1.00`, default `unit_price = 0.00`) and did not change manual line behavior, issue/send/payment behavior, Visit Scope behavior, Pricebook behavior, estimate behavior, Stripe tenant payment behavior, or QBO behavior.
+- Work Item Import Defaults Clarification V1 is also complete as copy/UX-only polish on the same draft internal invoice panel: the Work Item import area now explicitly states the current conservative defaults with helper copy, `Imported Work Items start as draft Invoice Charges with Qty 1.00 and Unit Price $0.00. Review and edit pricing before issuing.`
+- This clarification reinforces the locked boundary without changing mechanics: Work Items remain the operational work record, imported Work Items become draft Invoice Charges, Invoice Charges remain reviewed/edited billed copies before issue, no automatic pricing or Pricebook text matching was introduced, and no persisted Work Item provenance was added.
 - Pricebook-assisted Work Item Creation V1 is complete (`6145f16`) with model boundaries preserved:
 	- Work Item builder now includes optional `Start from Pricebook template` assist in both intake and job detail edit surfaces.
 	- Template selection now prefills Work Item `title` from Pricebook `item_name` and Work Item `details` from Pricebook `default_description`.
@@ -206,6 +208,7 @@ Pricebook-backed drafting should stay aligned to that boundary:
 	- Work Items remain fully editable after template prefill and continue saving through existing `visit_scope_items_json` submission.
 	- No Pricebook commercial/provenance fields are persisted onto Work Items in this slice.
 	- Validation passed: `npx.cmd tsc --noEmit`, targeted tests (`4` files / `76` tests), and browser smoke (intake prefill/edit/save, job-detail template assist, Work Item import to draft Invoice Charges, and direct draft invoice Add From Pricebook path).
+- Work Item Import Defaults Clarification V1 validation passed: `npx.cmd tsc --noEmit`; targeted tests (`2` files / `24` tests); and browser smoke confirming the helper copy appeared near Work Item import, imported Work Items still created draft Invoice Charges at qty `1.00` and unit price `$0.00`, imported charges remained editable, and issue behavior did not change.
 
 That is already the locked business roadmap direction.
 
