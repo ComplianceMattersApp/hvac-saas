@@ -7,6 +7,9 @@
 import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { addLineItemAction } from "./actions";
+import PricebookLineEntryFields, {
+  type PricebookEntryItem,
+} from "@/components/pricebook/PricebookLineEntryFields";
 
 const ITEM_TYPES = [
   { value: "service", label: "Service" },
@@ -21,15 +24,7 @@ const labelClass =
 const inputClass =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200";
 
-type PricebookPickerItem = {
-  id: string;
-  item_name: string;
-  item_type: string;
-  category: string | null;
-  default_description: string | null;
-  default_unit_price: number;
-  unit_label: string | null;
-};
+type PricebookPickerItem = PricebookEntryItem;
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
@@ -48,9 +43,6 @@ export default function AddLineItemForm({
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const [selectedPricebookId, setSelectedPricebookId] = useState("");
-
-  const selectedPricebookItem =
-    pricebookItems.find((item) => item.id === selectedPricebookId) ?? null;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -189,62 +181,41 @@ export default function AddLineItemForm({
             </div>
           ) : (
             <form onSubmit={handlePricebookSubmit} className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="add_pricebook_item_id" className={labelClass}>
-                    Pricebook Item <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    id="add_pricebook_item_id"
-                    name="source_pricebook_item_id"
-                    value={selectedPricebookId}
-                    onChange={(event) => setSelectedPricebookId(event.target.value)}
-                    required
-                    className={inputClass}
-                  >
-                    <option value="">Select an item…</option>
-                    {pricebookItems.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.item_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="add_pricebook_quantity" className={labelClass}>
-                    Quantity <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="add_pricebook_quantity"
-                    name="pricebook_quantity"
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0.01"
-                    defaultValue="1"
-                    required
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-
-              {selectedPricebookItem && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
-                  <div className="font-semibold text-slate-900">{selectedPricebookItem.item_name}</div>
-                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
-                    <span>Category: {selectedPricebookItem.category || "Uncategorized"}</span>
-                    <span>Type: {selectedPricebookItem.item_type}</span>
-                    <span>Unit: {selectedPricebookItem.unit_label || "unit"}</span>
-                    <span>Default Price: {formatCurrency(Number(selectedPricebookItem.default_unit_price ?? 0))}</span>
+              <PricebookLineEntryFields
+                items={pricebookItems}
+                selectedItemId={selectedPricebookId}
+                onSelectedItemIdChange={setSelectedPricebookId}
+                itemFieldName="source_pricebook_item_id"
+                quantityFieldName="pricebook_quantity"
+                itemLabel="Pricebook Item *"
+                quantityLabel="Quantity *"
+                itemSelectId="add_pricebook_item_id"
+                quantityInputId="add_pricebook_quantity"
+                labelClassName={labelClass}
+                inputClassName={inputClass}
+                quantityInputType="number"
+                quantityStep="0.01"
+                quantityMin="0.01"
+                quantityDefaultValue="1"
+                includeEmptyOption
+                emptyOptionLabel="Select an item..."
+                renderSelectedItem={(selectedPricebookItem) => (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+                    <div className="font-semibold text-slate-900">{selectedPricebookItem.item_name}</div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+                      <span>Category: {selectedPricebookItem.category || "Uncategorized"}</span>
+                      <span>Type: {selectedPricebookItem.item_type}</span>
+                      <span>Unit: {selectedPricebookItem.unit_label || "unit"}</span>
+                      <span>Default Price: {formatCurrency(Number(selectedPricebookItem.default_unit_price ?? 0))}</span>
+                    </div>
+                    {selectedPricebookItem.default_description && (
+                      <p className="mt-1.5 text-xs leading-5 text-slate-600">
+                        {selectedPricebookItem.default_description}
+                      </p>
+                    )}
                   </div>
-                  {selectedPricebookItem.default_description && (
-                    <p className="mt-1.5 text-xs leading-5 text-slate-600">
-                      {selectedPricebookItem.default_description}
-                    </p>
-                  )}
-                </div>
-              )}
+                )}
+              />
 
               <div className="flex justify-end">
                 <button

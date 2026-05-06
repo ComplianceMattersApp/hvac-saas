@@ -3,6 +3,9 @@
 import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import SubmitButton from '@/components/SubmitButton';
+import PricebookLineEntryFields, {
+  type PricebookEntryItem,
+} from '@/components/pricebook/PricebookLineEntryFields';
 import type { InternalInvoiceItemType, InternalInvoiceLineItemRecord } from '@/lib/business/internal-invoice';
 
 type InternalInvoiceActionResult = {
@@ -20,15 +23,7 @@ type InlineFeedback = {
   message: string;
 };
 
-type PricebookPickerItem = {
-  id: string;
-  item_name: string;
-  item_type: string;
-  category: string | null;
-  unit_label: string | null;
-  default_unit_price: number;
-  default_description: string | null;
-};
+type PricebookPickerItem = PricebookEntryItem;
 
 type VisitScopePickerItem = {
   id: string;
@@ -197,8 +192,6 @@ export default function InternalInvoiceLineItemsTable({
     pricebookPickerItems[0]?.id ?? '',
   );
   const [selectedVisitScopeItemIds, setSelectedVisitScopeItemIds] = useState<string[]>([]);
-  const selectedPricebookItem =
-    pricebookPickerItems.find((item) => item.id === selectedPricebookItemId) ?? null;
   const eligibleVisitScopeItems = visitScopePickerItems.filter((item) => !item.alreadyAdded);
 
   function toggleVisitScopeItem(itemId: string) {
@@ -331,49 +324,42 @@ export default function InternalInvoiceLineItemsTable({
 
           {pricebookPickerItems.length > 0 ? (
             <>
-              <div className="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(6.25rem,0.74fr)_auto] md:items-end">
-                <div>
-                  <label className={workspaceFieldLabelClass}>Pricebook Service / Charge</label>
-                  <select
-                    name="pricebook_item_id"
-                    value={selectedPricebookItemId}
-                    onChange={(event) => setSelectedPricebookItemId(event.target.value)}
-                    className={workspaceInputClass}
-                    required
-                  >
-                    {pricebookPickerItems.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.item_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className={workspaceFieldLabelClass}>Quantity</label>
-                  <input name="quantity" inputMode="decimal" defaultValue="1.00" className={workspaceInputClass} required />
-                </div>
-
-                <SubmitButton loadingText="Adding..." className={primaryButtonClass}>
-                  Add Pricebook Item
-                </SubmitButton>
-              </div>
-
-              {selectedPricebookItem ? (
-                <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
-                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    <span>{formatInternalInvoiceItemType(selectedPricebookItem.item_type)}</span>
-                    {selectedPricebookItem.category ? <span>• {selectedPricebookItem.category}</span> : null}
-                    {selectedPricebookItem.unit_label ? <span>• Unit: {selectedPricebookItem.unit_label}</span> : null}
+              <PricebookLineEntryFields
+                items={pricebookPickerItems}
+                selectedItemId={selectedPricebookItemId}
+                onSelectedItemIdChange={setSelectedPricebookItemId}
+                itemFieldName="pricebook_item_id"
+                quantityFieldName="quantity"
+                itemLabel="Pricebook Service / Charge"
+                quantityLabel="Quantity"
+                itemSelectId="invoice_pricebook_item_id"
+                quantityInputId="invoice_pricebook_quantity"
+                labelClassName={workspaceFieldLabelClass}
+                inputClassName={workspaceInputClass}
+                quantityDefaultValue="1.00"
+                gridClassName="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(6.25rem,0.74fr)_auto] md:items-end"
+                actionSlotClassName="md:self-end"
+                actionSlot={
+                  <SubmitButton loadingText="Adding..." className={primaryButtonClass}>
+                    Add Pricebook Item
+                  </SubmitButton>
+                }
+                renderSelectedItem={(selectedPricebookItem) => (
+                  <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      <span>{formatInternalInvoiceItemType(selectedPricebookItem.item_type)}</span>
+                      {selectedPricebookItem.category ? <span>• {selectedPricebookItem.category}</span> : null}
+                      {selectedPricebookItem.unit_label ? <span>• Unit: {selectedPricebookItem.unit_label}</span> : null}
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-900">
+                      Default Unit Price: {formatCurrencyFromAmount(selectedPricebookItem.default_unit_price)}
+                    </div>
+                    {selectedPricebookItem.default_description ? (
+                      <div className="mt-1 text-sm leading-6 text-slate-600">{selectedPricebookItem.default_description}</div>
+                    ) : null}
                   </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">
-                    Default Unit Price: {formatCurrencyFromAmount(selectedPricebookItem.default_unit_price)}
-                  </div>
-                  {selectedPricebookItem.default_description ? (
-                    <div className="mt-1 text-sm leading-6 text-slate-600">{selectedPricebookItem.default_description}</div>
-                  ) : null}
-                </div>
-              ) : null}
+                )}
+              />
             </>
           ) : (
             <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm leading-6 text-amber-900">
