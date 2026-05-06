@@ -380,6 +380,9 @@ export default function InternalInvoiceLineItemsTable({
                 <div className="mt-1 text-xs leading-5 text-slate-500">
                   Start from the Work Items already captured for this visit. Imported items become draft Invoice Charges you can review and edit before issuing.
                 </div>
+                <div className="mt-1 text-xs leading-5 text-slate-500">
+                  Imported Work Items start as draft Invoice Charges with Qty 1.00 and Unit Price $0.00. Review and edit pricing before issuing.
+                </div>
                 <div className="mt-1 text-xs leading-5 text-slate-600">
                   Work Items remain the operational work record. Invoice Charges are the billed copy used for this invoice.
                 </div>
