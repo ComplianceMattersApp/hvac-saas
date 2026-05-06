@@ -687,12 +687,20 @@ Mobile home-screen launch QA checklist (Slice 1):
   - manual estimate line add and draft remove remain working
   - sent/non-draft estimate lock behavior remains unchanged
   - no invoice or Visit Scope behavior changed
+- Completed: Work Item-first Invoice Builder Clarity V1 is implemented and verified on draft internal invoice panel.
+  - `Build Invoice Charges from Work Items` is now presented as the recommended path when Work Items are available
+  - helper copy now states operators should start from Work Items already captured for the visit
+  - helper copy now states imported items become draft Invoice Charges for review/edit before issue
+  - boundary copy now explicitly states Work Items remain operational record while Invoice Charges remain billed copy
+  - `Add From Pricebook` remains available as a secondary/fallback path
+  - no action/payload or behavior changes were introduced for Work Item import, Pricebook add, manual line handling, or issue/send/payment flows
 - Completed: Shared Pricebook Entry UI Primitive V1 closeout is confirmed for current internal estimate/invoice drafting continuity.
   - estimate draft line entry and draft invoice line entry now use the same clean Pricebook-style entry pattern for reusable selection and manual line entry
   - this is UI consolidation only; schema, migrations, RLS/policy, server ownership, estimate lifecycle truth, invoice immutability, Visit Scope ownership, payment behavior, and production estimate gating are unchanged
 - Completed validation (V1J baseline): `npx vitest run lib/estimates` passed (`123/123`), `npx tsc --noEmit` passed (`TSC_OK`).
 - Completed validation (Estimate Detail Wording + Internal Scaffolding Collapse): `npx.cmd tsc --noEmit` passed; `npx.cmd vitest run lib/estimates` passed (`7` files / `127` tests).
 - Completed validation (Estimate Pricebook Editable Defaults V1): `npx.cmd tsc --noEmit` passed; `npx.cmd vitest run lib/estimates` passed (`7` files / `127` tests).
+- Completed validation (Work Item-first Invoice Builder Clarity V1): `npx.cmd tsc --noEmit` passed; targeted tests passed (`npx.cmd vitest run lib/actions/__tests__/internal-invoice-pricebook-line-actions.test.ts lib/business/__tests__/internal-invoice-line-items-provenance.test.ts` = `2` files / `24` tests).
 - Completed validation (Shared Pricebook Entry UI Primitive V1 closeout): targeted validation passed and no new production/runbook/payment boundary was introduced.
 - Completed production readiness hardening guard: `createEstimateDraft` in `lib/estimates/estimate-actions.ts` now returns `{ success: false, error: "Estimates are currently unavailable." }` as the first statement when `ENABLE_ESTIMATES` is false or unset, running before `createClient`/auth/DB work. This was the sole identified pre-production code blocker from the readiness audit.
 - Completed production readiness hardening validation: `npx vitest run lib/estimates` passed (`127/127`), `npx tsc --noEmit` passed (`TSC_OK`). Tests confirm flag-off returns unavailable with no DB insert, no estimate_events insert, and flag-on valid create still passing. No migrations, Supabase commands, production data, email sends, feature flag enables, RLS/policy changes, or PDF/storage/customer/public/payment/conversion behavior were introduced.
@@ -713,6 +721,16 @@ Mobile home-screen launch QA checklist (Slice 1):
   - draft remove still worked
   - sent estimate remained locked
   - no invoice, payment, conversion, approval, PDF, or live-email behavior appeared
+- Completed browser smoke (Work Item-first Invoice Builder Clarity V1):
+  - create draft invoice worked
+  - add selected Work Items worked
+  - imported Work Item appeared and was marked `Already added`
+  - Add From Pricebook still worked
+  - manual add/edit/remove still worked
+  - save charge worked
+  - remove charge worked
+  - no persistent feature breakage observed
+  - transient dev-session navigation/request churn was observed and not treated as a blocker for this copy/UX slice
 - Confirmed: estimate migrations are applied to sandbox only (`20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`).
 - Confirmed: sandbox project ref is `kvpesjdukqwwlgpkzfjm`.
 - Confirmed: production estimate migrations are not applied.
@@ -770,6 +788,7 @@ Mobile home-screen launch QA checklist (Slice 1):
   - future response flow may include explicit customer approve/decline/request-change outcomes after dedicated design/gates
   - future estimate reporting, explicit estimate-to-job/service-visit conversion, explicit later estimate-to-invoice-charge conversion, multi-option/good-better-best quoting, and top-ribbon/nav workflow access remain deferred design tracks
   - future Work Item-first billing flow remains a separate audit/planning item: Work Items stay primary operational truth, free-text scope/notes stay narrative context, and Invoice Charges should eventually be buildable from existing Work Items with review/editing
+  - future slices may explore Pricebook -> Work Item assisted creation, smarter defaults, and broader invoice panel polish; those remain deferred and are not implemented by this slice
   - payment/deposit remains deferred until tenant payment execution is intentionally enabled
 
 ### 2.21 Contractor report delivery current-scope closeout (completed)

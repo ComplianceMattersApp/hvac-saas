@@ -197,6 +197,8 @@ Pricebook-backed drafting should stay aligned to that boundary:
 - those draft transactional rows remain editable records owned by the estimate/invoice workflow, not live catalog pointers
 - Visit Scope / Work Items remain the operational layer and should not be renamed into commercial truth
 - Estimate Pricebook Editable Defaults V1 is complete for draft estimate pre-add behavior: selected Pricebook values now prefill editable estimate draft fields before add while preserving `source_pricebook_item_id` provenance; this did not change Visit Scope ownership, invoice behavior, or post-add estimate editing.
+- Work Item-first Invoice Builder Clarity V1 is complete as copy/UX-only polish on draft internal invoice panel: Work Item import is now explicitly presented as the recommended path when Work Items exist, helper copy now states Work Items already captured for the visit can become draft Invoice Charges for review/edit before issue, boundary copy now explicitly preserves operational-vs-billed truth, and Pricebook add remains available as secondary/fallback.
+- This slice did not change Work Item-to-invoice transfer mechanics (`source_kind = visit_scope`, `source_visit_scope_item_id` preserved, default `quantity = 1.00`, default `unit_price = 0.00`) and did not change manual line behavior, issue/send/payment behavior, Visit Scope behavior, Pricebook behavior, estimate behavior, Stripe tenant payment behavior, or QBO behavior.
 
 That is already the locked business roadmap direction.
 
@@ -265,3 +267,14 @@ Make the top of the job page scope-first, not invoice-first
 	- Preserve the boundary between Work Items, Estimate Lines, and Invoice Charges.
 	- Future customer-centered estimate/invoice history, reporting views, conversion flows, and top-nav/profile access should layer on top of that boundary rather than collapsing Work Items into commercial rows.
 	- Future Work Item-first billing flow remains a separate audit/planning item: structured Work Items stay primary operational truth, free-text scope/notes remain narrative context, and Invoice Charges should eventually be buildable from existing Work Items with review/editing to avoid re-entry.
+
+	Work Item-first billing direction remains active after this closeout:
+	- enter the work once
+	- use it downstream
+	- review before billing
+	- avoid duplicate entry
+
+	Future work remains deferred and not implemented by this slice:
+	- Pricebook -> Work Item assisted creation
+	- smarter defaults for downstream commercial drafting
+	- broader invoice panel polish beyond this clarity pass
