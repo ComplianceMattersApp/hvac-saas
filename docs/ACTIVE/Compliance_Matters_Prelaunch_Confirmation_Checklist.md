@@ -678,11 +678,21 @@ Mobile home-screen launch QA checklist (Slice 1):
   - `Mark Sent Manually` helper copy now explicitly states lifecycle/status-only behavior with no email/PDF send side effect
   - `Send Estimate` remains communication-attempt wording only
   - send helper copy now explicitly states communication-attempt logging does not change estimate lifecycle status
+- Completed: Estimate Pricebook Editable Defaults V1 is implemented and verified on estimate draft Add from Pricebook.
+  - selecting a Pricebook item now prefills editable estimate line fields for item name, description, item type, category, unit label, quantity, and unit price
+  - users can edit the prefilled values before add
+  - added estimate line snapshots now use edited submitted values
+  - Pricebook provenance is preserved via `source_pricebook_item_id`
+  - no post-add estimate line editor was introduced
+  - manual estimate line add and draft remove remain working
+  - sent/non-draft estimate lock behavior remains unchanged
+  - no invoice or Visit Scope behavior changed
 - Completed: Shared Pricebook Entry UI Primitive V1 closeout is confirmed for current internal estimate/invoice drafting continuity.
   - estimate draft line entry and draft invoice line entry now use the same clean Pricebook-style entry pattern for reusable selection and manual line entry
   - this is UI consolidation only; schema, migrations, RLS/policy, server ownership, estimate lifecycle truth, invoice immutability, Visit Scope ownership, payment behavior, and production estimate gating are unchanged
 - Completed validation (V1J baseline): `npx vitest run lib/estimates` passed (`123/123`), `npx tsc --noEmit` passed (`TSC_OK`).
 - Completed validation (Estimate Detail Wording + Internal Scaffolding Collapse): `npx.cmd tsc --noEmit` passed; `npx.cmd vitest run lib/estimates` passed (`7` files / `127` tests).
+- Completed validation (Estimate Pricebook Editable Defaults V1): `npx.cmd tsc --noEmit` passed; `npx.cmd vitest run lib/estimates` passed (`7` files / `127` tests).
 - Completed validation (Shared Pricebook Entry UI Primitive V1 closeout): targeted validation passed and no new production/runbook/payment boundary was introduced.
 - Completed production readiness hardening guard: `createEstimateDraft` in `lib/estimates/estimate-actions.ts` now returns `{ success: false, error: "Estimates are currently unavailable." }` as the first statement when `ENABLE_ESTIMATES` is false or unset, running before `createClient`/auth/DB work. This was the sole identified pre-production code blocker from the readiness audit.
 - Completed production readiness hardening validation: `npx vitest run lib/estimates` passed (`127/127`), `npx tsc --noEmit` passed (`TSC_OK`). Tests confirm flag-off returns unavailable with no DB insert, no estimate_events insert, and flag-on valid create still passing. No migrations, Supabase commands, production data, email sends, feature flag enables, RLS/policy changes, or PDF/storage/customer/public/payment/conversion behavior were introduced.
@@ -694,6 +704,15 @@ Mobile home-screen launch QA checklist (Slice 1):
   - blocked `Record Send Attempt` writes communication truth while lifecycle status remained `Draft`
   - `Mark Sent Manually` transitioned lifecycle `Draft -> Sent`
   - no customer approval, PDF, conversion, payment/deposit, or live-email behavior surfaced
+- Completed authenticated sandbox smoke (Estimate Pricebook Editable Defaults V1):
+  - Pricebook item selected in draft estimate Add from Pricebook
+  - editable fields prefilled
+  - item name, description, quantity, and unit price edited before add
+  - added line displayed edited submitted values
+  - manual line add still worked
+  - draft remove still worked
+  - sent estimate remained locked
+  - no invoice, payment, conversion, approval, PDF, or live-email behavior appeared
 - Confirmed: estimate migrations are applied to sandbox only (`20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`).
 - Confirmed: sandbox project ref is `kvpesjdukqwwlgpkzfjm`.
 - Confirmed: production estimate migrations are not applied.
@@ -745,10 +764,12 @@ Mobile home-screen launch QA checklist (Slice 1):
 - Future roadmap notes recorded for later design only; not implemented by this closeout:
   - future estimate polish should target the same professional clarity standard already reached by contractor report delivery
   - completed in current baseline: workflow wording now separates `Send Estimate` from `Mark Sent Manually` more explicitly
+  - completed in current baseline: draft estimate Pricebook add now applies editable defaults before add while preserving provenance
   - future customer-centered estimate access/history may extend into customer profile/history, reporting, and standard nav once the guarded internal baseline is intentionally advanced
   - future estimate entry should support customer email/location prefill with explicit editability
   - future response flow may include explicit customer approve/decline/request-change outcomes after dedicated design/gates
   - future estimate reporting, explicit estimate-to-job/service-visit conversion, explicit later estimate-to-invoice-charge conversion, multi-option/good-better-best quoting, and top-ribbon/nav workflow access remain deferred design tracks
+  - future Work Item-first billing flow remains a separate audit/planning item: Work Items stay primary operational truth, free-text scope/notes stay narrative context, and Invoice Charges should eventually be buildable from existing Work Items with review/editing
   - payment/deposit remains deferred until tenant payment execution is intentionally enabled
 
 ### 2.21 Contractor report delivery current-scope closeout (completed)

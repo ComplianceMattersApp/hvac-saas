@@ -196,6 +196,7 @@ Pricebook-backed drafting should stay aligned to that boundary:
 - reusable Pricebook entries may prefill defaults into draft Estimate Lines or draft Invoice Charges
 - those draft transactional rows remain editable records owned by the estimate/invoice workflow, not live catalog pointers
 - Visit Scope / Work Items remain the operational layer and should not be renamed into commercial truth
+- Estimate Pricebook Editable Defaults V1 is complete for draft estimate pre-add behavior: selected Pricebook values now prefill editable estimate draft fields before add while preserving `source_pricebook_item_id` provenance; this did not change Visit Scope ownership, invoice behavior, or post-add estimate editing.
 
 That is already the locked business roadmap direction.
 
@@ -263,3 +264,4 @@ Make the top of the job page scope-first, not invoice-first
 	- Long-term direction should reduce duplicate/similar line-item entry paths and favor selecting from Pricebook or adding manual line items through the same clean Pricebook-like entry pattern.
 	- Preserve the boundary between Work Items, Estimate Lines, and Invoice Charges.
 	- Future customer-centered estimate/invoice history, reporting views, conversion flows, and top-nav/profile access should layer on top of that boundary rather than collapsing Work Items into commercial rows.
+	- Future Work Item-first billing flow remains a separate audit/planning item: structured Work Items stay primary operational truth, free-text scope/notes remain narrative context, and Invoice Charges should eventually be buildable from existing Work Items with review/editing to avoid re-entry.
