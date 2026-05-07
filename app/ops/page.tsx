@@ -610,7 +610,10 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
         "ops:primaryQueueReads:fieldWork",
         trackOpsTiming("ops:fieldWork:fetch", fieldWorkQ)
       ),
-      trackOpsTiming("ops:primaryQueueReads:callList", callListQ),
+      trackOpsTiming(
+        "ops:primaryQueueReads:callList",
+        trackOpsTiming("ops:callList:fetch", callListQ)
+      ),
       trackOpsTiming("ops:primaryQueueReads:closeoutSource", closeoutQ),
       trackOpsTiming("ops:primaryQueueReads:stillOpenExceptions", stillOpenQ),
       trackOpsTiming("ops:primaryQueueReads:attention", attentionQ),
@@ -632,9 +635,11 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
     (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
   );
   if (opsTimingEnabled) console.log(`[ops:fieldWork:postFilter] ${Date.now() - _t_fieldWorkPostFilter}ms`);
+  const _t_callListPostFilter = opsTimingEnabled ? Date.now() : 0;
   const callListJobs = (callListRes.data ?? []).filter(
     (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
   );
+  if (opsTimingEnabled) console.log(`[ops:callList:postFilter] ${Date.now() - _t_callListPostFilter}ms`);
   const closeoutSourceJobs = (closeoutRes.data ?? []).filter(
     (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
   );
