@@ -171,6 +171,10 @@ export default async function OpsPage({
   const sort = (sp.sort ?? "").trim() || "default";
   const panel = (sp.panel ?? "").trim().toLowerCase();
 
+  const opsTimingEnabled = process.env.OPS_TIMING_DEBUG === "true";
+  const _t_total = opsTimingEnabled ? Date.now() : 0;
+
+  const _t_actorContext = opsTimingEnabled ? Date.now() : 0;
   const actorContext = await getRequestActorContext();
   const supabase = actorContext.supabase;
   const user = actorContext.user;
@@ -194,6 +198,7 @@ export default async function OpsPage({
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
   const internalBusinessDisplayName = internalBusinessIdentity.display_name;
+  if (opsTimingEnabled) console.log(`[ops:actorContext] ${Date.now() - _t_actorContext}ms`);
 
   function digitsOnly(v?: string | null) {
   return String(v ?? "").replace(/\D/g, "");
@@ -279,6 +284,7 @@ function subtractBusinessDays(date: Date, days: number) {
     .eq("lifecycle_state", "active")
     .order("name", { ascending: true });
 
+  const _t_countsAndRetestReads = opsTimingEnabled ? Date.now() : 0;
   const [countsRes, resolvedRetestRes, activeRetestRes, contractorsRes] = await Promise.all([
     countsQ,
     resolvedRetestChildrenQ,
@@ -290,6 +296,7 @@ function subtractBusinessDays(date: Date, days: number) {
   if (resolvedRetestRes.error) throw resolvedRetestRes.error;
   if (activeRetestRes.error) throw activeRetestRes.error;
   if (contractorsRes.error) throw contractorsRes.error;
+  if (opsTimingEnabled) console.log(`[ops:countsAndRetestReads] ${Date.now() - _t_countsAndRetestReads}ms`);
 
   const countRows = countsRes.data ?? [];
   const resolvedRetestChildren = resolvedRetestRes.data ?? [];
@@ -579,6 +586,7 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
 
     bucketQ = applyCommonFilters(bucketQ);
 
+  const _t_primaryQueueReads = opsTimingEnabled ? Date.now() : 0;
     const [
       fieldWorkRes,
       callListRes,
@@ -604,6 +612,7 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
   if (attentionRes.error) throw attentionRes.error;
   if (operationalReportingJobsRes.error) throw operationalReportingJobsRes.error;
   if (bucketRes.error) throw bucketRes.error;
+  if (opsTimingEnabled) console.log(`[ops:primaryQueueReads] ${Date.now() - _t_primaryQueueReads}ms`);
 
   const fieldWorkJobs = (fieldWorkRes.data ?? []).filter(
     (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
@@ -649,6 +658,7 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
     }
   }
 
+  const _t_serviceCaseAndThroughputReads = opsTimingEnabled ? Date.now() : 0;
   const [reportingServiceCasesRes, throughputEventsRes] = await Promise.all([
     reportingServiceCaseIds.length
       ? supabase
@@ -661,6 +671,7 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
 
   if (reportingServiceCasesRes.error) throw reportingServiceCasesRes.error;
   if (throughputEventsRes.error) throw throughputEventsRes.error;
+  if (opsTimingEnabled) console.log(`[ops:serviceCaseAndThroughputReads] ${Date.now() - _t_serviceCaseAndThroughputReads}ms`);
 
   const reportingServiceCases = reportingServiceCasesRes.data ?? [];
   const throughputEventRows = (throughputEventsRes.data ?? []) as Array<{ event_type: string | null }>;
@@ -696,11 +707,13 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
     certs_complete: job?.certs_complete,
   }));
 
+  const _t_closeoutProjection = opsTimingEnabled ? Date.now() : 0;
   const { projectionsByJobId: closeoutProjectionByJobId } = await buildBillingTruthCloseoutProjectionMap({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
     jobs: closeoutProjectionJobInputs,
   });
+  if (opsTimingEnabled) console.log(`[ops:closeoutProjection] ${Date.now() - _t_closeoutProjection}ms`);
 
   const getCloseoutProjection = (job: any) =>
     closeoutProjectionByJobId.get(String(job?.id ?? "").trim()) ?? job;
@@ -766,6 +779,7 @@ const locationIds = Array.from(
   new Set(allJobs.map((j) => j.location_id).filter(Boolean))
 ) as string[];
 
+const _t_customerLocationMaps = opsTimingEnabled ? Date.now() : 0;
 const [custRes, locRes] = await Promise.all([
   customerIds.length
     ? supabase
@@ -784,6 +798,7 @@ const [custRes, locRes] = await Promise.all([
 
 if (custRes.error) throw custRes.error;
 if (locRes.error) throw locRes.error;
+if (opsTimingEnabled) console.log(`[ops:customerLocationMaps] ${Date.now() - _t_customerLocationMaps}ms`);
 
 const customersById = new Map((custRes.data ?? []).map((c: any) => [c.id, c]));
 const locationsById = new Map((locRes.data ?? []).map((l: any) => [l.id, l]));
@@ -1166,6 +1181,7 @@ const pendingInfoJobIds = uniqueAllOpenOpsJobs
   .map((j: any) => String(j.id ?? ""))
   .filter(Boolean);
 
+const _t_secondarySignalReads = opsTimingEnabled ? Date.now() : 0;
 const [pendingInfoTransitionRes, activeAssignmentDisplayMap, signalRes, unreadContractorAwarenessNotifications, failedRunsRes] = await Promise.all([
   pendingInfoJobIds.length
     ? supabase
@@ -1215,6 +1231,7 @@ const [pendingInfoTransitionRes, activeAssignmentDisplayMap, signalRes, unreadCo
 if (pendingInfoTransitionRes.error) throw pendingInfoTransitionRes.error;
 if (signalRes.error) throw signalRes.error;
 if (failedRunsRes.error) throw failedRunsRes.error;
+if (opsTimingEnabled) console.log(`[ops:secondarySignalReads] ${Date.now() - _t_secondarySignalReads}ms`);
 
 const pendingInfoTransitionEvents = pendingInfoTransitionRes.data ?? [];
 
@@ -2118,6 +2135,7 @@ function sectionCountPill(count: number, tone: "neutral" | "danger" = "neutral")
   return <span className={className}>{count} jobs</span>;
 }
 
+if (opsTimingEnabled) console.log(`[ops:totalBeforeRender] ${Date.now() - _t_total}ms`);
 return (
   <div className="mx-auto max-w-7xl space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 lg:space-y-4.5">
     {notice === "estimates_unavailable" ? (
