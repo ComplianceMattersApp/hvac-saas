@@ -2,6 +2,15 @@ import { requireInternalUser } from "@/lib/auth/internal-user";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
+function isOpsTimingEnabled() {
+  return process.env.OPS_TIMING_DEBUG === "true";
+}
+
+function finishOpsTiming(label: string, startedAt: number) {
+  if (!startedAt) return;
+  console.log(`[${label}] ${Date.now() - startedAt}ms`);
+}
+
 export type AssignableInternalUser = {
   user_id: string;
   role: "admin" | "office" | "tech";
@@ -83,6 +92,7 @@ async function resolveIdentitySourceMap(params: {
 
   if (!unresolvedIds.length) return identityById;
 
+  const _t_fallbackUserLookups = isOpsTimingEnabled() ? Date.now() : 0;
   const admin = createAdminClient();
 
   for (const userId of unresolvedIds) {
@@ -105,6 +115,8 @@ async function resolveIdentitySourceMap(params: {
       metadata_given_name: metadata.given_name ? String(metadata.given_name).trim() : null,
     });
   }
+
+  finishOpsTiming("ops:assignmentDisplayMap:fallbackUserLookups", _t_fallbackUserLookups);
 
   return identityById;
 }
@@ -270,21 +282,27 @@ export async function getActiveJobAssignmentDisplayMap(params: {
 
   if (!jobIds.length) return {};
 
+  const _t_assignmentsFetch = isOpsTimingEnabled() ? Date.now() : 0;
   const { data: rows, error } = await supabase
     .from("job_assignments")
     .select("job_id, user_id, is_primary, created_at")
     .in("job_id", jobIds)
     .eq("is_active", true);
 
+  finishOpsTiming("ops:assignmentDisplayMap:assignmentsFetch", _t_assignmentsFetch);
+
   if (error) throw error;
 
+  const _t_profileDisplayMap = isOpsTimingEnabled() ? Date.now() : 0;
   const userDisplayMap = await resolveUserDisplayMap({
     supabase,
     userIds: (rows ?? [])
       .map((row: any) => String(row?.user_id ?? "").trim())
       .filter(Boolean),
   });
+  finishOpsTiming("ops:assignmentDisplayMap:profileDisplayMap", _t_profileDisplayMap);
 
+  const _t_mapBuild = isOpsTimingEnabled() ? Date.now() : 0;
   const map: Record<string, ActiveJobAssignmentDisplay[]> = {};
 
   for (const row of rows ?? []) {
@@ -318,6 +336,8 @@ export async function getActiveJobAssignmentDisplayMap(params: {
       });
     });
   }
+
+  finishOpsTiming("ops:assignmentDisplayMap:mapBuild", _t_mapBuild);
 
   return map;
 }
