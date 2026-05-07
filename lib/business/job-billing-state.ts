@@ -8,6 +8,15 @@ import {
   type InternalInvoiceStatus,
 } from "@/lib/business/internal-invoice";
 
+function isOpsTimingEnabled() {
+  return process.env.OPS_TIMING_DEBUG === "true";
+}
+
+function finishOpsTiming(label: string, startedAt: number) {
+  if (!startedAt) return;
+  console.log(`[${label}] ${Date.now() - startedAt}ms`);
+}
+
 type InternalInvoiceSnapshot = Pick<InternalInvoiceRecord, "status" | "invoice_number" | "issued_at"> | null | undefined;
 
 export type JobBillingStateTone = "slate" | "amber" | "emerald" | "rose";
@@ -117,10 +126,12 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
   billingMode: BillingMode;
   projectionsByJobId: Map<string, BillingTruthCloseoutProjection>;
 }> {
+  const _t_billingMode = isOpsTimingEnabled() ? Date.now() : 0;
   const billingMode = await resolveBillingModeByAccountOwnerId({
     supabase: params.supabase,
     accountOwnerUserId: params.accountOwnerUserId,
   });
+  finishOpsTiming("ops:closeoutProjection:billingMode", _t_billingMode);
 
   const jobs = Array.isArray(params.jobs) ? params.jobs : [];
   const jobIds = Array.from(
@@ -134,11 +145,14 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
   const internalInvoiceByJobId = new Map<string, InternalInvoiceSnapshot>();
 
   if (billingMode === "internal_invoicing" && jobIds.length > 0) {
+    const _t_invoiceFetch = isOpsTimingEnabled() ? Date.now() : 0;
     const { data, error } = await params.supabase
       .from("internal_invoices")
       .select("job_id, status, invoice_number, issued_at")
       .neq("status", "void")
       .in("job_id", jobIds);
+
+    finishOpsTiming("ops:closeoutProjection:invoiceFetch", _t_invoiceFetch);
 
     if (error) throw error;
 
@@ -154,6 +168,7 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
     }
   }
 
+  const _t_mapBuild = isOpsTimingEnabled() ? Date.now() : 0;
   const projectionsByJobId = new Map<string, BillingTruthCloseoutProjection>();
 
   for (const job of jobs) {
@@ -176,6 +191,8 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
       billingState,
     });
   }
+
+  finishOpsTiming("ops:closeoutProjection:mapBuild", _t_mapBuild);
 
   return {
     billingMode,
