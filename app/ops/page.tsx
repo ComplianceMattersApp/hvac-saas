@@ -1206,49 +1206,64 @@ const pendingInfoJobIds = uniqueAllOpenOpsJobs
 
 const _t_secondarySignalReads = opsTimingEnabled ? Date.now() : 0;
 const [pendingInfoTransitionRes, activeAssignmentDisplayMap, signalRes, unreadContractorAwarenessNotifications, failedRunsRes] = await Promise.all([
-  pendingInfoJobIds.length
-    ? supabase
-        .from("job_events")
-        .select("job_id, created_at, meta")
-        .in("job_id", pendingInfoJobIds)
-        .eq("event_type", "ops_update")
-        .order("created_at", { ascending: false })
-        .range(0, 5000)
-    : Promise.resolve({ data: [], error: null }),
-  getActiveJobAssignmentDisplayMap({
-    supabase,
-    jobIds: allOpenOpsJobIds,
-  }),
-  allOpenOpsJobIds.length
-    ? supabase
-        .from("job_events")
-        .select("job_id, event_type, created_at, meta")
-        .in("job_id", allOpenOpsJobIds)
-        .in("event_type", [
-          "retest_ready_requested",
-          "contractor_job_created",
-          "contractor_report_sent",
-          "contractor_note",
-          "contractor_correction_submission",
-          "contractor_schedule_updated",
-          "attachment_added",
-          "permit_info_updated",
-        ])
-        .order("created_at", { ascending: false })
-    : Promise.resolve({ data: [], error: null }),
-  listInternalNotifications({
-    limit: 100,
-    onlyUnread: true,
-    filterKey: "contractor_updates",
-  }),
-  allOpenOpsJobIds.length
-    ? supabase
-        .from("ecc_test_runs")
-        .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, created_at")
-        .in("job_id", allOpenOpsJobIds)
-        .eq("is_completed", true)
-        .or("override_pass.eq.false,computed_pass.eq.false")
-    : Promise.resolve({ data: [], error: null }),
+  trackOpsTiming(
+    "ops:secondarySignalReads:pendingInfoTransitions",
+    pendingInfoJobIds.length
+      ? supabase
+          .from("job_events")
+          .select("job_id, created_at, meta")
+          .in("job_id", pendingInfoJobIds)
+          .eq("event_type", "ops_update")
+          .order("created_at", { ascending: false })
+          .range(0, 5000)
+      : Promise.resolve({ data: [], error: null })
+  ),
+  trackOpsTiming(
+    "ops:secondarySignalReads:assignmentDisplayMap",
+    getActiveJobAssignmentDisplayMap({
+      supabase,
+      jobIds: allOpenOpsJobIds,
+    })
+  ),
+  trackOpsTiming(
+    "ops:secondarySignalReads:contractorSignalEvents",
+    allOpenOpsJobIds.length
+      ? supabase
+          .from("job_events")
+          .select("job_id, event_type, created_at, meta")
+          .in("job_id", allOpenOpsJobIds)
+          .in("event_type", [
+            "retest_ready_requested",
+            "contractor_job_created",
+            "contractor_report_sent",
+            "contractor_note",
+            "contractor_correction_submission",
+            "contractor_schedule_updated",
+            "attachment_added",
+            "permit_info_updated",
+          ])
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null })
+  ),
+  trackOpsTiming(
+    "ops:secondarySignalReads:unreadContractorNotifications",
+    listInternalNotifications({
+      limit: 100,
+      onlyUnread: true,
+      filterKey: "contractor_updates",
+    })
+  ),
+  trackOpsTiming(
+    "ops:secondarySignalReads:failedEccRuns",
+    allOpenOpsJobIds.length
+      ? supabase
+          .from("ecc_test_runs")
+          .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, created_at")
+          .in("job_id", allOpenOpsJobIds)
+          .eq("is_completed", true)
+          .or("override_pass.eq.false,computed_pass.eq.false")
+      : Promise.resolve({ data: [], error: null })
+  ),
 ]);
 
 if (pendingInfoTransitionRes.error) throw pendingInfoTransitionRes.error;
@@ -1281,11 +1296,11 @@ function assignmentSummaryForJob(jobId: string) {
 const signalEvents = signalRes.data ?? [];
 
 const unreadContractorUpdateNotifications = unreadContractorAwarenessNotifications
-  .filter((notification) => {
+  .filter((notification: any) => {
     const jobId = String(notification.job_id ?? "").trim();
     return Boolean(jobId);
   })
-  .map((notification) => ({
+  .map((notification: any) => ({
     job_id: String(notification.job_id ?? "").trim(),
     notification_type: String(notification.notification_type ?? "").trim(),
     created_at: String(notification.created_at ?? "").trim(),
