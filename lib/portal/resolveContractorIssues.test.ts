@@ -15,7 +15,7 @@ describe("resolveContractorIssues", () => {
 
     expect(result.primaryIssue.group).toBe("in_progress");
     expect(result.primaryIssue.headline).toBe("Scheduled");
-    expect(result.statusLabel).toBe("In Progress");
+    expect(result.statusLabel).toBe("Scheduled");
     expect(result.bucket).toBe("in_progress");
   });
 

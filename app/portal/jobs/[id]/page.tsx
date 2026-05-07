@@ -132,10 +132,10 @@ function readContractorFailureSummaryV1(meta: any) {
 
 function formatPortalTimelineLabel(type?: string | null, meta?: any) {
   if (type === "contractor_note") {
-    return getEventAttachmentCount(meta) > 0 ? "Contractor response received" : "Contractor note received";
+    return getEventAttachmentCount(meta) > 0 ? "Response received" : "Note received";
   }
-  if (type === "contractor_correction_submission") return "Correction submission received";
-  if (type === "attachment_added") return "Attachment received";
+  if (type === "contractor_correction_submission") return "Ready for review received";
+  if (type === "attachment_added") return "File shared";
   if (type === "customer_attempt") return "Contact attempt logged";
   if (type === "retest_ready_requested") return "Retest ready requested";
   if (type === "contractor_report_sent") return "Contractor report shared";
@@ -180,20 +180,19 @@ function buildAddressLines(opts: {
   state?: string | null;
   zip?: string | null;
 }) {
-  const line1 = [opts.address1, opts.address2]
-    .map((v) => String(v ?? "").trim())
-    .filter(Boolean)
-    .join(" ");
+  const line1 = String(opts.address1 ?? "").trim();
+  const line2 = String(opts.address2 ?? "").trim();
 
   const cityState = [String(opts.city ?? "").trim(), String(opts.state ?? "").trim()]
     .filter(Boolean)
     .join(", ");
 
-  const line2 = [cityState, String(opts.zip ?? "").trim()].filter(Boolean).join(" ");
+  const line3 = [cityState, String(opts.zip ?? "").trim()].filter(Boolean).join(" ");
 
   return {
     line1: line1 || "",
     line2: line2 || "",
+    line3: line3 || "",
   };
 }
 
@@ -252,6 +251,44 @@ function portalIssueTheme(group: string) {
   };
 }
 
+function portalStatusBadgeTheme(label: string, fallbackGroup: string) {
+  const normalized = String(label ?? "").trim().toLowerCase();
+
+  if (normalized === "scheduled" || normalized === "retest scheduled") {
+    return {
+      badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300",
+      label,
+    };
+  }
+
+  if (normalized === "waiting for scheduling" || normalized === "on hold") {
+    return {
+      badgeClass: "border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-900/55 dark:text-slate-200",
+      label,
+    };
+  }
+
+  if (normalized === "under review") {
+    return {
+      badgeClass: "border-cyan-200 bg-cyan-50 text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-300",
+      label,
+    };
+  }
+
+  if (normalized === "final processing" || normalized === "final paperwork") {
+    return {
+      badgeClass: "border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300",
+      label,
+    };
+  }
+
+  const fallbackTheme = portalIssueTheme(fallbackGroup);
+  return {
+    badgeClass: fallbackTheme.badgeClass,
+    label: fallbackTheme.statusLabel,
+  };
+}
+
 export default async function PortalJobDetailPage({
   params,
   searchParams,
@@ -279,9 +316,6 @@ export default async function PortalJobDetailPage({
 
   if (cuErr) throw cuErr;
   if (!cu?.contractor_id) redirect("/ops");
-
-  const contractorName =
-    (cu as any)?.contractors?.name ?? (cu?.contractor_id ? "Contractor" : "-");
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
@@ -468,6 +502,7 @@ export default async function PortalJobDetailPage({
     (testRuns ?? []).find((r: any) => r.is_completed && finalRunPass(r) === false) ?? null;
 
   const opsStatus = String((job as any)?.ops_status ?? "").toLowerCase();
+  const isScheduledOps = opsStatus === "scheduled";
   const isEccJob = String((job as any)?.job_type ?? "").trim().toLowerCase() === "ecc";
   const isPortalFailed = ["failed", "pending_office_review", "retest_needed"].includes(opsStatus);
   const canRequestRetestReady = isEccJob && opsStatus === "failed";
@@ -558,6 +593,10 @@ export default async function PortalJobDetailPage({
   const statusExplanation = useLatestReportSummaryForCurrentStatus
     ? latestSentFailureSummary?.contractor_safe_summary || primaryIssue.explanation
     : primaryIssue.explanation;
+  const displayStatusHeadline = isScheduledOps ? "Visit booked" : statusHeadline;
+  const displayStatusExplanation = isScheduledOps
+    ? "Review the service date and arrival window for timing."
+    : statusExplanation;
   const statusDetailLines =
     useLatestReportSummaryForCurrentStatus && (latestSentFailureSummary?.what_needs_correction?.length ?? 0) > 0
       ? latestSentFailureSummary?.what_needs_correction
@@ -566,8 +605,8 @@ export default async function PortalJobDetailPage({
     ? latestSentFailureSummary?.next_step || resolvedIssues.nextStep
     : resolvedIssues.nextStep;
   const normalizedStatusNextStep = normalizeMessageForCompare(rawStatusNextStep);
-  const normalizedStatusHeadline = normalizeMessageForCompare(statusHeadline);
-  const normalizedStatusExplanation = normalizeMessageForCompare(statusExplanation);
+  const normalizedStatusHeadline = normalizeMessageForCompare(displayStatusHeadline);
+  const normalizedStatusExplanation = normalizeMessageForCompare(displayStatusExplanation);
   const normalizedStatusDetailLines = new Set(
     (statusDetailLines ?? []).map((line: string) => normalizeMessageForCompare(line)).filter(Boolean)
   );
@@ -577,12 +616,13 @@ export default async function PortalJobDetailPage({
     !normalizedStatusDetailLines.has(normalizedStatusNextStep) &&
     (
       Boolean(latestSentFailureSummary?.next_step) ||
-      !["pending_info", "failed", "retest_needed", "pending_office_review"].includes(opsStatus)
+      !["pending_info", "failed", "retest_needed", "pending_office_review", "scheduled"].includes(opsStatus)
     );
   const statusNextStep = showStatusNextStep ? rawStatusNextStep : "";
   const issueTheme = portalIssueTheme(primaryIssue.group);
+  const statusBadge = portalStatusBadgeTheme(resolvedIssues.statusLabel, primaryIssue.group);
   const customerPhoneHref = customerPhone !== "-" && digitsOnly(customerPhone) ? `tel:${digitsOnly(customerPhone)}` : "";
-  const heroStatusPreview = summarizePlainText(statusNextStep || statusExplanation || resolvedIssues.nextStep, 110);
+  const heroStatusPreview = isScheduledOps ? "" : summarizePlainText(statusNextStep || displayStatusExplanation || resolvedIssues.nextStep, 110);
   const serviceDatePrimary = (job as any).scheduled_date ? formatBusinessDateUS(String((job as any).scheduled_date)) : "Scheduling pending";
   const serviceDateSecondary = (job as any).window_start && (job as any).window_end
     ? `${formatTimeLocal((job as any).window_start)}-${formatTimeLocal((job as any).window_end)}`
@@ -750,14 +790,14 @@ export default async function PortalJobDetailPage({
           >
             Back to portal
           </Link>
-          <div className={`inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] ${issueTheme.badgeClass}`}>
-            {issueTheme.statusLabel}
+          <div className={`inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] ${statusBadge.badgeClass}`}>
+            {statusBadge.label}
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 md:items-stretch">
           <div className="space-y-3">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{contractorName}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Customer / Site Contact</div>
 
             <div className="text-[clamp(1.7rem,4vw,2.35rem)] font-semibold tracking-[-0.03em] leading-tight text-slate-950 dark:text-slate-100">{customerName}</div>
             <div className="text-base font-semibold text-slate-700 dark:text-slate-300">{String((job as any).title ?? "Job")}</div>
@@ -774,7 +814,10 @@ export default async function PortalJobDetailPage({
               {addressDisplay.line2 ? (
                 <div className="text-sm text-slate-500 dark:text-slate-400">{addressDisplay.line2}</div>
               ) : null}
-              {!addressDisplay.line1 && !addressDisplay.line2 ? (
+              {addressDisplay.line3 ? (
+                <div className="text-sm text-slate-500 dark:text-slate-400">{addressDisplay.line3}</div>
+              ) : null}
+              {!addressDisplay.line1 && !addressDisplay.line2 && !addressDisplay.line3 ? (
                 <div className="text-sm text-slate-500 dark:text-slate-400">Address not available</div>
               ) : null}
             </div>
@@ -805,7 +848,7 @@ export default async function PortalJobDetailPage({
           <div className={`rounded-xl border p-4 ${issueTheme.surfaceClass}`}>
             <div className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${issueTheme.eyebrowClass}`}>Current Status</div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-slate-950 dark:text-slate-100">{primaryIssue.headline}</span>
+              <span className="font-semibold text-slate-950 dark:text-slate-100">{displayStatusHeadline}</span>
               {isPendingInfoOps ? (
                 <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
                   More info needed
@@ -839,14 +882,11 @@ export default async function PortalJobDetailPage({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-2xl">
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Current status</div>
-            <div className="mt-2 text-[1.55rem] font-semibold tracking-[-0.025em] text-slate-950 dark:text-slate-100">{statusHeadline}</div>
-          </div>
-          <div className={`inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] ${issueTheme.badgeClass}`}>
-            {issueTheme.statusLabel}
+            <div className="mt-2 text-[1.55rem] font-semibold tracking-[-0.025em] text-slate-950 dark:text-slate-100">{displayStatusHeadline}</div>
           </div>
         </div>
-        {statusExplanation ? (
-          <div className="max-w-3xl text-sm leading-7 text-slate-700 dark:text-slate-200">{statusExplanation}</div>
+        {displayStatusExplanation ? (
+          <div className="max-w-3xl text-sm leading-7 text-slate-700 dark:text-slate-200">{displayStatusExplanation}</div>
         ) : null}
 
         {(statusDetailLines ?? []).slice(0, 4).length > 0 ? (
@@ -873,9 +913,9 @@ export default async function PortalJobDetailPage({
 
         {latestRaterNote ? (
           <div className={portalInsetClass}>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Additional Note</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Latest update</div>
             <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              This note is separate from the issue summary above.
+              Most recent note from our team.
             </div>
             <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800 dark:text-slate-200">{latestRaterNote}</div>
           </div>
@@ -956,7 +996,7 @@ export default async function PortalJobDetailPage({
         <div>
           <div className="text-base font-semibold text-slate-950 dark:text-slate-100">Contractor Actions</div>
           <div className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-            Share updates, request review when corrections are complete, and keep the job record current.
+            Send notes, photos, or completion updates to our team.
           </div>
         </div>
 
@@ -990,7 +1030,7 @@ export default async function PortalJobDetailPage({
           <div>
             <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">Add contractor note</div>
             <div className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Share progress, context, or questions that should stay with the job record.
+              Share a question, field update, or anything we should know.
             </div>
           </div>
           {noteError === "empty_note" ? (
@@ -1070,7 +1110,7 @@ export default async function PortalJobDetailPage({
       <section className={`${portalPanelClass} space-y-4`}>
         <div className="space-y-1">
           <div className="text-base font-semibold text-slate-950 dark:text-slate-100">Photos &amp; Files</div>
-          <div className="text-sm leading-6 text-slate-600 dark:text-slate-300">Add photos or documents related to this job.</div>
+          <div className="text-sm leading-6 text-slate-600 dark:text-slate-300">Share job photos, documents, or correction evidence.</div>
         </div>
         <JobAttachments jobId={jobId} initialItems={sharedAttachmentItems} />
       </section>
@@ -1078,7 +1118,7 @@ export default async function PortalJobDetailPage({
       <section className={`${portalPanelClass} space-y-4`}>
         <div>
           <div className="text-base font-semibold text-slate-950 dark:text-slate-100">Timeline</div>
-          <div className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">A simplified history of updates that are visible in the portal.</div>
+          <div className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">Recent updates shared on this job.</div>
         </div>
 
         {timelineEvents.length === 0 ? (

@@ -191,7 +191,7 @@ export default function JobAttachments({
       <div className="flex items-center justify-between border-b border-slate-200/80 bg-slate-50/80 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
         <div>
           <div className="text-sm font-semibold text-slate-950 dark:text-slate-100">Photos / Documents</div>
-          <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Share supporting files or submit corrections for review.</div>
+          <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Add files for this job or send completed corrections for review.</div>
         </div>
         <div className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
           {initialItems?.length ?? 0} files
@@ -254,7 +254,7 @@ export default function JobAttachments({
         {/* Intent */}
 <div className="space-y-2">
   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-    What are you sending this for?
+    Upload purpose
   </div>
 
   <div className="flex flex-col sm:flex-row gap-2">
@@ -270,7 +270,7 @@ export default function JobAttachments({
       <div>
         <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Upload only</div>
         <div className="text-xs leading-5 text-slate-600 dark:text-slate-300">
-          Share photos/documents (ex: model/serial photos). No retest request.
+          Share photos or documents. No review request.
         </div>
       </div>
     </label>
@@ -285,9 +285,9 @@ export default function JobAttachments({
         disabled={isPending}
       />
       <div>
-        <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Correction / Ready for review</div>
+        <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Ready for review</div>
         <div className="text-xs leading-5 text-slate-600 dark:text-slate-300">
-          Marks this job as “Needs internal review” (usually leads to a retest).
+          Tell our team the correction work is complete.
         </div>
       </div>
     </label>
@@ -296,7 +296,7 @@ export default function JobAttachments({
 
 {/* Action */}
 <div className="text-xs text-slate-500 dark:text-slate-300">
-If this job failed testing, choose &quot;Correction / Ready for review&quot;.
+If this job failed testing, choose &quot;Ready for review&quot; after corrections are complete.
 </div>
 <button
   type="button"
@@ -368,7 +368,7 @@ If this job failed testing, choose &quot;Correction / Ready for review&quot;.
                         </a>
                       ) : (
                         <span className="shrink-0 text-xs text-slate-500 dark:text-slate-300">
-                          (no link)
+                          Preview unavailable
                         </span>
                       )}
                     </div>

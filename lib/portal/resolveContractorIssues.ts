@@ -434,7 +434,7 @@ export function resolveContractorIssues(
       ? "Needs Info"
       : primaryIssue.group === "passed"
       ? "Passed"
-      : "In Progress";
+      : primaryIssue.headline;
 
   let nextStep = primaryIssue.explanation ?? primaryIssue.headline;
 
