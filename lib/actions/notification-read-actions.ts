@@ -49,6 +49,24 @@ export type NotificationRowForUI = NotificationRow & {
 
 const DEFAULT_READ_RETENTION_DAYS = 30;
 
+function isOpsNotificationTimingEnabled(): boolean {
+  return process.env.OPS_TIMING_DEBUG === "true";
+}
+
+function finishOpsNotificationTiming(label: string, startedAt: number): void {
+  if (!startedAt) return;
+  console.log(`[${label}] ${Date.now() - startedAt}ms`);
+}
+
+async function trackOpsNotificationTiming<T>(label: string, value: PromiseLike<T>): Promise<T> {
+  const startedAt = isOpsNotificationTimingEnabled() ? Date.now() : 0;
+  try {
+    return await value;
+  } finally {
+    finishOpsNotificationTiming(label, startedAt);
+  }
+}
+
 async function buildProposalEnrichmentMap(
   supabase: any,
   rows: NotificationRow[]
@@ -390,10 +408,16 @@ export async function listInternalNotifications(params: {
   }
 
   const limit = params.limit ?? 50;
-  const { data, error } = await query.limit(limit);
+  const { data, error } = await trackOpsNotificationTiming(
+    "ops:notifications:fetch",
+    query.limit(limit)
+  );
 
   if (error) throw error;
 
+  const shouldTrackMapAndFilter = isOpsNotificationTimingEnabled();
+  let mapAndFilterMs = 0;
+  const mapAndFilterStartedAt = shouldTrackMapAndFilter ? Date.now() : 0;
   const nowMs = Date.now();
   const readRetentionCutoffMs = nowMs - DEFAULT_READ_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
@@ -419,11 +443,19 @@ export async function listInternalNotifications(params: {
   );
 
   const visibilityRows = dedupeProposalVisibilityRows(filteredRows).slice(0, limit);
+  if (mapAndFilterStartedAt) mapAndFilterMs += Date.now() - mapAndFilterStartedAt;
 
-  const proposalEnrichmentMap = await buildProposalEnrichmentMap(supabase, visibilityRows);
-  const jobEnrichmentMap = await buildJobEnrichmentMap(supabase, visibilityRows);
+  const proposalEnrichmentMap = await trackOpsNotificationTiming(
+    "ops:notifications:proposalEnrichment",
+    buildProposalEnrichmentMap(supabase, visibilityRows)
+  );
+  const jobEnrichmentMap = await trackOpsNotificationTiming(
+    "ops:notifications:jobEnrichment",
+    buildJobEnrichmentMap(supabase, visibilityRows)
+  );
 
-  return visibilityRows.map(row => {
+  const finalMapStartedAt = shouldTrackMapAndFilter ? Date.now() : 0;
+  const rowsForUI = visibilityRows.map(row => {
     const submissionId = proposalSubmissionId(row);
     const enrichment = (submissionId && proposalEnrichmentMap.get(submissionId)) || null;
     const jobId = String(row.job_id ?? "").trim() || null;
@@ -435,6 +467,9 @@ export async function listInternalNotifications(params: {
       job_enrichment: jobEnrichment,
     };
   });
+  if (finalMapStartedAt) mapAndFilterMs += Date.now() - finalMapStartedAt;
+  if (shouldTrackMapAndFilter) console.log(`[ops:notifications:mapAndFilter] ${mapAndFilterMs}ms`);
+  return rowsForUI;
 }
 
 export async function markNotificationAsRead(input: {
