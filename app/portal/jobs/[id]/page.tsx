@@ -591,6 +591,9 @@ export default async function PortalJobDetailPage({
     : "We will share the service time once it is set.";
   const permitDisplayValue = String((job as any).permit_number ?? "").trim();
   const permitSupportText = permitDisplayValue ? "Permit reference on file." : "We still need the permit number for this job.";
+  const jurisdictionDisplayValue = String((job as any).jurisdiction ?? "").trim();
+  const permitDateDisplayValue = String((job as any).permit_date ?? "").trim();
+  const hasPermitDetails = Boolean(permitDisplayValue || jurisdictionDisplayValue || permitDateDisplayValue);
 
   const timelineEvents = contractorSafeEvents.filter((e: any) => {
     const type = String(e?.event_type ?? "");
@@ -879,6 +882,32 @@ export default async function PortalJobDetailPage({
         ) : null}
       </section>
 
+
+        {hasPermitDetails ? (
+          <section className={`${portalPanelClass} space-y-4`}>
+            <div className="text-base font-semibold text-slate-950 dark:text-slate-100">Permit / Job Details</div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 text-sm">
+              {permitDisplayValue ? (
+                <div className={portalInsetClass}>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Permit #</div>
+                  <div className="mt-1 font-medium text-slate-900 dark:text-slate-100">{permitDisplayValue}</div>
+                </div>
+              ) : null}
+              {jurisdictionDisplayValue ? (
+                <div className={portalInsetClass}>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Jurisdiction</div>
+                  <div className="mt-1 font-medium text-slate-900 dark:text-slate-100">{jurisdictionDisplayValue}</div>
+                </div>
+              ) : null}
+              {permitDateDisplayValue ? (
+                <div className={portalInsetClass}>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Permit Date</div>
+                  <div className="mt-1 font-medium text-slate-900 dark:text-slate-100">{formatDateLA(permitDateDisplayValue)}</div>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
       {latestSentReportMeta ? (
         <section className={`${portalPanelClass} space-y-3`}>

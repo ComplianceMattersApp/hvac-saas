@@ -375,4 +375,23 @@ describe("contractor portal intake proposal scope hardening", () => {
     ]);
     expect(fixture.insertedComments).toHaveLength(0);
   });
+
+  it("proposed_permit_number is present in proposal detail read model when submitted", async () => {
+    const fixtureWithPermit = makeAdminFixture();
+    (fixtureWithPermit.sameContractorSubmission as any).proposed_permit_number = "B-2026-00123";
+    (fixtureWithPermit.sameContractorSubmission as any).proposed_jurisdiction = "City of Pasadena";
+
+    const { getContractorIntakeProposalPortalDetail } = await import(
+      "@/lib/portal/intake-proposal-read-model"
+    );
+
+    const detail = await getContractorIntakeProposalPortalDetail({
+      context: sameContractorContext,
+      submissionId: fixtureWithPermit.sameContractorSubmission.id,
+      admin: fixtureWithPermit.admin,
+    });
+
+    expect(detail?.submission?.proposed_permit_number).toBe("B-2026-00123");
+    expect(detail?.submission?.proposed_jurisdiction).toBe("City of Pasadena");
+  });
 });
