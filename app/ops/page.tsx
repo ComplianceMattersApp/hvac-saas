@@ -174,7 +174,7 @@ export default async function OpsPage({
   const opsTimingEnabled = process.env.OPS_TIMING_DEBUG === "true";
   const _t_total = opsTimingEnabled ? Date.now() : 0;
 
-  const _t_actorContext = opsTimingEnabled ? Date.now() : 0;
+  const _t_requestActorContext = opsTimingEnabled ? Date.now() : 0;
   const actorContext = await getRequestActorContext();
   const supabase = actorContext.supabase;
   const user = actorContext.user;
@@ -192,13 +192,16 @@ export default async function OpsPage({
   }
 
   const internalUser = actorContext.internalUser;
+  if (opsTimingEnabled) console.log(`[ops:requestActorContext] ${Date.now() - _t_requestActorContext}ms`);
 
-  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+  const _t_businessIdentity = opsTimingEnabled ? Date.now() : 0;
+  const internalBusinessIdentityPromise = resolveInternalBusinessIdentityByAccountOwnerId({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
+  }).then((result) => {
+    if (opsTimingEnabled) console.log(`[ops:businessIdentity] ${Date.now() - _t_businessIdentity}ms`);
+    return result;
   });
-  const internalBusinessDisplayName = internalBusinessIdentity.display_name;
-  if (opsTimingEnabled) console.log(`[ops:actorContext] ${Date.now() - _t_actorContext}ms`);
 
   function digitsOnly(v?: string | null) {
   return String(v ?? "").replace(/\D/g, "");
@@ -802,6 +805,9 @@ if (opsTimingEnabled) console.log(`[ops:customerLocationMaps] ${Date.now() - _t_
 
 const customersById = new Map((custRes.data ?? []).map((c: any) => [c.id, c]));
 const locationsById = new Map((locRes.data ?? []).map((l: any) => [l.id, l]));
+
+const internalBusinessIdentity = await internalBusinessIdentityPromise;
+const internalBusinessDisplayName = internalBusinessIdentity.display_name;
 
 // helpers used in JSX (prefer truth tables, fallback to job snapshot)
 function customerLine(j: any) {
