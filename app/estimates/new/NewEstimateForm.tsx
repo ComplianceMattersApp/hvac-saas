@@ -47,13 +47,15 @@ const inputClass =
 export default function NewEstimateForm({
   customers,
   locations,
+  initialCustomerId = "",
 }: {
   customers: CustomerRow[];
   locations: LocationRow[];
+  initialCustomerId?: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState(initialCustomerId);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const filteredLocations = locations.filter(

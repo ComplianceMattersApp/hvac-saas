@@ -296,6 +296,7 @@ export type EstimateListItem = {
 export async function listEstimatesByAccount(params: {
   internalUser: Pick<InternalUserRow, "account_owner_user_id">;
   status?: string | null;
+  customerId?: string | null;
   supabase: any;
 }): Promise<EstimateListItem[]> {
   let query = params.supabase
@@ -308,6 +309,10 @@ export async function listEstimatesByAccount(params: {
 
   if (params.status) {
     query = query.eq("status", params.status);
+  }
+
+  if (params.customerId) {
+    query = query.eq("customer_id", params.customerId);
   }
 
   const { data, error } = await query;

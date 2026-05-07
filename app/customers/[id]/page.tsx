@@ -10,6 +10,9 @@ import {
   updateCustomerNotesFromForm,
 } from "@/lib/actions/customer-actions";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
+import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
+import { listEstimatesByAccount, type EstimateListItem } from "@/lib/estimates/estimate-read";
+import { requireInternalUser, isInternalAccessError } from "@/lib/auth/internal-user";
 
 
 type CustomerRow = {
@@ -447,6 +450,26 @@ export default async function CustomerDetailPage(props: {
   const smsHref = makeSmsHref(customer.phone);
   const customerBillingAddress = billingAddressLine(customer);
 
+  // Estimates: load only for internal viewers when estimates are enabled
+  let customerEstimates: EstimateListItem[] = [];
+  const estimatesEnabled = isEstimatesEnabled();
+  if (isInternalViewer && estimatesEnabled) {
+    try {
+      const { internalUser: iu } = await requireInternalUser({ supabase, userId: userData.user.id });
+      customerEstimates = await listEstimatesByAccount({
+        internalUser: iu,
+        customerId,
+        supabase,
+      });
+    } catch (e) {
+      if (isInternalAccessError(e)) {
+        // silently skip — internal user check already passed above
+      } else {
+        throw e;
+      }
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl space-y-7 p-4 md:space-y-8 md:p-6">
@@ -865,6 +888,67 @@ export default async function CustomerDetailPage(props: {
             </div>
           )}
         </section>
+
+        {/* Estimates — internal only, visible when ENABLE_ESTIMATES is on */}
+        {isInternalViewer && estimatesEnabled ? (
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Estimates</h2>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  Draft and sent estimates for this customer.
+                </p>
+              </div>
+              <Link
+                href={`/estimates/new?customer_id=${customerId}`}
+                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+              >
+                Create Estimate
+              </Link>
+            </div>
+
+            {customerEstimates.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+                No estimates yet. Create one above.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {customerEstimates.map((est) => (
+                  <div
+                    key={est.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="text-sm font-medium text-slate-900 truncate">{est.title}</div>
+                      <div className="text-xs text-slate-500">
+                        {est.estimate_number} &middot;{" "}
+                        <span
+                          className={[
+                            "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                            est.status === "draft" ? "bg-slate-100 text-slate-700" :
+                            est.status === "sent" ? "bg-blue-100 text-blue-700" :
+                            est.status === "approved" ? "bg-emerald-100 text-emerald-700" :
+                            est.status === "declined" ? "bg-red-100 text-red-700" :
+                            "bg-slate-100 text-slate-700",
+                          ].join(" ")}
+                        >
+                          {est.status.charAt(0).toUpperCase() + est.status.slice(1)}
+                        </span>
+                        {" "}&middot; Created {formatDate(est.created_at)}
+                      </div>
+                    </div>
+                    <Link
+                      href={`/estimates/${est.id}`}
+                      className="shrink-0 inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                    >
+                      View
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : null}
 
         {isInternalViewer ? (
           <section className="rounded-2xl border border-red-200 bg-red-50/40 p-5 shadow-sm">

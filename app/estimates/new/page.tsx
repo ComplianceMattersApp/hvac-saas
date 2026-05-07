@@ -12,6 +12,10 @@ import NewEstimateForm from "./NewEstimateForm";
 
 export const metadata = { title: "New Estimate" };
 
+function isUuid(v: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
+
 type CustomerRow = {
   id: string;
   full_name: string | null;
@@ -29,7 +33,11 @@ type LocationRow = {
   nickname: string | null;
 };
 
-export default async function NewEstimatePage() {
+export default async function NewEstimatePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
@@ -44,6 +52,11 @@ export default async function NewEstimatePage() {
   if (!isEstimatesEnabled()) {
     redirect("/ops?notice=estimates_unavailable");
   }
+
+  // Resolve safe prefill customer_id from query params
+  const sp = searchParams ? await searchParams : {};
+  const rawCustomerId = typeof sp.customer_id === "string" ? sp.customer_id.trim() : "";
+  const initialCustomerId = rawCustomerId && isUuid(rawCustomerId) ? rawCustomerId : "";
 
   // Load customers scoped to this account via RLS
   const { data: customerRows, error: custErr } = await supabase
@@ -86,7 +99,7 @@ export default async function NewEstimatePage() {
       </div>
 
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.18)]">
-        <NewEstimateForm customers={customers} locations={locationRows} />
+        <NewEstimateForm customers={customers} locations={locationRows} initialCustomerId={initialCustomerId} />
       </div>
     </div>
   );
