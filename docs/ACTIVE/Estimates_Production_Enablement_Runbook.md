@@ -22,6 +22,7 @@ This runbook defines how internal-only production Estimates enablement must be e
 - The sole pre-production code blocker (missing `createEstimateDraft` fail-closed flag check) is now resolved and committed.
 - Estimate Detail Wording + Internal Scaffolding Collapse closeout is complete on the guarded internal baseline and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries.
 - Estimate Pricebook Editable Defaults V1 closeout is complete on the guarded internal baseline and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries.
+- Customer Estimate Profile Entry V1 closeout is complete on the guarded internal baseline (commits `bcfa9f7`, `b977c89`) and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries.
 
 ### Locked internal-only boundaries for this runbook
 
