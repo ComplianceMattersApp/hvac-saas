@@ -232,6 +232,60 @@ If any item here conflicts with the active spine, the spine wins.
   - continue audit -> small slice -> benchmark -> commit -> docs update
   - do not weaken auth/scope/source-of-truth/event/audit/revalidation just to chase speed
 
+### 2.3.5.1 Ops First Impression performance pass closeout (`/ops`) (completed)
+- Completed slices in this pass:
+  - A1 removed unused `/ops` Upcoming read path from the blocking render path (`0e0b05e`).
+  - A2 added `OPS_TIMING_DEBUG` diagnostics (`86d6e02`).
+  - A3 captured baseline timings.
+  - A4 split actor/business identity timing and safely overlapped business identity after actor scope was known (`c256153`).
+  - A5 added `primaryQueueReads` breakdown diagnostics (`3c5d261`).
+  - A6 split Field Work fetch vs post-filter (`277e898`).
+  - A7 compared Field Work vs Call List and confirmed Field Work was not uniquely slow (`1f978a6`).
+  - A8 split `secondarySignalReads` (`54708a8`).
+  - A9 split unread contractor notification cost (`bfcf72337cb1d9ce3afc2408b4db62eaa1e2fe55`).
+  - A10 switched Ops contractor-update awareness to a narrow helper, removing rich notification job enrichment from `/ops` first impression (`67163ec`).
+  - A11 split assignment display map internals (`64ce273`).
+  - A12 captured full current baseline after A10/A11.
+  - A13 split closeout projection internals (`44d63e1`).
+  - A14 split request actor context internals and confirmed variance source (`c07745c`).
+- Real behavior improvements delivered:
+  - unused Upcoming read path was removed from `/ops` first impression
+  - Ops contractor-update awareness now uses a narrow helper instead of rich notification enrichment
+- Diagnostic coverage now includes major `/ops` phases under `OPS_TIMING_DEBUG`:
+  - request actor context
+  - primary queues
+  - secondary signals
+  - assignment display
+  - notifications
+  - closeout projection
+- Findings captured:
+  - Field Work latency is fetch-side, not local filtering
+  - Field Work is not uniquely slow compared with Call List
+  - unread contractor notifications were slimmed successfully
+  - assignment display cost is assignments fetch + profile display map, not fallback lookup
+  - closeout projection is not a deterministic bottleneck
+  - request actor context variance is lookup-driven, not assembly
+  - remaining large spikes are more consistent with shared backend/network/Supabase variance than one obvious local loop
+- Explicit non-changes:
+  - no schema changes
+  - no migrations
+  - no Supabase commands
+  - no RLS/auth behavior changes
+  - no queue semantics changes
+  - no event/revalidation changes
+  - no billing/payment behavior changes
+  - no Estimates/Support/QBO/onboarding behavior changes
+- Validation recorded:
+  - TypeScript passed during slices
+  - targeted tests passed where run
+  - authenticated `/ops` timing smoke was used repeatedly
+  - logs were label/duration only and excluded sensitive data
+- Future backlog (optional, measured only):
+  - deeper auth/request-actor review only with high caution
+  - Ops-specific lightweight assignment helper only if timings justify it
+  - broader shared backend/read variance investigation
+  - continue measured/surgical performance work only when a specific issue harms usability
+
 ### 2.3.6 Resumed pre-launch execution order (active)
 - Pre-launch sequence is explicitly resumed in this order:
   1. Performance/responsiveness batch closeout and documentation (closed for the current pass)

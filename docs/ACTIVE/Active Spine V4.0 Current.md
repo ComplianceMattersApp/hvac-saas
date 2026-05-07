@@ -25,6 +25,46 @@ Current Program Status Note (May 2026)
   - Deferred follow-on remains explicit: persisted Pricebook provenance on Work Items, smarter downstream defaulting/pricing from Work Items to Invoice Charges, Work Item commercial fields, and broader invoice panel polish.
 
 - Performance/responsiveness intervention batch is complete for the current pass and is now treated as closed for this pass.
+- Ops First Impression performance pass for `/ops` is complete and closed for the current pass:
+  - real behavior improvements delivered:
+    - removed unused Upcoming read path from the blocking `/ops` server-render path (`0e0b05e`)
+    - `/ops` contractor-update awareness now uses a narrow helper instead of rich notification enrichment (`67163ec`)
+  - diagnostics coverage expanded under `OPS_TIMING_DEBUG` across major `/ops` phases:
+    - actor/business identity split (`c256153`)
+    - primary queue breakdown (`3c5d261`)
+    - field-work fetch vs post-filter (`277e898`)
+    - field-work vs call-list comparison (`1f978a6`)
+    - secondary signal breakdown (`54708a8`)
+    - unread contractor notification split (`bfcf72337cb1d9ce3afc2408b4db62eaa1e2fe55`)
+    - assignment display map internals (`64ce273`)
+    - closeout projection internals (`44d63e1`)
+    - request actor context internals (`c07745c`)
+  - measured findings for this pass:
+    - Field Work latency is fetch-side, not local filtering.
+    - Field Work is not uniquely slow compared with Call List.
+    - unread contractor notification path was successfully slimmed.
+    - assignment display cost is primarily assignment fetch + profile display map, not fallback lookup.
+    - closeout projection is not a deterministic bottleneck.
+    - request actor context variance is lookup-driven, not assembly.
+    - largest residual spikes appear to be shared backend/network/Supabase variance, not one obvious local loop.
+  - explicit non-changes for this pass:
+    - no schema changes or migrations
+    - no Supabase commands
+    - no RLS/auth behavior changes
+    - no queue semantics changes
+    - no event/revalidation changes
+    - no billing/payment behavior changes
+    - no Estimates/Support/QBO/onboarding behavior changes
+  - validation summary:
+    - TypeScript checks passed during slices.
+    - targeted tests passed where run.
+    - authenticated `/ops` timing smoke was used repeatedly.
+    - timing logs remained label/duration only with no sensitive data.
+  - forward backlog remains optional/measured only:
+    - deeper auth/request-actor review with high caution
+    - Ops-specific lightweight assignment helper only if future timings justify it
+    - broader shared backend/read variance investigation
+    - continue surgical performance work only when a concrete issue harms usability
 - Internal /jobs/[id] responsiveness hardening is complete for the current pass:
   - field action timing instrumentation shipped
   - job detail render timing instrumentation shipped

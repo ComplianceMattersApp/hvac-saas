@@ -238,6 +238,26 @@ Branch workflow update (active discipline):
   - do not casually alter invoice/billing/payment paths for speed
   - maintain audit -> small slice -> benchmark -> commit -> docs update
 
+Ops First Impression (`/ops`) closeout alignment note (current pass complete):
+- `/ops` first-impression pass is closed for this current pass and should not be treated as an always-on blocker.
+- Real behavior improvements completed:
+  - removed unused Upcoming read path from blocking render (`0e0b05e`)
+  - switched contractor-update awareness to narrow helper instead of rich notification enrichment (`67163ec`)
+- Diagnostics coverage now includes request actor context, primary queues, secondary signals, assignment display, notifications, and closeout projection under `OPS_TIMING_DEBUG` (`86d6e02`, `c256153`, `3c5d261`, `277e898`, `1f978a6`, `54708a8`, `bfcf72337cb1d9ce3afc2408b4db62eaa1e2fe55`, `64ce273`, `44d63e1`, `c07745c`).
+- Findings remain consistent with a shared-variance profile:
+  - Field Work is fetch-side and not uniquely slower than Call List
+  - assignment display cost centers on assignment fetch + profile display map
+  - closeout projection is not a deterministic bottleneck
+  - request actor context variance is lookup-driven, not assembly
+  - residual large spikes appear more consistent with backend/network/Supabase variance than a single local loop
+- Explicit non-changes preserved:
+  - no schema/migration/Supabase-command/RLS-auth/queue-semantics/event-revalidation/billing-payment/Estimates-Support-QBO-onboarding behavior changes
+- Future performance work remains optional and measured only:
+  - deeper auth/request-actor review with high caution
+  - optional Ops-specific lightweight assignment helper only if future timing data justifies it
+  - broader shared backend/read variance investigation
+  - continue surgical performance slices only when a concrete usability issue is observed
+
 ### Resumed pre-launch sequence (post-speed-batch)
 - The planned launch-readiness order is resumed as:
   1. Performance/responsiveness batch closeout and documentation (closed for the current pass)
