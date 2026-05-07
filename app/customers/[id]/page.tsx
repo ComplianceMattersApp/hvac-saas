@@ -525,6 +525,15 @@ export default async function CustomerDetailPage(props: {
                   Edit Customer
                 </Link>
 
+                {estimatesEnabled && (
+                  <Link
+                    href={`/estimates/new?customer_id=${customerId}`}
+                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                  >
+                    Create Estimate
+                  </Link>
+                )}
+
                 <Link
                   href={`/jobs/new?customer_id=${customerId}&source=customer`}
                   className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
@@ -892,24 +901,22 @@ export default async function CustomerDetailPage(props: {
         {/* Estimates — internal only, visible when ENABLE_ESTIMATES is on */}
         {isInternalViewer && estimatesEnabled ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">Estimates</h2>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  Draft and sent estimates for this customer.
-                </p>
-              </div>
-              <Link
-                href={`/estimates/new?customer_id=${customerId}`}
-                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
-              >
-                Create Estimate
-              </Link>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">Estimates</h2>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Draft and sent estimates for this customer.
+              </p>
             </div>
 
             {customerEstimates.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-                No estimates yet. Create one above.
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6">
+                <p className="text-sm text-slate-500">No estimates yet.</p>
+                <Link
+                  href={`/estimates/new?customer_id=${customerId}`}
+                  className="mt-3 inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                >
+                  Create First Estimate
+                </Link>
               </div>
             ) : (
               <div className="space-y-2">
