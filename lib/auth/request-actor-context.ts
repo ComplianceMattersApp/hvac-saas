@@ -17,6 +17,15 @@ export type RequestActorContext = {
   accountOwnerUserId: string | null;
 };
 
+function isOpsTimingEnabled() {
+  return process.env.OPS_TIMING_DEBUG === "true";
+}
+
+function finishOpsTiming(label: string, startedAt: number) {
+  if (!startedAt) return;
+  console.log(`[${label}] ${Date.now() - startedAt}ms`);
+}
+
 function buildUnauthenticatedActorContext(supabase: any): RequestActorContext {
   return {
     supabase,
@@ -39,10 +48,12 @@ function isAuthSessionMissingError(error: unknown): boolean {
 
 async function resolveRequestActorContextUncached(): Promise<RequestActorContext> {
   const supabase = await createClient();
+  const _t_getUser = isOpsTimingEnabled() ? Date.now() : 0;
   const {
     data: { user },
     error: userErr,
   } = await supabase.auth.getUser();
+  finishOpsTiming("ops:requestActorContext:getUser", _t_getUser);
 
   if (userErr) {
     if (isAuthSessionMissingError(userErr)) {
@@ -55,20 +66,42 @@ async function resolveRequestActorContextUncached(): Promise<RequestActorContext
     return buildUnauthenticatedActorContext(supabase);
   }
 
+  const contractorLookup = async () => {
+    const _t_contractorLookup = isOpsTimingEnabled() ? Date.now() : 0;
+    try {
+      return await supabase
+        .from("contractor_users")
+        .select("contractor_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+    } finally {
+      finishOpsTiming("ops:requestActorContext:contractorLookup", _t_contractorLookup);
+    }
+  };
+
+  const internalLookup = getInternalUser({
+    supabase,
+    userId: user.id,
+    timing: (phase, elapsedMs) => {
+      if (!isOpsTimingEnabled()) return;
+      if (phase === "internalUserLookup") {
+        console.log(`[ops:requestActorContext:internalLookup] ${elapsedMs}ms`);
+      }
+    },
+  });
+
   const [{ data: contractorUser, error: contractorErr }, internalUser] = await Promise.all([
-    supabase
-      .from("contractor_users")
-      .select("contractor_id")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    getInternalUser({ supabase, userId: user.id }),
+    contractorLookup(),
+    internalLookup,
   ]);
+  const _t_assembly = isOpsTimingEnabled() ? Date.now() : 0;
 
   if (contractorErr) throw contractorErr;
 
   const contractorId = String(contractorUser?.contractor_id ?? "").trim() || null;
 
   if (contractorId) {
+    finishOpsTiming("ops:requestActorContext:assembly", _t_assembly);
     return {
       supabase,
       user,
@@ -80,6 +113,7 @@ async function resolveRequestActorContextUncached(): Promise<RequestActorContext
   }
 
   if (internalUser?.is_active) {
+    finishOpsTiming("ops:requestActorContext:assembly", _t_assembly);
     return {
       supabase,
       user,
@@ -89,6 +123,8 @@ async function resolveRequestActorContextUncached(): Promise<RequestActorContext
       accountOwnerUserId: String(internalUser.account_owner_user_id ?? "").trim() || null,
     };
   }
+
+  finishOpsTiming("ops:requestActorContext:assembly", _t_assembly);
 
   return {
     supabase,
