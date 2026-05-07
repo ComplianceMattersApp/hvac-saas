@@ -606,7 +606,10 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
       operationalReportingJobsRes,
       bucketRes,
     ] = await Promise.all([
-      trackOpsTiming("ops:primaryQueueReads:fieldWork", fieldWorkQ),
+      trackOpsTiming(
+        "ops:primaryQueueReads:fieldWork",
+        trackOpsTiming("ops:fieldWork:fetch", fieldWorkQ)
+      ),
       trackOpsTiming("ops:primaryQueueReads:callList", callListQ),
       trackOpsTiming("ops:primaryQueueReads:closeoutSource", closeoutQ),
       trackOpsTiming("ops:primaryQueueReads:stillOpenExceptions", stillOpenQ),
@@ -624,9 +627,11 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
   if (bucketRes.error) throw bucketRes.error;
   if (opsTimingEnabled) console.log(`[ops:primaryQueueReads] ${Date.now() - _t_primaryQueueReads}ms`);
 
+  const _t_fieldWorkPostFilter = opsTimingEnabled ? Date.now() : 0;
   const fieldWorkJobs = (fieldWorkRes.data ?? []).filter(
     (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
   );
+  if (opsTimingEnabled) console.log(`[ops:fieldWork:postFilter] ${Date.now() - _t_fieldWorkPostFilter}ms`);
   const callListJobs = (callListRes.data ?? []).filter(
     (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
   );
