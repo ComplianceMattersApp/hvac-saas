@@ -203,6 +203,13 @@ export default async function OpsPage({
     return result;
   });
 
+  function trackOpsTiming(label: string, promiseLike: any) {
+    const startedAt = opsTimingEnabled ? Date.now() : 0;
+    return Promise.resolve(promiseLike).finally(() => {
+      if (opsTimingEnabled) console.log(`[${label}] ${Date.now() - startedAt}ms`);
+    });
+  }
+
   function digitsOnly(v?: string | null) {
   return String(v ?? "").replace(/\D/g, "");
 }
@@ -599,13 +606,13 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
       operationalReportingJobsRes,
       bucketRes,
     ] = await Promise.all([
-      fieldWorkQ,
-      callListQ,
-      closeoutQ,
-      stillOpenQ,
-      attentionQ,
-      operationalReportingJobsQ,
-      bucketQ,
+      trackOpsTiming("ops:primaryQueueReads:fieldWork", fieldWorkQ),
+      trackOpsTiming("ops:primaryQueueReads:callList", callListQ),
+      trackOpsTiming("ops:primaryQueueReads:closeoutSource", closeoutQ),
+      trackOpsTiming("ops:primaryQueueReads:stillOpenExceptions", stillOpenQ),
+      trackOpsTiming("ops:primaryQueueReads:attention", attentionQ),
+      trackOpsTiming("ops:primaryQueueReads:reportingJobs", operationalReportingJobsQ),
+      trackOpsTiming("ops:primaryQueueReads:activeBucket", bucketQ),
     ]);
 
   if (fieldWorkRes.error) throw fieldWorkRes.error;
