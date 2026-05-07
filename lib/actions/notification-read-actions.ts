@@ -47,6 +47,12 @@ export type NotificationRowForUI = NotificationRow & {
   job_enrichment?: JobEnrichment | null;
 };
 
+export type NotificationAwarenessRow = {
+  job_id: string | null;
+  notification_type: string;
+  created_at: string;
+};
+
 const DEFAULT_READ_RETENTION_DAYS = 30;
 
 function isOpsNotificationTimingEnabled(): boolean {
@@ -470,6 +476,62 @@ export async function listInternalNotifications(params: {
   if (finalMapStartedAt) mapAndFilterMs += Date.now() - finalMapStartedAt;
   if (shouldTrackMapAndFilter) console.log(`[ops:notifications:mapAndFilter] ${mapAndFilterMs}ms`);
   return rowsForUI;
+}
+
+export async function listInternalContractorUpdateAwareness(params: {
+  limit?: number;
+  onlyUnread?: boolean;
+} = {}): Promise<NotificationAwarenessRow[]> {
+  const { supabase, accountOwnerUserId } = await requireScopedInternalNotificationContext();
+
+  let query = supabase
+    .from("notifications")
+    .select("job_id, notification_type, read_at, created_at")
+    .eq("recipient_type", "internal")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .order("created_at", { ascending: false });
+
+  const onlyUnread = params.onlyUnread ?? true;
+  if (onlyUnread) {
+    query = query.is("read_at", null);
+  }
+
+  const limit = params.limit ?? 100;
+  const { data, error } = await trackOpsNotificationTiming(
+    "ops:notifications:fetch",
+    query.limit(limit)
+  );
+
+  if (error) throw error;
+
+  const shouldTrackMapAndFilter = isOpsNotificationTimingEnabled();
+  const mapAndFilterStartedAt = shouldTrackMapAndFilter ? Date.now() : 0;
+  const rows = (data ?? []) as Array<{
+    job_id: string | null;
+    notification_type: string | null;
+    created_at: string | null;
+  }>;
+
+  const contractorUpdateRows = rows
+    .filter((row) =>
+      matchesInternalNotificationFilter(
+        String(row.notification_type ?? "").trim().toLowerCase(),
+        "contractor_updates"
+      )
+    )
+    .map((row) => ({
+      job_id: row.job_id ? String(row.job_id).trim() : null,
+      notification_type: String(row.notification_type ?? "").trim(),
+      created_at: String(row.created_at ?? "").trim(),
+    }));
+
+  if (shouldTrackMapAndFilter) {
+    console.log(`[ops:notifications:mapAndFilter] ${Date.now() - mapAndFilterStartedAt}ms`);
+    // Compatibility label for ops timing tables when enrichment is intentionally skipped.
+    console.log("[ops:notifications:jobEnrichment] 0ms");
+  }
+
+  return contractorUpdateRows;
 }
 
 export async function markNotificationAsRead(input: {

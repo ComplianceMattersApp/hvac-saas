@@ -19,7 +19,7 @@ import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/sear
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import { buildPromotedCompanionReadModel, buildVisitScopeReadModel } from "@/lib/jobs/visit-scope";
-import { listInternalNotifications } from "@/lib/actions/notification-read-actions";
+import { listInternalContractorUpdateAwareness } from "@/lib/actions/notification-read-actions";
 import {
   didOpsStatusChangeTo,
   formatStatusAgeCompact,
@@ -1247,10 +1247,9 @@ const [pendingInfoTransitionRes, activeAssignmentDisplayMap, signalRes, unreadCo
   ),
   trackOpsTiming(
     "ops:secondarySignalReads:unreadContractorNotifications",
-    listInternalNotifications({
+    listInternalContractorUpdateAwareness({
       limit: 100,
       onlyUnread: true,
-      filterKey: "contractor_updates",
     })
   ),
   trackOpsTiming(
