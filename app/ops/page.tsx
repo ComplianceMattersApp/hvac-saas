@@ -459,22 +459,6 @@ let fieldWorkQ = supabase
 
 fieldWorkQ = applyCommonFilters(fieldWorkQ);
 
-// 2) UPCOMING (scheduled jobs on/after LA tomorrow)
-let upcomingQ = supabase
-  .from("jobs")
-  .select(baseSelect)
-  .is("deleted_at", null)
-  .neq("status", "cancelled")
-  .eq("status", "open")
-  .eq("ops_status", "scheduled")
-  .gte("scheduled_date", startTomorrowUtc)
-  .order("scheduled_date", { ascending: true })
-  .order("window_start", { ascending: true })
-  .limit(25);
-
-upcomingQ = applyCommonFilters(upcomingQ);
-
-
   // 3) CALL LIST preview (need_to_schedule)
   let callListQ = supabase
     .from("jobs")
@@ -597,7 +581,6 @@ upcomingQ = applyCommonFilters(upcomingQ);
 
     const [
       fieldWorkRes,
-      upcomingRes,
       callListRes,
       closeoutRes,
       stillOpenRes,
@@ -606,7 +589,6 @@ upcomingQ = applyCommonFilters(upcomingQ);
       bucketRes,
     ] = await Promise.all([
       fieldWorkQ,
-      upcomingQ,
       callListQ,
       closeoutQ,
       stillOpenQ,
@@ -616,7 +598,6 @@ upcomingQ = applyCommonFilters(upcomingQ);
     ]);
 
   if (fieldWorkRes.error) throw fieldWorkRes.error;
-  if (upcomingRes.error) throw upcomingRes.error;
   if (callListRes.error) throw callListRes.error;
   if (closeoutRes.error) throw closeoutRes.error;
   if (stillOpenRes.error) throw stillOpenRes.error;
@@ -625,9 +606,6 @@ upcomingQ = applyCommonFilters(upcomingQ);
   if (bucketRes.error) throw bucketRes.error;
 
   const fieldWorkJobs = (fieldWorkRes.data ?? []).filter(
-    (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
-  );
-  const upcomingJobs = (upcomingRes.data ?? []).filter(
     (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
   );
   const callListJobs = (callListRes.data ?? []).filter(
@@ -704,7 +682,6 @@ upcomingQ = applyCommonFilters(upcomingQ);
 
   const closeoutProjectionJobInputs = [
     ...fieldWorkJobs,
-    ...upcomingJobs,
     ...callListJobs,
     ...closeoutSourceJobs,
     ...stillOpenJobs,
@@ -774,7 +751,6 @@ upcomingQ = applyCommonFilters(upcomingQ);
   // --- Customer/Location lookup maps (source-of-truth) ---
 const allJobs = [
   ...(fieldWorkJobs ?? []),
-  ...(upcomingJobs ?? []),
   ...(callListJobs ?? []),
   ...(closeoutSourceJobs ?? []),
   ...(stillOpenJobs ?? []),
