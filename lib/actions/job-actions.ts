@@ -3940,6 +3940,18 @@ function computeDuctLeakagePayload(formData: FormData, projectType: string) {
   return { data, computed, computedPass };
 }
 
+function ensureMeasuredDuctLeakagePresentForCompletion(formData: FormData) {
+  const rawMeasuredLeakage = String(formData.get("measured_duct_leakage_cfm") || "").trim();
+  if (!rawMeasuredLeakage) {
+    throw new Error("Enter the measured duct leakage result before completing this test.");
+  }
+
+  const measuredLeakage = Number(rawMeasuredLeakage);
+  if (!Number.isFinite(measuredLeakage)) {
+    throw new Error("Enter the measured duct leakage result before completing this test.");
+  }
+}
+
 export async function addEccTestRunFromForm(formData: FormData) {
   "use server";
 
@@ -5249,6 +5261,8 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
 
   if (!jobId) throw new Error("Missing job_id");
   if (!testRunId) throw new Error("Missing test_run_id");
+
+  ensureMeasuredDuctLeakagePresentForCompletion(formData);
 
   const { data, computed, computedPass } = computeDuctLeakagePayload(formData, projectType);
   const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
