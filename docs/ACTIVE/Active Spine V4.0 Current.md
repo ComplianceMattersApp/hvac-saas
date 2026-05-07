@@ -1110,6 +1110,7 @@ broader role model refinement
 future branding/settings/business-profile formalization
 App-store/mobile native distribution remains intentionally deferred for current launch scope; web product launch readiness is the priority baseline.
 Field-ready installable/PWA access readiness V1 Slice 1 is limited to metadata/installability baseline hardening only (manifest/layout metadata coherence and home-screen launch QA checklist). Service worker/offline caching remains deferred to a separate planned slice.
+Field-ready installable/PWA access readiness V1B-1 (Proxy Verification + Portal Loading Polish) is complete: `proxy.ts` is confirmed active under Next.js 16 (the correct convention; `middleware.ts` is deprecated and must not be added), protected unauthenticated deep links preserve `?next=` for tested routes, and `app/portal/loading.tsx` provides a mobile-friendly contractor portal loading skeleton. Service worker/offline caching and native app-store distribution remain deferred. No auth, session, contractor/internal separation, first-owner routing, Estimates/Support flags, or source-of-truth boundaries changed.
 
 Note:
 Payment P1 foundation is closed at the current baseline.

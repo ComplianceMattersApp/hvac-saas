@@ -243,7 +243,7 @@ Branch workflow update (active discipline):
   1. Performance/responsiveness batch closeout and documentation (closed for the current pass)
   2. Support Console production readiness planning
   3. Estimates production readiness planning
-  4. Field-ready installable/PWA access readiness
+  4. Field-ready installable/PWA access readiness (V1 Slice 1 baseline hardening complete; V1B-1 Proxy Verification + Portal Loading Polish complete)
   5. Final launch confirmation sweep
   6. First-owner/operator handoff dry-run
   7. Controlled tester onboarding

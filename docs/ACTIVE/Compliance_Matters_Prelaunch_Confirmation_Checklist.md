@@ -253,6 +253,37 @@ If any item here conflicts with the active spine, the spine wins.
 - Chromium install prompt readiness may still require a future service-worker slice and is not implemented here.
 - iOS install flow remains manual Add to Home Screen guidance (no automatic browser install prompt path).
 
+### 2.3.7.1 Field-ready installable/PWA access readiness V1B-1 — Proxy Verification + Portal Loading Polish (completed)
+- Confirmed: `proxy.ts` is the active and correct routing convention for this project under Next.js 16.
+  - Next.js 16.0.0 officially renamed `middleware.ts` to `proxy.ts`; `middleware.ts` is deprecated.
+  - Root `proxy.ts` exports `function proxy(req: NextRequest)` — the correct named export form — and is wired and executing.
+  - Do not add `middleware.ts`; `proxy.ts` is the correct baseline convention for this app.
+- Confirmed: protected unauthenticated deep links preserve `?next=` return path for tested routes:
+  - `/ops` → `/login?next=%2Fops`
+  - `/calendar` → `/login?next=%2Fcalendar`
+  - `/portal/jobs/some-deep-link-id` → `/login?next=%2Fportal%2Fjobs%2Fsome-deep-link-id`
+- Confirmed: post-login role-routing safety is enforced by `resolveSafeAuthReturnPath`:
+  - contractor users are constrained to `/portal/*` return paths
+  - internal users are blocked from contractor portal return paths
+- Added: `app/portal/loading.tsx` — mobile-friendly contractor portal loading skeleton with header card and job-list pulse animation.
+- Confirmed boundaries unchanged:
+  - auth/session architecture is unchanged
+  - contractor/internal route separation is unchanged
+  - first-owner routing behavior is unchanged
+  - Estimates and Support Console production enablement remain deferred
+  - source-of-truth boundaries remain unchanged
+  - no schema, migrations, RLS, Supabase commands, feature flag changes, or production data actions
+  - no service worker/offline caching
+  - no native app-store packaging
+- Validation:
+  - `npx.cmd tsc --noEmit` passed
+  - browser smoke passed for unauthenticated `/ops`, `/calendar`, and `/portal/jobs/...` deep-link redirects with `?next=`
+- Deferred from this slice:
+  - post-login role-routing smoke with live credentials (validated logically via `resolveSafeAuthReturnPath` tests)
+  - authenticated slow-load visual confirmation of portal loading skeleton
+  - service worker/offline caching (separate planned slice)
+  - native app-store distribution (intentionally deferred)
+
 ### 2.3.8 Service Workflow / Visit Scope Field Experience V1 Slice 1 (completed)
 - Service job detail now uses clearer field-first Work Items guidance.
 - Prior "confirm the work" helper wording was replaced to avoid implying a required validation action.
