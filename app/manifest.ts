@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Compliance Matters",
-    short_name: "CM Software",
+    short_name: "Compliance Matters",
     description: "ECC Rater Field Software",
     id: "/",
     start_url: "/",

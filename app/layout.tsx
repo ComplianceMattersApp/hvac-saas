@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "CM Software",
+    title: "Compliance Matters",
   },
   formatDetection: {
     telephone: false,
