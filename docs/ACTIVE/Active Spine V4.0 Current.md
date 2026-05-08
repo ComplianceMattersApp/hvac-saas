@@ -3,6 +3,9 @@
 Status: ACTIVE SOURCE OF TRUTH
 Purpose: Align future development, audits, and thread handoffs to the current, stabilized system state.
 
+**Note on Product Modes:**
+See [Compliance_Matters_Business_Layer_Roadmap.md § 3 Product Mode Matrix](./Compliance_Matters_Business_Layer_Roadmap.md#3-product-mode-matrix--eccherms-version-vs-hvac-service-version) for architectural guidance on the two product configurations (ECC/HERS and HVAC Service). Future development should respect product-mode separation to prevent buyer-story drift.
+
 Current Program Status Note (May 2026)
 
 - Service Workflow / Visit Scope Field Experience V1 Slice 1 is complete:

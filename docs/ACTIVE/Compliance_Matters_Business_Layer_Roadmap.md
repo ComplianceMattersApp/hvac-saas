@@ -44,6 +44,252 @@ It extends it.
 - **Invoice** = billed commercial scope
 - **Payment** = money collected against an internal invoice, when payment capability exists
 
+---
+
+## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version
+
+### 3.1. Product-mode principle
+
+The Compliance Matters platform operates as **one shared platform engine** with **two product configurations/versions**:
+
+1. **ECC/HERS / Compliance Testing Version** — emphasizes contractor intake, testing, and compliance closeout
+2. **HVAC Service Version** — emphasizes service case continuity, dispatch, and technician workflows
+
+**Architecture decision:**
+- No codebase split is planned or required.
+- Product-mode separation is **presentation/configuration** at the UI/UX level, not a source-of-truth rewrite.
+- Both versions share the same operational platform, data model, and core business logic.
+- Mode identity is implicit in feature availability and UI/navigation styling, not explicit in a schema-level mode flag yet (future parked work).
+- Mode separation guides future development to prevent buyer-story drift and ensures each version receives intentional UX/navigation tuning.
+
+### 3.2. Shared platform engine
+
+The following foundations are **shared across both product versions**:
+
+**Core Entities:**
+- customers (account-owning organizations)
+- locations (facility/address records)
+- jobs / visits / work records (core operational unit)
+- service cases (multi-visit problem/continuity container)
+- contractors (external intake parties in ECC/HERS mode; not exposed in Service mode by default)
+
+**Operational Surfaces:**
+- scheduling / calendar / dispatch
+- internal users / team assignments / field lifecycle
+- Work Items / Visit Scope (operational work scope for each visit)
+- notes / timeline / contact attempts
+- attachments / photo galleries
+- operational reporting and queue management
+
+**Commercial Surfaces:**
+- invoices (billed truth)
+- payment tracking (collected truth; no payment execution in current scope)
+- pricebook (reusable pricing/service catalog)
+- estimates (proposed commercial scope; parked for production enablement)
+
+**Platform Services:**
+- notifications / signals
+- admin / company profile / users
+- mobile / PWA shell
+- source-of-truth models:
+  - `job_events` = narrative / operational truth
+  - `jobs.ops_status` = operational projection
+  - `ecc_test_runs` = ECC test truth (ECC mode only)
+  - `service_cases` = continuity truth
+  - `invoices` + `payments` = billing and collected truth
+
+### 3.3. ECC/HERS / Compliance Testing mode
+
+**This version emphasizes:**
+
+- **Contractor Intake / Workflow**
+  - Contractor portal for submission of new work requests (proposal intake)
+  - Contractor users invited per-job (limited role; no schedule authority)
+  - Contractor visibility into job status, test scheduling, and failed-test correction
+
+- **ECC Test Execution**
+  - ECC test runs capture technical results (baseline, measured values, pass/fail)
+  - Test types: HVAC charge, airflow, duct leakage, refrigerant, asbestos, and other compliance checks
+  - Failed tests generate contractor correction evidence requirements
+  - Contractor retest-ready requests are reviewed by internal users
+
+- **Compliance & Certification**
+  - Failed ECC test correction evidence (photos, notes, work details)
+  - Retest review workflow
+  - Compliance paperwork closeout
+  - Contractor reports (failed tests, next steps, corrective action guidance)
+  - Certification sign-off (internal authority)
+
+- **Contractor Portal Features**
+  - Job status visibility (proposal, intake, testing, corrections, closeout)
+  - Failed test details and corrective action requirements
+  - Retest readiness submission
+  - Attachment upload (evidence of corrections)
+  - Timeline of contractor events and internal communications
+  - Contractor-focused reports
+
+- **ECC-Specific Ops Queues**
+  - "Needs Attention" (new contractor requests, pending internal finalization)
+  - "Failed" (jobs with failed ECC tests requiring correction)
+  - "Retest Needed" (contractors have submitted evidence; retest is pending)
+  - "Retest Ready" (retest completed; closeout pending)
+
+**Contractor Authority Boundary (Locked):**
+- Contractors **can**: submit proposals, respond to requests, upload evidence, request retest review
+- Contractors **cannot**: schedule, modify tests, finalize closeout, issue certifications, modify billing
+- **Internal users** retain control of: scheduling, test truth, closeout decisions, certifications, billing truth, final status
+
+### 3.4. HVAC Service mode
+
+**This version emphasizes:**
+
+- **Customers & Locations**
+  - Customer (account-owning organization) view
+  - Location (facility/address) records
+  - Customer/location job history
+  - Service case continuity across multiple visits
+
+- **Service Cases & Continuity**
+  - Service cases capture multi-visit problems or maintenance agreements (future)
+  - Each visit creates a job linked to a service case
+  - Service-chain continuation: create next visit for the same problem/service case
+  - Per-visit Work Items (no automatic copy-forward between visits)
+
+- **Internal Job/Work-Order Creation**
+  - Internal users (technicians, dispatchers, managers) create jobs directly
+  - No contractor intake lane
+  - Work-order-first operational flow
+  - Proposal phase is internal planning, not contractor submission
+
+- **Dispatch & Calendar**
+  - Scheduling and assignment of technicians
+  - Calendar view for dispatch and resource planning
+  - Field technician mobile access
+  - Unassigned work visibility
+  - Preferred technician/team routing
+
+- **Work Items & Operational Scope**
+  - Work Items define the operational scope for each visit
+  - Waiting reasons: parts on order, approval pending, access issues, missing information
+  - Waiting state pauses work without deleting the Work Item scope
+  - Work Items are not automatically copied to follow-up visits (per-visit intentionality)
+
+- **Technicians & Team**
+  - Internal user roles for technicians, supervisors, dispatch, and management
+  - Assignment history and availability tracking
+  - Contact/attempt tracking for field coordination
+
+- **Service-Oriented Reporting**
+  - Service case aging and continuity
+  - Technician productivity and assignment metrics
+  - Invoice and payment tracking by job and service case
+  - Service case status and next-action visibility
+  - Future: estimates and recurring agreements (parked)
+
+- **Future (Parked)**
+  - Estimates for service cases (service company quotes before work)
+  - Recurring service agreements / maintenance contracts
+  - Time-and-materials vs fixed-price billing
+
+**Service Mode Positioning (Locked):**
+- Contractor intake and contractor portal **are not** visible by default
+- Contractor intake **should be hidden or de-emphasized** in Service mode configuration when product-mode switching is implemented
+- Service companies operate in internal work-order/dispatch lane, not contractor-intake lane
+- Contractor portal remains available only for ECC/HERS mode or explicitly invited contractors (future)
+
+### 3.5. Navigation and label matrix
+
+**Recommended navigation labels and naming by version:**
+
+| Feature/Route | ECC/HERS Version | HVAC Service Version |
+|---|---|---|
+| Job creation | "New Job" or "New Work Request" | "New Work Order" |
+| Intake lane | "Contractor Intake" | (hidden/not applicable) |
+| Contractor management | "Contractors" | (hidden by default) |
+| Job detail panels | ECC permit, tests, compliance closeout | Service details, service chain, work items |
+| Test management | "Tests / Retests / Compliance Closeout" | (not applicable) |
+| Dispatch | (optional) | "Dispatch" or "Calendar" |
+| User management | (internal) | "Technicians" / "Team" |
+| Customer section | (not applicable) | "Customers" |
+| Service case tracking | (not applicable) | "Service Cases" |
+| Invoicing & Billing | "Invoices" (ECC-oriented reports) | "Invoices" / "Billing" (service-oriented reports) |
+| Reports | Compliance-oriented (failed tests, closeout, contractor status) | Service-oriented (cases, technician, billing) |
+
+### 3.6. Intake/workspace/report/admin differences
+
+**Product-mode-specific surface behavior:**
+
+**Intake Path:**
+- ECC/HERS: `/app/jobs/new` defaults to contractor-intake flow (proposal submission)
+- HVAC Service: `/app/jobs/new` defaults to internal job/work-order creation
+
+**Job Workspace (`/app/jobs/[id]`):**
+- ECC/HERS: Emphasizes permit panel, ECC tests workspace, failed-test evidence collection, retest review, contractor portal visibility
+- HVAC Service: Emphasizes service details, service-chain continuation, per-visit Work Items, technician assignment, dispatch coordination
+
+**Ops Queue (`/app/ops`):**
+- ECC/HERS: Prioritizes ECC-specific queues ("Failed", "Retest Needed", "Retest Ready") alongside universal "Needs Attention"
+- HVAC Service: Prioritizes dispatch-ready work, unassigned assignments, work-item scope visibility
+
+**Reporting:**
+- ECC/HERS: Default presets for compliance/closeout reports, contractor status reports, failed-test aggregation
+- HVAC Service: Default presets for service-case aging, technician productivity, billing/invoice status
+
+**Admin & Company Profile (Future Parked Work):**
+- Future product-mode setting (schema field or tenant settings UI) will control:
+  - which version the company operates as
+  - which features are visible/enabled
+  - which intake lanes are active
+  - which navigation labels and queues render
+
+### 3.7. Parked future configuration work
+
+The following product-configuration work is **explicitly parked** and **not in current release scope**:
+
+**Schema & Settings:**
+- `product_mode` schema field (if needed) or tenant-settings flag
+- Tenant settings UI for product-mode configuration/switching
+- Starter kits / onboarding templates by mode
+
+**Navigation & Rendering:**
+- Full mode-aware navigation rendering (future)
+- Dynamic feature-flag or role-based visibility for intake lanes, menu items, and report presets
+- Mode-aware form defaults and button labels
+
+**Reporting & Analytics:**
+- Mode-aware report presets in dashboard (future)
+- Dashboard card exposure (show/hide by mode)
+- Compliance-vs-service reporting toggle (future)
+
+**Future Commercial Features (Parked):**
+- Customer portal (separate customer-scoped visibility; not in current external access scope)
+- Estimates production enablement (capability exists; not in release scope)
+- Recurring maintenance agreements / service subscriptions (capability exists; not in release scope)
+- Tenant payment execution (Stripe subscription/checkout; parked)
+- QBO integration (optional downstream; parked)
+- Support Console production enablement (parked)
+
+### 3.8. Release-scope statement
+
+**Current Owner Release Posture (May 2026):**
+
+- **Primary version**: ECC/HERS / Compliance Testing (go-to-market focus)
+- **Secondary foundation**: HVAC Service version (ready operationally; not primary marketing focus yet)
+- **External access**: Contractor-focused (ECC/HERS contractor intake and portal only)
+- **No immediate mode-switching**: Product-mode matrix documents the architectural intent; no UI mode-switch is required before next polish passes
+- **No customer portal in current scope**: Customer visibility for service cases is parked; only contractors and internal users have external access currently
+- **Onboarding**: Controlled-tester onboarding remains parked pending explicit owner approval (separate runbook process)
+
+**Development Guidance:**
+
+- Future slices should respect both versions and prevent buyer-story drift
+- Product-mode matrix should guide feature scope, navigation tuning, and reporting defaults
+- No source-of-truth rewrite is needed to support both versions
+- Shared engine model remains stable; mode differences are presentation/configuration only
+- When implementing features, ask: "Is this ECC/HERS-specific, Service-specific, or shared?" and document accordingly
+
+---
+
 ### Scope vs Line Items terminology alignment (completed)
 - The Scope vs Line Items terminology alignment pass is complete.
 - The product model remains:
