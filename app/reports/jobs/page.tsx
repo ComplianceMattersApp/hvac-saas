@@ -205,9 +205,11 @@ export default async function JobsReportPage({
             </Link>
           </div>
         </form>
+        <p className="mt-3 text-xs leading-5 text-slate-600">Scope controls whether you are viewing active, historical, or all visits. Date field controls which visit date the From/To range uses (created, scheduled, or completed).</p>
       </section>
 
       <section className="overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
+        <p className="border-b border-slate-200/80 bg-slate-50/70 px-4 py-3 text-xs leading-5 text-slate-600">Scan left to right: visit identity and assignment first, then ops and lifecycle status, then paperwork, invoice, and closeout requirements.</p>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50/90">

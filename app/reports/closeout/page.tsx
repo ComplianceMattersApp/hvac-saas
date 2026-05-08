@@ -204,6 +204,7 @@ export default async function CloseoutFollowUpLedgerPage({
             </div>
           </div>
         </form>
+        <p className="text-xs leading-5 text-slate-600">Scope controls whether you are viewing active backlog, historical, or all closeout rows. Date field controls which closeout milestone date the From/To range filters.</p>
       </section>
 
       <section className="overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">

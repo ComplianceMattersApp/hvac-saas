@@ -215,6 +215,7 @@ export default async function InvoiceLedgerPage({
           </section>
 
           <section className="overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
+            <p className="border-b border-slate-200/80 bg-slate-50/70 px-4 py-3 text-xs leading-5 text-slate-600">Scan left to right: invoice and visit identity first, communication status next, then billed totals and payment tracking fields.</p>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50/90">

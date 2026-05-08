@@ -178,6 +178,7 @@ export default async function ServiceCaseContinuityPage({
           </div>
           </div>
         </form>
+        <p className="text-xs leading-5 text-slate-600">Case status, kind, and repeat toggles define the scope of cases shown. Date field controls whether the From/To range applies to case creation or case resolution dates.</p>
       </section>
 
       <section className="overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
