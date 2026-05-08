@@ -65,6 +65,15 @@ function resolveInternalLifecycleState(isActive: boolean, emailConfirmed: boolea
   return "unknown" as const;
 }
 
+function toRoleLabel(role: string): string {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (normalized === "admin") return "Admin";
+  if (normalized === "office") return "Dispatcher";
+  if (normalized === "tech" || normalized === "technician") return "Technician";
+  if (normalized === "billing") return "Billing";
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Unknown";
+}
+
 type SearchParams = Promise<{ invite_status?: string; team_confirm?: string }>;
 
 const INVITE_STATUS_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
@@ -176,7 +185,7 @@ export default async function AdminInternalUsersPage({
               Manage internal role membership, profile details, and day-to-day access changes for your team.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Internal membership changes live here. People &amp; Access handles broader account recovery work.
+              Manage internal team members who perform office or field work.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -216,7 +225,7 @@ export default async function AdminInternalUsersPage({
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-semibold text-amber-900">Team setup not yet confirmed</p>
           <p className="mt-1 text-sm leading-6 text-amber-800">
-            Review your team members below, then confirm team setup to mark this onboarding step complete.
+            Review your team members below, then confirm team setup to mark this setup step complete.
           </p>
           <form action={confirmTeamSetupFromForm} className="mt-3">
             <button
@@ -231,9 +240,9 @@ export default async function AdminInternalUsersPage({
 
       <div>
       <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
-        <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invite teammate</h2>
+        <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invite team member</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          Send an onboarding email and attach internal role access automatically.
+          Send a setup link and attach internal role access automatically.
         </p>
         <form action={inviteInternalUserFromForm} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
           <input
@@ -248,15 +257,15 @@ export default async function AdminInternalUsersPage({
             defaultValue="office"
             className="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-2 focus:ring-slate-200"
           >
-            <option value="admin">admin</option>
-            <option value="office">office</option>
-            <option value="technician">technician</option>
+            <option value="admin">Admin</option>
+            <option value="office">Dispatcher</option>
+            <option value="technician">Technician</option>
           </select>
           <button
             type="submit"
             className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
           >
-            Send invite
+            Send setup link
           </button>
         </form>
       </div>
@@ -294,7 +303,7 @@ export default async function AdminInternalUsersPage({
                           role,
                         )}`}
                       >
-                        {role}
+                        {toRoleLabel(role)}
                       </span>
                       <span
                         className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${lifecycleBadgeTone(
@@ -327,9 +336,9 @@ export default async function AdminInternalUsersPage({
                         defaultValue={role}
                         className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
                       >
-                        <option value="admin">admin</option>
-                        <option value="office">office</option>
-                        <option value="tech">tech</option>
+                        <option value="admin">Admin</option>
+                        <option value="office">Dispatcher</option>
+                        <option value="tech">Technician</option>
                       </select>
                       <button
                         type="submit"

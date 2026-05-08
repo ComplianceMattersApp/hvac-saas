@@ -75,12 +75,13 @@ function roleBadgeClass(role: string) {
 
 function toRoleLabel(role: string): string {
   const normalized = String(role || "").trim().toLowerCase();
-  if (normalized === "tech") return "tech";
-  if (normalized === "member") return "member";
-  if (normalized === "owner") return "owner";
-  if (normalized === "admin") return "admin";
-  if (normalized === "office") return "office";
-  return normalized || "unknown";
+  if (normalized === "tech" || normalized === "technician") return "Technician";
+  if (normalized === "office") return "Dispatcher";
+  if (normalized === "billing") return "Billing";
+  if (normalized === "member") return "Member";
+  if (normalized === "owner") return "Owner";
+  if (normalized === "admin") return "Admin";
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Unknown";
 }
 
 function getInternalLifecycle(isActive: boolean, emailConfirmed: boolean | null): Lifecycle {
@@ -240,7 +241,7 @@ export default async function AdminUsersCommandCenterPage({
     const id = String(row.user_id);
     const profile = profileMap.get(id);
     const email = String(profile?.email ?? "").trim();
-    const role = toRoleLabel(String(row.role ?? ""));
+    const role = String(row.role ?? "").trim().toLowerCase();
     const lifecycle = getInternalLifecycle(Boolean(row.is_active), authConfirmedMap.get(id) ?? null);
 
     records.push({
@@ -266,7 +267,7 @@ export default async function AdminUsersCommandCenterPage({
     const contractor = contractorMap.get(contractorId);
     const profile = profileMap.get(id);
     const email = String(profile?.email ?? "").trim().toLowerCase();
-    const role = toRoleLabel(String(row.role ?? ""));
+    const role = String(row.role ?? "").trim().toLowerCase();
     if (email) contractorMembershipEmails.add(`${contractorId}:${email}`);
 
     records.push({
@@ -342,7 +343,7 @@ export default async function AdminUsersCommandCenterPage({
               Search every internal and contractor account, resend access emails, and handle recovery from one place.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Cross-role account operations live here. Internal Team handles internal membership changes.
+              Manage access, invites, and account-level permissions.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -439,8 +440,8 @@ export default async function AdminUsersCommandCenterPage({
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Quick invite</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">Send an onboarding email and attach the selected internal role in one step.</p>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invite team member</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">Send an access invite and assign an internal role in one step.</p>
           <form action={inviteInternalUserFromForm} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
             <input
               name="email"
@@ -454,15 +455,15 @@ export default async function AdminUsersCommandCenterPage({
               defaultValue="office"
               className="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-2 focus:ring-slate-200"
             >
-              <option value="admin">admin</option>
-              <option value="office">office</option>
-              <option value="technician">technician</option>
+              <option value="admin">Admin</option>
+              <option value="office">Dispatcher</option>
+              <option value="technician">Technician</option>
             </select>
             <button
               type="submit"
               className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
             >
-              Send invite
+              Send access invite
             </button>
           </form>
         </div>
@@ -506,7 +507,7 @@ export default async function AdminUsersCommandCenterPage({
                               record.role,
                             )}`}
                           >
-                            {record.role}
+                            {toRoleLabel(record.role)}
                           </span>
                         ) : null}
                         <span
@@ -535,9 +536,9 @@ export default async function AdminUsersCommandCenterPage({
                             defaultValue={record.role as InternalRole}
                             className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
                           >
-                            <option value="admin">admin</option>
-                            <option value="office">office</option>
-                            <option value="tech">tech</option>
+                            <option value="admin">Admin</option>
+                            <option value="office">Dispatcher</option>
+                            <option value="tech">Technician</option>
                           </select>
                           <button
                             type="submit"

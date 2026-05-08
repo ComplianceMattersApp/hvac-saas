@@ -56,7 +56,7 @@ export default async function OpsAdminPage() {
       section: "people",
       eyebrow: "People",
       title: "People & Access",
-      description: "Cross-role lookup, onboarding recovery, password operations, and access visibility.",
+      description: "Manage access, invites, and account-level permissions.",
       href: "/ops/admin/users",
       ctaLabel: "Open workspace",
       enabled: true,
@@ -65,7 +65,7 @@ export default async function OpsAdminPage() {
       section: "people",
       eyebrow: "People",
       title: "Internal Team",
-      description: "Manage internal roles, membership, and practical profile details for admins, office staff, and techs.",
+      description: "Manage internal team members who perform office or field work.",
       href: "/ops/admin/internal-users",
       ctaLabel: "Open workspace",
       enabled: true,
@@ -145,6 +145,9 @@ export default async function OpsAdminPage() {
             <p className="mt-1 text-sm leading-6 text-slate-600">
               Required: {readiness.completedRequiredCount} of {readiness.totalRequiredCount} complete
             </p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Readiness tracks setup confirmations, not just whether a field has text.
+            </p>
           </div>
         </div>
 
@@ -154,7 +157,7 @@ export default async function OpsAdminPage() {
             {incompleteRequiredItems.map((item) => (
               <div key={item.key} className="flex flex-wrap items-center justify-between gap-2 text-sm text-amber-900">
                 <div>
-                  <span className="font-semibold">Missing</span>: {item.label}
+                  <span className="font-semibold">Needs confirmation</span>: {item.label}
                 </div>
                 {item.href ? (
                   <Link

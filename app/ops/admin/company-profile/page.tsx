@@ -127,6 +127,9 @@ export default async function AdminCompanyProfilePage({
             {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required complete
           </div>
         </div>
+        <div className="mt-1 text-sm leading-6 text-slate-600">
+          Readiness tracks setup confirmations, not just whether a field has text.
+        </div>
         {readiness.isOperationallyReady ? (
           <div className="mt-1 font-medium text-emerald-700">Ready for operations</div>
         ) : (
@@ -134,7 +137,7 @@ export default async function AdminCompanyProfilePage({
             <div className="font-medium text-amber-700">Needs setup</div>
             {incompleteRequiredItems.map((item) => (
               <div key={item.key} className="flex flex-wrap items-center gap-2 text-slate-700">
-                <span>Missing: {item.label}</span>
+                <span>Needs setup confirmation: {item.label}</span>
                 {item.href ? (
                   <Link href={item.href} className="text-xs font-semibold text-slate-900 underline-offset-2 hover:underline">
                     Open
@@ -400,6 +403,9 @@ function PlatformAccountSection({
         <div className="text-sm font-semibold text-slate-950">Platform account</div>
         <div className="mt-1 text-sm text-slate-600">
           Current access level and usage for this account.
+        </div>
+        <div className="mt-1 text-sm text-slate-600">
+          This is platform account subscription billing, not customer invoice payment collection.
         </div>
       </div>
       <dl className="grid grid-cols-2 gap-px bg-slate-100/70 sm:grid-cols-4">
