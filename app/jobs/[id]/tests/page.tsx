@@ -1912,6 +1912,7 @@ const defaultHeatingOutputBtu =
                   </span>
                   <SubmitButton
                     form={ductSaveFormId}
+                    formNoValidate
                     loadingText="Saving..."
                     className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
                   >
