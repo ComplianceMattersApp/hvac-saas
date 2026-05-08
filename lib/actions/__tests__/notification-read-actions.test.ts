@@ -30,9 +30,26 @@ type NotificationRow = {
   created_at: string;
 };
 
+type SubmissionRow = {
+  id: string;
+  review_status: string;
+  proposed_customer_first_name?: string | null;
+  proposed_customer_last_name?: string | null;
+  proposed_address_line1?: string | null;
+  proposed_city?: string | null;
+  proposed_zip?: string | null;
+  proposed_location_nickname?: string | null;
+  proposed_job_type?: string | null;
+  proposed_project_type?: string | null;
+  proposed_job_notes?: string | null;
+  proposed_permit_number?: string | null;
+  proposed_jurisdiction?: string | null;
+  proposed_permit_date?: string | null;
+};
+
 function makeSupabase(fixture: {
   notifications: NotificationRow[];
-  submissions: Array<{ id: string; review_status: string }>;
+  submissions: SubmissionRow[];
   contractors?: Array<{ id: string; name: string }>;
   jobs?: Array<{ id: string; title: string | null; customer_first_name: string | null; customer_last_name: string | null; city: string | null; contractor_id: string | null }>;
 }) {
@@ -154,7 +171,10 @@ describe("internal notification readers", () => {
             notification_type: "contractor_intake_proposal_submitted",
             subject: "New Contractor Intake Proposal",
             body: "A contractor submitted an intake proposal pending internal finalization.",
-            payload: { contractor_intake_submission_id: "proposal-1" },
+            payload: {
+              contractor_intake_submission_id: "proposal-1",
+              contractor_id: "contractor-1",
+            },
             status: "queued",
             read_at: null,
             created_at: "2026-04-20T12:00:00.000Z",
@@ -174,7 +194,23 @@ describe("internal notification readers", () => {
             created_at: "2026-04-20T11:59:00.000Z",
           },
         ],
-        submissions: [{ id: "proposal-1", review_status: "pending" }],
+        submissions: [
+          {
+            id: "proposal-1",
+            review_status: "pending",
+            proposed_customer_first_name: "Maya",
+            proposed_customer_last_name: "Lopez",
+            proposed_address_line1: "100 Main St",
+            proposed_city: "Pasadena",
+            proposed_zip: "91101",
+            proposed_location_nickname: "Front Unit",
+            proposed_job_type: "ecc",
+            proposed_project_type: "alteration",
+            proposed_job_notes: "Needs airflow and leakage verification.",
+            proposed_permit_number: "P-100",
+          },
+        ],
+        contractors: [{ id: "contractor-1", name: "Rapid Comfort" }],
       }),
     );
 
@@ -195,6 +231,10 @@ describe("internal notification readers", () => {
     expect(notifications).toHaveLength(1);
     expect(notifications[0]?.notification_type).toBe("contractor_intake_proposal_submitted");
     expect(notifications[0]?.is_unread).toBe(true);
+    expect(notifications[0]?.proposal_enrichment?.contractor_name).toBe("Rapid Comfort");
+    expect(notifications[0]?.proposal_enrichment?.customer_name).toBe("Maya Lopez");
+    expect(notifications[0]?.proposal_enrichment?.address_summary).toContain("100 Main St");
+    expect(notifications[0]?.proposal_enrichment?.job_type_label).toBe("ECC");
     expect(unreadCount).toBe(1);
     expect(unreadBadgeCount).toBe(1);
   });
@@ -324,5 +364,111 @@ describe("internal notification readers", () => {
     expect(notif.job_enrichment?.customer_name).toBe("Linda Garza");
     expect(notif.job_enrichment?.city).toBe("Pasadena");
     expect(notif.job_enrichment?.contractor_name).toBe("Cool Air Services");
+  });
+
+  it("attaches job_enrichment when job_id is provided in JSON payload", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-contractor-note-json",
+            account_owner_user_id: "owner-1",
+            job_id: null,
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_note",
+            subject: "Contractor note",
+            body: "Technician left a note on the job.",
+            payload: JSON.stringify({ job_id: "job-json" }) as unknown as Record<string, unknown>,
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-22T10:30:00.000Z",
+          },
+        ],
+        submissions: [],
+        jobs: [
+          {
+            id: "job-json",
+            title: "Duct Sealing Follow-up",
+            customer_first_name: "Andre",
+            customer_last_name: "Miles",
+            city: "Monrovia",
+            contractor_id: "contractor-y",
+          },
+        ],
+        contractors: [{ id: "contractor-y", name: "Citywide Heating" }],
+      }),
+    );
+
+    const { listInternalNotifications } = await import("@/lib/actions/notification-read-actions");
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+      filterKey: "contractor_updates",
+    });
+
+    expect(notifications).toHaveLength(1);
+    const notif = notifications[0]!;
+    expect(notif.notification_type).toBe("contractor_note");
+    expect(notif.job_enrichment?.job_title).toBe("Duct Sealing Follow-up");
+    expect(notif.job_enrichment?.customer_name).toBe("Andre Miles");
+    expect(notif.job_enrichment?.city).toBe("Monrovia");
+    expect(notif.job_enrichment?.contractor_name).toBe("Citywide Heating");
+  });
+
+  it("excludes contractor_report_sent from feed and unread awareness counts", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-report-sent",
+            account_owner_user_id: "owner-1",
+            job_id: "job-1",
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_report_sent",
+            subject: "Contractor report sent",
+            body: "A contractor report was sent.",
+            payload: { event_type: "contractor_report_sent" },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-23T10:00:00.000Z",
+          },
+          {
+            id: "notif-note",
+            account_owner_user_id: "owner-1",
+            job_id: "job-1",
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_note",
+            subject: "Contractor note",
+            body: "A contractor note was added.",
+            payload: {},
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-23T09:00:00.000Z",
+          },
+        ],
+        submissions: [],
+      }),
+    );
+
+    const {
+      listInternalNotifications,
+      getInternalUnreadNotificationCount,
+      getInternalUnreadNotificationBadgeCount,
+    } = await import("@/lib/actions/notification-read-actions");
+
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+    });
+    const unreadCount = await getInternalUnreadNotificationCount();
+    const unreadBadgeCount = await getInternalUnreadNotificationBadgeCount();
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.notification_type).toBe("contractor_note");
+    expect(unreadCount).toBe(1);
+    expect(unreadBadgeCount).toBe(1);
   });
 });

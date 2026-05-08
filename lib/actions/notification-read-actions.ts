@@ -22,6 +22,8 @@ type NotificationRow = {
   created_at: string;
 };
 
+type NotificationPayload = Record<string, unknown>;
+
 export type ProposalEnrichment = {
   contractor_name: string | null;
   customer_name: string | null;
@@ -92,7 +94,9 @@ async function buildProposalEnrichmentMap(
   for (const row of proposalRowSubset) {
     const submissionId = proposalSubmissionId(row);
     if (!submissionId) continue;
-    const contractorId = String((row.payload ?? {}).contractor_id ?? "").trim();
+    const payload = normalizeNotificationPayload(row.payload);
+    const contractorId =
+      firstNonEmptyPayloadValue(payload, ["contractor_id", "contractorId"]) ?? "";
     submissionIds.push(submissionId);
     if (contractorId) contractorIdBySubmissionId.set(submissionId, contractorId);
   }
@@ -196,11 +200,11 @@ async function buildJobEnrichmentMap(
 
   const jobRows = rows.filter((row) => {
     const type = String(row.notification_type ?? "").trim().toLowerCase();
-    return !isProposalNotificationType(type) && Boolean(row.job_id);
+    return !isProposalNotificationType(type) && Boolean(notificationJobId(row));
   });
 
   const uniqueJobIds = Array.from(
-    new Set(jobRows.map((row) => String(row.job_id ?? "").trim()).filter(Boolean))
+    new Set(jobRows.map((row) => notificationJobId(row)).filter((id): id is string => Boolean(id)))
   );
   if (!uniqueJobIds.length) return enrichmentMap;
 
@@ -276,10 +280,48 @@ function isProposalNotificationType(value: string): boolean {
   );
 }
 
+function normalizeNotificationPayload(value: unknown): NotificationPayload {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as NotificationPayload;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as NotificationPayload;
+      }
+    } catch {
+      return {};
+    }
+  }
+
+  return {};
+}
+
+function firstNonEmptyPayloadValue(payload: NotificationPayload, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = String(payload[key] ?? "").trim();
+    if (value) return value;
+  }
+  return null;
+}
+
 function proposalSubmissionId(row: NotificationRow): string | null {
-  const payload = (row.payload ?? {}) as Record<string, unknown>;
-  const id = String(payload.contractor_intake_submission_id ?? "").trim();
-  return id || null;
+  const payload = normalizeNotificationPayload(row.payload);
+  return firstNonEmptyPayloadValue(payload, [
+    "contractor_intake_submission_id",
+    "contractorIntakeSubmissionId",
+    "submission_id",
+  ]);
+}
+
+function notificationJobId(row: NotificationRow): string | null {
+  const fromRow = String(row.job_id ?? "").trim();
+  if (fromRow) return fromRow;
+
+  const payload = normalizeNotificationPayload(row.payload);
+  return firstNonEmptyPayloadValue(payload, ["job_id", "jobId"]);
 }
 
 function rankProposalVisibilityRow(row: NotificationRow): number {
@@ -464,7 +506,7 @@ export async function listInternalNotifications(params: {
   const rowsForUI = visibilityRows.map(row => {
     const submissionId = proposalSubmissionId(row);
     const enrichment = (submissionId && proposalEnrichmentMap.get(submissionId)) || null;
-    const jobId = String(row.job_id ?? "").trim() || null;
+    const jobId = notificationJobId(row);
     const jobEnrichment = (jobId && jobEnrichmentMap.get(jobId)) || null;
     return {
       ...row,

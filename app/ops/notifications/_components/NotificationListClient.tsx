@@ -21,6 +21,41 @@ function isProposalNotificationType(value: string | null | undefined): boolean {
   );
 }
 
+function normalizePayload(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return {};
+    }
+  }
+
+  return {};
+}
+
+function proposalIdFromPayload(value: unknown): string | null {
+  const payload = normalizePayload(value);
+  const candidates = [
+    payload.contractor_intake_submission_id,
+    payload.contractorIntakeSubmissionId,
+    payload.submission_id,
+  ];
+
+  for (const candidate of candidates) {
+    const id = String(candidate ?? "").trim();
+    if (id) return id;
+  }
+
+  return null;
+}
+
 function formatSubmittedAt(value: string) {
   const submittedAt = new Date(value);
   if (!Number.isFinite(submittedAt.getTime())) return null;
@@ -435,9 +470,7 @@ export function NotificationListClient({
   return (
     <div className="space-y-3">
       {notifications.map((notif) => {
-        const payload = (notif.payload ?? {}) as Record<string, unknown>;
-        const proposalId =
-          String(payload.contractor_intake_submission_id ?? "").trim() || null;
+        const proposalId = proposalIdFromPayload(notif.payload);
 
         if (isProposalNotificationType(notif.notification_type)) {
           return (
