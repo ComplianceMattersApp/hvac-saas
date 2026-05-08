@@ -352,16 +352,27 @@ Roadmap-forward note:
 - Preserve the boundary between Work Items, Estimate Lines, and Invoice Charges.
 
 Mobile home-screen launch QA checklist (Slice 1):
-- [ ] Unauthenticated home-screen launch routes cleanly to `/login`.
-- [ ] Authenticated internal user launch routes correctly to `/ops`.
+- [x] Unauthenticated home-screen launch routes cleanly to `/login`.
+- [x] Authenticated internal user launch routes correctly to `/ops`.
 - [ ] Authenticated contractor user launch routes correctly to `/portal`.
-- [ ] First-owner/admin invite acceptance routing is unchanged (`/set-password?mode=invite` -> `/ops/admin` after anchor checks).
-- [ ] `/ops` remains reachable and mobile-safe.
-- [ ] `/jobs/[id]` remains reachable and mobile-safe.
-- [ ] `/jobs/new` remains reachable and mobile-safe.
-- [ ] `/calendar` remains reachable and mobile-safe.
+- [x] First-owner/admin invite acceptance routing is unchanged (`/set-password?mode=invite` -> `/ops/admin` after anchor checks).
+- [x] `/ops` remains reachable and mobile-safe.
+- [x] `/jobs/[id]` remains reachable and mobile-safe.
+- [x] `/jobs/new` remains reachable and mobile-safe.
+- [x] `/calendar` remains reachable and mobile-safe.
 - [ ] `/portal` remains reachable and mobile-safe.
 - [ ] `/portal/jobs/[id]` remains reachable and mobile-safe.
+
+Verification notes (2026-05-07, local dev session):
+- Browser/mobile-width smoke used `390x844` viewport.
+- Verified unauthenticated `/ops` launch redirects to `/login?next=%2Fops`.
+- Verified internal authenticated routing to `/ops` and mobile-safe reachability for `/ops`, `/jobs/[id]`, `/jobs/new`, and `/calendar` (no horizontal overflow observed in sampled views).
+- Verified first-owner/admin invite continuity by targeted routing tests:
+  - `lib/auth/__tests__/first-owner-routing.test.ts` (`7/7`) confirms first-owner marker path resolves to `/ops/admin` after anchor checks and contractor branch remains `/portal`.
+  - `lib/auth/__tests__/proxy-public-route.test.ts` (`3/3`) confirms `/set-password` is a public auth route and `/ops` remains protected.
+- Contractor-session browser smoke remains pending:
+  - current session is authenticated as an internal user; `/portal`, `/portal/jobs`, and `/portal/jobs/[id]` requests resolve back to `/ops` in this session.
+  - complete these three checklist items with a true contractor-authenticated mobile smoke session.
 
 
 ### 2.3.8 Dispatch calendar block edit/delete hardening and production RLS object-drift closeout (resolved)
