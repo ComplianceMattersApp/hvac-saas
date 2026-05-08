@@ -354,14 +354,14 @@ Roadmap-forward note:
 Mobile home-screen launch QA checklist (Slice 1):
 - [x] Unauthenticated home-screen launch routes cleanly to `/login`.
 - [x] Authenticated internal user launch routes correctly to `/ops`.
-- [ ] Authenticated contractor user launch routes correctly to `/portal`.
+- [x] Authenticated contractor user launch routes correctly to `/portal`.
 - [x] First-owner/admin invite acceptance routing is unchanged (`/set-password?mode=invite` -> `/ops/admin` after anchor checks).
 - [x] `/ops` remains reachable and mobile-safe.
 - [x] `/jobs/[id]` remains reachable and mobile-safe.
 - [x] `/jobs/new` remains reachable and mobile-safe.
 - [x] `/calendar` remains reachable and mobile-safe.
-- [ ] `/portal` remains reachable and mobile-safe.
-- [ ] `/portal/jobs/[id]` remains reachable and mobile-safe.
+- [x] `/portal` remains reachable and mobile-safe.
+- [x] `/portal/jobs/[id]` remains reachable and mobile-safe.
 
 Verification notes (2026-05-07, local dev session):
 - Browser/mobile-width smoke used `390x844` viewport.
@@ -370,9 +370,11 @@ Verification notes (2026-05-07, local dev session):
 - Verified first-owner/admin invite continuity by targeted routing tests:
   - `lib/auth/__tests__/first-owner-routing.test.ts` (`7/7`) confirms first-owner marker path resolves to `/ops/admin` after anchor checks and contractor branch remains `/portal`.
   - `lib/auth/__tests__/proxy-public-route.test.ts` (`3/3`) confirms `/set-password` is a public auth route and `/ops` remains protected.
-- Contractor-session browser smoke remains pending:
-  - current session is authenticated as an internal user; `/portal`, `/portal/jobs`, and `/portal/jobs/[id]` requests resolve back to `/ops` in this session.
-  - complete these three checklist items with a true contractor-authenticated mobile smoke session.
+- Contractor-session browser smoke completed (2026-05-07, second local dev session):
+  - Authenticated as contractor (Eddie Castellanos Jr): `/portal` rendered correctly — CONTRACTOR PORTAL header, 8 portal jobs, status badges (1 ACTION NEEDED, 3 UPCOMING, 0 ACTIVE WORK, 19 WAITING, 0 PASSED), search field.
+  - `/portal/jobs/[id]` rendered correctly — NEEDS CORRECTION badge, Customer/Site Contact, Street View map, Navigate/Open in Maps, Contractor Actions (note, upload, retest), Timeline. Second job confirmed SCHEDULED/Visit booked with contractor notes and timeline.
+  - Contractor session did not route to `/ops` — portal scope enforced correctly.
+  - All three previously pending checklist items are now closed.
 
 
 ### 2.3.8 Dispatch calendar block edit/delete hardening and production RLS object-drift closeout (resolved)
