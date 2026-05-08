@@ -632,6 +632,7 @@ export default async function ReportCenterDashboardPage({
               <header className="flex flex-col gap-1">
                 <h2 className="text-lg font-semibold tracking-tight text-slate-950">Invoices</h2>
                 <p className="text-sm text-slate-600">Billed truth only where internal invoices already support it honestly.</p>
+                <p className="text-sm text-slate-600">Recorded payment tracking only; no card processing from this surface.</p>
               </header>
               <div className="mt-4 grid gap-4 lg:grid-cols-2">
                 {dashboard.invoiceVisibility.cards.map((card) => (

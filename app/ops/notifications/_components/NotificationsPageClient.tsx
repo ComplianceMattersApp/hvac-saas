@@ -162,6 +162,9 @@ export function NotificationsPageClient({
               <p className="text-sm text-slate-600">
                 Internal event visibility for ops workflow.
               </p>
+              <p className="text-sm text-slate-600">
+                Signals for awareness; action ownership remains in Ops queues.
+              </p>
             </div>
 
             <div className="flex flex-wrap gap-2">

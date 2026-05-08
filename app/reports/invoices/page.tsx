@@ -91,6 +91,7 @@ export default async function InvoiceLedgerPage({
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Report Center</h1>
           <p className="mt-1 text-sm text-slate-600">Invoices Report</p>
+          <p className="text-sm text-slate-600">Recorded payment tracking only; no card processing from this surface.</p>
         </div>
         <div className="max-w-[28rem] text-sm text-slate-600 md:text-right">
           {usesInternalInvoicing ? (
