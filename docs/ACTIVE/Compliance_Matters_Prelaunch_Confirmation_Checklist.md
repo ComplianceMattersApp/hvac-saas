@@ -383,6 +383,50 @@ Mobile home-screen launch QA checklist (Slice 1):
 - Confirmed production smoke passed: mistaken block deleted, date change on remaining block persisted.
 - Confirmed no schema migration, RLS model, tenant boundary, or payment behavior changed.
 - Pre-launch guardrail added: for production readiness, sample-check critical RLS-controlled tables by direct `pg_policies` inspection, not migration list alone. Migration history entry does not guarantee database object existence.
+
+### 2.3.9 Field notes launch-hardening closeout (resolved)
+- Duct leakage required-result validation hardening is complete (`2dd205a`):
+  - duct leakage completion now requires `measured_duct_leakage_cfm`
+  - server-side completion guard blocks `is_completed = true` when measured value is missing/invalid
+  - measured result input has required behavior while Save Draft remains allowed with partial data
+  - computed pass/fail and override behavior are unchanged
+  - other ECC test types are unchanged
+  - validation passed: `npx.cmd tsc --noEmit`, `duct-leakage-required-result.test.ts` (`3/3`), `ecc-save-complete-scope-hardening.test.ts` (`18/18`)
+- Notifications richness/presentation/ops alignment is complete:
+  - enrichment resilience hardening (`381592b`) and card presentation polish (`38bd4e0`) are complete
+  - `/ops` New Work Requests signal family is complete (`d5a31cc`)
+  - signal label: `New Work Requests`
+  - signal link: `/ops/notifications?view=new_jobs&state=unread`
+  - canonical included types: `contractor_intake_proposal_submitted`, `contractor_job_created`
+  - email fallback rows (`internal_contractor_intake_proposal_email`, `internal_contractor_job_intake_email`) are deduped behind canonical rows
+  - Contractor Updates remains narrow only: `contractor_note`, `contractor_correction_submission`, `contractor_schedule_updated`
+  - global ribbon badge remains broad unread awareness
+  - `contractor_report_sent` remains excluded from internal notification awareness
+  - validation included TypeScript clean, notification/internal-awareness tests, browser smoke for `/ops`, `/ops/notifications`, `view=new_jobs`, `view=contractor_updates`, and mobile-width notification card smoke
+- Contractor portal closeout status alignment is complete (`9d51091`):
+  - evidence-accepted failed ECC jobs now project contractor-safe wording
+  - accepted but not fully closed: `Final processing` / `Accepted by review. Final paperwork is being completed.`
+  - accepted and fully closed: `Resolved` / `Accepted by review and closed.`
+  - projection uses `failure_resolved_by_correction_review` + `field_complete` + `certs_complete` + `invoice_complete`
+  - portal list/detail pass required flags/events into resolver
+  - historical failed-test truth remains intact
+  - internal lifecycle/ECC evaluator/queue/notification/auth-RLS/schema/authority boundaries remain unchanged
+  - validation passed: `npx.cmd tsc --noEmit`, `resolveContractorIssues.test.ts` (`11/11`)
+  - contractor-authenticated visual smoke remained pending due to internal-session scope during fix verification
+- Explicit non-changes for this field-note closeout batch:
+  - no schema changes
+  - no migrations
+  - no Supabase commands
+  - no RLS/auth changes
+  - no source-of-truth redesign
+  - no queue rewrite
+  - no payment/Stripe tenant execution/QBO/Estimates/Support/onboarding behavior changes
+- Launch gating posture remains unchanged:
+  - controlled tester onboarding remains parked until explicit owner approval after remaining spine review
+  - Estimates and Support Console production enablement remain parked behind runbooks
+  - tenant customer payment execution remains deferred
+  - QBO remains optional/downstream only
+
 ### 2.4 First owner onboarding/provisioning readiness
 - **V1 implemented and browser-smoked.** Public self-serve signup exists for standard onboarding at `/signup`, and invite-only platform-admin/operator provisioning remains active/manual fallback.
 - Confirmed: provisioning script (`scripts/provision-first-owner.ts`) requires explicit allow flags for apply mode; defaults to dry-run.

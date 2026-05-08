@@ -88,6 +88,39 @@ Current Program Status Note (May 2026)
   - server-confirmed truth behavior remains unchanged (event writes, redirects, banner, attempt count, `tab=ops` continuity)
 - Practical baseline after this pass has improved materially: latest local `/jobs/[id]` smoke showed steady-state renders commonly around ~1.45-2.47s, `timelineSummary` usually around ~183-384ms after softening, and `customerAttemptSummary` stayed `0ms`; cold/backend/Supabase variance can still cause spikes.
 - Performance remains an active launch-readiness backlog and does not own the entire roadmap unless a specific speed issue is actively damaging usability.
+- Field Notes launch-hardening closeout batch is complete and pushed:
+  - Duct leakage required-result validation hardening (`2dd205a`):
+    - duct leakage completion now requires `measured_duct_leakage_cfm`
+    - server guard blocks completion (`is_completed = true`) when measured value is missing/invalid
+    - measured result input uses required behavior while Save Draft remains allowed for partial data
+    - computed pass/fail and override behavior unchanged; other ECC test types unchanged
+    - validation passed: `npx.cmd tsc --noEmit`, `duct-leakage-required-result.test.ts` (`3/3`), `ecc-save-complete-scope-hardening.test.ts` (`18/18`)
+  - Notifications hardening and presentation/ops alignment:
+    - enrichment resilience (`381592b`) and card presentation polish (`38bd4e0`) are complete
+    - `/ops` New Work Requests signal family (`d5a31cc`) is complete with link `/ops/notifications?view=new_jobs&state=unread`
+    - new work awareness includes canonical `contractor_intake_proposal_submitted` and `contractor_job_created`
+    - email fallback rows `internal_contractor_intake_proposal_email` and `internal_contractor_job_intake_email` are deduped behind canonical rows
+    - Contractor Updates remains intentionally narrow (`contractor_note`, `contractor_correction_submission`, `contractor_schedule_updated`)
+    - global ribbon badge remains broad unread internal awareness
+    - `contractor_report_sent` remains excluded from internal notification awareness
+    - validation passed: TypeScript clean, notification/internal-awareness tests, browser smoke for `/ops`, `/ops/notifications`, `view=new_jobs`, `view=contractor_updates`, and mobile-width notification card smoke
+  - Contractor portal closeout status alignment (`9d51091`):
+    - evidence-accepted failed ECC jobs now project contractor-safe wording
+    - accepted but not fully closed: `Final processing` / `Accepted by review. Final paperwork is being completed.`
+    - accepted and fully closed: `Resolved` / `Accepted by review and closed.`
+    - projection uses `failure_resolved_by_correction_review` plus `field_complete`, `certs_complete`, and `invoice_complete`
+    - portal list/detail now pass required flags/events into resolver
+    - historical failed-test truth remains intact; internal lifecycle/ECC truth unchanged
+    - validation passed: `npx.cmd tsc --noEmit`, `resolveContractorIssues.test.ts` (`11/11`)
+    - contractor-authenticated visual smoke was not completed in the internal-session scope used during the fix
+- Explicit non-changes for this field-note closeout batch:
+  - no schema changes
+  - no migrations
+  - no Supabase commands
+  - no RLS/auth changes
+  - no source-of-truth redesign
+  - no queue rewrite
+  - no payment/Stripe tenant execution/QBO/Estimates/Support/onboarding behavior changes
 - Planned pre-launch spine order is now resumed after this docs closeout; Support Console and Estimates production enablement remain parked behind their runbooks, tenant customer payment execution remains deferred, QBO remains optional downstream/last-last, and controlled tester onboarding remains intentionally held until readiness work is acceptably complete and supportable.
 - Contractor Report current-scope delivery is complete and accepted for current launch scope quality:
   - failed ECC contractor reports aggregate all failed completed ECC runs for the job

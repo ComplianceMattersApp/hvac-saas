@@ -182,6 +182,31 @@ Completed production-shipped cleanup batch note (current baseline):
 - ECC/test workflow: refrigerant Photo Taken is attestation-only (no upload-proof validation claim), and Asbestos is included as a duct-leakage override suggestion while custom reasons remain supported.
 - This closeout note is baseline alignment only and does not add a new roadmap milestone.
 
+Field-note launch-hardening closeout alignment note (current baseline):
+- Completed commits in this batch:
+  - Duct leakage required-result hardening (`2dd205a`)
+  - Notification enrichment resilience (`381592b`)
+  - Notification card polish (`38bd4e0`)
+  - `/ops` New Work Requests signal alignment (`d5a31cc`)
+  - Contractor portal evidence-accepted closeout wording alignment (`9d51091`)
+- What was aligned:
+  - duct leakage completion now requires measured result while preserving Save Draft partial behavior
+  - notification awareness/presentation hardening is complete and `/ops` now exposes New Work Requests separately from narrow Contractor Updates
+  - evidence-accepted failed ECC contractor projection now distinguishes final-processing vs resolved/closed contractor-safe wording
+- Explicit non-changes preserved:
+  - no schema changes
+  - no migrations
+  - no Supabase commands
+  - no RLS/auth changes
+  - no source-of-truth redesign
+  - no queue rewrite
+  - no payment/Stripe tenant execution/QBO/Estimates/Support/onboarding behavior changes
+- Launch gating remains unchanged:
+  - controlled tester onboarding remains parked pending explicit owner approval
+  - Estimates and Support Console production enablement remain parked behind runbooks
+  - tenant customer payment execution remains deferred
+  - QBO remains optional/downstream only
+
 Contractor report current-scope closeout note (completed):
 - Contractor Report current-scope delivery is complete and professional enough for current launch scope.
 - Failed ECC contractor reports aggregate all failed completed ECC runs for the job and include enriched contractor-actionable details (baseline, measured value, variance) with corrected duct-leakage percentage logic.
