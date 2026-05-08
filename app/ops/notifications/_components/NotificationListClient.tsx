@@ -86,12 +86,23 @@ const JOB_AWARE_EVENT_HEADLINES: Record<string, string> = {
 };
 
 const JOB_AWARE_EVENT_HELPER_TEXT: Record<string, string> = {
-  contractor_note: "Contractor added a note on this job.",
-  contractor_correction_submission: "Contractor submitted corrections for internal review.",
-  contractor_schedule_updated: "Contractor provided scheduling details.",
-  contractor_job_created: "Contractor submitted a new job for internal review.",
-  retest_ready_requested: "Contractor marked this job ready for retest review.",
+  contractor_note: "Review contractor note and update next action if needed.",
+  contractor_correction_submission: "Review submitted corrections and confirm disposition.",
+  contractor_schedule_updated: "Confirm scheduling details and update dispatch plan.",
+  contractor_job_created: "Review the submitted request and schedule next steps.",
+  retest_ready_requested: "Confirm retest readiness and schedule follow-up.",
 };
+
+function isGenericContractorBody(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return [
+    "a contractor added a note.",
+    "a contractor submitted corrections for review.",
+    "a contractor submitted scheduling data with a new job.",
+    "a contractor submitted a new job that needs internal review and scheduling.",
+    "contractor requested retest readiness review.",
+  ].includes(normalized);
+}
 
 function notificationTypeLabel(value?: string | null) {
   const key = String(value ?? "").trim().toLowerCase();
@@ -146,11 +157,21 @@ function JobAwareNotificationCard({
       : notif.body
     : null;
   const bodyPreview =
-    rawBodyPreview && rawBodyPreview.trim() !== helperText?.trim()
+    rawBodyPreview &&
+    rawBodyPreview.trim() !== helperText?.trim() &&
+    !isGenericContractorBody(rawBodyPreview)
       ? rawBodyPreview
       : null;
 
   const jobEnrichment = notif.job_enrichment ?? null;
+  const identityLine = [
+    jobEnrichment?.customer_name,
+    jobEnrichment?.contractor_name,
+    jobEnrichment?.city,
+  ]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .join(" / ");
 
   return (
     <div
@@ -180,44 +201,11 @@ function JobAwareNotificationCard({
             )}
           </div>
 
-          {/* Job identity block — shows what job this is about */}
-          {(jobEnrichment?.job_title || jobEnrichment?.customer_name) && (
-            <div className="mb-2 space-y-0.5">
-              {jobEnrichment.job_title && (
-                <p className="flex items-baseline gap-1.5 text-sm text-slate-700">
-                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    Job
-                  </span>
-                  <span className="font-medium">{jobEnrichment.job_title}</span>
-                </p>
-              )}
-              {jobEnrichment.customer_name && (
-                <p className="flex items-baseline gap-1.5 text-sm text-slate-700">
-                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    Customer
-                  </span>
-                  <span>{jobEnrichment.customer_name}</span>
-                </p>
-              )}
-              {(jobEnrichment.contractor_name || jobEnrichment.city) && (
-                <p className="flex items-baseline gap-1.5 text-sm text-slate-700">
-                  {jobEnrichment.contractor_name && (
-                    <>
-                      <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                        Contractor
-                      </span>
-                      <span>{jobEnrichment.contractor_name}</span>
-                    </>
-                  )}
-                  {jobEnrichment.contractor_name && jobEnrichment.city && (
-                    <span className="text-slate-300" aria-hidden="true">/</span>
-                  )}
-                  {jobEnrichment.city && (
-                    <span className="text-slate-500">{jobEnrichment.city}</span>
-                  )}
-                </p>
-              )}
-            </div>
+          {jobEnrichment?.job_title && (
+            <p className="mb-1 text-sm font-medium text-slate-800">{jobEnrichment.job_title}</p>
+          )}
+          {identityLine && (
+            <p className="mb-2 text-[13px] text-slate-500">{identityLine}</p>
           )}
 
           {/* Secondary preview: restrained, not the main message */}
@@ -258,7 +246,7 @@ function JobAwareNotificationCard({
               disabled={pendingReadId === notif.id}
               className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {pendingReadId === notif.id ? "Saving…" : "Mark read"}
+              {pendingReadId === notif.id ? "Saving..." : "Mark read"}
             </button>
           )}
         </div>
@@ -286,15 +274,21 @@ function ProposalCard({
   pendingReadId,
   onMarkAsRead,
 }: ProposalCardProps) {
-  const headline = enrichment?.contractor_name
-    ? `New Proposal from ${enrichment.contractor_name}`
-    : "New Contractor Intake Proposal";
+  const contractorName = String(enrichment?.contractor_name ?? "").trim();
+  const customerName = String(enrichment?.customer_name ?? "").trim() || "Unknown customer";
+  const locationSummary =
+    String(enrichment?.location_nickname ?? "").trim() ||
+    String(enrichment?.address_summary ?? "").trim() ||
+    "Location not provided";
+  const requestSummary =
+    [enrichment?.job_type_label, enrichment?.project_type_label]
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean)
+      .join(" / ") || "Contractor-submitted work request";
+  const headline = contractorName
+    ? `New proposal from ${contractorName}`
+    : "New intake proposal awaiting review";
 
-  const hasDetails = !!(
-    enrichment?.customer_name ||
-    enrichment?.location_nickname ||
-    enrichment?.address_summary
-  );
   const submittedAtLabel = formatSubmittedAt(notif.created_at);
 
   return (
@@ -326,34 +320,21 @@ function ProposalCard({
           </div>
 
           {/* Key context block */}
-          {hasDetails && (
-            <div className="mb-2.5 space-y-1">
-              {enrichment?.customer_name && (
-                <p className="flex items-baseline gap-1.5 text-sm text-slate-700">
-                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    Customer
-                  </span>
-                  <span className="font-medium">{enrichment.customer_name}</span>
-                </p>
-              )}
-              {enrichment?.location_nickname && (
-                <p className="flex items-baseline gap-1.5 text-sm text-slate-700">
-                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    Location
-                  </span>
-                  <span>{enrichment.location_nickname}</span>
-                </p>
-              )}
-              {enrichment?.address_summary && (
-                <p className="flex items-baseline gap-1.5 text-sm text-slate-700">
-                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    Address
-                  </span>
-                  <span>{enrichment.address_summary}</span>
-                </p>
-              )}
-            </div>
-          )}
+          <div className="mb-2.5 space-y-1">
+            <p className="text-sm text-slate-700">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Contractor </span>
+              <span className="font-medium">{contractorName || "Contractor not specified"}</span>
+            </p>
+            <p className="text-sm text-slate-700">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Customer </span>
+              <span className="font-medium">{customerName}</span>
+            </p>
+            <p className="text-sm text-slate-700">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Location </span>
+              <span>{locationSummary}</span>
+            </p>
+            <p className="text-[13px] text-slate-500">{requestSummary}</p>
+          </div>
 
           {/* Notes preview */}
           {enrichment?.notes_preview && (
@@ -364,16 +345,6 @@ function ProposalCard({
 
           {/* Secondary metadata row */}
           <div className="flex flex-wrap items-center gap-2">
-            {enrichment?.job_type_label && (
-              <span className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                {enrichment.job_type_label}
-              </span>
-            )}
-            {enrichment?.project_type_label && (
-              <span className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                {enrichment.project_type_label}
-              </span>
-            )}
             <span className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
               Intake Proposal
             </span>
@@ -385,7 +356,7 @@ function ProposalCard({
             )}
             <span className="text-[12px] text-slate-400">
               {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true })}
-              {submittedAtLabel ? ` · ${submittedAtLabel}` : ""}
+              {submittedAtLabel ? ` | ${submittedAtLabel}` : ""}
             </span>
           </div>
         </div>
@@ -406,7 +377,7 @@ function ProposalCard({
               disabled={pendingReadId === notif.id}
               className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {pendingReadId === notif.id ? "Saving…" : "Mark read"}
+              {pendingReadId === notif.id ? "Saving..." : "Mark read"}
             </button>
           )}
         </div>
@@ -480,7 +451,7 @@ function GenericCard({ notif, pendingReadId, onMarkAsRead }: GenericCardProps) {
               disabled={pendingReadId === notif.id}
               className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {pendingReadId === notif.id ? "Saving…" : "Mark read"}
+              {pendingReadId === notif.id ? "Saving..." : "Mark read"}
             </button>
           )}
         </div>

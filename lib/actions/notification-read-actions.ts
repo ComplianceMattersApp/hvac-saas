@@ -107,7 +107,7 @@ async function buildProposalEnrichmentMap(
   const { data: submissions } = await supabase
     .from("contractor_intake_submissions")
     .select(
-      "id, proposed_customer_first_name, proposed_customer_last_name, proposed_address_line1, proposed_city, proposed_zip, proposed_location_nickname, proposed_job_type, proposed_project_type, proposed_job_notes, proposed_permit_number, proposed_jurisdiction, proposed_permit_date"
+      "id, contractor_id, proposed_customer_first_name, proposed_customer_last_name, proposed_address_line1, proposed_city, proposed_zip, proposed_location_nickname, proposed_job_type, proposed_project_type, proposed_job_notes, proposed_permit_number, proposed_jurisdiction, proposed_permit_date"
     )
     .in("id", uniqueSubmissionIds);
 
@@ -118,8 +118,14 @@ async function buildProposalEnrichmentMap(
   }
 
   // Batch-fetch contractor names
+  const contractorIdsFromSubmissions = Array.from(submissionById.values())
+    .map((sub) => String(sub.contractor_id ?? "").trim())
+    .filter(Boolean);
   const uniqueContractorIds = Array.from(
-    new Set(Array.from(contractorIdBySubmissionId.values()).filter(Boolean))
+    new Set([
+      ...Array.from(contractorIdBySubmissionId.values()).filter(Boolean),
+      ...contractorIdsFromSubmissions,
+    ])
   );
   const contractorNameById = new Map<string, string>();
   if (uniqueContractorIds.length) {
@@ -136,7 +142,9 @@ async function buildProposalEnrichmentMap(
 
   for (const submissionId of uniqueSubmissionIds) {
     const sub = submissionById.get(submissionId);
-    const contractorId = contractorIdBySubmissionId.get(submissionId) ?? "";
+    const contractorId =
+      contractorIdBySubmissionId.get(submissionId) ??
+      String(sub?.contractor_id ?? "").trim();
     const contractorName = contractorNameById.get(contractorId) || null;
 
     const firstName = String(sub?.proposed_customer_first_name ?? "").trim();

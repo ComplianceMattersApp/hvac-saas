@@ -33,6 +33,7 @@ type NotificationRow = {
 type SubmissionRow = {
   id: string;
   review_status: string;
+  contractor_id?: string | null;
   proposed_customer_first_name?: string | null;
   proposed_customer_last_name?: string | null;
   proposed_address_line1?: string | null;
@@ -237,6 +238,51 @@ describe("internal notification readers", () => {
     expect(notifications[0]?.proposal_enrichment?.job_type_label).toBe("ECC");
     expect(unreadCount).toBe(1);
     expect(unreadBadgeCount).toBe(1);
+  });
+
+  it("uses submission contractor_id for proposal enrichment when payload contractor_id is missing", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-proposal-fallback-contractor",
+            account_owner_user_id: "owner-1",
+            job_id: null,
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_intake_proposal_submitted",
+            subject: "New Contractor Intake Proposal",
+            body: "A contractor submitted an intake proposal pending internal finalization.",
+            payload: {
+              contractor_intake_submission_id: "proposal-fallback-contractor",
+            },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-20T13:00:00.000Z",
+          },
+        ],
+        submissions: [
+          {
+            id: "proposal-fallback-contractor",
+            review_status: "pending",
+            contractor_id: "contractor-2",
+            proposed_customer_first_name: "Rosa",
+            proposed_customer_last_name: "Diaz",
+          },
+        ],
+        contractors: [{ id: "contractor-2", name: "Summit Mechanical" }],
+      }),
+    );
+
+    const { listInternalNotifications } = await import("@/lib/actions/notification-read-actions");
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+      filterKey: "new_job_notifications",
+    });
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.proposal_enrichment?.contractor_name).toBe("Summit Mechanical");
   });
 
   it("does not drop proposal notifications when proposal status rows are not visible", async () => {
