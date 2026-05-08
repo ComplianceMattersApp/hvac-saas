@@ -2397,7 +2397,6 @@ const defaultHeatingOutputBtu =
                 
                 <div className="text-sm font-semibold text-slate-900">Override (Optional)</div>
                 <div className="rounded-md border p-3 mt-3 sm:col-span-2 space-y-2">
-                  <div className="text-sm font-semibold">Charge Verification Override (if applicable)</div>
                   <div className="text-xs text-slate-600">
                     Select an option, then use Save Draft or Complete Test.
                   </div>

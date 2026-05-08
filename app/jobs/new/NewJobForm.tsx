@@ -1282,7 +1282,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">Internal job creation</p>
                 <h2 className="mt-2 text-lg font-semibold text-white">Create with confidence, not form fatigue.</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-300">
-                  Resolve the customer and location first, choose the job family, confirm the relationship path, then define Work Items before scheduling or billing.
+                  Select the customer and location, pick a job family, then add Work Items before scheduling.
                 </p>
               </div>
               <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[26rem]">
@@ -2393,8 +2393,8 @@ const [billingRecipient, setBillingRecipient] = useState<
                     <h3 className="text-base font-semibold text-slate-900">Work Items</h3>
                     <p className="mt-1 text-sm text-slate-500">
                       {jobType === "service"
-                        ? "Add at least one structured Work Item that defines what belongs to this visit."
-                        : "ECC testing does not require work items. Add companion work only when this visit also includes service-related work."}
+                        ? "Add at least one Work Item defining what belongs to this visit."
+                        : "ECC jobs don't require Work Items. Add companion work only if this visit includes service work."}
                     </p>
                     {jobType === "service" ? (
                       <p className="mt-1 text-xs text-slate-500">

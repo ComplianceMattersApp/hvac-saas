@@ -2061,13 +2061,12 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   This invoice records billed work for this job. Payment entries are tracking-only and do not charge a card.
                 </div>
                 <div className="mt-2 rounded-lg border border-slate-200/80 bg-slate-50/75 px-3.5 py-3 text-sm leading-6 text-slate-700">
-                  Work Items capture the visit work. Invoice Charges are the billing lines you review before issue.
+                  Work Items capture visit work. Invoice Charges are the billing lines you review before issuing.
                 </div>
                 {internalInvoice.status === "draft" ? (
                   <>
                       <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Issue Invoice</div>
-                      <div className="mt-1 text-sm leading-6 text-slate-600">Review recipient, Invoice Charges, and total. Issue only when this billed invoice record is final. Sending happens after issue and is communication only.</div>
-                      <div className="mt-1 text-sm leading-6 text-slate-600">Invoice Charges are billed records and should be reviewed before issue.</div>
+                      <div className="mt-1 text-sm leading-6 text-slate-600">Review charges, recipient, and total before issuing. Sending is communication-only and happens after issue.</div>
 
                     <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
                       <div><span className="font-semibold text-slate-900">Review recipient:</span> {internalInvoiceRecipientName}</div>
@@ -2473,8 +2472,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           {normalizeRetestLinkedJobTitle(job.title) || "Operational job workspace"}
         </h1>
         <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-600">
-          Single-job control center for scheduling, field progress, closeout, and record history.
+          Manage scheduling, field progress, and closeout for this job.
         </p>
+        {!isFieldComplete ? (
+          <p className="mt-1 text-xs text-slate-500">
+            {!hasFullSchedule ? "Next: set a schedule to dispatch." : "Scheduled — use the field status buttons when work begins."}
+          </p>
+        ) : null}
         {visitScopeHeaderPreview.hasContent ? (
           <div className="mt-2 flex max-w-2xl flex-wrap items-center gap-1.5 text-xs text-slate-600">
             <span className="font-semibold uppercase tracking-[0.1em] text-slate-500">Visit</span>
