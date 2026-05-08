@@ -1211,7 +1211,7 @@ export async function CalendarView(props: Props) {
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div>
                   <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800">Scheduled Jobs Needing Attention</h3>
-                  <p className="mt-0.5 text-[11px] text-amber-800/75">Hidden from the dispatch canvas but still need operator review.</p>
+                  <p className="mt-0.5 text-[11px] text-amber-800/75">Scheduled but missing required info — open each job to resolve before dispatching.</p>
                 </div>
               </div>
               <div className="max-h-[32vh] space-y-2 overflow-y-auto pr-1">
@@ -1244,7 +1244,7 @@ export async function CalendarView(props: Props) {
                           ? 'Historical cancelled record'
                           : uiView === 'list'
                           ? 'Open to review'
-                          : 'Drag to schedule'}
+                          : 'Open to schedule'}
                       </p>
                     </CalendarDragJobLink>
                   );
@@ -1258,9 +1258,7 @@ export async function CalendarView(props: Props) {
             <div>
               <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">Unscheduled Jobs</h3>
               <p className="mt-0.5 text-[11px] text-slate-500">
-                {uiView === 'list'
-                  ? 'Open a job to review and place it on the schedule.'
-                  : 'Drag onto the calendar when a visit is ready to place.'}
+                {'Open a job to review and place it on the schedule.'}
               </p>
             </div>
           </div>
@@ -1307,7 +1305,7 @@ export async function CalendarView(props: Props) {
                       ))}
                     </div>
                     <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-500 group-hover:text-slate-700">
-                      {uiView === 'list' ? 'Open to schedule' : 'Drag to schedule'}
+                      {'Open to schedule'}
                     </p>
                   </CalendarDragJobLink>
                 );
