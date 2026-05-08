@@ -19,7 +19,10 @@ import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/sear
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import { buildPromotedCompanionReadModel, buildVisitScopeReadModel } from "@/lib/jobs/visit-scope";
-import { listInternalContractorUpdateAwareness } from "@/lib/actions/notification-read-actions";
+import {
+  listInternalContractorUpdateAwareness,
+  listInternalNewWorkRequestAwareness,
+} from "@/lib/actions/notification-read-actions";
 import {
   didOpsStatusChangeTo,
   formatStatusAgeCompact,
@@ -1205,7 +1208,14 @@ const pendingInfoJobIds = uniqueAllOpenOpsJobs
   .filter(Boolean);
 
 const _t_secondarySignalReads = opsTimingEnabled ? Date.now() : 0;
-const [pendingInfoTransitionRes, activeAssignmentDisplayMap, signalRes, unreadContractorAwarenessNotifications, failedRunsRes] = await Promise.all([
+const [
+  pendingInfoTransitionRes,
+  activeAssignmentDisplayMap,
+  signalRes,
+  unreadContractorAwarenessNotifications,
+  unreadNewWorkRequestAwarenessNotifications,
+  failedRunsRes,
+] = await Promise.all([
   trackOpsTiming(
     "ops:secondarySignalReads:pendingInfoTransitions",
     pendingInfoJobIds.length
@@ -1248,6 +1258,13 @@ const [pendingInfoTransitionRes, activeAssignmentDisplayMap, signalRes, unreadCo
   trackOpsTiming(
     "ops:secondarySignalReads:unreadContractorNotifications",
     listInternalContractorUpdateAwareness({
+      limit: 100,
+      onlyUnread: true,
+    })
+  ),
+  trackOpsTiming(
+    "ops:secondarySignalReads:unreadNewWorkRequestNotifications",
+    listInternalNewWorkRequestAwareness({
       limit: 100,
       onlyUnread: true,
     })
@@ -1406,6 +1423,7 @@ const contractorCreatedCount = uniqueAllOpenOpsJobs.filter((j: any) => {
 }).length;
 
 const contractorUpdatesCount = unreadContractorAwarenessNotifications.length;
+const newWorkRequestCount = unreadNewWorkRequestAwarenessNotifications.length;
 
 let signalFilteredBucketJobs = [...(filteredBucketJobs ?? [])];
 
@@ -1632,6 +1650,13 @@ const signalCards = [
     count: contractorCreatedCount,
   },
   {
+    key: "new_work_requests",
+    bucket,
+    label: "New Work Requests",
+    helper: "Unread contractor-submitted jobs or proposals that need review.",
+    count: newWorkRequestCount,
+  },
+  {
     key: "contractor_updates",
     bucket,
     label: "Contractor Updates",
@@ -1650,6 +1675,8 @@ const activeSignalLabel =
     ? "Retest Ready"
     : signal === "new_contractor"
     ? "New Contractor Jobs"
+    : signal === "new_work_requests"
+    ? "New Work Requests"
     : signal === "contractor_updates"
     ? "Contractor Updates"
     : "";
@@ -2113,6 +2140,7 @@ function workflowToneClass(key: string) {
 function signalToneClass(key: string) {
   if (key === "retest_ready") return "border-emerald-200 bg-emerald-50/70 text-emerald-900";
   if (key === "new_contractor") return "border-blue-200 bg-blue-50/70 text-blue-900";
+  if (key === "new_work_requests") return "border-cyan-200 bg-cyan-50/70 text-cyan-900";
   if (key === "contractor_updates") return "border-indigo-200 bg-indigo-50/70 text-indigo-900";
   return "border-gray-200 bg-white text-gray-900";
 }
@@ -2287,6 +2315,8 @@ return (
               const isActive = signal === card.key;
               const cardHref = card.key === "contractor_updates"
                 ? "/ops/notifications?view=contractor_updates&state=unread"
+                : card.key === "new_work_requests"
+                ? "/ops/notifications?view=new_jobs&state=unread"
                 : `/ops${buildQueryString({
                     bucket: card.bucket,
                     contractor: contractor ?? "",
@@ -2300,14 +2330,20 @@ return (
                   href={cardHref}
                   className={[
                     opsQueueChipClass,
-                    card.key !== "contractor_updates" && isActive
+                    card.key !== "contractor_updates" && card.key !== "new_work_requests" && isActive
                       ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
                       : `${signalToneClass(card.key)} hover:bg-white`,
                   ].join(" ")}
-                  title={card.key === "contractor_updates" ? "Open unread contractor-driven notifications" : undefined}
+                  title={
+                    card.key === "contractor_updates"
+                      ? "Open unread contractor-driven notifications"
+                      : card.key === "new_work_requests"
+                      ? "Open unread new work-request notifications"
+                      : undefined
+                  }
                 >
                   <span>{card.label}</span>
-                  <span className={`font-semibold tabular-nums ${card.key !== "contractor_updates" && isActive ? "text-slate-200" : "text-current/80"}`}>{card.count}</span>
+                  <span className={`font-semibold tabular-nums ${card.key !== "contractor_updates" && card.key !== "new_work_requests" && isActive ? "text-slate-200" : "text-current/80"}`}>{card.count}</span>
                 </Link>
               );
             })}

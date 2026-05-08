@@ -285,6 +285,103 @@ describe("internal notification readers", () => {
     expect(notifications[0]?.proposal_enrichment?.contractor_name).toBe("Summit Mechanical");
   });
 
+  it("builds unread new-work awareness from canonical rows and email fallbacks without duplicate pairs", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-job-email-older",
+            account_owner_user_id: "owner-1",
+            job_id: "job-new-1",
+            recipient_type: "internal",
+            channel: "email",
+            notification_type: "internal_contractor_job_intake_email",
+            subject: "Internal intake email",
+            body: "Internal ops/admin alert for contractor-submitted job.",
+            payload: {},
+            status: "sent",
+            read_at: null,
+            created_at: "2026-04-22T08:59:00.000Z",
+          },
+          {
+            id: "notif-job-awareness",
+            account_owner_user_id: "owner-1",
+            job_id: "job-new-1",
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_job_created",
+            subject: "Contractor job submitted",
+            body: "A contractor submitted a new job that needs internal review and scheduling.",
+            payload: {},
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-22T09:00:00.000Z",
+          },
+          {
+            id: "notif-proposal-email-older",
+            account_owner_user_id: "owner-1",
+            job_id: null,
+            recipient_type: "internal",
+            channel: "email",
+            notification_type: "internal_contractor_intake_proposal_email",
+            subject: "New Contractor Intake Proposal",
+            body: "Internal ops/admin alert for contractor-submitted intake proposal.",
+            payload: { contractor_intake_submission_id: "proposal-new-1" },
+            status: "sent",
+            read_at: null,
+            created_at: "2026-04-22T08:29:00.000Z",
+          },
+          {
+            id: "notif-proposal-awareness",
+            account_owner_user_id: "owner-1",
+            job_id: null,
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_intake_proposal_submitted",
+            subject: "New Contractor Intake Proposal",
+            body: "A contractor submitted an intake proposal pending internal finalization.",
+            payload: { contractor_intake_submission_id: "proposal-new-1" },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-22T08:30:00.000Z",
+          },
+          {
+            id: "notif-contractor-update",
+            account_owner_user_id: "owner-1",
+            job_id: "job-new-1",
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_note",
+            subject: "Contractor note",
+            body: "A contractor added a note.",
+            payload: {},
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-22T10:00:00.000Z",
+          },
+        ],
+        submissions: [
+          {
+            id: "proposal-new-1",
+            review_status: "pending",
+          },
+        ],
+      }),
+    );
+
+    const { listInternalNewWorkRequestAwareness } = await import("@/lib/actions/notification-read-actions");
+    const awarenessRows = await listInternalNewWorkRequestAwareness({
+      limit: 20,
+      onlyUnread: true,
+    });
+
+    expect(awarenessRows).toHaveLength(2);
+    expect(awarenessRows.map((row) => row.notification_type)).toEqual([
+      "contractor_job_created",
+      "contractor_intake_proposal_submitted",
+    ]);
+  });
+
   it("does not drop proposal notifications when proposal status rows are not visible", async () => {
     createClientMock.mockResolvedValue(
       makeSupabase({

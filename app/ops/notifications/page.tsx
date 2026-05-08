@@ -29,7 +29,9 @@ export default async function NotificationsPage({
   const categoryKey = (() => {
     const rawCategory = String(sp.category ?? sp.view ?? "").trim().toLowerCase();
     if (rawCategory === "contractor_updates") return "contractor_updates" as const;
-    if (rawCategory === "new_job_notifications") return "new_job_notifications" as const;
+    if (rawCategory === "new_job_notifications" || rawCategory === "new_jobs") {
+      return "new_job_notifications" as const;
+    }
     return null;
   })();
   const onlyUnread = String(sp.state ?? "").trim().toLowerCase() === "unread";

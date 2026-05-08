@@ -21,6 +21,21 @@ describe("contractor awareness notification matching", () => {
     expect(matchesInternalNotificationFilter("contractor_intake_proposal_submitted", "new_job_notifications")).toBe(true);
   });
 
+  it("internal intake email notifications stay in new job notifications, not contractor updates", () => {
+    const emailTypes = [
+      "internal_contractor_job_intake_email",
+      "internal_contractor_intake_proposal_email",
+    ];
+
+    for (const type of emailTypes) {
+      expect(NEW_JOB_NOTIFICATION_TYPES).toContain(type);
+      expect(isNewJobNotificationType(type)).toBe(true);
+      expect(matchesInternalNotificationFilter(type, "new_job_notifications")).toBe(true);
+      expect(isContractorUpdateNotificationType(type)).toBe(false);
+      expect(matchesInternalNotificationFilter(type, "contractor_updates")).toBe(false);
+    }
+  });
+
   it("contractor follow-up events are contractor updates, not new job notifications", () => {
     const updateTypes = [
       "contractor_note",

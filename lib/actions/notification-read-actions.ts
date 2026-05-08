@@ -392,6 +392,73 @@ function dedupeProposalVisibilityRows(rows: NotificationRow[]): NotificationRow[
   return merged;
 }
 
+function rankNewWorkRequestVisibilityRow(row: NotificationRow): number {
+  const type = String(row.notification_type ?? "").trim().toLowerCase();
+  if (type === "contractor_intake_proposal_submitted") return 4;
+  if (type === "internal_contractor_intake_proposal_email") return 3;
+  if (type === "contractor_job_created") return 2;
+  if (type === "internal_contractor_job_intake_email") return 1;
+  return 0;
+}
+
+function dedupeJobIntakeVisibilityRows(rows: NotificationRow[]): NotificationRow[] {
+  const preferredByJobId = new Map<string, NotificationRow>();
+  const passthrough: NotificationRow[] = [];
+
+  for (const row of rows) {
+    const type = String(row.notification_type ?? "").trim().toLowerCase();
+    if (type !== "contractor_job_created" && type !== "internal_contractor_job_intake_email") {
+      passthrough.push(row);
+      continue;
+    }
+
+    const jobId = notificationJobId(row);
+    if (!jobId) {
+      passthrough.push(row);
+      continue;
+    }
+
+    const existing = preferredByJobId.get(jobId);
+    if (!existing) {
+      preferredByJobId.set(jobId, row);
+      continue;
+    }
+
+    const existingRank = rankNewWorkRequestVisibilityRow(existing);
+    const candidateRank = rankNewWorkRequestVisibilityRow(row);
+
+    if (candidateRank > existingRank) {
+      preferredByJobId.set(jobId, row);
+      continue;
+    }
+
+    if (candidateRank === existingRank) {
+      const existingUnread = existing.read_at === null;
+      const candidateUnread = row.read_at === null;
+      if (candidateUnread && !existingUnread) {
+        preferredByJobId.set(jobId, row);
+        continue;
+      }
+
+      if (candidateUnread === existingUnread) {
+        const existingCreatedAt = Date.parse(existing.created_at);
+        const candidateCreatedAt = Date.parse(row.created_at);
+        if (
+          Number.isFinite(candidateCreatedAt) &&
+          Number.isFinite(existingCreatedAt) &&
+          candidateCreatedAt > existingCreatedAt
+        ) {
+          preferredByJobId.set(jobId, row);
+        }
+      }
+    }
+  }
+
+  const merged = [...passthrough, ...preferredByJobId.values()];
+  merged.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return merged;
+}
+
 async function filterPendingProposalVisibilityRows(
   supabase: any,
   rows: NotificationRow[]
@@ -582,6 +649,56 @@ export async function listInternalContractorUpdateAwareness(params: {
   }
 
   return contractorUpdateRows;
+}
+
+export async function listInternalNewWorkRequestAwareness(params: {
+  limit?: number;
+  onlyUnread?: boolean;
+} = {}): Promise<NotificationAwarenessRow[]> {
+  const { supabase, accountOwnerUserId } = await requireScopedInternalNotificationContext();
+
+  let query = supabase
+    .from("notifications")
+    .select(
+      "id, job_id, recipient_type, channel, notification_type, subject, body, payload, status, read_at, created_at"
+    )
+    .eq("recipient_type", "internal")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .order("created_at", { ascending: false });
+
+  const onlyUnread = params.onlyUnread ?? true;
+  if (onlyUnread) {
+    query = query.is("read_at", null);
+  }
+
+  const limit = params.limit ?? 100;
+  const { data, error } = await trackOpsNotificationTiming(
+    "ops:notifications:fetch",
+    query.limit(limit)
+  );
+
+  if (error) throw error;
+
+  const rows = (data ?? []) as NotificationRow[];
+  const newWorkRows = rows.filter((row) =>
+    matchesInternalNotificationFilter(
+      String(row.notification_type ?? "").trim().toLowerCase(),
+      "new_job_notifications"
+    )
+  );
+
+  const pendingProposalRows = await filterPendingProposalVisibilityRows(
+    supabase,
+    newWorkRows
+  );
+  const dedupedProposalRows = dedupeProposalVisibilityRows(pendingProposalRows);
+  const dedupedRows = dedupeJobIntakeVisibilityRows(dedupedProposalRows).slice(0, limit);
+
+  return dedupedRows.map((row) => ({
+    job_id: row.job_id ? String(row.job_id).trim() : null,
+    notification_type: String(row.notification_type ?? "").trim(),
+    created_at: String(row.created_at ?? "").trim(),
+  }));
 }
 
 export async function markNotificationAsRead(input: {
