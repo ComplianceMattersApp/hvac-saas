@@ -257,6 +257,10 @@ export default function JobAttachments({
     Upload purpose
   </div>
 
+  <div className="text-xs text-slate-500 dark:text-slate-300">
+    After completing correction work, choose &apos;Ready for review&apos; to notify our team.
+  </div>
+
   <div className="flex flex-col sm:flex-row gap-2">
     <label className={`flex items-start gap-2 rounded-xl border p-3 cursor-pointer transition-colors ${intent === "upload" ? "border-slate-300 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-900" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950"}`}>
       <input
@@ -295,9 +299,6 @@ export default function JobAttachments({
 </div>
 
 {/* Action */}
-<div className="text-xs text-slate-500 dark:text-slate-300">
-If this job failed testing, choose &quot;Ready for review&quot; after corrections are complete.
-</div>
 <button
   type="button"
   onClick={intent === "review" ? submitForReview : uploadOnly}

@@ -134,7 +134,7 @@ function formatPortalTimelineLabel(type?: string | null, meta?: any) {
   if (type === "contractor_note") {
     return getEventAttachmentCount(meta) > 0 ? "Response received" : "Note received";
   }
-  if (type === "contractor_correction_submission") return "Ready for review received";
+  if (type === "contractor_correction_submission") return "Correction submitted for review";
   if (type === "attachment_added") return "File shared";
   if (type === "customer_attempt") return "Contact attempt logged";
   if (type === "retest_ready_requested") return "Retest ready requested";
@@ -767,7 +767,7 @@ export default async function PortalJobDetailPage({
       ) : null}
 
       {banner === "note_saved" ? (
-        <FlashBanner type="success" message="Saved." />
+        <FlashBanner type="success" message="Note received — our team will review it." />
       ) : null}
 
       {banner === "note_duplicate" ? (
@@ -1028,10 +1028,10 @@ export default async function PortalJobDetailPage({
               <form action={requestRetestReadyFromPortal}>
                 <input type="hidden" name="job_id" value={jobId} />
                 <SubmitButton
-                  loadingText="Submitting..."
+                  loadingText="Requesting..."
                   className={portalPrimaryButtonClass}
                 >
-                  Retest Ready
+                  Request Retest Review
                 </SubmitButton>
               </form>
             )}
@@ -1161,7 +1161,7 @@ export default async function PortalJobDetailPage({
 
                   {type === "customer_attempt" ? (
                     <div className="text-xs text-slate-500 dark:text-slate-300">
-                      Operational contact history recorded for this job.
+                      Our team logged a customer contact attempt.
                     </div>
                   ) : null}
                 </div>

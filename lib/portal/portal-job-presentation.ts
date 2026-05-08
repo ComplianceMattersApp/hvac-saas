@@ -128,7 +128,7 @@ export function getPortalJobNextStep(row: PortalPresentationRow) {
   if (ops === "on_hold") return "Open this job to review the hold details.";
   if (ops === "pending_office_review") return "Open this job to review the latest update.";
   if (ops === "paperwork_required" || ops === "invoice_required") return "Open this job to review the latest processing details.";
-  if (row.resolved?.retestState === "pending_scheduling") return "Open this job to schedule the retest.";
+  if (row.resolved?.retestState === "pending_scheduling") return "Open this job to check retest scheduling status.";
   if (row.resolved?.retestState === "scheduled") return "Open this job to review the retest appointment.";
   if (row.resolved?.bucket === "action_required") return "Open this job to review the issue details and next step.";
   if (lifecycle === "on_the_way" || lifecycle === "in_progress" || lifecycle === "in_process" || ops === "in_process") return "Open this job for live visit details.";

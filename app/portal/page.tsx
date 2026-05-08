@@ -574,6 +574,14 @@ export default async function PortalPage({
         </div>
       </div>
 
+      {actionRequiredJobs.length > 5 && (
+        <div className="flex justify-end">
+          <Link href="/portal/jobs" className={portalSecondaryButtonClass}>
+            View all {actionRequiredJobs.length} &rarr;
+          </Link>
+        </div>
+      )}
+
       </section>
 
       <section className="space-y-3">
@@ -627,6 +635,14 @@ export default async function PortalPage({
             )}
           </div>
         </div>
+
+        {upcomingScheduledJobs.length > 5 && (
+          <div className="flex justify-end">
+            <Link href="/portal/jobs" className={portalSecondaryButtonClass}>
+              View all {upcomingScheduledJobs.length} &rarr;
+            </Link>
+          </div>
+        )}
       </section>
 
       <section className="space-y-3">
@@ -679,6 +695,14 @@ export default async function PortalPage({
             )}
           </div>
         </div>
+
+        {activeWorkJobs.length > 5 && (
+          <div className="flex justify-end">
+            <Link href="/portal/jobs" className={portalSecondaryButtonClass}>
+              View all {activeWorkJobs.length} &rarr;
+            </Link>
+          </div>
+        )}
       </section>
 
       <section className="space-y-3">
@@ -751,6 +775,14 @@ export default async function PortalPage({
             )}
           </div>
         </div>
+
+        {waitingCards.length > 5 && (
+          <div className="flex justify-end">
+            <Link href="/portal/jobs" className={portalSecondaryButtonClass}>
+              View all {waitingCards.length} &rarr;
+            </Link>
+          </div>
+        )}
       </section>
 
       <section className="space-y-3">
@@ -804,6 +836,14 @@ export default async function PortalPage({
             )}
           </div>
         </div>
+
+        {passedJobs.length > 5 && (
+          <div className="flex justify-end">
+            <Link href="/portal/jobs" className={portalSecondaryButtonClass}>
+              View all {passedJobs.length} &rarr;
+            </Link>
+          </div>
+        )}
       </section>
 
       {activeResolvedJobs.length > 5 && (

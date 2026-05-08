@@ -177,6 +177,9 @@ export default async function PortalIntakeSubmissionDetailPage({
           <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
             We received your submission and our team is reviewing it before finalization.
           </p>
+          <p className="mt-1.5 text-sm leading-6 text-slate-600 dark:text-slate-300">
+            Once confirmed, this job will appear in your portal job list.
+          </p>
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Submitted {submittedAt}</p>
         </div>
       </section>
