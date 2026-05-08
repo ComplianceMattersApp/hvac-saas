@@ -861,11 +861,14 @@ export default async function CustomerDetailPage(props: {
                 const isCaseResolved = caseStatusNorm === "resolved";
 
                 return (
-                  <div key={caseId} className="space-y-3">
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 to-slate-50 p-4">
-                      <div className="min-w-0 space-y-1">
+                  <div
+                    key={caseId}
+                    className="space-y-4 rounded-[1.75rem] border border-slate-300/80 bg-gradient-to-br from-slate-100 via-white to-slate-50 p-3 shadow-sm sm:p-4"
+                  >
+                    <div className="rounded-2xl border border-slate-300 bg-white/95 p-4 shadow-sm">
+                      <div className="min-w-0 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-semibold text-slate-900">Service Case</span>
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Service Case</span>
                           <span className="font-mono text-xs text-slate-500">{String(caseId).slice(0, 8)}</span>
                           <span
                             className={[
@@ -882,7 +885,7 @@ export default async function CustomerDetailPage(props: {
                           </span>
                         </div>
                         {serviceCase?.problem_summary ? (
-                          <div className="text-sm text-slate-700">
+                          <div className="max-w-3xl text-sm leading-6 text-slate-700">
                             {String(serviceCase.problem_summary).slice(0, 100)}
                             {String(serviceCase.problem_summary).length > 100 ? "..." : ""}
                           </div>
@@ -890,7 +893,7 @@ export default async function CustomerDetailPage(props: {
                       </div>
                     </div>
 
-                    <div className="space-y-2 pl-2">
+                    <div className="space-y-3 border-l-2 border-slate-200 pl-3 sm:ml-4 sm:pl-5">
                       {caseJobs.map((job) => {
                         const isArchived = Boolean(job.deleted_at);
                         const isCancelled = normalizeLifecycleStatus(job.status) === "cancelled";
