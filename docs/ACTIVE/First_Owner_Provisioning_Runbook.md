@@ -438,3 +438,203 @@ Reference-only example from completed controlled production verification:
 - legacy V1 `R-410A` remained non-duplicated and continued to classify as safe equivalent skip
 
 This reference outcome does not imply automatic, batch, or admin-UI-triggered backfill behavior. Dry-run-first operator control remains mandatory.
+
+---
+
+## 11. Operator handoff readiness packet (planning only — no onboarding approved)
+
+Status: PLANNING ONLY. No onboarding is currently approved or scheduled.
+Last updated: 2026-05-07
+Authority: Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md`
+
+---
+
+### 11.1 Current status
+
+- No onboarding is approved. First-owner apply remains parked until explicit owner approval.
+- Release is parked pending remaining product/readiness work. Controlled tester onboarding is not active.
+- Dry-run path has been verified after secret rotation (2026-05-07):
+  - sandbox target: `kvpesjdukqwwlgpkzfjm`
+  - mode: `dry_run`
+  - `inviteSent: false`
+  - `errors: []`
+  - no apply, no invite, no onboarding occurred
+- Mobile/PWA QA is 10/10 complete (contractor-session smoke closed 2026-05-07, commit `5c73c46`).
+- Final Launch Confirmation Sweep completed with no blockers (commit `5c73c46` / prior `f164fc40`).
+- All current checks are PASS or documented PENDING with known reason (none are blocking blockers).
+
+---
+
+### 11.2 Future operator sequence
+
+When explicit owner approval is given, the operator must follow these steps in order. Do not skip or reorder.
+
+**Step 1 — Branch and tree check**
+```
+git checkout main
+git pull origin main
+git status --short
+```
+Expected: clean working tree, HEAD matches origin/main.
+
+**Step 2 — Target project verification**
+- Open `docs/ENVIRONMENT_RULES.md` and confirm the intended project ref.
+  - sandbox ref: `kvpesjdukqwwlgpkzfjm`
+  - production ref: `ornrnvxtwwtulohqwxop`
+- Do not proceed if target is ambiguous.
+- Do not assume `.env.local` reflects the production target.
+
+**Step 3 — Secrets presence check (no values printed)**
+- Confirm `SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_SUPABASE_URL` are set for the intended target.
+- Confirm they match the verified project ref. Do not print or log values.
+- If uncertain, stop and verify via Supabase Dashboard → Project Settings → API.
+
+**Step 4 — Dry-run (required)**
+```bash
+ALLOW_FIRST_OWNER_PROVISIONING=true \
+ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true \
+npx tsx scripts/provision-first-owner.ts \
+  --email OWNER_EMAIL_HERE \
+  --business-display-name "BUSINESS_NAME_HERE" \
+  --owner-display-name "OWNER_NAME_HERE" \
+  --support-email SUPPORT_EMAIL_HERE \
+  --support-phone "+1-XXX-XXX-XXXX" \
+  --entitlement-preset internal_comped \
+  --default-billing-mode external_billing \
+  --starter-kit-version v3
+```
+Replace placeholders with real values before running.
+Review full output. Expected: `mode=dry_run`, `inviteSent=false`, `errors=[]`.
+
+**Step 5 — Dry-run review gate**
+- Confirm output shows the correct email, business name, entitlement preset, and starter kit version.
+- Confirm `errors` is empty.
+- Confirm `inviteSent` is false.
+- Do not proceed if any value is wrong or unexpected.
+
+**Step 6 — Owner approval gate (hard stop)**
+- Do not proceed to apply without explicit written owner approval for this specific operator/account.
+- Record who approved, when, and what was approved (email, business name, entitlement preset).
+
+**Step 7 — Apply**
+```bash
+ALLOW_FIRST_OWNER_PROVISIONING=true \
+ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true \
+npx tsx scripts/provision-first-owner.ts \
+  --email OWNER_EMAIL_HERE \
+  --business-display-name "BUSINESS_NAME_HERE" \
+  --owner-display-name "OWNER_NAME_HERE" \
+  --support-email SUPPORT_EMAIL_HERE \
+  --support-phone "+1-XXX-XXX-XXXX" \
+  --entitlement-preset internal_comped \
+  --default-billing-mode external_billing \
+  --starter-kit-version v3 \
+  --apply
+```
+Do not add `--apply` until Steps 1–6 are complete and recorded.
+
+**Step 8 — Post-apply verification**
+Verify (via Supabase Dashboard SQL Editor — read-only queries only):
+- auth user exists for the target email
+- profile row exists
+- `internal_users` owner row exists, anchored to `account_owner_user_id`
+- `internal_business_profiles` row exists
+- `platform_account_entitlements` row exists with expected preset values
+- first-owner marker is written to user metadata
+- Pricebook starter rows exist for the new account (97 rows for v3)
+
+**Step 9 — Invite path confirmation**
+- Owner receives invite email.
+- Owner clicks invite link → `/set-password?mode=invite`.
+- After set-password: first-owner marker detected → routes to `/ops/admin`.
+- Admin Center + Account Setup readiness card renders.
+- Confirm `0 of 5 complete` on first load (not a misleading pre-filled state).
+
+**Step 10 — Stop conditions**
+Stop immediately and do not continue if any of the following occur:
+- dry-run shows unexpected email, business name, or entitlement
+- dry-run `errors` is not empty
+- target project ref cannot be verified with certainty
+- secrets do not correspond to the verified target
+- owner approval has not been received
+- apply output shows unexpected rows or errors
+- invite email does not arrive or arrives for wrong address
+
+---
+
+### 11.3 Safety gates
+
+- No apply without explicit owner approval.
+- No invite without explicit owner approval.
+- No onboarding while release is parked or product work is incomplete.
+- Hosted Supabase target (including sandbox) requires both `ALLOW_FIRST_OWNER_PROVISIONING=true` and `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true` for both dry-run and apply.
+- Old key revocation is confirmed via Supabase Dashboard only — not terminal-tested. Never paste revoked or active service keys into transcripts, screenshots, or logs.
+- No secrets in transcripts, screenshots, terminal logs, or docs.
+- First-owner marker must be confirmed written before invite send is considered successful.
+- Do not attempt Pricebook backfill (§10) in the same operator session as first-owner apply — treat as a separate controlled action.
+- Entitlement preset for internal/comped accounts must be `internal_comped`; standard preset creates a trial entitlement and must not be used for owner accounts.
+- Do not enable `ENABLE_ESTIMATES`, `ENABLE_SUPPORT_CONSOLE`, or any other deferred feature flag as part of this onboarding pass.
+
+---
+
+### 11.4 Evidence template
+
+Fill in this template and retain for audit/handoff record. Do not paste secrets or key values.
+
+```
+First-Owner Provisioning Evidence Record
+-----------------------------------------
+Operator:              [name]
+Date/time:             [YYYY-MM-DD HH:MM TZ]
+Environment:           sandbox | production
+Project ref:           [ref — verify before recording]
+Commit hash (HEAD):    [git rev-parse HEAD output]
+Branch:                main
+Working tree clean:    yes | no
+
+Dry-run result:
+  mode:                dry_run
+  inviteSent:          false
+  errors:              []
+  entitlement preset:  internal_comped | standard
+  starter kit version: v3
+  pricebook seed_count: 97
+
+Owner approval:
+  Approved by:         [name]
+  Approval date/time:  [YYYY-MM-DD HH:MM TZ]
+  Approved email:      [email]
+
+Apply result:
+  apply executed:      yes | no
+  errors:              []
+  auth user created:   yes | no
+  profile row:         yes | no
+  internal_users row:  yes | no
+  entitlements row:    yes | no
+  first-owner marker:  yes | no
+  pricebook rows:      [count]
+
+Invite path:
+  invite sent:         yes | no
+  invite email:        [email]
+  owner accepted:      yes | no
+  routed to /ops/admin: yes | no
+  readiness card (0 of 5): yes | no
+
+Rollback/stop notes:   [describe any stop or rollback, or "none"]
+```
+
+---
+
+### 11.5 Explicit non-goals
+
+This section and this runbook are not:
+- A launch approval. Release remains parked pending remaining product/readiness work.
+- An onboarding action. No provisioning apply or invite is implied or scheduled.
+- A production Estimates enablement. `ENABLE_ESTIMATES` production flag must remain unset/false until Estimates runbook gates are approved.
+- A Support Console enablement. `ENABLE_SUPPORT_CONSOLE` production flag must remain unset until Support Console runbook gates are approved.
+- A tenant customer payment execution path. Tenant invoice/payment track remains deferred.
+- A QBO enablement. QBO remains optional/downstream only.
+- A native app-store or offline/service-worker action. Those remain separate deferred slices.
+- Authorization to skip any step in §11.2 or bypass any gate in §11.3.

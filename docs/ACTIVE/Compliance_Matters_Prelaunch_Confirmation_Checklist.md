@@ -461,6 +461,7 @@ Verification notes (2026-05-07, local dev session):
 - Confirmed: internal/comped owner provisioning remains operator-controlled and is not a public self-serve path.
 - **Pre-launch operator runbook item:** before onboarding the first real production account, operator must run dry-run first, verify the intended Supabase project, then run apply with both `ALLOW_FIRST_OWNER_PROVISIONING=true` and `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true`. Note: the production-flag is also required for any hosted Supabase project (including sandbox) because `.supabase.co` URLs are classified as production-like remote targets.
 - Runbook reference: `docs/ACTIVE/First_Owner_Provisioning_Runbook.md`.
+- **Operator handoff readiness packet documented (2026-05-07):** `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` §11 now contains the full operator handoff/readiness packet: current status, future operator sequence (10 steps), safety gates, evidence template, and explicit non-goals. No onboarding was executed. Release remains parked pending remaining product/readiness work.
 
 ### 2.5 Admin readiness checklist confirmation
 - Confirm Admin Readiness / Setup Checklist V1 is present and working on `/ops/admin` and contextually visible on `/ops/admin/company-profile`.
