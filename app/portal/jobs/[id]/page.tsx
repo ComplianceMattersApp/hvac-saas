@@ -254,6 +254,13 @@ function portalIssueTheme(group: string) {
 function portalStatusBadgeTheme(label: string, fallbackGroup: string) {
   const normalized = String(label ?? "").trim().toLowerCase();
 
+  if (normalized === "resolved") {
+    return {
+      badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300",
+      label,
+    };
+  }
+
   if (normalized === "scheduled" || normalized === "retest scheduled") {
     return {
       badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300",
@@ -322,6 +329,7 @@ export default async function PortalJobDetailPage({
     .select(
       `
       id, title, status, lifecycle_state, ops_status, city, job_address, location_id,
+      field_complete, certs_complete, invoice_complete,
       customer_id, customer_first_name, customer_last_name, customer_phone,
       created_at, follow_up_date, scheduled_date, window_start, window_end,
       permit_number, jurisdiction, permit_date, pending_info_reason, next_action_note,
@@ -374,6 +382,7 @@ export default async function PortalJobDetailPage({
     "retest_ready_requested",
     "job_failed",
     "job_passed",
+    "failure_resolved_by_correction_review",
     "status_changed",
     "contractor_report_sent",
   ];
@@ -514,6 +523,9 @@ export default async function PortalJobDetailPage({
     job: {
       id: String((job as any)?.id ?? ""),
       ops_status: (job as any)?.ops_status,
+      field_complete: Boolean((job as any)?.field_complete),
+      certs_complete: Boolean((job as any)?.certs_complete),
+      invoice_complete: Boolean((job as any)?.invoice_complete),
       pending_info_reason: (job as any)?.pending_info_reason,
       follow_up_date: (job as any)?.follow_up_date,
       next_action_note: (job as any)?.next_action_note,

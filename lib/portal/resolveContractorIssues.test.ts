@@ -88,6 +88,87 @@ describe("resolveContractorIssues", () => {
     expect(result.bucket).toBe("in_progress");
   });
 
+  it("shows final processing wording for evidence-accepted failed jobs still in closeout", () => {
+    const result = resolveContractorIssues({
+      job: {
+        id: "job-evidence-processing",
+        ops_status: "paperwork_required",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+      },
+      events: [
+        {
+          event_type: "failure_resolved_by_correction_review",
+          created_at: "2026-05-01T10:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(result.primaryIssue.group).toBe("in_progress");
+    expect(result.primaryIssue.headline).toBe("Final processing");
+    expect(result.primaryIssue.explanation).toBe("Accepted by review. Final paperwork is being completed.");
+    expect(result.statusLabel).toBe("Final processing");
+    expect(result.bucket).toBe("in_progress");
+  });
+
+  it("shows resolved wording when evidence-accepted failed jobs are fully closed", () => {
+    const result = resolveContractorIssues({
+      job: {
+        id: "job-evidence-closed",
+        ops_status: "closed",
+        field_complete: true,
+        certs_complete: true,
+        invoice_complete: true,
+      },
+      events: [
+        {
+          event_type: "failure_resolved_by_correction_review",
+          created_at: "2026-05-01T10:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(result.primaryIssue.group).toBe("passed");
+    expect(result.primaryIssue.headline).toBe("Resolved");
+    expect(result.primaryIssue.explanation).toBe("Accepted by review and closed.");
+    expect(result.statusLabel).toBe("Resolved");
+    expect(result.bucket).toBe("passed");
+  });
+
+  it("keeps unresolved failed jobs in failed/action-required state", () => {
+    const result = resolveContractorIssues({
+      job: {
+        id: "job-failed-unresolved",
+        ops_status: "failed",
+        field_complete: true,
+      },
+      failureReasons: ["Failed - duct leakage over threshold"],
+    });
+
+    expect(result.primaryIssue.group).toBe("failed");
+    expect(result.statusLabel).toBe("Failed");
+    expect(result.bucket).toBe("action_required");
+  });
+
+  it("keeps normal closed jobs as passed when not evidence-accepted", () => {
+    const result = resolveContractorIssues({
+      job: {
+        id: "job-normal-closed",
+        ops_status: "closed",
+        field_complete: true,
+        certs_complete: true,
+        invoice_complete: true,
+      },
+      events: [],
+    });
+
+    expect(result.primaryIssue.group).toBe("passed");
+    expect(result.primaryIssue.headline).toBe("Passed");
+    expect(result.statusLabel).toBe("Passed");
+    expect(result.bucket).toBe("passed");
+  });
+
   it("uses retest scheduled override only for failed and retest_needed states", () => {
     const result = resolveContractorIssues({
       job: {

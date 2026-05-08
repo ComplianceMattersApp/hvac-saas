@@ -22,6 +22,9 @@ export type ResolveContractorIssuesInput = {
   job: {
     id: string;
     ops_status?: string | null;
+    field_complete?: boolean | null;
+    certs_complete?: boolean | null;
+    invoice_complete?: boolean | null;
     pending_info_reason?: string | null;
     follow_up_date?: string | null;
     next_action_note?: string | null;
@@ -329,6 +332,13 @@ export function resolveContractorIssues(
   input: ResolveContractorIssuesInput
 ): ResolveContractorIssuesOutput {
   const opsStatus = normalize(input.job.ops_status);
+  const hasFailureResolvedByReview = (input.events ?? []).some(
+    (event) => normalize(event?.event_type) === "failure_resolved_by_correction_review"
+  );
+  const isCloseoutComplete =
+    Boolean(input.job.field_complete) &&
+    Boolean(input.job.certs_complete) &&
+    Boolean(input.job.invoice_complete);
   const pendingInfoReason = String(input.job.pending_info_reason ?? "").trim();
   const failureReasons = (input.failureReasons ?? []).map(String).map((s) => s.trim()).filter(Boolean);
   const hasOpenRetestChild = Boolean(input.chain?.hasOpenRetestChild);
@@ -395,20 +405,45 @@ export function resolveContractorIssues(
             : "This job is currently on hold.",
       stage: opsStatus,
     };
-  } else if (["paperwork_required", "invoice_required"].includes(opsStatus)) {
-    primaryIssue = {
-      group: "in_progress",
-      headline: "Final processing",
-      explanation: "This job has passed inspection and is in final processing.",
-      stage: opsStatus,
-    };
-  } else if (opsStatus === "closed") {
+  } else if (hasFailureResolvedByReview && isCloseoutComplete) {
     primaryIssue = {
       group: "passed",
-      headline: "Passed",
-      explanation: "This job is complete.",
-      stage: opsStatus,
+      headline: "Resolved",
+      explanation: "Accepted by review and closed.",
+      stage: "resolved_closed",
     };
+  } else if (["paperwork_required", "invoice_required"].includes(opsStatus)) {
+    if (hasFailureResolvedByReview) {
+      primaryIssue = {
+        group: "in_progress",
+        headline: "Final processing",
+        explanation: "Accepted by review. Final paperwork is being completed.",
+        stage: "resolved_final_processing",
+      };
+    } else {
+      primaryIssue = {
+        group: "in_progress",
+        headline: "Final processing",
+        explanation: "This job has passed inspection and is in final processing.",
+        stage: opsStatus,
+      };
+    }
+  } else if (opsStatus === "closed") {
+    if (hasFailureResolvedByReview) {
+      primaryIssue = {
+        group: "passed",
+        headline: "Resolved",
+        explanation: "Accepted by review and closed.",
+        stage: "resolved_closed",
+      };
+    } else {
+      primaryIssue = {
+        group: "passed",
+        headline: "Passed",
+        explanation: "This job is complete.",
+        stage: opsStatus,
+      };
+    }
   } else {
     primaryIssue = {
       group: "in_progress",
@@ -452,6 +487,12 @@ export function resolveContractorIssues(
   } else if (opsStatus === "pending_office_review") {
     statusLabel = "Under Review";
     nextStep = "Corrections submitted. Our team is reviewing your submission.";
+  } else if ((opsStatus === "paperwork_required" || opsStatus === "invoice_required") && hasFailureResolvedByReview) {
+    statusLabel = "Final processing";
+    nextStep = "Accepted by review. Final paperwork is being completed.";
+  } else if ((opsStatus === "closed" || isCloseoutComplete) && hasFailureResolvedByReview) {
+    statusLabel = "Resolved";
+    nextStep = "Accepted by review and closed.";
   }
 
   const actionRequired = bucket === "action_required";

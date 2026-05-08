@@ -67,6 +67,7 @@ export function getPortalJobStatusMeta(row: PortalPresentationRow) {
   const ops = normalize(row.job.ops_status);
   const resolvedLabel = String(row.resolved?.statusLabel ?? "").trim();
 
+  if (resolvedLabel === "Resolved") return { label: "Resolved", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
   if (ops === "pending_info") return { label: "Pending information", tone: "border-amber-200 bg-amber-50 text-amber-800" };
   if (ops === "on_hold") return { label: "On hold", tone: "border-slate-300 bg-slate-100 text-slate-800" };
   if (ops === "pending_office_review") return { label: "Under review", tone: "border-cyan-200 bg-cyan-50 text-cyan-800" };
@@ -89,6 +90,11 @@ export function getPortalJobDetailLine(row: PortalPresentationRow) {
   const pendingInfoReason = String(row.job.pending_info_reason ?? "").trim();
   const onHoldReason = String(row.job.on_hold_reason ?? "").trim();
   const failureDetail = cardDetailLine(row.resolved);
+  const resolvedLabel = String(row.resolved?.statusLabel ?? "").trim();
+
+  if (resolvedLabel === "Resolved") {
+    return "Accepted by review and closed.";
+  }
 
   if (ops === "pending_info") {
     return appendReason("We're waiting on information to keep this job moving.", pendingInfoReason);
@@ -113,6 +119,9 @@ export function getPortalJobDetailLine(row: PortalPresentationRow) {
 export function getPortalJobNextStep(row: PortalPresentationRow) {
   const lifecycle = normalize(row.job.status);
   const ops = normalize(row.job.ops_status);
+  const resolvedLabel = String(row.resolved?.statusLabel ?? "").trim();
+
+  if (resolvedLabel === "Resolved") return "Open this job to review closed details.";
 
   if (row.resolved?.bucket === "passed") return "Open the job to review details.";
   if (ops === "pending_info") return "Open this job to review the requested information.";
