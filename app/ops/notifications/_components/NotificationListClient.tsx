@@ -56,17 +56,41 @@ function proposalIdFromPayload(value: unknown): string | null {
   return null;
 }
 
+function jobIdFromNotification(notif: NotificationRowForUI): string | null {
+  const fromRow = String(notif.job_id ?? "").trim();
+  if (fromRow) return fromRow;
+
+  const payload = normalizePayload(notif.payload);
+  const candidates = [payload.job_id, payload.jobId];
+
+  for (const candidate of candidates) {
+    const id = String(candidate ?? "").trim();
+    if (id) return id;
+  }
+
+  return null;
+}
+
 function formatSubmittedAt(value: string) {
   const submittedAt = new Date(value);
   if (!Number.isFinite(submittedAt.getTime())) return null;
   return format(submittedAt, "MMM d, yyyy h:mm a");
 }
 
-const CONTRACTOR_UPDATE_EVENT_HEADLINES: Record<string, string> = {
+const JOB_AWARE_EVENT_HEADLINES: Record<string, string> = {
   contractor_note: "Contractor note added",
   contractor_correction_submission: "Correction submission received",
   contractor_schedule_updated: "Contractor scheduling updated",
   contractor_job_created: "New contractor job submitted",
+  retest_ready_requested: "Retest ready requested",
+};
+
+const JOB_AWARE_EVENT_HELPER_TEXT: Record<string, string> = {
+  contractor_note: "Contractor added a note on this job.",
+  contractor_correction_submission: "Contractor submitted corrections for internal review.",
+  contractor_schedule_updated: "Contractor provided scheduling details.",
+  contractor_job_created: "Contractor submitted a new job for internal review.",
+  retest_ready_requested: "Contractor marked this job ready for retest review.",
 };
 
 function notificationTypeLabel(value?: string | null) {
@@ -89,31 +113,42 @@ function notificationTypeLabel(value?: string | null) {
 }
 
 // ---------------------------------------------------------------------------
-// Contractor update card — event-type-driven headline, supporting context
+// Job-aware notification card — event-type-driven headline, supporting context
 // ---------------------------------------------------------------------------
 
-type ContractorUpdateCardProps = {
+type JobAwareNotificationCardProps = {
   notif: NotificationRowForUI;
   pendingReadId: string | null;
   onMarkAsRead: (id: string) => Promise<void>;
 };
 
-function ContractorUpdateCard({
+function isJobAwareNotificationType(value?: string | null) {
+  const type = String(value ?? "").trim().toLowerCase();
+  return Boolean(JOB_AWARE_EVENT_HEADLINES[type]);
+}
+
+function JobAwareNotificationCard({
   notif,
   pendingReadId,
   onMarkAsRead,
-}: ContractorUpdateCardProps) {
+}: JobAwareNotificationCardProps) {
   const type = String(notif.notification_type ?? "").trim().toLowerCase();
   const headline =
-    CONTRACTOR_UPDATE_EVENT_HEADLINES[type] ??
+    JOB_AWARE_EVENT_HEADLINES[type] ??
     notificationTypeLabel(notif.notification_type);
+  const helperText = JOB_AWARE_EVENT_HELPER_TEXT[type] ?? null;
+  const jobId = jobIdFromNotification(notif);
 
   // Body text is shown only as a small secondary preview, not as the main message
-  const bodyPreview = notif.body
+  const rawBodyPreview = notif.body
     ? notif.body.length > 120
       ? notif.body.slice(0, 120) + "\u2026"
       : notif.body
     : null;
+  const bodyPreview =
+    rawBodyPreview && rawBodyPreview.trim() !== helperText?.trim()
+      ? rawBodyPreview
+      : null;
 
   const jobEnrichment = notif.job_enrichment ?? null;
 
@@ -186,6 +221,11 @@ function ContractorUpdateCard({
           )}
 
           {/* Secondary preview: restrained, not the main message */}
+          {helperText && (
+            <p className="mb-1.5 text-[13px] text-slate-500">
+              {helperText}
+            </p>
+          )}
           {bodyPreview && (
             <p className="mb-2 text-[13px] italic text-slate-400">
               {bodyPreview}
@@ -204,9 +244,9 @@ function ContractorUpdateCard({
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-2">
-          {notif.job_id && (
+          {jobId && (
             <Link
-              href={`/jobs/${notif.job_id}`}
+              href={`/jobs/${jobId}`}
               className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
             >
               View job
@@ -485,9 +525,12 @@ export function NotificationListClient({
           );
         }
 
-        if (isContractorUpdateNotificationType(notif.notification_type)) {
+        if (
+          isContractorUpdateNotificationType(notif.notification_type) ||
+          isJobAwareNotificationType(notif.notification_type)
+        ) {
           return (
-            <ContractorUpdateCard
+            <JobAwareNotificationCard
               key={notif.id}
               notif={notif}
               pendingReadId={pendingReadId}
