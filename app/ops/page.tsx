@@ -226,7 +226,6 @@ function telHref(phone?: string | null) {
   const p = digitsOnly(phone);
   return p ? `tel:${p}` : "";
 }
-
 function mapsHref(parts: { address?: string | null; city?: string | null }) {
   const q = [parts.address, parts.city]
     .map((v) => String(v ?? "").trim())
@@ -966,7 +965,7 @@ function queueReason(j: any, activeBucket: string) {
 
   if (status === "failed" || status === "retest_needed") {
     if (retestState === "pending_scheduling") {
-      return "Retest pending scheduling — retest child exists but is not scheduled";
+      return "Retest pending scheduling — retest job exists but is not yet scheduled";
     }
     if (retestState === "scheduled") {
       return `Retest scheduled for ${retestSchedule}`;
@@ -1043,8 +1042,8 @@ function queueReason(j: any, activeBucket: string) {
 
   if (activeBucket === "invoice_required" || status === "invoice_required") {
     const needs = getCloseoutNeeds(getCloseoutProjection(j));
-    if (needs.needsInvoice) return "Status bucket — invoice still needed";
-    return "Status bucket — invoice follow-up already satisfied";
+    if (needs.needsInvoice) return "Invoice required — invoice still pending";
+    return "Invoice required — no further action needed";
   }
 
   if (activeBucket === "closeout") {
@@ -1095,7 +1094,7 @@ function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJo
 function signalReason(j: any, opts?: { retestReady?: boolean; newContractorJob?: boolean; scheduledRetest?: boolean }) {
   const retestState = retestStateForJob(String(j?.id ?? ""));
   if (retestState === "pending_scheduling") {
-    return "Retest pending scheduling — retest child needs date/time";
+    return "Retest pending scheduling — retest job needs a date and time";
   }
   if (opts?.scheduledRetest) {
     const retestSchedule = retestScheduleLabelForJob(String(j?.id ?? ""));
@@ -1539,7 +1538,7 @@ for (const j of stillOpenJobs ?? []) {
 
   stillOpenExceptionJobs.push(j);
   exceptionMetaById.set(id, {
-    reason: "Still open from prior day",
+    reason: "Still open past schedule",
     aging: `${ageDays} ${dayWord(ageDays)} open`,
   });
 }
@@ -1891,7 +1890,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     : retestState === "scheduled"
     ? `Retest scheduled for ${scheduledRetestLabel}`
     : retestState === "pending_scheduling"
-    ? "Retest child exists but still needs a scheduled date/time."
+    ? "Retest job exists but still needs a scheduled date and time."
     : opsStatus === "retest_needed"
     ? hasRetestReady
       ? "Contractor marked correction complete and is ready for retest review."
@@ -2295,9 +2294,9 @@ return (
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className={`${opsUtilityLabelClass} text-blue-700`}>Contractor-driven</div>
-          <div className="text-[15px] font-semibold tracking-tight text-slate-950">System Alerts</div>
+            <div className="text-[15px] font-semibold tracking-tight text-slate-950">Contractor Signals</div>
           <div className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">
-            Awareness routes to Notifications for acknowledgment. Ops queues remain the place to take action.
+            Signals route to Notifications for acknowledgment. Action happens in the queues below.
           </div>
         </div>
         <Link
@@ -2428,7 +2427,7 @@ return (
             {prioritizedCloseoutJobs.length > PREVIEW_LIMIT ? (
               <Link
                 href={`/ops${buildQueryString({
-                  bucket,
+                  bucket: "closeout",
                   contractor: contractor ?? "",
                   q: q ?? "",
                   sort: sort ?? "",
@@ -2454,7 +2453,7 @@ return (
 
     <section className={`rounded-2xl border ${exceptionVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="text-[15px] font-semibold tracking-tight text-slate-950">Exceptions (Still Open Past Scheduled Date)</div>
+        <div className="text-[15px] font-semibold tracking-tight text-slate-950">Overdue / Exceptions</div>
         <div className="flex items-center gap-3">
           {sectionCountPill(
             sortedExceptionJobs.length,
@@ -2494,7 +2493,7 @@ return (
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className={`${opsUtilityLabelClass} text-slate-500`}>Workflow</div>
-          <div className="text-[15px] font-semibold tracking-tight text-slate-950">System / Contractor Work</div>
+          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Ops Queues</div>
         </div>
       </div>
 
@@ -2547,8 +2546,8 @@ return (
       <div className="mt-3 rounded-2xl border border-slate-300/80 bg-white/94 p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.34)] ring-1 ring-slate-200/60">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="text-[15px] font-semibold tracking-tight text-slate-950">
-            Active Queue: {activeQueueLabel}
-            {activeSignalLabel ? ` (${activeSignalLabel})` : ""}
+            {activeQueueLabel}
+            {activeSignalLabel ? ` — ${activeSignalLabel}` : ""}
           </div>
           <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500 sm:text-[11px]">{sortedBucketJobs.length} jobs</div>
         </div>
