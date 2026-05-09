@@ -452,6 +452,14 @@ Summary of locked posture:
 
 This section is a pointer only. Do not duplicate the full deferred list here; the release packet is the canonical source.
 
+### 2.3.11 Support V0 Operational Readiness Pack (complete)
+
+Support V0 operational readiness is documented. See [docs/ACTIVE/Support_V0_Operational_Readiness_Pack.md](./Support_V0_Operational_Readiness_Pack.md).
+
+Pack covers: support contact SOP, issue intake template, severity matrix (S1–S4), response-time targets, escalation tree, engineering handoff template, daily support review checklist, launch-week cadence, V0 boundaries, and acceptance checklist for controlled first tester onboarding.
+
+This pack is a prerequisite to controlled tester onboarding. Do not onboard testers until the acceptance checklist (§ 11 of the pack) is fully confirmed.
+
 ### 2.4 First owner onboarding/provisioning readiness
 - **V1 implemented and browser-smoked.** Public self-serve signup exists for standard onboarding at `/signup`, and invite-only platform-admin/operator provisioning remains active/manual fallback.
 - Confirmed: provisioning script (`scripts/provision-first-owner.ts`) requires explicit allow flags for apply mode; defaults to dry-run.

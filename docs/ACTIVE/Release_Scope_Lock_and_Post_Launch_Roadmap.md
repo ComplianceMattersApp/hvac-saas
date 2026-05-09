@@ -191,7 +191,7 @@ Implementation note:
 
 Recommended order after owner-release:
 
-1. Support V0 documentation/readiness closeout (must be explicit before scaling users).
+1. Support V0 documentation/readiness closeout — **complete.** See `docs/ACTIVE/Support_V0_Operational_Readiness_Pack.md` for the full pack (contact SOP, intake template, severity matrix, escalation tree, engineering handoff template, daily review checklist, launch-week cadence, boundaries, and tester onboarding acceptance checklist).
 2. Controlled first tester onboarding.
 3. Read-only Support Console V1 only if/when support load justifies it.
 4. Estimates production enablement (internal-only runbook execution).
@@ -214,7 +214,7 @@ Ordering rationale:
 
 1. Support operational process readiness
    - Risk: ad-hoc support variance without clear intake/escalation discipline.
-   - Mitigation: finalize Support V0 SOP artifacts before scaling onboarding.
+   - Mitigation: Support V0 SOP artifacts are now documented in `docs/ACTIVE/Support_V0_Operational_Readiness_Pack.md`.
 
 2. Product-mode buyer-story drift
    - Risk: ECC/HERS and Service narratives blur in UX or roadmap language.
@@ -258,9 +258,9 @@ Cross-reference recommendation (future docs-only slice):
 
 ---
 
-## 10) Exact Documentation Prompt for Next Slice
+## 10) Documentation Prompt History
 
-Use the following prompt exactly for the next docs-only slice:
+The following prompt was used for the Support V0 Operational Readiness Pack slice (complete):
 
 "Create a docs-only Support V0 Operational Readiness Pack in docs/ACTIVE with no code changes. Include:
 1) support contact SOP,
@@ -273,7 +273,9 @@ Use the following prompt exactly for the next docs-only slice:
 8) launch-week support staffing cadence,
 9) boundaries (no impersonation, no support mutation),
 10) acceptance checklist for controlled first tester onboarding.
-Keep runbook-gated items unchanged. No schema/migration/Supabase/feature-flag changes." 
+Keep runbook-gated items unchanged. No schema/migration/Supabase/feature-flag changes."
+
+Result: `docs/ACTIVE/Support_V0_Operational_Readiness_Pack.md` created. 
 
 ---
 
