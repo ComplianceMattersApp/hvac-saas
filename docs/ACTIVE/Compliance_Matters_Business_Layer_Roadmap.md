@@ -1039,6 +1039,7 @@ The next natural roadmap area is smaller service-model revisions / service workf
 Estimates/quoting V1A-V1J is now implemented to the current guarded internal baseline.
 Estimates is intentionally not production-live yet because estimate migrations are sandbox-only, production estimate migrations are not applied, production `ENABLE_ESTIMATES` remains disabled, and production `ENABLE_ESTIMATE_EMAIL_SEND` remains disabled.
 The earlier enabled-mode render error is now a watch item only for planning purposes: clean captured smoke did not reproduce the `TypeError: Cannot read properties of undefined (reading 'call')`, and `/estimates` plus multiple `/estimates/[id]` routes returned `200` without a real stack trace.
+Estimates enablement readiness is therefore: ready after listed inputs, not ready to execute yet.
 V1E internal-only status transitions are complete (`draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`).
 V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
 V1E keeps line editing draft-only and hides line-edit controls after `sent`.
