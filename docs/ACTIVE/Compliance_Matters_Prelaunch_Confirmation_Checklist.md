@@ -440,6 +440,18 @@ Verification notes (2026-05-07, local dev session):
   - tenant customer payment execution remains deferred
   - QBO remains optional/downstream only
 
+### 2.3.10 Release scope lock confirmation (May 2026)
+
+Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for the canonical decision surface.
+
+Summary of locked posture:
+- Notifications, calendar, contractor portal, reports, admin/setup, job workspace, ops, product mode matrix, and customer continuity V1 are closed for the current owner-release pass.
+- Deferred/parked items (customer portal, QBO, tenant payment execution, estimates/support-console production enablement, mode-switch UI, native packaging) are not release blockers unless the owner explicitly reopens them.
+- Runbook-gated items (estimates enablement, support console enablement, first-owner provisioning) remain parked behind their runbooks.
+- No codebase split. ECC/HERS-first with HVAC Service-ready shared foundation.
+
+This section is a pointer only. Do not duplicate the full deferred list here; the release packet is the canonical source.
+
 ### 2.4 First owner onboarding/provisioning readiness
 - **V1 implemented and browser-smoked.** Public self-serve signup exists for standard onboarding at `/signup`, and invite-only platform-admin/operator provisioning remains active/manual fallback.
 - Confirmed: provisioning script (`scripts/provision-first-owner.ts`) requires explicit allow flags for apply mode; defaults to dry-run.

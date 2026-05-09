@@ -6,6 +6,17 @@ Purpose: Align future development, audits, and thread handoffs to the current, s
 **Note on Product Modes:**
 See [Compliance_Matters_Business_Layer_Roadmap.md § 3 Product Mode Matrix](./Compliance_Matters_Business_Layer_Roadmap.md#3-product-mode-matrix--eccherms-version-vs-hvac-service-version) for architectural guidance on the two product configurations (ECC/HERS and HVAC Service). Future development should respect product-mode separation to prevent buyer-story drift.
 
+**Release Scope Lock (May 2026):**
+Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for the canonical current decision surface covering:
+- Completion status matrix for all owner-release areas
+- Locked release scope
+- Deferred and parked items
+- Runbook-gated items
+- Support V0/V1/V2 model
+- Post-launch roadmap order
+
+Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No codebase split. No customer portal in current scope. Deferred and runbook-gated items remain parked unless explicitly reopened.
+
 Current Program Status Note (May 2026)
 
 - Service Workflow / Visit Scope Field Experience V1 Slice 1 is complete:

@@ -280,6 +280,8 @@ The following product-configuration work is **explicitly parked** and **not in c
 - **No customer portal in current scope**: Customer visibility for service cases is parked; only contractors and internal users have external access currently
 - **Onboarding**: Controlled-tester onboarding remains parked pending explicit owner approval (separate runbook process)
 
+**Release scope is locked.** See [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for the full decision surface: completion status matrix, locked scope, deferred/parked list, runbook-gated items, Support V0/V1/V2 model, and post-launch roadmap order.
+
 **Development Guidance:**
 
 - Future slices should respect both versions and prevent buyer-story drift
