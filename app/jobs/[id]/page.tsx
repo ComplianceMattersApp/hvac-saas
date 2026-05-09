@@ -1287,8 +1287,13 @@ const customerPhone =
 const customerEmail =
   customerBilling?.email ?? job.customer_email ?? "—";
 
-  const contractorName =
-    contractors?.find((c: any) => c.id === job.contractor_id)?.name ?? internalBusinessDisplayName;
+  const resolvedContractorName =
+    contractors?.find((c: any) => c.id === contractorId)?.name ??
+    String(contractorBilling?.name ?? "").trim();
+
+  const contractorName = contractorId
+    ? (resolvedContractorName || "Assigned contractor")
+    : null;
 
   const firstNonEmpty = (...values: Array<unknown>) => {
     for (const v of values) {
@@ -2639,10 +2644,12 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       )}
 
       <div className="mt-4 grid gap-x-6 gap-y-3 border-t border-slate-200/70 pt-4 text-sm sm:grid-cols-2">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Contractor</div>
-          <div className="mt-1 font-semibold text-slate-800">{contractorName}</div>
-        </div>
+        {contractorId ? (
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Contractor</div>
+            <div className="mt-1 font-semibold text-slate-800">{contractorName}</div>
+          </div>
+        ) : null}
         {customerPhone !== "—" ? (
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Phone</div>
@@ -4747,7 +4754,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 </details>
 ) : null}
 
-{isInternalUser && ["failed", "pending_info"].includes(String(job.ops_status ?? "")) ? (
+{isInternalUser && contractorId && ["failed", "pending_info"].includes(String(job.ops_status ?? "")) ? (
   <>
     <div className="order-4 xl:order-4">
       <ContractorReportPanel

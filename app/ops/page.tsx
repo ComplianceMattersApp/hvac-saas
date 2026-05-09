@@ -1667,6 +1667,8 @@ const visibleSignalCards = signalCards.filter(
   (card) => card.count > 0 || signal === card.key
 );
 const hasActiveSystemAlerts = visibleSignalCards.some((card) => card.count > 0);
+const showContractorFilter = (contractors ?? []).length > 0;
+const showContractorSignalsSection = visibleSignalCards.length > 0 || Boolean(signal);
 
 const activeQueueLabel = OPS_TABS.find((t) => t.key === bucket)?.label ?? bucket;
 const activeSignalLabel =
@@ -2236,8 +2238,10 @@ return (
           <div className="font-medium text-slate-800">{OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}</div>
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
+      <div className={`grid grid-cols-1 gap-2.5 ${showContractorFilter ? "lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]" : "lg:grid-cols-1"}`}>
+        {showContractorFilter ? (
+          <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
+        ) : null}
         <div className="grid gap-1">
           <label className={`${opsUtilityLabelClass} text-slate-500`}>Sort</label>
           <form action="/ops" method="get" className="flex flex-col gap-2 sm:flex-row">
@@ -2290,65 +2294,67 @@ return (
       </div>
     </section>
 
-    <section id="system-alerts" className={`rounded-2xl border p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-3.5 ${hasActiveSystemAlerts || signal ? "border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))]" : "border-slate-300/75 bg-slate-50/75"}`}>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className={`${opsUtilityLabelClass} text-blue-700`}>Contractor-driven</div>
-            <div className="text-[15px] font-semibold tracking-tight text-slate-950">Contractor Signals</div>
-          <div className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">
-            Signals route to Notifications for acknowledgment. Action happens in the queues below.
+    {showContractorSignalsSection ? (
+      <section id="system-alerts" className={`rounded-2xl border p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-3.5 ${hasActiveSystemAlerts || signal ? "border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))]" : "border-slate-300/75 bg-slate-50/75"}`}>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className={`${opsUtilityLabelClass} text-blue-700`}>Contractor-driven</div>
+              <div className="text-[15px] font-semibold tracking-tight text-slate-950">Contractor Signals</div>
+            <div className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">
+              Signals route to Notifications for acknowledgment. Action happens in the queues below.
+            </div>
           </div>
+          <Link
+            href="/ops/notifications?state=unread"
+            className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300"
+          >
+            Review notifications
+          </Link>
         </div>
-        <Link
-          href="/ops/notifications?state=unread"
-          className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300"
-        >
-          Review notifications
-        </Link>
-      </div>
-      {visibleSignalCards.length === 0 && !signal
-        ? quietSectionEmptyState("No active contractor-driven alerts right now.")
-        : (
-          <div className="flex flex-wrap gap-1.5">
-            {visibleSignalCards.map((card) => {
-              const isActive = signal === card.key;
-              const cardHref = card.key === "contractor_updates"
-                ? "/ops/notifications?view=contractor_updates&state=unread"
-                : card.key === "new_work_requests"
-                ? "/ops/notifications?view=new_jobs&state=unread"
-                : `/ops${buildQueryString({
-                    bucket: card.bucket,
-                    contractor: contractor ?? "",
-                    q: q ?? "",
-                    sort: sort ?? "",
-                    signal: card.key,
-                  })}#ops-queues`;
-              return (
-                <Link
-                  key={card.key}
-                  href={cardHref}
-                  className={[
-                    opsQueueChipClass,
-                    card.key !== "contractor_updates" && card.key !== "new_work_requests" && isActive
-                      ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
-                      : `${signalToneClass(card.key)} hover:bg-white`,
-                  ].join(" ")}
-                  title={
-                    card.key === "contractor_updates"
-                      ? "Open unread contractor-driven notifications"
-                      : card.key === "new_work_requests"
-                      ? "Open unread new work-request notifications"
-                      : undefined
-                  }
-                >
-                  <span>{card.label}</span>
-                  <span className={`font-semibold tabular-nums ${card.key !== "contractor_updates" && card.key !== "new_work_requests" && isActive ? "text-slate-200" : "text-current/80"}`}>{card.count}</span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-    </section>
+        {visibleSignalCards.length === 0 && !signal
+          ? quietSectionEmptyState("No active contractor-driven alerts right now.")
+          : (
+            <div className="flex flex-wrap gap-1.5">
+              {visibleSignalCards.map((card) => {
+                const isActive = signal === card.key;
+                const cardHref = card.key === "contractor_updates"
+                  ? "/ops/notifications?view=contractor_updates&state=unread"
+                  : card.key === "new_work_requests"
+                  ? "/ops/notifications?view=new_jobs&state=unread"
+                  : `/ops${buildQueryString({
+                      bucket: card.bucket,
+                      contractor: contractor ?? "",
+                      q: q ?? "",
+                      sort: sort ?? "",
+                      signal: card.key,
+                    })}#ops-queues`;
+                return (
+                  <Link
+                    key={card.key}
+                    href={cardHref}
+                    className={[
+                      opsQueueChipClass,
+                      card.key !== "contractor_updates" && card.key !== "new_work_requests" && isActive
+                        ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
+                        : `${signalToneClass(card.key)} hover:bg-white`,
+                    ].join(" ")}
+                    title={
+                      card.key === "contractor_updates"
+                        ? "Open unread contractor-driven notifications"
+                        : card.key === "new_work_requests"
+                        ? "Open unread new work-request notifications"
+                        : undefined
+                    }
+                  >
+                    <span>{card.label}</span>
+                    <span className={`font-semibold tabular-nums ${card.key !== "contractor_updates" && card.key !== "new_work_requests" && isActive ? "text-slate-200" : "text-current/80"}`}>{card.count}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+      </section>
+    ) : null}
 
     <OperationalReportingSection
       reporting={operationalReporting}

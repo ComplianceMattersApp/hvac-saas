@@ -74,7 +74,7 @@ export default async function OpsAdminPage() {
       section: "people",
       eyebrow: "Contractors",
       title: "Contractors",
-      description: "Manage contractor companies, primary contacts, and organization-scoped member access.",
+      description: "Optional contractor workflows for ECC/HERS or contractor-collaboration accounts.",
       href: "/ops/admin/contractors",
       ctaLabel: "Open workspace",
       enabled: true,
@@ -83,7 +83,7 @@ export default async function OpsAdminPage() {
       section: "people",
       eyebrow: "Contractors",
       title: "Intake Proposals",
-      description: "Review pending contractor-submitted customer/location proposals and finalize them into canonical jobs.",
+      description: "Optional contractor-submitted work review for accounts that use contractor intake.",
       href: "/ops/admin/contractor-intake-submissions",
       ctaLabel: "Review proposals",
       enabled: true,
@@ -120,7 +120,7 @@ export default async function OpsAdminPage() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
             <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Run the admin side of the business</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Move between people, contractors, and company settings without leaving one streamlined control center.
+              Manage people, company settings, and your operational workspace in one place.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
               Live workspaces are grouped below. Future tools stay clearly separated.
@@ -210,7 +210,7 @@ export default async function OpsAdminPage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">People</p>
           <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">Access and account management</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-            Start here for user lookup and recovery, then step into the focused team and contractor workspaces when you need deeper control.
+            Start here for user lookup and recovery, then step into team workspaces and optional contractor tools when needed.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
