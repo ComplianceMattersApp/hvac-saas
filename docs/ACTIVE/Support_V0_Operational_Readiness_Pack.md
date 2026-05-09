@@ -3,6 +3,7 @@
 **Status:** ACTIVE — current manual support model  
 **Authority:** Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md`  
 **Release context:** See `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md` for locked scope and deferred items.  
+**Owner-led go-live addendum:** See `docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md` for relationship-based owner-led first-customer support posture and expansion planning guardrails.  
 **Version:** V0 — white-glove manual support for first users and controlled testers
 
 ---

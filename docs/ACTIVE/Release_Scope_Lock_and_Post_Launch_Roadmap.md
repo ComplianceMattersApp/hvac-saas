@@ -28,6 +28,8 @@ This packet therefore recommends:
 - start with Support V0 plus controlled onboarding,
 - sequence post-launch roadmap in low-risk dependency order.
 
+Execution companion note: for practical first-customer support posture and expansion-lane classification guardrails, see `docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md`.
+
 ---
 
 ## 2) Current Owner-Release Completion Status

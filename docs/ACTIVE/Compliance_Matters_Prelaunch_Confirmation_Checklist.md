@@ -455,6 +455,7 @@ This section is a pointer only. Do not duplicate the full deferred list here; th
 ### 2.3.11 Support V0 Operational Readiness Pack (complete)
 
 Support V0 operational readiness is documented. See [docs/ACTIVE/Support_V0_Operational_Readiness_Pack.md](./Support_V0_Operational_Readiness_Pack.md).
+Owner-led practical go-live posture and expansion-lane readiness guidance are documented in [docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md](./Owner_Led_Go_Live_Readiness_Addendum.md).
 
 Pack covers: support contact SOP, issue intake template, severity matrix (S1–S4), response-time targets, escalation tree, engineering handoff template, daily support review checklist, launch-week cadence, V0 boundaries, and acceptance checklist for controlled first tester onboarding.
 
