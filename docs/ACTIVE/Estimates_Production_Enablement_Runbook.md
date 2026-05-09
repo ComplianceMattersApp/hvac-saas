@@ -10,6 +10,8 @@ Scope: Production enablement procedure for Estimates V1 internal-only slice. No 
 
 This runbook defines how internal-only production Estimates enablement must be executed through strict, auditable gates.
 
+The latest clean-run Estimates rehearsal closed the earlier enabled-mode render-error report as a watch item only: the `TypeError: Cannot read properties of undefined (reading 'call')` did not reproduce in fresh captured smoke, and no code change is warranted without a real stack trace.
+
 ### Current locked status
 
 - Estimates V1A-V1J is implemented to the current guarded internal baseline.
@@ -21,6 +23,7 @@ This runbook defines how internal-only production Estimates enablement must be e
 - Estimates nav remains hidden in production while `ENABLE_ESTIMATES` is disabled.
 - The sole pre-production code blocker (missing `createEstimateDraft` fail-closed flag check) is now resolved and committed.
 - Estimates Guard Parity + Send Wording Polish closeout is complete on the guarded internal baseline (commit `edf5022`): `addEstimateLineItem` and `removeEstimateLineItem` now fail-close when `ENABLE_ESTIMATES` is false/unset, mutator tests now assert unavailable response plus no `requireInternalUser` call when gated off, and estimate detail/send-attempt wording now uses `Record Send Attempt` while preserving internal-only boundary language.
+- Estimates Re-Entry audit watch item is closed for planning purposes only: the earlier enabled-mode `TypeError: Cannot read properties of undefined (reading 'call')` was not reproduced in clean captured smoke, `/estimates` and multiple `/estimates/[id]` routes returned `200`, `addLineItemAction` completed with `POST 200` twice, and no `Error`, `TypeError`, `ReferenceError`, `digest`, or `Unhandled` entry was captured. Treat this as a watch item only; do not recommend code changes without a real stack trace.
 - Estimate Detail Wording + Internal Scaffolding Collapse closeout is complete on the guarded internal baseline and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries.
 - Estimate Pricebook Editable Defaults V1 closeout is complete on the guarded internal baseline and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries.
 - Customer Estimate Profile Entry V1 closeout is complete on the guarded internal baseline (commits `bcfa9f7`, `b977c89`) and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries.
@@ -505,3 +508,4 @@ Completing this runbook does not authorize:
 | v1.0 | May 3, 2026 | Initial draft | Planning-only; no production execution. |
 | v1.1 | May 3, 2026 | Planning pass | Added production project ref (`ornrnvxtwwtulohqwxop`), hard stop gates (§3.1), preflight commands (§4.1), no-go conditions (§14), post-execution doc requirements (§15), final recommendation (§16). No execution; planning-only. |
 | v1.2 | May 9, 2026 | Docs closeout pass | Recorded Estimates Guard Parity + Send Wording Polish (`edf5022`): mutator-level fail-closed parity for add/remove, updated guarded-baseline validation (`131/131`), and `Record Send Attempt` wording safety. No runbook execution; production estimates remain disabled and runbook-gated. |
+| v1.3 | May 9, 2026 | Planning closeout pass | Recorded the enabled-mode render-error watch-item closeout: intermittent `TypeError` not reproduced in clean captured smoke, `/estimates` and `/estimates/[id]` returned `200`, `addLineItemAction` posted `200` twice, and no real stack trace was captured. No code changes; planning/watch item only. |
