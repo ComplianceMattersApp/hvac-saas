@@ -1944,6 +1944,10 @@ For business-layer planning purposes:
 - reporting must distinguish billed truth from collected truth
 - payment behavior must respect company billing mode
 - collected-payment truth is now materially implemented in `public.internal_invoice_payments` for internal-invoicing companies
+- tenant customer payment execution is the future processor-backed path for issued tenant internal invoices, separate from platform subscription billing
+- internal invoices remain billed truth; `internal_invoice_payments` remains collected-payment truth
+- manual/off-platform payment recording must continue to coexist with Stripe-sourced payment rows
+- Stripe is the payment rail, not the operational source of truth
 
 ### Locked rule
 Do not use this document to override:

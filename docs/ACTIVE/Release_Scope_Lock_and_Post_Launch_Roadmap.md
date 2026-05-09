@@ -93,7 +93,7 @@ The following remain intentionally deferred/parked (not blockers for owner-relea
 1. Estimates production enablement (runbook-gated; currently disabled in production).
 2. Support Console production enablement (runbook-gated; currently disabled).
 3. First-owner provisioning apply/invites outside controlled runbook operation.
-4. Tenant customer payment execution (online checkout/payment rail at tenant invoice layer).
+4. Tenant customer payment execution (online checkout/payment rail at tenant invoice layer; later Stripe-first invoice acceptance, separate from platform subscription billing).
 5. QBO integration (optional downstream only).
 6. Recurring services / maintenance agreements (customer-owned agreement V1; manual prep only; no automatic job generation).
 7. Customer portal (requires separate customer/location-scoped external visibility design).

@@ -33,6 +33,8 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirm Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Confirm this Stripe work is separate from tenant customer/work invoice payment execution.
 - Confirm the tenant customer/work payment execution track remains future/deferred:
+  - tenant customer payment execution V1 means processor-backed customer payment acceptance for issued tenant internal invoices
+  - it is separate from platform subscription billing, which charges the tenant account for Compliance Matters access and syncs entitlement truth
   - customer pays invoice online
   - payment outcome writes back to Compliance Matters
   - invoice payment status/balance updates
@@ -45,6 +47,7 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirm recent invoice/payment wording polish remains honest:
   - payment entries are tracking-only and do not execute card charges
   - no live Pay Now/Charge Card/checkout/refund/dispute/payout language appears as active behavior
+  - manual/off-platform payment recording continues to coexist with Stripe-sourced payment rows
 
 ### 2.3.1 Launch-readiness catch-up confirmations (completed)
 - Scope vs Line Items / Work Items terminology alignment is complete.

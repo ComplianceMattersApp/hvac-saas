@@ -325,6 +325,37 @@ Locked carry-forward clarification:
 - Platform subscription billing for account onboarding is implemented in V1 and live-smoke confirmed in production.
 - This platform-billing slice remains separate from tenant internal invoice/customer-work payment execution.
 
+### P2 architecture decision (V1)
+- Tenant customer payment execution V1 means processor-backed customer payment acceptance for issued tenant internal invoices.
+- It is separate from platform subscription billing.
+- Platform subscription billing charges the tenant account for Compliance Matters access and syncs entitlement truth.
+- Tenant customer payment execution collects end-customer money against tenant-issued internal invoices and syncs collected-payment truth.
+- Internal invoices remain billed truth.
+- `internal_invoice_payments` remains collected-payment truth.
+- Stripe is the payment rail / processor, not the operational source of truth.
+- Manual/off-platform payment recording remains first-class and must coexist with Stripe-sourced payment rows.
+- QBO remains optional downstream only.
+
+### Recommended V1 scope
+- issued internal invoices only
+- one invoice to many payment rows
+- Stripe-hosted processor flow later
+- idempotent webhook writeback
+- success/failure/pending outcome handling
+- payment rows store processor references, amount applied, outcome status, paid timestamp, and failure reason/code where available
+- reporting aggregates manual and Stripe-collected payments through the same collected-payment model
+
+### Suggested states
+- payment row states: pending, recorded, failed, reversed
+- derived invoice states: unpaid, partially_paid, paid, payment_attention
+
+### Event-backed outcomes
+- `payment_recorded`
+- `payment_partially_paid`
+- `payment_marked_paid`
+- `payment_marked_failed`
+- `payment_sync_failed`
+
 Launch-status update:
 - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed in production.
 - This work no longer sits in pending live-environment readiness; live keys, live webhook, and final smoke are complete for the platform-account subscription slice.
