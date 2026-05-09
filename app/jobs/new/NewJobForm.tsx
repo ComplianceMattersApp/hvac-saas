@@ -1348,8 +1348,9 @@ const [billingRecipient, setBillingRecipient] = useState<
           <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Job Type</h2>
 
           {/* Job Type */}
-          <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
             <label className="block text-sm font-medium text-slate-900">Job Type</label>
+            <p className="text-xs text-slate-600">Service is the default for service company workflows. Choose ECC/HERS for compliance testing visits.</p>
             <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
               <label className="flex cursor-pointer items-start gap-2.5">
                 <input
@@ -1361,10 +1362,8 @@ const [billingRecipient, setBillingRecipient] = useState<
                   className="mt-0.5"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-slate-900">ECC</span>
-                  {isContractorMode && (
-                    <span className="block text-xs text-slate-500">Energy Conservation Code test</span>
-                  )}
+                  <span className="block text-sm font-medium text-slate-900">ECC/HERS</span>
+                  <span className="block text-xs text-slate-500">Compliance testing</span>
                 </span>
               </label>
               <label className="flex cursor-pointer items-start gap-2.5">
@@ -1378,9 +1377,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 />
                 <span>
                   <span className="block text-sm font-medium text-slate-900">Service</span>
-                  {isContractorMode && (
-                    <span className="block text-xs text-slate-500">Standard service visit</span>
-                  )}
+                  <span className="block text-xs text-slate-500">Standard work order</span>
                 </span>
               </label>
             </div>
