@@ -62,6 +62,12 @@ The Compliance Matters platform operates as **one shared platform engine** with 
 - Mode identity is implicit in feature availability and UI/navigation styling, not explicit in a schema-level mode flag yet (future parked work).
 - Mode separation guides future development to prevent buyer-story drift and ensures each version receives intentional UX/navigation tuning.
 
+Packaging guardrail:
+
+- Product mode and plan tier are separate concepts.
+- Product mode answers workflow relevance; plan tier/add-ons answer commercial availability.
+- See [Competitive_Packaging_and_Tier_Spec.md](./Competitive_Packaging_and_Tier_Spec.md) for Standard/Growth/Pro and add-on placement guidance.
+
 ### 3.2. Shared platform engine
 
 The following foundations are **shared across both product versions**:

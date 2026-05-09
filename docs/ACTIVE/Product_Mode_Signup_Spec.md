@@ -61,8 +61,8 @@ When a company signs up as ECC/HERS Compliance Testing, default posture should b
 
 - product mode: ECC/HERS Compliance Testing
 - job creation default: ECC/compliance job
-- contractor intake/review enabled
-- contractor portal enabled
+- contractor intake/review is relevant/available in ECC mode
+- contractor portal is relevant/available in ECC mode
 - contractor admin visible
 - ECC tests visible
 - failed-test correction evidence visible
@@ -71,6 +71,11 @@ When a company signs up as ECC/HERS Compliance Testing, default posture should b
 - contractor reports/signals visible
 - compliance-oriented reporting emphasized
 - ECC/compliance starter kit when starter kits become mode-aware
+
+Tier/add-on clarification (future implementation):
+
+- ECC/HERS Standard supports internal ECC job creation and ECC workflow management.
+- Contractor portal/intake/correction flows should be enabled by tier/add-on/entitlement policy (for example Pro tier or explicit add-on), not by product mode alone.
 
 ## 5. HVAC Service Signup Defaults
 
@@ -92,6 +97,11 @@ When a company signs up as HVAC Service Company, default posture should be:
 - estimates/quoting positioned as service-first future module
 - recurring services positioned as future service-side module
 - service starter kit when starter kits become mode-aware
+
+Tier/add-on clarification (future implementation):
+
+- HVAC Service should hide contractor portal/intake by default unless a future entitlement explicitly enables a compatible workflow.
+- Estimates, SMS, tenant customer payments, and recurring-service capabilities should be controlled by tier/add-on policy rather than product mode identity alone.
 
 ## 6. Future Account-Level Product Mode
 
@@ -162,7 +172,7 @@ Current portal model is contractor-focused.
 
 Rules:
 
-- ECC/HERS version may enable contractor portal by default.
+- ECC/HERS version treats contractor portal/intake as relevant workflows, with final enablement controlled by tier/add-on/entitlement policy.
 - HVAC Service version should not show contractor portal/intake by default.
 - No customer portal is included in current scope.
 - Any future customer portal requires customer/location-scoped visibility and separate design.
@@ -211,5 +221,6 @@ This spec aligns with:
 - [Compliance_Matters_Business_Layer_Roadmap.md](./Compliance_Matters_Business_Layer_Roadmap.md)
 - [Owner_Led_Go_Live_Readiness_Addendum.md](./Owner_Led_Go_Live_Readiness_Addendum.md)
 - [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md)
+- [Competitive_Packaging_and_Tier_Spec.md](./Competitive_Packaging_and_Tier_Spec.md)
 
 These references are for planning alignment only and do not activate implementation changes.

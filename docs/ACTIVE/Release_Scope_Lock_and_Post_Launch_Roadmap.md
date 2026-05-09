@@ -257,6 +257,7 @@ Why both:
 
 Cross-reference recommendation (future docs-only slice):
 - Add a one-line pointer from prelaunch checklist and active spine status note to this packet.
+- Add a one-line pointer to [Competitive_Packaging_and_Tier_Spec.md](./Competitive_Packaging_and_Tier_Spec.md) for mode-vs-tier-vs-add-on packaging separation guidance.
 
 ---
 
