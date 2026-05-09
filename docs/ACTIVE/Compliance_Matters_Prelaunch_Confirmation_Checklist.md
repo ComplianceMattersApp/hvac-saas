@@ -42,6 +42,7 @@ If any item here conflicts with the active spine, the spine wins.
   - refunds/disputes/payment-failure handling remains later
   - optional small platform fee remains future capability
   - QBO remains optional/downstream only
+- Confirm QBO remains last-last and never overrides Compliance Matters invoice or payment truth.
 - Verify no UI implies live processor-backed payment collection before it truly exists.
 - Confirm Stripe-first future direction and QBO-optional boundary remain intact.
 - Confirm recent invoice/payment wording polish remains honest:

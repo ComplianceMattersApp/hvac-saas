@@ -275,6 +275,12 @@ The following product-configuration work is **explicitly parked** and **not in c
 - QBO integration (optional downstream; parked)
 - Support Console production enablement (parked)
 
+QBO parking rule:
+- QBO remains last-last optional downstream accounting sync/export only.
+- QBO is not the invoice source of truth, the customer source of truth, or the operational lifecycle system.
+- QBO must never override app-owned billed truth or collected-payment truth.
+- one-way Compliance Matters to QBO is the safest first sync shape; two-way authoritative sync remains deferred.
+
 ### 3.8. Release-scope statement
 
 **Current Owner Release Posture (May 2026):**
@@ -2061,6 +2067,7 @@ Compliance Matters must remain usable as a standalone system.
 
 ### Locked rule
 QBO remains optional and downstream.
+QBO remains parked until a later accounting-export slice is explicitly approved.
 
 ### Meaning
 Future accounting sync may later include:
@@ -2073,6 +2080,7 @@ But:
 - QBO is not required for core use
 - QBO is not the payment foundation
 - QBO is not the source of operational truth
+- QBO must not override app-owned invoice or payment truth
 
 For payment architecture, defer to the payments roadmap.
 

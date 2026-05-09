@@ -94,7 +94,7 @@ The following remain intentionally deferred/parked (not blockers for owner-relea
 2. Support Console production enablement (runbook-gated; currently disabled).
 3. First-owner provisioning apply/invites outside controlled runbook operation.
 4. Tenant customer payment execution (online checkout/payment rail at tenant invoice layer; later Stripe-first invoice acceptance, separate from platform subscription billing).
-5. QBO integration (optional downstream only).
+5. QBO integration (last-last, optional downstream accounting sync/export only).
 6. Recurring services / maintenance agreements (customer-owned agreement V1; manual prep only; no automatic job generation).
 7. Customer portal (requires separate customer/location-scoped external visibility design).
 8. Service worker/offline/native app-store packaging.
@@ -199,7 +199,7 @@ Recommended order after owner-release:
 4. Estimates production enablement (internal-only runbook execution).
 5. Recurring services / maintenance agreements (customer-owned agreement V1; manual prep only; no automatic job generation).
 6. Tenant customer payment execution.
-7. QBO integration last (optional downstream).
+7. QBO integration last-last (optional downstream accounting sync/export only).
 8. Product-mode configuration layer (settings/visibility/presets).
 9. Customer portal only if explicitly reopened.
 10. Native/offline/app-store packaging later.

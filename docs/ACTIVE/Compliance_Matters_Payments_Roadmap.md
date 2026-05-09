@@ -401,6 +401,20 @@ Possible scope:
 - QBO sync must remain optional and downstream
 - this must never become required for core usage
 - this must never be the only path to payment acceptance
+- QBO must not override Compliance Matters invoice truth or collected-payment truth
+- one-way Compliance Matters to QBO is the safest first shape; broad two-way sync stays deferred
+
+### QBO parking decision
+- QBO remains last-last.
+- QBO is optional downstream accounting sync/export only.
+- QBO is not required for launch.
+- QBO is not required for core product use.
+- QBO is not required before tenant Stripe customer payments.
+- QBO is not the payment rail.
+- QBO is not the invoice source of truth.
+- QBO is not the customer source of truth.
+- QBO is not the operational lifecycle/source-of-truth system.
+- QBO must not override Compliance Matters invoice or payment truth.
 
 ---
 
