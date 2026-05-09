@@ -381,7 +381,8 @@ export default function NewJobForm({
   // Contractor selection (internal/admin only). Contractor users are auto-tied.
  const [contractorId, setContractorId] = useState<string>(() => myContractor?.id ?? "");
 
-  const [jobType, setJobType] = useState<"ecc" | "service">("ecc");
+  const defaultJobType: "ecc" | "service" = myContractor?.id ? "ecc" : "service";
+  const [jobType, setJobType] = useState<"ecc" | "service">(defaultJobType);
   const [serviceCaseKind, setServiceCaseKind] = useState<
     "reactive" | "callback" | "warranty" | "maintenance"
   >("reactive");
@@ -867,7 +868,7 @@ const [billingRecipient, setBillingRecipient] = useState<
     setWindowEnd(d.windowEnd ?? "");
     setScheduledDate(d.scheduledDate ?? "");
     setContractorId(d.contractorId ?? "");
-    setJobType(d.jobType ?? "ecc");
+    setJobType(d.jobType ?? defaultJobType);
     setServiceCaseKind(d.serviceCaseKind ?? "reactive");
     setServiceVisitType(d.serviceVisitType ?? "diagnostic");
     setServiceVisitOutcome(d.serviceVisitOutcome ?? "follow_up_required");
