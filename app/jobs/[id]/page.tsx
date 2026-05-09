@@ -2569,7 +2569,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   <div className={`${workspaceInsetClass} mb-4 border-slate-200/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.82),rgba(255,255,255,0.99))] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]`}>
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.95fr)] lg:items-center">
       <div className="min-w-0">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Appointment</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Schedule</div>
         <div className="mt-1 text-[1.32rem] font-semibold tracking-[-0.02em] text-slate-950">{appointmentDateLabel}</div>
         <div className="mt-1 text-sm leading-6 text-slate-600">{appointmentTimeLabel}</div>
 

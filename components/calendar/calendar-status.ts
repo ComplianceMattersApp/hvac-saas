@@ -3,7 +3,7 @@ import type { DispatchJob } from '@/lib/actions/calendar';
 const CALENDAR_STATUS_LABELS: Record<string, string> = {
   open: 'Open',
   pending: 'Pending',
-  need_to_schedule: 'Needs Scheduling',
+  need_to_schedule: 'Need to Schedule',
   scheduled: 'Scheduled',
   pending_info: 'Pending Info',
   pending_information: 'Pending Info',
@@ -49,6 +49,7 @@ const CALENDAR_STATUS_DOT_CLASSES: Record<string, string> = {
 };
 
 export const CALENDAR_STATUS_LEGEND = [
+  'need_to_schedule',
   'scheduled',
   'on_my_way',
   'in_process',

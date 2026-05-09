@@ -160,7 +160,7 @@ export default function OpsFilteredPreviewClient(props: Props) {
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 text-sm font-semibold text-gray-900">Primary Lifecycle Filters (Preview)</div>
+      <div className="mb-3 text-sm font-semibold text-gray-900">Primary Lifecycle Filters</div>
       <div className="flex flex-wrap gap-2">
         {LIFECYCLE_FILTERS.map((item) => {
           const active = lifecycleFilter === item.key;
@@ -184,7 +184,7 @@ export default function OpsFilteredPreviewClient(props: Props) {
         })}
       </div>
 
-      <div className="mt-4 mb-2 text-sm font-semibold text-gray-900">Signal Filter Chips (Preview)</div>
+      <div className="mt-4 mb-2 text-sm font-semibold text-gray-900">Signal Filter Chips</div>
       <div className="flex flex-wrap gap-2">
         {SIGNAL_FILTERS.map((item) => {
           const active = signals.has(item.key);
