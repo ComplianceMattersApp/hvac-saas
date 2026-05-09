@@ -32,7 +32,7 @@ export default function SendEstimateForm({
 
     const confirmed = window.confirm(
       isEmailSendEnabled
-        ? `Send estimate to ${email}?\n\nThis records a send attempt. Accepted by provider is NOT the same as delivered or read. No PDF, customer approval, invoice, or conversion record is created.`
+        ? `Record a send attempt to ${email}?\n\nThis may attempt provider send when enabled. Accepted by provider is NOT the same as delivered or read. No PDF, customer approval, invoice, or conversion record is created.`
         : `Record a blocked send attempt to ${email}?\n\nEstimate sending is not enabled yet. No email will be sent. This only records the attempt with status "blocked".`
     );
     if (!confirmed) {
@@ -79,7 +79,7 @@ export default function SendEstimateForm({
           type="submit"
           className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-4 py-2 text-xs font-semibold text-blue-700 transition-[background-color,border-color,transform] hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] sm:shrink-0"
         >
-          {isEmailSendEnabled ? "Send Estimate" : "Record Send Attempt"}
+          Record Send Attempt
         </button>
       </div>
 

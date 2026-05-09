@@ -850,6 +850,34 @@ describe("addEstimateLineItem", () => {
       })
     ).rejects.toThrow("Active internal user required.");
   });
+
+  it.each(["false", "unset"])(
+    "returns unavailable when ENABLE_ESTIMATES is %s",
+    async (mode) => {
+      if (mode === "unset") {
+        delete process.env.ENABLE_ESTIMATES;
+      } else {
+        process.env.ENABLE_ESTIMATES = "false";
+      }
+
+      requireInternalUserMock.mockResolvedValue(makeInternalUser());
+      createClientMock.mockResolvedValue(makeSupabaseClient({}));
+
+      const result = await addEstimateLineItem({
+        estimateId: "est-1",
+        itemName: "Fee",
+        itemType: "service",
+        quantity: 1,
+        unitPriceCents: 1000,
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Estimates are currently unavailable.",
+      });
+      expect(requireInternalUserMock).not.toHaveBeenCalled();
+    }
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -979,6 +1007,31 @@ describe("removeEstimateLineItem", () => {
       removeEstimateLineItem({ estimateId: "est-1", lineItemId: "line-1" })
     ).rejects.toThrow("Active internal user required.");
   });
+
+  it.each(["false", "unset"])(
+    "returns unavailable when ENABLE_ESTIMATES is %s",
+    async (mode) => {
+      if (mode === "unset") {
+        delete process.env.ENABLE_ESTIMATES;
+      } else {
+        process.env.ENABLE_ESTIMATES = "false";
+      }
+
+      requireInternalUserMock.mockResolvedValue(makeInternalUser());
+      createClientMock.mockResolvedValue(makeSupabaseClient({}));
+
+      const result = await removeEstimateLineItem({
+        estimateId: "est-1",
+        lineItemId: "line-1",
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: "Estimates are currently unavailable.",
+      });
+      expect(requireInternalUserMock).not.toHaveBeenCalled();
+    }
+  );
 });
 
 // ---------------------------------------------------------------------------

@@ -178,6 +178,10 @@ export type AddEstimateLineItemResult =
 export async function addEstimateLineItem(
   params: AddEstimateLineItemParams
 ): Promise<AddEstimateLineItemResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
   const supabase = await createClient();
   const { internalUser } = await requireInternalUser({ supabase });
 
@@ -338,6 +342,10 @@ export async function removeEstimateLineItem(params: {
   estimateId: string;
   lineItemId: string;
 }): Promise<RemoveEstimateLineItemResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
   const supabase = await createClient();
   const { internalUser } = await requireInternalUser({ supabase });
 
