@@ -20,6 +20,7 @@ This runbook defines how internal-only production Estimates enablement must be e
 - All estimate routes redirect to `/ops?notice=estimates_unavailable` in production.
 - Estimates nav remains hidden in production while `ENABLE_ESTIMATES` is disabled.
 - The sole pre-production code blocker (missing `createEstimateDraft` fail-closed flag check) is now resolved and committed.
+- Estimates Guard Parity + Send Wording Polish closeout is complete on the guarded internal baseline (commit `edf5022`): `addEstimateLineItem` and `removeEstimateLineItem` now fail-close when `ENABLE_ESTIMATES` is false/unset, mutator tests now assert unavailable response plus no `requireInternalUser` call when gated off, and estimate detail/send-attempt wording now uses `Record Send Attempt` while preserving internal-only boundary language.
 - Estimate Detail Wording + Internal Scaffolding Collapse closeout is complete on the guarded internal baseline and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries.
 - Estimate Pricebook Editable Defaults V1 closeout is complete on the guarded internal baseline and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries.
 - Customer Estimate Profile Entry V1 closeout is complete on the guarded internal baseline (commits `bcfa9f7`, `b977c89`) and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries.
@@ -181,7 +182,7 @@ Confirm that sandbox is in a healthy baseline state before proceeding:
 4. `estimate_communications` table exists.
 5. `ENABLE_ESTIMATES=true` sandbox smoke passed: `/estimates` loads, create draft succeeds, add line item succeeds, Pricebook picker available, status transitions available, communication history renders, blocked send copy is present, no email/PDF/customer-facing controls exposed.
 6. `ENABLE_ESTIMATES=false` sandbox disabled-state smoke passed: `/estimates` redirects to `/ops?notice=estimates_unavailable`, estimates nav is hidden.
-7. `createEstimateDraft` returns unavailable when `ENABLE_ESTIMATES` is unset/false (confirmed by test suite: `npx vitest run lib/estimates` = `127/127`).
+7. `createEstimateDraft` returns unavailable when `ENABLE_ESTIMATES` is unset/false (confirmed by test suite: `npx vitest run lib/estimates` = `131/131`).
 8. `npx tsc --noEmit` passes cleanly with no estimate-related errors.
 9. Record sandbox validation evidence with operator name and timestamp.
 
@@ -465,7 +466,7 @@ The project is **eligible for a future internal-only production enablement run**
 
 - Estimates V1A-V1J is implemented to the guarded internal baseline.
 - The sole pre-production code blocker (`createEstimateDraft` missing fail-closed guard) is resolved and committed.
-- `lib/estimates` test suite passes at `127/127`; `npx tsc --noEmit` is clean.
+- `lib/estimates` test suite passes at `131/131`; `npx tsc --noEmit` is clean.
 - Both estimate migrations are applied to sandbox and confirmed healthy.
 - Sandbox end-to-end smoke has been completed (V1J draft-detail smoke closed).
 - Source docs are committed and aligned.
@@ -503,3 +504,4 @@ Completing this runbook does not authorize:
 |---|---|---|---|
 | v1.0 | May 3, 2026 | Initial draft | Planning-only; no production execution. |
 | v1.1 | May 3, 2026 | Planning pass | Added production project ref (`ornrnvxtwwtulohqwxop`), hard stop gates (§3.1), preflight commands (§4.1), no-go conditions (§14), post-execution doc requirements (§15), final recommendation (§16). No execution; planning-only. |
+| v1.2 | May 9, 2026 | Docs closeout pass | Recorded Estimates Guard Parity + Send Wording Polish (`edf5022`): mutator-level fail-closed parity for add/remove, updated guarded-baseline validation (`131/131`), and `Record Send Attempt` wording safety. No runbook execution; production estimates remain disabled and runbook-gated. |
