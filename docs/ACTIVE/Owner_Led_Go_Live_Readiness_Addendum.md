@@ -16,6 +16,13 @@ Current go-live approach:
 - Support is owner-led, guided, and hands-on.
 - Early adoption is intentionally controlled and high-touch.
 
+Support V0 clarification:
+- Support V0 documentation/readiness is complete.
+- Support V0 is the current manual operating support model for controlled first customers.
+- Practical onboarding setup still requires live contact details, support hours, after-hours S1 path, issue log location, and owner/first responder identity.
+- Controlled onboarding can proceed once those practical details are filled.
+- Support V0 does not close operationally until a formal ticketing/support system or equivalent support process is enabled later.
+
 This addendum does **not** activate or change any deferred/gated implementation area, including:
 - Support Console production enablement
 - onboarding automation/provisioning execution

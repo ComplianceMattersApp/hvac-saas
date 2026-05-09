@@ -23,7 +23,9 @@ Support V0 is the manual, white-glove support model for first users and controll
 - A grant of support-side mutation authority — operators may not edit production data to resolve user issues
 - A signal to begin onboarding new users — V0 support readiness is a prerequisite for controlled testing, not a trigger for it
 
-Support V0 closes when a formal ticketing/support system is in place and Support Console is production-enabled through its runbook.
+Support V0 documentation/readiness is complete, but practical first-customer setup still requires live contact details and an owner-led operating path before controlled onboarding begins.
+
+Support V0 closes operationally only when a formal ticketing/support system is in place and Support Console or an equivalent support process is enabled later.
 
 ---
 
@@ -37,25 +39,46 @@ Support V0 closes when a formal ticketing/support system is in place and Support
 | Support phone | `[phone number]` _(to be confirmed before tester onboarding)_ |
 | Preferred channel | Email for non-urgent issues; phone for S1/S2 blocked situations |
 
-### 2.2 Support hours
+### 2.2 Practical setup prerequisites
+
+Before controlled first-customer onboarding begins, the following live details must be filled:
+
+- support email
+- support phone
+- support hours and timezone
+- after-hours S1 path
+- issue log location
+- owner / first responder identity
+
+### 2.3 Support hours
 
 | Tier | Hours |
 |---|---|
 | Normal support hours | `[Mon–Fri, 8 AM–5 PM [timezone]]` _(to be confirmed)_ |
 | After-hours / emergency | S1 issues only — contact via `[phone/on-call channel]` outside normal hours |
 
-### 2.3 Who receives support requests
+### 2.4 Who receives support requests
 
 - **First responder:** Owner/operator (primary contact for all V0 issues)
 - **Escalation:** Engineering review as needed per § 6 escalation tree
 - **No third-party support tier exists at V0.** All intake flows through the operator.
 
-### 2.4 User expectations
+### 2.5 User expectations
 
 Inform testers before onboarding:
 - Support V0 is direct and manual — there is no ticketing portal or live chat
 - Response targets are best-effort, not contractual, at this stage
 - Users should submit issues via the intake template (§ 3) for consistent resolution
+
+### 2.6 Issue log location
+
+During V0, issues should be recorded in one shared operational issue log, such as a spreadsheet or doc, while preserving the originating email thread for user-facing communication.
+
+Recommended tracking rule:
+- customer-facing communication through email
+- phone only for urgent blockers
+- internal issue tracking through one spreadsheet/doc issue log
+- GitHub issues only for confirmed engineering bugs, not customer-facing support intake
 
 ---
 
