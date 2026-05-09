@@ -17,6 +17,8 @@ Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Laun
 
 Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No codebase split. No customer portal in current scope. Deferred and runbook-gated items remain parked unless explicitly reopened.
 
+**Owner-Completion Cycle Closeout (May 2026):** All areas in the owner-release completion matrix are confirmed closed at current quality bar. Next work is treated as post-launch/future-roadmap work unless the owner explicitly reopens a release-scope item. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for the canonical decision surface.
+
 Current Program Status Note (May 2026)
 
 - Service Workflow / Visit Scope Field Experience V1 Slice 1 is complete:
