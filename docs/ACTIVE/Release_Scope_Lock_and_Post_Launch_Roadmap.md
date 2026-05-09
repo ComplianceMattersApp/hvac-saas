@@ -95,7 +95,7 @@ The following remain intentionally deferred/parked (not blockers for owner-relea
 3. First-owner provisioning apply/invites outside controlled runbook operation.
 4. Tenant customer payment execution (online checkout/payment rail at tenant invoice layer).
 5. QBO integration (optional downstream only).
-6. Recurring services / maintenance agreements.
+6. Recurring services / maintenance agreements (customer-owned agreement V1; manual prep only; no automatic job generation).
 7. Customer portal (requires separate customer/location-scoped external visibility design).
 8. Service worker/offline/native app-store packaging.
 9. Product_mode schema/settings UI.
@@ -197,7 +197,7 @@ Recommended order after owner-release:
 2. Controlled first tester onboarding.
 3. Read-only Support Console V1 only if/when support load justifies it.
 4. Estimates production enablement (internal-only runbook execution).
-5. Recurring services / maintenance agreements.
+5. Recurring services / maintenance agreements (customer-owned agreement V1; manual prep only; no automatic job generation).
 6. Tenant customer payment execution.
 7. QBO integration last (optional downstream).
 8. Product-mode configuration layer (settings/visibility/presets).

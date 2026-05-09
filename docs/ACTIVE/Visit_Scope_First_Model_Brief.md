@@ -301,3 +301,4 @@ Make the top of the job page scope-first, not invoice-first
 	- Work Item commercial fields
 	- smarter defaults for downstream commercial drafting
 	- broader invoice panel polish beyond this clarity pass
+	- Recurring Services / Maintenance Agreements V1 is a customer-owned recurring service agreement that may reference a primary location and plan future visits; it is not a job, service_case, invoice, or payment record, and the actual visits still use normal Work Items / Visit Scope.

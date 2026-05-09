@@ -363,7 +363,9 @@ The following product-configuration work is **explicitly parked** and **not in c
   - Work Item commercial fields
   - broader invoice panel density cleanup
 - Future end-of-road UX review option (deferred and not current implementation): evaluate whether billing/invoice work should move into a job-owned workspace route such as `/jobs/[id]/billing` or `/jobs/[id]/invoice` only if job detail remains too dense after broader completion; do not split into disconnected invoice pages; preserve job context, Work Item import behavior, issue/send/payment boundaries, permissions, source-of-truth ownership, and existing invoice components where practical.
-- Maintenance Agreements / Recurring Services should remain modeled later as planned/recurring Work Items with commercial terms, not as billing-first records.
+- Maintenance Agreements / Recurring Services V1 should be modeled as a customer-owned recurring service agreement, optionally anchored to a primary location, that plans future visits but is not itself a job, service_case, or billing record.
+- Jobs remain the actual visit / work execution unit; service_cases remain continuity truth; Work Items / Visit Scope remain the operational scope for each visit; invoices remain billed truth; payments remain collected truth where implemented.
+- Pricebook may assist later with agreement templates/defaults, but it must not become agreement truth.
 
 ### Current status note (reporting/truth separation)
 - Internal invoice ledger collected-payment visibility is now implemented for internal invoicing report surfaces (including CSV export) as reporting/tracking only.
