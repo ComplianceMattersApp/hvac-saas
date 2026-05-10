@@ -97,7 +97,7 @@ describe("product mode defaults", () => {
     ).toBe("hvac_service");
   });
 
-  it("defaults ECC/HERS customer accounts to ECC/HERS when contractor signals exist", () => {
+  it("defaults ECC customer accounts to ECC when contractor signals exist", () => {
     expect(
       resolveProductModeFromSignals({
         accountOwnerUserId: "ecc-owner",

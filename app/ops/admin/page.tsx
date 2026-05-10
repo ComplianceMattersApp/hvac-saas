@@ -74,7 +74,7 @@ export default async function OpsAdminPage() {
       section: "people",
       eyebrow: "Contractors",
       title: "Contractors",
-      description: "Optional contractor workflows for ECC/HERS or contractor-collaboration accounts.",
+      description: "Optional contractor workflows for ECC or contractor-collaboration accounts.",
       href: "/ops/admin/contractors",
       ctaLabel: "Open workspace",
       enabled: true,

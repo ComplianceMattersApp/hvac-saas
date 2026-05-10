@@ -1364,7 +1364,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           {/* Job Type */}
           <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
             <label className="block text-sm font-medium text-slate-900">Job Type</label>
-            <p className="text-xs text-slate-600">Service is the default for service company workflows. Choose ECC/HERS for compliance testing visits.</p>
+            <p className="text-xs text-slate-600">Service is the default for service company workflows. Choose ECC for compliance testing visits.</p>
             <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
               <label className="flex cursor-pointer items-start gap-2.5">
                 <input
@@ -1376,7 +1376,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   className="mt-0.5"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-slate-900">ECC/HERS</span>
+                  <span className="block text-sm font-medium text-slate-900">ECC</span>
                   <span className="block text-xs text-slate-500">Compliance testing</span>
                 </span>
               </label>
@@ -2890,7 +2890,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             <div className="mt-3 grid gap-3 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
               <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Job</p>
-                <p className="mt-1 font-medium text-slate-900">{jobType === "service" ? "Service" : `ECC/HERS (${projectType.replaceAll("_", " ")})`}</p>
+                <p className="mt-1 font-medium text-slate-900">{jobType === "service" ? "Service" : `ECC (${projectType.replaceAll("_", " ")})`}</p>
               </div>
               <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Customer</p>
