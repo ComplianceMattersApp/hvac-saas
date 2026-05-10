@@ -90,7 +90,7 @@ Release scope lock statements:
 
 The following remain intentionally deferred/parked (not blockers for owner-release):
 
-1. Estimates production enablement (runbook-gated; feature remains disabled in production, with V1A schema migration applied).
+1. Estimates production enablement expansion beyond internal-only baseline (runbook-gated; internal-only production enablement is now completed).
 2. Support Console production enablement (runbook-gated; currently disabled).
 3. First-owner provisioning apply/invites outside controlled runbook operation.
 4. Tenant customer payment execution (online checkout/payment rail at tenant invoice layer; later Stripe-first invoice acceptance, separate from platform subscription billing).
@@ -259,7 +259,12 @@ The following are explicitly runbook-gated and must remain controlled:
    - Estimate Communications V1H production migration execution is complete for `20260502120000_estimate_communications_v1h.sql` using isolated single-migration worktree strategy from commit `e5a8e8e`
    - V1H isolated artifact included `20260501120000`, `20260501140000`, `20260502120000` and excluded `20260509120000`; dry-run confirmed only V1H targeted; explicit approval received before apply
    - V1H post-apply verification passed: `public.estimate_communications` exists; RLS enabled; all 13 columns, 8 constraints, 2 indexes, 2 policies verified; row count `0`; `20260502120000` applied and `20260509120000` absent from production history
-   - V1H boundaries preserved: `ENABLE_ESTIMATES` false/unset, `ENABLE_ESTIMATE_EMAIL_SEND` false/unset, no email/PDF/public exposure/estimate-record creation/conversion/payment/QBO/support-console/Product Mode changes
+   - Internal-only feature enablement execution completed: `ENABLE_ESTIMATES=true` enabled in Vercel Production only, successful production redeploy, and alias confirmed at `https://hvac-saas-xi.vercel.app`
+   - Post-enable unauthenticated checks passed: `/estimates` and `/estimates/new` remained login-gated
+   - Authenticated internal production smoke passed: `/estimates` and `/estimates/new` load; smart customer picker (commit `235d0ce`) works in production; location field enables/scopes after customer selection
+   - Controlled smoke estimate created in production: `8796f8fc-04fb-4c53-bb05-15ab98ab31b4` (`EST-20260510-414FB343`) as `Draft`, with one manual line item (`Production smoke manual line item`, qty `1`, unit `$123.45`) and total `$123.45`
+   - Enablement boundaries preserved: `ENABLE_ESTIMATE_EMAIL_SEND` remained unset/false; no outbound email/PDF/public links/contractor-customer exposure/conversion/payment/Stripe-tenant/QBO/Product Mode/Support Console changes
+   - Warning/watch item: intermittent `net::ERR_ABORTED` browser-log events during navigation/action transitions; required smoke outcomes persisted successfully
 2. Support Console production enablement
    - Controlled by Support Console runbook
    - V1 read-only, account-scoped, no impersonation, no tenant mutation

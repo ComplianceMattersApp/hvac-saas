@@ -271,9 +271,13 @@ The following product-configuration work is **explicitly parked** and **not in c
 - Customer portal (separate customer-scoped visibility; not in current external access scope)
 - Estimates production enablement (capability exists; not in release scope)
   - Estimates V1A schema-domain production migration execution is complete for `20260501140000_estimates_v1a_schema_domain.sql` on production ref `ornrnvxtwwtulohqwxop`, using an isolated artifact from commit `a200a17` with dry-run and explicit approval before apply.
-  - Feature remains runbook-gated and disabled for public/customer/contractor exposure; no estimate email/PDF/public-link/customer-portal enablement occurred.
+  - Feature remains runbook-gated for boundary-controlled expansion; internal-only production enablement is now complete.
   - Estimate Communications V1H production migration execution is complete for `20260502120000_estimate_communications_v1h.sql` on production ref `ornrnvxtwwtulohqwxop`, using an isolated artifact from commit `e5a8e8e` with dry-run and explicit approval before apply; `20260509120000` excluded and confirmed absent from production migration history.
-  - `ENABLE_ESTIMATES` and `ENABLE_ESTIMATE_EMAIL_SEND` remain false/unset; no email/PDF/public/customer/contractor exposure occurred.
+  - `ENABLE_ESTIMATES=true` is enabled in Vercel Production only; `ENABLE_ESTIMATE_EMAIL_SEND` remains unset/false.
+  - Production internal smoke passed for `/estimates` and `/estimates/new`, including smart customer picker behavior (commit `235d0ce`) and location scoping after customer selection.
+  - Controlled smoke estimate created and verified: `8796f8fc-04fb-4c53-bb05-15ab98ab31b4` (`EST-20260510-414FB343`) with one manual line item and total `$123.45`.
+  - Boundaries remained intact: no outbound email/PDF/public links/contractor-customer exposure/conversion/payment/Stripe-tenant/QBO/Product Mode/Support Console changes.
+  - Warning/watch item: intermittent `net::ERR_ABORTED` browser-log events appeared during navigation/action transitions; required smoke outcomes persisted successfully.
 - Recurring maintenance agreements / service subscriptions (capability exists; not in release scope)
 - Tenant payment execution (Stripe subscription/checkout; parked)
 - QBO integration (optional downstream; parked)
@@ -1172,9 +1176,9 @@ Payment P1 foundation is closed at the current baseline.
 Out-of-box readiness / business identity / settings packaging is also closed at the current baseline.
 The next natural roadmap area is smaller service-model revisions / service workflow refinement.
 Estimates/quoting V1A-V1J is now implemented to the current guarded internal baseline.
-Estimates is intentionally not production-live yet because estimate migrations are sandbox-only, production estimate migrations are not applied, production `ENABLE_ESTIMATES` remains disabled, and production `ENABLE_ESTIMATE_EMAIL_SEND` remains disabled.
+Estimates is internal-only production-live: V1A and V1H migrations are applied in production, `ENABLE_ESTIMATES=true` is enabled in Vercel Production only, and `ENABLE_ESTIMATE_EMAIL_SEND` remains unset/false.
 The earlier enabled-mode render error is now a watch item only for planning purposes: clean captured smoke did not reproduce the `TypeError: Cannot read properties of undefined (reading 'call')`, and `/estimates` plus multiple `/estimates/[id]` routes returned `200` without a real stack trace.
-Estimates enablement readiness is therefore: ready after listed inputs, not ready to execute yet.
+Estimates internal-only production enablement execution is complete and documented in the runbook closeout.
 V1E internal-only status transitions are complete (`draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`).
 V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
 V1E keeps line editing draft-only and hides line-edit controls after `sent`.
@@ -1669,12 +1673,12 @@ Estimate is the proposed commercial scope for solving a problem.
 
 ### Current implementation status (V1A-V1J)
 - V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
-- Estimate migrations are applied to sandbox only (`20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`).
-- Production estimate migrations are not applied.
+- Estimate migrations `20260501140000_estimates_v1a_schema_domain.sql` and `20260502120000_estimate_communications_v1h.sql` are applied in sandbox and production.
+- Product Mode migration `20260509120000_account_settings_product_mode_v1.sql` remains pending/unapplied in production.
 - V1B create/read/line server actions are implemented.
 - V1C internal estimates UI is implemented (`/estimates`, `/estimates/new`, `/estimates/[id]`) with draft creation and manual line add/remove.
 - V1C fail-closed `ENABLE_ESTIMATES` guard is implemented.
-- Production `ENABLE_ESTIMATES` remains unset/false; production `/estimates` redirects to `/ops?notice=estimates_unavailable`.
+- Production `ENABLE_ESTIMATES=true` is enabled in Vercel Production only; unauthenticated production `/estimates` and `/estimates/new` remain login-gated.
 - Production `ENABLE_ESTIMATE_EMAIL_SEND` remains unset/false.
 - V1D draft-only Pricebook-backed line picker on estimate detail is implemented.
 - V1D preserves manual line add/remove and server-owned Pricebook snapshots/provenance.

@@ -980,14 +980,34 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
   - imported charge remained editable
   - direct `Add Pricebook Item` invoice path still worked
   - no invoice/payment/estimate/conversion behavior drift observed
-- Confirmed: estimate migrations are applied to sandbox only (`20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`).
+- Confirmed: estimate migrations `20260501140000_estimates_v1a_schema_domain.sql` and `20260502120000_estimate_communications_v1h.sql` are applied in sandbox and production.
 - Confirmed: sandbox project ref is `kvpesjdukqwwlgpkzfjm`.
-- Confirmed: production estimate migrations are not applied.
-- Confirmed: production `ENABLE_ESTIMATES` remains unset/false.
+- Confirmed: production estimate migrations V1A and V1H are applied; Product Mode `20260509120000_account_settings_product_mode_v1.sql` remains pending/unapplied.
+- Confirmed: production `ENABLE_ESTIMATES=true` is enabled in Vercel Production only.
 - Confirmed: production `ENABLE_ESTIMATE_EMAIL_SEND` remains unset/false.
-- Confirmed: production `/estimates` redirects to `/ops?notice=estimates_unavailable` when disabled.
-- Confirmed: estimates nav remains hidden in production while `ENABLE_ESTIMATES` is disabled.
-- Confirmed: estimates are not production-live.
+- Confirmed: post-enable unauthenticated production `/estimates` and `/estimates/new` remain login-gated.
+- Confirmed: authenticated internal production smoke passed for `/estimates` and `/estimates/new`.
+- Confirmed: production `/estimates/new` smart customer picker is active (commit `235d0ce`) and location scoping works after customer selection.
+- Confirmed: controlled production smoke estimate created and verified:
+  - ID: `8796f8fc-04fb-4c53-bb05-15ab98ab31b4`
+  - Number: `EST-20260510-414FB343`
+  - Status: `Draft`
+  - Title: `PROD SMOKE 2026-05-10 - customer picker controlled draft`
+  - Customer: `Eddie Castellanos`
+  - Location: `3166 Jade Ct, Stockton`
+  - Manual line item: `Production smoke manual line item`, quantity `1`, unit price `$123.45`
+  - Total confirmed: `$123.45`
+- Confirmed: boundaries preserved during enablement/smoke:
+  - no outbound email
+  - no PDF
+  - no public links
+  - no contractor/customer exposure
+  - no estimate-to-job conversion
+  - no estimate-to-invoice conversion
+  - no payment/Stripe tenant payment/QBO behavior
+  - no Product Mode migration
+  - no Support Console changes
+- Warning/watch item: intermittent `net::ERR_ABORTED` browser-log events were seen during navigation/action transitions, but required smoke outcomes persisted successfully.
 - Confirmed source-of-truth boundaries remain locked:
   - `estimate_events` = lifecycle/operator audit truth
   - `estimate_communications` = send-attempt/communication truth
@@ -1013,16 +1033,9 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
   - QBO behavior
   - production estimate feature enablement
 - Production rollout remains a later explicit decision. The sole pre-production code blocker (missing `createEstimateDraft` flag guard) is now resolved and committed.
-- Internal-only production enablement requires, in order:
-  - governance preflight (Phase A of runbook)
-  - sandbox pre-validation with both migrations confirmed healthy (Phase B)
-  - intentional production migration apply for both estimate migrations (Phase C)
-  - disabled-state smoke confirmation with schema applied and flag still off (Phase D)
-  - production `ENABLE_ESTIMATES` enablement for internal-only slice only (Phase E)
-  - internal-only production smoke checklist (Phase F)
-  - rollback by disabling `ENABLE_ESTIMATES` if needed (Phase G)
+- Internal-only production enablement execution is completed through runbook phases, including pre-enable disabled-state checks, Production-only `ENABLE_ESTIMATES=true` enablement, production redeploy, and internal-only smoke with controlled draft creation.
 - Production `ENABLE_ESTIMATE_EMAIL_SEND` must remain unset/false for the internal-only slice. Real outbound estimate email requires a separate email-enablement runbook after all V1I go/no-go gates are satisfied.
-- Full procedure is documented in the hardened committed runbook (`df9870f`) at `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`; next step remains a future explicit production execution decision, not automatic enablement.
+- Full procedure and execution closeout are documented in `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md` (latest runbook history entry v1.7).
 - Next implementation direction: V1I planning and V1J internal document-template/readiness implementation are both complete.
   - draft-detail smoke caveat is closed
   - Option A remains next: sandbox-only provider enablement after documented gates

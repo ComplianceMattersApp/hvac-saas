@@ -19,12 +19,13 @@ The latest clean-run Estimates rehearsal closed the earlier enabled-mode render-
 ### Current locked status
 
 - Estimates V1A-V1J is implemented to the current guarded internal baseline.
-- Production estimates are not live.
+- Production estimates are internal-only live.
 - Production estimate migrations are partially applied: V1A and V1H are applied; Product Mode remains pending.
-- Production `ENABLE_ESTIMATES` remains unset/false.
+- Production `ENABLE_ESTIMATES` is enabled (`true`) in Vercel Production only.
 - Production `ENABLE_ESTIMATE_EMAIL_SEND` remains unset/false.
-- All estimate routes redirect to `/ops?notice=estimates_unavailable` in production.
-- Estimates nav remains hidden in production while `ENABLE_ESTIMATES` is disabled.
+- Unauthenticated production access to `/estimates` and `/estimates/new` remains login-gated.
+- Authenticated internal users can access `/estimates` and `/estimates/new`.
+- Customer picker polish commit `235d0ce` is deployed and active in production (`/estimates/new` smart search picker).
 - The sole pre-production code blocker (missing `createEstimateDraft` fail-closed flag check) is now resolved and committed.
 - Estimates Guard Parity + Send Wording Polish closeout is complete on the guarded internal baseline (commit `edf5022`): `addEstimateLineItem` and `removeEstimateLineItem` now fail-close when `ENABLE_ESTIMATES` is false/unset, mutator tests now assert unavailable response plus no `requireInternalUser` call when gated off, and estimate detail/send-attempt wording now uses `Record Send Attempt` while preserving internal-only boundary language.
 - Estimates Re-Entry audit watch item is closed for planning purposes only: the earlier enabled-mode `TypeError: Cannot read properties of undefined (reading 'call')` was not reproduced in clean captured smoke, `/estimates` and multiple `/estimates/[id]` routes returned `200`, `addLineItemAction` completed with `POST 200` twice, and no `Error`, `TypeError`, `ReferenceError`, `digest`, or `Unhandled` entry was captured. Treat this as a watch item only; do not recommend code changes without a real stack trace.
@@ -248,6 +249,54 @@ Migration state after this execution window:
 	- `20260509120000_account_settings_product_mode_v1.sql`
 - Isolated worktree removed and pruned after successful verification.
 
+### 1.4 Internal-only production flag enablement and controlled smoke closeout (completed May 10, 2026)
+
+Enablement execution outcome:
+- `ENABLE_ESTIMATES=true` was enabled in Vercel Production only.
+- Production redeploy completed successfully and is aliased to `https://hvac-saas-xi.vercel.app`.
+- `ENABLE_ESTIMATE_EMAIL_SEND` remained unset/false throughout.
+
+Phase D disabled-state confirmation outcome (pre-enable):
+- Unauthenticated production routes `/estimates` and `/estimates/new` remained login-gated.
+
+Phase E feature-flag enablement outcome:
+- `ENABLE_ESTIMATES=true` set in Production only.
+- No other flag changed.
+- `ENABLE_ESTIMATE_EMAIL_SEND` remained unset/false.
+
+Phase F internal-only production smoke outcome:
+- Authenticated internal smoke passed:
+	- `/estimates` loads.
+	- `/estimates/new` loads.
+	- Smart customer picker works in production.
+	- Location field enables/scopes correctly after customer selection.
+- Controlled production smoke estimate created:
+	- Estimate ID: `8796f8fc-04fb-4c53-bb05-15ab98ab31b4`
+	- Estimate number: `EST-20260510-414FB343`
+	- Status: `Draft`
+	- Title: `PROD SMOKE 2026-05-10 - customer picker controlled draft`
+	- Customer: `Eddie Castellanos`
+	- Location: `3166 Jade Ct, Stockton`
+	- One manual line item added: `Production smoke manual line item`
+	- Quantity: `1`
+	- Unit price: `$123.45`
+	- Total confirmed: `$123.45`
+
+Boundaries preserved during enablement/smoke:
+- no estimate email sending enabled
+- no outbound email
+- no PDF
+- no public links
+- no contractor/customer exposure
+- no estimate-to-job conversion
+- no estimate-to-invoice conversion
+- no payment/Stripe tenant payment/QBO behavior
+- no Product Mode migration
+- no Support Console changes
+
+Warning/watch item:
+- Intermittent `net::ERR_ABORTED` browser-log events appeared during navigation/action transitions, but required smoke outcomes persisted successfully.
+
 ---
 
 ## 2. Owner / responsibility table
@@ -451,6 +500,12 @@ Gate decision:
 - Go only if the disabled-state is confirmed clean.
 - No-go if any estimate UI surface is accessible without the flag, or if any unexpected data mutation occurred.
 
+### 7.1 Phase D execution closeout (May 10, 2026)
+
+- Completed as planned before flag enablement.
+- Unauthenticated production `/estimates` and `/estimates/new` remained login-gated.
+- Evidence captured in the execution record.
+
 ---
 
 ## 8. Phase E — internal-only feature flag enablement
@@ -470,6 +525,12 @@ This phase enables `ENABLE_ESTIMATES=true` in the production environment for int
 Set `ENABLE_ESTIMATES=true` in the production environment for `PRODUCTION_PROJECT_REF`.
 
 Verify the deployment picks up the new value (may require a redeploy depending on environment variable strategy).
+
+### 8.3 Phase E execution closeout (May 10, 2026)
+
+- Completed: `ENABLE_ESTIMATES=true` enabled in Vercel Production only.
+- Completed: production redeploy succeeded and active alias is `https://hvac-saas-xi.vercel.app`.
+- Confirmed: `ENABLE_ESTIMATE_EMAIL_SEND` remained unset/false.
 
 ---
 
@@ -536,6 +597,22 @@ After enabling `ENABLE_ESTIMATES=true`, execute the following smoke checklist. A
 Gate decision:
 - Go only if all smoke steps pass and evidence is recorded.
 - No-go on any unexpected estimate behavior, email, PDF, customer exposure, payment trigger, or boundary failure.
+
+### 9.9 Phase F execution closeout (May 10, 2026)
+
+- Authenticated internal smoke passed for `/estimates` and `/estimates/new`.
+- Production smart customer picker behavior was verified (commit `235d0ce` deployed):
+	- searchable dropdown + smart search filtering
+	- customer selection
+	- location enable/scope after customer selection
+- Controlled production smoke estimate created and verified:
+	- ID `8796f8fc-04fb-4c53-bb05-15ab98ab31b4`
+	- number `EST-20260510-414FB343`
+	- status `Draft`
+	- title `PROD SMOKE 2026-05-10 - customer picker controlled draft`
+	- one manual line item added (`Production smoke manual line item`, qty `1`, unit `$123.45`)
+	- total verified at `$123.45`
+- All internal-only boundaries remained preserved.
 
 ---
 
@@ -716,3 +793,4 @@ Completing this runbook does not authorize:
 | v1.4 | May 9, 2026 | Docs closeout pass | Recorded completed Estimates V1A production migration execution for `20260501140000_estimates_v1a_schema_domain.sql` on ref `ornrnvxtwwtulohqwxop` using isolated artifact from `a200a17`, with dry-run + explicit approval, successful apply, post-apply schema/RLS/policy/index/constraint verification, zero-row confirmation, login-gated smoke, and preserved no-change boundaries. |
 | v1.5 | May 10, 2026 | Docs planning pass | Added V1H-only migration-window addendum: V1A already applied, target-only `20260502120000_estimate_communications_v1h.sql`, Product Mode exclusion (`20260509120000`), required isolated artifact include/exclude lists, preflight, approval-gated dry-run/apply sequence, post-apply verification, disabled-state smoke, no-go triggers, and migration-only documentation requirements alignment. |
 | v1.6 | May 10, 2026 | Docs closeout pass | Recorded completed Estimate Communications V1H production migration execution for `20260502120000_estimate_communications_v1h.sql` on ref `ornrnvxtwwtulohqwxop` using isolated artifact from `e5a8e8e`, with dry-run + explicit approval, successful apply, full post-apply schema/RLS/policy/index/constraint/column verification, zero-row confirmation, login-gated smoke, preserved disabled-state boundaries, worktree cleanup. Product Mode (`20260509120000`) confirmed excluded and absent from migration history. |
+| v1.7 | May 10, 2026 | Docs closeout pass | Recorded completed internal-only production feature enablement: `ENABLE_ESTIMATES=true` in Vercel Production only, successful redeploy to `https://hvac-saas-xi.vercel.app`, `ENABLE_ESTIMATE_EMAIL_SEND` remained unset/false, unauthenticated routes remained login-gated, authenticated internal smoke passed (`/estimates`, `/estimates/new`, smart customer picker + location scoping), controlled smoke estimate created (`8796f8fc-04fb-4c53-bb05-15ab98ab31b4`, `EST-20260510-414FB343`) with one manual line item and total `$123.45`, boundaries preserved, and `net::ERR_ABORTED` warning logged as watch item only. |
