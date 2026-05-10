@@ -281,6 +281,54 @@ QBO parking rule:
 - QBO must never override app-owned billed truth or collected-payment truth.
 - one-way Compliance Matters to QBO is the safest first sync shape; two-way authoritative sync remains deferred.
 
+### 3.7.1 Product Mode V2 implementation decision (approved)
+
+Product Mode V2 should be implemented as a dedicated account-level settings read path.
+
+Data/model decision:
+
+- Product mode should live in a dedicated account-level settings table, likely `account_settings`.
+- `product_mode` values:
+  - `hybrid`
+  - `hvac_service`
+  - `ecc_hers`
+- `product_mode` should remain nullable in first implementation for safe rollout.
+
+Separation decision:
+
+- Do not store product mode in `billing_mode`.
+- Do not store/infer product mode from `plan_tier`.
+- Do not store/infer product mode from entitlements/add-ons.
+- Do not store/infer product mode from business-profile display fields.
+
+Resolver order decision:
+
+1. Read real account setting first
+2. Read temporary Slice 1 override second
+3. Read signal fallback third
+4. Apply safe default last
+
+Authority boundary decision:
+
+- Product mode controls workflow relevance/defaults only.
+- Product mode does not control:
+  - billing or payments
+  - RLS/security/auth boundaries
+  - source-of-truth ownership
+  - contractor authority
+  - report datasets/calculations
+  - tier/add-on enforcement
+  - feature-flag rollout
+
+Rollout decision:
+
+- first implementation is additive and reversible
+- admin display starts read-only
+- admin mutation/edit UI is later
+- signup mode capture is later
+- tier/add-on enforcement is later
+- full mode-aware navigation/report rewrites are later
+
 ### 3.8. Release-scope statement
 
 **Current Owner Release Posture (May 2026):**

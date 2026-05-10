@@ -98,7 +98,7 @@ The following remain intentionally deferred/parked (not blockers for owner-relea
 6. Recurring services / maintenance agreements (customer-owned agreement V1; manual prep only; no automatic job generation).
 7. Customer portal (requires separate customer/location-scoped external visibility design).
 8. Service worker/offline/native app-store packaging.
-9. Product_mode schema/settings UI.
+9. Product-mode configuration layer V2 (account-level settings table, nullable initial rollout, read-only admin display first).
 10. Mode-aware navigation rendering.
 11. Mode-aware starter kits.
 12. Mode-aware report presets.
@@ -108,6 +108,16 @@ The following remain intentionally deferred/parked (not blockers for owner-relea
 16. Broad performance campaign unless daily use surfaces specific real issues.
 
 Deferred means intentionally sequenced later, not ignored.
+
+Product Mode V2 boundary note:
+
+- Product mode should live in dedicated account-level settings (likely `account_settings`).
+- `product_mode` values are `hybrid`, `hvac_service`, `ecc_hers`.
+- First implementation keeps `product_mode` nullable for safe rollout.
+- Resolver order should be: real account setting, temporary Slice 1 override, signal fallback, safe default.
+- Product mode controls workflow relevance/defaults only.
+- Product mode must not control billing/payments, RLS/security, source-of-truth ownership, contractor authority, report datasets/calculations, tier/add-on enforcement, or feature flags.
+- Admin mutation/edit UI, signup capture, tier/add-on enforcement, and full navigation/report rewrites remain later.
 
 ---
 

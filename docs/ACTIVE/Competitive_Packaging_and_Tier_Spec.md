@@ -31,6 +31,18 @@ Definitions are locked and must stay separate:
 
 Separation rule: `product_mode` and `plan_tier` are orthogonal; neither should be reused as the other.
 
+Product Mode V2 decision alignment:
+
+- Product mode lives in dedicated account-level settings (likely `account_settings`), not in billing/tier/entitlement/profile display fields.
+- `product_mode` is nullable for first rollout to keep migration/rollout risk low.
+- Resolver order is:
+	1. real account setting
+	2. temporary Slice 1 override
+	3. signal fallback
+	4. safe default
+- Product mode controls workflow relevance/defaults only.
+- Product mode does **not** control billing, payments, RLS/security, source-of-truth behavior, contractor authority, report datasets/calculations, tier/add-on enforcement, or feature flags.
+
 ## 3. Product Modes
 
 Compliance Matters supports two primary product modes on one shared engine:
@@ -213,6 +225,15 @@ Visibility and access controls should follow this order:
 2. `plan_tier` plus add-ons controls capability availability
 3. platform entitlements controls write access and enforcement
 4. feature flags controls rollout safety
+
+Product Mode V2 rollout boundary:
+
+- first implementation should be additive and reversible
+- admin starts with read-only display of resolved mode
+- admin mutation/edit UI is later
+- signup mode capture is later
+- tier/add-on enforcement is later
+- full mode-aware navigation/report rewrites are later
 
 ## 13. Non-Goals
 

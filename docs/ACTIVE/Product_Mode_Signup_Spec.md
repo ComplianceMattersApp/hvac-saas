@@ -116,6 +116,53 @@ Clarifications:
 - Do not reuse `billing_mode` for product identity.
 - `billing_mode` and `product_mode` are separate concepts and must remain separate.
 
+### 6.1 Product Mode V2 decision (implementation contract)
+
+Product Mode V2 is approved as an **additive account-level settings decision**, not a billing/tier/entitlement repurposing.
+
+V2 storage decision:
+
+- Product mode should live in a dedicated account-level settings table, likely `account_settings`.
+- `product_mode` values are:
+   - `hybrid`
+   - `hvac_service`
+   - `ecc_hers`
+- `product_mode` remains nullable in first implementation for safe rollout.
+
+Resolver order decision:
+
+1. Read real account setting first (`account_settings.product_mode` when present)
+2. Read temporary Slice 1 override second
+3. Read signal fallback third
+4. Apply safe default last
+
+Separation and boundary decision:
+
+- `product_mode` must not live in `billing_mode`.
+- `product_mode` must not live in `plan_tier`.
+- `product_mode` must not live in entitlements/add-on rows.
+- `product_mode` must not be inferred from business-profile display fields.
+- `product_mode` controls workflow relevance/defaults only.
+
+Explicit non-authority for `product_mode`:
+
+- no billing or payment behavior control
+- no RLS/auth/security scope control
+- no source-of-truth ownership changes
+- no contractor authority changes
+- no report dataset/calculation control
+- no tier/add-on enforcement
+- no feature-flag control
+
+Rollout shape decision:
+
+- First implementation should be additive and reversible.
+- Admin display starts read-only.
+- Admin mutation/edit UI is later.
+- Signup capture is later.
+- Tier/add-on enforcement is later.
+- Full mode-aware navigation/report rewrites are later.
+
 ## 7. Signup Flow Concepts
 
 Possible future signup approaches:
@@ -194,11 +241,13 @@ This preserves current release-scope boundaries while enabling forward planning.
 Recommended future implementation order:
 
 1. Product Mode Signup Spec (this document)
-2. Add account-level `product_mode` field later
-3. Apply safe defaults such as `/jobs/new` default by product mode
-4. Add signup choice/routes
-5. Add mode-aware navigation/admin/report/starter-kit behavior
-6. Add hybrid mode only if needed later
+2. Product Mode V1 Slice 1 temporary resolver/default seam (completed)
+3. Product Mode V2 account settings read path (`account_settings.product_mode`, nullable)
+4. Add safe defaults such as `/jobs/new` default by product mode via resolver order
+5. Add read-only admin product-mode display
+6. Add signup choice/routes later
+7. Add mode-aware navigation/admin/report/starter-kit behavior later
+8. Add admin mutation UI and tier/add-on enforcement later
 
 ## 13. Non-Goals
 
