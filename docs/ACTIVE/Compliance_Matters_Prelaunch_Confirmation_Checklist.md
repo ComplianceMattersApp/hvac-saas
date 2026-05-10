@@ -489,6 +489,11 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - **Operator handoff readiness packet documented (2026-05-07):** `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` §11 now contains the full operator handoff/readiness packet: current status, future operator sequence (10 steps), safety gates, evidence template, and explicit non-goals. No onboarding was executed. Release remains parked pending remaining product/readiness work.
 
 ### 2.5 Admin readiness checklist confirmation
+- Runbook reference: `docs/ACTIVE/First_Owner_Provisioning_Runbook.md`.
+- **Operator handoff readiness packet documented (2026-05-07):** `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` §12 now contains the full operator handoff/readiness packet: current status, future operator sequence (10 steps), safety gates, evidence template, and explicit non-goals. No onboarding was executed. Release remains parked pending remaining product/readiness work.
+- **Product mode capture planning (future implementation):** First owner provisioning will eventually require `--product-mode hvac_service|ecc_hers|hybrid` flag. Product mode will be written to `account_settings` during apply, after owner identity resolution and before invite send. Missing/invalid product_mode will block provisioning apply once implemented. See `docs/ACTIVE/Product_Mode_Signup_Spec.md` §6.5 and `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` §11 for phase 1/2/3 planning. Phase 1 does not require backfilling existing accounts. Production account_settings migration must be applied before production provisioning writes product_mode.
+
+### 2.5 Admin readiness checklist confirmation
 - Confirm Admin Readiness / Setup Checklist V1 is present and working on `/ops/admin` and contextually visible on `/ops/admin/company-profile`.
 - Confirm readiness packaging remains read-only derived state from existing tenant/account sources (no new readiness truth table).
 - Confirm required criteria and optional criteria render separately with clear setup guidance.

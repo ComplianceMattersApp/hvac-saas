@@ -437,11 +437,105 @@ Reference-only example from completed controlled production verification:
 - owner-account Pricebook count verified: `108`
 - legacy V1 `R-410A` remained non-duplicated and continued to classify as safe equivalent skip
 
+- Seeding is idempotent by `seed_key`: re-running apply does not duplicate rows already seeded.
+- Production existing-account backfill remains dry-run-first and operator-controlled; one controlled production owner-account V3 verification has been completed and documented, but this does not change single-account/manual operator boundaries.
+
+### 10.8 Post-apply verification
+
+After apply, verify:
+- `inserted_count` matches the expected number of new rows
+- `skipped_existing_seed_key_count` reflects already-present seed_key rows (expected 0 for a fresh backfill)
+- Pricebook admin surface for the target account shows starter rows for the selected version (`v2` or `v3`)
+- No invoice, payment, or user records were changed
+
+### 10.9 Production verification example outcome (reference)
+
+Reference-only example from completed controlled production verification:
+
+- target owner: `93dd810e-3c0c-4b69-9dae-edfa0e481dbb`
+- target host: `ornrnvxtwwtulohqwxop.supabase.co`
+- terminal post-apply dry-run state:
+  - `would_insert_count = 0`
+  - `would_skip_existing_seed_key_count = 96`
+  - `would_skip_existing_equivalent_count = 1`
+  - `possible_collision_count = 0`
+  - `errors = 0`
+- owner-account Pricebook count verified: `108`
+- legacy V1 `R-410A` remained non-duplicated and continued to classify as safe equivalent skip
+
 This reference outcome does not imply automatic, batch, or admin-UI-triggered backfill behavior. Dry-run-first operator control remains mandatory.
 
 ---
 
-## 11. Operator handoff readiness packet (planning only — no onboarding approved)
+## 11. Future product-mode capture for first-owner provisioning (planning only)
+
+Status: FUTURE IMPLEMENTATION PLANNING. Not yet implemented or required for current provisioning flow.
+
+Product mode should be introduced as a required provisioning parameter in a future phase, with First Owner Provisioning as the first implementation surface (before public signup capture).
+
+### 11.1 Future Phase 1 — Product mode on first-owner provisioning
+
+When implemented, the first-owner provisioning script should:
+
+- Accept `--product-mode` as a required flag with allowed values: `hvac_service`, `ecc_hers`, `hybrid`
+- Include product mode in dry-run output (value must be visible for operator verification)
+- Write `account_settings.product_mode` during apply, after owner/account identity is resolved and before invite send
+- Block provisioning apply if `--product-mode` is missing or has an invalid value
+- Dry-run example output addition:
+  ```
+  product_mode: hvac_service | ecc_hers | hybrid (required, must be selected)
+  ```
+- Apply example output addition:
+  ```
+  account_settings.product_mode: [value from --product-mode flag]
+  ```
+
+### 11.2 Precedence and fallback rules
+
+- Once Phase 1 is implemented:
+  - Missing `--product-mode` blocks provisioning apply only (not signup or login)
+  - Current fallback behavior (signal-based defaults) remains functional for backward-compatible accounts
+  - Accounts without `account_settings.product_mode` rows continue to resolve safely via signal fallback
+- Phase 1 does not require backfilling existing accounts with product_mode values
+- Phase 1 does not change trial/payment flow or entitlement behavior
+
+### 11.3 Relationship to other provisioning parameters
+
+Product mode is separate from:
+- `--entitlement-preset`: controls trial vs. comped entitlement status
+- `--default-billing-mode`: controls invoice workflow (internal_invoicing vs. external_billing)
+- `--starter-kit-version`: controls pricebook seeding (v1, v2, v3)
+- Tier (`plan_key`): business package level
+- Feature flags: rollout safety gates
+
+These parameters must remain independent in Phase 1 and Phase 2 planning.
+
+### 11.4 Phase 2 — Public signup capture (future, later than Phase 1)
+
+Public signup at `/signup` will eventually support:
+- HVAC Service (`hvac_service`)
+- ECC (`ecc_hers`, customer-facing label "ECC")
+- Hybrid (`hybrid`) remains manual/internal/sales-assisted only
+
+Possible signup routes (not yet decided):
+- `/signup/hvac-service` and `/signup/ecc` as separate entry points
+- or single `/signup` with choice page redirecting to mode-specific flow
+- or branded landing pages (`/ecc`, `/hvac-service`) with signup entry points
+
+Phase 2 scope:
+- Capture product_mode from signup flow
+- Write product_mode to account_settings during signup account creation
+- Do not enable until production account_settings migration is live
+
+### 11.5 Phase 3 — Admin configuration UI (future, later than Phase 1 and Phase 2)
+
+Admin configuration should start with read-only display only:
+- Admin Center should display current product_mode in read-only form
+- Edit UI and customer-initiated mode switches are later and require explicit gating
+
+---
+
+## 12. Operator handoff readiness packet (planning only — no onboarding approved)
 
 Status: PLANNING ONLY. No onboarding is currently approved or scheduled.
 Last updated: 2026-05-07

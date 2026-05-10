@@ -338,6 +338,71 @@ Future validation (recommended):
 - Test contractor-portal behavior unchanged for contractor-role users.
 - Create HVAC Service fixture account with non-default display_name for HVAC smoke validation.
 
+### 6.5 Provisioning capture planning (2026-05-10)
+
+Product mode capture should be phased, with the first implementation surface being First Owner Provisioning, not public signup.
+
+Phased approach:
+
+1. **Phase 1: First Owner Provisioning (future implementation)**
+   - First Owner Provisioning script should require `--product-mode` flag
+   - Allowed values: `hvac_service`, `ecc_hers`, `hybrid`
+   - Product mode should be written to `account_settings.product_mode` during provisioning apply, after owner/account identity is resolved and before invite send
+   - Dry-run output must include the required `product_mode` value
+   - Missing or invalid `product_mode` should block provisioning apply once this phase is implemented
+   - See First_Owner_Provisioning_Runbook.md section 12 for phase-1 implementation details
+
+2. **Phase 2: Public signup capture (later)**
+   - Public signup at `/signup` will eventually support two customer paths:
+     - HVAC Service (`hvac_service`)
+     - ECC (`ecc_hers`, customer-facing as "ECC")
+   - Hybrid (`hybrid`) remains manual/internal/sales-assisted only during this phase
+   - Signup routing may eventually be:
+     - `/signup/hvac-service`
+     - `/signup/ecc`
+     - or single `/signup` with choice page
+   - Customer-facing "ECC" label maps to internal stored value `ecc_hers` until future internal rename/migration phase
+
+3. **Phase 3: Admin configuration (later)**
+   - Admin/company setup should start with read-only product_mode display only
+   - Admin edit UI is later and must be guarded with explicit approval
+   - Customer-initiated mode changes require admin authority gates
+
+Fallback and safety rules:
+
+- Missing `product_mode` should continue to fall back safely (signal-based defaults remain functional)
+- Missing `product_mode` must not block login, signup, invites, or reports
+- Once Phase 1 is implemented, missing `product_mode` should only block provisioning apply (not user/account functionality)
+
+Separation of concerns:
+
+- `product_mode` controls workflow relevance and default job/work-order types only
+- `plan_tier` controls package level (starter, growth, pro, etc.)
+- `entitlements` / `add-ons` control feature availability and write access (e.g., estimates, SMS, contractor portal)
+- `billing_mode` controls invoice workflow behavior (internal_invoicing vs external_billing)
+- `feature_flags` control rollout safety and optional behavior gates
+- None of these concepts are equivalent and must remain separate in both planning and implementation
+
+Special case: Angkor Heating and Air
+
+- Angkor Heating and Air should later be assigned `hvac_service` during approved onboarding/provisioning
+- No onboarding, provisioning, invites, or account changes happen for Angkor in current timeframe
+- Angkor remains a reference account for non-mode-aware legacy behavior during Phase 1/2
+
+Production readiness requirement:
+
+- Production `account_settings` migration must be applied before production provisioning apply or signup capture can write `product_mode` values
+- Sandbox validation for `account_settings` migration and resolver chain is complete (see section 6.4)
+- Production migration and validation remains future work until production account_settings write is explicitly approved
+
+Non-actions (scope out of Phase 1):
+
+- No tier/add-on enforcement based on product_mode
+- No signup billing/payment flow changes (trial/payment flow remains separate from product_mode)
+- No feature-flag enables as part of product_mode capture
+- No automatic contractor portal hiding (mode separation remains presentation-level only)
+- No report dataset changes (shared report engine remains unchanged; mode-aware presets are later)
+
 ## 7. Signup Flow Concepts
 
 Possible future signup approaches:
