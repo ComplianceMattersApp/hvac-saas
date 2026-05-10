@@ -234,6 +234,15 @@ Product Mode Surface Hints V0 closeout note:
 - Product mode remains workflow-relevance/defaults only and does not control security/RLS, roles, entitlements, report datasets/calculations, billing/payments, or contractor authority.
 - No hard route blocking, no manual ECC/Service selector removal, and no broad navigation rewrite were introduced.
 
+HVAC Service Surface Cleanup V1 closeout note:
+
+- HVAC Service Surface Cleanup V1 is implemented as a surgical presentation-only pass.
+- HVAC Service mode now de-emphasizes ECC/compliance-first breadcrumbs and keeps service/work-order language primary on approved admin and `/jobs/new` surfaces.
+- HVAC Service Admin now moves contractor/intake cards out of the primary people grid into a secondary collapsed optional collaboration section.
+- No functionality was deleted; contractor/subcontractor collaboration tools remain reachable by direct routes and from the optional section.
+- ECC/HERS and Hybrid visibility behavior remains unchanged.
+- No permissions/security/RLS/contractor-authority/billing/report/data behavior changed.
+
 Product Mode V2 production migration execution closeout note:
 
 - Production migration scope executed: `supabase/migrations/20260509120000_account_settings_product_mode_v1.sql` only.

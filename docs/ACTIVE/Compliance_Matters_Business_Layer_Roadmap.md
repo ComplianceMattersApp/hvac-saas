@@ -386,6 +386,15 @@ Product Mode Surface Hints V0 closeout note:
 - No security/RLS/role/entitlement/report/billing/payment/QBO/contractor-authority behavior changed.
 - No route blocking or manual ECC/Service selection removal was introduced.
 
+HVAC Service Surface Cleanup V1 closeout note:
+
+- HVAC Service Surface Cleanup V1 is complete as a presentation-only cleanup slice.
+- HVAC Service mode now hides/de-emphasizes ECC/compliance-first breadcrumbs and keeps service/work-order language primary on approved admin and `/jobs/new` surfaces.
+- Contractor/subcontractor collaboration tools were moved out of the HVAC primary admin grid into a secondary collapsed optional collaboration section.
+- No functionality was deleted; optional collaboration tools remain reachable.
+- ECC/HERS and Hybrid visibility behavior is preserved.
+- No permissions/security/RLS/contractor-authority/billing/report/data behavior changed.
+
 Sandbox migration apply closeout (2026-05-09):
 
 - Initial guarded attempt correctly stopped when production ref `ornrnvxtwwtulohqwxop` was detected; no writes occurred in that stopped attempt.

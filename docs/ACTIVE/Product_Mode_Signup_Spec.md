@@ -211,6 +211,14 @@ Product Mode Surface Hints V0 closeout snapshot (2026-05-10):
 - Product mode continues to control workflow relevance/defaults only.
 - No security/RLS/auth scope changes, role/permission changes, entitlement/tier enforcement, report dataset/calculation changes, billing/payment/QBO changes, contractor-authority changes, or hard route blocking were introduced.
 
+HVAC Service Surface Cleanup V1 closeout snapshot (2026-05-10):
+
+- HVAC Service Surface Cleanup V1 is implemented as a presentation-only follow-up.
+- HVAC Service mode now de-emphasizes ECC/compliance-first breadcrumbs and keeps service/work-order language primary on approved admin and `/jobs/new` surfaces.
+- Contractor/subcontractor collaboration tools remain available and were repositioned as optional/advanced within HVAC Service admin surfaces.
+- No functionality was deleted and direct routes remain reachable.
+- No permissions/security/RLS/auth scope, contractor-authority, billing/payment/QBO, report dataset/calculation, or Product Mode schema/provisioning behavior changed.
+
 ### 6.3 Sandbox migration apply closeout (2026-05-09)
 
 Execution guardrail and environment facts:

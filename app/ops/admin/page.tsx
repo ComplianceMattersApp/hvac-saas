@@ -104,7 +104,7 @@ export default async function OpsAdminPage() {
       title: productMode === "hvac_service" ? "Contractors (Optional)" : "Contractors",
       description:
         productMode === "hvac_service"
-          ? "Optional contractor directory for service accounts that still coordinate outside contractor work."
+          ? "Optional subcontractor and vendor directory for service accounts that still coordinate outside collaboration work."
           : "Optional contractor workflows for ECC or contractor-collaboration accounts.",
       href: "/ops/admin/contractors",
       ctaLabel: productMode === "hvac_service" ? "Optional workspace" : "Open workspace",
@@ -116,7 +116,7 @@ export default async function OpsAdminPage() {
       title: productMode === "hvac_service" ? "Intake Proposals (Optional)" : "Intake Proposals",
       description:
         productMode === "hvac_service"
-          ? "Optional contractor-submitted work review if this service account uses contractor intake alongside internal work orders."
+          ? "Optional subcontractor/vendor-submitted work review for service accounts that use outside collaboration lanes."
           : "Optional contractor-submitted work review for accounts that use contractor intake.",
       href: "/ops/admin/contractor-intake-submissions",
       ctaLabel: productMode === "hvac_service" ? "Optional workspace" : "Review proposals",
@@ -142,8 +142,26 @@ export default async function OpsAdminPage() {
     },
   ];
 
-  const peopleCards = cards.filter((card) => card.section === "people");
+  const collaborationCardHrefs = new Set([
+    "/ops/admin/contractors",
+    "/ops/admin/contractor-intake-submissions",
+  ]);
+  const peopleCards = cards.filter((card) => {
+    if (card.section !== "people") return false;
+    if (productMode !== "hvac_service") return true;
+    return !collaborationCardHrefs.has(card.href);
+  });
+  const collaborationCards =
+    productMode === "hvac_service"
+      ? cards.filter((card) => card.section === "people" && collaborationCardHrefs.has(card.href))
+      : [];
   const organizationCards = cards.filter((card) => card.section === "organization");
+  const peopleSectionTitle =
+    productMode === "hvac_service" ? "Service team and account access" : "Access and account management";
+  const peopleSectionDescription =
+    productMode === "hvac_service"
+      ? "Start with internal team access and account controls. Optional outside collaboration tools are moved below so this page stays service/work-order first."
+      : modeContext.peopleCopy;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 text-gray-900 sm:space-y-8 sm:p-6">
@@ -245,9 +263,9 @@ export default async function OpsAdminPage() {
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">People</p>
-          <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">Access and account management</h2>
+          <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">{peopleSectionTitle}</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-            {modeContext.peopleCopy}
+            {peopleSectionDescription}
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -271,6 +289,51 @@ export default async function OpsAdminPage() {
           ))}
         </div>
       </section>
+
+      {productMode === "hvac_service" && collaborationCards.length > 0 ? (
+        <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+          <details className="group rounded-2xl border border-slate-200 bg-slate-50/70 p-4" name="optional-collaboration-tools">
+            <summary className="cursor-pointer list-none">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Advanced</p>
+                  <h2 className="mt-1 text-lg font-semibold tracking-[-0.02em] text-slate-950">Optional Collaboration Tools</h2>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+                    Use these only when this service account coordinates subcontractor or vendor collaboration.
+                  </p>
+                </div>
+                <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 group-open:hidden">
+                  Expand
+                </span>
+                <span className="hidden items-center rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 group-open:inline-flex">
+                  Collapse
+                </span>
+              </div>
+            </summary>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {collaborationCards.map((card) => (
+                <div
+                  key={card.title}
+                  className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-[0_14px_24px_-20px_rgba(15,23,42,0.35)]"
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{card.eyebrow}</p>
+                  <h3 className="mt-3 text-base font-semibold tracking-[-0.01em] text-slate-950">{card.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{card.description}</p>
+                  <div className="mt-5">
+                    <Link
+                      href={card.href}
+                      className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-[background-color,box-shadow,transform] hover:bg-slate-100 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
+                    >
+                      {card.ctaLabel}
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
+        </section>
+      ) : null}
 
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div>

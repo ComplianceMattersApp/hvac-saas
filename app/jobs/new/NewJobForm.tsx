@@ -588,18 +588,34 @@ const [billingRecipient, setBillingRecipient] = useState<
   }, [customerPrimaryLocationMap, guidedCustomerQuery, guidedCustomers]);
 
   const internalPageTitle = productMode === "hvac_service" ? "New Work Order" : "New Job";
+  const isHvacServiceMode = productMode === "hvac_service";
   const internalPageIntro =
-    productMode === "hvac_service"
-      ? "Create a new service work order in a few quick steps. ECC remains available when you need a compliance testing visit."
+    isHvacServiceMode
+      ? "Create a new service work order in a few quick steps. Advanced collaboration and compliance lanes remain available when needed."
       : productMode === "ecc_hers"
         ? "Create a new job in a few quick steps. ECC/compliance workflows remain front and center, with Service still available when needed."
         : "Create a new job in a few quick steps. Service and ECC remain available together for all-in-one accounts.";
   const internalModeHint =
-    productMode === "hvac_service"
-      ? "Service is the default for HVAC Service accounts. Choose ECC any time you need a compliance testing visit."
+    isHvacServiceMode
+      ? "Service is the default for HVAC Service accounts. Keep work-order flow primary, and switch to ECC only for advanced compliance jobs."
       : productMode === "ecc_hers"
         ? "ECC remains the default for compliance workflows. Choose Service when you need a work-order-first visit."
         : "Hybrid keeps both workflows available. Choose ECC or Service based on the visit you are creating.";
+  const internalFlowSummary = isHvacServiceMode
+    ? "Select the customer and location, keep the work-order family primary, then add Work Items before scheduling."
+    : "Select the customer and location, pick a job family, then add Work Items before scheduling.";
+  const internalFlowStep2Label = isHvacServiceMode ? "Work order and relationship" : "Family and relationship";
+  const jobFamilyStepTitle = isHvacServiceMode ? "Work order family" : "Job family";
+  const jobFamilyStepDescription = isHvacServiceMode
+    ? "Service stays primary for HVAC accounts. ECC remains available in an advanced lane when this visit is a compliance test."
+    : "Choose ECC or Service first so any relationship review stays inside the right intake lane.";
+  const jobFamilyControlLabel = isHvacServiceMode ? "Work Order Family" : "Job Family";
+  const serviceJobFamilyDescription = isHvacServiceMode
+    ? "Primary service/work-order workflow"
+    : "Standard service visit workflow";
+  const eccJobFamilyDescription = isHvacServiceMode
+    ? "Advanced compliance testing workflow"
+    : "Energy code test workflow";
 
   const selectedCustomer = useMemo(
     () => guidedCustomers.find((c) => c.id === selectedCustomerId) ?? null,
@@ -796,8 +812,12 @@ const [billingRecipient, setBillingRecipient] = useState<
   const showInternalSetupHint =
     isInternalMode && (!internalResolutionReady || (shouldShowRelationshipStep && !relationshipDecisionReady));
   const internalNextStepMessage = !internalResolutionReady
-    ? "Resolve customer and location to unlock job family, relationship review, Work Items, scheduling, billing, and optional details."
-    : "Choose the job family and relationship path before defining the Work Items for this trip.";
+    ? isHvacServiceMode
+      ? "Resolve customer and location to unlock work-order family, relationship review, Work Items, scheduling, billing, and optional details."
+      : "Resolve customer and location to unlock job family, relationship review, Work Items, scheduling, billing, and optional details."
+    : isHvacServiceMode
+      ? "Choose the work-order family and relationship path before defining the Work Items for this trip."
+      : "Choose the job family and relationship path before defining the Work Items for this trip.";
   const billingRecipientLabel =
     billingRecipient === "contractor"
       ? "Contractor"
@@ -1314,7 +1334,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">Internal job creation</p>
                 <h2 className="mt-2 text-lg font-semibold text-white">Create with confidence, not form fatigue.</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-300">
-                  Select the customer and location, pick a job family, then add Work Items before scheduling.
+                  {internalFlowSummary}
                 </p>
               </div>
               <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[26rem]">
@@ -1324,7 +1344,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">2</p>
-                  <p className="mt-1 text-sm font-medium text-white">Family and relationship</p>
+                  <p className="mt-1 text-sm font-medium text-white">{internalFlowStep2Label}</p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">3</p>
@@ -2039,41 +2059,87 @@ const [billingRecipient, setBillingRecipient] = useState<
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 3</p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-900">Job family</h2>
-                <p className="mt-1 text-sm text-slate-500">Choose ECC or Service first so any relationship review stays inside the right intake lane.</p>
+                <h2 className="mt-1 text-lg font-semibold text-slate-900">{jobFamilyStepTitle}</h2>
+                <p className="mt-1 text-sm text-slate-500">{jobFamilyStepDescription}</p>
               </div>
 
               <div className="space-y-3">
-                <label className="block text-sm font-medium text-slate-900">Job Family</label>
+                <label className="block text-sm font-medium text-slate-900">{jobFamilyControlLabel}</label>
                 <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
-                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:bg-slate-100 sm:flex-1">
-                    <input
-                      type="radio"
-                      name="_jobTypeUi"
-                      value="ecc"
-                      checked={jobType === "ecc"}
-                      onChange={() => setJobType("ecc")}
-                      className="mt-0.5"
-                    />
-                    <span>
-                      <span className="block text-sm font-medium text-slate-900">ECC</span>
-                      <span className="mt-0.5 block text-xs text-slate-500">Energy code test workflow</span>
-                    </span>
-                  </label>
-                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:bg-slate-100 sm:flex-1">
-                    <input
-                      type="radio"
-                      name="_jobTypeUi"
-                      value="service"
-                      checked={jobType === "service"}
-                      onChange={() => setJobType("service")}
-                      className="mt-0.5"
-                    />
-                    <span>
-                      <span className="block text-sm font-medium text-slate-900">Service</span>
-                      <span className="mt-0.5 block text-xs text-slate-500">Standard service visit workflow</span>
-                    </span>
-                  </label>
+                  {isHvacServiceMode ? (
+                    <>
+                      <label
+                        className={[
+                          "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition-colors sm:flex-1",
+                          jobType === "service"
+                            ? "border-slate-900 bg-slate-900 text-white hover:bg-slate-800"
+                            : "border-slate-200 bg-slate-50 text-slate-900 hover:bg-slate-100",
+                        ].join(" ")}
+                      >
+                        <input
+                          type="radio"
+                          name="_jobTypeUi"
+                          value="service"
+                          checked={jobType === "service"}
+                          onChange={() => setJobType("service")}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className={jobType === "service" ? "block text-sm font-medium text-white" : "block text-sm font-medium text-slate-900"}>
+                            Service
+                          </span>
+                          <span className={jobType === "service" ? "mt-0.5 block text-xs text-slate-200" : "mt-0.5 block text-xs text-slate-500"}>
+                            {serviceJobFamilyDescription}
+                          </span>
+                        </span>
+                      </label>
+                      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:bg-slate-100 sm:flex-1">
+                        <input
+                          type="radio"
+                          name="_jobTypeUi"
+                          value="ecc"
+                          checked={jobType === "ecc"}
+                          onChange={() => setJobType("ecc")}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="block text-sm font-medium text-slate-900">ECC</span>
+                          <span className="mt-0.5 block text-xs text-slate-500">{eccJobFamilyDescription}</span>
+                        </span>
+                      </label>
+                    </>
+                  ) : (
+                    <>
+                      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:bg-slate-100 sm:flex-1">
+                        <input
+                          type="radio"
+                          name="_jobTypeUi"
+                          value="ecc"
+                          checked={jobType === "ecc"}
+                          onChange={() => setJobType("ecc")}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="block text-sm font-medium text-slate-900">ECC</span>
+                          <span className="mt-0.5 block text-xs text-slate-500">{eccJobFamilyDescription}</span>
+                        </span>
+                      </label>
+                      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:bg-slate-100 sm:flex-1">
+                        <input
+                          type="radio"
+                          name="_jobTypeUi"
+                          value="service"
+                          checked={jobType === "service"}
+                          onChange={() => setJobType("service")}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="block text-sm font-medium text-slate-900">Service</span>
+                          <span className="mt-0.5 block text-xs text-slate-500">{serviceJobFamilyDescription}</span>
+                        </span>
+                      </label>
+                    </>
+                  )}
                 </div>
                 <input type="hidden" name="job_type" value={jobType} />
               </div>
