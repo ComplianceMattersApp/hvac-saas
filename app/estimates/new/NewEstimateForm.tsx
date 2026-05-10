@@ -72,6 +72,7 @@ export default function NewEstimateForm({
   const [allCustomers, setAllCustomers] = useState<CustomerRow[]>(customers);
   const [allLocations, setAllLocations] = useState<LocationRow[]>(locations);
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialCustomerId);
+  const [selectedLocationId, setSelectedLocationId] = useState("");
   const [customerQuery, setCustomerQuery] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -235,6 +236,7 @@ export default function NewEstimateForm({
       upsertLocation(result.location);
 
       setSelectedCustomerId(result.customerId);
+      setSelectedLocationId(result.locationId);
       setCustomerQuery(customerDisplayName(result.customer));
       setPickerOpen(false);
       setAssistError(null);
@@ -284,6 +286,7 @@ export default function NewEstimateForm({
                 type="button"
                 onClick={() => {
                   setSelectedCustomerId("");
+                  setSelectedLocationId("");
                   setCustomerQuery("");
                   setPickerOpen(true);
                 }}
@@ -334,6 +337,7 @@ export default function NewEstimateForm({
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={() => {
                             setSelectedCustomerId(customer.id);
+                            setSelectedLocationId("");
                             setCustomerQuery(displayName);
                             setPickerOpen(false);
                           }}
@@ -489,6 +493,8 @@ export default function NewEstimateForm({
         <select
           id="location_id"
           name="location_id"
+          value={selectedLocationId}
+          onChange={(event) => setSelectedLocationId(event.target.value)}
           required
           disabled={!selectedCustomerId}
           className={inputClass}
