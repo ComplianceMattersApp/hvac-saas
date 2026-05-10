@@ -7,6 +7,7 @@ import MobileShellMenu from "@/components/layout/MobileShellMenu";
 import UserAccountMenu from "@/components/layout/UserAccountMenu";
 import { getInternalUnreadNotificationBadgeCount } from "@/lib/actions/notification-read-actions";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
+import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
@@ -72,6 +73,7 @@ export default async function RootLayout({
   let isAdmin = false;
   const estimatesEnabled = isEstimatesEnabled();
   let unreadNotificationCount = 0;
+  let productMode: ProductMode = "hybrid";
 
   if (actorContext.kind === "contractor") {
     homeHref = "/portal";
@@ -80,11 +82,18 @@ export default async function RootLayout({
     homeHref = "/ops";
     isInternalUser = true;
     isAdmin = actorContext.internalUser.role === "admin";
+    const accountOwnerUserId = String(actorContext.internalUser.account_owner_user_id ?? "").trim();
     unreadNotificationCount = await getInternalUnreadNotificationBadgeCount({
       supabase,
-      accountOwnerUserId: actorContext.accountOwnerUserId,
+      accountOwnerUserId,
+    });
+    productMode = await resolveProductModeForAccountOwnerId({
+      supabase,
+      accountOwnerUserId,
     });
   }
+
+  const primaryJobCtaLabel = productMode === "hvac_service" ? "+ New Work Order" : "+ New Job";
 
   const userMetadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
   const accountDisplayName = resolveHumanDisplayName({
@@ -140,7 +149,7 @@ export default async function RootLayout({
                       href="/jobs/new"
                       className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_22px_-18px_rgba(37,99,235,0.58)] transition-all hover:-translate-y-px hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:translate-y-0"
                     >
-                      + New Job
+                      {primaryJobCtaLabel}
                     </Link>
                     {isInternalUser ? (
                       <Link
@@ -217,6 +226,7 @@ export default async function RootLayout({
                       isEstimatesEnabled={estimatesEnabled}
                       unreadNotificationCount={unreadNotificationCount}
                       unreadNotificationBadgeLabel={unreadNotificationBadgeLabel}
+                      primaryJobCtaLabel={primaryJobCtaLabel}
                     />
                   </div>
                 </div>

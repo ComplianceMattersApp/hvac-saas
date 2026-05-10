@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { resolveAccountReadiness } from "@/lib/business/account-readiness";
+import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { getPlatformBillingAvailability } from "@/lib/business/platform-billing-stripe";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
@@ -46,10 +47,37 @@ type AdminCard = {
 export default async function OpsAdminPage() {
   const { supabase, internalUser } = await requireAdminOrRedirect();
   const readiness = await resolveAccountReadiness(internalUser.account_owner_user_id, supabase);
+  const productMode = await resolveProductModeForAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
   const platformBillingAvailability = getPlatformBillingAvailability();
   const requiredItems = readiness.items.filter((item) => item.status !== "optional");
   const incompleteRequiredItems = requiredItems.filter((item) => item.status === "incomplete");
   const optionalItems = readiness.items.filter((item) => item.status === "optional");
+
+  const modeContextByProductMode: Record<ProductMode, { badge: string; heroHint: string; peopleCopy: string }> = {
+    hvac_service: {
+      badge: "HVAC Service",
+      heroHint: "Service/work-order-first workspace. Contractor tools remain optional and unchanged.",
+      peopleCopy:
+        "Start here for user lookup and internal team workspaces. Contractor tools remain available as optional collaboration workspaces when this service account needs them.",
+    },
+    ecc_hers: {
+      badge: "ECC/HERS",
+      heroHint: "Compliance and contractor collaboration remain relevant in this workspace.",
+      peopleCopy:
+        "Start here for user lookup and recovery, then step into team workspaces and contractor/compliance collaboration tools when needed.",
+    },
+    hybrid: {
+      badge: "All-in-One",
+      heroHint: "Owner all-in-one workspace. Service and compliance tools remain available together.",
+      peopleCopy:
+        "Start here for user lookup and recovery, then step into team workspaces and optional contractor tools when needed.",
+    },
+  };
+
+  const modeContext = modeContextByProductMode[productMode];
 
   const cards: AdminCard[] = [
     {
@@ -72,20 +100,26 @@ export default async function OpsAdminPage() {
     },
     {
       section: "people",
-      eyebrow: "Contractors",
-      title: "Contractors",
-      description: "Optional contractor workflows for ECC or contractor-collaboration accounts.",
+      eyebrow: productMode === "hvac_service" ? "Optional Contractor Tools" : "Contractors",
+      title: productMode === "hvac_service" ? "Contractors (Optional)" : "Contractors",
+      description:
+        productMode === "hvac_service"
+          ? "Optional contractor directory for service accounts that still coordinate outside contractor work."
+          : "Optional contractor workflows for ECC or contractor-collaboration accounts.",
       href: "/ops/admin/contractors",
-      ctaLabel: "Open workspace",
+      ctaLabel: productMode === "hvac_service" ? "Optional workspace" : "Open workspace",
       enabled: true,
     },
     {
       section: "people",
-      eyebrow: "Contractors",
-      title: "Intake Proposals",
-      description: "Optional contractor-submitted work review for accounts that use contractor intake.",
+      eyebrow: productMode === "hvac_service" ? "Optional Contractor Tools" : "Contractors",
+      title: productMode === "hvac_service" ? "Intake Proposals (Optional)" : "Intake Proposals",
+      description:
+        productMode === "hvac_service"
+          ? "Optional contractor-submitted work review if this service account uses contractor intake alongside internal work orders."
+          : "Optional contractor-submitted work review for accounts that use contractor intake.",
       href: "/ops/admin/contractor-intake-submissions",
-      ctaLabel: "Review proposals",
+      ctaLabel: productMode === "hvac_service" ? "Optional workspace" : "Review proposals",
       enabled: true,
     },
     {
@@ -124,6 +158,9 @@ export default async function OpsAdminPage() {
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
               Live workspaces are grouped below. Future tools stay clearly separated.
+            </div>
+            <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+              {modeContext.badge}: {modeContext.heroHint}
             </div>
           </div>
           <Link
@@ -210,7 +247,7 @@ export default async function OpsAdminPage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">People</p>
           <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">Access and account management</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-            Start here for user lookup and recovery, then step into team workspaces and optional contractor tools when needed.
+            {modeContext.peopleCopy}
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

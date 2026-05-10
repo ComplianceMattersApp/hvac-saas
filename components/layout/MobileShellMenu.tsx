@@ -11,6 +11,7 @@ type Props = {
   isEstimatesEnabled: boolean;
   unreadNotificationCount: number;
   unreadNotificationBadgeLabel: string;
+  primaryJobCtaLabel: string;
 };
 
 const mobileMenuItemClass =
@@ -22,6 +23,7 @@ export default function MobileShellMenu({
   isEstimatesEnabled,
   unreadNotificationCount,
   unreadNotificationBadgeLabel,
+  primaryJobCtaLabel,
 }: Props) {
   const pathname = usePathname();
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -79,7 +81,7 @@ export default function MobileShellMenu({
             onClick={() => setOpen(false)}
             className="block rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-[0_12px_20px_-16px_rgba(37,99,235,0.55)] transition-colors hover:bg-blue-700"
           >
-            + New Job
+            {primaryJobCtaLabel}
           </Link>
           {isInternalUser ? (
             <Link

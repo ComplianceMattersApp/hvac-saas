@@ -84,10 +84,19 @@ export async function resolveDefaultJobTypeForAccountOwnerId(params: {
   accountOwnerUserId: string;
   overridesByOwnerId?: Record<string, ProductMode>;
 }): Promise<JobTypeDefault> {
+  const mode = await resolveProductModeForAccountOwnerId(params);
+  return resolveJobTypeDefaultForProductMode(mode);
+}
+
+export async function resolveProductModeForAccountOwnerId(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  overridesByOwnerId?: Record<string, ProductMode>;
+}): Promise<ProductMode> {
   const accountOwnerUserId = toCleanString(params.accountOwnerUserId);
 
   if (!accountOwnerUserId) {
-    return "ecc";
+    return "hybrid";
   }
 
   const accountSettingMode = await readProductModeSettingForAccountOwnerId({
@@ -96,7 +105,7 @@ export async function resolveDefaultJobTypeForAccountOwnerId(params: {
   });
 
   if (accountSettingMode) {
-    return resolveJobTypeDefaultForProductMode(accountSettingMode);
+    return accountSettingMode;
   }
 
   const [identity, contractorCountResult] = await Promise.all([
@@ -121,5 +130,5 @@ export async function resolveDefaultJobTypeForAccountOwnerId(params: {
     overridesByOwnerId: params.overridesByOwnerId,
   });
 
-  return resolveJobTypeDefaultForProductMode(mode);
+  return mode;
 }

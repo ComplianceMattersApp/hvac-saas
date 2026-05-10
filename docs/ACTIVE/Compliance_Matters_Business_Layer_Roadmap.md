@@ -377,6 +377,15 @@ Explicit non-actions for this closeout:
 - Product mode is not documented here as admin-editable yet.
 - Signup product-mode capture is still later.
 
+Product Mode Surface Hints V0 closeout note:
+
+- Product Mode Surface Hints V0 is complete as a presentation-only slice.
+- HVAC Service copy is now slightly more service/work-order oriented on approved shell, admin, and `/jobs/new` surfaces.
+- ECC/HERS and Hybrid preserve current contractor/ECC relevance, and Hybrid remains owner All-in-One.
+- Product mode continues to control workflow relevance/defaults only.
+- No security/RLS/role/entitlement/report/billing/payment/QBO/contractor-authority behavior changed.
+- No route blocking or manual ECC/Service selection removal was introduced.
+
 Sandbox migration apply closeout (2026-05-09):
 
 - Initial guarded attempt correctly stopped when production ref `ornrnvxtwwtulohqwxop` was detected; no writes occurred in that stopped attempt.

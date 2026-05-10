@@ -25,6 +25,7 @@ import {
   resolveDefaultJobTypeForNewJobForm,
   resolveRestoredDraftJobType,
 } from "./new-job-defaults";
+import type { ProductMode } from "@/lib/business/product-mode-defaults";
 
 type Contractor = { id: string; name: string };
 
@@ -331,6 +332,7 @@ export default function NewJobForm({
   customerContextMode = false,
   customerContextSource = null,
   initialJobType,
+  productMode = "hybrid",
   pricebookTemplateItems = [],
 }: {
   contractors: Contractor[];
@@ -344,6 +346,7 @@ export default function NewJobForm({
   customerContextMode?: boolean;
   customerContextSource?: string | null;
   initialJobType?: "ecc" | "service";
+  productMode?: ProductMode;
   pricebookTemplateItems?: VisitScopePricebookTemplateItem[];
 }) {
 
@@ -583,6 +586,20 @@ const [billingRecipient, setBillingRecipient] = useState<
       }))
       .slice(0, 10);
   }, [customerPrimaryLocationMap, guidedCustomerQuery, guidedCustomers]);
+
+  const internalPageTitle = productMode === "hvac_service" ? "New Work Order" : "New Job";
+  const internalPageIntro =
+    productMode === "hvac_service"
+      ? "Create a new service work order in a few quick steps. ECC remains available when you need a compliance testing visit."
+      : productMode === "ecc_hers"
+        ? "Create a new job in a few quick steps. ECC/compliance workflows remain front and center, with Service still available when needed."
+        : "Create a new job in a few quick steps. Service and ECC remain available together for all-in-one accounts.";
+  const internalModeHint =
+    productMode === "hvac_service"
+      ? "Service is the default for HVAC Service accounts. Choose ECC any time you need a compliance testing visit."
+      : productMode === "ecc_hers"
+        ? "ECC remains the default for compliance workflows. Choose Service when you need a work-order-first visit."
+        : "Hybrid keeps both workflows available. Choose ECC or Service based on the visit you are creating.";
 
   const selectedCustomer = useMemo(
     () => guidedCustomers.find((c) => c.id === selectedCustomerId) ?? null,
@@ -1222,12 +1239,12 @@ const [billingRecipient, setBillingRecipient] = useState<
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
       <div className="rounded-3xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/35 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.35)] sm:p-6">
       <h1 className="text-2xl font-semibold text-slate-900 mb-1">
-        {isContractorMode ? "Intake Form" : "New Job"}
+        {isContractorMode ? "Intake Form" : internalPageTitle}
       </h1>
       <p className="mb-6 text-sm text-slate-600">
         {isContractorMode
           ? "Fill in the details below. Our team will review your submission and follow up to confirm scheduling."
-          : "Create a new job in a few quick steps."}
+          : internalPageIntro}
       </p>
 
       <ActionFeedback
@@ -1364,7 +1381,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           {/* Job Type */}
           <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
             <label className="block text-sm font-medium text-slate-900">Job Type</label>
-            <p className="text-xs text-slate-600">Service is the default for service company workflows. Choose ECC for compliance testing visits.</p>
+            <p className="text-xs text-slate-600">{internalModeHint}</p>
             <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
               <label className="flex cursor-pointer items-start gap-2.5">
                 <input

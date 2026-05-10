@@ -226,6 +226,14 @@ Product Mode Provisioning Capture Slice 1 closeout note:
 - Separation preserved: product mode remains independent from entitlement preset (`internal_comped` does not imply `hybrid`; `standard` does not imply `hvac_service`).
 - Boundaries unchanged: no signup capture, no admin edit UI, no tier/add-on enforcement, no mode-aware navigation/report/starter-kit rewrite, no billing/payment/contractor-authority/Estimates/Support behavior changes.
 
+Product Mode Surface Hints V0 closeout note:
+
+- Product Mode Surface Hints V0 is implemented as a surgical presentation-only pass.
+- HVAC Service first-impression copy is slightly more service/work-order oriented on approved shell, admin, and `/jobs/new` surfaces.
+- ECC/HERS and Hybrid preserve current contractor/ECC relevance; Hybrid remains All-in-One with owner access unchanged.
+- Product mode remains workflow-relevance/defaults only and does not control security/RLS, roles, entitlements, report datasets/calculations, billing/payments, or contractor authority.
+- No hard route blocking, no manual ECC/Service selector removal, and no broad navigation rewrite were introduced.
+
 Product Mode V2 production migration execution closeout note:
 
 - Production migration scope executed: `supabase/migrations/20260509120000_account_settings_product_mode_v1.sql` only.
