@@ -256,6 +256,11 @@ The following are explicitly runbook-gated and must remain controlled:
    - Support V1A foundation production migration readiness is closed at **ready after listed inputs** for `20260501120000_support_access_v1a_foundation.sql` only
    - Normal `db push` from current repo state is unsafe because later pending migrations exist; future execution should use an isolated single-migration artifact/worktree
    - Schema apply alone must remain dormant: `ENABLE_SUPPORT_CONSOLE` false/unset, no support seeding, no grants/sessions, no bundled Estimates/Product Mode apply
+   - Support V1A production migration execution is complete for `20260501120000_support_access_v1a_foundation.sql` using isolated single-migration worktree strategy from commit `ab1fb34`
+   - Production ref for execution: `ornrnvxtwwtulohqwxop`; dry-run + explicit approval gates were completed before apply
+   - Post-apply production verification passed: support schema objects/indexes/constraints exist, RLS enabled, no support-table policies, no grants for PUBLIC/anon/authenticated, and zero support rows
+   - Boundaries preserved: `ENABLE_SUPPORT_CONSOLE` remained false/unset; no support seeding/sessions/grants; no Estimates/Estimate Communications/Product Mode migration applied
+   - Remaining pending production migrations after this window: `20260501140000`, `20260502120000`, `20260509120000`
 3. First Owner Provisioning
    - Controlled by first-owner provisioning runbook
    - Dry-run first, guarded apply, environment verification gates

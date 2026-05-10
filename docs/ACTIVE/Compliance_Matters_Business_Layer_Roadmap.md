@@ -2274,6 +2274,12 @@ New business modules must not regress:
 - Recommended future production apply strategy is an isolated single-migration execution artifact/worktree because normal `db push` from current repo state would include later pending migrations.
 - Future Support V1A schema apply remains additive/dormant only: no support-user seed, no grant/session creation, no live audit generation through use, and `ENABLE_SUPPORT_CONSOLE` remains intentionally unset/false after schema apply.
 - Estimates and Product Mode migrations must not be bundled into that Support V1A migration window.
+- Support Console foundation production migration execution is now complete for `20260501120000_support_access_v1a_foundation.sql` on production ref `ornrnvxtwwtulohqwxop`.
+- Execution used isolated single-migration worktree strategy from commit `ab1fb34`, with dry-run and explicit approval before apply.
+- Post-apply verification passed: support tables/indexes/constraints present, RLS enabled, no support-table policies, no grants for PUBLIC/anon/authenticated, and all support-table row counts remained `0`.
+- Execution boundaries remained intact: `ENABLE_SUPPORT_CONSOLE` stayed false/unset; no support seeding/grants/sessions/live audit generation; no Estimates/Estimate Communications/Product Mode migration bundled.
+- Current production pending set after this window: `20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`, `20260509120000_account_settings_product_mode_v1.sql`.
+- Main workspace Supabase link remains production ref; future sandbox work must relink/verify sandbox explicitly before any sandbox operation.
 - Future support rollout remains explicit and later-scoped:
   - production migration approval
   - production `support_user` seed

@@ -133,6 +133,55 @@ Support Console foundation migration readiness closeout (planning only):
 - No support seeding or support grants are part of this migration window.
 - Rollback posture is forward-fix preferred because the schema is additive/dormant.
 
+Support Console foundation production migration execution closeout (completed):
+
+- Execution verdict: **completed successfully**.
+- Applied production migration: `20260501120000_support_access_v1a_foundation.sql`.
+- Production project ref used: `ornrnvxtwwtulohqwxop`.
+- Execution used an isolated single-migration worktree/artifact from commit `ab1fb34`.
+- Isolated artifact included Support V1A migration and excluded later pending migrations:
+	- `20260501140000_estimates_v1a_schema_domain.sql`
+	- `20260502120000_estimate_communications_v1h.sql`
+	- `20260509120000_account_settings_product_mode_v1.sql`
+- Dry-run was completed before apply.
+- Explicit approval was received before apply.
+- Apply succeeded.
+
+Post-apply production verification (read-only):
+
+- `support_users`, `support_account_grants`, `support_access_sessions`, and `support_access_audit_events` exist.
+- RLS is enabled on all four support tables.
+- Expected indexes exist.
+- Expected PK/FK/check constraints exist.
+- No support-table policies exist in `pg_policies`.
+- No grants exist for `PUBLIC`, `anon`, or `authenticated`.
+- Row counts for all four support tables are `0`.
+
+Boundaries preserved during execution:
+
+- `ENABLE_SUPPORT_CONSOLE` remained false/unset.
+- No support users, support grants, or support sessions were created.
+- No support audit events were intentionally generated.
+- Support Console remained fail-closed/auth-gated.
+- No Estimates migration applied.
+- No Estimate Communications migration applied.
+- No Product Mode migration applied.
+- No Vercel/env/feature-flag changes.
+- No code/docs/provisioning/account-user changes.
+
+Migration state after Support V1A production apply:
+
+- Applied in production:
+	- `20260501120000_support_access_v1a_foundation.sql`
+- Still pending in production:
+	- `20260501140000_estimates_v1a_schema_domain.sql`
+	- `20260502120000_estimate_communications_v1h.sql`
+	- `20260509120000_account_settings_product_mode_v1.sql`
+
+Operator note:
+
+- Main workspace Supabase link remains production ref `ornrnvxtwwtulohqwxop`; future sandbox work must relink and verify explicitly before any sandbox operation.
+
 ---
 
 ## 6. Phase C - support user setup plan
