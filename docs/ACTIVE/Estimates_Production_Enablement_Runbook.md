@@ -2,8 +2,7 @@
 
 Status: ACTIVE EXECUTION-CONTROLLED PLANNING ARTIFACT  
 Authority: Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md` and `docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md`  
-Scope: Production enablement procedure for Estimates V1 internal-only slice. No execution has occurred.
-Scope: Production enablement procedure for Estimates V1 internal-only slice. Includes documented closeout for completed V1A production migration execution.
+Scope: Production enablement procedure for Estimates V1 internal-only slice, including V1A execution closeout and a V1H-only migration-window addendum.
 
 ---
 
@@ -21,7 +20,7 @@ The latest clean-run Estimates rehearsal closed the earlier enabled-mode render-
 
 - Estimates V1A-V1J is implemented to the current guarded internal baseline.
 - Production estimates are not live.
-- Production estimate migrations are not applied.
+- Production estimate migrations are partially applied: V1A is applied; V1H remains pending.
 - Production `ENABLE_ESTIMATES` remains unset/false.
 - Production `ENABLE_ESTIMATE_EMAIL_SEND` remains unset/false.
 - All estimate routes redirect to `/ops?notice=estimates_unavailable` in production.
@@ -120,6 +119,80 @@ Migration state after this execution window:
 	- `20260502120000_estimate_communications_v1h.sql`
 	- `20260509120000_account_settings_product_mode_v1.sql`
 - Main workspace Supabase link remained production ref `ornrnvxtwwtulohqwxop`; future sandbox work must relink and re-verify explicitly.
+
+### 1.2 V1H-only migration-window addendum (planning/audit)
+
+This addendum defines the next production migration window as a strict V1H-only apply sequence.
+
+Current prerequisite state:
+- V1A (`20260501140000_estimates_v1a_schema_domain.sql`) is already applied in production.
+- Next migration target is only `20260502120000_estimate_communications_v1h.sql`.
+- Product Mode migration `20260509120000_account_settings_product_mode_v1.sql` must remain excluded from this window.
+
+Isolated artifact/worktree requirement:
+- An isolated artifact/worktree is required.
+- Do not run normal `supabase db push` from full repo state if Product Mode is pending.
+
+Migration include list for the isolated artifact:
+- `20260501120000_support_access_v1a_foundation.sql`
+- `20260501140000_estimates_v1a_schema_domain.sql`
+- `20260502120000_estimate_communications_v1h.sql`
+
+Migration exclude list for the isolated artifact:
+- `20260509120000_account_settings_product_mode_v1.sql`
+
+Locked disabled-state boundaries for this V1H-only window:
+- `ENABLE_ESTIMATES` remains false/unset.
+- `ENABLE_ESTIMATE_EMAIL_SEND` remains false/unset.
+- No outbound email.
+- No PDFs.
+- No public/customer/contractor estimate exposure.
+- No estimate record creation.
+- No estimate conversion (job/invoice).
+- No payment, Stripe tenant payment, or QBO behavior.
+- No Support Console changes.
+
+Required V1H preflight checklist before dry-run:
+- Branch is `main`.
+- Working tree is clean.
+- Source docs are committed and pushed.
+- Production ref is confirmed as `ornrnvxtwwtulohqwxop`.
+- V1A migration (`20260501140000`) is confirmed applied.
+- V1H migration (`20260502120000`) is confirmed pending.
+- Product Mode migration (`20260509120000`) is confirmed pending.
+- `ENABLE_ESTIMATES` and `ENABLE_ESTIMATE_EMAIL_SEND` are confirmed false/unset.
+
+V1H dry-run and apply sequence (approval-gated):
+1. Run dry-run first in the isolated artifact/worktree.
+2. Stop at a hard approval gate after dry-run review.
+3. Apply only after explicit owner approval.
+
+Required post-apply verification checklist for V1H:
+- `public.estimate_communications` exists.
+- Expected columns exist.
+- Expected constraints/FKs/checks exist.
+- Expected indexes exist.
+- RLS is enabled.
+- Expected account-scoped policies exist.
+- Row count is `0`.
+- Migration history confirms `20260502120000` applied.
+- Migration history confirms `20260509120000` remains unapplied.
+
+Required disabled-state smoke checklist after V1H apply:
+- `/`, `/ops`, `/estimates`, `/portal` remain login-gated or disabled as expected.
+- No public estimate exposure appears.
+- No estimate communication rows are created by smoke.
+- No outbound email is sent.
+
+V1H no-go triggers (hard stop):
+- Wrong linked project ref.
+- Product Mode migration present in the isolated artifact/worktree.
+- Unexpected migration drift.
+- `ENABLE_ESTIMATE_EMAIL_SEND` is true/set.
+- Any public/customer/contractor estimate exposure appears.
+- Dry-run output differs from V1H-only target.
+- Evidence path missing.
+- Rollback owner missing.
 
 ---
 
@@ -266,6 +339,9 @@ Gate decision:
 ---
 
 ## 6. Phase C — production migration readiness and apply
+
+V1H-only execution note:
+- If V1A is already applied in production, execute this phase as V1H-only using the isolated include/exclude lists in Section 1.2. Do not re-run a broad two-migration apply path.
 
 ### 6.1 Pre-apply confirmation
 
@@ -478,6 +554,7 @@ The following conditions are hard stops at any phase. If any of these arise, hal
 | Pending uncommitted docs or code | Source of truth is not closed; proceed only from a clean committed baseline |
 | Production migration list contains unexpected items | Schema may have drifted from the expected baseline |
 | `ENABLE_ESTIMATE_EMAIL_SEND` is true or set | Internal-only slice must not send real email |
+| Product Mode migration is present in isolated artifact/worktree | Window is out of scope; do not risk bundled apply |
 | Any customer/public/contractor estimate surface appears | Scope boundary violation |
 | Any real outbound email is sent | Immediate rollback required |
 | Any PDF or storage object is created | Scope boundary violation |
@@ -485,6 +562,7 @@ The following conditions are hard stops at any phase. If any of these arise, hal
 | Any estimate-to-job or estimate-to-invoice conversion occurs | Scope boundary violation |
 | Any customer approval record is created | Scope boundary violation |
 | Smoke step fails or produces unexpected output | Do not advance; root-cause before retrying |
+| Dry-run output differs from V1H-only target | Do not apply; rebuild isolated artifact and re-review |
 | Operator confidence is uncertain | Do not proceed on doubt; pause and review |
 | Rollback owner unavailable | Do not proceed without confirmed rollback authority |
 | Evidence storage is unavailable | Do not proceed without a place to record evidence |
@@ -495,16 +573,18 @@ Any single condition above requires a halt, a documented reason, and a re-approv
 
 ## 15. Post-execution documentation requirements
 
-After a successful internal-only enablement run, the following documentation updates are required **before** the execution window is considered closed.
+After a successful migration or enablement run, the following documentation updates are required **before** the execution window is considered closed.
 
 ### 15.1 Required doc updates
 
 | Document | Section | Required update |
 |---|---|---|
-| `docs/ACTIVE/Active Spine V4.0 Current.md` | Estimates section | Add bullet: migrations applied to production, `ENABLE_ESTIMATES` enabled, internal-only smoke passed, `ENABLE_ESTIMATE_EMAIL_SEND` remains false, date and `DEPLOYMENT_ID` |
-| `docs/ACTIVE/Compliance_Matters_Prelaunch_Confirmation_Checklist.md` | §2.3.6 + §2.20 estimates block | Mark Phase A–G gates as executed; record migration apply result, flag state, smoke result, date |
-| `docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md` | §9 Production rollout prerequisites | Update Phase A–G gate statuses to executed/confirmed |
-| `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md` | §13 Version history | Add v1.1 entry with execution date, operator, deployment ID, and outcome |
+| `docs/ACTIVE/Compliance_Matters_Prelaunch_Confirmation_Checklist.md` | Readiness closeout bullets | Record migration apply result, boundaries preserved, smoke result, and date |
+| `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md` | Runbook-gated Estimates item | Record migration state and pending-set updates |
+| `docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md` | Parked Estimates rollout note | Record migration state while preserving disabled boundaries |
+| `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md` | Version history and addenda | Record execution/addendum details with date and outcome |
+
+For a migration-only window where feature flags remain disabled, `docs/ACTIVE/Active Spine V4.0 Current.md` is optional unless release governance explicitly requests it.
 
 ### 15.2 Required evidence records
 
@@ -580,3 +660,4 @@ Completing this runbook does not authorize:
 | v1.2 | May 9, 2026 | Docs closeout pass | Recorded Estimates Guard Parity + Send Wording Polish (`edf5022`): mutator-level fail-closed parity for add/remove, updated guarded-baseline validation (`131/131`), and `Record Send Attempt` wording safety. No runbook execution; production estimates remain disabled and runbook-gated. |
 | v1.3 | May 9, 2026 | Planning closeout pass | Recorded the enabled-mode render-error watch-item closeout: intermittent `TypeError` not reproduced in clean captured smoke, `/estimates` and `/estimates/[id]` returned `200`, `addLineItemAction` posted `200` twice, and no real stack trace was captured. No code changes; planning/watch item only. |
 | v1.4 | May 9, 2026 | Docs closeout pass | Recorded completed Estimates V1A production migration execution for `20260501140000_estimates_v1a_schema_domain.sql` on ref `ornrnvxtwwtulohqwxop` using isolated artifact from `a200a17`, with dry-run + explicit approval, successful apply, post-apply schema/RLS/policy/index/constraint verification, zero-row confirmation, login-gated smoke, and preserved no-change boundaries. |
+| v1.5 | May 10, 2026 | Docs planning pass | Added V1H-only migration-window addendum: V1A already applied, target-only `20260502120000_estimate_communications_v1h.sql`, Product Mode exclusion (`20260509120000`), required isolated artifact include/exclude lists, preflight, approval-gated dry-run/apply sequence, post-apply verification, disabled-state smoke, no-go triggers, and migration-only documentation requirements alignment. |

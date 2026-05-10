@@ -256,6 +256,10 @@ The following are explicitly runbook-gated and must remain controlled:
    - Post-apply verification passed: estimates tables/columns/constraints/FKs/checks/indexes/policies verified; RLS enabled on all three estimates tables; row counts `0`
    - Non-invasive production route smoke (`/`, `/ops`, `/estimates`, `/portal`) returned login-gated pages; no public/unauthenticated estimates surface observed
    - Boundaries preserved: no estimate records/emails/PDFs, no customer/public/contractor estimate exposure, no env/flag/code/provisioning changes, no Estimate Communications or Product Mode migration apply
+   - Next migration window is V1H-only: target `20260502120000_estimate_communications_v1h.sql` only
+   - V1H-only window must use isolated artifact/worktree include list `20260501120000`, `20260501140000`, `20260502120000` and exclude `20260509120000`
+   - V1H-only sequence remains dry-run first, hard approval stop, apply only after explicit owner approval
+   - V1H-only boundaries remain strict: `ENABLE_ESTIMATES` false/unset, `ENABLE_ESTIMATE_EMAIL_SEND` false/unset, no email/PDF/public exposure/estimate-record creation/conversion/payment/QBO/support-console changes
 2. Support Console production enablement
    - Controlled by Support Console runbook
    - V1 read-only, account-scoped, no impersonation, no tenant mutation

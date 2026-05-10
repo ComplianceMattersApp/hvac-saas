@@ -273,6 +273,10 @@ The following product-configuration work is **explicitly parked** and **not in c
   - Estimates V1A schema-domain production migration execution is complete for `20260501140000_estimates_v1a_schema_domain.sql` on production ref `ornrnvxtwwtulohqwxop`, using an isolated artifact from commit `a200a17` with dry-run and explicit approval before apply.
   - Feature remains runbook-gated and disabled for public/customer/contractor exposure; no estimate email/PDF/public-link/customer-portal enablement occurred.
   - `20260502120000_estimate_communications_v1h.sql` remains pending in production.
+  - Next migration window is V1H-only and must target only `20260502120000_estimate_communications_v1h.sql`.
+  - Product Mode migration `20260509120000_account_settings_product_mode_v1.sql` must remain excluded from the V1H window.
+  - V1H window must use isolated artifact/worktree include set `20260501120000`, `20260501140000`, `20260502120000` and exclude `20260509120000`.
+  - V1H window remains disabled-state only: `ENABLE_ESTIMATES` false/unset, `ENABLE_ESTIMATE_EMAIL_SEND` false/unset, no outbound email/PDF/public exposure/estimate-record creation/conversion/payment/QBO/support-console changes.
 - Recurring maintenance agreements / service subscriptions (capability exists; not in release scope)
 - Tenant payment execution (Stripe subscription/checkout; parked)
 - QBO integration (optional downstream; parked)
@@ -2281,7 +2285,7 @@ New business modules must not regress:
 - Execution used isolated single-migration worktree strategy from commit `ab1fb34`, with dry-run and explicit approval before apply.
 - Post-apply verification passed: support tables/indexes/constraints present, RLS enabled, no support-table policies, no grants for PUBLIC/anon/authenticated, and all support-table row counts remained `0`.
 - Execution boundaries remained intact: `ENABLE_SUPPORT_CONSOLE` stayed false/unset; no support seeding/grants/sessions/live audit generation; no Estimates/Estimate Communications/Product Mode migration bundled.
-- Current production pending set after this window: `20260501140000_estimates_v1a_schema_domain.sql`, `20260502120000_estimate_communications_v1h.sql`, `20260509120000_account_settings_product_mode_v1.sql`.
+- Current production pending set after this window: `20260502120000_estimate_communications_v1h.sql`, `20260509120000_account_settings_product_mode_v1.sql`.
 - Main workspace Supabase link remains production ref; future sandbox work must relink/verify sandbox explicitly before any sandbox operation.
 - Future support rollout remains explicit and later-scoped:
   - production migration approval
