@@ -7,6 +7,7 @@
 
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requireInternalUser } from "@/lib/auth/internal-user";
+import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import {
   buildEstimateNumber,
   loadScopedCustomerForEstimate,
@@ -26,6 +27,248 @@ import {
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 
 export { getEstimateById, listEstimatesByAccount };
+
+function normalizeLocationPart(value: string | null | undefined) {
+  return String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function validLocationZip(zip: string) {
+  return /^\d{5}(?:-\d{4})?$/.test(zip);
+}
+
+function splitName(name: string) {
+  const cleaned = String(name ?? "").trim().replace(/\s+/g, " ");
+  if (!cleaned) {
+    return { firstName: "", lastName: "" };
+  }
+
+  const parts = cleaned.split(" ").filter(Boolean);
+  const firstName = parts[0] ?? "";
+  const lastName = parts.slice(1).join(" ");
+  return { firstName, lastName };
+}
+
+export type EstimateCustomerAssistParams = {
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string | null;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  state: string;
+  zip: string;
+};
+
+export type EstimateCustomerAssistResult =
+  | {
+      success: true;
+      customerId: string;
+      locationId: string;
+      customer: {
+        id: string;
+        full_name: string | null;
+        first_name: string | null;
+        last_name: string | null;
+        phone: string | null;
+        email: string | null;
+      };
+      location: {
+        id: string;
+        customer_id: string;
+        address_line1: string | null;
+        address_line2: string | null;
+        city: string | null;
+        state: string | null;
+        zip: string | null;
+        nickname: string | null;
+      };
+      reusedCustomer: boolean;
+      reusedLocation: boolean;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+export async function resolveEstimateCustomerLocationAssist(
+  params: EstimateCustomerAssistParams
+): Promise<EstimateCustomerAssistResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
+  const customerName = String(params.customerName ?? "").trim().replace(/\s+/g, " ");
+  const customerPhone = String(params.customerPhone ?? "").trim();
+  const customerEmail = String(params.customerEmail ?? "").trim() || null;
+  const addressLine1 = String(params.addressLine1 ?? "").trim().replace(/\s+/g, " ");
+  const addressLine2 = String(params.addressLine2 ?? "").trim().replace(/\s+/g, " ") || null;
+  const city = String(params.city ?? "").trim().replace(/\s+/g, " ");
+  const state = String(params.state ?? "").trim().toUpperCase();
+  const zip = String(params.zip ?? "").trim();
+
+  if (!customerName) {
+    return { success: false, error: "Customer name is required." };
+  }
+  if (!customerPhone) {
+    return { success: false, error: "Customer phone is required." };
+  }
+  if (!addressLine1 || !city || !state || !zip) {
+    return {
+      success: false,
+      error: "Address, city, state, and ZIP are required.",
+    };
+  }
+  if (!validLocationZip(zip)) {
+    return {
+      success: false,
+      error: "ZIP must be 5 digits (or ZIP+4).",
+    };
+  }
+
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+  const admin = createAdminClient();
+
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  if (!accountOwnerUserId) {
+    return { success: false, error: "Internal account scope is required." };
+  }
+
+  const { firstName, lastName } = splitName(customerName);
+
+  const { customerId, reused: reusedCustomer } = await findOrCreateCustomer({
+    supabase: admin,
+    firstName,
+    lastName,
+    phone: customerPhone,
+    email: customerEmail,
+    ownerUserId: accountOwnerUserId,
+  });
+
+  const locationAddressNorm = normalizeLocationPart(addressLine1);
+  const locationAddress2Norm = normalizeLocationPart(addressLine2);
+  const locationCityNorm = normalizeLocationPart(city);
+  const locationStateNorm = normalizeLocationPart(state);
+  const locationZipNorm = normalizeLocationPart(zip);
+
+  const { data: customerLocations, error: locationsErr } = await admin
+    .from("locations")
+    .select("id, customer_id, address_line1, address_line2, city, state, zip, postal_code, nickname")
+    .eq("owner_user_id", accountOwnerUserId)
+    .eq("customer_id", customerId);
+  if (locationsErr) throw locationsErr;
+
+  const existingLocation = (customerLocations ?? []).find((row: any) => {
+    const rowAddress1 = normalizeLocationPart(row.address_line1);
+    const rowAddress2 = normalizeLocationPart(row.address_line2);
+    const rowCity = normalizeLocationPart(row.city);
+    const rowState = normalizeLocationPart(row.state);
+    const rowZip = normalizeLocationPart(row.zip ?? row.postal_code);
+
+    if (!rowAddress1 || !rowCity) return false;
+    if (rowAddress1 !== locationAddressNorm) return false;
+    if (rowCity !== locationCityNorm) return false;
+    if (locationStateNorm && rowState && rowState !== locationStateNorm) return false;
+    if (locationZipNorm && rowZip && rowZip !== locationZipNorm) return false;
+    if (locationAddress2Norm && rowAddress2 && rowAddress2 !== locationAddress2Norm) {
+      return false;
+    }
+    return true;
+  });
+
+  let locationId = "";
+  let reusedLocation = false;
+  let locationSnapshot: {
+    id: string;
+    customer_id: string;
+    address_line1: string | null;
+    address_line2: string | null;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+    nickname: string | null;
+  } | null = null;
+
+  if (existingLocation?.id) {
+    locationId = String(existingLocation.id);
+    reusedLocation = true;
+    locationSnapshot = {
+      id: locationId,
+      customer_id: String(existingLocation.customer_id ?? customerId),
+      address_line1: String(existingLocation.address_line1 ?? "").trim() || null,
+      address_line2: String(existingLocation.address_line2 ?? "").trim() || null,
+      city: String(existingLocation.city ?? "").trim() || null,
+      state: String(existingLocation.state ?? "").trim() || null,
+      zip:
+        String(existingLocation.zip ?? existingLocation.postal_code ?? "").trim() || null,
+      nickname: String(existingLocation.nickname ?? "").trim() || null,
+    };
+  } else {
+    const { data: insertedLocation, error: insertLocationErr } = await admin
+      .from("locations")
+      .insert({
+        owner_user_id: accountOwnerUserId,
+        customer_id: customerId,
+        address_line1: addressLine1,
+        address_line2: addressLine2,
+        city,
+        state,
+        zip,
+        postal_code: zip,
+      })
+      .select("id, customer_id, address_line1, address_line2, city, state, zip, nickname")
+      .single();
+    if (insertLocationErr) throw insertLocationErr;
+
+    locationId = String(insertedLocation.id ?? "").trim();
+    locationSnapshot = {
+      id: locationId,
+      customer_id: String(insertedLocation.customer_id ?? customerId),
+      address_line1: String(insertedLocation.address_line1 ?? "").trim() || null,
+      address_line2: String(insertedLocation.address_line2 ?? "").trim() || null,
+      city: String(insertedLocation.city ?? "").trim() || null,
+      state: String(insertedLocation.state ?? "").trim() || null,
+      zip: String(insertedLocation.zip ?? "").trim() || null,
+      nickname: String(insertedLocation.nickname ?? "").trim() || null,
+    };
+  }
+
+  if (!locationId) {
+    return { success: false, error: "Failed to resolve location." };
+  }
+
+  const { data: customerRow, error: customerReadErr } = await admin
+    .from("customers")
+    .select("id, full_name, first_name, last_name, phone, email")
+    .eq("owner_user_id", accountOwnerUserId)
+    .eq("id", customerId)
+    .maybeSingle();
+  if (customerReadErr) throw customerReadErr;
+
+  if (!customerRow?.id || !locationSnapshot) {
+    return { success: false, error: "Failed to resolve customer or location." };
+  }
+
+  return {
+    success: true,
+    customerId,
+    locationId,
+    reusedCustomer,
+    reusedLocation,
+    customer: {
+      id: String(customerRow.id),
+      full_name: String(customerRow.full_name ?? "").trim() || null,
+      first_name: String(customerRow.first_name ?? "").trim() || null,
+      last_name: String(customerRow.last_name ?? "").trim() || null,
+      phone: String(customerRow.phone ?? "").trim() || null,
+      email: String(customerRow.email ?? "").trim() || null,
+    },
+    location: locationSnapshot,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Create estimate draft

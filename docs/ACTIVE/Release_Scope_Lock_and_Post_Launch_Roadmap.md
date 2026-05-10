@@ -287,6 +287,8 @@ The following are explicitly runbook-gated and must remain controlled:
    - Internal-only feature enablement execution completed: `ENABLE_ESTIMATES=true` enabled in Vercel Production only, successful production redeploy, and alias confirmed at `https://hvac-saas-xi.vercel.app`
    - Post-enable unauthenticated checks passed: `/estimates` and `/estimates/new` remained login-gated
    - Authenticated internal production smoke passed: `/estimates` and `/estimates/new` load; smart customer picker (commit `235d0ce`) works in production; location field enables/scopes after customer selection
+   - Estimate New Customer Assist V1 is complete for `/estimates/new`: internal users can open inline `+ Add Customer`, create/reuse customer + service location in-flow, and auto-select the resolved canonical ids before saving draft estimates
+   - V1 boundaries preserved: no schema/migration/Supabase command/production data actions; no job/service_case/estimate_event/payment/exposure changes; no use of full `createJobFromForm`
    - Controlled smoke estimate created in production: `8796f8fc-04fb-4c53-bb05-15ab98ab31b4` (`EST-20260510-414FB343`) as `Draft`, with one manual line item (`Production smoke manual line item`, qty `1`, unit `$123.45`) and total `$123.45`
    - Enablement boundaries preserved: `ENABLE_ESTIMATE_EMAIL_SEND` remained unset/false; no outbound email/PDF/public links/contractor-customer exposure/conversion/payment/Stripe-tenant/QBO/Product Mode/Support Console changes
    - Warning/watch item: intermittent `net::ERR_ABORTED` browser-log events during navigation/action transitions; required smoke outcomes persisted successfully

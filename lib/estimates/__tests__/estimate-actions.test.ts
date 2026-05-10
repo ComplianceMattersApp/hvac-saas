@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
+const findOrCreateCustomerMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
@@ -19,6 +20,10 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("@/lib/auth/internal-user", () => ({
   requireInternalUser: (...args: unknown[]) => requireInternalUserMock(...args),
+}));
+
+vi.mock("@/lib/customers/findOrCreateCustomer", () => ({
+  findOrCreateCustomer: (...args: unknown[]) => findOrCreateCustomerMock(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -245,6 +250,7 @@ function makeAdminClient(params: {
 
 const {
   createEstimateDraft,
+  resolveEstimateCustomerLocationAssist,
   addEstimateLineItem,
   removeEstimateLineItem,
   transitionEstimateStatus,
@@ -566,6 +572,230 @@ describe("createEstimateDraft", () => {
       expect(result.estimateId).toBe("est-new-1");
       expect(result.estimateNumber).toMatch(/^EST-\d{8}-[0-9A-F]{8}$/);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveEstimateCustomerLocationAssist
+// ---------------------------------------------------------------------------
+
+describe("resolveEstimateCustomerLocationAssist", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    process.env.ENABLE_ESTIMATES = "true";
+  });
+
+  function setupAssistAdmin(params: {
+    existingLocations?: Array<Record<string, unknown>>;
+    insertedLocationId?: string;
+    customerRow?: Record<string, unknown>;
+  }) {
+    const existingLocations = params.existingLocations ?? [];
+    const insertedLocationId = params.insertedLocationId ?? "loc-new-1";
+    const customerRow =
+      params.customerRow ??
+      ({
+        id: "cust-new-1",
+        full_name: "Jane Doe",
+        first_name: "Jane",
+        last_name: "Doe",
+        phone: "555-123-4567",
+        email: "jane@example.com",
+      } as Record<string, unknown>);
+
+    const insertedLocation = {
+      id: insertedLocationId,
+      customer_id: customerRow.id,
+      address_line1: "101 Main St",
+      address_line2: null,
+      city: "Los Angeles",
+      state: "CA",
+      zip: "90001",
+      nickname: null,
+    };
+
+    return {
+      from: vi.fn((table: string) => {
+        if (table === "locations") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(async () => ({
+                  data: existingLocations,
+                  error: null,
+                })),
+              })),
+            })),
+            insert: vi.fn(() => ({
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({
+                  data: insertedLocation,
+                  error: null,
+                })),
+              })),
+            })),
+          };
+        }
+        if (table === "customers") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({
+                    data: customerRow,
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          };
+        }
+        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: null, error: null })) })) })) };
+      }),
+    };
+  }
+
+  it("creates customer/location and returns resolved ids", async () => {
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(makeSupabaseClient({}));
+    findOrCreateCustomerMock.mockResolvedValue({ customerId: "cust-new-1", reused: false });
+    const admin = setupAssistAdmin({ existingLocations: [] });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await resolveEstimateCustomerLocationAssist({
+      customerName: "Jane Doe",
+      customerPhone: "555-123-4567",
+      customerEmail: "jane@example.com",
+      addressLine1: "101 Main St",
+      city: "Los Angeles",
+      state: "CA",
+      zip: "90001",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.customerId).toBe("cust-new-1");
+      expect(result.locationId).toBe("loc-new-1");
+      expect(result.reusedCustomer).toBe(false);
+      expect(result.reusedLocation).toBe(false);
+    }
+    expect(findOrCreateCustomerMock).toHaveBeenCalledTimes(1);
+    expect(admin.from).not.toHaveBeenCalledWith("estimates");
+    expect(admin.from).not.toHaveBeenCalledWith("jobs");
+    expect(admin.from).not.toHaveBeenCalledWith("service_cases");
+    expect(admin.from).not.toHaveBeenCalledWith("estimate_events");
+  });
+
+  it("reuses existing customer and location", async () => {
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(makeSupabaseClient({}));
+    findOrCreateCustomerMock.mockResolvedValue({ customerId: "cust-existing-1", reused: true });
+
+    const admin = setupAssistAdmin({
+      existingLocations: [
+        {
+          id: "loc-existing-1",
+          customer_id: "cust-existing-1",
+          address_line1: "101 Main St",
+          address_line2: "Unit 5",
+          city: "Los Angeles",
+          state: "CA",
+          zip: "90001",
+          postal_code: "90001",
+          nickname: null,
+        },
+      ],
+      customerRow: {
+        id: "cust-existing-1",
+        full_name: "Jane Doe",
+        first_name: "Jane",
+        last_name: "Doe",
+        phone: "555-123-4567",
+        email: "jane@example.com",
+      },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await resolveEstimateCustomerLocationAssist({
+      customerName: "Jane Doe",
+      customerPhone: "555-123-4567",
+      customerEmail: "jane@example.com",
+      addressLine1: "101 Main St",
+      addressLine2: "Unit 5",
+      city: "Los Angeles",
+      state: "CA",
+      zip: "90001",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.customerId).toBe("cust-existing-1");
+      expect(result.locationId).toBe("loc-existing-1");
+      expect(result.reusedCustomer).toBe(true);
+      expect(result.reusedLocation).toBe(true);
+    }
+
+    const locationTable = admin.from.mock.results
+      .map((entry: any) => entry.value)
+      .find((value: any) => Boolean(value?.insert));
+    expect(locationTable?.insert).not.toHaveBeenCalled();
+  });
+
+  it("returns validation error for missing required location fields", async () => {
+    process.env.ENABLE_ESTIMATES = "true";
+
+    const result = await resolveEstimateCustomerLocationAssist({
+      customerName: "Jane Doe",
+      customerPhone: "555-123-4567",
+      customerEmail: "jane@example.com",
+      addressLine1: "",
+      city: "",
+      state: "",
+      zip: "",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Address, city, state, and ZIP are required.",
+    });
+    expect(requireInternalUserMock).not.toHaveBeenCalled();
+  });
+
+  it("denies non-internal actors via requireInternalUser", async () => {
+    createClientMock.mockResolvedValue(makeSupabaseClient({}));
+    requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
+
+    await expect(
+      resolveEstimateCustomerLocationAssist({
+        customerName: "Jane Doe",
+        customerPhone: "555-123-4567",
+        customerEmail: "jane@example.com",
+        addressLine1: "101 Main St",
+        city: "Los Angeles",
+        state: "CA",
+        zip: "90001",
+      })
+    ).rejects.toThrow("Active internal user required.");
+  });
+
+  it("returns unavailable when ENABLE_ESTIMATES is disabled", async () => {
+    process.env.ENABLE_ESTIMATES = "false";
+
+    const result = await resolveEstimateCustomerLocationAssist({
+      customerName: "Jane Doe",
+      customerPhone: "555-123-4567",
+      customerEmail: "jane@example.com",
+      addressLine1: "101 Main St",
+      city: "Los Angeles",
+      state: "CA",
+      zip: "90001",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Estimates are currently unavailable.",
+    });
+    expect(requireInternalUserMock).not.toHaveBeenCalled();
   });
 });
 

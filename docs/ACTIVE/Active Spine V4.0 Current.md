@@ -21,6 +21,11 @@ Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No co
 
 Current Program Status Note (May 2026)
 
+- Estimate New Customer Assist V1 is complete for `/estimates/new`:
+  - Internal users can add/reuse customer + service location inline from the estimate draft form and continue without leaving the flow.
+  - The assist action resolves canonical customer/location ids and auto-selects them in-form before draft creation.
+  - Boundaries preserved: no schema/migration/Supabase command/production data action; no job/service_case/event/payment/public-exposure changes.
+
 - Service Workflow / Visit Scope Field Experience V1 Slice 1 is complete:
   - Service job detail now uses clearer field-first Work Items guidance.
   - Prior "confirm the work" helper wording was replaced to avoid implying a required validation action.
