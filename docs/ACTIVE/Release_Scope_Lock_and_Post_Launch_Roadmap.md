@@ -243,6 +243,18 @@ HVAC Service Surface Cleanup V1 closeout note:
 - ECC/HERS and Hybrid visibility behavior remains unchanged.
 - No permissions/security/RLS/contractor-authority/billing/report/data behavior changed.
 
+Owner Signup Visibility V1 closeout note:
+
+- Owner Signup Visibility V1 is implemented with best-effort observability only.
+- Self-serve signup now attempts a non-blocking platform-owner notification after successful provisioning, product-mode validation (for product-specific paths), and invite orchestration attempt.
+- Notification delivery failure is warning-only and does not block signup submitted/neutral behavior.
+- New read-only route `/ops/owner-console` is guarded by explicit platform-owner allowlist env authority.
+- Authority is not derived from `product_mode`, tenant admin role, entitlement status, billing mode, or company attributes.
+- Allowlist envs: `PLATFORM_OWNER_EMAILS` and optional `PLATFORM_OWNER_USER_IDS`; guard fails closed when allowlist envs are empty/missing.
+- Notification recipient envs: `PLATFORM_OWNER_SIGNUP_NOTIFY_EMAIL` fallback to first valid address in `PLATFORM_OWNER_EMAILS`.
+- Scope boundaries preserved: not Support Console, no impersonation, no support-side mutation, no tenant edit/mutation actions, no billing/Stripe admin actions, no product-mode editing, no security/RLS changes, and no billing/payment/QBO behavior changes.
+- Hybrid customer mode remains a tenant workflow choice only and does not grant platform-wide visibility.
+
 Product Mode V2 production migration execution closeout note:
 
 - Production migration scope executed: `supabase/migrations/20260509120000_account_settings_product_mode_v1.sql` only.

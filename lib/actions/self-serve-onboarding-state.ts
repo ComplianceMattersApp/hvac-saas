@@ -30,5 +30,27 @@ export type SelfServeOnboardingDeps = {
     authUserId: string | null;
     accountOwnerUserId: string | null;
   }) => Promise<FirstOwnerInviteResult>;
+  loadOwnerSnapshot: (params: {
+    accountOwnerUserId: string | null;
+  }) => Promise<{
+    companyName: string | null;
+    ownerDisplayName: string | null;
+    billingMode: string | null;
+    planKey: string | null;
+    entitlementStatus: string | null;
+  } | null>;
+  notifyPlatformOwnerSignup: (params: {
+    companyName: string;
+    ownerEmail: string;
+    ownerDisplayName: string | null;
+    signupPath: "generic" | "service" | "ecc";
+    productMode: "hybrid" | "hvac_service" | "ecc_hers" | null;
+    billingMode: string | null;
+    entitlementStatus: string | null;
+    planKey: string | null;
+    accountOwnerUserId: string | null;
+    inviteStatus: string;
+    timestampIso: string;
+  }) => Promise<{ sent: boolean; recipient: string | null }>;
   log: (message: string, details?: Record<string, unknown>) => void;
 };

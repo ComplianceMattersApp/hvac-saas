@@ -11,6 +11,7 @@ import {
   orchestrateFirstOwnerInvite,
   type FirstOwnerInviteDeps,
 } from "@/lib/business/first-owner-invite";
+import { sendPlatformOwnerSignupNotification } from "@/lib/business/platform-owner-signup-notification";
 import type { ProductMode } from "@/lib/business/product-mode-defaults";
 import type { PricebookSeedInsertRow } from "@/lib/business/pricebook-seeding";
 import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
@@ -38,6 +39,27 @@ function resolveProductModeFromSignupIntent(value: unknown): ProductMode | null 
   if (intent === "service") return "hvac_service";
   if (intent === "ecc") return "ecc_hers";
   return "invalid";
+}
+
+function resolveSignupPath(value: ProductMode | null): "generic" | "service" | "ecc" {
+  if (value === "hvac_service") return "service";
+  if (value === "ecc_hers") return "ecc";
+  return "generic";
+}
+
+function resolveInviteStatus(inviteResult: {
+  inviteSent: boolean;
+  inviteSkippedReason?: string;
+  errors: Array<{ code: string }>;
+}) {
+  if (inviteResult.inviteSent) return "invite_sent";
+  if (inviteResult.errors.length > 0) {
+    return `invite_error:${inviteResult.errors.map((error) => error.code).join(",")}`;
+  }
+  if (inviteResult.inviteSkippedReason) {
+    return `invite_skipped:${inviteResult.inviteSkippedReason}`;
+  }
+  return "invite_not_sent";
 }
 
 function submittedNeutralState(): SelfServeOnboardingState {
@@ -427,6 +449,46 @@ function createRealDeps(): SelfServeOnboardingDeps {
   return {
     provision: async (input) => provisionFirstOwnerAccount({ input, client: provisioningClient }),
     invite: async (params) => orchestrateFirstOwnerInvite({ ...params, deps: inviteDeps }),
+    loadOwnerSnapshot: async ({ accountOwnerUserId }) => {
+      const ownerId = toCleanString(accountOwnerUserId);
+      if (!ownerId) return null;
+
+      const [{ data: businessProfile }, { data: entitlement }, { data: profile }] = await Promise.all([
+        admin
+          .from("internal_business_profiles")
+          .select("display_name, billing_mode")
+          .eq("account_owner_user_id", ownerId)
+          .maybeSingle(),
+        admin
+          .from("platform_account_entitlements")
+          .select("plan_key, entitlement_status")
+          .eq("account_owner_user_id", ownerId)
+          .maybeSingle(),
+        admin.from("profiles").select("full_name").eq("id", ownerId).maybeSingle(),
+      ]);
+
+      return {
+        companyName: toCleanString((businessProfile as any)?.display_name) || null,
+        ownerDisplayName: toCleanString((profile as any)?.full_name) || null,
+        billingMode: toCleanString((businessProfile as any)?.billing_mode) || null,
+        planKey: toCleanString((entitlement as any)?.plan_key) || null,
+        entitlementStatus: toCleanString((entitlement as any)?.entitlement_status) || null,
+      };
+    },
+    notifyPlatformOwnerSignup: async (params) =>
+      sendPlatformOwnerSignupNotification({
+        companyName: params.companyName,
+        ownerEmail: params.ownerEmail,
+        ownerDisplayName: params.ownerDisplayName,
+        signupPath: params.signupPath,
+        productMode: params.productMode,
+        billingMode: params.billingMode,
+        entitlementStatus: params.entitlementStatus,
+        planKey: params.planKey,
+        accountOwnerUserId: params.accountOwnerUserId,
+        inviteStatus: params.inviteStatus,
+        timestampIso: params.timestampIso,
+      }),
     log: (message, details) => {
       console.warn(message, details ?? {});
     },
@@ -536,6 +598,32 @@ export async function submitSelfServeOnboardingForm(
       deps.log("self-serve onboarding invite failed", {
         email,
         errorCodes: inviteResult.errors.map((error) => error.code),
+      });
+    }
+
+    const ownerSnapshot = await deps.loadOwnerSnapshot({
+      accountOwnerUserId: provisioning.accountOwnerUserId,
+    });
+
+    try {
+      await deps.notifyPlatformOwnerSignup({
+        companyName: ownerSnapshot?.companyName || businessDisplayName,
+        ownerEmail: email,
+        ownerDisplayName: ownerSnapshot?.ownerDisplayName || ownerDisplayName,
+        signupPath: resolveSignupPath(selectedProductMode),
+        productMode: provisioning.productModeCapture.selectedProductMode,
+        billingMode: ownerSnapshot?.billingMode || null,
+        entitlementStatus: ownerSnapshot?.entitlementStatus || null,
+        planKey: ownerSnapshot?.planKey || null,
+        accountOwnerUserId: provisioning.accountOwnerUserId,
+        inviteStatus: resolveInviteStatus(inviteResult),
+        timestampIso: new Date().toISOString(),
+      });
+    } catch (notifyError) {
+      deps.log("self-serve onboarding platform owner notification failed", {
+        email,
+        accountOwnerUserId: provisioning.accountOwnerUserId,
+        message: notifyError instanceof Error ? notifyError.message : String(notifyError),
       });
     }
 

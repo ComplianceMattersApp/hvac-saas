@@ -43,6 +43,17 @@ function makeDeps(overrides?: Partial<SelfServeOnboardingDeps>): SelfServeOnboar
       warnings: [],
       errors: [],
     })),
+    loadOwnerSnapshot: vi.fn(async () => ({
+      companyName: "Owner Business",
+      ownerDisplayName: "Owner User",
+      billingMode: "self_serve",
+      planKey: "starter",
+      entitlementStatus: "trial",
+    })),
+    notifyPlatformOwnerSignup: vi.fn(async () => ({
+      sent: true,
+      recipient: "owner@example.com",
+    })),
     log: vi.fn(),
     ...overrides,
   };
@@ -129,6 +140,12 @@ describe("submitSelfServeOnboardingForm", () => {
       }),
     );
     expect(deps.invite).toHaveBeenCalled();
+    expect(deps.notifyPlatformOwnerSignup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signupPath: "service",
+        productMode: "hvac_service",
+      }),
+    );
   });
 
   it("passes ECC signup intent into provisioning as ecc_hers", async () => {
@@ -157,6 +174,12 @@ describe("submitSelfServeOnboardingForm", () => {
       }),
     );
     expect(deps.invite).toHaveBeenCalled();
+    expect(deps.notifyPlatformOwnerSignup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signupPath: "ecc",
+        productMode: "ecc_hers",
+      }),
+    );
   });
 
   it("does not pass product mode for generic signup", async () => {
@@ -171,6 +194,11 @@ describe("submitSelfServeOnboardingForm", () => {
     expect(deps.provision).toHaveBeenCalledWith(
       expect.not.objectContaining({
         productMode: expect.anything(),
+      }),
+    );
+    expect(deps.notifyPlatformOwnerSignup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signupPath: "generic",
       }),
     );
   });
@@ -215,6 +243,7 @@ describe("submitSelfServeOnboardingForm", () => {
     expect(result.status).toBe("error");
     expect(result.message).toContain("product setup");
     expect(deps.invite).not.toHaveBeenCalled();
+    expect(deps.notifyPlatformOwnerSignup).not.toHaveBeenCalled();
   });
 
   it("blocks product-specific success when provisioning captures a different mode", async () => {
@@ -240,6 +269,7 @@ describe("submitSelfServeOnboardingForm", () => {
     expect(result.status).toBe("error");
     expect(result.message).toContain("product setup");
     expect(deps.invite).not.toHaveBeenCalled();
+    expect(deps.notifyPlatformOwnerSignup).not.toHaveBeenCalled();
   });
 
   it("uses shared invite orchestration after successful provisioning", async () => {
@@ -261,6 +291,7 @@ describe("submitSelfServeOnboardingForm", () => {
         accountOwnerUserId: "owner-1",
       }),
     );
+    expect(deps.notifyPlatformOwnerSignup).toHaveBeenCalled();
   });
 
   it("returns neutral submitted response for existing/duplicate email paths", async () => {
@@ -309,5 +340,64 @@ describe("submitSelfServeOnboardingForm", () => {
     expect(result.status).toBe("submitted");
     expect(result.message).toContain("If eligible");
     expect(deps.invite).not.toHaveBeenCalled();
+    expect(deps.notifyPlatformOwnerSignup).not.toHaveBeenCalled();
+  });
+
+  it("logs notification failures but still returns submitted state", async () => {
+    const deps = makeDeps({
+      provision: vi.fn(async () =>
+        makeProvisioningResult({
+          productModeCapture: {
+            selectedProductMode: "hvac_service",
+            applyReady: true,
+            action: "created",
+            issues: [],
+          },
+        }),
+      ),
+      notifyPlatformOwnerSignup: vi.fn(async () => {
+        throw new Error("notification transport failure");
+      }),
+    });
+
+    const result = await submitSelfServeOnboardingForm(
+      INITIAL_SELF_SERVE_ONBOARDING_STATE,
+      makeProductFormData("service"),
+      deps,
+    );
+
+    expect(result.status).toBe("submitted");
+    expect(deps.notifyPlatformOwnerSignup).toHaveBeenCalled();
+    expect(deps.log).toHaveBeenCalledWith(
+      "self-serve onboarding platform owner notification failed",
+      expect.objectContaining({
+        email: "owner@example.com",
+      }),
+    );
+  });
+
+  it("does not send platform owner notification when provisioning fails", async () => {
+    const deps = makeDeps({
+      provision: vi.fn(async () =>
+        makeProvisioningResult({
+          status: "failed",
+          errors: [
+            {
+              code: "AUTH_CREATE_FAILED",
+              stage: "auth",
+              message: "create user failed",
+            },
+          ],
+        }),
+      ),
+    });
+
+    await submitSelfServeOnboardingForm(
+      INITIAL_SELF_SERVE_ONBOARDING_STATE,
+      makeProductFormData("service"),
+      deps,
+    );
+
+    expect(deps.notifyPlatformOwnerSignup).not.toHaveBeenCalled();
   });
 });

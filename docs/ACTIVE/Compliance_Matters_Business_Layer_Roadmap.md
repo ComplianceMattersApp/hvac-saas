@@ -395,6 +395,16 @@ HVAC Service Surface Cleanup V1 closeout note:
 - ECC/HERS and Hybrid visibility behavior is preserved.
 - No permissions/security/RLS/contractor-authority/billing/report/data behavior changed.
 
+Owner Signup Visibility V1 closeout note:
+
+- Owner Signup Visibility V1 is implemented as a read-only allowlisted observability slice.
+- Self-serve signup now performs a best-effort owner notification only after successful provisioning, product-specific mode validation where applicable, and invite orchestration attempt.
+- Notification delivery failure is warning-only and does not block signup success/neutral submitted behavior.
+- New route `/ops/owner-console` provides platform-wide account/user/product-mode summaries and is intentionally separate from Support Console.
+- Access authority is explicit env allowlist only (`PLATFORM_OWNER_EMAILS`, optional `PLATFORM_OWNER_USER_IDS`) and fails closed when allowlists are empty/missing.
+- Access is not granted by `product_mode` (including `hybrid`), tenant admin role, billing mode, entitlement status, or company profile metadata.
+- Scope boundaries remain intact: no impersonation, no support-side mutation, no tenant data edit actions, no product-mode editing, no billing/Stripe admin actions, and no security/RLS behavior changes.
+
 Sandbox migration apply closeout (2026-05-09):
 
 - Initial guarded attempt correctly stopped when production ref `ornrnvxtwwtulohqwxop` was detected; no writes occurred in that stopped attempt.

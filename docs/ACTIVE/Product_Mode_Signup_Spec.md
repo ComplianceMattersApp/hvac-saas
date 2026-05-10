@@ -594,6 +594,16 @@ Out of scope for this slice:
 - no payment/SMS/QBO work
 - no codebase split
 
+## 14. Owner Signup Visibility V1 Closeout
+
+- Owner Signup Visibility V1 is implemented as an allowlisted observability slice and is not a Hybrid tenant feature.
+- Best-effort owner notification now runs after successful signup provisioning and invite orchestration attempt; notification failure is non-blocking.
+- Read-only Platform Owner Dashboard route is `/ops/owner-console`.
+- Dashboard authority is env allowlist based (`PLATFORM_OWNER_EMAILS`, optional `PLATFORM_OWNER_USER_IDS`) and fails closed when allowlist envs are empty/missing.
+- Notification recipient uses `PLATFORM_OWNER_SIGNUP_NOTIFY_EMAIL` with fallback to first valid `PLATFORM_OWNER_EMAILS` value.
+- Platform owner authority is not derived from `product_mode`, including `hybrid`.
+- Scope boundaries preserved: not Support Console, no impersonation, no support-side mutation, no tenant data editing, no product-mode editing, no billing/payment/QBO/security/RLS behavior changes.
+
 ## Cross-Reference Notes
 
 This spec aligns with:
