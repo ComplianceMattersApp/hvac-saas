@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import NewJobForm from "./NewJobForm";
+import { resolveDefaultJobTypeForAccountOwnerId } from "@/lib/business/product-mode-defaults";
 
 type ExistingCustomerRow = {
   id: string;
@@ -75,6 +76,7 @@ export default async function NewJobPage(props: {
 
   // Identify contractor user (multi-user per contractor)
   let myContractor: { id: string; name: string } | null = null;
+  let initialJobType: "ecc" | "service" = "ecc";
 
   const { data: cu, error: cuErr } = await supabase
     .from("contractor_users")
@@ -119,6 +121,12 @@ export default async function NewJobPage(props: {
     if (internalUserErr) throw new Error(internalUserErr.message);
 
     const accountOwnerUserId = String(internalUserRow?.account_owner_user_id ?? "").trim();
+    initialJobType = accountOwnerUserId
+      ? await resolveDefaultJobTypeForAccountOwnerId({
+          supabase,
+          accountOwnerUserId,
+        })
+      : "ecc";
     if (accountOwnerUserId && internalUserRow?.is_active !== false) {
       const { data: pricebookRows, error: pricebookRowsErr } = await supabase
         .from("pricebook_items")
@@ -217,6 +225,7 @@ export default async function NewJobPage(props: {
       submittedProposalId={submittedProposalId}
       customerContextMode={customerContextMode}
       customerContextSource={customerContextMode ? "customer" : null}
+      initialJobType={initialJobType}
       pricebookTemplateItems={pricebookTemplateItems}
     />
   );

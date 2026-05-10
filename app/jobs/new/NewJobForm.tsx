@@ -326,6 +326,7 @@ export default function NewJobForm({
   submittedProposalId,
   customerContextMode = false,
   customerContextSource = null,
+  initialJobType,
   pricebookTemplateItems = [],
 }: {
   contractors: Contractor[];
@@ -338,6 +339,7 @@ export default function NewJobForm({
   submittedProposalId?: string | null;
   customerContextMode?: boolean;
   customerContextSource?: string | null;
+  initialJobType?: "ecc" | "service";
   pricebookTemplateItems?: VisitScopePricebookTemplateItem[];
 }) {
 
@@ -381,7 +383,7 @@ export default function NewJobForm({
   // Contractor selection (internal/admin only). Contractor users are auto-tied.
  const [contractorId, setContractorId] = useState<string>(() => myContractor?.id ?? "");
 
-  const defaultJobType: "ecc" | "service" = myContractor?.id ? "ecc" : "service";
+  const defaultJobType: "ecc" | "service" = myContractor?.id ? "ecc" : (initialJobType ?? "service");
   const [jobType, setJobType] = useState<"ecc" | "service">(defaultJobType);
   const [serviceCaseKind, setServiceCaseKind] = useState<
     "reactive" | "callback" | "warranty" | "maintenance"
@@ -2876,7 +2878,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             <div className="mt-3 grid gap-3 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
               <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Job</p>
-                <p className="mt-1 font-medium text-slate-900">{jobType === "service" ? "Service" : `ECC (${projectType.replaceAll("_", " ")})`}</p>
+                <p className="mt-1 font-medium text-slate-900">{jobType === "service" ? "Service" : `ECC/HERS (${projectType.replaceAll("_", " ")})`}</p>
               </div>
               <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Customer</p>
