@@ -98,7 +98,7 @@ The following remain intentionally deferred/parked (not blockers for owner-relea
 6. Recurring services / maintenance agreements (customer-owned agreement V1; manual prep only; no automatic job generation).
 7. Customer portal (requires separate customer/location-scoped external visibility design).
 8. Service worker/offline/native app-store packaging.
-9. Product-mode configuration layer V2 (account-level settings table, nullable initial rollout, read-only admin display first).
+9. Product-mode configuration next slices (admin mutation/edit UI, signup capture, tier/add-on enforcement, and full mode-aware navigation/report/starter-kit behavior).
 10. Mode-aware navigation rendering.
 11. Mode-aware starter kits.
 12. Mode-aware report presets.
@@ -118,6 +118,31 @@ Product Mode V2 boundary note:
 - Product mode controls workflow relevance/defaults only.
 - Product mode must not control billing/payments, RLS/security, source-of-truth ownership, contractor authority, report datasets/calculations, tier/add-on enforcement, or feature flags.
 - Admin mutation/edit UI, signup capture, tier/add-on enforcement, and full navigation/report rewrites remain later.
+
+Product Mode V2 Slice 1 and ECC naming Phase 1 closeout note:
+
+- Product Mode V2 Slice 1 is implemented in commit `c42f4a2`.
+- ECC Naming Phase 1 is implemented in commit `6680ba8`.
+- Implemented V2 Slice 1 behavior:
+   - resolver now reads real `account_settings.product_mode` first
+   - fallback order remains: real setting -> temporary Slice 1 override -> signal fallback -> safe default
+   - mapping remains: `hybrid` -> ECC default, `ecc_hers` -> ECC default, `hvac_service` -> Service default
+   - contractor mode unchanged
+   - draft `jobType` still wins
+   - ECC and Service remain selectable
+- Implemented ECC naming Phase 1 behavior:
+   - visible user-facing/product copy now prefers "ECC" where this phase applied
+   - internal value `ecc_hers` remains intentionally unchanged
+   - `ProductMode` type remains intentionally unchanged
+   - `account_settings.product_mode` constraint remains intentionally unchanged
+   - resolver logic remains unchanged by naming cleanup
+   - internal enum/data migration remains deferred to a future Phase 2
+- Explicit non-actions:
+   - no production migration applied
+   - no Supabase db push run
+   - no backfill or provisioning
+   - no implication that product_mode is editable in admin yet
+   - no implication that signup mode capture exists yet
 
 ---
 

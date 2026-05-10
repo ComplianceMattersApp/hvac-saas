@@ -43,6 +43,29 @@ Product Mode V2 decision alignment:
 - Product mode controls workflow relevance/defaults only.
 - Product mode does **not** control billing, payments, RLS/security, source-of-truth behavior, contractor authority, report datasets/calculations, tier/add-on enforcement, or feature flags.
 
+Implementation closeout snapshot (2026-05-09):
+
+- Product Mode V2 Slice 1 is implemented in commit `c42f4a2`.
+- ECC Naming Phase 1 is implemented in commit `6680ba8`.
+- Resolver read precedence is now live in code as documented:
+	1. real account setting
+	2. temporary Slice 1 override
+	3. signal fallback
+	4. safe default
+- Mapping remains unchanged:
+	- `hybrid` -> ECC default
+	- `ecc_hers` -> ECC default
+	- `hvac_service` -> Service default
+- Contractor mode remains unchanged.
+- Draft `jobType` still wins.
+- ECC and Service remain selectable.
+- Customer-facing/product wording should prefer "ECC" where visible copy has been updated in Phase 1.
+- Internal storage/type values remain intentionally unchanged (`ecc_hers` remains valid and in use).
+- Internal enum/data migration is deferred to future Phase 2.
+- No production migration was applied.
+- No Supabase db push was run.
+- No backfill or provisioning occurred.
+
 ## 3. Product Modes
 
 Compliance Matters supports two primary product modes on one shared engine:
@@ -234,6 +257,7 @@ Product Mode V2 rollout boundary:
 - signup mode capture is later
 - tier/add-on enforcement is later
 - full mode-aware navigation/report rewrites are later
+- internal enum/data rename migration is later (Phase 2)
 
 ## 13. Non-Goals
 

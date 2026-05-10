@@ -1123,6 +1123,30 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Any move out of `public` must be handled as a dedicated search/index maintenance pass with regression testing.
 - Preferred timing: deliberate pre-launch hardening window or immediate post-launch maintenance, depending on stability risk.
 
+### 4.2 Product mode and naming closeout confirmations (completed docs record)
+- Product Mode V2 Slice 1 implementation is confirmed in commit `c42f4a2`.
+- ECC Naming Phase 1 implementation is confirmed in commit `6680ba8`.
+- Confirmed Product Mode V2 Slice 1 facts:
+  - account-level `account_settings` migration file was added
+  - nullable `product_mode` was added
+  - allowed values remain `hybrid`, `hvac_service`, `ecc_hers`
+  - resolver precedence is real setting -> temporary Slice 1 override -> signal fallback -> safe default
+  - `/jobs/new` mapping remains `hybrid` -> ECC default, `ecc_hers` -> ECC default, `hvac_service` -> Service default
+  - contractor mode unchanged
+  - draft `jobType` still wins
+  - ECC and Service remain selectable
+- Confirmed ECC Naming Phase 1 facts:
+  - customer-facing/product wording should prefer "ECC" where visible copy was updated
+  - internal storage/type naming remains intentionally unchanged (`ecc_hers`)
+  - resolver behavior was unchanged by naming cleanup
+  - internal enum/data migration remains deferred to future Phase 2
+- Explicitly not performed in this closeout:
+  - no production migration applied
+  - no Supabase db push run
+  - no backfill or provisioning
+  - no admin product-mode edit surface implied
+  - no signup product-mode capture implied
+
 ---
 
 ## 5. Final launch confirmation sweep

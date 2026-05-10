@@ -163,6 +163,46 @@ Rollout shape decision:
 - Tier/add-on enforcement is later.
 - Full mode-aware navigation/report rewrites are later.
 
+### 6.2 Implementation closeout snapshot (2026-05-09)
+
+Completed implementation references:
+
+- Product Mode V2 Slice 1 is implemented in commit `c42f4a2`.
+- ECC Naming Phase 1 is implemented in commit `6680ba8`.
+
+Product Mode V2 Slice 1 facts (implemented):
+
+- Added account-level `account_settings` migration file.
+- Added nullable `product_mode`.
+- Allowed values remain `hybrid`, `hvac_service`, `ecc_hers`.
+- Resolver now reads `account_settings.product_mode` first.
+- Resolver fallback order is:
+   1. real account setting
+   2. temporary Slice 1 override
+   3. signal fallback
+   4. safe default
+- Mapping remains:
+   - `hybrid` -> ECC default
+   - `ecc_hers` -> ECC default
+   - `hvac_service` -> Service default
+- Contractor mode is unchanged.
+- Draft `jobType` still wins.
+- ECC and Service remain selectable.
+
+ECC naming Phase 1 facts (implemented):
+
+- Customer-facing/product wording now prefers "ECC" in visible copy where this phase applied.
+- Internal code/storage may continue to use `ecc_hers` temporarily.
+- Internal enum/data migration is deferred to a future Phase 2.
+
+Explicit boundaries (not performed in these slices):
+
+- No production migration was applied.
+- No Supabase db push was run.
+- No backfill or provisioning occurred.
+- Do not treat this as admin-editable product mode.
+- Do not treat this as signup product-mode capture.
+
 ## 7. Signup Flow Concepts
 
 Possible future signup approaches:
@@ -250,6 +290,8 @@ Recommended future implementation order:
 8. Add admin mutation UI and tier/add-on enforcement later
 
 ## 13. Non-Goals
+
+Note: non-goals below are the original planning-slice non-goals for this spec document; see Section 6.2 for implemented closeout facts.
 
 Out of scope for this slice:
 

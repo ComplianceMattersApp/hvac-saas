@@ -329,6 +329,46 @@ Rollout decision:
 - tier/add-on enforcement is later
 - full mode-aware navigation/report rewrites are later
 
+### 3.7.2 Product Mode V2 Slice 1 and ECC naming Phase 1 closeout (implemented)
+
+Implementation references:
+
+- Product Mode V2 Slice 1: `c42f4a2`
+- ECC Naming Phase 1: `6680ba8`
+
+Confirmed implementation facts:
+
+- `account_settings` migration file was added for account-level settings.
+- Nullable `product_mode` was added with allowed values unchanged: `hybrid`, `hvac_service`, `ecc_hers`.
+- Resolver reads `account_settings.product_mode` first.
+- Resolver fallback order is now:
+  1. real account setting
+  2. temporary Slice 1 override
+  3. signal fallback
+  4. safe default
+- `/jobs/new` default mapping remains:
+  - `hybrid` -> ECC default
+  - `ecc_hers` -> ECC default
+  - `hvac_service` -> Service default
+- Contractor mode behavior is unchanged.
+- Draft `jobType` still wins over defaults.
+- ECC and Service remain selectable.
+
+ECC naming Phase 1 boundary:
+
+- Visible user-facing copy should prefer "ECC" where this phase applied.
+- Internal storage/type naming remains intentionally unchanged (`ecc_hers` still exists and is valid).
+- Resolver behavior is unchanged by naming cleanup.
+- Internal enum/data migration is deferred to a future Phase 2.
+
+Explicit non-actions for this closeout:
+
+- No production migration was applied.
+- No Supabase db push was run.
+- No backfill or provisioning occurred.
+- Product mode is not documented here as admin-editable yet.
+- Signup product-mode capture is still later.
+
 ### 3.8. Release-scope statement
 
 **Current Owner Release Posture (May 2026):**
