@@ -865,6 +865,28 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
   - manual estimate line add and draft remove remain working
   - sent/non-draft estimate lock behavior remains unchanged
   - no invoice or Visit Scope behavior changed
+- Completed: Estimate New Customer Assist V1 is implemented and verified on `/estimates/new`.
+  - existing smart customer picker remains unchanged for existing customers
+  - inline `+ Add Customer` opens customer/location fields directly inside the estimate flow
+  - inline fields include customer name, phone, optional email, address, optional address line 2, city, state, and ZIP
+  - customer/location creation remains internal-only
+  - customer remains canonical in `customers`; location remains canonical in `locations`
+  - estimate draft creation still links by `customer_id` and `location_id`
+  - no estimate is created until `Create Draft Estimate` is clicked
+  - full job intake path was not reused
+  - no job, service case, or `job_event` is created by the assist
+  - no schema/migration/RLS/feature-flag/email/PDF/public-link/customer-approval/conversion/payment/QBO/Product Mode/Support behavior changed
+- Completed: Estimate New Customer Assist V1 validation/closeout is documented.
+  - authenticated local smoke passed
+  - `+ Add Customer` opens
+  - `Cancel` closes
+  - saving a new customer/location selects both customer and location automatically
+  - draft creation redirects to estimate detail
+  - estimate detail shows expected customer/location
+  - `npx.cmd tsc --noEmit` passed
+  - targeted Vitest passed: `54/54` in `lib/estimates/__tests__/estimate-actions.test.ts`
+  - browser smoke found and fixed the location auto-select issue in commit `56a5fcc` (`Fix estimate assist location auto-select`)
+  - smoke-created estimate/customer/location were sandbox-only test data; no production cleanup was needed
 - Completed: Work Item-first Invoice Builder Clarity V1 is implemented and verified on draft internal invoice panel.
   - `Build Invoice Charges from Work Items` is now presented as the recommended path when Work Items are available
   - helper copy now states operators should start from Work Items already captured for the visit
