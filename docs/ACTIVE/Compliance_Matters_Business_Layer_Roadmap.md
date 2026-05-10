@@ -270,6 +270,9 @@ The following product-configuration work is **explicitly parked** and **not in c
 **Future Commercial Features (Parked):**
 - Customer portal (separate customer-scoped visibility; not in current external access scope)
 - Estimates production enablement (capability exists; not in release scope)
+  - Estimates V1A schema-domain production migration execution is complete for `20260501140000_estimates_v1a_schema_domain.sql` on production ref `ornrnvxtwwtulohqwxop`, using an isolated artifact from commit `a200a17` with dry-run and explicit approval before apply.
+  - Feature remains runbook-gated and disabled for public/customer/contractor exposure; no estimate email/PDF/public-link/customer-portal enablement occurred.
+  - `20260502120000_estimate_communications_v1h.sql` remains pending in production.
 - Recurring maintenance agreements / service subscriptions (capability exists; not in release scope)
 - Tenant payment execution (Stripe subscription/checkout; parked)
 - QBO integration (optional downstream; parked)

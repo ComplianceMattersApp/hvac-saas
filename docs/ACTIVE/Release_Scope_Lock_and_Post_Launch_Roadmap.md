@@ -90,7 +90,7 @@ Release scope lock statements:
 
 The following remain intentionally deferred/parked (not blockers for owner-release):
 
-1. Estimates production enablement (runbook-gated; currently disabled in production).
+1. Estimates production enablement (runbook-gated; feature remains disabled in production, with V1A schema migration applied).
 2. Support Console production enablement (runbook-gated; currently disabled).
 3. First-owner provisioning apply/invites outside controlled runbook operation.
 4. Tenant customer payment execution (online checkout/payment rail at tenant invoice layer; later Stripe-first invoice acceptance, separate from platform subscription billing).
@@ -250,6 +250,12 @@ The following are explicitly runbook-gated and must remain controlled:
 1. Estimates production enablement
    - Controlled by Estimates production enablement runbook
    - Internal-only boundaries; feature flags and migration gates required
+   - Estimates V1A production migration execution is complete for `20260501140000_estimates_v1a_schema_domain.sql` using isolated single-migration worktree strategy from commit `a200a17`
+   - Production ref for execution: `ornrnvxtwwtulohqwxop`; dry-run + explicit approval gates were completed before apply
+   - Isolated artifact included `20260501120000_support_access_v1a_foundation.sql` and `20260501140000_estimates_v1a_schema_domain.sql`, and excluded `20260502120000_estimate_communications_v1h.sql` and `20260509120000_account_settings_product_mode_v1.sql`
+   - Post-apply verification passed: estimates tables/columns/constraints/FKs/checks/indexes/policies verified; RLS enabled on all three estimates tables; row counts `0`
+   - Non-invasive production route smoke (`/`, `/ops`, `/estimates`, `/portal`) returned login-gated pages; no public/unauthenticated estimates surface observed
+   - Boundaries preserved: no estimate records/emails/PDFs, no customer/public/contractor estimate exposure, no env/flag/code/provisioning changes, no Estimate Communications or Product Mode migration apply
 2. Support Console production enablement
    - Controlled by Support Console runbook
    - V1 read-only, account-scoped, no impersonation, no tenant mutation
@@ -260,7 +266,7 @@ The following are explicitly runbook-gated and must remain controlled:
    - Production ref for execution: `ornrnvxtwwtulohqwxop`; dry-run + explicit approval gates were completed before apply
    - Post-apply production verification passed: support schema objects/indexes/constraints exist, RLS enabled, no support-table policies, no grants for PUBLIC/anon/authenticated, and zero support rows
    - Boundaries preserved: `ENABLE_SUPPORT_CONSOLE` remained false/unset; no support seeding/sessions/grants; no Estimates/Estimate Communications/Product Mode migration applied
-   - Remaining pending production migrations after this window: `20260501140000`, `20260502120000`, `20260509120000`
+   - Remaining pending production migrations after this window: `20260502120000`, `20260509120000`
 3. First Owner Provisioning
    - Controlled by first-owner provisioning runbook
    - Dry-run first, guarded apply, environment verification gates

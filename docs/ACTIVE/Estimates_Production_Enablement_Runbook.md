@@ -3,6 +3,7 @@
 Status: ACTIVE EXECUTION-CONTROLLED PLANNING ARTIFACT  
 Authority: Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md` and `docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md`  
 Scope: Production enablement procedure for Estimates V1 internal-only slice. No execution has occurred.
+Scope: Production enablement procedure for Estimates V1 internal-only slice. Includes documented closeout for completed V1A production migration execution.
 
 ---
 
@@ -54,6 +55,71 @@ The following are explicitly out of scope for this runbook and must not be enabl
 ### Execution rule
 
 Production enablement is allowed only after explicit gate approval at each phase, evidence capture, rollback readiness, and final sign-off. Each gate is a hard stop.
+
+### 1.1 Production execution closeout (completed May 9, 2026)
+
+Execution window outcome:
+- Estimates V1A production migration execution completed successfully.
+- Target migration applied in production: `20260501140000_estimates_v1a_schema_domain.sql`.
+- Production project ref for execution: `ornrnvxtwwtulohqwxop`.
+- Execution used an isolated single-migration artifact/worktree from commit `a200a17`.
+- Isolated artifact included only:
+	- `20260501120000_support_access_v1a_foundation.sql`
+	- `20260501140000_estimates_v1a_schema_domain.sql`
+- Isolated artifact excluded later pending migrations:
+	- `20260502120000_estimate_communications_v1h.sql`
+	- `20260509120000_account_settings_product_mode_v1.sql`
+- Dry-run completed before apply.
+- Explicit approval was received before apply.
+- Apply succeeded.
+- Benign `DROP POLICY IF EXISTS ... does not exist, skipping` notices were observed and were non-blocking.
+
+Post-apply verification outcome (read-only verification):
+- `public.estimates` exists.
+- `public.estimate_line_items` exists.
+- `public.estimate_events` exists.
+- RLS is enabled on all three estimates tables.
+- Expected columns exist.
+- Expected constraints/FKs/checks exist.
+- Expected indexes exist.
+- Expected account-scoped internal policies exist.
+- Row counts are all `0`:
+	- `estimates`: `0`
+	- `estimate_line_items`: `0`
+	- `estimate_events`: `0`
+- Migration history confirms `20260501140000` applied.
+- Later migrations remain unapplied:
+	- `20260502120000_estimate_communications_v1h.sql`
+	- `20260509120000_account_settings_product_mode_v1.sql`
+
+Non-invasive app smoke outcome:
+- Production routes checked: `/`, `/ops`, `/estimates`, `/portal`.
+- All returned login-gated pages.
+- No public/unauthenticated estimates surface observed.
+
+Boundaries preserved for this pass:
+- `ENABLE_ESTIMATES` remained false/unset unless previously intentionally set; no flag change occurred in this pass.
+- `ENABLE_ESTIMATE_EMAIL_SEND` remained false/unset; no flag change occurred in this pass.
+- No estimate records were created.
+- No estimate emails were sent.
+- No PDFs were generated.
+- No customer/public/contractor estimate exposure was enabled.
+- No Estimate Communications migration was applied.
+- No Product Mode migration was applied.
+- No Vercel/env/feature-flag changes occurred.
+- No code changes occurred in execution.
+- No provisioning or account/user changes occurred.
+- No Angkor onboarding occurred.
+- No billing/report/entitlement/contractor-authority/source-of-truth/navigation/signup/admin-edit changes occurred.
+
+Migration state after this execution window:
+- Applied in production:
+	- `20260501120000_support_access_v1a_foundation.sql`
+	- `20260501140000_estimates_v1a_schema_domain.sql`
+- Still pending in production:
+	- `20260502120000_estimate_communications_v1h.sql`
+	- `20260509120000_account_settings_product_mode_v1.sql`
+- Main workspace Supabase link remained production ref `ornrnvxtwwtulohqwxop`; future sandbox work must relink and re-verify explicitly.
 
 ---
 
@@ -513,3 +579,4 @@ Completing this runbook does not authorize:
 | v1.1 | May 3, 2026 | Planning pass | Added production project ref (`ornrnvxtwwtulohqwxop`), hard stop gates (§3.1), preflight commands (§4.1), no-go conditions (§14), post-execution doc requirements (§15), final recommendation (§16). No execution; planning-only. |
 | v1.2 | May 9, 2026 | Docs closeout pass | Recorded Estimates Guard Parity + Send Wording Polish (`edf5022`): mutator-level fail-closed parity for add/remove, updated guarded-baseline validation (`131/131`), and `Record Send Attempt` wording safety. No runbook execution; production estimates remain disabled and runbook-gated. |
 | v1.3 | May 9, 2026 | Planning closeout pass | Recorded the enabled-mode render-error watch-item closeout: intermittent `TypeError` not reproduced in clean captured smoke, `/estimates` and `/estimates/[id]` returned `200`, `addLineItemAction` posted `200` twice, and no real stack trace was captured. No code changes; planning/watch item only. |
+| v1.4 | May 9, 2026 | Docs closeout pass | Recorded completed Estimates V1A production migration execution for `20260501140000_estimates_v1a_schema_domain.sql` on ref `ornrnvxtwwtulohqwxop` using isolated artifact from `a200a17`, with dry-run + explicit approval, successful apply, post-apply schema/RLS/policy/index/constraint verification, zero-row confirmation, login-gated smoke, and preserved no-change boundaries. |
