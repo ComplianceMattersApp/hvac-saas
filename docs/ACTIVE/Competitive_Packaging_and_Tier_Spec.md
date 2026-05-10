@@ -62,9 +62,10 @@ Implementation closeout snapshot (2026-05-09):
 - Customer-facing/product wording should prefer "ECC" where visible copy has been updated in Phase 1.
 - Internal storage/type values remain intentionally unchanged (`ecc_hers` remains valid and in use).
 - Internal enum/data migration is deferred to future Phase 2.
-- No production migration was applied.
-- No Supabase db push was run.
-- No backfill or provisioning occurred.
+- Product Mode production schema migration is now applied for `20260509120000_account_settings_product_mode_v1.sql` on production ref `ornrnvxtwwtulohqwxop`.
+- Apply used an isolated worktree with final dry-run targeting only `20260509120000`.
+- Verification confirmed `public.account_settings` schema objects (columns, PK/FKs/check, RLS, policy, trigger) and migration history are correct, with row count `0`.
+- No backfill or provisioning occurred in the migration window.
 
 ## 3. Product Modes
 

@@ -412,6 +412,45 @@ Sandbox migration apply closeout (2026-05-09):
   - no production writes
   - no env/feature-flag/provisioning actions
 
+Product Mode V2 production migration execution closeout (2026-05-10):
+
+- Applied migration: `20260509120000_account_settings_product_mode_v1.sql`.
+- Production ref: `ornrnvxtwwtulohqwxop`.
+- Isolated apply worktree: `C:/Users/eddie/hvac-saas-productmode-dryrun`.
+- Final pre-apply dry-run targeted only `20260509120000`; apply completed with exit code `0`.
+- Post-apply read-only verification passed:
+  - `public.account_settings` exists
+  - expected columns exist (`account_owner_user_id`, `product_mode`, `product_mode_updated_at`, `product_mode_updated_by_user_id`, `created_at`, `updated_at`)
+  - PK/FKs/check/RLS/policy/trigger verified
+  - row count is `0`
+  - migration history confirms `20260509120000` applied
+- No-write smoke passed:
+  - `/jobs/new` loads for internal user
+  - existing manual ECC and Service selection remains stable
+  - `/estimates` behavior unchanged
+  - Support/People & Access workspace unchanged
+  - no admin product-mode edit UI
+  - no signup product-mode capture
+  - contractor admin/access flows unchanged
+- Warnings/watch items:
+  - expected benign idempotent trigger/policy drop notices during apply
+  - intermittent `net::ERR_ABORTED` navigation requests observed; destination pages still loaded and smoke checks passed
+  - Supabase CLI update notice observed
+- Boundaries preserved:
+  - no `account_settings` rows created
+  - no backfill
+  - no owner Hybrid row written
+  - no customer account product-mode rows
+  - no signup capture
+  - no admin edit UI
+  - no tier/add-on enforcement
+  - no navigation/report/starter-kit behavior changes
+  - no billing/payments changes
+  - no contractor authority changes
+  - no Estimates behavior changes
+  - no Support Console behavior changes
+  - no Vercel/env flag changes
+
 ### 3.8. Release-scope statement
 
 **Current Owner Release Posture (May 2026):**
@@ -1674,7 +1713,7 @@ Estimate is the proposed commercial scope for solving a problem.
 ### Current implementation status (V1A-V1J)
 - V1A schema/domain foundation is implemented (commit `a200a17`; migration `20260501140000_estimates_v1a_schema_domain.sql`).
 - Estimate migrations `20260501140000_estimates_v1a_schema_domain.sql` and `20260502120000_estimate_communications_v1h.sql` are applied in sandbox and production.
-- Product Mode migration `20260509120000_account_settings_product_mode_v1.sql` remains pending/unapplied in production.
+- Product Mode migration `20260509120000_account_settings_product_mode_v1.sql` is applied in sandbox and production.
 - V1B create/read/line server actions are implemented.
 - V1C internal estimates UI is implemented (`/estimates`, `/estimates/new`, `/estimates/[id]`) with draft creation and manual line add/remove.
 - V1C fail-closed `ENABLE_ESTIMATES` guard is implemented.
@@ -2286,7 +2325,7 @@ New business modules must not regress:
 - Execution used isolated single-migration worktree strategy from commit `ab1fb34`, with dry-run and explicit approval before apply.
 - Post-apply verification passed: support tables/indexes/constraints present, RLS enabled, no support-table policies, no grants for PUBLIC/anon/authenticated, and all support-table row counts remained `0`.
 - Execution boundaries remained intact: `ENABLE_SUPPORT_CONSOLE` stayed false/unset; no support seeding/grants/sessions/live audit generation; no Estimates/Estimate Communications/Product Mode migration bundled.
-- Current production pending set after this window: `20260502120000_estimate_communications_v1h.sql`, `20260509120000_account_settings_product_mode_v1.sql`.
+- Current production pending set after this window was: `20260502120000_estimate_communications_v1h.sql`, `20260509120000_account_settings_product_mode_v1.sql`.
 - Main workspace Supabase link remains production ref; future sandbox work must relink/verify sandbox explicitly before any sandbox operation.
 - Future support rollout remains explicit and later-scoped:
   - production migration approval

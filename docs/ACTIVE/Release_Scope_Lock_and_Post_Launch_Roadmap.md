@@ -217,29 +217,45 @@ Product Mode Provisioning Capture Planning note:
 - See `docs/ACTIVE/Product_Mode_Signup_Spec.md` section 6.5 for full provisioning capture planning details.
 - See `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` section 11 for future Phase 1 implementation planning.
 
-Product Mode V2 production migration readiness closeout note:
+Product Mode V2 production migration execution closeout note:
 
-- Verdict: **ready after listed inputs**.
-- Future production migration scope is only: `supabase/migrations/20260509120000_account_settings_product_mode_v1.sql`.
-- Production remained untouched during readiness planning (no migration, no SQL commands, no writes, no env/flag/provisioning changes).
-- Sandbox evidence supports readiness: migration apply verified; schema/RLS/policy/trigger verified; row-validation confirmed explicit-row precedence and safe rowless fallback.
-- Known caveats remain: full HVAC fixture browser smoke not completed; cross-account browser switching not completed; contractor-session smoke not completed; draft jobType browser smoke not completed.
-- Future production preflight must include:
-   - branch `main` + clean worktree
-   - source docs committed
-   - production ref confirmation (`ornrnvxtwwtulohqwxop`) and explicit sandbox/prod distinction
-   - migration list confirmation
-   - dependency checks for `public.set_updated_at` and `public.current_internal_account_owner_id`
-   - dry-run review
-   - named rollback owner
-   - named approver/decision channel
-   - approved change window
-   - confirmed evidence location
-- Future apply sequence remains controlled: ref verify -> migration list -> dry-run -> apply -> post-apply schema/RLS/policy/trigger verification -> app smoke.
-- Backfill decision for migration window: no `account_settings` backfill, no owner Hybrid row write, no Angkor `hvac_service` row/provisioning.
-- Product_mode rows should be created later through approved provisioning/signup capture flows.
-- First Owner Provisioning product_mode capture remains blocked for production use until production migration is applied and verified.
-- Explicit non-actions remain locked: no production execution now, no Supabase commands now, no backfill, no Angkor onboarding, no signup capture, no admin edit UI, no feature flags, no Vercel changes.
+- Production migration scope executed: `supabase/migrations/20260509120000_account_settings_product_mode_v1.sql` only.
+- Production ref: `ornrnvxtwwtulohqwxop`.
+- Isolated worktree: `C:/Users/eddie/hvac-saas-productmode-dryrun`.
+- Final pre-apply dry-run targeted only `20260509120000`.
+- Apply completed successfully (exit code `0`).
+- Post-apply verification passed:
+   - `public.account_settings` exists
+   - expected columns exist (`account_owner_user_id`, `product_mode`, `product_mode_updated_at`, `product_mode_updated_by_user_id`, `created_at`, `updated_at`)
+   - PK/FKs/check/RLS/policy/trigger verified (`account_settings_select_account_scope`, `account_settings_set_updated_at`)
+   - row count is `0`
+   - migration history shows `20260509120000` applied
+- No-write smoke passed:
+   - `/jobs/new` loads for internal user
+   - existing default/manual ECC and Service selection remains stable
+   - `/estimates` behavior unchanged
+   - Support/People & Access workspace unchanged
+   - no admin product-mode edit UI
+   - no signup product-mode capture
+   - contractor admin/access flows unchanged
+- Warnings/watch items:
+   - expected benign idempotent trigger/policy drop notices during apply
+   - intermittent `net::ERR_ABORTED` navigation requests observed; destination pages still loaded and smoke checks passed
+   - Supabase CLI update notice observed
+- Boundaries preserved:
+   - no `account_settings` rows created
+   - no backfill
+   - no owner Hybrid row write
+   - no customer account product-mode rows
+   - no signup capture
+   - no admin edit UI
+   - no tier/add-on enforcement
+   - no navigation/report/starter-kit behavior changes
+   - no billing/payments changes
+   - no contractor authority changes
+   - no Estimates behavior changes
+   - no Support Console behavior changes
+   - no Vercel/env flag changes
 
 ---
 
@@ -275,7 +291,7 @@ The following are explicitly runbook-gated and must remain controlled:
    - Production ref for execution: `ornrnvxtwwtulohqwxop`; dry-run + explicit approval gates were completed before apply
    - Post-apply production verification passed: support schema objects/indexes/constraints exist, RLS enabled, no support-table policies, no grants for PUBLIC/anon/authenticated, and zero support rows
    - Boundaries preserved: `ENABLE_SUPPORT_CONSOLE` remained false/unset; no support seeding/sessions/grants; no Estimates/Estimate Communications/Product Mode migration applied
-   - Remaining pending production migrations after this window: `20260509120000`
+   - Product Mode production migration execution is complete for `20260509120000_account_settings_product_mode_v1.sql` on production ref `ornrnvxtwwtulohqwxop`, using isolated worktree `C:/Users/eddie/hvac-saas-productmode-dryrun`, with final dry-run targeting only `20260509120000` before apply.
 3. First Owner Provisioning
    - Controlled by first-owner provisioning runbook
    - Dry-run first, guarded apply, environment verification gates
