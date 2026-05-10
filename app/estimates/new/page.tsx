@@ -21,6 +21,8 @@ type CustomerRow = {
   full_name: string | null;
   first_name: string | null;
   last_name: string | null;
+  phone: string | null;
+  email: string | null;
 };
 
 type LocationRow = {
@@ -61,7 +63,7 @@ export default async function NewEstimatePage({
   // Load customers scoped to this account via RLS
   const { data: customerRows, error: custErr } = await supabase
     .from("customers")
-    .select("id, full_name, first_name, last_name")
+    .select("id, full_name, first_name, last_name, phone, email")
     .order("full_name", { ascending: true })
     .limit(500);
   if (custErr) throw new Error(custErr.message);
