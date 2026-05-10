@@ -203,6 +203,57 @@ Explicit boundaries (not performed in these slices):
 - Do not treat this as admin-editable product mode.
 - Do not treat this as signup product-mode capture.
 
+### 6.3 Sandbox migration apply closeout (2026-05-09)
+
+Execution guardrail and environment facts:
+
+- Initial guarded attempt correctly stopped when production ref `ornrnvxtwwtulohqwxop` was detected.
+- No writes occurred during that stopped production-linked attempt.
+- Corrected pass relinked to sandbox ref `kvpesjdukqwwlgpkzfjm`.
+- Branch was `main` and worktree was clean.
+
+Pre-apply scope and dependency checks:
+
+- Migration `20260509120000_account_settings_product_mode_v1.sql` was pending only in sandbox before apply.
+- Dependency preflight checks passed:
+   - `public.set_updated_at` exists.
+   - `public.current_internal_account_owner_id` exists.
+   - `public.account_settings` did not already exist in conflicting shape.
+
+Sandbox apply commands (executed in order):
+
+- `supabase db push --linked --dry-run`
+- `supabase db push --linked`
+
+Post-apply verification passed:
+
+- `public.account_settings` exists.
+- Expected columns exist.
+- PK/check/FKs are present.
+- RLS is enabled.
+- SELECT policy `account_settings_select_account_scope` exists and is scoped by `current_internal_account_owner_id()`.
+- Trigger `account_settings_set_updated_at` exists and uses `set_updated_at`.
+- Migration list shows local/remote applied for `20260509120000`.
+
+Browser smoke passed:
+
+- `/jobs/new` loads.
+- Owner/hybrid current account defaults ECC.
+- Service remains manually selectable.
+- Switching back to ECC works.
+
+Skipped checks (intentional risk control):
+
+- Optional allowed-values mutation test was skipped to avoid extra mutation risk.
+- Cross-account HVAC/ECC fixture smoke was skipped because fixture/account context switching was unavailable.
+
+Production remained untouched:
+
+- No production migration.
+- No production db push.
+- No production writes.
+- No env, feature-flag, or provisioning changes.
+
 ## 7. Signup Flow Concepts
 
 Possible future signup approaches:

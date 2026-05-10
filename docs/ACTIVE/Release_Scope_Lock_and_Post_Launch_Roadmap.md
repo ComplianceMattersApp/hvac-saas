@@ -144,6 +144,40 @@ Product Mode V2 Slice 1 and ECC naming Phase 1 closeout note:
    - no implication that product_mode is editable in admin yet
    - no implication that signup mode capture exists yet
 
+Product Mode V2 sandbox migration apply closeout note:
+
+- Guarded initial attempt correctly stopped when production ref `ornrnvxtwwtulohqwxop` was detected, with no writes.
+- Corrected pass relinked to sandbox ref `kvpesjdukqwwlgpkzfjm`.
+- Branch/worktree state was `main` with clean status.
+- Before apply, migration `20260509120000_account_settings_product_mode_v1.sql` was pending only in sandbox.
+- Dependency preflight checks passed:
+   - `public.set_updated_at` exists
+   - `public.current_internal_account_owner_id` exists
+   - `public.account_settings` did not already exist in conflicting shape
+- Sandbox apply commands executed:
+   - `supabase db push --linked --dry-run`
+   - `supabase db push --linked`
+- Post-apply verification passed:
+   - `public.account_settings` exists
+   - expected columns exist
+   - PK/check/FKs present
+   - RLS enabled
+   - SELECT policy `account_settings_select_account_scope` exists and is scoped by `current_internal_account_owner_id()`
+   - trigger `account_settings_set_updated_at` exists and uses `set_updated_at`
+   - migration list shows local/remote applied for `20260509120000`
+- Browser smoke passed for `/jobs/new` load and default toggling behavior:
+   - owner/hybrid current account defaults ECC
+   - Service remains manually selectable
+   - switching back to ECC works
+- Intentionally skipped checks:
+   - optional allowed-values mutation test (extra mutation risk avoidance)
+   - cross-account HVAC/ECC fixture smoke (no fixture/account context switch available)
+- Production remained untouched:
+   - no production migration
+   - no production db push
+   - no production writes
+   - no env/feature-flag/provisioning actions
+
 ---
 
 ## 5) Runbook-Gated / Controlled Enablement Items

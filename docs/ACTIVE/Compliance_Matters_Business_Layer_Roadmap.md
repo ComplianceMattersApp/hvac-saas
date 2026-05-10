@@ -369,6 +369,41 @@ Explicit non-actions for this closeout:
 - Product mode is not documented here as admin-editable yet.
 - Signup product-mode capture is still later.
 
+Sandbox migration apply closeout (2026-05-09):
+
+- Initial guarded attempt correctly stopped when production ref `ornrnvxtwwtulohqwxop` was detected; no writes occurred in that stopped attempt.
+- Corrected pass relinked to sandbox ref `kvpesjdukqwwlgpkzfjm`.
+- Branch/worktree state was `main` with clean status.
+- Migration `20260509120000_account_settings_product_mode_v1.sql` was pending only in sandbox before apply.
+- Dependency preflight checks passed:
+  - `public.set_updated_at` exists
+  - `public.current_internal_account_owner_id` exists
+  - `public.account_settings` did not already exist in conflicting shape
+- Sandbox migration apply commands were:
+  - `supabase db push --linked --dry-run`
+  - `supabase db push --linked`
+- Post-apply verification passed:
+  - `public.account_settings` exists
+  - expected columns exist
+  - PK/check/FKs present
+  - RLS enabled
+  - SELECT policy `account_settings_select_account_scope` exists and is scoped by `current_internal_account_owner_id()`
+  - `account_settings_set_updated_at` trigger exists and uses `set_updated_at`
+  - migration list shows local/remote applied for `20260509120000`
+- Browser smoke passed:
+  - `/jobs/new` loads
+  - owner/hybrid current account defaults ECC
+  - Service remains manually selectable
+  - switching back to ECC works
+- Intentionally skipped checks:
+  - optional allowed-values mutation test skipped to avoid extra mutation risk
+  - cross-account HVAC/ECC fixture smoke skipped because fixture/account context switching was unavailable
+- Production remained untouched:
+  - no production migration
+  - no production db push
+  - no production writes
+  - no env/feature-flag/provisioning actions
+
 ### 3.8. Release-scope statement
 
 **Current Owner Release Posture (May 2026):**

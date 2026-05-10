@@ -1147,6 +1147,43 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
   - no admin product-mode edit surface implied
   - no signup product-mode capture implied
 
+### 4.3 Product Mode V2 sandbox migration apply closeout (completed docs record)
+- Guarded attempt behavior:
+  - initial guarded attempt correctly stopped when production ref `ornrnvxtwwtulohqwxop` was detected
+  - no writes occurred during that stopped attempt
+- Corrected execution scope:
+  - relinked to sandbox ref `kvpesjdukqwwlgpkzfjm`
+  - branch was `main` and worktree was clean
+  - migration `20260509120000_account_settings_product_mode_v1.sql` was pending only in sandbox before apply
+- Dependency preflight checks passed:
+  - `public.set_updated_at` exists
+  - `public.current_internal_account_owner_id` exists
+  - `public.account_settings` did not already exist in conflicting shape
+- Apply commands used:
+  - `supabase db push --linked --dry-run`
+  - `supabase db push --linked`
+- Post-apply verification passed:
+  - `public.account_settings` exists
+  - expected columns exist
+  - PK/check/FKs present
+  - RLS enabled
+  - SELECT policy `account_settings_select_account_scope` exists and is scoped by `current_internal_account_owner_id()`
+  - `account_settings_set_updated_at` trigger exists and uses `set_updated_at`
+  - migration list shows local/remote applied for `20260509120000`
+- Browser smoke passed:
+  - `/jobs/new` loads
+  - owner/hybrid current account defaults ECC
+  - Service remains manually selectable
+  - switching back to ECC works
+- Skipped checks by design:
+  - optional allowed-values mutation test skipped to avoid extra mutation risk
+  - cross-account HVAC/ECC fixture smoke skipped because fixture/account context switching was unavailable
+- Production untouched confirmation:
+  - no production migration
+  - no production db push
+  - no production writes
+  - no env/feature-flag/provisioning actions
+
 ---
 
 ## 5. Final launch confirmation sweep
