@@ -272,11 +272,8 @@ The following product-configuration work is **explicitly parked** and **not in c
 - Estimates production enablement (capability exists; not in release scope)
   - Estimates V1A schema-domain production migration execution is complete for `20260501140000_estimates_v1a_schema_domain.sql` on production ref `ornrnvxtwwtulohqwxop`, using an isolated artifact from commit `a200a17` with dry-run and explicit approval before apply.
   - Feature remains runbook-gated and disabled for public/customer/contractor exposure; no estimate email/PDF/public-link/customer-portal enablement occurred.
-  - `20260502120000_estimate_communications_v1h.sql` remains pending in production.
-  - Next migration window is V1H-only and must target only `20260502120000_estimate_communications_v1h.sql`.
-  - Product Mode migration `20260509120000_account_settings_product_mode_v1.sql` must remain excluded from the V1H window.
-  - V1H window must use isolated artifact/worktree include set `20260501120000`, `20260501140000`, `20260502120000` and exclude `20260509120000`.
-  - V1H window remains disabled-state only: `ENABLE_ESTIMATES` false/unset, `ENABLE_ESTIMATE_EMAIL_SEND` false/unset, no outbound email/PDF/public exposure/estimate-record creation/conversion/payment/QBO/support-console changes.
+  - Estimate Communications V1H production migration execution is complete for `20260502120000_estimate_communications_v1h.sql` on production ref `ornrnvxtwwtulohqwxop`, using an isolated artifact from commit `e5a8e8e` with dry-run and explicit approval before apply; `20260509120000` excluded and confirmed absent from production migration history.
+  - `ENABLE_ESTIMATES` and `ENABLE_ESTIMATE_EMAIL_SEND` remain false/unset; no email/PDF/public/customer/contractor exposure occurred.
 - Recurring maintenance agreements / service subscriptions (capability exists; not in release scope)
 - Tenant payment execution (Stripe subscription/checkout; parked)
 - QBO integration (optional downstream; parked)

@@ -2,7 +2,7 @@
 
 Status: ACTIVE EXECUTION-CONTROLLED PLANNING ARTIFACT  
 Authority: Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md` and `docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md`  
-Scope: Production enablement procedure for Estimates V1 internal-only slice, including V1A execution closeout and a V1H-only migration-window addendum.
+Scope: Production enablement procedure for Estimates V1 internal-only slice, including V1A execution closeout, V1H execution closeout, and future windows.
 
 ---
 
@@ -20,7 +20,7 @@ The latest clean-run Estimates rehearsal closed the earlier enabled-mode render-
 
 - Estimates V1A-V1J is implemented to the current guarded internal baseline.
 - Production estimates are not live.
-- Production estimate migrations are partially applied: V1A is applied; V1H remains pending.
+- Production estimate migrations are partially applied: V1A and V1H are applied; Product Mode remains pending.
 - Production `ENABLE_ESTIMATES` remains unset/false.
 - Production `ENABLE_ESTIMATE_EMAIL_SEND` remains unset/false.
 - All estimate routes redirect to `/ops?notice=estimates_unavailable` in production.
@@ -120,7 +120,7 @@ Migration state after this execution window:
 	- `20260509120000_account_settings_product_mode_v1.sql`
 - Main workspace Supabase link remained production ref `ornrnvxtwwtulohqwxop`; future sandbox work must relink and re-verify explicitly.
 
-### 1.2 V1H-only migration-window addendum (planning/audit)
+### 1.2 V1H-only migration-window addendum (execution completed May 10, 2026)
 
 This addendum defines the next production migration window as a strict V1H-only apply sequence.
 
@@ -193,6 +193,60 @@ V1H no-go triggers (hard stop):
 - Dry-run output differs from V1H-only target.
 - Evidence path missing.
 - Rollback owner missing.
+
+### 1.3 V1H production execution closeout (completed May 10, 2026)
+
+Execution window outcome:
+- Estimate Communications V1H production migration execution completed successfully.
+- Target migration applied in production: `20260502120000_estimate_communications_v1h.sql`.
+- Production project ref for execution: `ornrnvxtwwtulohqwxop`.
+- Execution used an isolated single-migration artifact/worktree from commit `e5a8e8e`.
+- Isolated artifact included only:
+	- `20260501120000_support_access_v1a_foundation.sql`
+	- `20260501140000_estimates_v1a_schema_domain.sql`
+	- `20260502120000_estimate_communications_v1h.sql`
+- Isolated artifact excluded:
+	- `20260509120000_account_settings_product_mode_v1.sql`
+- Dry-run completed before apply; output confirmed only `20260502120000_estimate_communications_v1h.sql` would be pushed.
+- Explicit approval was received before apply.
+- Apply succeeded.
+
+Post-apply verification outcome (read-only verification):
+- `public.estimate_communications` exists.
+- RLS is enabled.
+- All 13 expected columns present: `account_owner_user_id`, `attempt_error`, `attempt_status`, `attempted_at`, `body_template_key`, `created_at`, `estimate_id`, `id`, `initiated_by_user_id`, `provider_message_id`, `provider_name`, `recipient_email_snapshot`, `subject_snapshot`.
+- All 8 expected constraints present: PK (`estimate_communications_pkey`), 3 FKs (`estimates`, `auth.users` x2), 4 checks (attempt_status, recipient, subject, body_template_key not-blank).
+- Both expected indexes present: `estimate_communications_estimate_id_idx`, `estimate_communications_account_owner_idx`.
+- Both expected RLS policies present: `estimate_communications_select_internal`, `estimate_communications_insert_internal` (PERMISSIVE, authenticated).
+- Row count: `0`.
+- Migration history confirms `20260502120000` applied in production.
+- Migration history confirms `20260509120000` is NOT in production (correctly excluded).
+
+Non-invasive app smoke outcome:
+- Production routes checked: `/`, `/ops`, `/estimates`, `/portal`.
+- All returned login-gated pages.
+- No public/unauthenticated estimates surface observed.
+
+Boundaries preserved for this pass:
+- `ENABLE_ESTIMATES` remained false/unset; no flag change occurred.
+- `ENABLE_ESTIMATE_EMAIL_SEND` remained false/unset; no flag change occurred.
+- No estimate records were created.
+- No estimate emails were sent.
+- No PDFs were generated.
+- No customer/public/contractor estimate exposure was enabled.
+- No Product Mode migration was applied.
+- No Vercel/env/feature-flag changes occurred.
+- No code changes occurred in execution.
+- No provisioning or account/user changes occurred.
+
+Migration state after this execution window:
+- Applied in production:
+	- `20260501120000_support_access_v1a_foundation.sql`
+	- `20260501140000_estimates_v1a_schema_domain.sql`
+	- `20260502120000_estimate_communications_v1h.sql`
+- Still pending in production:
+	- `20260509120000_account_settings_product_mode_v1.sql`
+- Isolated worktree removed and pruned after successful verification.
 
 ---
 
@@ -661,3 +715,4 @@ Completing this runbook does not authorize:
 | v1.3 | May 9, 2026 | Planning closeout pass | Recorded the enabled-mode render-error watch-item closeout: intermittent `TypeError` not reproduced in clean captured smoke, `/estimates` and `/estimates/[id]` returned `200`, `addLineItemAction` posted `200` twice, and no real stack trace was captured. No code changes; planning/watch item only. |
 | v1.4 | May 9, 2026 | Docs closeout pass | Recorded completed Estimates V1A production migration execution for `20260501140000_estimates_v1a_schema_domain.sql` on ref `ornrnvxtwwtulohqwxop` using isolated artifact from `a200a17`, with dry-run + explicit approval, successful apply, post-apply schema/RLS/policy/index/constraint verification, zero-row confirmation, login-gated smoke, and preserved no-change boundaries. |
 | v1.5 | May 10, 2026 | Docs planning pass | Added V1H-only migration-window addendum: V1A already applied, target-only `20260502120000_estimate_communications_v1h.sql`, Product Mode exclusion (`20260509120000`), required isolated artifact include/exclude lists, preflight, approval-gated dry-run/apply sequence, post-apply verification, disabled-state smoke, no-go triggers, and migration-only documentation requirements alignment. |
+| v1.6 | May 10, 2026 | Docs closeout pass | Recorded completed Estimate Communications V1H production migration execution for `20260502120000_estimate_communications_v1h.sql` on ref `ornrnvxtwwtulohqwxop` using isolated artifact from `e5a8e8e`, with dry-run + explicit approval, successful apply, full post-apply schema/RLS/policy/index/constraint/column verification, zero-row confirmation, login-gated smoke, preserved disabled-state boundaries, worktree cleanup. Product Mode (`20260509120000`) confirmed excluded and absent from migration history. |
