@@ -11,6 +11,7 @@ import {
   orchestrateFirstOwnerInvite,
   type FirstOwnerInviteDeps,
 } from "@/lib/business/first-owner-invite";
+import type { ProductMode } from "@/lib/business/product-mode-defaults";
 import type { PricebookSeedInsertRow } from "@/lib/business/pricebook-seeding";
 import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
 import type {
@@ -29,6 +30,14 @@ function normalizeEmail(value: unknown) {
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function resolveProductModeFromSignupIntent(value: unknown): ProductMode | null | "invalid" {
+  const intent = toCleanString(value).toLowerCase();
+  if (!intent) return null;
+  if (intent === "service") return "hvac_service";
+  if (intent === "ecc") return "ecc_hers";
+  return "invalid";
 }
 
 function submittedNeutralState(): SelfServeOnboardingState {
@@ -432,6 +441,9 @@ export async function submitSelfServeOnboardingForm(
   const email = normalizeEmail(formData.get("email"));
   const ownerDisplayName = toCleanString(formData.get("owner_display_name"));
   const businessDisplayName = toCleanString(formData.get("business_display_name"));
+  const selectedProductMode = resolveProductModeFromSignupIntent(
+    formData.get("product_signup_intent"),
+  );
 
   const fieldErrors: SelfServeFieldErrors = {};
 
@@ -455,12 +467,20 @@ export async function submitSelfServeOnboardingForm(
     };
   }
 
+  if (selectedProductMode === "invalid") {
+    return {
+      status: "error",
+      message: "We could not identify the selected signup path. Please use the current signup link and try again.",
+    };
+  }
+
   try {
     const provisioning = await deps.provision({
       targetEmail: email,
       ownerDisplayName,
       businessDisplayName,
       entitlementPreset: "standard",
+      ...(selectedProductMode ? { productMode: selectedProductMode } : {}),
       starterKitVersion: "v3",
       dryRun: false,
       operatorMetadata: {
@@ -472,10 +492,36 @@ export async function submitSelfServeOnboardingForm(
     if (provisioning.status === "failed" || provisioning.errors.length > 0) {
       deps.log("self-serve onboarding provisioning failed", {
         email,
+        productMode: selectedProductMode,
         status: provisioning.status,
         errorCodes: provisioning.errors.map((error) => error.code),
       });
+
+      if (selectedProductMode) {
+        return {
+          status: "error",
+          message: "We could not finish product setup for this signup path. Please try again or contact support.",
+        };
+      }
+
       return submittedNeutralState();
+    }
+
+    if (
+      selectedProductMode &&
+      provisioning.productModeCapture.selectedProductMode !== selectedProductMode
+    ) {
+      deps.log("self-serve onboarding product mode capture mismatch", {
+        email,
+        selectedProductMode,
+        capturedProductMode: provisioning.productModeCapture.selectedProductMode,
+        captureAction: provisioning.productModeCapture.action,
+      });
+
+      return {
+        status: "error",
+        message: "We could not finish product setup for this signup path. Please try again or contact support.",
+      };
     }
 
     const inviteResult = await deps.invite({

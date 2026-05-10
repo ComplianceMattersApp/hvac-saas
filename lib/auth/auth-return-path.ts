@@ -10,6 +10,7 @@ function isAuthRoutePath(pathname: string) {
     pathname.startsWith("/login?") ||
     pathname === "/signup" ||
     pathname.startsWith("/signup?") ||
+    pathname.startsWith("/signup/") ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/set-password")
   );

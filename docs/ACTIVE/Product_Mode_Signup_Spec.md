@@ -219,6 +219,17 @@ HVAC Service Surface Cleanup V1 closeout snapshot (2026-05-10):
 - No functionality was deleted and direct routes remain reachable.
 - No permissions/security/RLS/auth scope, contractor-authority, billing/payment/QBO, report dataset/calculation, or Product Mode schema/provisioning behavior changed.
 
+Product Mode Signup Links V1 closeout snapshot (2026-05-10):
+
+- Product-specific public signup entry links are implemented.
+- `/signup/service` maps the public Service signup path to internal `hvac_service`.
+- `/signup/ecc` maps the public ECC / Compliance Testing signup path to internal `ecc_hers`.
+- Generic `/signup` remains available and keeps existing broad self-serve behavior.
+- Hybrid / All-in-One remains manual/operator-only; no public `/signup/hybrid` route is exposed.
+- Product-mode capture happens through the existing first-owner provisioning helper and writes `account_settings.product_mode` after owner creation.
+- Product-mode write/capture failure prevents product-specific signup from presenting a ready/success state.
+- No tier/add-on enforcement, billing/payment/QBO behavior, security/RLS authority, contractor authority, report dataset/calculation behavior, Product Mode schema, or First Owner Provisioning command behavior changed.
+
 ### 6.3 Sandbox migration apply closeout (2026-05-09)
 
 Execution guardrail and environment facts:

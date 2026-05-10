@@ -56,6 +56,12 @@ function makeValidFormData() {
   return formData;
 }
 
+function makeProductFormData(intent: string) {
+  const formData = makeValidFormData();
+  formData.set("product_signup_intent", intent);
+  return formData;
+}
+
 describe("submitSelfServeOnboardingForm", () => {
   it("validates required fields", async () => {
     const deps = makeDeps();
@@ -95,6 +101,145 @@ describe("submitSelfServeOnboardingForm", () => {
         dryRun: false,
       }),
     );
+  });
+
+  it("passes HVAC Service signup intent into provisioning as hvac_service", async () => {
+    const deps = makeDeps({
+      provision: vi.fn(async () =>
+        makeProvisioningResult({
+          productModeCapture: {
+            selectedProductMode: "hvac_service",
+            applyReady: true,
+            action: "created",
+            issues: [],
+          },
+        }),
+      ),
+    });
+
+    await submitSelfServeOnboardingForm(
+      INITIAL_SELF_SERVE_ONBOARDING_STATE,
+      makeProductFormData("service"),
+      deps,
+    );
+
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productMode: "hvac_service",
+      }),
+    );
+    expect(deps.invite).toHaveBeenCalled();
+  });
+
+  it("passes ECC signup intent into provisioning as ecc_hers", async () => {
+    const deps = makeDeps({
+      provision: vi.fn(async () =>
+        makeProvisioningResult({
+          productModeCapture: {
+            selectedProductMode: "ecc_hers",
+            applyReady: true,
+            action: "created",
+            issues: [],
+          },
+        }),
+      ),
+    });
+
+    await submitSelfServeOnboardingForm(
+      INITIAL_SELF_SERVE_ONBOARDING_STATE,
+      makeProductFormData("ecc"),
+      deps,
+    );
+
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productMode: "ecc_hers",
+      }),
+    );
+    expect(deps.invite).toHaveBeenCalled();
+  });
+
+  it("does not pass product mode for generic signup", async () => {
+    const deps = makeDeps();
+
+    await submitSelfServeOnboardingForm(
+      INITIAL_SELF_SERVE_ONBOARDING_STATE,
+      makeValidFormData(),
+      deps,
+    );
+
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        productMode: expect.anything(),
+      }),
+    );
+  });
+
+  it("rejects invalid signup product intents before provisioning", async () => {
+    const deps = makeDeps();
+
+    const result = await submitSelfServeOnboardingForm(
+      INITIAL_SELF_SERVE_ONBOARDING_STATE,
+      makeProductFormData("hybrid"),
+      deps,
+    );
+
+    expect(result.status).toBe("error");
+    expect(result.message).toContain("selected signup path");
+    expect(deps.provision).not.toHaveBeenCalled();
+    expect(deps.invite).not.toHaveBeenCalled();
+  });
+
+  it("blocks product-specific success when product mode capture fails", async () => {
+    const deps = makeDeps({
+      provision: vi.fn(async () =>
+        makeProvisioningResult({
+          status: "failed",
+          errors: [
+            {
+              code: "ACCOUNT_SETTINGS_WRITE_FAILED",
+              stage: "account_settings",
+              message: "Failed to write account_settings product mode.",
+            },
+          ],
+        }),
+      ),
+    });
+
+    const result = await submitSelfServeOnboardingForm(
+      INITIAL_SELF_SERVE_ONBOARDING_STATE,
+      makeProductFormData("service"),
+      deps,
+    );
+
+    expect(result.status).toBe("error");
+    expect(result.message).toContain("product setup");
+    expect(deps.invite).not.toHaveBeenCalled();
+  });
+
+  it("blocks product-specific success when provisioning captures a different mode", async () => {
+    const deps = makeDeps({
+      provision: vi.fn(async () =>
+        makeProvisioningResult({
+          productModeCapture: {
+            selectedProductMode: "ecc_hers",
+            applyReady: true,
+            action: "created",
+            issues: [],
+          },
+        }),
+      ),
+    });
+
+    const result = await submitSelfServeOnboardingForm(
+      INITIAL_SELF_SERVE_ONBOARDING_STATE,
+      makeProductFormData("service"),
+      deps,
+    );
+
+    expect(result.status).toBe("error");
+    expect(result.message).toContain("product setup");
+    expect(deps.invite).not.toHaveBeenCalled();
   });
 
   it("uses shared invite orchestration after successful provisioning", async () => {

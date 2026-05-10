@@ -4,6 +4,8 @@ import { isUnauthedPublicRoute } from "@/proxy";
 describe("isUnauthedPublicRoute", () => {
   it("allows /signup without auth", () => {
     expect(isUnauthedPublicRoute("/signup")).toBe(true);
+    expect(isUnauthedPublicRoute("/signup/service")).toBe(true);
+    expect(isUnauthedPublicRoute("/signup/ecc")).toBe(true);
   });
 
   it("continues allowing existing auth routes", () => {
