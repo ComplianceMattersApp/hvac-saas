@@ -2270,6 +2270,10 @@ New business modules must not regress:
 - No production support access is live.
 - Support V1 is intentionally parked from production enablement; this is not unfinished architecture.
 - Do not proceed now with production support migration apply, production support seeding, or production `ENABLE_SUPPORT_CONSOLE` enablement.
+- Support Console foundation production migration readiness is now closed at **ready after listed inputs** for `20260501120000_support_access_v1a_foundation.sql` only.
+- Recommended future production apply strategy is an isolated single-migration execution artifact/worktree because normal `db push` from current repo state would include later pending migrations.
+- Future Support V1A schema apply remains additive/dormant only: no support-user seed, no grant/session creation, no live audit generation through use, and `ENABLE_SUPPORT_CONSOLE` remains intentionally unset/false after schema apply.
+- Estimates and Product Mode migrations must not be bundled into that Support V1A migration window.
 - Future support rollout remains explicit and later-scoped:
   - production migration approval
   - production `support_user` seed

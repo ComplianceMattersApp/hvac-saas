@@ -111,6 +111,28 @@ Gate decision:
 - Go only if all migration verification checks pass.
 - No-go on any schema/invariant mismatch or unexplained drift.
 
+Support Console foundation migration readiness closeout (planning only):
+
+- Verdict: **ready after listed inputs**.
+- Target production migration is only `20260501120000_support_access_v1a_foundation.sql`.
+- This migration creates dormant support foundation schema only:
+	- `support_users`
+	- `support_account_grants`
+	- `support_access_sessions`
+	- `support_access_audit_events`
+- The migration is additive and remains dormant if `ENABLE_SUPPORT_CONSOLE` stays false/unset.
+- This migration window must not create support users, grants, sessions, or audit events through live use, and must not enable Support Console.
+- Estimates and Product Mode migrations must not be applied in the same window.
+- Normal `supabase db push` from the current repo state is unsafe because later pending migrations exist.
+- Recommended apply strategy is an isolated single-migration execution artifact/worktree containing Support V1A but not later pending migrations.
+- Future execution must verify production ref `ornrnvxtwwtulohqwxop` and confirm only `20260501120000` is pending in the isolated artifact.
+- Future execution sequence: dry-run, stop for explicit approval, then apply only after explicit approval.
+- Post-apply verification must confirm tables, indexes, constraints/FKs, RLS, revoke posture, and no permissive policies.
+- `ENABLE_SUPPORT_CONSOLE` must remain false/unset after schema apply.
+- Support Console must remain unavailable/fail-closed after schema apply.
+- No support seeding or support grants are part of this migration window.
+- Rollback posture is forward-fix preferred because the schema is additive/dormant.
+
 ---
 
 ## 6. Phase C - support user setup plan

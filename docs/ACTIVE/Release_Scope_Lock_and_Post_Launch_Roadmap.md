@@ -253,6 +253,9 @@ The following are explicitly runbook-gated and must remain controlled:
 2. Support Console production enablement
    - Controlled by Support Console runbook
    - V1 read-only, account-scoped, no impersonation, no tenant mutation
+   - Support V1A foundation production migration readiness is closed at **ready after listed inputs** for `20260501120000_support_access_v1a_foundation.sql` only
+   - Normal `db push` from current repo state is unsafe because later pending migrations exist; future execution should use an isolated single-migration artifact/worktree
+   - Schema apply alone must remain dormant: `ENABLE_SUPPORT_CONSOLE` false/unset, no support seeding, no grants/sessions, no bundled Estimates/Product Mode apply
 3. First Owner Provisioning
    - Controlled by first-owner provisioning runbook
    - Dry-run first, guarded apply, environment verification gates
