@@ -254,6 +254,90 @@ Production remained untouched:
 - No production writes.
 - No env, feature-flag, or provisioning changes.
 
+### 6.4 Sandbox row validation closeout (2026-05-10)
+
+Sandbox row validation executed as a controlled pass to verify the `account_settings` resolver works correctly with explicit product_mode rows.
+
+Environment facts:
+
+- Sandbox Supabase ref confirmed: `kvpesjdukqwwlgpkzfjm`.
+- Production ref `ornrnvxtwwtulohqwxop` remained untouched.
+- Branch: `main`, git status: clean throughout.
+- No code changes, no new migrations, no Vercel/production actions.
+
+Pre-mutation discovery (read-only):
+
+- Identified 3 sandbox accounts with discoverable internal users:
+  - One hybrid-mode test fixture (classified: OWNER-HYBRID)
+  - One multi-user fixture with contractors (classified: ECC-FIXTURE)
+  - One third account (OWNER-HYBRID-C, reserved for future validation)
+- All accounts had display_name = "Compliance Matters" per signal fallback.
+- All accounts had explicit_product_mode = NULL (table empty at start).
+
+Controlled row mutations (sandbox-only):
+
+- Executed: `INSERT INTO public.account_settings (account_owner_user_id, product_mode) VALUES (OWNER-HYBRID, 'hybrid'), (ECC-FIXTURE, 'ecc_hers') ON CONFLICT (account_owner_user_id) DO UPDATE SET product_mode = EXCLUDED.product_mode`.
+- Scope: Two explicit account_owner_user_id values only; no wildcards, no bulk updates.
+- Result: 2 rows inserted successfully on 2026-05-10 05:02:58 UTC.
+
+Post-mutation verification (read-only):
+
+- Confirmed 2 exact rows existed with correct values:
+  - OWNER-HYBRID: product_mode = 'hybrid' ✓
+  - ECC-FIXTURE: product_mode = 'ecc_hers' ✓
+- Verified resolver chain using SQL:
+  - OWNER-HYBRID and ECC-FIXTURE correctly resolved to explicit values (explicit row read priority).
+  - OWNER-HYBRID-C (no explicit row) still correctly resolved to 'hybrid' via signal fallback.
+- No unintended rows created; no adjacent accounts affected.
+
+Browser smoke (partial):
+
+- `/jobs/new` loaded successfully when authenticated as ECC-FIXTURE account.
+- Form rendered STEP 1 customer selection correctly.
+- Job Family (ECC/Service radio) section was correctly gated behind customer/location completion (expected behavior).
+- Confirmed no errors or migration-related issues on form load.
+
+Skipped checks (documented scope limitations):
+
+- HVAC Service fixture smoke: Skipped because no suitable HVAC fixture account exists in sandbox (requires non-default display_name).
+- Cross-account browser switching: Skipped because only one active session available.
+- Contractor-session smoke: Skipped because no contractor auth session active in current browser.
+- Full job-family default verification: Partially deferred because form requires customer selection unlock before job family radios render; customer selection workflow not completed in this pass.
+- Draft jobType persistence: Skipped because requires full job creation workflow; deferred to future validation.
+
+Production verification:
+
+- No production migration applied.
+- No production db push executed.
+- No production account_settings rows created/modified.
+- No Vercel env vars changed.
+- No feature flags enabled/disabled.
+- No provisioning executed.
+- Git status: clean, no commits made.
+
+Rollback readiness:
+
+- Pre-mutation state preserved: account_settings table was empty before insertions.
+- Rollback procedure if needed: `DELETE FROM public.account_settings;` or `UPDATE public.account_settings SET product_mode = NULL;`
+- Fallback behavior verified to work correctly for accounts without explicit rows.
+
+Validation verdict:
+
+- Resolver chain works correctly: explicit account_settings rows are prioritized, fallback works for rowless accounts.
+- account_settings table schema, RLS, and trigger are stable.
+- /jobs/new form renders without errors.
+- Sandbox-only mutation was controlled, scoped, and verifiable.
+- Production remained untouched.
+- No regressions detected in partial browser validation.
+
+Future validation (recommended):
+
+- Complete cross-account browser smoke with proper HVAC/Hybrid/ECC fixtures when multi-account session switching is available.
+- Verify job-family default selection (ECC vs Service) matches product_mode on form unlock.
+- Test draft jobType persistence (ensure draft selection is not overwritten by product_mode default).
+- Test contractor-portal behavior unchanged for contractor-role users.
+- Create HVAC Service fixture account with non-default display_name for HVAC smoke validation.
+
 ## 7. Signup Flow Concepts
 
 Possible future signup approaches:

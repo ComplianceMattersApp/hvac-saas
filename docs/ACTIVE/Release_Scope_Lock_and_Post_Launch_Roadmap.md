@@ -178,6 +178,31 @@ Product Mode V2 sandbox migration apply closeout note:
    - no production writes
    - no env/feature-flag/provisioning actions
 
+Product Mode V2 sandbox row validation closeout note:
+
+- Sandbox Supabase ref confirmed: `kvpesjdukqwwlgpkzfjm`.
+- Production ref `ornrnvxtwwtulohqwxop` remained untouched.
+- Branch: `main`, git status: clean.
+- Read-only discovery identified 2 usable test fixtures (Hybrid fixture, ECC fixture).
+- Controlled upsert: `INSERT INTO public.account_settings (account_owner_user_id, product_mode) VALUES (...) ON CONFLICT (...) DO UPDATE ...` for 2 explicit account UUIDs.
+- Mutation result: 2 rows inserted with correct values ('hybrid', 'ecc_hers') on 2026-05-10 05:02:58 UTC.
+- Post-mutation verification passed:
+   - exactly 2 rows exist with expected values
+   - Hybrid fixture: product_mode = 'hybrid' ✓
+   - ECC fixture: product_mode = 'ecc_hers' ✓
+   - resolver correctly prioritizes explicit rows
+   - rowless accounts still use signal fallback ✓
+- Browser smoke (partial): `/jobs/new` loaded, form rendered without errors, job family section correctly gated behind customer selection.
+- Skipped checks (documented scope limitations):
+   - HVAC Service fixture smoke (no HVAC fixture account in sandbox)
+   - Cross-account browser switching (single session only)
+   - Contractor-session smoke (no contractor auth available)
+   - Full job-family default verification (requires customer selection workflow; partial validation only)
+   - Draft jobType persistence (requires full job creation; deferred)
+- Production verification: no migration, no db push, no writes, no env/flag/provisioning changes.
+- Rollback readiness: pre-mutation state preserved; DELETE/UPDATE procedures documented if needed.
+- Validation verdict: Resolver chain works correctly; schema/RLS/trigger stable; `/jobs/new` renders without errors; sandbox-only mutation controlled and verifiable; production untouched; no regressions detected.
+
 ---
 
 ## 5) Runbook-Gated / Controlled Enablement Items
