@@ -14,6 +14,14 @@ function toCleanString(value: unknown) {
   return String(value ?? "").trim();
 }
 
+export function normalizeProductMode(value: unknown): ProductMode | null {
+  const normalized = toCleanString(value).toLowerCase();
+  if (normalized === "hybrid") return "hybrid";
+  if (normalized === "ecc_hers") return "ecc_hers";
+  if (normalized === "hvac_service") return "hvac_service";
+  return null;
+}
+
 function isDefaultOwnerDisplayName(displayName: string) {
   return displayName.trim().toLowerCase() === DEFAULT_INTERNAL_BUSINESS_DISPLAY_NAME.toLowerCase();
 }
@@ -26,7 +34,7 @@ export function resolveProductModeFromSignals(params: {
 }): ProductMode {
   const accountOwnerUserId = toCleanString(params.accountOwnerUserId);
   const overrideMap = params.overridesByOwnerId ?? TEMPORARY_PRODUCT_MODE_OVERRIDES_BY_OWNER_ID;
-  const explicitMode = overrideMap[accountOwnerUserId];
+  const explicitMode = normalizeProductMode(overrideMap[accountOwnerUserId]);
 
   if (explicitMode) return explicitMode;
 
@@ -47,6 +55,30 @@ export function resolveJobTypeDefaultForProductMode(mode: ProductMode): JobTypeD
   return mode === "hvac_service" ? "service" : "ecc";
 }
 
+export async function readProductModeSettingForAccountOwnerId(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+}): Promise<ProductMode | null> {
+  const accountOwnerUserId = toCleanString(params.accountOwnerUserId);
+  if (!accountOwnerUserId) return null;
+
+  const { data, error } = await params.supabase
+    .from("account_settings")
+    .select("product_mode")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (error) {
+    const code = toCleanString((error as any)?.code);
+    if (code === "42P01" || code === "PGRST205") {
+      return null;
+    }
+    throw error;
+  }
+
+  return normalizeProductMode(data?.product_mode);
+}
+
 export async function resolveDefaultJobTypeForAccountOwnerId(params: {
   supabase: any;
   accountOwnerUserId: string;
@@ -56,6 +88,15 @@ export async function resolveDefaultJobTypeForAccountOwnerId(params: {
 
   if (!accountOwnerUserId) {
     return "ecc";
+  }
+
+  const accountSettingMode = await readProductModeSettingForAccountOwnerId({
+    supabase: params.supabase,
+    accountOwnerUserId,
+  });
+
+  if (accountSettingMode) {
+    return resolveJobTypeDefaultForProductMode(accountSettingMode);
   }
 
   const [identity, contractorCountResult] = await Promise.all([

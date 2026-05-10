@@ -21,6 +21,10 @@ import {
   createVisitScopeItemId,
   sanitizeVisitScopeItemId,
 } from "@/lib/jobs/visit-scope";
+import {
+  resolveDefaultJobTypeForNewJobForm,
+  resolveRestoredDraftJobType,
+} from "./new-job-defaults";
 
 type Contractor = { id: string; name: string };
 
@@ -383,7 +387,10 @@ export default function NewJobForm({
   // Contractor selection (internal/admin only). Contractor users are auto-tied.
  const [contractorId, setContractorId] = useState<string>(() => myContractor?.id ?? "");
 
-  const defaultJobType: "ecc" | "service" = myContractor?.id ? "ecc" : (initialJobType ?? "service");
+  const defaultJobType: "ecc" | "service" = resolveDefaultJobTypeForNewJobForm({
+    contractorId: myContractor?.id,
+    initialJobType,
+  });
   const [jobType, setJobType] = useState<"ecc" | "service">(defaultJobType);
   const [serviceCaseKind, setServiceCaseKind] = useState<
     "reactive" | "callback" | "warranty" | "maintenance"
@@ -870,7 +877,12 @@ const [billingRecipient, setBillingRecipient] = useState<
     setWindowEnd(d.windowEnd ?? "");
     setScheduledDate(d.scheduledDate ?? "");
     setContractorId(d.contractorId ?? "");
-    setJobType(d.jobType ?? defaultJobType);
+    setJobType(
+      resolveRestoredDraftJobType({
+        draftJobType: d.jobType,
+        defaultJobType,
+      }),
+    );
     setServiceCaseKind(d.serviceCaseKind ?? "reactive");
     setServiceVisitType(d.serviceVisitType ?? "diagnostic");
     setServiceVisitOutcome(d.serviceVisitOutcome ?? "follow_up_required");
