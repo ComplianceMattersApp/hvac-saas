@@ -403,6 +403,84 @@ Non-actions (scope out of Phase 1):
 - No automatic contractor portal hiding (mode separation remains presentation-level only)
 - No report dataset changes (shared report engine remains unchanged; mode-aware presets are later)
 
+### 6.6 Production migration readiness closeout (planning only, 2026-05-10)
+
+Readiness verdict:
+
+- **Ready after listed inputs** (not ready for immediate production execution in this planning pass).
+
+Future production migration scope (only):
+
+- `supabase/migrations/20260509120000_account_settings_product_mode_v1.sql`
+
+Production status:
+
+- Production remains untouched in this pass.
+- No production migration applied.
+- No production SQL run.
+- No production writes.
+- No Vercel env/feature-flag/provisioning actions.
+
+Sandbox evidence supporting future production window:
+
+- Migration applied and verified in sandbox.
+- `public.account_settings` table, columns, constraints/FKs, RLS, policy, and trigger verified.
+- Sandbox row validation completed.
+- Explicit `account_settings` rows resolved ahead of fallback.
+- Rowless account fallback continued to work safely.
+
+Known caveats still open:
+
+- Full HVAC fixture browser smoke not completed.
+- Cross-account browser switching not completed.
+- Contractor-session smoke not completed.
+- Draft jobType browser smoke not completed.
+
+Future production preflight requirements:
+
+- Branch `main` and clean worktree.
+- Source docs committed.
+- Production ref confirmation: `ornrnvxtwwtulohqwxop`.
+- Explicit sandbox vs production ref distinction.
+- Migration list confirmation before apply.
+- Dependency checks for `public.set_updated_at` and `public.current_internal_account_owner_id`.
+- Dry-run output review/approval.
+- Named rollback owner.
+- Named approver and decision channel.
+- Approved change window.
+- Evidence capture location confirmed.
+
+Future controlled apply sequence (listed only; not run now):
+
+1. Project-ref verification before each risky step.
+2. Migration list review.
+3. Dry-run.
+4. Apply.
+5. Immediate post-apply schema/RLS/policy/trigger verification.
+6. App smoke.
+
+Backfill and onboarding decision:
+
+- No `account_settings` row backfill in the same production migration window.
+- No owner Hybrid row write in the same window.
+- No Angkor `hvac_service` row/provisioning in the same window.
+- Product-mode rows should be created later through approved provisioning/signup capture flows.
+
+Provisioning dependency:
+
+- First Owner Provisioning `--product-mode` capture remains blocked for production use until production migration is applied and verified.
+
+Explicit non-actions:
+
+- No production execution now.
+- No Supabase commands now.
+- No backfill now.
+- No Angkor onboarding.
+- No signup capture enablement.
+- No admin edit UI enablement.
+- No feature-flag changes.
+- No Vercel changes.
+
 ## 7. Signup Flow Concepts
 
 Possible future signup approaches:

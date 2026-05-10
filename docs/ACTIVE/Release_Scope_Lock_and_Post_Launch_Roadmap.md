@@ -217,6 +217,30 @@ Product Mode Provisioning Capture Planning note:
 - See `docs/ACTIVE/Product_Mode_Signup_Spec.md` section 6.5 for full provisioning capture planning details.
 - See `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` section 11 for future Phase 1 implementation planning.
 
+Product Mode V2 production migration readiness closeout note:
+
+- Verdict: **ready after listed inputs**.
+- Future production migration scope is only: `supabase/migrations/20260509120000_account_settings_product_mode_v1.sql`.
+- Production remained untouched during readiness planning (no migration, no SQL commands, no writes, no env/flag/provisioning changes).
+- Sandbox evidence supports readiness: migration apply verified; schema/RLS/policy/trigger verified; row-validation confirmed explicit-row precedence and safe rowless fallback.
+- Known caveats remain: full HVAC fixture browser smoke not completed; cross-account browser switching not completed; contractor-session smoke not completed; draft jobType browser smoke not completed.
+- Future production preflight must include:
+   - branch `main` + clean worktree
+   - source docs committed
+   - production ref confirmation (`ornrnvxtwwtulohqwxop`) and explicit sandbox/prod distinction
+   - migration list confirmation
+   - dependency checks for `public.set_updated_at` and `public.current_internal_account_owner_id`
+   - dry-run review
+   - named rollback owner
+   - named approver/decision channel
+   - approved change window
+   - confirmed evidence location
+- Future apply sequence remains controlled: ref verify -> migration list -> dry-run -> apply -> post-apply schema/RLS/policy/trigger verification -> app smoke.
+- Backfill decision for migration window: no `account_settings` backfill, no owner Hybrid row write, no Angkor `hvac_service` row/provisioning.
+- Product_mode rows should be created later through approved provisioning/signup capture flows.
+- First Owner Provisioning product_mode capture remains blocked for production use until production migration is applied and verified.
+- Explicit non-actions remain locked: no production execution now, no Supabase commands now, no backfill, no Angkor onboarding, no signup capture, no admin edit UI, no feature flags, no Vercel changes.
+
 ---
 
 ## 5) Runbook-Gated / Controlled Enablement Items

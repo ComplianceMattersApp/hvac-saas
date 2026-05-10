@@ -533,6 +533,32 @@ Admin configuration should start with read-only display only:
 - Admin Center should display current product_mode in read-only form
 - Edit UI and customer-initiated mode switches are later and require explicit gating
 
+### 11.6 Production readiness gate for product_mode capture (planning closeout)
+
+Product Mode V2 production migration readiness planning is closed with verdict: **ready after listed inputs**.
+
+Production-use gate for this runbook section:
+
+- Do not use provisioning `--product-mode` capture in production until migration `20260509120000_account_settings_product_mode_v1.sql` is applied and verified in production.
+- Treat production migration application as a separate approved window with dry-run/verify discipline.
+- Keep this runbook planning-only for product_mode capture until that gate is satisfied.
+
+Execution-window boundaries (future production migration window):
+
+- No `account_settings` row backfill in the same window.
+- No owner Hybrid row write in the same window.
+- No Angkor `hvac_service` provisioning/onboarding/invite in the same window.
+- Product_mode row creation should occur later through approved provisioning/signup capture flows.
+
+Non-actions confirmed for this closeout pass:
+
+- No production execution.
+- No Supabase commands.
+- No backfill.
+- No signup capture enablement.
+- No admin edit UI enablement.
+- No feature-flag or Vercel changes.
+
 ---
 
 ## 12. Operator handoff readiness packet (planning only — no onboarding approved)
