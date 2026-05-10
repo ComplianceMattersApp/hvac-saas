@@ -11,6 +11,7 @@ import {
   type StarterKitVersion,
   resolveStarterKitSeeds,
 } from "@/lib/business/pricebook-seeding";
+import type { ProductMode } from "@/lib/business/product-mode-defaults";
 
 export type FirstOwnerProvisioningStatus = "provisioned" | "confirmed" | "failed" | "dry_run";
 export type EntitlementPreset = "standard" | "internal_comped";
@@ -23,6 +24,7 @@ type RecordKey =
   | "internal_users"
   | "internal_business_profiles"
   | "platform_account_entitlements"
+  | "account_settings"
   | "pricebook_items";
 
 export type FirstOwnerProvisioningError = {
@@ -35,8 +37,25 @@ export type FirstOwnerProvisioningError = {
     | "internal_users"
     | "internal_business_profiles"
     | "platform_account_entitlements"
+    | "account_settings"
     | "pricebook_items"
     | "invariants";
+};
+
+export type ProductModeCaptureAction =
+  | "missing"
+  | "would_create"
+  | "would_patch"
+  | "would_confirm"
+  | "created"
+  | "patched"
+  | "confirmed";
+
+export type ProductModeCaptureResult = {
+  selectedProductMode: ProductMode | null;
+  applyReady: boolean;
+  action: ProductModeCaptureAction;
+  issues: Array<{ code: string; message: string }>;
 };
 
 export type FirstOwnerProvisioningInviteIntent = {
@@ -54,6 +73,7 @@ export type FirstOwnerProvisioningResult = {
   recordsConfirmed: RecordKey[];
   recordsPatched: RecordKey[];
   inviteIntent: FirstOwnerProvisioningInviteIntent;
+  productModeCapture: ProductModeCaptureResult;
   pricebookSeeding: PricebookSeedResult | null;
   warnings: string[];
   errors: FirstOwnerProvisioningError[];
@@ -73,6 +93,7 @@ export type FirstOwnerProvisioningInput = {
   supportPhone?: string | null;
   defaultBillingMode?: BillingMode | string | null;
   entitlementPreset?: EntitlementPreset | string | null;
+  productMode?: ProductMode | string | null;
   starterKitVersion?: StarterKitVersion | string | null;
   operatorMetadata?: FirstOwnerOperatorMetadata;
   dryRun?: boolean;
@@ -119,6 +140,11 @@ export type ProvisioningEntitlementRow = {
   stripe_current_period_end: string | null;
   stripe_cancel_at_period_end: boolean | null;
   notes: string | null;
+};
+
+export type ProvisioningAccountSettingsRow = {
+  account_owner_user_id: string;
+  product_mode: string | null;
 };
 
 export type FirstOwnerProvisioningClient = {
@@ -170,6 +196,13 @@ export type FirstOwnerProvisioningClient = {
     stripe_cancel_at_period_end?: boolean;
     notes?: string | null;
   }): Promise<ProvisioningEntitlementRow>;
+
+  getAccountSettingsByOwnerId(ownerUserId: string): Promise<ProvisioningAccountSettingsRow | null>;
+  upsertAccountSettings(input: {
+    account_owner_user_id: string;
+    product_mode: ProductMode;
+    product_mode_updated_by_user_id: string;
+  }): Promise<ProvisioningAccountSettingsRow>;
 
   listExistingPricebookSeedRows(ownerUserId: string): Promise<PricebookExistingSeedRow[]>;
   insertPricebookSeedRows(rows: PricebookSeedInsertRow[]): Promise<void>;
@@ -264,6 +297,12 @@ function pushError(
       authUserId: null,
       reason: "failed",
     },
+    productModeCapture: {
+      selectedProductMode: null,
+      applyReady: false,
+      action: "missing",
+      issues: [],
+    },
     warnings: [],
     pricebookSeeding: null,
     errors,
@@ -294,6 +333,14 @@ function normalizeEntitlementPreset(value: unknown): EntitlementPreset {
   return toCleanString(value).toLowerCase() === "internal_comped"
     ? "internal_comped"
     : "standard";
+}
+
+function normalizeProductMode(value: unknown): ProductMode | null {
+  const v = toCleanString(value).toLowerCase();
+  if (v === "hybrid") return "hybrid";
+  if (v === "ecc_hers") return "ecc_hers";
+  if (v === "hvac_service") return "hvac_service";
+  return null;
 }
 
 function computeStandardTrialEndsAtIso(now: Date = new Date()) {
@@ -351,6 +398,7 @@ export async function provisionFirstOwnerAccount(params: {
   const supportPhone = toCleanString(input.supportPhone);
   const billingMode = normalizeBillingMode(input.defaultBillingMode);
   const entitlementPreset = normalizeEntitlementPreset(input.entitlementPreset);
+  const selectedProductMode = normalizeProductMode(input.productMode);
   const entitlementPresetValues = buildEntitlementPresetValues(entitlementPreset);
   const starterKitSelection = resolveStarterKitSeeds(
     input.starterKitVersion ?? DEFAULT_FIRST_OWNER_STARTER_KIT_VERSION,
@@ -383,6 +431,19 @@ export async function provisionFirstOwnerAccount(params: {
             email,
             authUserId: null,
             reason: "dry_run",
+          },
+          productModeCapture: {
+            selectedProductMode,
+            applyReady: Boolean(selectedProductMode),
+            action: selectedProductMode ? "would_create" : "missing",
+            issues: selectedProductMode
+              ? []
+              : [
+                  {
+                    code: "PRODUCT_MODE_REQUIRED_FOR_APPLY",
+                    message: "Apply readiness requires --product-mode (hvac_service|ecc_hers|hybrid).",
+                  },
+                ],
           },
           pricebookSeeding: buildSeedPreviewForNewAccount(starterKitSelection),
           warnings,
@@ -586,6 +647,125 @@ export async function provisionFirstOwnerAccount(params: {
       }
     }
 
+    let productModeCapture: ProductModeCaptureResult;
+
+    if (!selectedProductMode) {
+      warnings.push(
+        `${dryRun ? "dry_run" : "run"}: --product-mode is missing; account_settings.product_mode capture is skipped and apply readiness is false.`,
+      );
+      productModeCapture = {
+        selectedProductMode: null,
+        applyReady: false,
+        action: "missing",
+        issues: [
+          {
+            code: "PRODUCT_MODE_REQUIRED_FOR_APPLY",
+            message: "Apply readiness requires --product-mode (hvac_service|ecc_hers|hybrid).",
+          },
+        ],
+      };
+    } else {
+      let existingAccountSettings: ProvisioningAccountSettingsRow | null;
+      try {
+        existingAccountSettings = await client.getAccountSettingsByOwnerId(authUserId);
+      } catch (error) {
+        return pushError(errors, {
+          code: "ACCOUNT_SETTINGS_READ_FAILED",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to read account_settings for product mode capture.",
+          stage: "account_settings",
+        });
+      }
+
+      if (!existingAccountSettings) {
+        if (dryRun) {
+          warnings.push(
+            `dry_run: account_settings row would be created with product_mode=${selectedProductMode}.`,
+          );
+          productModeCapture = {
+            selectedProductMode,
+            applyReady: true,
+            action: "would_create",
+            issues: [],
+          };
+        } else {
+          try {
+            await client.upsertAccountSettings({
+              account_owner_user_id: authUserId,
+              product_mode: selectedProductMode,
+              product_mode_updated_by_user_id: authUserId,
+            });
+          } catch (error) {
+            return pushError(errors, {
+              code: "ACCOUNT_SETTINGS_WRITE_FAILED",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to write account_settings product mode.",
+              stage: "account_settings",
+            });
+          }
+
+          recordsCreated.push("account_settings");
+          productModeCapture = {
+            selectedProductMode,
+            applyReady: true,
+            action: "created",
+            issues: [],
+          };
+        }
+      } else {
+        const currentProductMode = normalizeProductMode(existingAccountSettings.product_mode);
+
+        if (currentProductMode === selectedProductMode) {
+          recordsConfirmed.push("account_settings");
+          productModeCapture = {
+            selectedProductMode,
+            applyReady: true,
+            action: dryRun ? "would_confirm" : "confirmed",
+            issues: [],
+          };
+        } else if (dryRun) {
+          warnings.push(
+            `dry_run: account_settings row would be patched from ${currentProductMode ?? "null"} to ${selectedProductMode}.`,
+          );
+          productModeCapture = {
+            selectedProductMode,
+            applyReady: true,
+            action: "would_patch",
+            issues: [],
+          };
+        } else {
+          try {
+            await client.upsertAccountSettings({
+              account_owner_user_id: authUserId,
+              product_mode: selectedProductMode,
+              product_mode_updated_by_user_id: authUserId,
+            });
+          } catch (error) {
+            return pushError(errors, {
+              code: "ACCOUNT_SETTINGS_WRITE_FAILED",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to write account_settings product mode.",
+              stage: "account_settings",
+            });
+          }
+
+          recordsPatched.push("account_settings");
+          productModeCapture = {
+            selectedProductMode,
+            applyReady: true,
+            action: "patched",
+            issues: [],
+          };
+        }
+      }
+    }
+
     const basePricebookSeeding = dryRun
       ? await dryRunPricebookSeeding(pricebookSeedStore, authUserId, starterKitSelection.seeds)
       : await applyPricebookSeeding(pricebookSeedStore, authUserId, starterKitSelection.seeds);
@@ -618,6 +798,7 @@ export async function provisionFirstOwnerAccount(params: {
           authUserId,
           reason: "failed",
         },
+        productModeCapture,
         pricebookSeeding,
         warnings,
         errors,
@@ -663,6 +844,10 @@ export async function provisionFirstOwnerAccount(params: {
         invariantFailures.push("ENTITLEMENT_INVALID");
       }
 
+      if (selectedProductMode && productModeCapture.action === "missing") {
+        invariantFailures.push("ACCOUNT_SETTINGS_CAPTURE_INVALID");
+      }
+
       if (invariantFailures.length > 0) {
         return pushError(errors, {
           code: "INVARIANT_NOT_CONFIRMED",
@@ -695,6 +880,7 @@ export async function provisionFirstOwnerAccount(params: {
         authUserId,
         reason: dryRun ? "dry_run" : "ready_for_invite",
       },
+      productModeCapture,
       pricebookSeeding,
       warnings,
       errors,

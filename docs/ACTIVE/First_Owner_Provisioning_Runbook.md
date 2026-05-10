@@ -26,6 +26,11 @@ Supported entitlement preset values for --entitlement-preset:
 - standard (default)
 - internal_comped
 
+Supported product mode values for --product-mode:
+- hvac_service
+- ecc_hers
+- hybrid
+
 Supported starter kit selector values for --starter-kit-version:
 - v1 (explicit legacy/manual option)
 - v2 (explicit legacy/manual option)
@@ -83,6 +88,7 @@ npx tsx scripts/provision-first-owner.ts \
   --support-email support@example.com \
   --support-phone "+1-555-555-0100" \
   --entitlement-preset standard \
+  --product-mode hvac_service \
   --default-billing-mode external_billing
 ```
 
@@ -98,6 +104,7 @@ npx tsx scripts/provision-first-owner.ts \
   --support-email support@example.com \
   --support-phone "+1-555-555-0100" \
   --entitlement-preset internal_comped \
+  --product-mode hybrid \
   --default-billing-mode external_billing
 ```
 
@@ -113,6 +120,7 @@ npx tsx scripts/provision-first-owner.ts \
   --support-email support@example.com \
   --support-phone "+1-555-555-0100" \
   --entitlement-preset standard \
+  --product-mode hvac_service \
   --default-billing-mode external_billing \
   --starter-kit-version v2
 ```
@@ -131,6 +139,7 @@ Expected dry-run behavior:
   - `active_seed_count = 91`
   - `inactive_seed_count = 6`
 - Dry-run output includes selected starter kit metadata (`starter_kit_version`, `seed_count`, `active_seed_count`, `inactive_seed_count`)
+- Dry-run output includes structured product-mode capture readiness (`selectedProductMode`, `applyReady`, `action`, `issues`)
 - Dry-run remains non-mutating and must not send invites
 
 ## 5. Apply after project verification
@@ -150,6 +159,7 @@ npx tsx scripts/provision-first-owner.ts \
   --support-email support@example.com \
   --support-phone "+1-555-555-0100" \
   --entitlement-preset standard \
+  --product-mode hvac_service \
   --default-billing-mode external_billing \
   --apply
 ```
@@ -163,6 +173,7 @@ Confirm the run completed and the owner invite path is valid:
 - internal_users owner row exists and is self-anchored to account_owner_user_id
 - internal_business_profiles row exists
 - platform_account_entitlements row exists
+- account_settings row exists with selected `product_mode`
 - first-owner marker is written before invite send
 - starter Pricebook rows exist for the new account after apply
 - starter seeding is idempotent by `seed_key` (re-running apply does not duplicate seeded rows)
@@ -467,37 +478,40 @@ This reference outcome does not imply automatic, batch, or admin-UI-triggered ba
 
 ---
 
-## 11. Future product-mode capture for first-owner provisioning (planning only)
+## 11. Product-mode capture for first-owner provisioning (Slice 1 implemented)
 
-Status: FUTURE IMPLEMENTATION PLANNING. Not yet implemented or required for current provisioning flow.
+Status: IMPLEMENTED for First Owner Provisioning script path.
 
-Product mode should be introduced as a required provisioning parameter in a future phase, with First Owner Provisioning as the first implementation surface (before public signup capture).
+Product mode capture is now supported in the operator provisioning flow as the first implementation surface, before public signup capture.
 
-### 11.1 Future Phase 1 — Product mode on first-owner provisioning
+### 11.1 Slice 1 behavior — Product mode on first-owner provisioning
 
-When implemented, the first-owner provisioning script should:
+Current script behavior:
 
-- Accept `--product-mode` as a required flag with allowed values: `hvac_service`, `ecc_hers`, `hybrid`
-- Include product mode in dry-run output (value must be visible for operator verification)
-- Write `account_settings.product_mode` during apply, after owner/account identity is resolved and before invite send
-- Block provisioning apply if `--product-mode` is missing or has an invalid value
-- Dry-run example output addition:
-  ```
-  product_mode: hvac_service | ecc_hers | hybrid (required, must be selected)
-  ```
-- Apply example output addition:
-  ```
-  account_settings.product_mode: [value from --product-mode flag]
-  ```
+- Accepts `--product-mode` with allowed values: `hvac_service`, `ecc_hers`, `hybrid`.
+- Parser rejects invalid values.
+- Apply mode requires valid `--product-mode`; missing value blocks apply.
+- During apply, `account_settings.product_mode` is upserted after owner identity resolution and before invite orchestration.
+- Account settings write failure blocks completion and prevents invite send.
+- Dry-run remains non-mutating.
+- Dry-run without `--product-mode` reports non-apply-ready structured state.
+- Dry-run with `--product-mode` reports selected value and preview action (`would_create` / `would_patch` / `would_confirm`).
+- Entitlement preset remains independent from product mode selection.
+
+Operator usage examples:
+
+- Internal comped owner/shared-brand pattern:
+  - `--entitlement-preset internal_comped --product-mode hybrid`
+- Standard service-company pattern:
+  - `--entitlement-preset standard --product-mode hvac_service`
 
 ### 11.2 Precedence and fallback rules
 
-- Once Phase 1 is implemented:
-  - Missing `--product-mode` blocks provisioning apply only (not signup or login)
-  - Current fallback behavior (signal-based defaults) remains functional for backward-compatible accounts
-  - Accounts without `account_settings.product_mode` rows continue to resolve safely via signal fallback
-- Phase 1 does not require backfilling existing accounts with product_mode values
-- Phase 1 does not change trial/payment flow or entitlement behavior
+- Missing `--product-mode` blocks provisioning apply only (not signup or login).
+- Current fallback behavior (signal-based defaults) remains functional for backward-compatible accounts.
+- Accounts without `account_settings.product_mode` rows continue to resolve safely via signal fallback.
+- Slice 1 does not require backfilling existing accounts with product_mode values.
+- Slice 1 does not change trial/payment flow or entitlement behavior.
 
 ### 11.3 Relationship to other provisioning parameters
 
@@ -508,7 +522,7 @@ Product mode is separate from:
 - Tier (`plan_key`): business package level
 - Feature flags: rollout safety gates
 
-These parameters must remain independent in Phase 1 and Phase 2 planning.
+These parameters remain independent in Slice 1 implementation and later phases.
 
 ### 11.4 Phase 2 — Public signup capture (future, later than Phase 1)
 
@@ -533,15 +547,19 @@ Admin configuration should start with read-only display only:
 - Admin Center should display current product_mode in read-only form
 - Edit UI and customer-initiated mode switches are later and require explicit gating
 
-### 11.6 Production readiness gate for product_mode capture (planning closeout)
+### 11.6 Production gate and boundaries for product_mode capture
 
-Product Mode V2 production migration readiness planning is closed with verdict: **ready after listed inputs**.
+Production schema gate is now satisfied:
 
-Production-use gate for this runbook section:
+- Migration `20260509120000_account_settings_product_mode_v1.sql` is applied and verified in production.
+- `public.account_settings` exists with row count `0` post-migration baseline.
 
-- Do not use provisioning `--product-mode` capture in production until migration `20260509120000_account_settings_product_mode_v1.sql` is applied and verified in production.
-- Treat production migration application as a separate approved window with dry-run/verify discipline.
-- Keep this runbook planning-only for product_mode capture until that gate is satisfied.
+Boundaries for this runbook section remain:
+
+- No existing-account backfill.
+- No owner Hybrid row write outside approved operator execution.
+- No Angkor `hvac_service` provisioning/onboarding/invite in the same change pass.
+- Product_mode row creation remains operator-runbook controlled and dry-run-first.
 
 Execution-window boundaries (future production migration window):
 
@@ -550,11 +568,8 @@ Execution-window boundaries (future production migration window):
 - No Angkor `hvac_service` provisioning/onboarding/invite in the same window.
 - Product_mode row creation should occur later through approved provisioning/signup capture flows.
 
-Non-actions confirmed for this closeout pass:
+Non-actions still confirmed:
 
-- No production execution.
-- No Supabase commands.
-- No backfill.
 - No signup capture enablement.
 - No admin edit UI enablement.
 - No feature-flag or Vercel changes.

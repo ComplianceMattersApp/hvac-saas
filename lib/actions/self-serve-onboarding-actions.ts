@@ -306,6 +306,41 @@ function createProvisioningClientFromAdmin(admin: any): FirstOwnerProvisioningCl
       };
     },
 
+    async getAccountSettingsByOwnerId(ownerUserId) {
+      const { data, error } = await admin
+        .from("account_settings")
+        .select("account_owner_user_id, product_mode")
+        .eq("account_owner_user_id", ownerUserId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data?.account_owner_user_id) return null;
+      return {
+        account_owner_user_id: String(data.account_owner_user_id),
+        product_mode: toCleanString(data.product_mode) || null,
+      };
+    },
+
+    async upsertAccountSettings(input) {
+      const { data, error } = await admin
+        .from("account_settings")
+        .upsert(
+          {
+            account_owner_user_id: input.account_owner_user_id,
+            product_mode: input.product_mode,
+            product_mode_updated_at: new Date().toISOString(),
+            product_mode_updated_by_user_id: input.product_mode_updated_by_user_id,
+          },
+          { onConflict: "account_owner_user_id" },
+        )
+        .select("account_owner_user_id, product_mode")
+        .single();
+      if (error) throw error;
+      return {
+        account_owner_user_id: String(data.account_owner_user_id),
+        product_mode: toCleanString(data.product_mode) || null,
+      };
+    },
+
     async listExistingPricebookSeedRows(ownerUserId) {
       const { data, error } = await admin
         .from("pricebook_items")

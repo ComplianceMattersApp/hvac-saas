@@ -338,19 +338,21 @@ Future validation (recommended):
 - Test contractor-portal behavior unchanged for contractor-role users.
 - Create HVAC Service fixture account with non-default display_name for HVAC smoke validation.
 
-### 6.5 Provisioning capture planning (2026-05-10)
+### 6.5 Provisioning capture Slice 1 (implemented, 2026-05-10)
 
 Product mode capture should be phased, with the first implementation surface being First Owner Provisioning, not public signup.
 
-Phased approach:
+Current implementation status:
 
-1. **Phase 1: First Owner Provisioning (future implementation)**
-   - First Owner Provisioning script should require `--product-mode` flag
-   - Allowed values: `hvac_service`, `ecc_hers`, `hybrid`
-   - Product mode should be written to `account_settings.product_mode` during provisioning apply, after owner/account identity is resolved and before invite send
-   - Dry-run output must include the required `product_mode` value
-   - Missing or invalid `product_mode` should block provisioning apply once this phase is implemented
-   - See First_Owner_Provisioning_Runbook.md section 12 for phase-1 implementation details
+1. **Phase 1: First Owner Provisioning (implemented)**
+   - First Owner Provisioning script supports `--product-mode` with allowed values `hvac_service`, `ecc_hers`, `hybrid`
+   - Invalid `--product-mode` is rejected by parser
+   - Apply mode requires valid `--product-mode` and blocks apply when missing
+   - Product mode is written to `account_settings.product_mode` during provisioning apply, after owner/account identity is resolved and before invite send
+   - Account settings write failure blocks completion and prevents invite send
+   - Dry-run remains non-mutating and reports product-mode capture readiness
+   - Dry-run preview reports whether account_settings would be created, patched, or confirmed
+   - See `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` section 11 for operational details
 
 2. **Phase 2: Public signup capture (later)**
    - Public signup at `/signup` will eventually support two customer paths:
@@ -372,7 +374,7 @@ Fallback and safety rules:
 
 - Missing `product_mode` should continue to fall back safely (signal-based defaults remain functional)
 - Missing `product_mode` must not block login, signup, invites, or reports
-- Once Phase 1 is implemented, missing `product_mode` should only block provisioning apply (not user/account functionality)
+- In Slice 1 implementation, missing `product_mode` blocks provisioning apply (not user/account functionality)
 
 Separation of concerns:
 
@@ -391,9 +393,9 @@ Special case: Angkor Heating and Air
 
 Production readiness requirement:
 
-- Production `account_settings` migration must be applied before production provisioning apply or signup capture can write `product_mode` values
-- Sandbox validation for `account_settings` migration and resolver chain is complete (see section 6.4)
-- Production migration and validation remains future work until production account_settings write is explicitly approved
+- Production `account_settings` migration prerequisite is satisfied (`20260509120000_account_settings_product_mode_v1.sql` applied)
+- Provisioning product_mode writes remain operator-runbook controlled and approval-gated
+- This slice does not perform backfill or existing-account product_mode writes
 
 Non-actions (scope out of Phase 1):
 

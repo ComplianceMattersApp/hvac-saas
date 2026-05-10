@@ -217,6 +217,15 @@ Product Mode Provisioning Capture Planning note:
 - See `docs/ACTIVE/Product_Mode_Signup_Spec.md` section 6.5 for full provisioning capture planning details.
 - See `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` section 11 for future Phase 1 implementation planning.
 
+Product Mode Provisioning Capture Slice 1 closeout note:
+
+- First Owner Provisioning script now supports `--product-mode hvac_service|ecc_hers|hybrid`.
+- Apply mode requires valid `--product-mode` and blocks when missing/invalid.
+- Apply path writes `account_settings.product_mode` after owner identity resolution and before invite orchestration.
+- Dry-run remains non-mutating and reports apply-readiness plus create/patch/confirm preview for account_settings capture.
+- Separation preserved: product mode remains independent from entitlement preset (`internal_comped` does not imply `hybrid`; `standard` does not imply `hvac_service`).
+- Boundaries unchanged: no signup capture, no admin edit UI, no tier/add-on enforcement, no mode-aware navigation/report/starter-kit rewrite, no billing/payment/contractor-authority/Estimates/Support behavior changes.
+
 Product Mode V2 production migration execution closeout note:
 
 - Production migration scope executed: `supabase/migrations/20260509120000_account_settings_product_mode_v1.sql` only.

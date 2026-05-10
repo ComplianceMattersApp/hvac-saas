@@ -37,6 +37,12 @@ function makeProvisioningSuccess(
       authUserId: "owner-1",
       reason: "ready_for_invite",
     },
+    productModeCapture: {
+      selectedProductMode: "hvac_service",
+      applyReady: true,
+      action: "confirmed",
+      issues: [],
+    },
     pricebookSeeding: {
       starter_kit_version: version,
       seed_count: seeds.length,
@@ -96,6 +102,8 @@ describe("parseProvisionFirstOwnerArgs", () => {
       "My Company",
       "--owner-display-name",
       "Owner Name",
+      "--product-mode",
+      "hybrid",
       "--entitlement-preset",
       "internal_comped",
       "--starter-kit-version",
@@ -107,6 +115,7 @@ describe("parseProvisionFirstOwnerArgs", () => {
     expect(parsed.email).toBe("owner@example.com");
     expect(parsed.businessDisplayName).toBe("My Company");
     expect(parsed.ownerDisplayName).toBe("Owner Name");
+    expect(parsed.productMode).toBe("hybrid");
     expect(parsed.entitlementPreset).toBe("internal_comped");
     expect(parsed.starterKitVersion).toBe("v2");
     expect(parsed.resendInvite).toBe(true);
@@ -151,6 +160,50 @@ describe("parseProvisionFirstOwnerArgs", () => {
     ).toThrow("Invalid --entitlement-preset (expected: standard|internal_comped)");
   });
 
+  it("accepts each supported --product-mode", () => {
+    const hvac = parseProvisionFirstOwnerArgs([
+      "--email",
+      "owner@example.com",
+      "--business-display-name",
+      "My Company",
+      "--product-mode",
+      "hvac_service",
+    ]);
+    const ecc = parseProvisionFirstOwnerArgs([
+      "--email",
+      "owner@example.com",
+      "--business-display-name",
+      "My Company",
+      "--product-mode",
+      "ecc_hers",
+    ]);
+    const hybrid = parseProvisionFirstOwnerArgs([
+      "--email",
+      "owner@example.com",
+      "--business-display-name",
+      "My Company",
+      "--product-mode",
+      "hybrid",
+    ]);
+
+    expect(hvac.productMode).toBe("hvac_service");
+    expect(ecc.productMode).toBe("ecc_hers");
+    expect(hybrid.productMode).toBe("hybrid");
+  });
+
+  it("rejects invalid --product-mode", () => {
+    expect(() =>
+      parseProvisionFirstOwnerArgs([
+        "--email",
+        "owner@example.com",
+        "--business-display-name",
+        "My Company",
+        "--product-mode",
+        "invalid",
+      ]),
+    ).toThrow("Invalid --product-mode (expected: hvac_service|ecc_hers|hybrid)");
+  });
+
   it("throws if required args are missing", () => {
     expect(() =>
       parseProvisionFirstOwnerArgs(["--email", "owner@example.com"]),
@@ -188,6 +241,7 @@ describe("runProvisionFirstOwnerScript", () => {
   const baseArgs = {
     email: "owner@example.com",
     businessDisplayName: "My Company",
+    productMode: "hvac_service" as const,
     entitlementPreset: "standard" as const,
     starterKitVersion: "v3" as const,
     resendInvite: false,
@@ -204,6 +258,7 @@ describe("runProvisionFirstOwnerScript", () => {
       expect.objectContaining({
         targetEmail: "owner@example.com",
         businessDisplayName: "My Company",
+        productMode: "hvac_service",
         entitlementPreset: "standard",
         starterKitVersion: "v3",
         dryRun: true,
@@ -212,6 +267,7 @@ describe("runProvisionFirstOwnerScript", () => {
     expect(deps.sendInvite).not.toHaveBeenCalled();
     expect(result.inviteSent).toBe(false);
     expect(result.inviteSkippedReason).toBe("dry_run");
+    expect(result.productModeCapture.selectedProductMode).toBe("hvac_service");
     expect(result.pricebookSeeding).toEqual(
       expect.objectContaining({
         starter_kit_version: "v3",
@@ -227,6 +283,8 @@ describe("runProvisionFirstOwnerScript", () => {
       "owner@example.com",
       "--business-display-name",
       "My Company",
+      "--product-mode",
+      "hvac_service",
     ]);
 
     const result = await runProvisionFirstOwnerScript(parsed, deps);
@@ -313,6 +371,50 @@ describe("runProvisionFirstOwnerScript", () => {
       expect.objectContaining({
         starter_kit_version: "v3",
         inserted_count: STARTER_KIT_V3_SEEDS.length,
+      }),
+    );
+  });
+
+  it("apply without product mode is blocked", async () => {
+    const deps = makeDeps();
+
+    const result = await runProvisionFirstOwnerScript(
+      { ...baseArgs, productMode: undefined, apply: true },
+      deps,
+    );
+
+    expect(result.errors[0]?.code).toBe("PRODUCT_MODE_REQUIRED_FOR_APPLY");
+    expect(deps.provision).not.toHaveBeenCalled();
+    expect(deps.sendInvite).not.toHaveBeenCalled();
+  });
+
+  it("dry-run without product mode is non-mutating and not apply-ready", async () => {
+    const deps = makeDeps();
+
+    const result = await runProvisionFirstOwnerScript(
+      { ...baseArgs, productMode: undefined, apply: false },
+      deps,
+    );
+
+    expect(result.mode).toBe("dry_run");
+    expect(result.productModeCapture.applyReady).toBe(false);
+    expect(result.productModeCapture.issues[0]?.code).toBe("PRODUCT_MODE_REQUIRED_FOR_APPLY");
+    expect(result.inviteSent).toBe(false);
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.objectContaining({ dryRun: true, productMode: undefined }),
+    );
+    expect(deps.sendInvite).not.toHaveBeenCalled();
+  });
+
+  it("dry-run with product mode passes selected value to helper", async () => {
+    const deps = makeDeps();
+
+    await runProvisionFirstOwnerScript({ ...baseArgs, productMode: "ecc_hers", apply: false }, deps);
+
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productMode: "ecc_hers",
+        dryRun: true,
       }),
     );
   });

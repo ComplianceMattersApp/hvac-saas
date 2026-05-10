@@ -47,6 +47,10 @@ type Store = {
     }
   >;
   entitlementsByOwnerId: Record<string, EntitlementRow>;
+  accountSettingsByOwnerId: Record<
+    string,
+    { account_owner_user_id: string; product_mode: string | null }
+  >;
   pricebookSeedRowsByOwnerId: Record<string, Array<{ seed_key: string; item_name: string }>>;
   sequence: number;
 };
@@ -76,6 +80,7 @@ function createStore(seed?: Partial<Store>): Store {
     internalUsersByUserId: seed?.internalUsersByUserId ?? {},
     businessProfilesByOwnerId: seed?.businessProfilesByOwnerId ?? {},
     entitlementsByOwnerId: seed?.entitlementsByOwnerId ?? {},
+    accountSettingsByOwnerId: seed?.accountSettingsByOwnerId ?? {},
     pricebookSeedRowsByOwnerId: seed?.pricebookSeedRowsByOwnerId ?? {},
     sequence: seed?.sequence ?? 1,
   };
@@ -168,6 +173,19 @@ function createMockClient(store: Store): FirstOwnerProvisioningClient {
       return row;
     }),
 
+    getAccountSettingsByOwnerId: vi.fn(async (ownerUserId: string) => {
+      return store.accountSettingsByOwnerId[ownerUserId] ?? null;
+    }),
+
+    upsertAccountSettings: vi.fn(async (input) => {
+      const row = {
+        account_owner_user_id: input.account_owner_user_id,
+        product_mode: input.product_mode,
+      };
+      store.accountSettingsByOwnerId[input.account_owner_user_id] = row;
+      return row;
+    }),
+
     listExistingPricebookSeedRows: vi.fn(async (ownerUserId: string) => {
       return store.pricebookSeedRowsByOwnerId[ownerUserId] ?? [];
     }),
@@ -196,6 +214,7 @@ describe("provisionFirstOwnerAccount", () => {
         targetEmail: "OWNER@EXAMPLE.COM",
         ownerDisplayName: "Owner User",
         businessDisplayName: "Owner Business",
+        productMode: "hvac_service",
       },
     });
 
@@ -210,8 +229,15 @@ describe("provisionFirstOwnerAccount", () => {
         "internal_users",
         "internal_business_profiles",
         "platform_account_entitlements",
+        "account_settings",
         "pricebook_items",
       ]),
+    );
+    expect(result.productModeCapture).toEqual(
+      expect.objectContaining({
+        selectedProductMode: "hvac_service",
+        applyReady: true,
+      }),
     );
     expect(result.pricebookSeeding).toEqual(
       expect.objectContaining({
@@ -299,6 +325,7 @@ describe("provisionFirstOwnerAccount", () => {
     );
     expect(client.createAuthUser).not.toHaveBeenCalled();
     expect(client.insertProfile).not.toHaveBeenCalled();
+    expect(result.productModeCapture.applyReady).toBe(false);
   });
 
   it("dry run previews starter pricebook seeding for a new account", async () => {
@@ -310,11 +337,19 @@ describe("provisionFirstOwnerAccount", () => {
       input: {
         targetEmail: "owner@example.com",
         dryRun: true,
+        productMode: "ecc_hers",
       },
     });
 
     expect(result.status).toBe("dry_run");
     expect(result.accountOwnerUserId).toBeNull();
+    expect(result.productModeCapture).toEqual(
+      expect.objectContaining({
+        selectedProductMode: "ecc_hers",
+        applyReady: true,
+        action: "would_create",
+      }),
+    );
     expect(result.pricebookSeeding).toEqual(
       expect.objectContaining({
         starter_kit_version: "v3",
@@ -335,6 +370,7 @@ describe("provisionFirstOwnerAccount", () => {
         targetEmail: "owner@example.com",
         businessDisplayName: "Owner Business",
         starterKitVersion: "v1",
+        productMode: "hvac_service",
       },
     });
 
@@ -362,6 +398,7 @@ describe("provisionFirstOwnerAccount", () => {
         targetEmail: "owner@example.com",
         businessDisplayName: "Owner Business",
         starterKitVersion: "v2",
+        productMode: "hvac_service",
       },
     });
 
@@ -412,6 +449,7 @@ describe("provisionFirstOwnerAccount", () => {
       input: {
         targetEmail: "owner@example.com",
         businessDisplayName: "Recovered Business",
+        productMode: "hvac_service",
       },
     });
 
@@ -752,6 +790,12 @@ describe("provisionFirstOwnerAccount", () => {
           entitlement_status: "active",
         }),
       },
+      accountSettingsByOwnerId: {
+        [ownerId]: {
+          account_owner_user_id: ownerId,
+          product_mode: "hvac_service",
+        },
+      },
       pricebookSeedRowsByOwnerId: {
         [ownerId]: STARTER_KIT_V3_SEEDS.map((seed) => ({
           seed_key: seed.seed_key,
@@ -765,11 +809,13 @@ describe("provisionFirstOwnerAccount", () => {
       client,
       input: {
         targetEmail: "owner@example.com",
+        productMode: "hvac_service",
       },
     });
 
     expect(result.status).toBe("confirmed");
     expect(result.recordsPatched).not.toContain("platform_account_entitlements");
+    expect(result.recordsPatched).not.toContain("account_settings");
     expect(store.entitlementsByOwnerId[ownerId]?.plan_key).toBe("enterprise");
     expect(store.entitlementsByOwnerId[ownerId]?.entitlement_status).toBe("active");
   });
@@ -849,5 +895,218 @@ describe("provisionFirstOwnerAccount", () => {
         skipped_count: STARTER_KIT_V3_SEEDS.length,
       }),
     );
+  });
+
+  it("apply mode upserts account_settings product_mode", async () => {
+    const ownerId = "user-300";
+    const store = createStore({
+      authUsersByEmail: {
+        "owner@example.com": { id: ownerId, email: "owner@example.com" },
+      },
+      profilesById: {
+        [ownerId]: { id: ownerId, email: "owner@example.com", full_name: "Owner" },
+      },
+      internalUsersByUserId: {
+        [ownerId]: {
+          user_id: ownerId,
+          account_owner_user_id: ownerId,
+          role: "admin",
+          is_active: true,
+          created_by: ownerId,
+        },
+      },
+      businessProfilesByOwnerId: {
+        [ownerId]: {
+          account_owner_user_id: ownerId,
+          display_name: "Configured",
+          support_email: null,
+          support_phone: null,
+          billing_mode: "external_billing",
+        },
+      },
+      entitlementsByOwnerId: {
+        [ownerId]: makeEntitlementRow({
+          account_owner_user_id: ownerId,
+          plan_key: "starter",
+          entitlement_status: "trial",
+        }),
+      },
+    });
+    const client = createMockClient(store);
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: { targetEmail: "owner@example.com", productMode: "hvac_service" },
+    });
+
+    expect(result.status).toBe("provisioned");
+    expect(result.recordsCreated).toContain("account_settings");
+    expect(store.accountSettingsByOwnerId[ownerId]?.product_mode).toBe("hvac_service");
+  });
+
+  it("existing matching account_settings row is confirmed", async () => {
+    const ownerId = "user-301";
+    const store = createStore({
+      authUsersByEmail: {
+        "owner@example.com": { id: ownerId, email: "owner@example.com" },
+      },
+      profilesById: {
+        [ownerId]: { id: ownerId, email: "owner@example.com", full_name: "Owner" },
+      },
+      internalUsersByUserId: {
+        [ownerId]: {
+          user_id: ownerId,
+          account_owner_user_id: ownerId,
+          role: "admin",
+          is_active: true,
+          created_by: ownerId,
+        },
+      },
+      businessProfilesByOwnerId: {
+        [ownerId]: {
+          account_owner_user_id: ownerId,
+          display_name: "Configured",
+          support_email: null,
+          support_phone: null,
+          billing_mode: "external_billing",
+        },
+      },
+      entitlementsByOwnerId: {
+        [ownerId]: makeEntitlementRow({
+          account_owner_user_id: ownerId,
+          plan_key: "starter",
+          entitlement_status: "trial",
+        }),
+      },
+      accountSettingsByOwnerId: {
+        [ownerId]: { account_owner_user_id: ownerId, product_mode: "ecc_hers" },
+      },
+      pricebookSeedRowsByOwnerId: {
+        [ownerId]: STARTER_KIT_V3_SEEDS.map((seed) => ({
+          seed_key: seed.seed_key,
+          item_name: seed.item_name,
+        })),
+      },
+    });
+    const client = createMockClient(store);
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: { targetEmail: "owner@example.com", productMode: "ecc_hers" },
+    });
+
+    expect(result.status).toBe("confirmed");
+    expect(result.recordsConfirmed).toContain("account_settings");
+    expect(result.recordsPatched).not.toContain("account_settings");
+    expect(result.productModeCapture.action).toBe("confirmed");
+  });
+
+  it("existing different account_settings row is patched only in apply", async () => {
+    const ownerId = "user-302";
+    const store = createStore({
+      authUsersByEmail: {
+        "owner@example.com": { id: ownerId, email: "owner@example.com" },
+      },
+      profilesById: {
+        [ownerId]: { id: ownerId, email: "owner@example.com", full_name: "Owner" },
+      },
+      internalUsersByUserId: {
+        [ownerId]: {
+          user_id: ownerId,
+          account_owner_user_id: ownerId,
+          role: "admin",
+          is_active: true,
+          created_by: ownerId,
+        },
+      },
+      businessProfilesByOwnerId: {
+        [ownerId]: {
+          account_owner_user_id: ownerId,
+          display_name: "Configured",
+          support_email: null,
+          support_phone: null,
+          billing_mode: "external_billing",
+        },
+      },
+      entitlementsByOwnerId: {
+        [ownerId]: makeEntitlementRow({
+          account_owner_user_id: ownerId,
+          plan_key: "starter",
+          entitlement_status: "trial",
+        }),
+      },
+      accountSettingsByOwnerId: {
+        [ownerId]: { account_owner_user_id: ownerId, product_mode: "hybrid" },
+      },
+    });
+    const client = createMockClient(store);
+
+    const dryRunResult = await provisionFirstOwnerAccount({
+      client,
+      input: { targetEmail: "owner@example.com", productMode: "hvac_service", dryRun: true },
+    });
+
+    expect(dryRunResult.status).toBe("dry_run");
+    expect(dryRunResult.productModeCapture.action).toBe("would_patch");
+    expect(store.accountSettingsByOwnerId[ownerId]?.product_mode).toBe("hybrid");
+
+    const applyResult = await provisionFirstOwnerAccount({
+      client,
+      input: { targetEmail: "owner@example.com", productMode: "hvac_service" },
+    });
+
+    expect(applyResult.recordsPatched).toContain("account_settings");
+    expect(applyResult.productModeCapture.action).toBe("patched");
+    expect(store.accountSettingsByOwnerId[ownerId]?.product_mode).toBe("hvac_service");
+  });
+
+  it("account settings write failure returns error and blocks provisioning completion", async () => {
+    const store = createStore();
+    const client = createMockClient(store);
+    (client.upsertAccountSettings as any).mockRejectedValueOnce(new Error("account settings blocked"));
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: { targetEmail: "owner@example.com", productMode: "hybrid" },
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.errors[0]?.code).toBe("ACCOUNT_SETTINGS_WRITE_FAILED");
+  });
+
+  it("internal_comped with hybrid keeps entitlement and product mode separate", async () => {
+    const store = createStore();
+    const client = createMockClient(store);
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: {
+        targetEmail: "owner@example.com",
+        entitlementPreset: "internal_comped",
+        productMode: "hybrid",
+      },
+    });
+
+    const ownerId = result.accountOwnerUserId as string;
+    expect(store.entitlementsByOwnerId[ownerId]?.notes).toBe("internal_comped_v1");
+    expect(store.accountSettingsByOwnerId[ownerId]?.product_mode).toBe("hybrid");
+  });
+
+  it("standard with hvac_service keeps entitlement and product mode separate", async () => {
+    const store = createStore();
+    const client = createMockClient(store);
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: {
+        targetEmail: "owner@example.com",
+        entitlementPreset: "standard",
+        productMode: "hvac_service",
+      },
+    });
+
+    const ownerId = result.accountOwnerUserId as string;
+    expect(store.entitlementsByOwnerId[ownerId]?.entitlement_status).toBe("trial");
+    expect(store.accountSettingsByOwnerId[ownerId]?.product_mode).toBe("hvac_service");
   });
 });

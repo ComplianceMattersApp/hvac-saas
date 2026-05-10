@@ -22,6 +22,12 @@ function makeProvisioningResult(
       authUserId: "owner-1",
       reason: "ready_for_invite",
     },
+    productModeCapture: {
+      selectedProductMode: null,
+      applyReady: false,
+      action: "missing",
+      issues: [],
+    },
     pricebookSeeding: null,
     warnings: [],
     errors: [],

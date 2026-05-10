@@ -5,6 +5,7 @@ import {
   type FirstOwnerProvisioningInput,
   type FirstOwnerProvisioningResult,
 } from "../lib/business/first-owner-provisioning";
+import type { ProductMode } from "../lib/business/product-mode-defaults";
 import {
   orchestrateFirstOwnerInvite,
   type FirstOwnerInviteDeps,
@@ -19,6 +20,7 @@ type ParsedArgs = {
   supportEmail?: string;
   supportPhone?: string;
   defaultBillingMode?: string;
+  productMode?: ProductMode;
   entitlementPreset: "standard" | "internal_comped";
   starterKitVersion: "v1" | "v2" | "v3";
   resendInvite: boolean;
@@ -37,6 +39,7 @@ type ScriptResult = {
   recordsCreated: string[];
   recordsConfirmed: string[];
   recordsPatched: string[];
+  productModeCapture: FirstOwnerProvisioningResult["productModeCapture"];
   pricebookSeeding: FirstOwnerProvisioningResult["pricebookSeeding"];
   inviteSent: boolean;
   inviteSkippedReason?: string;
@@ -145,6 +148,7 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
   const supportEmail = toCleanString(parseArgValue(argv, "--support-email"));
   const supportPhone = toCleanString(parseArgValue(argv, "--support-phone"));
   const defaultBillingMode = toCleanString(parseArgValue(argv, "--default-billing-mode"));
+  const productModeRaw = toCleanString(parseArgValue(argv, "--product-mode")).toLowerCase();
   const entitlementPresetRaw = toCleanString(parseArgValue(argv, "--entitlement-preset")).toLowerCase();
   const starterKitVersionRaw = toCleanString(parseArgValue(argv, "--starter-kit-version")).toLowerCase();
   const resendInvite = hasFlag(argv, "--resend-invite");
@@ -176,6 +180,15 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
           })()
         : "v3";
 
+  const productMode =
+    productModeRaw === "hvac_service" || productModeRaw === "ecc_hers" || productModeRaw === "hybrid"
+      ? productModeRaw
+      : productModeRaw
+        ? (() => {
+            throw new Error("Invalid --product-mode (expected: hvac_service|ecc_hers|hybrid)");
+          })()
+        : undefined;
+
   return {
     email,
     businessDisplayName,
@@ -183,6 +196,7 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
     supportEmail: supportEmail || undefined,
     supportPhone: supportPhone || undefined,
     defaultBillingMode: defaultBillingMode || undefined,
+    productMode,
     entitlementPreset,
     starterKitVersion,
     resendInvite,
@@ -196,6 +210,35 @@ export async function runProvisionFirstOwnerScript(
 ): Promise<ScriptResult> {
   const mode: ScriptResult["mode"] = args.apply ? "apply" : "dry_run";
   const guardrailErrors = collectGuardrailErrors({ apply: args.apply, env: deps.env });
+  const productModeReadinessIssues: Array<{ code: string; message: string }> = [];
+
+  if (!args.productMode) {
+    productModeReadinessIssues.push({
+      code: "PRODUCT_MODE_REQUIRED_FOR_APPLY",
+      message: "Apply readiness requires --product-mode (hvac_service|ecc_hers|hybrid).",
+    });
+  }
+
+  if (args.apply && productModeReadinessIssues.length > 0) {
+    return {
+      mode,
+      accountOwnerUserId: null,
+      authUserId: null,
+      recordsCreated: [],
+      recordsConfirmed: [],
+      recordsPatched: [],
+      productModeCapture: {
+        selectedProductMode: args.productMode ?? null,
+        applyReady: false,
+        action: "missing",
+        issues: productModeReadinessIssues,
+      },
+      pricebookSeeding: null,
+      inviteSent: false,
+      warnings: [],
+      errors: productModeReadinessIssues,
+    };
+  }
 
   if (guardrailErrors.length > 0) {
     return {
@@ -205,6 +248,12 @@ export async function runProvisionFirstOwnerScript(
       recordsCreated: [],
       recordsConfirmed: [],
       recordsPatched: [],
+      productModeCapture: {
+        selectedProductMode: args.productMode ?? null,
+        applyReady: !args.apply,
+        action: args.productMode ? "would_create" : "missing",
+        issues: productModeReadinessIssues,
+      },
       pricebookSeeding: null,
       inviteSent: false,
       warnings: [],
@@ -219,6 +268,7 @@ export async function runProvisionFirstOwnerScript(
     supportEmail: args.supportEmail,
     supportPhone: args.supportPhone,
     defaultBillingMode: args.defaultBillingMode,
+    productMode: args.productMode,
     entitlementPreset: args.entitlementPreset,
     starterKitVersion: args.starterKitVersion,
     dryRun: !args.apply,
@@ -230,6 +280,15 @@ export async function runProvisionFirstOwnerScript(
 
   const warnings = [...provisioning.warnings];
   const errors = provisioning.errors.map((e) => ({ code: e.code, message: e.message }));
+  const effectiveProductModeCapture =
+    productModeReadinessIssues.length > 0
+      ? {
+          selectedProductMode: null,
+          applyReady: false,
+          action: "missing" as const,
+          issues: productModeReadinessIssues,
+        }
+      : provisioning.productModeCapture;
 
   if (provisioning.status === "failed" || errors.length > 0) {
     return {
@@ -239,6 +298,7 @@ export async function runProvisionFirstOwnerScript(
       recordsCreated: provisioning.recordsCreated,
       recordsConfirmed: provisioning.recordsConfirmed,
       recordsPatched: provisioning.recordsPatched,
+      productModeCapture: effectiveProductModeCapture,
       pricebookSeeding: provisioning.pricebookSeeding,
       inviteSent: false,
       warnings,
@@ -254,6 +314,7 @@ export async function runProvisionFirstOwnerScript(
       recordsCreated: provisioning.recordsCreated,
       recordsConfirmed: provisioning.recordsConfirmed,
       recordsPatched: provisioning.recordsPatched,
+      productModeCapture: effectiveProductModeCapture,
       pricebookSeeding: provisioning.pricebookSeeding,
       inviteSent: false,
       inviteSkippedReason: "dry_run",
@@ -281,6 +342,7 @@ export async function runProvisionFirstOwnerScript(
       recordsCreated: provisioning.recordsCreated,
       recordsConfirmed: provisioning.recordsConfirmed,
       recordsPatched: provisioning.recordsPatched,
+      productModeCapture: effectiveProductModeCapture,
       pricebookSeeding: provisioning.pricebookSeeding,
       inviteSent: false,
       warnings,
@@ -295,6 +357,7 @@ export async function runProvisionFirstOwnerScript(
     recordsCreated: provisioning.recordsCreated,
     recordsConfirmed: provisioning.recordsConfirmed,
     recordsPatched: provisioning.recordsPatched,
+    productModeCapture: effectiveProductModeCapture,
     pricebookSeeding: provisioning.pricebookSeeding,
     inviteSent: inviteResult.inviteSent,
     inviteSkippedReason: inviteResult.inviteSkippedReason,
@@ -573,6 +636,41 @@ function createProvisioningClientFromAdmin(admin: any): FirstOwnerProvisioningCl
       };
     },
 
+    async getAccountSettingsByOwnerId(ownerUserId) {
+      const { data, error } = await admin
+        .from("account_settings")
+        .select("account_owner_user_id, product_mode")
+        .eq("account_owner_user_id", ownerUserId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data?.account_owner_user_id) return null;
+      return {
+        account_owner_user_id: String(data.account_owner_user_id),
+        product_mode: toCleanString(data.product_mode) || null,
+      };
+    },
+
+    async upsertAccountSettings(input) {
+      const { data, error } = await admin
+        .from("account_settings")
+        .upsert(
+          {
+            account_owner_user_id: input.account_owner_user_id,
+            product_mode: input.product_mode,
+            product_mode_updated_at: new Date().toISOString(),
+            product_mode_updated_by_user_id: input.product_mode_updated_by_user_id,
+          },
+          { onConflict: "account_owner_user_id" },
+        )
+        .select("account_owner_user_id, product_mode")
+        .single();
+      if (error) throw error;
+      return {
+        account_owner_user_id: String(data.account_owner_user_id),
+        product_mode: toCleanString(data.product_mode) || null,
+      };
+    },
+
     async listExistingPricebookSeedRows(ownerUserId) {
       const { data, error } = await admin
         .from("pricebook_items")
@@ -665,6 +763,7 @@ export async function main(argv = process.argv.slice(2)) {
     recordsCreated: result.recordsCreated,
     recordsConfirmed: result.recordsConfirmed,
     recordsPatched: result.recordsPatched,
+    productModeCapture: result.productModeCapture,
     pricebookSeeding: result.pricebookSeeding,
     inviteSent: result.inviteSent,
     inviteSkippedReason: result.inviteSkippedReason,
