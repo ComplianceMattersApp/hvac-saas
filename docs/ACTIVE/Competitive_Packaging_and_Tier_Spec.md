@@ -286,3 +286,22 @@ This spec aligns with:
 - [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md)
 
 This document is planning-only and does not activate implementation.
+
+---
+
+## Group 7A — Pricing / Tiers / Seat Alignment: Roadmap Placement (May 2026)
+
+Group 7A is planned and not yet started.
+
+This spec is the primary planning artifact for Group 7A.
+
+Group 7A scope when opened:
+- Finalize tier naming alignment (Standard / Growth / Pro) and map to internal plan keys.
+- Define seat count boundaries per tier for ECC/HERS and HVAC Service modes.
+- Confirm add-on placement for contractor portal, estimates/quoting, SMS, customer portal, and QBO.
+- Define tier enforcement model (entitlement gates, billing mode coupling, provisioning path writes).
+- Plan upgrade/downgrade path and trial-to-paid conversion boundaries.
+
+Group 7A must remain non-implementing until explicitly opened. No schema changes, no entitlement enforcement, no billing changes, and no plan_tier implementation are in scope until Group 7A is formally started.
+
+See `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md` section 13 for the full remaining roadmap sequence.

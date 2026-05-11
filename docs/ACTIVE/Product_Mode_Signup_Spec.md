@@ -623,3 +623,17 @@ This spec aligns with:
 - [Competitive_Packaging_and_Tier_Spec.md](./Competitive_Packaging_and_Tier_Spec.md)
 
 These references are for planning alignment only and do not activate implementation changes.
+
+---
+
+## Group 2 — Signup Front Door / Product Choice: Closeout Status (May 2026)
+
+Group 2 is closed.
+
+- `/signup` product-choice landing is live with SERVICE and ECC cards.
+- `/signup/service` routes to `hvac_service` provisioning path.
+- `/signup/ecc` routes to `ecc_hers` provisioning path.
+- Hybrid / All-in-One remains manual/operator-only with no public signup route.
+- All provisioning, product-mode capture, and notification behaviors are documented in sections 6.x above.
+- No tier/add-on enforcement, billing/payment/QBO behavior, security/RLS authority, or contractor-authority behavior changed.
+- Remaining signup-related work (admin edit UI, tier/add-on enforcement, full navigation/report mode rewrites) remains deferred to Groups 7 and 7A.

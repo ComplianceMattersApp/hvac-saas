@@ -554,6 +554,74 @@ Owner Console Hidden Test Accounts V1 closeout note:
 
 ---
 
+---
+
+## 13) Controlled Onboarding Readiness — Group Closeout Summary (May 2026)
+
+The following implementation groups have been closed as of May 2026.
+
+### Group 1 — Sandbox / Production Mirror Audit (CLOSED)
+
+- Production SQL verification confirmed expected migrations applied.
+- Key production tables exist and are structurally correct.
+- RLS is enabled on protected tables.
+- `calendar_events` SELECT/INSERT/UPDATE/DELETE policies are present.
+- Support Console foundation schema is applied in production but remains operationally dormant (`ENABLE_SUPPORT_CONSOLE` unset/false; no seeding, no grants, no sessions).
+- Sandbox and production are mirrored enough for sandbox-first controlled validation, with light production smoke still required after deploys.
+- Data parity between sandbox and production is intentionally not required.
+
+### Group 2 — Signup Front Door / Product Choice (CLOSED)
+
+- `/signup` shows SERVICE and ECC product-choice cards.
+- `/signup/service` maps to internal `hvac_service`.
+- `/signup/ecc` maps to internal `ecc_hers`.
+- Hybrid / All-in-One remains manual/operator-assisted only; no public Hybrid signup path exists.
+- Signup behavior, provisioning paths, and product-mode capture boundaries are documented in `docs/ACTIVE/Product_Mode_Signup_Spec.md`.
+
+### Group 3 — First HVAC Service User Onboarding (CLOSED / MONITORING)
+
+- First HVAC Service user has signed up and appears in the Owner Console.
+- No active blocker is known.
+- Any future user feedback should be classified through Support V0 style intake before becoming build work.
+- See `docs/ACTIVE/Support_V0_Operational_Readiness_Pack.md` for intake and triage discipline.
+
+### Group 4 — Owner Console / Test Accounts (CLOSED)
+
+- Known old production test accounts are hidden from default Owner Console counts and table views via `PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS` env-configured display filtering.
+- No accounts were deleted or archived; no Stripe-linked history was touched.
+- Owner Console remains read-only and platform-owner-only.
+- A `Hidden / Test` filter view provides inspection access to suppressed accounts without polluting operating metrics.
+
+### Remaining Roadmap (Groups 6–9)
+
+Active planned groups in priority sequence:
+
+| Group | Name | Status |
+|---|---|---|
+| 6 | Estimates / Quoting Completion | Next planned |
+| 7 | Product Mode / Packaging Completion | Planned |
+| 7A | Pricing / Tiers / Seat Alignment | Planned — see `docs/ACTIVE/Competitive_Packaging_and_Tier_Spec.md` |
+| 8 | Support / Owner Operations | Planned |
+| 9A | Recurring Services / Maintenance Agreements | Planned |
+| 9B | SMS / On-My-Way Messaging | Planned |
+| 9C | Tenant Customer Payments / Stripe Customer Payment Execution | Planned |
+| 9D | Customer Portal | Planned |
+| 9E | QBO / Accounting Sync | Last-last; optional downstream only |
+
+Group 5 (Production Migration / Enablement Gates) is closed inline through migration execution closeout notes above.
+
+### Going-Forward Execution Discipline
+
+- Choose one lane.
+- Audit/plan first.
+- Implement surgically.
+- Validate (TSC, targeted tests, browser smoke).
+- Commit and push.
+- Update docs at closeout.
+- Do not jump lanes unless there is a real blocker, dependency, risk, or owner decision to park.
+
+---
+
 ## Source References Reviewed for This Packet
 
 - docs/ACTIVE/Active Spine V4.0 Current.md

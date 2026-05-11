@@ -337,3 +337,15 @@ All items must be confirmed before the first controlled tester is onboarded. Thi
 | Emergency stop condition | Notify owner; pause testing; document the stop in issue log |
 | Tester asks about deferred feature | Redirect to known limitations communicated at onboarding; do not promise timelines |
 | Support Console or impersonation requested | Decline — not available at V0 |
+
+---
+
+## Group 3 — First HVAC Service User Onboarding: Monitoring Note (May 2026)
+
+Group 3 is closed / monitoring.
+
+- First HVAC Service user has signed up and appears in the Owner Console.
+- No active blocker is known at time of group closeout.
+- Support V0 intake discipline is the correct path for any user-reported issues: use the intake template (§ 3), classify severity (§ 4), and escalate through the documented path before treating any feedback as build work.
+- Any feedback that suggests a platform gap should be classified as S3/S4 minimum and reviewed at the next planning slot before becoming a work item.
+- Controlled onboarding expansion (additional testers/users) remains owner-decision-gated; V0 support readiness is a prerequisite but not a trigger.
