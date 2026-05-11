@@ -522,10 +522,18 @@ Product Mode Signup Links V1 is implemented as a surgical signup-entry follow-up
 
 - `/signup/service` maps to `hvac_service`.
 - `/signup/ecc` maps to `ecc_hers`.
-- Generic `/signup` remains available.
+- `/signup` is now a product-choice landing page with SERVICE and ECC cards.
 - Hybrid / All-in-One remains manual/operator-only; no public Hybrid signup path was added.
 - Product-mode capture uses the existing first-owner provisioning path and writes `account_settings.product_mode` after owner creation.
 - No tier/add-on enforcement, billing/payment/QBO behavior, security/RLS authority, contractor authority, report dataset/calculation behavior, Product Mode schema, or First Owner Provisioning command behavior changed.
+
+Product Choice Signup Landing V1 closeout note:
+
+- Public `/signup` now presents a product-choice landing with two clear card paths: SERVICE and ECC.
+- SERVICE card routes to `/signup/service` and keeps existing HVAC Service signup behavior.
+- ECC card routes to `/signup/ecc` and keeps existing ECC signup behavior.
+- Hybrid remains manual/operator-only and is not exposed as a public signup route.
+- No tier/add-on, billing/payment/QBO, security/RLS, or contractor-authority behavior changed.
 
 ---
 

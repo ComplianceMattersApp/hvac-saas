@@ -230,6 +230,15 @@ Product Mode Signup Links V1 closeout snapshot (2026-05-10):
 - Product-mode write/capture failure prevents product-specific signup from presenting a ready/success state.
 - No tier/add-on enforcement, billing/payment/QBO behavior, security/RLS authority, contractor authority, report dataset/calculation behavior, Product Mode schema, or First Owner Provisioning command behavior changed.
 
+Product Choice Signup Landing V1 closeout snapshot (2026-05-10):
+
+- Public `/signup` now shows a product-choice landing instead of an ambiguous generic signup form.
+- Two public cards are exposed: SERVICE and ECC.
+- SERVICE routes to `/signup/service`; ECC routes to `/signup/ecc`.
+- Existing `/signup/service` and `/signup/ecc` behavior remains unchanged.
+- Hybrid remains manual/operator-only and no public `/signup/hybrid` signup path is exposed.
+- No tier/add-on enforcement, billing/payment/QBO behavior, security/RLS authority, or contractor-authority behavior changed.
+
 ### 6.3 Sandbox migration apply closeout (2026-05-09)
 
 Execution guardrail and environment facts:

@@ -1,5 +1,5 @@
-import { SignupContent } from "@/app/signup/signup-content";
+import { SignupProductChoiceLanding } from "@/app/signup/product-choice-landing";
 
 export default function SignupPage() {
-  return <SignupContent />;
+  return <SignupProductChoiceLanding />;
 }

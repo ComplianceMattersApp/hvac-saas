@@ -405,6 +405,14 @@ Owner Signup Visibility V1 closeout note:
 - Access is not granted by `product_mode` (including `hybrid`), tenant admin role, billing mode, entitlement status, or company profile metadata.
 - Scope boundaries remain intact: no impersonation, no support-side mutation, no tenant data edit actions, no product-mode editing, no billing/Stripe admin actions, and no security/RLS behavior changes.
 
+Product Choice Signup Landing V1 closeout note:
+
+- Public `/signup` now renders a product-choice landing with two cards: SERVICE and ECC.
+- SERVICE routes to `/signup/service` and ECC routes to `/signup/ecc`.
+- Existing `/signup/service` and `/signup/ecc` product-mode behavior is unchanged.
+- Hybrid remains manual/operator-only and has no public signup path.
+- No tier/add-on, billing/payment/QBO, security/RLS, or contractor-authority behavior changed.
+
 Sandbox migration apply closeout (2026-05-09):
 
 - Initial guarded attempt correctly stopped when production ref `ornrnvxtwwtulohqwxop` was detected; no writes occurred in that stopped attempt.
