@@ -422,7 +422,13 @@ Owner Console UI Polish + Admin Link V1 closeout note:
 - Link visibility is not granted by product mode (`hybrid` included), tenant admin role, billing mode, entitlement status, or profile metadata.
 - Scope boundaries remain unchanged: no impersonation, no support-console enablement, no tenant mutation actions, and no security/RLS behavior changes.
 
-Sandbox migration apply closeout (2026-05-09):
+Owner Console Hidden Test Accounts V1 closeout note:
+
+- Known internal/test accounts are suppressed from default Owner Console headline counts and the Current view via `PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS` env var (comma-separated, case-insensitive).
+- A new read-only `Hidden / Test` filter view exposes these accounts for inspection without adding them to normal operating metrics.
+- No data deletion, archive, Stripe cleanup, auth deletion, Support Console activation, impersonation, or tenant mutation was performed.
+- Logic lives entirely in `lib/business/platform-owner-dashboard.ts` (`parseHiddenAccountEmails`, `isHiddenTestAccountRow`, updated `filterPlatformOwnerDashboardRows` / `summarizePlatformOwnerDashboardRows`).
+- 25/25 tests passing; TSC clean.
 
 - Initial guarded attempt correctly stopped when production ref `ornrnvxtwwtulohqwxop` was detected; no writes occurred in that stopped attempt.
 - Corrected pass relinked to sandbox ref `kvpesjdukqwwlgpkzfjm`.

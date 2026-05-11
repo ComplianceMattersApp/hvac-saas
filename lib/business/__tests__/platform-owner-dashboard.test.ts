@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildPlatformOwnerDashboardModel,
   filterPlatformOwnerDashboardRows,
+  isHiddenTestAccountRow,
+  parseHiddenAccountEmails,
   summarizePlatformOwnerDashboardRows,
 } from "@/lib/business/platform-owner-dashboard";
 
@@ -239,5 +241,162 @@ describe("platform owner dashboard model", () => {
     expect(summary.displayedHvacServiceAccounts).toBe(1);
     expect(summary.displayedEccAccounts).toBe(0);
     expect(summary.hiddenInactiveCancelledAccounts).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hidden test-account helpers
+// ---------------------------------------------------------------------------
+
+describe("parseHiddenAccountEmails", () => {
+  it("returns empty set when env var is absent", () => {
+    expect(parseHiddenAccountEmails({}).size).toBe(0);
+  });
+
+  it("returns empty set when env var is an empty string", () => {
+    expect(parseHiddenAccountEmails({ PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS: "" }).size).toBe(0);
+    expect(parseHiddenAccountEmails({ PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS: "  " }).size).toBe(0);
+  });
+
+  it("parses a single email", () => {
+    const result = parseHiddenAccountEmails({
+      PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS: "test@example.com",
+    });
+    expect(result.has("test@example.com")).toBe(true);
+    expect(result.size).toBe(1);
+  });
+
+  it("parses multiple comma-separated emails and lowercases/trims them", () => {
+    const result = parseHiddenAccountEmails({
+      PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS: "  Test@Example.com , ANOTHER@example.com  ",
+    });
+    expect(result.has("test@example.com")).toBe(true);
+    expect(result.has("another@example.com")).toBe(true);
+    expect(result.size).toBe(2);
+  });
+});
+
+describe("isHiddenTestAccountRow", () => {
+  const makeRow = (email: string | null) => ({
+    company: "Co",
+    ownerEmail: email,
+    ownerName: null,
+    accountOwnerUserId: "x",
+    productMode: null,
+    billingMode: null,
+    planKey: null,
+    entitlementStatus: null,
+    trialEnd: null,
+    activeUsers: 0,
+    totalUsers: 0,
+    createdAt: null,
+    updatedAt: null,
+    setupInviteState: "unknown" as const,
+  });
+
+  it("returns false when hiddenEmails is empty", () => {
+    expect(isHiddenTestAccountRow(makeRow("test@example.com"), new Set())).toBe(false);
+  });
+
+  it("returns true for an exact match", () => {
+    expect(
+      isHiddenTestAccountRow(makeRow("test@example.com"), new Set(["test@example.com"])),
+    ).toBe(true);
+  });
+
+  it("is case-insensitive", () => {
+    expect(
+      isHiddenTestAccountRow(makeRow("TEST@EXAMPLE.COM"), new Set(["test@example.com"])),
+    ).toBe(true);
+  });
+
+  it("returns false when email is null", () => {
+    expect(isHiddenTestAccountRow(makeRow(null), new Set(["test@example.com"]))).toBe(false);
+  });
+});
+
+describe("hidden account filter integration", () => {
+  function buildTwoRows() {
+    return buildPlatformOwnerDashboardModel({
+      businessProfiles: [
+        {
+          account_owner_user_id: "real-1",
+          display_name: "Real Company",
+          billing_mode: "self_serve",
+          created_at: "2026-05-01T00:00:00.000Z",
+          updated_at: "2026-05-01T00:00:00.000Z",
+        },
+        {
+          account_owner_user_id: "test-1",
+          display_name: "Test Account",
+          billing_mode: "self_serve",
+          created_at: "2026-05-01T00:00:00.000Z",
+          updated_at: "2026-05-01T00:00:00.000Z",
+        },
+      ],
+      accountSettings: [],
+      entitlements: [
+        {
+          account_owner_user_id: "real-1",
+          plan_key: "starter",
+          entitlement_status: "active",
+          trial_ends_at: null,
+        },
+        {
+          account_owner_user_id: "test-1",
+          plan_key: "starter",
+          entitlement_status: "active",
+          trial_ends_at: null,
+        },
+      ],
+      internalUsers: [],
+      ownerProfiles: [
+        { id: "real-1", email: "real@example.com", full_name: "Real Owner" },
+        { id: "test-1", email: "test@internal.com", full_name: "Test Owner" },
+      ],
+      ownerAuthUsers: [],
+    });
+  }
+
+  it("hides test account from current view when email is in hidden set", () => {
+    const model = buildTwoRows();
+    const hiddenEmails = new Set(["test@internal.com"]);
+    const rows = filterPlatformOwnerDashboardRows({ rows: model.rows, view: "current", hiddenEmails });
+    expect(rows.map((r) => r.accountOwnerUserId)).toEqual(["real-1"]);
+  });
+
+  it("shows only test account in hidden view", () => {
+    const model = buildTwoRows();
+    const hiddenEmails = new Set(["test@internal.com"]);
+    const rows = filterPlatformOwnerDashboardRows({ rows: model.rows, view: "hidden", hiddenEmails });
+    expect(rows.map((r) => r.accountOwnerUserId)).toEqual(["test-1"]);
+  });
+
+  it("all view includes all accounts regardless of hidden set", () => {
+    const model = buildTwoRows();
+    const hiddenEmails = new Set(["test@internal.com"]);
+    const rows = filterPlatformOwnerDashboardRows({ rows: model.rows, view: "all", hiddenEmails });
+    expect(rows).toHaveLength(2);
+  });
+
+  it("behavior unchanged when hiddenEmails is empty", () => {
+    const model = buildTwoRows();
+    const rows = filterPlatformOwnerDashboardRows({ rows: model.rows, view: "current" });
+    expect(rows).toHaveLength(2);
+  });
+
+  it("summarize counts hiddenTestAccounts correctly", () => {
+    const model = buildTwoRows();
+    const hiddenEmails = new Set(["test@internal.com"]);
+    const currentRows = filterPlatformOwnerDashboardRows({ rows: model.rows, view: "current", hiddenEmails });
+    const summary = summarizePlatformOwnerDashboardRows({
+      rows: currentRows,
+      allRows: model.rows,
+      hiddenEmails,
+    });
+    expect(summary.displayedAccounts).toBe(1);
+    expect(summary.hiddenTestAccounts).toBe(1);
+    // cancelled count should be 0 — neither is cancelled
+    expect(summary.hiddenInactiveCancelledAccounts).toBe(0);
   });
 });

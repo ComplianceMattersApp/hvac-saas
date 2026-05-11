@@ -2,7 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import {
   filterPlatformOwnerDashboardRows,
+  isHiddenTestAccountRow,
   loadPlatformOwnerDashboardModel,
+  parseHiddenAccountEmails,
   summarizePlatformOwnerDashboardRows,
   type PlatformOwnerConsoleView,
 } from "@/lib/business/platform-owner-dashboard";
@@ -42,6 +44,7 @@ function resolveView(value: string | undefined): PlatformOwnerConsoleView {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "inactive") return "inactive";
   if (normalized === "all") return "all";
+  if (normalized === "hidden") return "hidden";
   return "current";
 }
 
@@ -59,7 +62,11 @@ const VIEW_META: Record<
   },
   all: {
     label: "All",
-    description: "All account states",
+    description: "All account states including hidden test accounts",
+  },
+  hidden: {
+    label: "Hidden / Test",
+    description: "Accounts suppressed from default counts via env config",
   },
 };
 
@@ -70,14 +77,16 @@ export default async function PlatformOwnerConsolePage(props: {
 
   const admin = createAdminClient();
   const model = await loadPlatformOwnerDashboardModel({ admin });
+  const hiddenEmails = parseHiddenAccountEmails(process.env);
   const searchParams = (props.searchParams ? await props.searchParams : {}) ?? {};
   const view = resolveView(
     typeof searchParams.view === "string" ? searchParams.view : undefined,
   );
-  const filteredRows = filterPlatformOwnerDashboardRows({ rows: model.rows, view });
+  const filteredRows = filterPlatformOwnerDashboardRows({ rows: model.rows, view, hiddenEmails });
   const viewSummary = summarizePlatformOwnerDashboardRows({
     rows: filteredRows,
     allRows: model.rows,
+    hiddenEmails,
   });
 
   return (
@@ -139,6 +148,14 @@ export default async function PlatformOwnerConsolePage(props: {
         </p>
       ) : null}
 
+      {view === "current" && viewSummary.hiddenTestAccounts > 0 ? (
+        <p className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-900">
+          {viewSummary.hiddenTestAccounts} test/internal account(s) are suppressed from default counts via{" "}
+          <code className="font-mono">PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS</code>. Use the{" "}
+          <strong>Hidden / Test</strong> view to inspect them.
+        </p>
+      ) : null}
+
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-[1050px] divide-y divide-slate-200 text-left text-sm">
@@ -156,12 +173,19 @@ export default async function PlatformOwnerConsolePage(props: {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
-              {filteredRows.map((row) => (
+              {filteredRows.map((row) => {
+                const isHidden = isHiddenTestAccountRow(row, hiddenEmails);
+                return (
                 <tr key={row.accountOwnerUserId} className="align-top">
                   <td className="px-4 py-3 font-medium text-slate-900">
                     <div className="max-w-[260px] truncate" title={row.company}>
                       {row.company}
                     </div>
+                    {isHidden ? (
+                      <span className="mt-0.5 inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                        Hidden / test
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 text-slate-700">
                     <div className="max-w-[280px] truncate" title={row.ownerName ?? "-"}>
@@ -193,7 +217,8 @@ export default async function PlatformOwnerConsolePage(props: {
                     </span>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {filteredRows.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-10 text-center text-sm text-slate-500">

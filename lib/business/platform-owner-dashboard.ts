@@ -87,7 +87,32 @@ export type PlatformOwnerDashboardModel = {
   rows: PlatformOwnerDashboardRow[];
 };
 
-export type PlatformOwnerConsoleView = "current" | "inactive" | "all";
+export type PlatformOwnerConsoleView = "current" | "inactive" | "all" | "hidden";
+
+// ---------------------------------------------------------------------------
+// Hidden test-account filtering — env-driven display suppression only.
+// No data deletion, no auth changes, no mutation of any kind.
+// ---------------------------------------------------------------------------
+
+export function parseHiddenAccountEmails(env: Record<string, string | undefined>): Set<string> {
+  const raw = (env["PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS"] ?? "").trim();
+  if (!raw) return new Set();
+  return new Set(
+    raw
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export function isHiddenTestAccountRow(
+  row: PlatformOwnerDashboardRow,
+  hiddenEmails: Set<string>,
+): boolean {
+  if (hiddenEmails.size === 0) return false;
+  const email = (row.ownerEmail ?? "").trim().toLowerCase();
+  return Boolean(email) && hiddenEmails.has(email);
+}
 
 export type PlatformOwnerConsoleViewSummary = {
   displayedAccounts: number;
@@ -100,6 +125,7 @@ export type PlatformOwnerConsoleViewSummary = {
   displayedInternalUsers: number;
   displayedActiveInternalUsers: number;
   hiddenInactiveCancelledAccounts: number;
+  hiddenTestAccounts: number;
 };
 
 function resolveInviteState(authOwner: AuthOwnerRow | null) {
@@ -125,20 +151,36 @@ export function isInactivePlatformOwnerAccountRow(row: PlatformOwnerDashboardRow
 export function filterPlatformOwnerDashboardRows(params: {
   rows: PlatformOwnerDashboardRow[];
   view: PlatformOwnerConsoleView;
+  hiddenEmails?: Set<string>;
 }) {
-  if (params.view === "all") return params.rows;
-  if (params.view === "inactive") {
-    return params.rows.filter((row) => isInactivePlatformOwnerAccountRow(row));
+  const hidden = params.hiddenEmails ?? new Set<string>();
+
+  // "hidden" view: show only the suppressed test accounts
+  if (params.view === "hidden") {
+    return params.rows.filter((row) => isHiddenTestAccountRow(row, hidden));
   }
-  return params.rows.filter((row) => isCurrentPlatformOwnerAccountRow(row));
+
+  // "all" view: show everything, hidden or not
+  if (params.view === "all") return params.rows;
+
+  // All other views: exclude hidden test accounts first, then apply status filter
+  const visible = params.rows.filter((row) => !isHiddenTestAccountRow(row, hidden));
+
+  if (params.view === "inactive") {
+    return visible.filter((row) => isInactivePlatformOwnerAccountRow(row));
+  }
+  // default: "current"
+  return visible.filter((row) => isCurrentPlatformOwnerAccountRow(row));
 }
 
 export function summarizePlatformOwnerDashboardRows(params: {
   rows: PlatformOwnerDashboardRow[];
   allRows: PlatformOwnerDashboardRow[];
+  hiddenEmails?: Set<string>;
 }): PlatformOwnerConsoleViewSummary {
   const rows = params.rows;
   const allRows = params.allRows;
+  const hidden = params.hiddenEmails ?? new Set<string>();
 
   return {
     displayedAccounts: rows.length,
@@ -152,7 +194,10 @@ export function summarizePlatformOwnerDashboardRows(params: {
     ).length,
     displayedInternalUsers: rows.reduce((sum, row) => sum + row.totalUsers, 0),
     displayedActiveInternalUsers: rows.reduce((sum, row) => sum + row.activeUsers, 0),
-    hiddenInactiveCancelledAccounts: allRows.filter((row) => isInactivePlatformOwnerAccountRow(row)).length,
+    hiddenInactiveCancelledAccounts: allRows
+      .filter((row) => !isHiddenTestAccountRow(row, hidden))
+      .filter((row) => isInactivePlatformOwnerAccountRow(row)).length,
+    hiddenTestAccounts: allRows.filter((row) => isHiddenTestAccountRow(row, hidden)).length,
   };
 }
 
