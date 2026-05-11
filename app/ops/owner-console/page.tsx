@@ -108,20 +108,24 @@ export default async function PlatformOwnerConsolePage(props: {
   });
 
   return (
-    <div className="mx-auto max-w-[1200px] space-y-5 p-4 text-slate-900 sm:p-6 lg:space-y-6">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Platform Owner</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.02em] text-slate-950">Owner Console</h1>
-        <p className="mt-2 max-w-3xl text-sm text-slate-600">
-          Read-only platform-wide signup and account visibility. This is not the Support Console and exposes no tenant mutation actions.
-        </p>
-        <p className="mt-2 text-xs text-slate-500">
-          Default view emphasizes current operating accounts. Inactive/cancelled accounts remain available in a separate filter.
-        </p>
+    <div className="mx-auto max-w-[1200px] space-y-5 p-4 text-slate-900 sm:p-6">
+
+      {/* Header */}
+      <section className="rounded-3xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Platform Owner</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-slate-950">Owner Console</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Read-only platform-wide account overview. No tenant mutation actions.
+            </p>
+          </div>
+        </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* View switcher */}
+      <section className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             {(Object.keys(VIEW_META) as PlatformOwnerConsoleView[]).map((candidate) => {
               const selected = candidate === view;
@@ -141,123 +145,142 @@ export default async function PlatformOwnerConsolePage(props: {
               );
             })}
           </div>
-          <p className="text-xs text-slate-600 sm:text-sm">{VIEW_META[view].description}</p>
+          <p className="text-xs text-slate-500">{VIEW_META[view].description}</p>
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard label="Customer Accounts" value={viewSummary.displayedCustomerAccounts} />
-        <SummaryCard label="Platform / Internal" value={viewSummary.displayedPlatformInternalAccounts} />
-        <SummaryCard label="Hidden / Test Accounts" value={viewSummary.hiddenTestAccounts} />
-        <SummaryCard label="HVAC Service" value={viewSummary.displayedHvacServiceAccounts} />
-        <SummaryCard label="ECC" value={viewSummary.displayedEccAccounts} />
-        <SummaryCard label="Hybrid" value={viewSummary.displayedHybridAccounts} />
-        <SummaryCard label="Not Set" value={viewSummary.displayedUnknownModeAccounts} />
-        <SummaryCard label="Trial" value={viewSummary.displayedTrialAccounts} />
-        <SummaryCard label="Current (Active/Trial/Grace)" value={viewSummary.displayedActiveAccounts} />
-        <SummaryCard label="Displayed Rows" value={viewSummary.displayedAccounts} />
-        <SummaryCard label="Displayed Internal Users" value={viewSummary.displayedInternalUsers} />
-        <SummaryCard
-          label="Displayed Active Users"
-          value={viewSummary.displayedActiveInternalUsers}
-        />
+      {/* Compact helper notes */}
+      <div className="space-y-1.5">
+        {view === "current" && viewSummary.hiddenInactiveCancelledAccounts > 0 ? (
+          <p className="text-xs text-slate-500">
+            {viewSummary.hiddenInactiveCancelledAccounts} inactive/cancelled account(s) excluded from this view. Use <strong>Inactive</strong> to inspect.
+          </p>
+        ) : null}
+        {view === "current" && viewSummary.hiddenTestAccounts > 0 ? (
+          <p className="text-xs text-slate-500">
+            {viewSummary.hiddenTestAccounts} hidden/test account(s) excluded from default counts. Use <strong>Hidden / Test</strong> to inspect.
+          </p>
+        ) : null}
+        {view === "current" && internalEmails.size > 0 ? (
+          <p className="text-xs text-slate-500">
+            Platform/internal accounts are excluded from customer account counts.
+          </p>
+        ) : null}
+      </div>
+
+      {/* Account Overview — primary cards */}
+      <section>
+        <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Account Overview</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <SummaryCard label="Customer Accounts" value={viewSummary.displayedCustomerAccounts} />
+          <SummaryCard label="Trial Accounts" value={viewSummary.displayedTrialAccounts} />
+          <SummaryCard label="Platform / Internal" value={viewSummary.displayedPlatformInternalAccounts} />
+          <SummaryCard label="Hidden / Test" value={viewSummary.hiddenTestAccounts} />
+        </div>
       </section>
 
-      {view === "current" && viewSummary.hiddenInactiveCancelledAccounts > 0 ? (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
-          {viewSummary.hiddenInactiveCancelledAccounts} inactive/cancelled account(s) are hidden from default headline counts.
-        </p>
-      ) : null}
+      {/* Product Mix — secondary, smaller */}
+      <section>
+        <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Product Mix</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {(
+            [
+              { label: "HVAC Service", value: viewSummary.displayedHvacServiceAccounts },
+              { label: "ECC", value: viewSummary.displayedEccAccounts },
+              { label: "Hybrid", value: viewSummary.displayedHybridAccounts },
+              { label: "Not Set", value: viewSummary.displayedUnknownModeAccounts },
+            ] as { label: string; value: number }[]
+          ).map(({ label, value }) => (
+            <div
+              key={label}
+              className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5"
+            >
+              <span className="text-xs font-medium text-slate-600">{label}</span>
+              <span className="text-sm font-semibold text-slate-900">{value}</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
-      {view === "current" && viewSummary.hiddenTestAccounts > 0 ? (
-        <p className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-900">
-          {viewSummary.hiddenTestAccounts} hidden/test account(s) are suppressed from default counts via{" "}
-          <code className="font-mono">PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS</code>. Use the{" "}
-          <strong>Hidden / Test</strong> view to inspect them.
+      {/* Accounts table */}
+      <section>
+        <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+          Accounts{filteredRows.length > 0 ? ` — ${filteredRows.length}` : ""}
         </p>
-      ) : null}
-
-      {view === "current" && internalEmails.size > 0 ? (
-        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs text-emerald-900">
-          Platform/internal rows are classified via <code className="font-mono">PLATFORM_OWNER_INTERNAL_ACCOUNT_EMAILS</code> and excluded from default customer counts.
-        </p>
-      ) : null}
-
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-[940px] divide-y divide-slate-200 text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-[0.1em] text-slate-500">
-              <tr>
-                <th className="w-[23%] px-4 py-3 font-semibold">Company</th>
-                <th className="w-[20%] px-4 py-3 font-semibold">Owner</th>
-                <th className="w-[12%] px-4 py-3 font-semibold">Product</th>
-                <th className="w-[12%] px-4 py-3 font-semibold">Billing</th>
-                <th className="w-[13%] px-4 py-3 font-semibold">Status</th>
-                <th className="w-[8%] px-4 py-3 font-semibold">Users</th>
-                <th className="w-[8%] px-4 py-3 font-semibold">Created</th>
-                <th className="w-[8%] px-4 py-3 font-semibold">Setup</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {filteredRows.map((row) => {
-                const isHidden = isHiddenTestAccountRow(row, hiddenEmails);
-                const isInternal = isPlatformInternalAccountRow(row, internalEmails);
-                return (
-                <tr key={row.accountOwnerUserId} className="align-top">
-                  <td className="px-4 py-3 font-medium text-slate-900">
-                    <div className="max-w-[250px] truncate" title={row.company}>
-                      {row.company}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      {isInternal ? (
-                        <span className="inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
-                          Platform / Internal
-                        </span>
-                      ) : null}
-                      {isHidden ? (
-                        <span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
-                          Hidden / Test
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="mt-1 font-mono text-[10px] text-slate-400" title={row.accountOwnerUserId}>
-                      ID: {row.accountOwnerUserId.slice(0, 8)}...
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">
-                    <div className="max-w-[240px] truncate font-medium" title={row.ownerName ?? "-"}>
-                      {row.ownerName ?? "-"}
-                    </div>
-                    <div className="max-w-[240px] truncate text-xs text-slate-500" title={row.ownerEmail ?? "-"}>
-                      {row.ownerEmail ?? "-"}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{formatProductModeLabel({ row, internalEmails })}</td>
-                  <td className="px-4 py-3 text-slate-700">{formatBillingModeLabel(row.billingMode)}</td>
-                  <td className="px-4 py-3 text-slate-700">
-                    <div className="font-medium">{formatStatusLabel(row.entitlementStatus)}</div>
-                    <div className="text-xs text-slate-500">Plan: {row.planKey ?? "-"}</div>
-                    <div className="text-xs text-slate-500">Trial: {formatOwnerConsoleDate(row.trialEnd)}</div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                    {row.activeUsers}/{row.totalUsers}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                    {formatOwnerConsoleDate(row.createdAt)}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{row.setupInviteState}</td>
-                </tr>
-                );
-              })}
-              {filteredRows.length === 0 ? (
+        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="min-w-[780px] divide-y divide-slate-200 text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-[0.1em] text-slate-500">
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-500">
-                    No accounts in this view.
-                  </td>
+                  <th className="w-[24%] px-4 py-3 font-semibold">Company</th>
+                  <th className="w-[22%] px-4 py-3 font-semibold">Owner</th>
+                  <th className="w-[13%] px-4 py-3 font-semibold">Product</th>
+                  <th className="w-[16%] px-4 py-3 font-semibold">Status</th>
+                  <th className="w-[8%] px-4 py-3 font-semibold">Users</th>
+                  <th className="w-[9%] px-4 py-3 font-semibold">Created</th>
+                  <th className="w-[8%] px-4 py-3 font-semibold text-slate-400">Billing</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {filteredRows.map((row) => {
+                  const isHidden = isHiddenTestAccountRow(row, hiddenEmails);
+                  const isInternal = isPlatformInternalAccountRow(row, internalEmails);
+                  return (
+                    <tr key={row.accountOwnerUserId} className="align-top">
+                      <td className="px-4 py-3">
+                        <div className="max-w-[240px] truncate font-medium text-slate-900" title={row.company}>
+                          {row.company}
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                          {isInternal ? (
+                            <span className="inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+                              Platform
+                            </span>
+                          ) : null}
+                          {isHidden ? (
+                            <span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                              Test
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        <div className="max-w-[220px] truncate font-medium" title={row.ownerName ?? "-"}>
+                          {row.ownerName ?? "-"}
+                        </div>
+                        <div className="max-w-[220px] truncate text-xs text-slate-400" title={row.ownerEmail ?? "-"}>
+                          {row.ownerEmail ?? "-"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {formatProductModeLabel({ row, internalEmails })}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        <div className="font-medium">{formatStatusLabel(row.entitlementStatus)}</div>
+                        <div className="text-xs text-slate-400">Trial ends: {formatOwnerConsoleDate(row.trialEnd)}</div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                        {row.activeUsers}/{row.totalUsers}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                        {formatOwnerConsoleDate(row.createdAt)}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-400">
+                        {formatBillingModeLabel(row.billingMode)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-500">
+                      No accounts in this view.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
     </div>
