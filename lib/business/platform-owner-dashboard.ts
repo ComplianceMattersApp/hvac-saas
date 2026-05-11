@@ -87,6 +87,21 @@ export type PlatformOwnerDashboardModel = {
   rows: PlatformOwnerDashboardRow[];
 };
 
+export type PlatformOwnerConsoleView = "current" | "inactive" | "all";
+
+export type PlatformOwnerConsoleViewSummary = {
+  displayedAccounts: number;
+  displayedHvacServiceAccounts: number;
+  displayedEccAccounts: number;
+  displayedHybridAccounts: number;
+  displayedUnknownModeAccounts: number;
+  displayedTrialAccounts: number;
+  displayedActiveAccounts: number;
+  displayedInternalUsers: number;
+  displayedActiveInternalUsers: number;
+  hiddenInactiveCancelledAccounts: number;
+};
+
 function resolveInviteState(authOwner: AuthOwnerRow | null) {
   if (!authOwner) return "unknown";
   if (toCleanString(authOwner.email_confirmed_at || authOwner.confirmed_at)) return "confirmed";
@@ -97,6 +112,48 @@ function resolveInviteState(authOwner: AuthOwnerRow | null) {
 function statusInSet(status: string | null, values: string[]) {
   const normalized = toCleanString(status).toLowerCase();
   return values.includes(normalized);
+}
+
+export function isCurrentPlatformOwnerAccountRow(row: PlatformOwnerDashboardRow) {
+  return statusInSet(row.entitlementStatus, ["active", "trial", "grace"]);
+}
+
+export function isInactivePlatformOwnerAccountRow(row: PlatformOwnerDashboardRow) {
+  return statusInSet(row.entitlementStatus, ["expired", "suspended", "cancelled"]);
+}
+
+export function filterPlatformOwnerDashboardRows(params: {
+  rows: PlatformOwnerDashboardRow[];
+  view: PlatformOwnerConsoleView;
+}) {
+  if (params.view === "all") return params.rows;
+  if (params.view === "inactive") {
+    return params.rows.filter((row) => isInactivePlatformOwnerAccountRow(row));
+  }
+  return params.rows.filter((row) => isCurrentPlatformOwnerAccountRow(row));
+}
+
+export function summarizePlatformOwnerDashboardRows(params: {
+  rows: PlatformOwnerDashboardRow[];
+  allRows: PlatformOwnerDashboardRow[];
+}): PlatformOwnerConsoleViewSummary {
+  const rows = params.rows;
+  const allRows = params.allRows;
+
+  return {
+    displayedAccounts: rows.length,
+    displayedHvacServiceAccounts: rows.filter((row) => row.productMode === "hvac_service").length,
+    displayedEccAccounts: rows.filter((row) => row.productMode === "ecc_hers").length,
+    displayedHybridAccounts: rows.filter((row) => row.productMode === "hybrid").length,
+    displayedUnknownModeAccounts: rows.filter((row) => row.productMode === null).length,
+    displayedTrialAccounts: rows.filter((row) => statusInSet(row.entitlementStatus, ["trial"])).length,
+    displayedActiveAccounts: rows.filter((row) =>
+      statusInSet(row.entitlementStatus, ["active", "trial", "grace"]),
+    ).length,
+    displayedInternalUsers: rows.reduce((sum, row) => sum + row.totalUsers, 0),
+    displayedActiveInternalUsers: rows.reduce((sum, row) => sum + row.activeUsers, 0),
+    hiddenInactiveCancelledAccounts: allRows.filter((row) => isInactivePlatformOwnerAccountRow(row)).length,
+  };
 }
 
 export function buildPlatformOwnerDashboardModel(input: {

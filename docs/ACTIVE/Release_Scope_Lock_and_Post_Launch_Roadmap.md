@@ -535,6 +535,15 @@ Product Choice Signup Landing V1 closeout note:
 - Hybrid remains manual/operator-only and is not exposed as a public signup route.
 - No tier/add-on, billing/payment/QBO, security/RLS, or contractor-authority behavior changed.
 
+Owner Console UI Polish + Admin Link V1 closeout note:
+
+- `/ops/owner-console` now defaults to a Current view that keeps headline counts focused on active/trial/grace accounts.
+- Inactive/cancelled accounts remain visible through separate read-only filters (`Inactive / Cancelled` and `All`).
+- Readability polish was applied to the owner table (column priority, truncation, UUID de-emphasis) with no mutation controls added.
+- `/ops/admin` includes an `Owner Console` link card only for explicit platform-owner allowlist actors.
+- Access and visibility remain allowlist-based only (`PLATFORM_OWNER_EMAILS`, optional `PLATFORM_OWNER_USER_IDS`) and are not granted by product mode, tenant admin role, billing mode, entitlement status, or profile metadata.
+- Scope boundaries remain unchanged: no impersonation, no support-console enablement, no tenant mutation actions, and no security/RLS behavior changes.
+
 ---
 
 ## Source References Reviewed for This Packet

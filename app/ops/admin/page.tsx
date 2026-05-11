@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { resolveAccountReadiness } from "@/lib/business/account-readiness";
+import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { getPlatformBillingAvailability } from "@/lib/business/platform-billing-stripe";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
@@ -16,7 +17,7 @@ async function requireAdminOrRedirect() {
 
   try {
     const authz = await requireInternalRole("admin", { supabase, userId: user.id });
-    return { supabase, internalUser: authz.internalUser };
+    return { supabase, internalUser: authz.internalUser, user };
   } catch (error) {
     if (isInternalAccessError(error)) {
       const { data: cu, error: cuErr } = await supabase
@@ -45,7 +46,7 @@ type AdminCard = {
 };
 
 export default async function OpsAdminPage() {
-  const { supabase, internalUser } = await requireAdminOrRedirect();
+  const { supabase, internalUser, user } = await requireAdminOrRedirect();
   const readiness = await resolveAccountReadiness(internalUser.account_owner_user_id, supabase);
   const productMode = await resolveProductModeForAccountOwnerId({
     supabase,
@@ -141,6 +142,24 @@ export default async function OpsAdminPage() {
       enabled: true,
     },
   ];
+
+  const platformOwnerAllowed = isPlatformOwnerActor({
+    userId: user.id,
+    email: user.email,
+    env: process.env,
+  });
+
+  if (platformOwnerAllowed) {
+    cards.push({
+      section: "organization",
+      eyebrow: "Platform Owner",
+      title: "Owner Console",
+      description: "Read-only platform-wide signup and account visibility for allowlisted platform owners.",
+      href: "/ops/owner-console",
+      ctaLabel: "Open owner console",
+      enabled: true,
+    });
+  }
 
   const collaborationCardHrefs = new Set([
     "/ops/admin/contractors",
