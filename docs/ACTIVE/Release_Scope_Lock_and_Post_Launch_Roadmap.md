@@ -552,6 +552,14 @@ Owner Console Hidden Test Accounts V1 closeout note:
 - Logic lives entirely in `lib/business/platform-owner-dashboard.ts`; page wires the env-parsed set through filter and summarize at render time.
 - 25/25 tests passing; TSC clean.
 
+Owner Console Internal Account Separation + Display Polish V2 closeout note:
+
+- Platform/internal owner accounts are now separated from customer counts via env-configured display classification (`PLATFORM_OWNER_INTERNAL_ACCOUNT_EMAILS`) and a read-only `Platform / Internal` view.
+- Hidden/test accounts remain suppressed from default customer counts via env-configured filtering (`PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS`) and remain inspectable in `Hidden / Test` and `All` views.
+- Product mode and billing mode now render with friendly display labels; null product mode renders as `Platform / Internal` for internal rows or `Not Set` for customer rows.
+- Owner Console table/readability polish is V2 complete (priority columns, cleaner status/date presentation, de-emphasized technical IDs), while remaining read-only and platform-owner-only.
+- No product_mode mutation, database cleanup, Stripe cleanup, Support Console activation, impersonation, or tenant mutation occurred.
+
 ---
 
 ---

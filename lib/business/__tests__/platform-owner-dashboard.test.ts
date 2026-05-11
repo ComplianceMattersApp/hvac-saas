@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPlatformOwnerDashboardModel,
+  formatBillingModeLabel,
+  formatOwnerConsoleDate,
+  formatProductModeLabel,
   filterPlatformOwnerDashboardRows,
   isHiddenTestAccountRow,
+  isPlatformInternalAccountRow,
   parseHiddenAccountEmails,
+  parseInternalAccountEmails,
   summarizePlatformOwnerDashboardRows,
 } from "@/lib/business/platform-owner-dashboard";
 
@@ -276,6 +281,21 @@ describe("parseHiddenAccountEmails", () => {
   });
 });
 
+describe("parseInternalAccountEmails", () => {
+  it("returns empty set when env var is absent", () => {
+    expect(parseInternalAccountEmails({}).size).toBe(0);
+  });
+
+  it("parses comma-separated values case-insensitively", () => {
+    const result = parseInternalAccountEmails({
+      PLATFORM_OWNER_INTERNAL_ACCOUNT_EMAILS: " Eddie@Example.com ,SECOND@example.com ",
+    });
+    expect(result.has("eddie@example.com")).toBe(true);
+    expect(result.has("second@example.com")).toBe(true);
+    expect(result.size).toBe(2);
+  });
+});
+
 describe("isHiddenTestAccountRow", () => {
   const makeRow = (email: string | null) => ({
     company: "Co",
@@ -312,6 +332,38 @@ describe("isHiddenTestAccountRow", () => {
 
   it("returns false when email is null", () => {
     expect(isHiddenTestAccountRow(makeRow(null), new Set(["test@example.com"]))).toBe(false);
+  });
+});
+
+describe("isPlatformInternalAccountRow", () => {
+  const makeRow = (email: string | null) => ({
+    company: "Co",
+    ownerEmail: email,
+    ownerName: null,
+    accountOwnerUserId: "x",
+    productMode: null,
+    billingMode: null,
+    planKey: null,
+    entitlementStatus: null,
+    trialEnd: null,
+    activeUsers: 0,
+    totalUsers: 0,
+    createdAt: null,
+    updatedAt: null,
+    setupInviteState: "unknown" as const,
+  });
+
+  it("matches case-insensitively", () => {
+    expect(
+      isPlatformInternalAccountRow(
+        makeRow("OWNER@EXAMPLE.COM"),
+        new Set(["owner@example.com"]),
+      ),
+    ).toBe(true);
+  });
+
+  it("returns false when email missing", () => {
+    expect(isPlatformInternalAccountRow(makeRow(null), new Set(["owner@example.com"]))).toBe(false);
   });
 });
 
@@ -385,6 +437,28 @@ describe("hidden account filter integration", () => {
     expect(rows).toHaveLength(2);
   });
 
+  it("excludes platform/internal accounts from current view", () => {
+    const model = buildTwoRows();
+    const internalEmails = new Set(["real@example.com"]);
+    const rows = filterPlatformOwnerDashboardRows({
+      rows: model.rows,
+      view: "current",
+      internalEmails,
+    });
+    expect(rows.map((r) => r.accountOwnerUserId)).toEqual(["test-1"]);
+  });
+
+  it("shows internal accounts in platform view", () => {
+    const model = buildTwoRows();
+    const internalEmails = new Set(["real@example.com"]);
+    const rows = filterPlatformOwnerDashboardRows({
+      rows: model.rows,
+      view: "platform",
+      internalEmails,
+    });
+    expect(rows.map((r) => r.accountOwnerUserId)).toEqual(["real-1"]);
+  });
+
   it("summarize counts hiddenTestAccounts correctly", () => {
     const model = buildTwoRows();
     const hiddenEmails = new Set(["test@internal.com"]);
@@ -398,5 +472,84 @@ describe("hidden account filter integration", () => {
     expect(summary.hiddenTestAccounts).toBe(1);
     // cancelled count should be 0 — neither is cancelled
     expect(summary.hiddenInactiveCancelledAccounts).toBe(0);
+  });
+
+  it("summary separates customer and platform/internal counts", () => {
+    const model = buildTwoRows();
+    const internalEmails = new Set(["real@example.com"]);
+    const currentRows = filterPlatformOwnerDashboardRows({
+      rows: model.rows,
+      view: "all",
+      internalEmails,
+    });
+    const summary = summarizePlatformOwnerDashboardRows({
+      rows: currentRows,
+      allRows: model.rows,
+      internalEmails,
+    });
+
+    expect(summary.displayedAccounts).toBe(2);
+    expect(summary.displayedCustomerAccounts).toBe(1);
+    expect(summary.displayedPlatformInternalAccounts).toBe(1);
+  });
+});
+
+describe("friendly display helpers", () => {
+  const baseRow = {
+    company: "Company",
+    ownerEmail: "owner@example.com",
+    ownerName: "Owner",
+    accountOwnerUserId: "owner-1",
+    productMode: null as any,
+    billingMode: null,
+    planKey: null,
+    entitlementStatus: null,
+    trialEnd: null,
+    activeUsers: 0,
+    totalUsers: 0,
+    createdAt: null,
+    updatedAt: null,
+    setupInviteState: "unknown",
+  };
+
+  it("maps product mode labels", () => {
+    expect(
+      formatProductModeLabel({
+        row: { ...baseRow, productMode: "hvac_service" },
+      } as any),
+    ).toBe("HVAC Service");
+    expect(
+      formatProductModeLabel({
+        row: { ...baseRow, productMode: "ecc_hers" },
+      } as any),
+    ).toBe("ECC");
+    expect(
+      formatProductModeLabel({
+        row: { ...baseRow, productMode: "hybrid" },
+      } as any),
+    ).toBe("Hybrid");
+  });
+
+  it("shows Platform / Internal for internal null product mode", () => {
+    const row = { ...baseRow, ownerEmail: "internal@example.com", productMode: null } as any;
+    expect(
+      formatProductModeLabel({ row, internalEmails: new Set(["internal@example.com"]) }),
+    ).toBe("Platform / Internal");
+  });
+
+  it("shows Not Set for customer null product mode", () => {
+    expect(formatProductModeLabel({ row: { ...baseRow, productMode: null } as any })).toBe("Not Set");
+  });
+
+  it("maps billing mode labels", () => {
+    expect(formatBillingModeLabel("external_billing")).toBe("External Billing");
+    expect(formatBillingModeLabel("internal_invoicing")).toBe("Internal Invoicing");
+    expect(formatBillingModeLabel(null)).toBe("Not Set");
+  });
+
+  it("formats owner-console dates as MM-DD-YYYY", () => {
+    expect(formatOwnerConsoleDate("2026-05-10T13:10:00.000Z")).toMatch(/^\d{2}-\d{2}-\d{4}$/);
+    expect(formatOwnerConsoleDate(null)).toBe("-");
+    expect(formatOwnerConsoleDate("not-a-date")).toBe("-");
   });
 });

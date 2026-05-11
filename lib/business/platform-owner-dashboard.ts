@@ -87,7 +87,7 @@ export type PlatformOwnerDashboardModel = {
   rows: PlatformOwnerDashboardRow[];
 };
 
-export type PlatformOwnerConsoleView = "current" | "inactive" | "all" | "hidden";
+export type PlatformOwnerConsoleView = "current" | "inactive" | "platform" | "all" | "hidden";
 
 // ---------------------------------------------------------------------------
 // Hidden test-account filtering — env-driven display suppression only.
@@ -96,6 +96,17 @@ export type PlatformOwnerConsoleView = "current" | "inactive" | "all" | "hidden"
 
 export function parseHiddenAccountEmails(env: Record<string, string | undefined>): Set<string> {
   const raw = (env["PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS"] ?? "").trim();
+  if (!raw) return new Set();
+  return new Set(
+    raw
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export function parseInternalAccountEmails(env: Record<string, string | undefined>): Set<string> {
+  const raw = (env["PLATFORM_OWNER_INTERNAL_ACCOUNT_EMAILS"] ?? "").trim();
   if (!raw) return new Set();
   return new Set(
     raw
@@ -114,8 +125,72 @@ export function isHiddenTestAccountRow(
   return Boolean(email) && hiddenEmails.has(email);
 }
 
+export function isPlatformInternalAccountRow(
+  row: PlatformOwnerDashboardRow,
+  internalEmails: Set<string>,
+): boolean {
+  if (internalEmails.size === 0) return false;
+  const email = (row.ownerEmail ?? "").trim().toLowerCase();
+  return Boolean(email) && internalEmails.has(email);
+}
+
+function titleCaseWords(value: string) {
+  return value
+    .split(/[\s_\-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+export function formatProductModeLabel(params: {
+  row: PlatformOwnerDashboardRow;
+  internalEmails?: Set<string>;
+}) {
+  if (isPlatformInternalAccountRow(params.row, params.internalEmails ?? new Set<string>())) {
+    return "Platform / Internal";
+  }
+  if (params.row.productMode === "hvac_service") return "HVAC Service";
+  if (params.row.productMode === "ecc_hers") return "ECC";
+  if (params.row.productMode === "hybrid") return "Hybrid";
+  return "Not Set";
+}
+
+export function formatBillingModeLabel(value: string | null) {
+  const normalized = toCleanString(value).toLowerCase();
+  if (!normalized) return "Not Set";
+  if (normalized === "external_billing") return "External Billing";
+  if (normalized === "internal_invoicing") return "Internal Invoicing";
+  return titleCaseWords(normalized);
+}
+
+export function formatStatusLabel(value: string | null) {
+  const normalized = toCleanString(value).toLowerCase();
+  if (!normalized) return "Not Set";
+  if (normalized === "active") return "Active";
+  if (normalized === "trial") return "Trial";
+  if (normalized === "grace") return "Grace";
+  if (normalized === "expired") return "Expired";
+  if (normalized === "suspended") return "Suspended";
+  if (normalized === "cancelled") return "Cancelled";
+  return titleCaseWords(normalized);
+}
+
+export function formatOwnerConsoleDate(value: string | null) {
+  const raw = toCleanString(value);
+  if (!raw) return "-";
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return "-";
+
+  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getDate()).padStart(2, "0");
+  const yyyy = String(parsed.getFullYear());
+  return `${mm}-${dd}-${yyyy}`;
+}
+
 export type PlatformOwnerConsoleViewSummary = {
   displayedAccounts: number;
+  displayedCustomerAccounts: number;
+  displayedPlatformInternalAccounts: number;
   displayedHvacServiceAccounts: number;
   displayedEccAccounts: number;
   displayedHybridAccounts: number;
@@ -152,19 +227,29 @@ export function filterPlatformOwnerDashboardRows(params: {
   rows: PlatformOwnerDashboardRow[];
   view: PlatformOwnerConsoleView;
   hiddenEmails?: Set<string>;
+  internalEmails?: Set<string>;
 }) {
   const hidden = params.hiddenEmails ?? new Set<string>();
+  const internal = params.internalEmails ?? new Set<string>();
+
+  const isHidden = (row: PlatformOwnerDashboardRow) => isHiddenTestAccountRow(row, hidden);
+  const isInternal = (row: PlatformOwnerDashboardRow) => isPlatformInternalAccountRow(row, internal);
 
   // "hidden" view: show only the suppressed test accounts
   if (params.view === "hidden") {
-    return params.rows.filter((row) => isHiddenTestAccountRow(row, hidden));
+    return params.rows.filter((row) => isHidden(row));
+  }
+
+  // "platform" view: show internal owner/platform rows only (excluding hidden)
+  if (params.view === "platform") {
+    return params.rows.filter((row) => !isHidden(row) && isInternal(row));
   }
 
   // "all" view: show everything, hidden or not
   if (params.view === "all") return params.rows;
 
-  // All other views: exclude hidden test accounts first, then apply status filter
-  const visible = params.rows.filter((row) => !isHiddenTestAccountRow(row, hidden));
+  // All customer-focused default views: exclude hidden and internal rows first.
+  const visible = params.rows.filter((row) => !isHidden(row) && !isInternal(row));
 
   if (params.view === "inactive") {
     return visible.filter((row) => isInactivePlatformOwnerAccountRow(row));
@@ -177,27 +262,36 @@ export function summarizePlatformOwnerDashboardRows(params: {
   rows: PlatformOwnerDashboardRow[];
   allRows: PlatformOwnerDashboardRow[];
   hiddenEmails?: Set<string>;
+  internalEmails?: Set<string>;
 }): PlatformOwnerConsoleViewSummary {
   const rows = params.rows;
   const allRows = params.allRows;
   const hidden = params.hiddenEmails ?? new Set<string>();
+  const internal = params.internalEmails ?? new Set<string>();
+
+  const isHidden = (row: PlatformOwnerDashboardRow) => isHiddenTestAccountRow(row, hidden);
+  const isInternal = (row: PlatformOwnerDashboardRow) => isPlatformInternalAccountRow(row, internal);
+  const customerRows = rows.filter((row) => !isHidden(row) && !isInternal(row));
+  const visibleNonHiddenRows = allRows.filter((row) => !isHidden(row));
 
   return {
     displayedAccounts: rows.length,
-    displayedHvacServiceAccounts: rows.filter((row) => row.productMode === "hvac_service").length,
-    displayedEccAccounts: rows.filter((row) => row.productMode === "ecc_hers").length,
-    displayedHybridAccounts: rows.filter((row) => row.productMode === "hybrid").length,
-    displayedUnknownModeAccounts: rows.filter((row) => row.productMode === null).length,
-    displayedTrialAccounts: rows.filter((row) => statusInSet(row.entitlementStatus, ["trial"])).length,
-    displayedActiveAccounts: rows.filter((row) =>
+    displayedCustomerAccounts: customerRows.length,
+    displayedPlatformInternalAccounts: rows.filter((row) => isInternal(row)).length,
+    displayedHvacServiceAccounts: customerRows.filter((row) => row.productMode === "hvac_service").length,
+    displayedEccAccounts: customerRows.filter((row) => row.productMode === "ecc_hers").length,
+    displayedHybridAccounts: customerRows.filter((row) => row.productMode === "hybrid").length,
+    displayedUnknownModeAccounts: customerRows.filter((row) => row.productMode === null).length,
+    displayedTrialAccounts: customerRows.filter((row) => statusInSet(row.entitlementStatus, ["trial"])).length,
+    displayedActiveAccounts: customerRows.filter((row) =>
       statusInSet(row.entitlementStatus, ["active", "trial", "grace"]),
     ).length,
     displayedInternalUsers: rows.reduce((sum, row) => sum + row.totalUsers, 0),
     displayedActiveInternalUsers: rows.reduce((sum, row) => sum + row.activeUsers, 0),
-    hiddenInactiveCancelledAccounts: allRows
-      .filter((row) => !isHiddenTestAccountRow(row, hidden))
+    hiddenInactiveCancelledAccounts: visibleNonHiddenRows
+      .filter((row) => !isInternal(row))
       .filter((row) => isInactivePlatformOwnerAccountRow(row)).length,
-    hiddenTestAccounts: allRows.filter((row) => isHiddenTestAccountRow(row, hidden)).length,
+    hiddenTestAccounts: allRows.filter((row) => isHidden(row)).length,
   };
 }
 

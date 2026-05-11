@@ -1,10 +1,16 @@
 import { notFound, redirect } from "next/navigation";
 import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import {
+  formatBillingModeLabel,
+  formatOwnerConsoleDate,
+  formatProductModeLabel,
+  formatStatusLabel,
   filterPlatformOwnerDashboardRows,
   isHiddenTestAccountRow,
+  isPlatformInternalAccountRow,
   loadPlatformOwnerDashboardModel,
   parseHiddenAccountEmails,
+  parseInternalAccountEmails,
   summarizePlatformOwnerDashboardRows,
   type PlatformOwnerConsoleView,
 } from "@/lib/business/platform-owner-dashboard";
@@ -43,6 +49,7 @@ function SummaryCard(props: { label: string; value: number }) {
 function resolveView(value: string | undefined): PlatformOwnerConsoleView {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "inactive") return "inactive";
+  if (normalized === "platform") return "platform";
   if (normalized === "all") return "all";
   if (normalized === "hidden") return "hidden";
   return "current";
@@ -60,9 +67,13 @@ const VIEW_META: Record<
     label: "Inactive / Cancelled",
     description: "Expired, suspended, and cancelled accounts",
   },
+  platform: {
+    label: "Platform / Internal",
+    description: "Compliance Matters owner/internal accounts",
+  },
   all: {
     label: "All",
-    description: "All account states including hidden test accounts",
+    description: "All account states including hidden and platform/internal",
   },
   hidden: {
     label: "Hidden / Test",
@@ -78,19 +89,26 @@ export default async function PlatformOwnerConsolePage(props: {
   const admin = createAdminClient();
   const model = await loadPlatformOwnerDashboardModel({ admin });
   const hiddenEmails = parseHiddenAccountEmails(process.env);
+  const internalEmails = parseInternalAccountEmails(process.env);
   const searchParams = (props.searchParams ? await props.searchParams : {}) ?? {};
   const view = resolveView(
     typeof searchParams.view === "string" ? searchParams.view : undefined,
   );
-  const filteredRows = filterPlatformOwnerDashboardRows({ rows: model.rows, view, hiddenEmails });
+  const filteredRows = filterPlatformOwnerDashboardRows({
+    rows: model.rows,
+    view,
+    hiddenEmails,
+    internalEmails,
+  });
   const viewSummary = summarizePlatformOwnerDashboardRows({
     rows: filteredRows,
     allRows: model.rows,
     hiddenEmails,
+    internalEmails,
   });
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 text-slate-900 sm:p-6">
+    <div className="mx-auto max-w-[1200px] space-y-5 p-4 text-slate-900 sm:p-6 lg:space-y-6">
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Platform Owner</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-[-0.02em] text-slate-950">Owner Console</h1>
@@ -123,18 +141,21 @@ export default async function PlatformOwnerConsolePage(props: {
               );
             })}
           </div>
-          <p className="text-xs text-slate-600">{VIEW_META[view].description}</p>
+          <p className="text-xs text-slate-600 sm:text-sm">{VIEW_META[view].description}</p>
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label="Displayed Accounts" value={viewSummary.displayedAccounts} />
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <SummaryCard label="Customer Accounts" value={viewSummary.displayedCustomerAccounts} />
+        <SummaryCard label="Platform / Internal" value={viewSummary.displayedPlatformInternalAccounts} />
+        <SummaryCard label="Hidden / Test Accounts" value={viewSummary.hiddenTestAccounts} />
         <SummaryCard label="HVAC Service" value={viewSummary.displayedHvacServiceAccounts} />
         <SummaryCard label="ECC" value={viewSummary.displayedEccAccounts} />
         <SummaryCard label="Hybrid" value={viewSummary.displayedHybridAccounts} />
-        <SummaryCard label="Unknown Mode" value={viewSummary.displayedUnknownModeAccounts} />
+        <SummaryCard label="Not Set" value={viewSummary.displayedUnknownModeAccounts} />
         <SummaryCard label="Trial" value={viewSummary.displayedTrialAccounts} />
         <SummaryCard label="Current (Active/Trial/Grace)" value={viewSummary.displayedActiveAccounts} />
+        <SummaryCard label="Displayed Rows" value={viewSummary.displayedAccounts} />
         <SummaryCard label="Displayed Internal Users" value={viewSummary.displayedInternalUsers} />
         <SummaryCard
           label="Displayed Active Users"
@@ -150,78 +171,87 @@ export default async function PlatformOwnerConsolePage(props: {
 
       {view === "current" && viewSummary.hiddenTestAccounts > 0 ? (
         <p className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-900">
-          {viewSummary.hiddenTestAccounts} test/internal account(s) are suppressed from default counts via{" "}
+          {viewSummary.hiddenTestAccounts} hidden/test account(s) are suppressed from default counts via{" "}
           <code className="font-mono">PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS</code>. Use the{" "}
           <strong>Hidden / Test</strong> view to inspect them.
         </p>
       ) : null}
 
+      {view === "current" && internalEmails.size > 0 ? (
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs text-emerald-900">
+          Platform/internal rows are classified via <code className="font-mono">PLATFORM_OWNER_INTERNAL_ACCOUNT_EMAILS</code> and excluded from default customer counts.
+        </p>
+      ) : null}
+
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-[1050px] divide-y divide-slate-200 text-left text-sm">
+          <table className="min-w-[940px] divide-y divide-slate-200 text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-[0.1em] text-slate-500">
               <tr>
-                <th className="w-[19%] px-4 py-3 font-semibold">Company</th>
-                <th className="w-[21%] px-4 py-3 font-semibold">Owner</th>
-                <th className="w-[9%] px-4 py-3 font-semibold">Product Mode</th>
-                <th className="w-[9%] px-4 py-3 font-semibold">Billing Mode</th>
-                <th className="px-4 py-3 font-semibold">Entitlement</th>
-                <th className="w-[9%] px-4 py-3 font-semibold">Users</th>
-                <th className="w-[11%] px-4 py-3 font-semibold">Created</th>
-                <th className="px-4 py-3 font-semibold">Setup/Invite</th>
-                <th className="px-4 py-3 font-semibold">Owner User ID</th>
+                <th className="w-[23%] px-4 py-3 font-semibold">Company</th>
+                <th className="w-[20%] px-4 py-3 font-semibold">Owner</th>
+                <th className="w-[12%] px-4 py-3 font-semibold">Product</th>
+                <th className="w-[12%] px-4 py-3 font-semibold">Billing</th>
+                <th className="w-[13%] px-4 py-3 font-semibold">Status</th>
+                <th className="w-[8%] px-4 py-3 font-semibold">Users</th>
+                <th className="w-[8%] px-4 py-3 font-semibold">Created</th>
+                <th className="w-[8%] px-4 py-3 font-semibold">Setup</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
               {filteredRows.map((row) => {
                 const isHidden = isHiddenTestAccountRow(row, hiddenEmails);
+                const isInternal = isPlatformInternalAccountRow(row, internalEmails);
                 return (
                 <tr key={row.accountOwnerUserId} className="align-top">
                   <td className="px-4 py-3 font-medium text-slate-900">
-                    <div className="max-w-[260px] truncate" title={row.company}>
+                    <div className="max-w-[250px] truncate" title={row.company}>
                       {row.company}
                     </div>
-                    {isHidden ? (
-                      <span className="mt-0.5 inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
-                        Hidden / test
-                      </span>
-                    ) : null}
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {isInternal ? (
+                        <span className="inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+                          Platform / Internal
+                        </span>
+                      ) : null}
+                      {isHidden ? (
+                        <span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                          Hidden / Test
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-1 font-mono text-[10px] text-slate-400" title={row.accountOwnerUserId}>
+                      ID: {row.accountOwnerUserId.slice(0, 8)}...
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-slate-700">
-                    <div className="max-w-[280px] truncate" title={row.ownerName ?? "-"}>
+                    <div className="max-w-[240px] truncate font-medium" title={row.ownerName ?? "-"}>
                       {row.ownerName ?? "-"}
                     </div>
-                    <div className="max-w-[280px] truncate text-xs text-slate-500" title={row.ownerEmail ?? "-"}>
+                    <div className="max-w-[240px] truncate text-xs text-slate-500" title={row.ownerEmail ?? "-"}>
                       {row.ownerEmail ?? "-"}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{row.productMode ?? "null"}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.billingMode ?? "-"}</td>
+                  <td className="px-4 py-3 text-slate-700">{formatProductModeLabel({ row, internalEmails })}</td>
+                  <td className="px-4 py-3 text-slate-700">{formatBillingModeLabel(row.billingMode)}</td>
                   <td className="px-4 py-3 text-slate-700">
-                    <div>{row.entitlementStatus ?? "-"}</div>
+                    <div className="font-medium">{formatStatusLabel(row.entitlementStatus)}</div>
                     <div className="text-xs text-slate-500">Plan: {row.planKey ?? "-"}</div>
-                    <div className="text-xs text-slate-500">Trial end: {row.trialEnd ?? "-"}</div>
+                    <div className="text-xs text-slate-500">Trial: {formatOwnerConsoleDate(row.trialEnd)}</div>
                   </td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {row.activeUsers} active / {row.totalUsers} total
+                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                    {row.activeUsers}/{row.totalUsers}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-700">
-                    <span className="block max-w-[180px] truncate" title={row.createdAt ?? "-"}>
-                      {row.createdAt ?? "-"}
-                    </span>
+                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                    {formatOwnerConsoleDate(row.createdAt)}
                   </td>
                   <td className="px-4 py-3 text-slate-700">{row.setupInviteState}</td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-slate-500">
-                    <span className="block max-w-[210px] truncate" title={row.accountOwnerUserId}>
-                      {row.accountOwnerUserId}
-                    </span>
-                  </td>
                 </tr>
                 );
               })}
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-500">
                     No accounts in this view.
                   </td>
                 </tr>
