@@ -90,6 +90,7 @@ import {
   loadScopedInternalJobDetailReadBoundary,
   resolveJobDetailActor,
 } from "@/lib/actions/internal-job-detail-read-boundary";
+import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 
 import DeferredJobAttachmentsInternal from "./_components/DeferredJobAttachmentsInternal";
 import DeferredCustomerAttemptsHistory from "./_components/DeferredCustomerAttemptsHistory";
@@ -973,6 +974,19 @@ export default async function JobDetailPage({
   const serviceCaseId = (job as any).service_case_id as string | null;
   const contractorId = job.contractor_id ?? null;
   const customerId = job.customer_id ?? null;
+  const estimatesEnabled = isEstimatesEnabled();
+  const createEstimateFromJobHref = (() => {
+    if (!estimatesEnabled || !customerId || !job.location_id || !job.id) return null;
+    const params = new URLSearchParams({
+      customer_id: String(customerId),
+      location_id: String(job.location_id),
+      origin_job_id: String(job.id),
+    });
+    if (serviceCaseId) {
+      params.set("service_case_id", String(serviceCaseId));
+    }
+    return `/estimates/new?${params.toString()}`;
+  })();
 
   const immediateInvoiceTruthPromise = timedPhase("immediateInvoiceTruthRead", async () => {
     if (!(isInternalUser && billingMode === "internal_invoicing")) {
@@ -2555,6 +2569,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               className={compactUtilityButtonClass}
             >
               Open Customer
+            </Link>
+          ) : null}
+
+          {createEstimateFromJobHref ? (
+            <Link
+              href={createEstimateFromJobHref}
+              className={compactUtilityButtonClass}
+            >
+              Create Estimate
             </Link>
           ) : null}
 

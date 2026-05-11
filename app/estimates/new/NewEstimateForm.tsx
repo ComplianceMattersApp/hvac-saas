@@ -10,6 +10,7 @@ import {
   createEstimateDraft,
   resolveEstimateCustomerLocationAssist,
 } from "@/lib/estimates/estimate-actions";
+import { buildEstimateDraftCreatePayload } from "@/lib/estimates/estimate-new-entry";
 
 type CustomerRow = {
   id: string;
@@ -62,17 +63,23 @@ export default function NewEstimateForm({
   customers,
   locations,
   initialCustomerId = "",
+  initialLocationId = "",
+  initialOriginJobId = "",
+  initialServiceCaseId = "",
 }: {
   customers: CustomerRow[];
   locations: LocationRow[];
   initialCustomerId?: string;
+  initialLocationId?: string;
+  initialOriginJobId?: string;
+  initialServiceCaseId?: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [allCustomers, setAllCustomers] = useState<CustomerRow[]>(customers);
   const [allLocations, setAllLocations] = useState<LocationRow[]>(locations);
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialCustomerId);
-  const [selectedLocationId, setSelectedLocationId] = useState("");
+  const [selectedLocationId, setSelectedLocationId] = useState(initialLocationId);
   const [customerQuery, setCustomerQuery] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -260,7 +267,16 @@ export default function NewEstimateForm({
     }
 
     startTransition(async () => {
-      const result = await createEstimateDraft({ customerId, locationId, title, notes });
+      const result = await createEstimateDraft(
+        buildEstimateDraftCreatePayload({
+          customerId,
+          locationId,
+          title,
+          notes,
+          originJobId: initialOriginJobId,
+          serviceCaseId: initialServiceCaseId,
+        })
+      );
       if (result.success) {
         router.push(`/estimates/${result.estimateId}`);
       } else {
