@@ -19,6 +19,7 @@ describe("isEccTestApplicableToSystem", () => {
     expect(manualAddForDuctless).not.toContain("fan_watt_draw");
     expect(manualAddForDuctless).not.toContain("air_filter_device");
     expect(manualAddForDuctless).toContain("refrigerant_charge");
+    expect(manualAddForDuctless).toContain("local_mechanical_exhaust");
   });
 
   it("retains existing manual add applicability for non-ductless systems", () => {
@@ -36,5 +37,6 @@ describe("isEccTestApplicableToSystem", () => {
     expect(manualAddForDucted).toContain("fan_watt_draw");
     expect(manualAddForDucted).toContain("air_filter_device");
     expect(manualAddForDucted).toContain("refrigerant_charge");
+    expect(manualAddForDucted).toContain("local_mechanical_exhaust");
   });
 });

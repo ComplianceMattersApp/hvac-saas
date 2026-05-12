@@ -58,6 +58,10 @@ import {
   buildAhriVerificationPayload,
   ensureAhriVerificationCompletionFields,
 } from "@/lib/ecc/ahri-verification";
+import {
+  buildLocalMechanicalExhaustPayload,
+  ensureLocalMechanicalExhaustCompletionFields,
+} from "@/lib/ecc/local-mechanical-exhaust";
 import type { JobStatus } from "@/lib/types/job";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { mapToCanonicalRole, sanitizeEquipmentFields } from "@/lib/utils/equipment-domain";
@@ -3864,7 +3868,8 @@ function computeDuctLeakagePayload(formData: FormData, projectType: string) {
   const airflowMethodRaw = String(formData.get("airflow_method") || "").trim().toLowerCase();
   const airflowMethod = airflowMethodRaw === "heating" ? "heating" : "cooling";
 
-  const leakagePercentAllowed = getDuctLeakagePercentAllowed(projectType);
+  const leakagePercentTarget = num("leakage_percent_target");
+  let leakagePercentAllowed = getDuctLeakagePercentAllowed(projectType);
 
   const derivedHeatingOutputBtu =
     heatingOutputBtu != null
@@ -3890,13 +3895,22 @@ function computeDuctLeakagePayload(formData: FormData, projectType: string) {
       ? tonnage * 400
       : null;
 
-  const maxLeakageCfm =
+  let maxLeakageCfm =
     nominalAirflowCfm != null && leakagePercentAllowed != null
       ? nominalAirflowCfm * leakagePercentAllowed
       : null;
 
   const failures: string[] = [];
   const warnings: string[] = [];
+
+  if (leakagePercentTarget != null) {
+    if (leakagePercentTarget > 0 && leakagePercentTarget <= 100) {
+      leakagePercentAllowed = leakagePercentTarget / 100;
+      maxLeakageCfm = nominalAirflowCfm != null ? nominalAirflowCfm * leakagePercentAllowed : null;
+    } else {
+      warnings.push("Leakage target must be between 0 and 100 percent");
+    }
+  }
 
   if (airflowMethod === "cooling" && tonnage == null) {
     warnings.push("Missing tonnage");
@@ -3928,6 +3942,8 @@ function computeDuctLeakagePayload(formData: FormData, projectType: string) {
 
   const data = {
     measured_duct_leakage_cfm: measuredLeakageCfm,
+    leakage_percent_target:
+      leakagePercentAllowed != null ? Number((leakagePercentAllowed * 100).toFixed(3)) : null,
     tonnage,
     airflow_method: airflowMethod,
     heating_output_btu: heatingOutputBtu,
@@ -4889,7 +4905,7 @@ export async function saveAirflowDataFromForm(formData: FormData) {
   const measuredTotalCfm = num("measured_total_cfm");
   const tonnage = num("tonnage");
 
-  const cfmPerTon = resolveAirflowCfmPerTon(projectType);
+  const cfmPerTon = resolveAirflowCfmPerTon(projectType, formData);
   const requiredTotalCfm = tonnage != null ? tonnage * cfmPerTon : null;
 
   const failures: string[] = [];
@@ -4920,6 +4936,7 @@ export async function saveAirflowDataFromForm(formData: FormData) {
   const data = {
     measured_total_cfm: measuredTotalCfm,
     tonnage,
+    cfm_per_ton_target: cfmPerTon,
     cfm_per_ton_required: cfmPerTon,
     notes: String(formData.get("notes") || "").trim() || null,
 
@@ -5247,6 +5264,96 @@ export async function saveAndCompleteAhriVerificationFromForm(formData: FormData
   redirectToTests({ jobId, testType: "ahri_verification", systemId });
 }
 
+export async function saveLocalMechanicalExhaustDataFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  const payload = buildLocalMechanicalExhaustPayload(formData);
+
+  const supabase = await createClient();
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
+
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data: payload.data,
+      computed: payload.computed,
+      computed_pass: payload.computedPass,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  await evaluateEccOpsStatus(jobId);
+  revalidateEccProjectionConsumers(jobId);
+  redirectToTests({ jobId, testType: "local_mechanical_exhaust", systemId });
+}
+
+export async function saveAndCompleteLocalMechanicalExhaustFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  ensureLocalMechanicalExhaustCompletionFields(formData);
+  const payload = buildLocalMechanicalExhaustPayload(formData);
+
+  const supabase = await createClient();
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
+
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data: payload.data,
+      computed: payload.computed,
+      computed_pass: payload.computedPass,
+      override_pass: null,
+      override_reason: null,
+      updated_at: new Date().toISOString(),
+      is_completed: true,
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  await evaluateEccOpsStatus(jobId);
+  revalidateEccProjectionConsumers(jobId);
+  redirectToTests({ jobId, testType: "local_mechanical_exhaust", systemId });
+}
+
 function parseOverrideSelectionFromForm(formData: FormData) {
   const override = String(formData.get("override") || "none").trim().toLowerCase();
   const reasonRaw = String(formData.get("override_reason") || "").trim();
@@ -5265,7 +5372,14 @@ function parseOverrideSelectionFromForm(formData: FormData) {
   };
 }
 
-function resolveAirflowCfmPerTon(projectType: string): number {
+function resolveAirflowCfmPerTon(projectType: string, formData?: FormData): number {
+  const formValueRaw = formData ? String(formData.get("cfm_per_ton_target") || "").trim() : "";
+  const formValue = formValueRaw ? Number(formValueRaw) : null;
+
+  if (formValue != null && Number.isFinite(formValue) && formValue > 0) {
+    return formValue;
+  }
+
   const threshold = getThresholdRuleForTest(projectType, "airflow");
   const rawValue = threshold?.unit === "cfm_per_ton" ? threshold.targetValue : null;
   const parsed = typeof rawValue === "number" ? rawValue : Number(rawValue);
@@ -5638,7 +5752,7 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
   const measuredTotalCfm = num("measured_total_cfm");
   const tonnage = num("tonnage");
 
-  const cfmPerTon = resolveAirflowCfmPerTon(projectType);
+  const cfmPerTon = resolveAirflowCfmPerTon(projectType, formData);
   const requiredTotalCfm = tonnage != null ? tonnage * cfmPerTon : null;
 
   const failures: string[] = [];
@@ -5668,6 +5782,7 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
   const data = {
     measured_total_cfm: measuredTotalCfm,
     tonnage,
+    cfm_per_ton_target: cfmPerTon,
     cfm_per_ton_required: cfmPerTon,
     notes: String(formData.get("notes") || "").trim() || null,
     airflow_override_applied: airflowOverridePass,

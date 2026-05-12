@@ -28,6 +28,8 @@ import {
   saveAndCompleteFanWattDrawFromForm,
   saveAndCompleteAhriVerificationFromForm,
   saveAndCompleteAirFilterDeviceFromForm,
+  saveLocalMechanicalExhaustDataFromForm,
+  saveAndCompleteLocalMechanicalExhaustFromForm,
   saveAndCompleteRefrigerantChargeFromForm,
 } from "@/lib/actions/job-actions";
 
@@ -748,6 +750,7 @@ export default async function JobTestsPage({
   const runAF = selectedSystemId ? pickRunForSystem(job, "airflow", selectedSystemId) : null;
   const runFan = selectedSystemId ? pickRunForSystem(job, "fan_watt_draw", selectedSystemId) : null;
   const runAhri = selectedSystemId ? pickRunForSystem(job, "ahri_verification", selectedSystemId) : null;
+  const runLocalExhaust = selectedSystemId ? pickRunForSystem(job, "local_mechanical_exhaust", selectedSystemId) : null;
   const runFilter = selectedSystemId ? pickRunForSystem(job, "air_filter_device", selectedSystemId) : null;
   const runRC = selectedSystemId ? pickRunForSystem(job, "refrigerant_charge", selectedSystemId) : null;
   const ductSaveFormId = runDL ? `duct-save-${runDL.id}` : "";
@@ -757,6 +760,8 @@ export default async function JobTestsPage({
   const fanDeleteFormId = runFan ? `fan-delete-${runFan.id}` : "";
   const ahriSaveFormId = runAhri ? `ahri-save-${runAhri.id}` : "";
   const ahriDeleteFormId = runAhri ? `ahri-delete-${runAhri.id}` : "";
+  const localExhaustSaveFormId = runLocalExhaust ? `local-exhaust-save-${runLocalExhaust.id}` : "";
+  const localExhaustDeleteFormId = runLocalExhaust ? `local-exhaust-delete-${runLocalExhaust.id}` : "";
   const filterSaveFormId = runFilter ? `filter-save-${runFilter.id}` : "";
   const filterDeleteFormId = runFilter ? `filter-delete-${runFilter.id}` : "";
   const rcSaveFormId = runRC ? `rc-save-${runRC.id}` : "";
@@ -850,6 +855,7 @@ export default async function JobTestsPage({
     focusedType !== "airflow" &&
     focusedType !== "fan_watt_draw" &&
     focusedType !== "ahri_verification" &&
+    focusedType !== "local_mechanical_exhaust" &&
     focusedType !== "air_filter_device" &&
     focusedType !== "refrigerant_charge"
       ? (focusedType as EccTestType)
@@ -1056,6 +1062,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
     const runAirflow = systemIsHeatOnly || systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "airflow", systemId);
     const runFan = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "fan_watt_draw", systemId);
     const runAhri = pickLatestRunForSystem(job, "ahri_verification", systemId);
+    const runLocalExhaust = pickLatestRunForSystem(job, "local_mechanical_exhaust", systemId);
     const runFilter = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "air_filter_device", systemId);
     const runDuct = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "duct_leakage", systemId);
     const runRefrigerant = systemIsHeatOnly ? null : pickLatestRunForSystem(job, "refrigerant_charge", systemId);
@@ -1083,6 +1090,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       runAirflow,
       runFan,
       runAhri,
+      runLocalExhaust,
       runFilter,
       runDuct,
       runRefrigerant,
@@ -1314,6 +1322,38 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
 
                     <div>
+                      <span className="font-semibold text-slate-950">Local Mechanical Exhaust Verification:</span>
+                      <div className="mt-1 space-y-1 text-slate-800">
+                        {!sys.runLocalExhaust ? (
+                          <div>No local mechanical exhaust verification run found for this system.</div>
+                        ) : (
+                          <>
+                            <div>Building Type: {fallbackText(sys.runLocalExhaust?.data?.building_type)}</div>
+                            <div>Kitchen Floor Area: {fmtValue(sys.runLocalExhaust?.data?.total_kitchen_floor_area, "sq ft")}</div>
+                            <div>
+                              Kitchen Average Ceiling Height: {fmtValue(sys.runLocalExhaust?.data?.kitchen_average_ceiling_height, "ft")}
+                            </div>
+                            <div>Kitchen Type: {fallbackText(sys.runLocalExhaust?.data?.kitchen_type)}</div>
+                            <div>System Name: {fallbackText(sys.runLocalExhaust?.data?.system_name)}</div>
+                            <div>Manufacturer: {fallbackText(sys.runLocalExhaust?.data?.manufacturer_name)}</div>
+                            <div>System Type: {fallbackText(sys.runLocalExhaust?.data?.system_type)}</div>
+                            <div>HVI/AHAM Model Number: {fallbackText(sys.runLocalExhaust?.data?.hvi_aham_model_number)}</div>
+                            <div>
+                              HVI/AHAM Rated Airflow: {fmtValue(sys.runLocalExhaust?.data?.hvi_aham_rated_airflow_cfm, "CFM")}
+                            </div>
+                            <div>HVI/AHAM Sound Rating: {fallbackText(sys.runLocalExhaust?.data?.hvi_aham_sound_rating)}</div>
+                            <div>Minimum Airflow: {fmtValue(sys.runLocalExhaust?.data?.minimum_airflow_cfm, "CFM")}</div>
+                            <div>Operation Schedule: {fallbackText(sys.runLocalExhaust?.data?.operation_schedule)}</div>
+                            <div>Notes: {fallbackText(sys.runLocalExhaust?.data?.notes)}</div>
+                            <div>
+                              Airflow Compliance Statement: {fallbackText(sys.runLocalExhaust?.computed?.airflow_compliance_statement)}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
                       <span className="font-semibold text-slate-950">Airflow Summary:</span>
                       <div className="mt-1 space-y-1 text-slate-800">
                         {sys.systemIsDuctlessMiniSplit ? (
@@ -1322,6 +1362,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                           <div>Not applicable for heat-only system (no cooling equipment).</div>
                         ) : (
                           <>
+                            <div>Target Airflow: {fmtValue(sys.runAirflow?.data?.cfm_per_ton_required, "CFM/ton")}</div>
+                            <div>Required Total Airflow: {fmtValue(sys.runAirflow?.computed?.required_total_cfm, "CFM")}</div>
                             <div>Measured Airflow: {fmtValue(sys.runAirflow?.data?.measured_total_cfm, "CFM")}</div>
                             <div>Result: {sys.runAirflow ? getEffectiveResultLabel(sys.runAirflow) : "No run"}</div>
                           </>
@@ -1397,6 +1439,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                           <div>Not applicable for ductless mini split systems.</div>
                         ) : (
                           <>
+                            <div>Target Leakage Limit: {fmtValue(sys.runDuct?.computed?.leakage_percent_allowed_display, "%")}</div>
+                            <div>Max Allowed Leakage: {fmtValue(sys.runDuct?.computed?.max_leakage_cfm, "CFM")}</div>
                             <div>Entered duct leakage value: {fmtValue(sys.runDuct?.data?.measured_duct_leakage_cfm, "CFM")}</div>
                             <div>Result: {sys.runDuct ? getEffectiveResultLabel(sys.runDuct) : "No run"}</div>
                           </>
@@ -2051,6 +2095,27 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`dl-target-${runDL.id}`}>
+                        Duct Leakage Target (%)
+                      </label>
+                      <input
+                        id={`dl-target-${runDL.id}`}
+                        name="leakage_percent_target"
+                        type="number"
+                        min="0.1"
+                        max="100"
+                        step="0.1"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={
+                          runDL.data?.leakage_percent_target ??
+                          runDL.computed?.leakage_percent_allowed_display ??
+                          (String(job.project_type ?? "").trim().toLowerCase() === "alteration" ? 10 : 5)
+                        }
+                      />
+                      <div className="text-xs text-slate-600">Editable per run; defaults from profile if unchanged.</div>
+                    </div>
+
                     <DuctLeakageMethodFields
                       runId={runDL.id}
                       defaultMethod={defaultDuctAirflowMethod === "heating" ? "heating" : "cooling"}
@@ -2132,6 +2197,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 <div className="text-sm text-muted-foreground rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
                   <div>
                     Method: {(savedDuctMethodRaw === "heating" || savedDuctMethodRaw === "cooling" ? savedDuctMethodRaw : defaultDuctAirflowMethod) === "heating" ? "Heating Method" : "Cooling Method"}
+                  </div>
+                  <div>
+                    Target Leakage Limit: {fmtValue(runDL.computed?.leakage_percent_allowed_display, "%")}
                   </div>
                   <div>
                     Max Allowed: {runDL.computed?.max_leakage_cfm ?? "—"} CFM
@@ -2240,6 +2308,22 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="grid gap-1">
+                    <label className="text-sm font-medium" htmlFor={`af-target-${runAF.id}`}>
+                      Airflow Target (CFM per ton)
+                    </label>
+                    <input
+                      id={`af-target-${runAF.id}`}
+                      name="cfm_per_ton_target"
+                      type="number"
+                      min="1"
+                      step="1"
+                      className="w-full rounded-md border px-3 py-2"
+                      defaultValue={runAF.data?.cfm_per_ton_required ?? (String(job.project_type ?? "").trim().toLowerCase() === "all_new" ? 350 : 300)}
+                    />
+                    <div className="text-xs text-slate-600">Editable per run; defaults from project profile if unchanged.</div>
+                  </div>
+
+                  <div className="grid gap-1">
                     <label className="text-sm font-medium" htmlFor={`af-ton-${runAF.id}`}>
                       System Tonnage (auto-filled from equipment if available)
                     </label>
@@ -2320,6 +2404,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
                 <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
                 <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <div>Target Airflow: {fmtValue(runAF.data?.cfm_per_ton_required, "CFM/ton")}</div>
                   <div>Required Total Airflow: {fmtValue(runAF.computed?.required_total_cfm, "CFM")}</div>
                   <div>Measured Total Airflow: {fmtValue(runAF.data?.measured_total_cfm, "CFM")}</div>
                 </div>
@@ -2975,6 +3060,149 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 <form id={ahriDeleteFormId} action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runAhri.id} />
+                </form>
+              </>
+            )}
+          </div>
+        ) : null}
+
+        {/* =========================
+            LOCAL MECHANICAL EXHAUST VERIFICATION
+            ========================= */}
+        {focusedType === "local_mechanical_exhaust" ? (
+          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="font-medium">Local Mechanical Exhaust Verification</div>
+                <div className="mt-1 text-sm text-slate-700">
+                  Use this when the project requires local mechanical exhaust documentation, such as kitchen exhaust system data.
+                </div>
+                <div className="mt-1 text-sm">
+                  <span className="font-medium">Result:</span>{" "}
+                  {runLocalExhaust ? getEffectiveResultLabel(runLocalExhaust) : "Not started"}
+                </div>
+              </div>
+              <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
+                {runLocalExhaust?.updated_at ? new Date(runLocalExhaust.updated_at).toLocaleString() : null}
+              </div>
+            </div>
+
+            {!runLocalExhaust ? (
+              <form action={addEccTestRunFromForm} className="flex items-center gap-2">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="system_id" value={selectedSystemId} />
+                <input type="hidden" name="test_type" value="local_mechanical_exhaust" />
+                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                  Create Local Mechanical Exhaust Run
+                </SubmitButton>
+              </form>
+            ) : (
+              <>
+                <div className="text-sm font-semibold text-slate-900">Structured Documentation Inputs</div>
+                <form id={localExhaustSaveFormId} action={saveLocalMechanicalExhaustDataFromForm} className="grid gap-3 border-t pt-3">
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runLocalExhaust.id} />
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`lme-building-type-${runLocalExhaust.id}`}>Building Type</label>
+                      <input id={`lme-building-type-${runLocalExhaust.id}`} name="building_type" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.building_type ?? ""} />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`lme-kitchen-area-${runLocalExhaust.id}`}>Total Kitchen Floor Area</label>
+                      <input id={`lme-kitchen-area-${runLocalExhaust.id}`} name="total_kitchen_floor_area" type="number" step="0.1" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.total_kitchen_floor_area ?? ""} />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`lme-ceiling-height-${runLocalExhaust.id}`}>Kitchen Average Ceiling Height</label>
+                      <input id={`lme-ceiling-height-${runLocalExhaust.id}`} name="kitchen_average_ceiling_height" type="number" step="0.1" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.kitchen_average_ceiling_height ?? ""} />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`lme-kitchen-type-${runLocalExhaust.id}`}>Kitchen Type</label>
+                      <input id={`lme-kitchen-type-${runLocalExhaust.id}`} name="kitchen_type" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.kitchen_type ?? ""} placeholder="Non-Enclosed" />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`lme-system-name-${runLocalExhaust.id}`}>System Name</label>
+                      <input id={`lme-system-name-${runLocalExhaust.id}`} name="system_name" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.system_name ?? ""} />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`lme-manufacturer-${runLocalExhaust.id}`}>Manufacturer Name</label>
+                      <input id={`lme-manufacturer-${runLocalExhaust.id}`} name="manufacturer_name" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.manufacturer_name ?? ""} />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`lme-system-type-${runLocalExhaust.id}`}>System Type</label>
+                      <input id={`lme-system-type-${runLocalExhaust.id}`} name="system_type" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.system_type ?? ""} />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`lme-model-${runLocalExhaust.id}`}>HVI or AHAM Directory Listed Model Number</label>
+                      <input id={`lme-model-${runLocalExhaust.id}`} name="hvi_aham_model_number" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.hvi_aham_model_number ?? ""} />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`lme-rated-airflow-${runLocalExhaust.id}`}>HVI or AHAM Directory Listed Rated Airflow (CFM)</label>
+                      <input id={`lme-rated-airflow-${runLocalExhaust.id}`} name="hvi_aham_rated_airflow_cfm" type="number" step="1" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.hvi_aham_rated_airflow_cfm ?? ""} />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`lme-sound-${runLocalExhaust.id}`}>HVI or AHAM Directory Listed Sound Rating</label>
+                      <input id={`lme-sound-${runLocalExhaust.id}`} name="hvi_aham_sound_rating" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.hvi_aham_sound_rating ?? ""} />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`lme-min-airflow-${runLocalExhaust.id}`}>Minimum Airflow (CFM)</label>
+                      <input id={`lme-min-airflow-${runLocalExhaust.id}`} name="minimum_airflow_cfm" type="number" step="1" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.minimum_airflow_cfm ?? ""} />
+                    </div>
+                    <div className="grid gap-1 sm:col-span-2">
+                      <label className="text-sm font-medium" htmlFor={`lme-schedule-${runLocalExhaust.id}`}>Operation Schedule</label>
+                      <input id={`lme-schedule-${runLocalExhaust.id}`} name="operation_schedule" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.operation_schedule ?? ""} />
+                    </div>
+                    <div className="grid gap-1 sm:col-span-2">
+                      <label className="text-sm font-medium" htmlFor={`lme-notes-${runLocalExhaust.id}`}>Notes</label>
+                      <textarea id={`lme-notes-${runLocalExhaust.id}`} name="notes" rows={3} className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.notes ?? ""} />
+                    </div>
+                  </div>
+                </form>
+
+                <div className="text-sm font-semibold text-slate-900">Summary</div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <div>System Name: {fallbackText(runLocalExhaust.data?.system_name)}</div>
+                  <div>Manufacturer: {fallbackText(runLocalExhaust.data?.manufacturer_name)}</div>
+                  <div>System Type: {fallbackText(runLocalExhaust.data?.system_type)}</div>
+                  <div>HVI/AHAM Model Number: {fallbackText(runLocalExhaust.data?.hvi_aham_model_number)}</div>
+                  <div>HVI/AHAM Rated Airflow: {fmtValue(runLocalExhaust.data?.hvi_aham_rated_airflow_cfm, "CFM")}</div>
+                  <div>Minimum Airflow: {fmtValue(runLocalExhaust.data?.minimum_airflow_cfm, "CFM")}</div>
+                  <div>Airflow Compliance Statement: {fallbackText(runLocalExhaust.computed?.airflow_compliance_statement)}</div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                  <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
+                    {runLocalExhaust.is_completed && "✅ Verification completed"}
+                  </span>
+                  <SubmitButton
+                    form={localExhaustSaveFormId}
+                    formNoValidate
+                    loadingText="Saving..."
+                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                  >
+                    Save Draft
+                  </SubmitButton>
+                  <SubmitButton
+                    form={localExhaustSaveFormId}
+                    loadingText="Saving & completing..."
+                    formAction={saveAndCompleteLocalMechanicalExhaustFromForm}
+                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  >
+                    Complete Verification
+                  </SubmitButton>
+                  <button
+                    type="submit"
+                    form={localExhaustDeleteFormId}
+                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+
+                <form id={localExhaustDeleteFormId} action={deleteEccTestRunFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runLocalExhaust.id} />
                 </form>
               </>
             )}

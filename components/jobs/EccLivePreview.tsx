@@ -56,6 +56,14 @@ function leakPercentAllowed(projectType?: string | null) {
   return null;
 }
 
+function leakPercentFromForm(fd: FormData, projectType?: string | null) {
+  const rawTarget = toNumber(fd.get("leakage_percent_target"));
+  if (rawTarget != null && rawTarget > 0 && rawTarget <= 100) {
+    return rawTarget / 100;
+  }
+  return leakPercentAllowed(projectType);
+}
+
 export default function EccLivePreview({ mode, formId, projectType }: Props) {
   const [content, setContent] = useState<ReactNode>(null);
 
@@ -76,7 +84,7 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
         const heatingOutputBtu = toNumber(fd.get("heating_output_btu"));
         const heatingInputBtu = toNumber(fd.get("heating_input_btu"));
         const heatingEfficiencyPercent = toNumber(fd.get("heating_efficiency_percent"));
-        const percent = leakPercentAllowed(projectType);
+        const percent = leakPercentFromForm(fd, projectType);
 
         const derivedHeatingOutputBtu =
           heatingOutputBtu != null
@@ -139,7 +147,11 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
       if (mode === "airflow") {
         const tonnage = toNumber(fd.get("tonnage"));
         const measured = toNumber(fd.get("measured_total_cfm"));
-        const cfmPerTon = normalizeProjectType(projectType) === "all_new" ? 350 : 300;
+        const cfmPerTon = (() => {
+          const target = toNumber(fd.get("cfm_per_ton_target"));
+          if (target != null && target > 0) return target;
+          return normalizeProjectType(projectType) === "all_new" ? 350 : 300;
+        })();
         const required = tonnage != null ? tonnage * cfmPerTon : null;
         const overridePass = String(fd.get("airflow_override_pass") ?? "").trim() === "true";
 
@@ -165,6 +177,7 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
               </div>
             </div>
             <div>Required Total Airflow: {formatNum(required, "CFM")}</div>
+            <div>Target: {formatNum(cfmPerTon, "CFM/ton")}</div>
             <div>Measured Total Airflow: {formatNum(measured, "CFM")}</div>
             {overridePass ? (
               <div className="text-xs text-amber-700">Override pass is selected and will be applied only when saved.</div>

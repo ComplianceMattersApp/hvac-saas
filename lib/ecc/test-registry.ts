@@ -14,6 +14,7 @@ export type EccTestType =
   | "refrigerant_charge"
   | "fan_watt_draw"
   | "ahri_verification"
+  | "local_mechanical_exhaust"
   | "custom"
   // framed for later
   | "qii_insulation"
@@ -151,6 +152,21 @@ export const ECC_TEST_REGISTRY: Record<EccTestType, EccTestDefinition> = {
     rendererKey: "fan_watt_draw",
     computeKey: "fan_watt_draw",
     sortOrder: 50,
+  },
+
+  local_mechanical_exhaust: {
+    code: "local_mechanical_exhaust",
+    label: "Local Mechanical Exhaust Verification",
+    shortLabel: "Local Exhaust",
+    family: "ventilation",
+    active: true,
+    allowManualAdd: true,
+    allowInCustomProfile: true,
+    supportsNotApplicable: true,
+    requiresReasonWhenNotApplicable: false,
+    rendererKey: "local_mechanical_exhaust",
+    computeKey: "local_mechanical_exhaust",
+    sortOrder: 60,
   },
 
   custom: {
