@@ -57,6 +57,7 @@ import {
   resolveBillingModeByAccountOwnerId,
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
+import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { buildJobBillingStateReadModel } from "@/lib/business/job-billing-state";
 import {
   resolveInternalInvoiceEmailDeliveries,
@@ -841,9 +842,10 @@ export default async function JobDetailPage({
   let isInternalAdmin = false;
   let internalBusinessDisplayName = "";
   let billingMode: BillingMode = "external_billing";
+  let productMode: ProductMode = "hybrid";
 
   isInternalAdmin = internalUser.role === "admin";
-  const { internalBusinessIdentity, resolvedBillingMode } = await timedPhase("businessProfileReads", async () => {
+  const { internalBusinessIdentity, resolvedBillingMode, resolvedProductMode } = await timedPhase("businessProfileReads", async () => {
     const resolvedBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
@@ -852,14 +854,20 @@ export default async function JobDetailPage({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
     });
+    const resolvedProductMode = await resolveProductModeForAccountOwnerId({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
 
     return {
       internalBusinessIdentity: resolvedBusinessIdentity,
       resolvedBillingMode,
+      resolvedProductMode,
     };
   });
   internalBusinessDisplayName = internalBusinessIdentity.display_name;
   billingMode = resolvedBillingMode;
+  productMode = resolvedProductMode;
 
   // Explicit same-account internal scoped-job preflight: deny before main job-detail read assembly
   const scopedReadJob = await timedPhase("sameAccountScopedJobBoundary", () =>
@@ -1698,7 +1706,10 @@ const eccSummaryText = job.ecc_test_runs?.length
 const sharedNotesTitle = hasDirectNarrativeChain ? "Shared Notes Across Job Chain" : "Shared Notes";
 const internalNotesTitle = hasDirectNarrativeChain ? "Internal Notes Across Job Chain" : "Internal Notes";
 const timelineTitle = hasDirectNarrativeChain ? "Job Chain Timeline" : "Timeline";
-const sharedNotesSummaryText = "Notes stream below.";
+const isHvacServiceMode = productMode === "hvac_service";
+const sharedNotesSummaryText = isHvacServiceMode
+  ? "Optional collaboration stream. Timeline and Internal Notes remain primary."
+  : "Notes stream below.";
 const internalNotesSummaryText = "Notes stream below.";
 const timelineSummaryText = "History loads below.";
 
@@ -4533,7 +4544,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     <section className="order-1 space-y-4 xl:order-5">
       <div className="space-y-4">
         {/* Shared Notes */}
-        <details className={workspaceDetailsClass}>
+        <details className={`${workspaceDetailsClass}${isHvacServiceMode ? " opacity-90" : ""}`}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} />
           </summary>
@@ -4547,7 +4558,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     <textarea
       name="note"
       rows={3}
-      placeholder="Add a note visible to the contractor..."
+      placeholder={isHvacServiceMode ? "Add an optional collaboration note..." : "Add a note visible to the contractor..."}
       className={workspaceTextareaClass}
     />
 

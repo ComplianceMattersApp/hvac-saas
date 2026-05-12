@@ -34,6 +34,7 @@ import {
   buildOperationalReportingReadModel,
   type OperationalReportingJob,
 } from "@/lib/ops/operational-reporting";
+import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -197,6 +198,15 @@ export default async function OpsPage({
   const internalUser = actorContext.internalUser;
   if (opsTimingEnabled) console.log(`[ops:requestActorContext] ${Date.now() - _t_requestActorContext}ms`);
 
+  const resolvedProductModePromise = resolveProductModeForAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const productMode: ProductMode = await resolvedProductModePromise;
+  const isHvacServiceMode = productMode === "hvac_service";
+  const contractorScopeFilter = isHvacServiceMode ? null : contractor;
+
   const _t_businessIdentity = opsTimingEnabled ? Date.now() : 0;
   const internalBusinessIdentityPromise = resolveInternalBusinessIdentityByAccountOwnerId({
     supabase,
@@ -271,7 +281,7 @@ function subtractBusinessDays(date: Date, days: number) {
     .neq("status", "cancelled")
     .is("deleted_at", null);
 
-  if (contractor) countsQ = countsQ.eq("contractor_id", contractor);
+  if (contractorScopeFilter) countsQ = countsQ.eq("contractor_id", contractorScopeFilter);
 
   // Parents with at least one successfully resolved retest child should leave active unresolved queues.
   // The parent remains historically failed, but should not stay in active Failed / Attention views.
@@ -397,7 +407,7 @@ function shouldHideFailedParentJob(j: any) {
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
-    if (contractor) qb = qb.eq("contractor_id", contractor);
+    if (contractorScopeFilter) qb = qb.eq("contractor_id", contractorScopeFilter);
 
     if (q) {
       const terms = buildIlikeSearchTerms(q)
@@ -550,7 +560,7 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
     .is("deleted_at", null)
     .neq("status", "cancelled");
 
-  if (contractor) operationalReportingJobsQ = operationalReportingJobsQ.eq("contractor_id", contractor);
+  if (contractorScopeFilter) operationalReportingJobsQ = operationalReportingJobsQ.eq("contractor_id", contractorScopeFilter);
 
   // 7) BUCKET list (tabs)
     let bucketQ = supabase
@@ -665,14 +675,14 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
   );
 
   let throughputEventsQ: any = null;
-  if (!contractor || operationalReportingJobs.length > 0) {
+  if (!contractorScopeFilter || operationalReportingJobs.length > 0) {
     throughputEventsQ = supabase
       .from("job_events")
       .select("event_type")
       .gte("created_at", recentThroughputCutoffIso)
       .in("event_type", ["job_created", "job_completed", "scheduled", "schedule_updated", "contractor_schedule_updated"]);
 
-    if (contractor) {
+    if (contractorScopeFilter) {
       throughputEventsQ = throughputEventsQ.in(
         "job_id",
         operationalReportingJobs.map((job) => job.id)
@@ -1180,7 +1190,7 @@ function sortJobs(jobs: any[] | null | undefined, mode: string) {
 }
 
   const selectedContractorName =
-    contractor && contractors?.find((c: any) => c.id === contractor)?.name;
+    contractorScopeFilter && contractors?.find((c: any) => c.id === contractorScopeFilter)?.name;
 
 const uniqueAllOpenOpsJobs = Array.from(
   new Map(
@@ -1596,6 +1606,74 @@ const closeoutJobs = sortJobs(
   sort
 );
 
+const teamSnapshotScheduledTodayCount = (fieldWorkJobs ?? []).length;
+const teamSnapshotUnassignedCount = uniqueAllOpenOpsJobs.filter(
+  (job: any) => assignmentSummaryForJob(String(job?.id ?? "")) === "Unassigned"
+).length;
+const teamSnapshotInProgressCount = uniqueAllOpenOpsJobs.filter((job: any) => {
+  const lifecycle = String(job?.status ?? "").toLowerCase();
+  return lifecycle === "on_the_way" || lifecycle === "in_progress";
+}).length;
+const teamSnapshotWaitingCount = uniqueAllOpenOpsJobs.filter((job: any) => {
+  const waitingState = getActiveWaitingState({
+    ops_status: job?.ops_status ?? null,
+    pending_info_reason: job?.pending_info_reason ?? null,
+    on_hold_reason: job?.on_hold_reason ?? null,
+  });
+  return Boolean(waitingState?.status);
+}).length;
+const teamSnapshotNeedsCloseoutCount = closeoutJobs.length;
+
+const teamSnapshotCards = [
+  { key: "scheduled_today", label: "Scheduled Today", count: teamSnapshotScheduledTodayCount },
+  { key: "unassigned", label: "Unassigned", count: teamSnapshotUnassignedCount },
+  { key: "in_progress", label: "In Progress", count: teamSnapshotInProgressCount },
+  { key: "waiting", label: "Waiting", count: teamSnapshotWaitingCount },
+  { key: "needs_closeout", label: "Needs Closeout", count: teamSnapshotNeedsCloseoutCount },
+];
+
+const teamSnapshotTotalCount = teamSnapshotCards.reduce((sum, card) => sum + card.count, 0);
+
+const workByTechnicianMap = new Map<string, { open: number; scheduled: number; waiting: number }>();
+for (const job of uniqueAllOpenOpsJobs) {
+  const jobId = String(job?.id ?? "");
+  if (!jobId) continue;
+
+  const assignments = activeAssignmentDisplayMap[jobId] ?? [];
+  if (!assignments.length) continue;
+
+  const isScheduled = String(job?.ops_status ?? "").toLowerCase() === "scheduled";
+  const waitingState = getActiveWaitingState({
+    ops_status: job?.ops_status ?? null,
+    pending_info_reason: job?.pending_info_reason ?? null,
+    on_hold_reason: job?.on_hold_reason ?? null,
+  });
+  const isWaiting = Boolean(waitingState?.status);
+
+  for (const assignment of assignments) {
+    const displayName = String(assignment?.display_name ?? "").trim();
+    if (!displayName) continue;
+
+    const existing = workByTechnicianMap.get(displayName) ?? { open: 0, scheduled: 0, waiting: 0 };
+    if (isWaiting) {
+      existing.waiting += 1;
+    } else if (isScheduled) {
+      existing.scheduled += 1;
+    } else {
+      existing.open += 1;
+    }
+    workByTechnicianMap.set(displayName, existing);
+  }
+}
+
+const workByTechnicianRows = Array.from(workByTechnicianMap.entries())
+  .map(([name, counts]) => ({
+    name,
+    ...counts,
+    total: counts.open + counts.scheduled + counts.waiting,
+  }))
+  .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+
 const activeFailedCount = (countRows ?? []).filter((row: any) => {
   const status = String((row as any)?.ops_status ?? "").toLowerCase();
   const jobId = String((row as any)?.id ?? "");
@@ -1645,20 +1723,22 @@ const signalCards = [
   {
     key: "new_contractor",
     bucket: "need_to_schedule",
-    label: "New Contractor Jobs",
+    label: isHvacServiceMode ? "New Submitted Jobs" : "New Contractor Jobs",
     count: contractorCreatedCount,
   },
   {
     key: "new_work_requests",
     bucket,
     label: "New Work Requests",
-    helper: "Unread contractor-submitted jobs or proposals that need review.",
+    helper: isHvacServiceMode
+      ? "Unread submitted jobs or proposals that need review."
+      : "Unread contractor-submitted jobs or proposals that need review.",
     count: newWorkRequestCount,
   },
   {
     key: "contractor_updates",
     bucket,
-    label: "Contractor Updates",
+    label: isHvacServiceMode ? "Collaboration Updates" : "Contractor Updates",
     count: contractorUpdatesCount,
   },
 ];
@@ -1668,6 +1748,7 @@ const visibleSignalCards = signalCards.filter(
 );
 const hasActiveSystemAlerts = visibleSignalCards.some((card) => card.count > 0);
 const showContractorFilter = (contractors ?? []).length > 0;
+const showContractorFilterInPrimary = showContractorFilter && !isHvacServiceMode;
 const showContractorSignalsSection = visibleSignalCards.length > 0 || Boolean(signal);
 
 const activeQueueLabel = OPS_TABS.find((t) => t.key === bucket)?.label ?? bucket;
@@ -2238,15 +2319,65 @@ return (
           <div className="font-medium text-slate-800">{OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}</div>
         </div>
       </div>
-      <div className={`grid grid-cols-1 gap-2.5 ${showContractorFilter ? "lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]" : "lg:grid-cols-1"}`}>
-        {showContractorFilter ? (
-          <ContractorFilter contractors={contractors ?? []} selectedId={contractor ?? ""} />
+      <div className={`grid grid-cols-1 gap-2.5 ${(showContractorFilterInPrimary || isHvacServiceMode) ? "lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" : "lg:grid-cols-1"}`}>
+        {showContractorFilterInPrimary ? (
+          <ContractorFilter contractors={contractors ?? []} selectedId={contractorScopeFilter ?? ""} />
+        ) : null}
+        {isHvacServiceMode ? (
+          <div className="rounded-xl border border-slate-200/80 bg-white/90 p-3">
+            <div className={`${opsUtilityLabelClass} text-slate-500`}>Mode-aware</div>
+            <div className="mt-0.5 text-[14px] font-semibold tracking-tight text-slate-950">Team Work Snapshot</div>
+            {teamSnapshotTotalCount === 0 ? (
+              <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                No active team work to summarize yet.
+              </div>
+            ) : (
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {teamSnapshotCards.map((card) => (
+                  <div key={card.key} className="rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{card.label}</div>
+                    <div className="mt-1 text-base font-semibold text-slate-900 tabular-nums">{card.count}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Work by Technician</div>
+              {workByTechnicianRows.length === 0 ? (
+                <div className="mt-1 text-xs text-slate-600">No assigned team work to summarize yet.</div>
+              ) : (
+                <div className="mt-1 space-y-1.5 text-xs text-slate-700">
+                  {workByTechnicianRows.slice(0, 6).map((row) => (
+                    <div key={row.name} className="flex items-center justify-between gap-3">
+                      <span className="truncate font-medium text-slate-800">{row.name}</span>
+                      <span className="shrink-0 text-slate-600">
+                        Open {row.open} / Scheduled {row.scheduled} / Waiting {row.waiting}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {contractor ? (
+              <div className="mt-2 text-[11px] text-slate-600">
+                Contractor filtering is de-emphasized in this mode.
+                <Link
+                  href={`/ops${buildQueryString({ bucket, q: q ?? "", sort, signal })}`}
+                  className="ml-1 font-semibold text-slate-700 underline-offset-2 hover:underline"
+                >
+                  Clear contractor filter
+                </Link>
+              </div>
+            ) : null}
+          </div>
         ) : null}
         <div className="grid gap-1">
           <label className={`${opsUtilityLabelClass} text-slate-500`}>Sort</label>
           <form action="/ops" method="get" className="flex flex-col gap-2 sm:flex-row">
             <input type="hidden" name="bucket" value={bucket} />
-            <input type="hidden" name="contractor" value={contractor ?? ""} />
+            <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
             <input type="hidden" name="q" value={q ?? ""} />
             <input type="hidden" name="signal" value={signal ?? ""} />
             <select
@@ -2276,7 +2407,7 @@ return (
         </div>
         <form action="/ops" method="get" className="flex flex-col gap-2 sm:flex-row">
           <input type="hidden" name="bucket" value={bucket} />
-          <input type="hidden" name="contractor" value={contractor ?? ""} />
+          <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
           <input type="hidden" name="sort" value={sort} />
           <input
             name="q"
@@ -2298,8 +2429,8 @@ return (
       <section id="system-alerts" className={`rounded-2xl border p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-3.5 ${hasActiveSystemAlerts || signal ? "border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))]" : "border-slate-300/75 bg-slate-50/75"}`}>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className={`${opsUtilityLabelClass} text-blue-700`}>Contractor-driven</div>
-              <div className="text-[15px] font-semibold tracking-tight text-slate-950">Contractor Signals</div>
+            <div className={`${opsUtilityLabelClass} text-blue-700`}>{isHvacServiceMode ? "Collaboration" : "Contractor-driven"}</div>
+              <div className="text-[15px] font-semibold tracking-tight text-slate-950">{isHvacServiceMode ? "Collaboration Signals" : "Contractor Signals"}</div>
             <div className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">
               Signals route to Notifications for acknowledgment. Action happens in the queues below.
             </div>
@@ -2312,7 +2443,7 @@ return (
           </Link>
         </div>
         {visibleSignalCards.length === 0 && !signal
-          ? quietSectionEmptyState("No active contractor-driven alerts right now.")
+          ? quietSectionEmptyState(isHvacServiceMode ? "No active collaboration alerts right now." : "No active contractor-driven alerts right now.")
           : (
             <div className="flex flex-wrap gap-1.5">
               {visibleSignalCards.map((card) => {
@@ -2323,7 +2454,7 @@ return (
                   ? "/ops/notifications?view=new_jobs&state=unread"
                   : `/ops${buildQueryString({
                       bucket: card.bucket,
-                      contractor: contractor ?? "",
+                      contractor: contractorScopeFilter ?? "",
                       q: q ?? "",
                       sort: sort ?? "",
                       signal: card.key,
@@ -2358,8 +2489,8 @@ return (
 
     <OperationalReportingSection
       reporting={operationalReporting}
-      scopeLabel={selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
-      contractorId={contractor}
+      scopeLabel={isHvacServiceMode ? "All team work" : selectedContractorName ? `Filtered: ${selectedContractorName}` : "All contractors"}
+      contractorId={contractorScopeFilter}
       sort={sort}
     />
 
@@ -2373,7 +2504,7 @@ return (
               <Link
                 href={`/ops${buildQueryString({
                   bucket,
-                  contractor: contractor ?? "",
+                  contractor: contractorScopeFilter ?? "",
                   q: q ?? "",
                   sort: sort ?? "",
                   signal: signal ?? "",
@@ -2385,7 +2516,7 @@ return (
               </Link>
             ) : null}
             <Link
-              href={`/ops/call-list${contractor ? `?contractor=${encodeURIComponent(contractor)}` : ""}`}
+              href={`/ops/call-list${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`}
               className={inlineSectionLinkClass}
             >
               Full page
@@ -2408,7 +2539,7 @@ return (
             <Link
               href={`/ops${buildQueryString({
                 bucket,
-                contractor: contractor ?? "",
+                contractor: contractorScopeFilter ?? "",
                 q: q ?? "",
                 sort: sort ?? "",
                 signal: signal ?? "",
@@ -2440,7 +2571,7 @@ return (
               <Link
                 href={`/ops${buildQueryString({
                   bucket: "closeout",
-                  contractor: contractor ?? "",
+                  contractor: contractorScopeFilter ?? "",
                   q: q ?? "",
                   sort: sort ?? "",
                   signal: signal ?? "",
@@ -2475,7 +2606,7 @@ return (
             <Link
               href={`/ops${buildQueryString({
                 bucket,
-                contractor: contractor ?? "",
+                contractor: contractorScopeFilter ?? "",
                 q: q ?? "",
                 sort: sort ?? "",
                 signal: signal ?? "",
@@ -2516,7 +2647,7 @@ return (
             <Link
               href={`/ops${buildQueryString({
                 bucket: "workflow_all",
-                contractor: contractor ?? "",
+                contractor: contractorScopeFilter ?? "",
                 q: q ?? "",
                 sort: sort ?? "",
                 signal: "",
@@ -2534,7 +2665,7 @@ return (
                   key={card.key}
                   href={`/ops${buildQueryString({
                     bucket: card.key,
-                    contractor: contractor ?? "",
+                    contractor: contractorScopeFilter ?? "",
                     q: q ?? "",
                     sort: sort ?? "",
                     signal: "",
