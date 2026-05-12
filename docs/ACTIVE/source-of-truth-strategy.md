@@ -83,6 +83,11 @@ Snapshot sync exists to support legacy reads and keep the Ops UI stable until no
      - `/jobs`
      - `/jobs/[id]`
 
+5) **Schedule-only update preservation rule (implemented)**
+   - Schedule updates submitted through `updateJobScheduleFromForm` must preserve existing permit fields when permit values are omitted from the schedule form payload.
+   - Omitted schedule-form submits must not clear `permit_number`, `jurisdiction`, or `permit_date`.
+   - This is a data-preservation rule for partial updates and does not alter lifecycle ownership, queue semantics, or scheduling source-of-truth boundaries.
+
 ---
 
 ## ECC-Specific Sync / Events (Operational Log Rules)

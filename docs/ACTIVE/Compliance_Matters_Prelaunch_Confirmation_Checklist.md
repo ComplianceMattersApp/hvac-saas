@@ -258,6 +258,49 @@ If any item here conflicts with the active spine, the spine wins.
 - Diagnostic coverage now includes major `/ops` phases under `OPS_TIMING_DEBUG`:
   - request actor context
   - primary queues
+
+### 2.3.6 Field bus improvement passes closeout (completed)
+
+- The following field-bus improvement passes are complete, committed, and pushed.
+- Scope of this closeout is documentation alignment only; no new runtime behavior is implied beyond already shipped code.
+
+- New Job Alert lifecycle cleanup:
+  - New job/new work awareness is no longer treated as active unread once work is scheduled/finalized/rejected/handled.
+  - Manual Read remains available.
+  - Contractor note/update notification scope remains unchanged.
+
+- Owner Console company-name fallback correction:
+  - customer account rows use tenant-safe company-name resolution.
+  - missing company names render a neutral setup placeholder instead of platform fallback branding.
+
+- Equipment fields and CHEERS/report visibility:
+  - furnace labels are clarified as:
+    - Heating Input (KBTU/h)
+    - Heating Output (BTU/h)
+    - Efficiency / AFUE %
+  - Heating Input helper text is clarified: Enter thousands of BTU/h, for example 66 for 66,000 BTU/h.
+  - report/equipment summary surfaces include saved equipment details.
+  - coil manufacturer/model/serial summary coverage was verified.
+  - no schema/storage/unit-conversion/test-type behavior changed.
+
+- Login screen signup options and copy polish:
+  - login links to HVAC Service signup and ECC / Compliance Testing signup.
+  - Hybrid public signup remains intentionally not exposed.
+  - invited-user access helper text is clarified for company-invited users.
+
+- `/jobs/new` Create New Customer shortcut:
+  - Create New Customer is reachable near the top of the flow.
+  - existing customer search/reuse and server-side intake behavior remain unchanged.
+
+- `/ops/call-list` full page:
+  - dedicated full Call List workspace is active.
+  - `/ops` remains command-center summary.
+  - premium polish pass accepted with restrained operations-software styling.
+
+- Schedule update permit-field preservation:
+  - schedule-only updates now preserve omitted permit fields server-side in `updateJobScheduleFromForm`.
+  - omitted schedule-form submits no longer clear `permit_number`, `jurisdiction`, or `permit_date`.
+  - no scheduling source-of-truth, lifecycle, notification, or queue semantics changes were made.
   - secondary signals
   - assignment display
   - notifications

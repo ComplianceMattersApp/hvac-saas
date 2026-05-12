@@ -21,6 +21,36 @@ Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No co
 
 Current Program Status Note (May 2026)
 
+- Field Bus Improvement Passes closeout is complete and pushed (May 2026):
+  - New Job Alert lifecycle cleanup:
+    - New job/new work alerts no longer act as active unread awareness once scheduled, finalized, rejected, or otherwise handled.
+    - Manual Read remains available.
+    - Contractor note/update notification scope was not changed.
+  - Owner Console company-name fallback correction:
+    - customer account rows now use tenant-safe company-name resolution.
+    - when company name is missing, a neutral setup placeholder is shown instead of a platform fallback label.
+  - Equipment fields and CHEERS/report visibility:
+    - furnace labels are clarified to: Heating Input (KBTU/h), Heating Output (BTU/h), Efficiency / AFUE %.
+    - Heating Input helper text is now: Enter thousands of BTU/h, for example 66 for 66,000 BTU/h.
+    - saved equipment summary visibility in report surfaces includes the relevant equipment details.
+    - coil manufacturer/model/serial summary coverage was verified.
+    - no schema/storage/unit-conversion/test-type behavior changed.
+  - Login screen signup options and copy polish:
+    - login now links to HVAC Service signup and ECC / Compliance Testing signup.
+    - Hybrid public signup remains intentionally not exposed.
+    - invited-user admin access helper text is clarified.
+  - `/jobs/new` Create New Customer shortcut:
+    - Create New Customer entry is now reachable near the top of the intake flow.
+    - existing customer search/reuse and server-side intake behavior remain unchanged.
+  - `/ops/call-list` full page and polish:
+    - dedicated full Call List page is active for larger scheduling queues.
+    - `/ops` remains the command-center summary surface.
+    - premium polish pass is accepted with restrained operations-software styling.
+  - Schedule update permit-field preservation:
+    - `updateJobScheduleFromForm` preserves omitted permit fields server-side on schedule-only updates.
+    - schedule updates no longer clear `permit_number`, `jurisdiction`, or `permit_date` when those fields are omitted from the submitted schedule form.
+    - no scheduling source-of-truth, lifecycle model, or queue semantics changes were introduced.
+
 - Estimate New Customer Assist V1 is complete for `/estimates/new`:
   - Internal users can add/reuse customer + service location inline from the estimate draft form and continue without leaving the flow.
   - The assist action resolves canonical customer/location ids and auto-selects them in-form before draft creation.

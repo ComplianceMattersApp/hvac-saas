@@ -28,6 +28,16 @@ This packet therefore recommends:
 - start with Support V0 plus controlled onboarding,
 - sequence post-launch roadmap in low-risk dependency order.
 
+Field bus closeout documentation note (May 2026):
+- Active documentation now records completed passes for:
+   - New Job Alert lifecycle cleanup
+   - Owner Console company-name fallback correction
+   - Equipment/CHEERS visibility and furnace label-helper clarity
+   - login signup surface/copy polish
+   - `/jobs/new` top-of-flow Create New Customer shortcut
+   - `/ops/call-list` dedicated full page and polish
+   - schedule update permit-field preservation in `updateJobScheduleFromForm`
+
 Execution companion note: for practical first-customer support posture and expansion-lane classification guardrails, see `docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md`.
 
 ---
