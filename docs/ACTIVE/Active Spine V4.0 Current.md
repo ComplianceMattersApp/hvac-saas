@@ -50,6 +50,37 @@ Current Program Status Note (May 2026)
     - `updateJobScheduleFromForm` preserves omitted permit fields server-side on schedule-only updates.
     - schedule updates no longer clear `permit_number`, `jurisdiction`, or `permit_date` when those fields are omitted from the submitted schedule form.
     - no scheduling source-of-truth, lifecycle model, or queue semantics changes were introduced.
+  - Calendar action responsiveness:
+    - Calendar Open Job action now has improved perceived responsiveness through a dedicated responsive/prefetching button.
+    - Schedule Save already shows immediate Saving feedback and remains server-confirmed.
+    - `scheduledAttentionWindowJobs` now uses the requested calendar anchor date instead of today.
+    - Permit preservation stayed intact.
+    - No calendar engine/source-of-truth rewrite.
+  - Contractor Report saved snapshot / resend workflow:
+    - Contractor report sent history reuses saved report content from `job_events` metadata.
+    - Saved report can be resent to another recipient without regenerating/retyping.
+    - Each send creates separate `contractor_report_sent` history entry.
+    - Failed sends do not create false sent history.
+    - No schema/PDF/notification-table/contractor authority changes.
+  - Contractor Report language + timeline polish:
+    - Timeline now shows recipient inline for `contractor_report_sent` entries when available. Example: "Contractor report sent to contractor@example.com".
+    - Contractor Report panel language cleaned up:
+      - Report history (was: Last sent report)
+      - Resend Report (was: Resend Saved Report)
+      - Generate Fresh Report (was: Generate Updated Report)
+      - Send Report (unified button label)
+    - User-facing wording no longer exposes internal snapshot/meta/payload concepts.
+  - Job detail technical chip cleanup:
+    - Removed implementation-style chips:
+      - DEFERRED (from Attachments section)
+      - NOTES LOAD BELOW (from Shared Notes and Internal Notes sections)
+      - RECENT ATTEMPTS LOADING (from Follow-Up History section)
+      - HISTORY LOADS BELOW (from Timeline section)
+    - Kept meaningful count/status chips:
+      - visit count (Service Chain section)
+      - equipment item count (Equipment section)
+      - ECC run count (ECC Summary section)
+    - Deferred loading behavior unchanged.
 
 - Estimate New Customer Assist V1 is complete for `/estimates/new`:
   - Internal users can add/reuse customer + service location inline from the estimate draft form and continue without leaving the flow.
