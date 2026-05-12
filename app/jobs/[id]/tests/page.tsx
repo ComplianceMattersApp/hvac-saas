@@ -20,11 +20,13 @@ import {
   saveDuctLeakageDataFromForm,
   saveAirflowDataFromForm,
   saveFanWattDrawDataFromForm,
+  saveAhriVerificationDataFromForm,
   saveAirFilterDeviceDataFromForm,
   saveRefrigerantChargeDataFromForm,
   saveAndCompleteDuctLeakageFromForm,
   saveAndCompleteAirflowFromForm,
   saveAndCompleteFanWattDrawFromForm,
+  saveAndCompleteAhriVerificationFromForm,
   saveAndCompleteAirFilterDeviceFromForm,
   saveAndCompleteRefrigerantChargeFromForm,
 } from "@/lib/actions/job-actions";
@@ -208,6 +210,16 @@ function fmtValue(value: unknown, unit?: string) {
 function fallbackText(value: unknown) {
   const rendered = String(value ?? "").trim();
   return rendered || "—";
+}
+
+function ahriStatusLabel(value: unknown) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "verified_listed") return "Verified / Listed";
+  if (normalized === "not_found") return "Not Found";
+  if (normalized === "needs_model_correction") return "Needs Model Correction";
+  if (normalized === "not_applicable") return "Not Applicable";
+  if (normalized === "not_started") return "Not Started";
+  return "Not Started";
 }
 
 function firstNonBlank(...values: unknown[]) {
@@ -735,6 +747,7 @@ export default async function JobTestsPage({
   const runDL = selectedSystemId ? pickRunForSystem(job, "duct_leakage", selectedSystemId) : null;
   const runAF = selectedSystemId ? pickRunForSystem(job, "airflow", selectedSystemId) : null;
   const runFan = selectedSystemId ? pickRunForSystem(job, "fan_watt_draw", selectedSystemId) : null;
+  const runAhri = selectedSystemId ? pickRunForSystem(job, "ahri_verification", selectedSystemId) : null;
   const runFilter = selectedSystemId ? pickRunForSystem(job, "air_filter_device", selectedSystemId) : null;
   const runRC = selectedSystemId ? pickRunForSystem(job, "refrigerant_charge", selectedSystemId) : null;
   const ductSaveFormId = runDL ? `duct-save-${runDL.id}` : "";
@@ -742,6 +755,8 @@ export default async function JobTestsPage({
   const airflowSaveFormId = runAF ? `airflow-save-${runAF.id}` : "";
   const fanSaveFormId = runFan ? `fan-save-${runFan.id}` : "";
   const fanDeleteFormId = runFan ? `fan-delete-${runFan.id}` : "";
+  const ahriSaveFormId = runAhri ? `ahri-save-${runAhri.id}` : "";
+  const ahriDeleteFormId = runAhri ? `ahri-delete-${runAhri.id}` : "";
   const filterSaveFormId = runFilter ? `filter-save-${runFilter.id}` : "";
   const filterDeleteFormId = runFilter ? `filter-delete-${runFilter.id}` : "";
   const rcSaveFormId = runRC ? `rc-save-${runRC.id}` : "";
@@ -825,12 +840,16 @@ export default async function JobTestsPage({
     new Set([...(requiredTests as string[]), ...applicableSystemRunTestTypes, ...carriedForwardPassedTypes])
   ) as EccTestType[];
 
+  const officeVerificationTypes = visibleTestTypes.filter((testType) => testType === "ahri_verification");
+  const visibleFieldTestTypes = visibleTestTypes.filter((testType) => testType !== "ahri_verification");
+
   const focusedCustomTestType =
     focusedType &&
     focusedType !== "custom" &&
     focusedType !== "duct_leakage" &&
     focusedType !== "airflow" &&
     focusedType !== "fan_watt_draw" &&
+    focusedType !== "ahri_verification" &&
     focusedType !== "air_filter_device" &&
     focusedType !== "refrigerant_charge"
       ? (focusedType as EccTestType)
@@ -931,6 +950,46 @@ const defaultHeatingOutputBtu =
 const defaultFanActualAirflowCfm =
   runFan?.data?.actual_tested_airflow_cfm ?? runAF?.data?.measured_total_cfm ?? "";
 
+const outdoorModelForAhri =
+  selectedSystemEquipment.find((eq: any) => isOutdoorEquipment(eq))?.model ?? "";
+
+const indoorCoilModelForAhri =
+  selectedSystemEquipment.find((eq: any) => {
+    const role = String(eq?.equipment_role ?? "").toLowerCase();
+    const componentType = String(eq?.component_type ?? "").toLowerCase();
+    return role.includes("indoor_unit") || componentType.includes("coil");
+  })?.model ?? "";
+
+const furnaceOrAirHandlerModelForAhri =
+  selectedSystemEquipment.find((eq: any) => {
+    const role = String(eq?.equipment_role ?? "").toLowerCase();
+    return role.includes("furnace") || role.includes("air_handler");
+  })?.model ?? "";
+
+const miniSplitOutdoorModelForAhri =
+  selectedSystemEquipment.find((eq: any) => {
+    const role = String(eq?.equipment_role ?? "").toLowerCase();
+    const componentType = String(eq?.component_type ?? "").toLowerCase();
+    return role.includes("mini_split_outdoor") || componentType.includes("mini_split_outdoor");
+  })?.model ?? "";
+
+const miniSplitHeadModelForAhri =
+  selectedSystemEquipment.find((eq: any) => {
+    const role = String(eq?.equipment_role ?? "").toLowerCase();
+    const componentType = String(eq?.component_type ?? "").toLowerCase();
+    return role.includes("mini_split_head") || componentType.includes("mini_split_head");
+  })?.model ?? "";
+
+const ahriModelReadinessRows = [
+  { label: "Outdoor model", value: String(outdoorModelForAhri || "").trim() },
+  { label: "Indoor coil model", value: String(indoorCoilModelForAhri || "").trim() },
+  { label: "Furnace / air handler model", value: String(furnaceOrAirHandlerModelForAhri || "").trim() },
+  { label: "Mini-split outdoor model", value: String(miniSplitOutdoorModelForAhri || "").trim() },
+  { label: "Mini-split indoor head model", value: String(miniSplitHeadModelForAhri || "").trim() },
+];
+
+const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
+
   const carriedForwardDL = !runDL && carriedForwardPassedTypes.includes("duct_leakage");
   const carriedForwardAF = !runAF && carriedForwardPassedTypes.includes("airflow");
   const carriedForwardRC = !runRC && carriedForwardPassedTypes.includes("refrigerant_charge");
@@ -996,6 +1055,7 @@ const defaultFanActualAirflowCfm =
 
     const runAirflow = systemIsHeatOnly || systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "airflow", systemId);
     const runFan = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "fan_watt_draw", systemId);
+    const runAhri = pickLatestRunForSystem(job, "ahri_verification", systemId);
     const runFilter = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "air_filter_device", systemId);
     const runDuct = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "duct_leakage", systemId);
     const runRefrigerant = systemIsHeatOnly ? null : pickLatestRunForSystem(job, "refrigerant_charge", systemId);
@@ -1022,6 +1082,7 @@ const defaultFanActualAirflowCfm =
       systemName: String(sys.name ?? "System").trim() || "System",
       runAirflow,
       runFan,
+      runAhri,
       runFilter,
       runDuct,
       runRefrigerant,
@@ -1230,6 +1291,26 @@ const defaultFanActualAirflowCfm =
                       ) : (
                         <div className="mt-1 text-slate-900">Equipment not located</div>
                       )}
+                    </div>
+
+                    <div>
+                      <span className="font-semibold text-slate-950">AHRI Matched System Verification (Office):</span>
+                      <div className="mt-1 space-y-1 text-slate-800">
+                        {!sys.runAhri ? (
+                          <div>No AHRI office verification run found for this system.</div>
+                        ) : (
+                          <>
+                            <div>Status: {ahriStatusLabel(sys.runAhri?.data?.ahri_status)}</div>
+                            <div>
+                              AHRI Certificate / Reference Number: {fallbackText(sys.runAhri?.data?.ahri_certificate_number)}
+                            </div>
+                            <div>Verified Date: {fallbackText(sys.runAhri?.data?.verified_at)}</div>
+                            <div>Verified By: {fallbackText(sys.runAhri?.data?.verified_by_name)}</div>
+                            <div>Matched Equipment: {fallbackText(sys.runAhri?.data?.matched_equipment_summary)}</div>
+                            <div>Notes: {fallbackText(sys.runAhri?.data?.verification_notes)}</div>
+                          </>
+                        )}
+                      </div>
                     </div>
 
                     <div>
@@ -1502,7 +1583,7 @@ const defaultFanActualAirflowCfm =
               </div>
             </div>
 
-            {visibleTestTypes.length === 0 ? (
+            {visibleFieldTestTypes.length === 0 ? (
               <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 {isPlanDrivenNewConstruction
                   ? "New Construction is currently plan-driven/custom. No default required tests are preloaded yet. Use Add Test to build the custom set."
@@ -1523,7 +1604,7 @@ const defaultFanActualAirflowCfm =
               </div>
             ) : (
               <div className="grid gap-2">
-                {visibleTestTypes.map((testType: EccTestType) => {
+                {visibleFieldTestTypes.map((testType: EccTestType) => {
   const status = getRequiredTestStatusForSystem(job, selectedSystemId, testType);
   const parentRun = pickParentRunForSelectedSystem(testType);
   const parentOutcome = getEffectiveResultState(parentRun);
@@ -1610,6 +1691,72 @@ const defaultFanActualAirflowCfm =
 })}
               </div>
             )}
+
+            <div className="rounded-lg border border-sky-200 bg-sky-50/70 p-3 space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">Office Verifications</div>
+                  <div className="text-sm font-semibold text-slate-900">AHRI Matched System Verification</div>
+                </div>
+                <span className="rounded-full border border-sky-300 bg-white px-2 py-1 text-[11px] font-medium text-sky-700">
+                  Office verification
+                </span>
+              </div>
+
+              <div className="text-xs text-slate-700 space-y-1">
+                <div>Use the captured equipment model numbers to confirm the installed combination is AHRI listed.</div>
+                <div>Enter the AHRI certificate/reference number used for CHEERS.</div>
+                <div>This is an office verification, not a field-measured test.</div>
+              </div>
+
+              <div className="rounded-md border border-sky-200 bg-white px-3 py-2 text-xs text-slate-700">
+                <div className="font-semibold text-slate-900">Equipment model readiness</div>
+                <div className="mt-1 grid gap-1">
+                  {ahriModelReadinessRows.map((row) => (
+                    <div key={row.label}>
+                      {row.label}: <span className={row.value ? "text-slate-900" : "text-amber-700"}>{row.value || "Missing"}</span>
+                    </div>
+                  ))}
+                </div>
+                {ahriMissingModelRows.length > 0 ? (
+                  <div className="mt-2 text-amber-700">
+                    Missing model information may prevent AHRI verification.
+                  </div>
+                ) : (
+                  <div className="mt-2 text-emerald-700">All tracked model fields are captured.</div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2 items-center">
+                {!runAhri ? (
+                  <form action={addEccTestRunFromForm}>
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="system_id" value={selectedSystemId} />
+                    <input type="hidden" name="test_type" value="ahri_verification" />
+                    <SubmitButton loadingText="Creating..." className="inline-flex min-h-9 items-center rounded-md bg-slate-900 px-3 py-2 text-xs text-white hover:bg-slate-800">
+                      Start AHRI Office Verification
+                    </SubmitButton>
+                  </form>
+                ) : (
+                  <Link
+                    href={`/jobs/${job.id}/tests?s=${selectedSystemId}&t=ahri_verification`}
+                    className="inline-flex min-h-9 items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-50"
+                  >
+                    Open AHRI Workspace
+                  </Link>
+                )}
+
+                <span className="text-xs text-slate-600">
+                  Status: {runAhri ? ahriStatusLabel(runAhri.data?.ahri_status) : "Not started"}
+                </span>
+              </div>
+
+              {officeVerificationTypes.length === 0 ? null : (
+                <div className="text-xs text-slate-600">
+                  Additional office verification runs are tracked separately from field-measured tests.
+                </div>
+              )}
+            </div>
 
             {isRetestChild && parentFailedComparisonRows.length > 0 ? (
               <div className="rounded-md border border-red-200 bg-red-50 px-3 py-3 space-y-2">
@@ -2593,6 +2740,241 @@ const defaultFanActualAirflowCfm =
                 <form id={filterDeleteFormId} action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runFilter.id} />
+                </form>
+              </>
+            )}
+          </div>
+        ) : null}
+
+        {/* =========================
+            AHRI MATCHED SYSTEM VERIFICATION (OFFICE)
+            ========================= */}
+        {focusedType === "ahri_verification" ? (
+          <div className="min-w-0 rounded-lg border border-sky-200 bg-sky-50/60 p-4 space-y-4">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="font-medium text-slate-900">AHRI Matched System Verification</div>
+                <div className="mt-1 text-sm text-slate-700">Office verification workflow for AHRI listed matched equipment combination.</div>
+                <div className="mt-1 text-sm">
+                  <span className="font-medium">Status:</span>{" "}
+                  {runAhri ? ahriStatusLabel(runAhri.data?.ahri_status) : "Not started"}
+                </div>
+              </div>
+              <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
+                {runAhri?.updated_at ? new Date(runAhri.updated_at).toLocaleString() : null}
+              </div>
+            </div>
+
+            <div className="rounded-md border border-sky-200 bg-white px-3 py-2 text-xs text-slate-700 space-y-1">
+              <div>Use the captured equipment model numbers to confirm the installed combination is AHRI listed.</div>
+              <div>Enter the AHRI certificate/reference number used for CHEERS.</div>
+              <div>This is an office verification, not a field-measured test.</div>
+            </div>
+
+            {!runAhri ? (
+              <form action={addEccTestRunFromForm} className="flex items-center gap-2">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="system_id" value={selectedSystemId} />
+                <input type="hidden" name="test_type" value="ahri_verification" />
+                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                  Create AHRI Verification Run
+                </SubmitButton>
+              </form>
+            ) : (
+              <>
+                <div className="text-sm font-semibold text-slate-900">Office Verification Inputs</div>
+                <form id={ahriSaveFormId} action={saveAhriVerificationDataFromForm} className="grid gap-3 border-t pt-3">
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runAhri.id} />
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`ahri-status-${runAhri.id}`}>
+                        AHRI Verification Status
+                      </label>
+                      <select
+                        id={`ahri-status-${runAhri.id}`}
+                        name="ahri_status"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runAhri.data?.ahri_status ?? "not_started"}
+                      >
+                        <option value="not_started">Not Started</option>
+                        <option value="verified_listed">Verified / Listed</option>
+                        <option value="not_found">Not Found</option>
+                        <option value="needs_model_correction">Needs Model Correction</option>
+                        <option value="not_applicable">Not Applicable</option>
+                      </select>
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`ahri-cert-${runAhri.id}`}>
+                        AHRI Certificate / Reference Number
+                      </label>
+                      <input
+                        id={`ahri-cert-${runAhri.id}`}
+                        name="ahri_certificate_number"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runAhri.data?.ahri_certificate_number ?? ""}
+                        placeholder="Required when status is Verified / Listed"
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`ahri-verified-by-${runAhri.id}`}>
+                        Verified By
+                      </label>
+                      <input
+                        id={`ahri-verified-by-${runAhri.id}`}
+                        name="verified_by_name"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runAhri.data?.verified_by_name ?? ""}
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`ahri-verified-at-${runAhri.id}`}>
+                        Verified Date
+                      </label>
+                      <input
+                        id={`ahri-verified-at-${runAhri.id}`}
+                        name="verified_at"
+                        type="date"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runAhri.data?.verified_at ?? ""}
+                      />
+                    </div>
+
+                    <div className="grid gap-1 sm:col-span-2">
+                      <label className="text-sm font-medium" htmlFor={`ahri-summary-${runAhri.id}`}>
+                        Matched Equipment Summary
+                      </label>
+                      <input
+                        id={`ahri-summary-${runAhri.id}`}
+                        name="matched_equipment_summary"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runAhri.data?.matched_equipment_summary ?? ""}
+                        placeholder="Outdoor + Indoor + Furnace/Air Handler combination summary"
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`ahri-outdoor-${runAhri.id}`}>
+                        Outdoor Model
+                      </label>
+                      <input
+                        id={`ahri-outdoor-${runAhri.id}`}
+                        name="outdoor_model"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runAhri.data?.outdoor_model ?? outdoorModelForAhri}
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`ahri-indoor-coil-${runAhri.id}`}>
+                        Indoor Coil Model
+                      </label>
+                      <input
+                        id={`ahri-indoor-coil-${runAhri.id}`}
+                        name="indoor_coil_model"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runAhri.data?.indoor_coil_model ?? indoorCoilModelForAhri}
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`ahri-furnace-airhandler-${runAhri.id}`}>
+                        Furnace / Air Handler Model
+                      </label>
+                      <input
+                        id={`ahri-furnace-airhandler-${runAhri.id}`}
+                        name="furnace_or_air_handler_model"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runAhri.data?.furnace_or_air_handler_model ?? furnaceOrAirHandlerModelForAhri}
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`ahri-mini-outdoor-${runAhri.id}`}>
+                        Mini-Split Outdoor Model
+                      </label>
+                      <input
+                        id={`ahri-mini-outdoor-${runAhri.id}`}
+                        name="mini_split_outdoor_model"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runAhri.data?.mini_split_outdoor_model ?? miniSplitOutdoorModelForAhri}
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`ahri-mini-head-${runAhri.id}`}>
+                        Mini-Split Indoor Head Model
+                      </label>
+                      <input
+                        id={`ahri-mini-head-${runAhri.id}`}
+                        name="mini_split_head_model"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runAhri.data?.mini_split_head_model ?? miniSplitHeadModelForAhri}
+                      />
+                    </div>
+
+                    <div className="grid gap-1 sm:col-span-2">
+                      <label className="text-sm font-medium" htmlFor={`ahri-notes-${runAhri.id}`}>
+                        Verification Notes
+                      </label>
+                      <textarea
+                        id={`ahri-notes-${runAhri.id}`}
+                        name="verification_notes"
+                        rows={3}
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runAhri.data?.verification_notes ?? ""}
+                      />
+                    </div>
+                  </div>
+                </form>
+
+                <div className="text-sm font-semibold text-slate-900">Office Summary</div>
+                <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                  <div>Status: {ahriStatusLabel(runAhri.data?.ahri_status)}</div>
+                  <div>AHRI Certificate / Reference Number: {fallbackText(runAhri.data?.ahri_certificate_number)}</div>
+                  <div>Verified By: {fallbackText(runAhri.data?.verified_by_name)}</div>
+                  <div>Verified Date: {fallbackText(runAhri.data?.verified_at)}</div>
+                  <div>Missing Model Fields: {Array.isArray(runAhri.computed?.missing_equipment_model_fields) && runAhri.computed?.missing_equipment_model_fields.length > 0 ? runAhri.computed.missing_equipment_model_fields.join(", ") : "None"}</div>
+                  <div>Compliance Statement: {fallbackText(runAhri.computed?.compliance_statement)}</div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                  <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
+                    {runAhri.is_completed && "✅ Verification completed"}
+                  </span>
+                  <SubmitButton
+                    form={ahriSaveFormId}
+                    formNoValidate
+                    loadingText="Saving..."
+                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                  >
+                    Save Draft
+                  </SubmitButton>
+                  <SubmitButton
+                    form={ahriSaveFormId}
+                    loadingText="Saving & completing..."
+                    formAction={saveAndCompleteAhriVerificationFromForm}
+                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  >
+                    Complete Verification
+                  </SubmitButton>
+                  <button
+                    type="submit"
+                    form={ahriDeleteFormId}
+                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+
+                <form id={ahriDeleteFormId} action={deleteEccTestRunFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runAhri.id} />
                 </form>
               </>
             )}

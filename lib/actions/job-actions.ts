@@ -54,6 +54,10 @@ import {
   buildFanWattDrawPayload,
   ensureFanWattDrawCompletionFields,
 } from "@/lib/ecc/fan-watt-draw";
+import {
+  buildAhriVerificationPayload,
+  ensureAhriVerificationCompletionFields,
+} from "@/lib/ecc/ahri-verification";
 import type { JobStatus } from "@/lib/types/job";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { mapToCanonicalRole, sanitizeEquipmentFields } from "@/lib/utils/equipment-domain";
@@ -5150,6 +5154,97 @@ export async function saveAndCompleteFanWattDrawFromForm(formData: FormData) {
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
   redirectToTests({ jobId, testType: "fan_watt_draw", systemId });
+}
+
+export async function saveAhriVerificationDataFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  const payload = buildAhriVerificationPayload(formData);
+
+  const supabase = await createClient();
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
+
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data: payload.data,
+      computed: payload.computed,
+      computed_pass: payload.computedPass,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  await evaluateEccOpsStatus(jobId);
+  revalidateEccProjectionConsumers(jobId);
+  redirectToTests({ jobId, testType: "ahri_verification", systemId });
+}
+
+export async function saveAndCompleteAhriVerificationFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  ensureAhriVerificationCompletionFields(formData);
+
+  const payload = buildAhriVerificationPayload(formData);
+
+  const supabase = await createClient();
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
+
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data: payload.data,
+      computed: payload.computed,
+      computed_pass: payload.computedPass,
+      override_pass: null,
+      override_reason: null,
+      updated_at: new Date().toISOString(),
+      is_completed: true,
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  await evaluateEccOpsStatus(jobId);
+  revalidateEccProjectionConsumers(jobId);
+  redirectToTests({ jobId, testType: "ahri_verification", systemId });
 }
 
 function parseOverrideSelectionFromForm(formData: FormData) {
