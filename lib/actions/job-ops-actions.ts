@@ -182,6 +182,16 @@ export type ContractorReportPreview = {
   contractor_failure_summary_v1: ContractorFailureSummaryV1;
 };
 
+export type ContractorSavedReportSnapshot = {
+  event_id: string;
+  sent_at_iso: string | null;
+  recipient_email: string | null;
+  default_recipient_email: string | null;
+  report_render_version: string | null;
+  body_text: string;
+  contractor_note: string | null;
+};
+
 type ContractorReportResolved = ContractorReportPreview & {
   report_kind: ContractorReportKind;
   ops_status: string;
@@ -648,6 +658,82 @@ function sanitizeContractorNote(raw: unknown) {
   return sanitized.slice(0, 4000);
 }
 
+function snapshotMetaFromEventMeta(rawMeta: unknown): Record<string, unknown> | null {
+  if (!rawMeta || typeof rawMeta !== "object" || Array.isArray(rawMeta)) return null;
+  return rawMeta as Record<string, unknown>;
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  const normalized = String(value ?? "").trim();
+  return normalized ? normalized : null;
+}
+
+async function findSavedContractorReportEvent(params: {
+  supabase: any;
+  jobId: string;
+  eventId?: string | null;
+}) {
+  const { supabase, jobId, eventId } = params;
+  const explicitEventId = normalizeOptionalString(eventId);
+
+  let query = supabase
+    .from("job_events")
+    .select("id, created_at, meta")
+    .eq("job_id", jobId)
+    .eq("event_type", "contractor_report_sent");
+
+  if (explicitEventId) {
+    query = query.eq("id", explicitEventId);
+  } else {
+    query = query.order("created_at", { ascending: false }).limit(1);
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data?.id) return null;
+
+  const meta = snapshotMetaFromEventMeta((data as any).meta);
+  if (!meta) return null;
+
+  const bodyText = normalizeOptionalString(meta.body_text);
+  if (!bodyText) return null;
+
+  return {
+    eventId: String((data as any).id),
+    createdAt: normalizeOptionalString((data as any).created_at),
+    meta,
+  };
+}
+
+export async function getLatestSavedContractorReportSnapshot(input: {
+  jobId: string;
+}): Promise<ContractorSavedReportSnapshot | null> {
+  const supabase = await createClient();
+  const jobId = String(input.jobId ?? "").trim();
+  if (!jobId) throw new Error("Missing jobId");
+
+  await requireInternalScopedJobUserOrThrow(supabase, jobId);
+
+  const savedEvent = await findSavedContractorReportEvent({
+    supabase,
+    jobId,
+  });
+
+  if (!savedEvent) return null;
+
+  return {
+    event_id: savedEvent.eventId,
+    sent_at_iso:
+      normalizeOptionalString(savedEvent.meta.sent_at_iso) ??
+      savedEvent.createdAt,
+    recipient_email: normalizeOptionalString(savedEvent.meta.recipient_email),
+    default_recipient_email: normalizeOptionalString(savedEvent.meta.default_recipient_email),
+    report_render_version: normalizeOptionalString(savedEvent.meta.report_render_version),
+    body_text: String(savedEvent.meta.body_text ?? "").trim(),
+    contractor_note: normalizeOptionalString(savedEvent.meta.contractor_note),
+  };
+}
+
 export async function generateContractorReportPreview(input: {
   jobId: string;
 }): Promise<ContractorReportPreview> {
@@ -685,6 +771,7 @@ export async function sendContractorReport(input: {
   recipientEmail?: string | null;
   contractorSummary?: string | null;
   contractorNote?: string | null;
+  savedReportEventId?: string | null;
 }): Promise<{ ok: true; alreadySent?: boolean }> {
   const supabase = await createClient();
   const jobId = String(input.jobId ?? "").trim();
@@ -698,7 +785,10 @@ export async function sendContractorReport(input: {
     accountOwnerUserId: authz.internalUser.account_owner_user_id,
   });
 
-  const report = await resolveContractorReportForJob({ supabase, jobId });
+  const savedReportEventId = normalizeOptionalString(input.savedReportEventId);
+  const report = savedReportEventId
+    ? null
+    : await resolveContractorReportForJob({ supabase, jobId });
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
@@ -713,11 +803,28 @@ export async function sendContractorReport(input: {
     throw new Error("Cannot send contractor report: no contractor is assigned to this job.");
   }
 
-  const contractorSummary = sanitizeContractorSummary(input.contractorSummary);
-  const contractorNote = sanitizeContractorNote(input.contractorNote);
   const defaultRecipientEmail = String((job as any)?.contractors?.email ?? "").trim().toLowerCase();
   const submittedRecipientEmail = String(input.recipientEmail ?? "").trim().toLowerCase();
-  const recipientEmail = submittedRecipientEmail || defaultRecipientEmail;
+  const savedReportEvent = savedReportEventId
+    ? await findSavedContractorReportEvent({
+        supabase,
+        jobId,
+        eventId: savedReportEventId,
+      })
+    : null;
+
+  if (savedReportEventId && !savedReportEvent) {
+    throw new Error("Saved contractor report not found.");
+  }
+
+  const savedMeta = savedReportEvent?.meta ?? null;
+  const snapshotDefaultRecipient = savedMeta
+    ? normalizeOptionalString(savedMeta.default_recipient_email) ??
+      normalizeOptionalString(savedMeta.recipient_email)
+    : null;
+
+  const recipientEmail =
+    submittedRecipientEmail || snapshotDefaultRecipient || defaultRecipientEmail;
 
   if (!recipientEmail) {
     throw new Error("Cannot send contractor report email: recipient email is required.");
@@ -731,60 +838,63 @@ export async function sendContractorReport(input: {
   const recipientOverridden =
     submittedRecipientEmail.length > 0 && submittedRecipientEmail !== defaultRecipientEmail;
 
-  const sentAtIso = new Date().toISOString();
-  const contractorFailureSummary = buildContractorFailureSummaryV1({
-    reportKind: report.report_kind,
-    reasons: report.reasons,
-    nextStep: report.next_step,
-    contractorSummary,
-  });
+  const contractorSummary = sanitizeContractorSummary(input.contractorSummary);
+  const contractorNote = savedMeta
+    ? normalizeOptionalString(savedMeta.contractor_note)
+    : sanitizeContractorNote(input.contractorNote);
 
-  const bodyText = buildReportBody({
-    title: report.title,
-    locationText: report.location_text,
-    reasons: report.reasons,
-    failureDetails: report.failure_details,
-    nextStep: report.next_step,
-    contractorSummary: contractorFailureSummary.contractor_safe_summary,
-    contractorNote,
-  });
-
-  const { data: insertedEvent, error: eventErr } = await supabase
-    .from("job_events")
-    .insert({
-      job_id: jobId,
-      event_type: "contractor_report_sent",
-      message: "Contractor report sent",
-      meta: {
-        report_kind: report.report_kind,
-        report_version: 1,
-        report_render_version: "contractor_failure_report_v2",
-        sent_at_iso: sentAtIso,
-        generated_from: {
-          ops_status: report.ops_status,
-        },
-        customer_name: report.customer_name,
-        location_text: report.location_text,
-        contractor_name: report.contractor_name,
-        recipient_email: recipientEmail,
-        default_recipient_email: defaultRecipientEmail || null,
-        recipient_overridden: recipientOverridden,
-        service_date_text: report.service_date_text,
+  const generatedContractorFailureSummary = report
+    ? buildContractorFailureSummaryV1({
+        reportKind: report.report_kind,
         reasons: report.reasons,
-        failure_details: report.failure_details,
-        contractor_failure_summary_v1: contractorFailureSummary,
-        contractor_note: contractorNote,
-        next_step: report.next_step,
-        body_text: bodyText,
-      },
-      user_id: user.id,
-    })
-    .select("id")
-    .single();
+        nextStep: report.next_step,
+        contractorSummary,
+      })
+    : null;
 
-  if (eventErr) throw new Error(eventErr.message);
-  const eventId = String(insertedEvent?.id ?? "").trim();
-  if (!eventId) throw new Error("Failed to capture contractor_report_sent event id");
+  const contractorFailureSummary = savedMeta
+    ? (savedMeta.contractor_failure_summary_v1 as ContractorFailureSummaryV1 | undefined) ?? null
+    : generatedContractorFailureSummary;
+
+  const bodyText = savedMeta
+    ? String(savedMeta.body_text ?? "").trim()
+    : buildReportBody({
+        title: String(report?.title ?? "ECC TEST REPORT"),
+        locationText: String(report?.location_text ?? "Location not available"),
+        reasons: report?.reasons ?? [],
+        failureDetails: report?.failure_details ?? [],
+        nextStep: String(report?.next_step ?? "Review and submit your response in the portal."),
+        contractorSummary: contractorFailureSummary?.contractor_safe_summary ?? null,
+        contractorNote,
+      });
+
+  if (!bodyText) {
+    throw new Error("Saved contractor report is missing body content.");
+  }
+
+  const fallbackCustomerName = String(report?.customer_name ?? "Customer").trim() || "Customer";
+  const fallbackLocationText = String(report?.location_text ?? "Location not available").trim() || "Location not available";
+  const fallbackServiceDateText =
+    String(report?.service_date_text ?? "Service/Test date not available").trim() ||
+    "Service/Test date not available";
+  const fallbackContractorName = String(report?.contractor_name ?? "").trim() || null;
+  const fallbackTitle = String(report?.title ?? "ECC TEST REPORT").trim() || "ECC TEST REPORT";
+
+  const resolvedCustomerName = normalizeOptionalString(savedMeta?.customer_name) ?? fallbackCustomerName;
+  const resolvedLocationText = normalizeOptionalString(savedMeta?.location_text) ?? fallbackLocationText;
+  const resolvedServiceDateText = normalizeOptionalString(savedMeta?.service_date_text) ?? fallbackServiceDateText;
+  const resolvedContractorName = normalizeOptionalString(savedMeta?.contractor_name) ?? fallbackContractorName;
+  const resolvedTitle = normalizeOptionalString(savedMeta?.title) ?? fallbackTitle;
+  const resolvedReasons = Array.isArray(savedMeta?.reasons)
+    ? (savedMeta?.reasons as unknown[]).map((reason) => String(reason ?? "").trim()).filter(Boolean)
+    : (report?.reasons ?? []);
+  const resolvedFailureDetails = Array.isArray(savedMeta?.failure_details)
+    ? (savedMeta?.failure_details as ContractorFailureDetail[])
+    : (report?.failure_details ?? []);
+  const fallbackNextStep =
+    String(report?.next_step ?? "Review and submit your response in the portal.").trim() ||
+    "Review and submit your response in the portal.";
+  const resolvedNextStep = normalizeOptionalString(savedMeta?.next_step) ?? fallbackNextStep;
 
   const accountOwnerUserId = String((job as any)?.contractors?.owner_user_id ?? "").trim();
   const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
@@ -794,23 +904,23 @@ export async function sendContractorReport(input: {
   const supportDisplayName = internalBusinessIdentity.display_name;
   const supportPhone = internalBusinessIdentity.support_phone;
   const supportEmail = internalBusinessIdentity.support_email;
-  const customerName = String(report.customer_name ?? "").trim() || "Customer";
-  const jobAddress = String(report.location_text ?? "").trim() || "Location not available";
+  const customerName = resolvedCustomerName;
+  const jobAddress = resolvedLocationText;
   const subjectContext = jobAddress !== "Location not available" ? jobAddress : customerName;
-  const subject = `Action Requested: ECC Test Report for ${subjectContext}`;
+  const subject = normalizeOptionalString(savedMeta?.email_subject) ?? `Action Requested: ECC Test Report for ${subjectContext}`;
 
   const appUrl = resolveAppUrl();
   const portalJobUrl = appUrl ? `${appUrl}/portal/jobs/${jobId}` : null;
   const emailHtml = buildContractorReportEmailHtml({
-    title: report.title,
-    customerName: report.customer_name,
-    locationText: report.location_text,
-    serviceDateText: report.service_date_text,
-    contractorName: report.contractor_name,
-    reasons: report.reasons,
-    failureDetails: report.failure_details,
-    nextStep: report.next_step,
-    contractorSummary: contractorFailureSummary.contractor_safe_summary,
+    title: resolvedTitle,
+    customerName: resolvedCustomerName,
+    locationText: resolvedLocationText,
+    serviceDateText: resolvedServiceDateText,
+    contractorName: resolvedContractorName,
+    reasons: resolvedReasons,
+    failureDetails: resolvedFailureDetails,
+    nextStep: resolvedNextStep,
+    contractorSummary: contractorFailureSummary?.contractor_safe_summary,
     contractorNote,
     portalJobUrl,
     supportDisplayName,
@@ -818,15 +928,15 @@ export async function sendContractorReport(input: {
     supportEmail,
   });
   const emailText = buildContractorReportEmailText({
-    title: report.title,
-    customerName: report.customer_name,
-    locationText: report.location_text,
-    serviceDateText: report.service_date_text,
-    contractorName: report.contractor_name,
-    reasons: report.reasons,
-    failureDetails: report.failure_details,
-    nextStep: report.next_step,
-    contractorSummary: contractorFailureSummary.contractor_safe_summary,
+    title: resolvedTitle,
+    customerName: resolvedCustomerName,
+    locationText: resolvedLocationText,
+    serviceDateText: resolvedServiceDateText,
+    contractorName: resolvedContractorName,
+    reasons: resolvedReasons,
+    failureDetails: resolvedFailureDetails,
+    nextStep: resolvedNextStep,
+    contractorSummary: contractorFailureSummary?.contractor_safe_summary,
     contractorNote,
     portalJobUrl,
     supportDisplayName,
@@ -845,6 +955,51 @@ export async function sendContractorReport(input: {
     const errMessage = error instanceof Error ? error.message : "Unknown transport error";
     throw new Error(`Failed to send contractor report email: ${errMessage}`);
   }
+
+  const sentAtIso = new Date().toISOString();
+  const eventMeta: Record<string, unknown> = {
+    report_kind: normalizeOptionalString(savedMeta?.report_kind) ?? report?.report_kind ?? "failed",
+    report_version: Number(savedMeta?.report_version ?? 1),
+    report_render_version: normalizeOptionalString(savedMeta?.report_render_version) ?? "contractor_failure_report_v2",
+    sent_at_iso: sentAtIso,
+    generated_from: savedMeta?.generated_from ?? (report ? { ops_status: report.ops_status } : undefined),
+    customer_name: resolvedCustomerName,
+    location_text: resolvedLocationText,
+    contractor_name: resolvedContractorName,
+    recipient_email: recipientEmail,
+    default_recipient_email: defaultRecipientEmail || snapshotDefaultRecipient || null,
+    recipient_overridden: recipientOverridden,
+    service_date_text: resolvedServiceDateText,
+    reasons: resolvedReasons,
+    failure_details: resolvedFailureDetails,
+    contractor_failure_summary_v1: contractorFailureSummary,
+    contractor_note: contractorNote,
+    next_step: resolvedNextStep,
+    body_text: bodyText,
+    email_subject: subject,
+  };
+
+  if (savedReportEvent?.eventId) {
+    eventMeta.source_snapshot_event_id = savedReportEvent.eventId;
+    eventMeta.send_mode = "saved_snapshot";
+  } else {
+    eventMeta.send_mode = "generated_current";
+  }
+
+  const { data: insertedEvent, error: eventErr } = await supabase
+    .from("job_events")
+    .insert({
+      job_id: jobId,
+      event_type: "contractor_report_sent",
+      message: "Contractor report sent",
+      meta: eventMeta,
+      user_id: user.id,
+    })
+    .select("id")
+    .single();
+
+  if (eventErr) throw new Error(eventErr.message);
+  if (!insertedEvent?.id) throw new Error("Failed to capture contractor_report_sent event id");
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/portal/jobs/${jobId}`);
