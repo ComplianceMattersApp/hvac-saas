@@ -52,6 +52,12 @@ vi.mock("@/lib/actions/job-ops-actions", () => ({
   releasePendingInfoAndRecompute: vi.fn(async () => null),
 }));
 
+vi.mock("@/lib/actions/notification-actions", () => ({
+  createContractorIntakeProposalAwarenessNotification: vi.fn(async () => null),
+  insertInternalNotificationForEvent: vi.fn(async () => null),
+  markInternalNewWorkNotificationsResolved: vi.fn(async () => undefined),
+}));
+
 vi.mock("@/lib/business/platform-entitlement", () => ({
   resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
     resolveOperationalMutationEntitlementAccessMock(...args),
@@ -129,6 +135,85 @@ function makeAllowSupabaseFixture() {
   return { supabase };
 }
 
+function makeSchedulePreservationFixture(beforeOverrides: Record<string, unknown> = {}) {
+  const jobsUpdates: Record<string, unknown>[] = [];
+  const jobEvents: Record<string, unknown>[] = [];
+  const before = {
+    scheduled_date: "2026-04-20",
+    window_start: "08:00",
+    window_end: "10:00",
+    ops_status: "scheduled",
+    job_type: "ecc",
+    status: "open",
+    field_complete: false,
+    permit_number: "PERMIT-123",
+    jurisdiction: "Sacramento",
+    permit_date: "2026-04-15",
+    pending_info_reason: null,
+    follow_up_date: null,
+    next_action_note: null,
+    action_required_by: null,
+    ...beforeOverrides,
+  };
+
+  const supabase = {
+    from(table: string) {
+      if (table === "jobs") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn(async () => ({ data: before, error: null })),
+            })),
+          })),
+          update: vi.fn((payload: Record<string, unknown>) => {
+            jobsUpdates.push(payload);
+            return {
+              eq: vi.fn(() => ({
+                select: vi.fn(() => ({
+                  single: vi.fn(async () => ({ data: { id: "job-1" }, error: null })),
+                })),
+              })),
+            };
+          }),
+        };
+      }
+
+      if (table === "job_events") {
+        return {
+          insert: vi.fn(async (payload: Record<string, unknown>) => {
+            jobEvents.push(payload);
+            return { error: null };
+          }),
+        };
+      }
+
+      if (table === "notifications") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  in: vi.fn(() => ({
+                    order: vi.fn(() => ({
+                      limit: vi.fn(() => ({
+                        maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+                      })),
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    },
+  };
+
+  return { supabase, jobsUpdates, jobEvents };
+}
+
 function buildJobOnlyFormData() {
   const formData = new FormData();
   formData.set("job_id", "job-1");
@@ -148,6 +233,16 @@ function buildScheduleFormData() {
   formData.set("scheduled_date", "2026-04-23");
   formData.set("window_start", "08:00");
   formData.set("window_end", "10:00");
+  return formData;
+}
+
+function buildScheduleOnlyFormData() {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
+  formData.set("scheduled_date", "2026-04-24");
+  formData.set("window_start", "09:00");
+  formData.set("window_end", "11:00");
+  formData.set("no_redirect", "1");
   return formData;
 }
 
@@ -261,6 +356,63 @@ describe("internal same-account lifecycle scheduling hardening", () => {
     );
     expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+    );
+  });
+
+  it("preserves permit fields when schedule-only form omits permit inputs", async () => {
+    const { supabase, jobsUpdates, jobEvents } = makeSchedulePreservationFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobScheduleFromForm } = await import("@/lib/actions/job-actions");
+
+    await updateJobScheduleFromForm(buildScheduleOnlyFormData());
+
+    expect(jobsUpdates).toHaveLength(1);
+    expect(jobsUpdates[0]).toEqual(
+      expect.objectContaining({
+        scheduled_date: "2026-04-24",
+        window_start: "09:00",
+        window_end: "11:00",
+        permit_number: "PERMIT-123",
+        jurisdiction: "Sacramento",
+        permit_date: "2026-04-15",
+      }),
+    );
+    expect(jobEvents[0]?.meta).toEqual(
+      expect.objectContaining({
+        after: expect.objectContaining({
+          permit_number: "PERMIT-123",
+          jurisdiction: "Sacramento",
+          permit_date: "2026-04-15",
+        }),
+      }),
+    );
+  });
+
+  it("preserves permit fields when blank unschedule form omits permit inputs", async () => {
+    const { supabase, jobsUpdates } = makeSchedulePreservationFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("unschedule", "1");
+    formData.set("no_redirect", "1");
+
+    const { updateJobScheduleFromForm } = await import("@/lib/actions/job-actions");
+
+    await updateJobScheduleFromForm(formData);
+
+    expect(jobsUpdates[0]).toEqual(
+      expect.objectContaining({
+        scheduled_date: null,
+        window_start: null,
+        window_end: null,
+        permit_number: "PERMIT-123",
+        jurisdiction: "Sacramento",
+        permit_date: "2026-04-15",
+      }),
     );
   });
 

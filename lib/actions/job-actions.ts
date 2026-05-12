@@ -8427,6 +8427,9 @@ export async function updateJobScheduleFromForm(formData: FormData) {
 
   const supabase = await createClient();
 
+  const hasPermitNumberInput = formData.has("permit_number");
+  const hasPermitDateInput = formData.has("permit_date");
+  const hasJurisdictionInput = formData.has("jurisdiction");
   const permitNumberRaw = String(formData.get("permit_number") || "").trim();
   const permitDateRaw = String(formData.get("permit_date") || "").trim();
   const jurisdictionRaw = String(formData.get("jurisdiction") || "").trim();
@@ -8516,9 +8519,15 @@ export async function updateJobScheduleFromForm(formData: FormData) {
 
   const isServiceJob = String(before?.job_type ?? "").toLowerCase() === "service";
 
-  const permit_number = isServiceJob ? null : (permitNumberRaw || null);
-  const jurisdiction = isServiceJob ? null : (jurisdictionRaw || null);
-  const permit_date = isServiceJob ? null : (permitDateRaw || null);
+  const permit_number = hasPermitNumberInput
+    ? isServiceJob ? null : (permitNumberRaw || null)
+    : before?.permit_number ?? null;
+  const jurisdiction = hasJurisdictionInput
+    ? isServiceJob ? null : (jurisdictionRaw || null)
+    : before?.jurisdiction ?? null;
+  const permit_date = hasPermitDateInput
+    ? isServiceJob ? null : (permitDateRaw || null)
+    : before?.permit_date ?? null;
 
   const didPermitFieldsChange =
     normalizeScheduleValue(before?.permit_number) !== normalizeScheduleValue(permit_number) ||
