@@ -273,7 +273,7 @@ export default function LoginPage() {
       </div>
 
       <p className="text-xs text-gray-400 dark:text-gray-500">
-        If you don&apos;t have an account, please contact your administrator.
+        Already invited by your company? Contact your administrator if you need access.
       </p>
       </div>
     </div>
