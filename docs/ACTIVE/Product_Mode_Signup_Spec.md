@@ -243,6 +243,18 @@ HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 closeout snapsho
    - no source-of-truth ownership change
    - no feature deletion
 
+`/jobs/new` Product-Mode Family Visibility Tightening V1 closeout snapshot (2026-05-12):
+
+- Internal `/jobs/new` now applies strict normal-account family presentation by product mode:
+   - `hvac_service`: show Service / Work Order family only.
+   - `ecc_hers`: show ECC / Compliance Test family only.
+   - `hybrid`: preserve both Service and ECC visibility for All-in-One/internal owner usage.
+- Normal product accounts no longer render both family cards side-by-side on `/jobs/new`.
+- Hidden-field safety was tightened so stale draft/query/form state cannot silently submit the wrong family for non-hybrid internal accounts.
+- Shared engine behavior remains intact (no ECC or Service capability deletion).
+- Future cross-family unlock for ECC accounts remains roadmap-only tier/add-on work and is not active in this implementation.
+- Non-change boundaries preserved: no schema/migration/Supabase/RLS/auth/security/source-of-truth/authority/billing/report behavior changes.
+
 Product Mode Signup Links V1 closeout snapshot (2026-05-10):
 
 - Product-specific public signup entry links are implemented.

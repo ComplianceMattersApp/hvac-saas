@@ -23,6 +23,7 @@ import {
 } from "@/lib/jobs/visit-scope";
 import {
   resolveDefaultJobTypeForNewJobForm,
+  resolveModeSafeJobType,
   resolveRestoredDraftJobType,
 } from "./new-job-defaults";
 import type { ProductMode } from "@/lib/business/product-mode-defaults";
@@ -353,6 +354,7 @@ export default function NewJobForm({
   const isContractorMode = Boolean(myContractor?.id);
   const router = useRouter();
   const isInternalMode = !isContractorMode;
+  const isHybridProductMode = productMode === "hybrid";
   const hasSeededCustomer = Boolean(existingCustomer?.id);
   const isCustomerContextInternalMode =
     isInternalMode && customerContextMode && Boolean(existingCustomer?.id);
@@ -393,8 +395,15 @@ export default function NewJobForm({
   const defaultJobType: "ecc" | "service" = resolveDefaultJobTypeForNewJobForm({
     contractorId: myContractor?.id,
     initialJobType,
+    productMode,
+    isInternalMode,
   });
   const [jobType, setJobType] = useState<"ecc" | "service">(defaultJobType);
+  const modeSafeJobType = resolveModeSafeJobType({
+    requestedJobType: jobType,
+    productMode,
+    isInternalMode,
+  });
   const [serviceCaseKind, setServiceCaseKind] = useState<
     "reactive" | "callback" | "warranty" | "maintenance"
   >("reactive");
@@ -591,15 +600,15 @@ const [billingRecipient, setBillingRecipient] = useState<
   const isHvacServiceMode = productMode === "hvac_service";
   const internalPageIntro =
     isHvacServiceMode
-      ? "Create a new service work order in a few quick steps. Advanced collaboration and compliance lanes remain available when needed."
+      ? "Create a new service work order in a few quick steps with service-first workflow language and defaults."
       : productMode === "ecc_hers"
-        ? "Create a new job in a few quick steps. ECC/compliance workflows remain front and center, with Service still available when needed."
+        ? "Create a new job in a few quick steps with ECC/compliance workflow language and defaults."
         : "Create a new job in a few quick steps. Service and ECC remain available together for all-in-one accounts.";
   const internalModeHint =
     isHvacServiceMode
-      ? "Service is the default for HVAC Service accounts. Keep work-order flow primary, and switch to ECC only for advanced compliance jobs."
+      ? "HVAC Service accounts use the Service / Work Order family by default and presentation."
       : productMode === "ecc_hers"
-        ? "ECC remains the default for compliance workflows. Choose Service when you need a work-order-first visit."
+        ? "ECC/HERS accounts use the ECC / Compliance Test family by default and presentation."
         : "Hybrid keeps both workflows available. Choose ECC or Service based on the visit you are creating.";
   const internalFlowSummary = isHvacServiceMode
     ? "Select the customer and location, keep the work-order family primary, then add Work Items before scheduling."
@@ -607,8 +616,10 @@ const [billingRecipient, setBillingRecipient] = useState<
   const internalFlowStep2Label = isHvacServiceMode ? "Work order and relationship" : "Family and relationship";
   const jobFamilyStepTitle = isHvacServiceMode ? "Work order family" : "Job family";
   const jobFamilyStepDescription = isHvacServiceMode
-    ? "Service stays primary for HVAC accounts. ECC remains available in an advanced lane when this visit is a compliance test."
-    : "Choose ECC or Service first so any relationship review stays inside the right intake lane.";
+    ? "HVAC Service accounts stay in the Service / Work Order family for internal intake."
+    : productMode === "ecc_hers"
+      ? "ECC/HERS accounts stay in the ECC / Compliance Test family for internal intake."
+      : "Choose ECC or Service first so any relationship review stays inside the right intake lane.";
   const jobFamilyControlLabel = isHvacServiceMode ? "Work Order Family" : "Job Family";
   const serviceJobFamilyDescription = isHvacServiceMode
     ? "Primary service/work-order workflow"
@@ -616,6 +627,11 @@ const [billingRecipient, setBillingRecipient] = useState<
   const eccJobFamilyDescription = isHvacServiceMode
     ? "Advanced compliance testing workflow"
     : "Energy code test workflow";
+
+  useEffect(() => {
+    if (jobType === modeSafeJobType) return;
+    setJobType(modeSafeJobType);
+  }, [jobType, modeSafeJobType]);
 
   const selectedCustomer = useMemo(
     () => guidedCustomers.find((c) => c.id === selectedCustomerId) ?? null,
@@ -918,6 +934,8 @@ const [billingRecipient, setBillingRecipient] = useState<
       resolveRestoredDraftJobType({
         draftJobType: d.jobType,
         defaultJobType,
+        productMode,
+        isInternalMode,
       }),
     );
     setServiceCaseKind(d.serviceCaseKind ?? "reactive");
@@ -1029,7 +1047,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       return;
     }
 
-    if (isInternalMode && jobType === "service") {
+    if (isInternalMode && modeSafeJobType === "service") {
       const nonEmptyItems = visitScopeItems.filter((item) => item.title.trim() || item.details.trim());
       if (nonEmptyItems.length === 0) {
         event.preventDefault();
@@ -1071,7 +1089,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       void getInternalIntakeRelationshipContext({
         customerId: selectedCustomerId,
         locationId,
-        jobType,
+        jobType: modeSafeJobType,
       })
         .then((nextContext) => {
           if (relationshipRequestRef.current !== requestId) return;
@@ -1083,7 +1101,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           setRelationshipError("Could not load existing work context. You can still continue as a new case.");
         });
     });
-  }, [jobType, locationId, selectedCustomerId, shouldShowRelationshipStep, startRelationshipTransition]);
+  }, [locationId, modeSafeJobType, selectedCustomerId, shouldShowRelationshipStep, startRelationshipTransition]);
 
   const secondaryButtonClass =
     "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition-all duration-150 hover:bg-slate-100 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60";
@@ -1434,7 +1452,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             </div>
 
             {/* real submitted value */}
-            <input type="hidden" name="job_type" value={jobType} />
+            <input type="hidden" name="job_type" value={modeSafeJobType} />
           </div>
 
           {/* Project Type */}
@@ -2065,49 +2083,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-slate-900">{jobFamilyControlLabel}</label>
                 <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
-                  {isHvacServiceMode ? (
-                    <>
-                      <label
-                        className={[
-                          "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition-colors sm:flex-1",
-                          jobType === "service"
-                            ? "border-slate-900 bg-slate-900 text-white hover:bg-slate-800"
-                            : "border-slate-200 bg-slate-50 text-slate-900 hover:bg-slate-100",
-                        ].join(" ")}
-                      >
-                        <input
-                          type="radio"
-                          name="_jobTypeUi"
-                          value="service"
-                          checked={jobType === "service"}
-                          onChange={() => setJobType("service")}
-                          className="mt-0.5"
-                        />
-                        <span>
-                          <span className={jobType === "service" ? "block text-sm font-medium text-white" : "block text-sm font-medium text-slate-900"}>
-                            Service
-                          </span>
-                          <span className={jobType === "service" ? "mt-0.5 block text-xs text-slate-200" : "mt-0.5 block text-xs text-slate-500"}>
-                            {serviceJobFamilyDescription}
-                          </span>
-                        </span>
-                      </label>
-                      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:bg-slate-100 sm:flex-1">
-                        <input
-                          type="radio"
-                          name="_jobTypeUi"
-                          value="ecc"
-                          checked={jobType === "ecc"}
-                          onChange={() => setJobType("ecc")}
-                          className="mt-0.5"
-                        />
-                        <span>
-                          <span className="block text-sm font-medium text-slate-900">ECC</span>
-                          <span className="mt-0.5 block text-xs text-slate-500">{eccJobFamilyDescription}</span>
-                        </span>
-                      </label>
-                    </>
-                  ) : (
+                  {isHybridProductMode ? (
                     <>
                       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:bg-slate-100 sm:flex-1">
                         <input
@@ -2138,9 +2114,33 @@ const [billingRecipient, setBillingRecipient] = useState<
                         </span>
                       </label>
                     </>
+                  ) : isHvacServiceMode ? (
+                    <>
+                      <div className="flex items-start gap-3 rounded-xl border border-slate-900 bg-slate-900 px-3 py-3 text-white sm:flex-1">
+                        <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full border border-slate-200/90 bg-white/10 text-[10px] font-bold text-white">
+                          ✓
+                        </span>
+                        <span>
+                          <span className="block text-sm font-medium text-white">Service</span>
+                          <span className="mt-0.5 block text-xs text-slate-200">{serviceJobFamilyDescription}</span>
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-start gap-3 rounded-xl border border-slate-900 bg-slate-900 px-3 py-3 text-white sm:flex-1">
+                        <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full border border-slate-200/90 bg-white/10 text-[10px] font-bold text-white">
+                          ✓
+                        </span>
+                        <span>
+                          <span className="block text-sm font-medium text-white">ECC</span>
+                          <span className="mt-0.5 block text-xs text-slate-200">{eccJobFamilyDescription}</span>
+                        </span>
+                      </div>
+                    </>
                   )}
                 </div>
-                <input type="hidden" name="job_type" value={jobType} />
+                <input type="hidden" name="job_type" value={modeSafeJobType} />
               </div>
 
               {jobType !== "service" ? (

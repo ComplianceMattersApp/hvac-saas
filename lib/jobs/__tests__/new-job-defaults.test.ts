@@ -10,6 +10,8 @@ describe("new job defaults", () => {
       resolveDefaultJobTypeForNewJobForm({
         contractorId: "contractor-1",
         initialJobType: "service",
+        productMode: "hvac_service",
+        isInternalMode: false,
       }),
     ).toBe("ecc");
   });
@@ -19,21 +21,47 @@ describe("new job defaults", () => {
       resolveDefaultJobTypeForNewJobForm({
         contractorId: null,
         initialJobType: "service",
+        productMode: "hybrid",
+        isInternalMode: true,
       }),
     ).toBe("service");
     expect(
       resolveDefaultJobTypeForNewJobForm({
         contractorId: null,
         initialJobType: "ecc",
+        productMode: "hybrid",
+        isInternalMode: true,
       }),
     ).toBe("ecc");
   });
 
-  it("keeps draft jobType as the winner over the computed default", () => {
+  it("locks internal defaults by product mode for normal product accounts", () => {
+    expect(
+      resolveDefaultJobTypeForNewJobForm({
+        contractorId: null,
+        initialJobType: "ecc",
+        productMode: "hvac_service",
+        isInternalMode: true,
+      }),
+    ).toBe("service");
+
+    expect(
+      resolveDefaultJobTypeForNewJobForm({
+        contractorId: null,
+        initialJobType: "service",
+        productMode: "ecc_hers",
+        isInternalMode: true,
+      }),
+    ).toBe("ecc");
+  });
+
+  it("keeps draft jobType as the winner only in hybrid internal mode", () => {
     expect(
       resolveRestoredDraftJobType({
         draftJobType: "service",
         defaultJobType: "ecc",
+        productMode: "hybrid",
+        isInternalMode: true,
       }),
     ).toBe("service");
 
@@ -41,6 +69,28 @@ describe("new job defaults", () => {
       resolveRestoredDraftJobType({
         draftJobType: undefined,
         defaultJobType: "ecc",
+        productMode: "hybrid",
+        isInternalMode: true,
+      }),
+    ).toBe("ecc");
+  });
+
+  it("overrides stale draft jobType for non-hybrid internal accounts", () => {
+    expect(
+      resolveRestoredDraftJobType({
+        draftJobType: "ecc",
+        defaultJobType: "service",
+        productMode: "hvac_service",
+        isInternalMode: true,
+      }),
+    ).toBe("service");
+
+    expect(
+      resolveRestoredDraftJobType({
+        draftJobType: "service",
+        defaultJobType: "ecc",
+        productMode: "ecc_hers",
+        isInternalMode: true,
       }),
     ).toBe("ecc");
   });

@@ -428,6 +428,17 @@ HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 closeout note:
 - Validation recorded: TypeScript passed (`npx.cmd tsc --noEmit`), browser smoke passed across HVAC Service + ECC/HERS + Hybrid coverage, and no console/hydration issues were reported.
 - Non-change boundaries remain explicit: no schema/migration/Supabase command work, no auth/RLS/authority changes, no billing/payment/Stripe/QBO changes, and no report-calculation changes.
 
+`/jobs/new` Product-Mode Family Visibility Tightening V1 closeout note:
+
+- Completed as a presentation/defaulting tightening slice for internal intake on `/jobs/new`.
+- Normal product accounts now show only their relevant family lane:
+  - `hvac_service` -> Service / Work Order only
+  - `ecc_hers` -> ECC / Compliance Test only
+- Hybrid / Master / All-in-One remains the explicit all-in-one exception and continues to show both lanes.
+- Hidden-field safety and server-side intake normalization were tightened so stale draft/query/form state does not flip family for non-hybrid internal accounts.
+- No tier/add-on unlock behavior was introduced in this slice; future ECC-plus-Service unlock remains roadmap/backlog only.
+- Boundaries preserved: no schema/migrations/Supabase command/RLS/auth/security/source-of-truth/contractor-authority/billing/payment/report-calculation behavior change, and no codebase split.
+
 Owner Signup Visibility V1 closeout note:
 
 - Owner Signup Visibility V1 is implemented as a read-only allowlisted observability slice.

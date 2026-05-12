@@ -420,6 +420,24 @@ If any item here conflicts with the active spine, the spine wins.
 - Invoice language remains downstream: Invoice Charges are billed truth; Work Items are operational scope, not billing records.
 - No schema, RLS, lifecycle, billing, payment, estimate, support console, or contractor-authority behavior changed.
 
+### 2.3.9 `/jobs/new` Product-Mode Family Visibility Tightening V1 (completed)
+- Internal `/jobs/new` family presentation is now strict by normal product mode:
+  - `hvac_service` shows Service / Work Order only
+  - `ecc_hers` shows ECC / Compliance Test only
+- Hybrid / Master / All-in-One remains all-in-one and continues to show both ECC and Service families.
+- Hidden field and stale-state safety was tightened so non-hybrid internal intake posts mode-safe `job_type` even when stale draft/query/form state is present.
+- Future cross-family unlock remains deferred roadmap/tier-add-on work and is not active behavior.
+- Validation recorded in this closeout:
+  - TypeScript passed: `npx.cmd tsc --noEmit`
+  - targeted mode-default tests passed: `npx.cmd vitest run lib/jobs/__tests__/new-job-defaults.test.ts` (5/5)
+- Explicit non-changes:
+  - no schema/migration/Supabase commands
+  - no RLS/auth/security/contractor-authority changes
+  - no source-of-truth ownership changes
+  - no billing/payment/Stripe/QBO changes
+  - no report dataset/calculation changes
+  - no feature deletion and no codebase split
+
 Roadmap-forward note:
 - Future backlog: Line Item Source Consolidation / Pricebook-style Entry.
 - Long-term direction should reduce duplicate/similar line-item entry paths and favor selecting from Pricebook or adding manual line items through the same clean Pricebook-like entry pattern.

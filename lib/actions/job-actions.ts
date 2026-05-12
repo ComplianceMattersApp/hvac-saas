@@ -40,6 +40,7 @@ import {
   resolveBillingModeByAccountOwnerId,
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
+import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode-defaults";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { renderSystemEmailLayout, escapeHtml, resolveAppUrl } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
@@ -268,6 +269,17 @@ export type InternalIntakeRelationshipContext = {
 function normalizeIntakeJobType(value: unknown): "ecc" | "service" | null {
   const normalized = String(value ?? "").trim().toLowerCase();
   return normalized === "ecc" || normalized === "service" ? normalized : null;
+}
+
+function lockInternalIntakeJobTypeForProductMode(params: {
+  requestedJobType: "ecc" | "service";
+  productMode: "hybrid" | "ecc_hers" | "hvac_service";
+  isContractorUser: boolean;
+}): "ecc" | "service" {
+  if (params.isContractorUser) return params.requestedJobType;
+  if (params.productMode === "hvac_service") return "service";
+  if (params.productMode === "ecc_hers") return "ecc";
+  return params.requestedJobType;
 }
 
 function isActiveIntakeRelationshipJob(job: {
@@ -6718,7 +6730,7 @@ export async function createJobFromForm(formData: FormData) {
     throw new Error("Invalid job type");
   }
 
-const jobType = relationshipJobType;
+let jobType: "ecc" | "service" = relationshipJobType;
   const projectType = String(formData.get("project_type") || "alteration").trim();
 
   const contractorIdRaw = formData.get("contractor_id");
@@ -6777,9 +6789,9 @@ const service_visit_outcome = normalizeServiceVisitOutcome(serviceVisitOutcomeRa
 const intakeSource = String(formData.get("intake_source") || "").trim().toLowerCase();
 const isCustomerContextIntake = intakeSource === "customer";
 
-const jurisdiction = jobType === "service" ? null : (jurisdictionRaw || null);
-const permit_date = jobType === "service" ? null : (permitDateRaw || null);
-const permit_number = jobType === "service" ? null : (permitNumberRaw || null);
+let jurisdiction: string | null = null;
+let permit_date: string | null = null;
+let permit_number: string | null = null;
 
 // Intake create is always born open; lifecycle transitions happen later via dedicated flows.
 const status: JobStatus = "open";
@@ -6828,10 +6840,6 @@ if (!isContractorUser) {
     visit_scope_items = parseVisitScopeItemsJson(visitScopeItemsRaw);
   } catch {
     redirect("/jobs/new?err=visit_scope_invalid");
-  }
-
-  if (jobType === "service" && visit_scope_items.length === 0) {
-    redirect("/jobs/new?err=visit_scope_required");
   }
 }
 
@@ -6887,6 +6895,25 @@ if (!canonicalOwnerUserId) {
 
   throw new Error("Canonical owner user id is required");
 }
+
+  const productMode = await resolveProductModeForAccountOwnerId({
+    supabase,
+    accountOwnerUserId: canonicalOwnerUserId,
+  });
+
+  jobType = lockInternalIntakeJobTypeForProductMode({
+    requestedJobType: jobType,
+    productMode,
+    isContractorUser,
+  });
+
+  jurisdiction = jobType === "service" ? null : (jurisdictionRaw || null);
+  permit_date = jobType === "service" ? null : (permitDateRaw || null);
+  permit_number = jobType === "service" ? null : (permitNumberRaw || null);
+
+  if (!isContractorUser && jobType === "service" && visit_scope_items.length === 0) {
+    redirect("/jobs/new?err=visit_scope_required");
+  }
 
   await requireOwnerScopedInternalIntakeCreateContext({
     supabase,

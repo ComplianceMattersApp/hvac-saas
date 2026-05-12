@@ -47,6 +47,24 @@ Current Program Status Note (May 2026)
     - no codebase split
     - no feature deletion
 
+- `/jobs/new` Product-Mode Family Visibility Tightening V1 is complete and pushed (May 2026):
+  - Normal product accounts now show only the relevant internal job-family lane on `/jobs/new`:
+    - `hvac_service` shows Service / Work Order only.
+    - `ecc_hers` shows ECC / Compliance Test only.
+  - Hybrid / Master / All-in-One accounts intentionally preserve both ECC and Service visibility.
+  - Hidden-field and stale-state safety was tightened so non-hybrid product mode wins for posted `job_type` during internal intake.
+  - Product boundary remains additive/presentation/defaulting only:
+    - no schema changes
+    - no migrations
+    - no Supabase commands
+    - no RLS/auth/security changes
+    - no source-of-truth ownership changes
+    - no contractor authority changes
+    - no billing/payment/Stripe/QBO changes
+    - no report calculation changes
+    - no feature deletion and no codebase split
+  - Future cross-family ECC-plus-Service availability remains a tier/add-on roadmap item and is not active in this slice.
+
 - Field Bus Improvement Passes closeout is complete and pushed (May 2026):
   - New Job Alert lifecycle cleanup:
     - New job/new work alerts no longer act as active unread awareness once scheduled, finalized, rejected, or otherwise handled.
