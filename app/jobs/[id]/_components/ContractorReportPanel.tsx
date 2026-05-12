@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   generateContractorReportPreview,
+  getLatestSavedContractorReportSnapshot,
   sendContractorReport,
   type ContractorReportPreview,
   type ContractorFailureDetail,
+  type ContractorSavedReportSnapshot,
 } from "@/lib/actions/job-ops-actions";
 import ActionFeedback from "@/components/ui/ActionFeedback";
 
@@ -43,16 +45,42 @@ export default function ContractorReportPanel({
   contractorResponseSubLabel?: string | null;
 }) {
   const [preview, setPreview] = useState<ContractorReportPreview | null>(null);
+  const [savedSnapshot, setSavedSnapshot] = useState<ContractorSavedReportSnapshot | null>(null);
+  const [sendMode, setSendMode] = useState<"generated" | "saved">("generated");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [contractorNote, setContractorNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [lastAction, setLastAction] = useState<"generate" | "send" | null>(null);
-  const [sent, setSent] = useState(false);
+  const [lastAction, setLastAction] = useState<"generate" | "send" | "load_saved" | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const canSend = !!preview && !isPending && !sent;
+  const canSend =
+    sendMode === "saved"
+      ? !!savedSnapshot && !isPending
+      : !!preview && !isPending;
   const summaryLabels = contractorSummaryLabels(preview?.contractor_failure_summary_v1?.report_kind);
+
+  useEffect(() => {
+    setLastAction("load_saved");
+    startTransition(async () => {
+      try {
+        const latest = await getLatestSavedContractorReportSnapshot({ jobId });
+        setSavedSnapshot(latest);
+      } catch (e) {
+        console.error("getLatestSavedContractorReportSnapshot failed", e);
+      } finally {
+        setLastAction(null);
+      }
+    });
+  }, [jobId]);
+
+  function formatSavedSentAt(value?: string | null) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return null;
+    const parsed = new Date(raw);
+    if (!Number.isFinite(parsed.getTime())) return raw;
+    return parsed.toLocaleString();
+  }
 
   function onGenerate() {
     setError(null);
@@ -63,9 +91,9 @@ export default function ContractorReportPanel({
       try {
         const nextPreview = await generateContractorReportPreview({ jobId });
         setPreview(nextPreview);
+        setSendMode("generated");
         setRecipientEmail(nextPreview.default_recipient_email ?? "");
         setContractorNote("");
-        setSent(false);
       } catch (e) {
         console.error("generateContractorReportPreview failed", e);
         setPreview(null);
@@ -77,7 +105,8 @@ export default function ContractorReportPanel({
   }
 
   function onSend() {
-    if (!preview) return;
+    if (sendMode === "generated" && !preview) return;
+    if (sendMode === "saved" && !savedSnapshot) return;
 
     setError(null);
     setSuccess(null);
@@ -88,11 +117,16 @@ export default function ContractorReportPanel({
         const result = await sendContractorReport({
           jobId,
           recipientEmail,
-          contractorNote,
+          contractorNote: sendMode === "generated" ? contractorNote : undefined,
+          savedReportEventId: sendMode === "saved" ? savedSnapshot?.event_id : undefined,
         });
 
         setSuccess(result.alreadySent ? "This was already sent." : "Report sent.");
-        setSent(true);
+        const refreshedSnapshot = await getLatestSavedContractorReportSnapshot({ jobId });
+        setSavedSnapshot(refreshedSnapshot);
+        if (refreshedSnapshot) {
+          setSendMode("saved");
+        }
       } catch (e) {
         console.error("sendContractorReport failed", e);
         const msg = e instanceof Error ? String(e.message ?? "").trim() : "";
@@ -105,6 +139,15 @@ export default function ContractorReportPanel({
         setLastAction(null);
       }
     });
+  }
+
+  function onUseSavedReport() {
+    if (!savedSnapshot) return;
+    setError(null);
+    setSuccess(null);
+    setPreview(null);
+    setSendMode("saved");
+    setRecipientEmail(savedSnapshot.default_recipient_email ?? savedSnapshot.recipient_email ?? "");
   }
 
   return (
@@ -126,13 +169,28 @@ export default function ContractorReportPanel({
       <ActionFeedback type="success" message={success} className="mb-3" />
 
       <div className="mb-3 flex flex-wrap gap-2">
+        {savedSnapshot ? (
+          <button
+            type="button"
+            onClick={onUseSavedReport}
+            disabled={isPending}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-50"
+          >
+            Resend Report
+          </button>
+        ) : null}
+
         <button
           type="button"
           onClick={onGenerate}
           disabled={isPending}
           className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-50"
         >
-          {isPending && lastAction === "generate" ? "Generating..." : "Generate Contractor Report"}
+          {isPending && lastAction === "generate"
+            ? "Generating..."
+            : savedSnapshot
+            ? "Generate Fresh Report"
+            : "Generate Report"}
         </button>
 
         <button
@@ -141,15 +199,57 @@ export default function ContractorReportPanel({
           disabled={!canSend}
           className="inline-flex min-h-10 items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {sent
-            ? "Sent ✓"
-            : isPending && lastAction === "send"
+          {isPending && lastAction === "send"
             ? "Sending..."
-            : "Send to Contractor"}
+            : sendMode === "saved"
+            ? "Send Report"
+            : "Send Report"}
         </button>
       </div>
 
-      {preview ? (
+      {savedSnapshot ? (
+        <div className="mb-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-3 text-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Report history</div>
+          <div className="mt-1 text-slate-700">
+            {formatSavedSentAt(savedSnapshot.sent_at_iso) ? (
+              <span>Sent {formatSavedSentAt(savedSnapshot.sent_at_iso)}</span>
+            ) : (
+              <span>Report saved and ready to send</span>
+            )}
+            {savedSnapshot.recipient_email ? <span> to {savedSnapshot.recipient_email}</span> : null}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            {sendMode === "saved"
+              ? "Sending the saved report to a different recipient — no regeneration needed."
+              : "You can resend the saved report or generate a fresh one with updated test results."}
+          </div>
+        </div>
+      ) : null}
+
+      {sendMode === "saved" && savedSnapshot ? (
+        <div className="space-y-3 text-sm">
+          <div className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3">
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Recipient</div>
+            <input
+              type="email"
+              value={recipientEmail}
+              onChange={(e) => setRecipientEmail(e.target.value)}
+              placeholder="contractor@example.com"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            />
+            <p className="mt-1.5 text-xs text-slate-500">
+              Use the saved report content. Change the recipient as needed.
+            </p>
+
+            {savedSnapshot.contractor_note ? (
+              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                <div className="mb-1 font-semibold uppercase tracking-[0.1em] text-slate-500">Previous note</div>
+                <div className="whitespace-pre-wrap">{savedSnapshot.contractor_note}</div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : preview ? (
         <div className="space-y-3 text-sm">
           {/* Meta block */}
           <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 px-3.5 py-3">
@@ -228,7 +328,7 @@ export default function ContractorReportPanel({
           {/* Additional Note block */}
           <div className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3">
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-              Send report to
+              Recipient
             </label>
             <input
               type="email"
@@ -238,24 +338,26 @@ export default function ContractorReportPanel({
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300"
             />
             <p className="mt-1.5 text-xs text-slate-500">
-              Defaults to the contractor email. Edit if this report should go to a different contact.
+              Defaults to the contractor email on file. Change if sending to a different contact.
             </p>
 
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-              Additional Note to Contractor <span className="normal-case font-normal text-slate-400">(optional)</span>
+              Additional note <span className="normal-case font-normal text-slate-400">(optional)</span>
             </label>
             <textarea
               value={contractorNote}
               onChange={(e) => setContractorNote(e.target.value)}
               rows={3}
-              placeholder="Optional note included in the contractor report"
+              placeholder="Optional note to include in the report"
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300"
             />
           </div>
         </div>
       ) : (
         <div className="text-sm leading-6 text-slate-600">
-          Generate a report preview from current job data. Preview is ephemeral and is not saved.
+          {isPending && lastAction === "load_saved"
+            ? "Loading report history..."
+            : "Generate a fresh report with current test results. The report will be saved for later resend if needed."}
         </div>
       )}
     </div>

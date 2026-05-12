@@ -89,6 +89,8 @@ function makeContractorReportFixture(options?: {
 }) {
   const writes: Array<{ table: string; op: string }> = [];
   const insertedJobEvents: any[] = [];
+  const storedJobEvents: Array<{ id: string; job_id: string; event_type: string; meta: any; created_at: string }> = [];
+  let eventCounter = 0;
   const eccRuns = options?.eccRuns ?? [
     {
       created_at: "2026-04-20T10:00:00Z",
@@ -140,14 +142,63 @@ function makeContractorReportFixture(options?: {
       }
 
       if (table === "job_events") {
+        let filterJobId = "";
+        let filterEventType = "";
+        let filterId = "";
+        let orderCreatedAtDesc = false;
+        let limitCount: number | null = null;
+
+        const selectQuery: any = {
+          eq: vi.fn((column: string, value: unknown) => {
+            if (column === "job_id") filterJobId = String(value ?? "").trim();
+            if (column === "event_type") filterEventType = String(value ?? "").trim();
+            if (column === "id") filterId = String(value ?? "").trim();
+            return selectQuery;
+          }),
+          order: vi.fn((column: string, opts?: { ascending?: boolean }) => {
+            if (column === "created_at" && opts?.ascending === false) {
+              orderCreatedAtDesc = true;
+            }
+            return selectQuery;
+          }),
+          limit: vi.fn((value: number) => {
+            limitCount = Number(value);
+            return selectQuery;
+          }),
+          maybeSingle: vi.fn(async () => {
+            let rows = [...storedJobEvents];
+            if (filterJobId) rows = rows.filter((row) => row.job_id === filterJobId);
+            if (filterEventType) rows = rows.filter((row) => row.event_type === filterEventType);
+            if (filterId) rows = rows.filter((row) => row.id === filterId);
+            if (orderCreatedAtDesc) {
+              rows.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+            }
+            if (typeof limitCount === "number" && limitCount > 0) {
+              rows = rows.slice(0, limitCount);
+            }
+            return { data: rows[0] ?? null, error: null };
+          }),
+        };
+
         return {
+          select: vi.fn(() => selectQuery),
           insert: vi.fn((payload: any) => {
             writes.push({ table, op: "insert" });
             insertedJobEvents.push(payload);
+            eventCounter += 1;
+            const insertedId = `event-${eventCounter}`;
+            const row = {
+              id: insertedId,
+              job_id: String(payload?.job_id ?? "").trim(),
+              event_type: String(payload?.event_type ?? "").trim(),
+              meta: payload?.meta ?? null,
+              created_at: new Date(Date.now() + eventCounter).toISOString(),
+            };
+            storedJobEvents.push(row);
             return {
               select: vi.fn(() => ({
                 single: vi.fn(async () => ({
-                  data: { id: "event-1" },
+                  data: { id: insertedId },
                   error: null,
                 })),
               })),
@@ -192,7 +243,7 @@ function makeContractorReportFixture(options?: {
     }),
   };
 
-  return { supabase, writes, insertedJobEvents };
+  return { supabase, writes, insertedJobEvents, storedJobEvents };
 }
 
 describe("contractor report entitlement hardening", () => {
@@ -689,6 +740,156 @@ describe("contractor report entitlement hardening", () => {
 
       expect(sendEmailMock).not.toHaveBeenCalled();
       expect(fixture.writes.filter((w) => w.table === "job_events")).toHaveLength(0);
+    });
+
+    it("reuses saved report snapshot for second recipient without regenerating body/note", async () => {
+      const fixture = makeContractorReportFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { sendContractorReport } = await import("@/lib/actions/job-ops-actions");
+
+      await sendContractorReport({
+        jobId: "job-1",
+        contractorNote: "Initial contractor note",
+      });
+
+      const firstEvent = fixture.storedJobEvents[0];
+      expect(firstEvent?.id).toBeTruthy();
+
+      await sendContractorReport({
+        jobId: "job-1",
+        savedReportEventId: firstEvent.id,
+        recipientEmail: "second-recipient@test.com",
+      });
+
+      expect(fixture.storedJobEvents).toHaveLength(2);
+      const secondEvent = fixture.storedJobEvents[1];
+
+      expect(secondEvent.meta.body_text).toBe(firstEvent.meta.body_text);
+      expect(secondEvent.meta.contractor_note).toBe(firstEvent.meta.contractor_note);
+      expect(secondEvent.meta.source_snapshot_event_id).toBe(firstEvent.id);
+      expect(secondEvent.meta.send_mode).toBe("saved_snapshot");
+      expect(secondEvent.meta.recipient_email).toBe("second-recipient@test.com");
+
+      expect(firstEvent.meta.recipient_email).toBe("contractor@test.com");
+      expect(firstEvent.meta.send_mode).toBe("generated_current");
+
+      const lastEmailArgs = sendEmailMock.mock.calls[1]?.[0];
+      expect(lastEmailArgs?.to).toBe("second-recipient@test.com");
+      expect(lastEmailArgs?.text).toContain("Initial contractor note");
+    });
+
+    it("returns latest saved contractor report snapshot when history exists", async () => {
+      const fixture = makeContractorReportFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { sendContractorReport, getLatestSavedContractorReportSnapshot } = await import(
+        "@/lib/actions/job-ops-actions"
+      );
+
+      await sendContractorReport({
+        jobId: "job-1",
+        contractorNote: "Snapshot note",
+      });
+
+      const snapshot = await getLatestSavedContractorReportSnapshot({ jobId: "job-1" });
+
+      expect(snapshot?.event_id).toBe(fixture.storedJobEvents[0]?.id);
+      expect(snapshot?.recipient_email).toBe("contractor@test.com");
+      expect(snapshot?.body_text).toContain("FAILED TEST");
+      expect(snapshot?.contractor_note).toBe("Snapshot note");
+    });
+
+    it("returns null saved snapshot when none exists", async () => {
+      const fixture = makeContractorReportFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { getLatestSavedContractorReportSnapshot } = await import("@/lib/actions/job-ops-actions");
+
+      const snapshot = await getLatestSavedContractorReportSnapshot({ jobId: "job-1" });
+      expect(snapshot).toBeNull();
+    });
+
+    it("does not create contractor_report_sent history when email send fails", async () => {
+      const fixture = makeContractorReportFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+      sendEmailMock.mockRejectedValueOnce(new Error("Transport down"));
+
+      const { sendContractorReport } = await import("@/lib/actions/job-ops-actions");
+
+      await expect(
+        sendContractorReport({
+          jobId: "job-1",
+          contractorNote: "Will fail",
+        }),
+      ).rejects.toThrow("Failed to send contractor report email: Transport down");
+
+      expect(fixture.storedJobEvents).toHaveLength(0);
+      expect(fixture.writes.filter((w) => w.table === "job_events")).toHaveLength(0);
+    });
+  });
+
+  describe("timeline recipient display", () => {
+    it("includes recipient in contractor_report_sent event metadata", async () => {
+      const fixture = makeContractorReportFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { sendContractorReport } = await import("@/lib/actions/job-ops-actions");
+
+      await sendContractorReport({
+        jobId: "job-1",
+        recipientEmail: "test-recipient@example.com",
+        contractorNote: "Test note",
+      });
+
+      const event = fixture.storedJobEvents[0];
+      expect(event?.meta?.recipient_email).toBe("test-recipient@example.com");
+      expect(event?.meta?.default_recipient_email).toBe("contractor@test.com");
+    });
+
+    it("saves metadata for resent report to second recipient", async () => {
+      const fixture = makeContractorReportFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { sendContractorReport } = await import("@/lib/actions/job-ops-actions");
+
+      // First send
+      await sendContractorReport({
+        jobId: "job-1",
+        contractorNote: "Initial note",
+      });
+
+      const firstEvent = fixture.storedJobEvents[0];
+
+      // Resend to different recipient
+      await sendContractorReport({
+        jobId: "job-1",
+        savedReportEventId: firstEvent.id,
+        recipientEmail: "another@example.com",
+      });
+
+      const secondEvent = fixture.storedJobEvents[1];
+      expect(secondEvent?.meta?.recipient_email).toBe("another@example.com");
+      expect(secondEvent?.meta?.send_mode).toBe("saved_snapshot");
+      expect(secondEvent?.meta?.source_snapshot_event_id).toBe(firstEvent.id);
+    });
+
+    it("preserves both default and actual recipient in metadata", async () => {
+      const fixture = makeContractorReportFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { sendContractorReport } = await import("@/lib/actions/job-ops-actions");
+
+      await sendContractorReport({
+        jobId: "job-1",
+        recipientEmail: "override-recipient@example.com",
+        contractorNote: "Override test",
+      });
+
+      const event = fixture.storedJobEvents[0];
+      expect(event?.meta?.default_recipient_email).toBe("contractor@test.com");
+      expect(event?.meta?.recipient_email).toBe("override-recipient@example.com");
+      expect(event?.meta?.recipient_overridden).toBe(true);
     });
   });
 

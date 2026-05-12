@@ -179,6 +179,16 @@ function formatTimelineEvent(type?: string | null, meta?: any, message?: string 
     return `${actor} uploaded ${count} attachment${count === 1 ? "" : "s"}`;
   }
 
+  if (eventType === "contractor_report_sent") {
+    const recipientEmail = String(meta?.recipient_email ?? "").trim().toLowerCase();
+    const defaultEmail = String(meta?.default_recipient_email ?? "").trim().toLowerCase();
+    const recipient = recipientEmail || defaultEmail;
+    if (recipient) {
+      return `Contractor report sent to ${recipient}`;
+    }
+    return "Contractor report sent";
+  }
+
   const map: Record<string, string> = {
     job_created: "Job created",
     intake_submitted: "Intake submitted",
