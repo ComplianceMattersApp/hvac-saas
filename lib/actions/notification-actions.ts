@@ -55,6 +55,24 @@ const EVENT_TO_BODY: Record<NotificationTriggerEventType, string> = {
   contractor_schedule_updated: "A contractor submitted scheduling data with a new job.",
 };
 
+const INTERNAL_NEW_WORK_PROPOSAL_NOTIFICATION_TYPES = [
+  "contractor_intake_proposal_submitted",
+  "internal_contractor_intake_proposal_email",
+] as const;
+
+const INTERNAL_NEW_WORK_JOB_NOTIFICATION_TYPES = [
+  "contractor_job_created",
+  "internal_contractor_job_intake_email",
+] as const;
+
+type MarkInternalNewWorkNotificationsResolvedInput = {
+  supabase: any;
+  accountOwnerUserId: string;
+  contractorIntakeSubmissionId?: string | null;
+  jobId?: string | null;
+  readAtIso?: string | null;
+};
+
 function isInternalAwarenessEventType(value: NotificationTriggerEventType): boolean {
   return value !== "contractor_report_sent";
 }
@@ -143,6 +161,64 @@ export async function createContractorIntakeProposalAwarenessNotification(
       account_owner_user_id: accountOwnerUserId,
     },
   });
+}
+
+export async function markInternalNewWorkNotificationsResolved(
+  input: MarkInternalNewWorkNotificationsResolvedInput,
+): Promise<void> {
+  const accountOwnerUserId = String(input.accountOwnerUserId ?? "").trim();
+  const contractorIntakeSubmissionId =
+    String(input.contractorIntakeSubmissionId ?? "").trim() || null;
+  const jobId = String(input.jobId ?? "").trim() || null;
+
+  if (!accountOwnerUserId) {
+    throw new Error("Missing accountOwnerUserId for new-work notification resolution");
+  }
+
+  if (!contractorIntakeSubmissionId && !jobId) {
+    return;
+  }
+
+  const readAtIso = String(input.readAtIso ?? "").trim() || new Date().toISOString();
+
+  if (contractorIntakeSubmissionId) {
+    const { error } = await input.supabase
+      .from("notifications")
+      .update({ read_at: readAtIso })
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("recipient_type", "internal")
+      .in("notification_type", [...INTERNAL_NEW_WORK_PROPOSAL_NOTIFICATION_TYPES])
+      .contains("payload", {
+        contractor_intake_submission_id: contractorIntakeSubmissionId,
+      })
+      .is("read_at", null);
+
+    if (error) throw error;
+  }
+
+  if (jobId) {
+    const { error: byJobIdError } = await input.supabase
+      .from("notifications")
+      .update({ read_at: readAtIso })
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("recipient_type", "internal")
+      .in("notification_type", [...INTERNAL_NEW_WORK_JOB_NOTIFICATION_TYPES])
+      .eq("job_id", jobId)
+      .is("read_at", null);
+
+    if (byJobIdError) throw byJobIdError;
+
+    const { error: byPayloadJobIdError } = await input.supabase
+      .from("notifications")
+      .update({ read_at: readAtIso })
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("recipient_type", "internal")
+      .in("notification_type", [...INTERNAL_NEW_WORK_JOB_NOTIFICATION_TYPES])
+      .contains("payload", { job_id: jobId })
+      .is("read_at", null);
+
+    if (byPayloadJobIdError) throw byPayloadJobIdError;
+  }
 }
 
 export async function insertInternalNotificationForEvent(

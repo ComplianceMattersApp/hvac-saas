@@ -64,6 +64,7 @@ function formatDateTime(value: string | null) {
 function noticeText(notice: string) {
   const key = normalizeText(notice).toLowerCase();
   if (key === "rejected") return "Proposal rejected.";
+  if (key === "already_reviewed") return "Proposal was already reviewed.";
   if (key === "duplicate") return "Proposal marked as duplicate of an existing job.";
   return "";
 }

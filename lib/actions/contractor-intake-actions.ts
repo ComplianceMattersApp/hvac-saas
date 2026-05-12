@@ -8,6 +8,7 @@ import {
   requireInternalRole,
 } from "@/lib/auth/internal-user";
 import { createJob } from "@/lib/actions/job-actions";
+import { markInternalNewWorkNotificationsResolved } from "@/lib/actions/notification-actions";
 import {
   normalizeContractorIntakeProjectType,
   resolveFinalizedContractorIntakeTitle,
@@ -603,19 +604,22 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
 
   if (proposalUpdateErr) throw proposalUpdateErr;
 
-  // Mark any unread internal notifications tied to this proposal as read.
-  // The filterPendingProposalVisibilityRows guard uses the user-scoped client which may
-  // not be able to read the submission row (RLS) once status is no longer "pending",
-  // causing the fallback to keep the notification visible. Writing read_at here is
-  // the authoritative cleanup: it scopes to account + recipient_type to avoid touching
-  // unrelated notifications.
-  await admin
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("account_owner_user_id", accountOwnerUserId)
-    .eq("recipient_type", "internal")
-    .contains("payload", { contractor_intake_submission_id: submission.id })
-    .is("read_at", null);
+  try {
+    await markInternalNewWorkNotificationsResolved({
+      supabase: admin,
+      accountOwnerUserId,
+      contractorIntakeSubmissionId: submission.id,
+      jobId: created.id,
+      readAtIso: reviewedAtIso,
+    });
+  } catch (notificationResolutionError) {
+    console.error("[contractor-intake] Failed to resolve finalized new-work notifications", {
+      submissionId: submission.id,
+      jobId: created.id,
+      accountOwnerUserId,
+      error: notificationResolutionError,
+    });
+  }
 
   await admin.from("job_events").insert({
     job_id: created.id,
@@ -647,7 +651,33 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
 }
 
 export async function rejectContractorIntakeSubmissionFromForm(formData: FormData) {
-  const { userId, admin, accountOwnerUserId, submission } = await requireScopedPendingAdjudication(formData);
+  const submissionId = normalizeText(formData.get("submission_id"));
+  if (!isUuid(submissionId)) throw new Error("Invalid submission_id");
+
+  let scoped:
+    | {
+        userId: string;
+        admin: ReturnType<typeof createAdminClient>;
+        accountOwnerUserId: string;
+        submissionId: string;
+        submission: IntakeSubmissionRow;
+      }
+    | null = null;
+
+  try {
+    scoped = await requireScopedPendingAdjudication(formData);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    // Reject should be idempotent from the detail page and never hard-crash
+    // when a pending proposal has already been adjudicated.
+    if (message === "Intake submission is no longer pending") {
+      redirect(`/ops/admin/contractor-intake-submissions/${submissionId}?notice=already_reviewed`);
+    }
+
+    throw error;
+  }
+
+  const { userId, admin, accountOwnerUserId, submission } = scoped;
   const reviewNote = normalizeText(formData.get("review_note")) || null;
 
   const reviewedAtIso = new Date().toISOString();
@@ -665,15 +695,20 @@ export async function rejectContractorIntakeSubmissionFromForm(formData: FormDat
 
   if (error) throw error;
 
-  // Mark any unread internal notifications tied to this proposal as read;
-  // the proposal is no longer actionable once rejected.
-  await admin
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("account_owner_user_id", accountOwnerUserId)
-    .eq("recipient_type", "internal")
-    .contains("payload", { contractor_intake_submission_id: submission.id })
-    .is("read_at", null);
+  try {
+    await markInternalNewWorkNotificationsResolved({
+      supabase: admin,
+      accountOwnerUserId,
+      contractorIntakeSubmissionId: submission.id,
+      readAtIso: reviewedAtIso,
+    });
+  } catch (notificationResolutionError) {
+    console.error("[contractor-intake] Failed to resolve rejected proposal notifications", {
+      submissionId: submission.id,
+      accountOwnerUserId,
+      error: notificationResolutionError,
+    });
+  }
 
   revalidatePath("/ops");
   revalidatePath("/ops/admin/contractor-intake-submissions");
@@ -726,6 +761,22 @@ export async function markContractorIntakeSubmissionAsDuplicateFromForm(formData
     .eq("review_status", "pending");
 
   if (error) throw error;
+
+  try {
+    await markInternalNewWorkNotificationsResolved({
+      supabase: admin,
+      accountOwnerUserId,
+      contractorIntakeSubmissionId: submissionId,
+      readAtIso: reviewedAtIso,
+    });
+  } catch (notificationResolutionError) {
+    console.error("[contractor-intake] Failed to resolve duplicate proposal notifications", {
+      submissionId,
+      duplicateJobId,
+      accountOwnerUserId,
+      error: notificationResolutionError,
+    });
+  }
 
   revalidatePath("/ops");
   revalidatePath("/ops/admin/contractor-intake-submissions");

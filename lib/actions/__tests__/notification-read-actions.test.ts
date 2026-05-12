@@ -52,7 +52,19 @@ function makeSupabase(fixture: {
   notifications: NotificationRow[];
   submissions: SubmissionRow[];
   contractors?: Array<{ id: string; name: string }>;
-  jobs?: Array<{ id: string; title: string | null; customer_first_name: string | null; customer_last_name: string | null; city: string | null; contractor_id: string | null }>;
+  jobs?: Array<{
+    id: string;
+    title: string | null;
+    customer_first_name: string | null;
+    customer_last_name: string | null;
+    city: string | null;
+    contractor_id: string | null;
+    status?: string | null;
+    ops_status?: string | null;
+    scheduled_date?: string | null;
+    window_start?: string | null;
+    window_end?: string | null;
+  }>;
 }) {
   return {
     from(table: string) {
@@ -456,6 +468,121 @@ describe("internal notification readers", () => {
     const unreadCount = await getInternalUnreadNotificationCount();
 
     expect(unreadCount).toBe(0);
+  });
+
+  it("hides scheduled job new-work notifications from awareness and unread badges", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-job-stale-new-work",
+            account_owner_user_id: "owner-1",
+            job_id: "job-scheduled-1",
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_job_created",
+            subject: "Contractor job submitted",
+            body: "A contractor submitted a new job that needs internal review and scheduling.",
+            payload: { job_id: "job-scheduled-1" },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-23T09:00:00.000Z",
+          },
+        ],
+        submissions: [],
+        jobs: [
+          {
+            id: "job-scheduled-1",
+            title: "Scheduled follow-up",
+            customer_first_name: "Ava",
+            customer_last_name: "Reed",
+            city: "Pasadena",
+            contractor_id: "contractor-x",
+            status: "open",
+            ops_status: "scheduled",
+            scheduled_date: "2026-04-24",
+            window_start: "08:00",
+            window_end: "10:00",
+          },
+        ],
+      }),
+    );
+
+    const {
+      listInternalNewWorkRequestAwareness,
+      listInternalNotifications,
+      getInternalUnreadNotificationBadgeCount,
+    } = await import("@/lib/actions/notification-read-actions");
+
+    const awarenessRows = await listInternalNewWorkRequestAwareness({
+      limit: 20,
+      onlyUnread: true,
+    });
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+      filterKey: "new_job_notifications",
+    });
+    const unreadBadgeCount = await getInternalUnreadNotificationBadgeCount();
+
+    expect(awarenessRows).toHaveLength(0);
+    expect(notifications).toHaveLength(0);
+    expect(unreadBadgeCount).toBe(0);
+  });
+
+  it("keeps resolved scheduled new-work notifications in all/history view", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-job-scheduled-read",
+            account_owner_user_id: "owner-1",
+            job_id: "job-scheduled-2",
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_job_created",
+            subject: "Contractor job submitted",
+            body: "A contractor submitted a new job that needs internal review and scheduling.",
+            payload: { job_id: "job-scheduled-2" },
+            status: "queued",
+            read_at: "2026-04-24T09:30:00.000Z",
+            created_at: "2026-04-24T09:00:00.000Z",
+          },
+        ],
+        submissions: [],
+        jobs: [
+          {
+            id: "job-scheduled-2",
+            title: "Resolved job",
+            customer_first_name: "Nia",
+            customer_last_name: "Cole",
+            city: "Pasadena",
+            contractor_id: "contractor-z",
+            status: "open",
+            ops_status: "scheduled",
+            scheduled_date: "2026-04-24",
+            window_start: "13:00",
+            window_end: "15:00",
+          },
+        ],
+      }),
+    );
+
+    const { listInternalNotifications, getInternalUnreadNotificationBadgeCount } = await import(
+      "@/lib/actions/notification-read-actions"
+    );
+
+    const allNotifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: false,
+    });
+    const unreadBadgeCount = await getInternalUnreadNotificationBadgeCount();
+
+    expect(allNotifications).toHaveLength(1);
+    expect(allNotifications[0]?.id).toBe("notif-job-scheduled-read");
+    expect(allNotifications[0]?.notification_type).toBe("contractor_job_created");
+    expect(allNotifications[0]?.is_unread).toBe(false);
+    expect(unreadBadgeCount).toBe(0);
   });
 
   it("attaches job_enrichment to contractor update notifications", async () => {

@@ -16,6 +16,7 @@ import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions
 import {
   createContractorIntakeProposalAwarenessNotification,
   insertInternalNotificationForEvent,
+  markInternalNewWorkNotificationsResolved,
 } from "@/lib/actions/notification-actions";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import {
@@ -8653,6 +8654,23 @@ export async function updateJobScheduleFromForm(formData: FormData) {
 
     if (hasPriorContractorScheduleEmail) {
       await sendContractorScheduledEmailForJob({ supabase, jobId: id });
+    }
+  }
+
+  if (isScheduled) {
+    try {
+      await markInternalNewWorkNotificationsResolved({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        jobId: id,
+      });
+    } catch (notificationResolutionError) {
+      console.error("[jobs] Failed to resolve scheduled new-work notifications", {
+        jobId: id,
+        eventType: event_type,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        error: notificationResolutionError,
+      });
     }
   }
 

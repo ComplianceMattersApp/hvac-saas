@@ -509,6 +509,95 @@ async function filterPendingProposalVisibilityRows(
   });
 }
 
+function isJobNewWorkNotificationType(type: string): boolean {
+  return type === "contractor_job_created" || type === "internal_contractor_job_intake_email";
+}
+
+function isJobNewWorkStillActionable(job: {
+  status: string | null;
+  ops_status: string | null;
+  scheduled_date: string | null;
+  window_start: string | null;
+  window_end: string | null;
+}): boolean {
+  const status = String(job.status ?? "").trim().toLowerCase();
+  if (status === "cancelled" || status === "completed") return false;
+
+  const opsStatus = String(job.ops_status ?? "").trim().toLowerCase();
+  if (opsStatus === "scheduled") return false;
+
+  const hasScheduleWindow =
+    Boolean(String(job.scheduled_date ?? "").trim()) ||
+    Boolean(String(job.window_start ?? "").trim()) ||
+    Boolean(String(job.window_end ?? "").trim());
+
+  if (hasScheduleWindow) return false;
+  return true;
+}
+
+async function filterActiveJobNewWorkVisibilityRows(
+  supabase: any,
+  rows: NotificationRow[]
+): Promise<NotificationRow[]> {
+  const jobIds = Array.from(
+    new Set(
+      rows
+        .map((row) => {
+          const type = String(row.notification_type ?? "").trim().toLowerCase();
+          if (!isJobNewWorkNotificationType(type)) return null;
+          return notificationJobId(row);
+        })
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  if (!jobIds.length) return rows;
+
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("id, status, ops_status, scheduled_date, window_start, window_end")
+    .in("id", jobIds);
+
+  if (error) throw error;
+
+  const jobStateById = new Map<
+    string,
+    {
+      status: string | null;
+      ops_status: string | null;
+      scheduled_date: string | null;
+      window_start: string | null;
+      window_end: string | null;
+    }
+  >();
+
+  for (const row of data ?? []) {
+    const id = String((row as any)?.id ?? "").trim();
+    if (!id) continue;
+    jobStateById.set(id, {
+      status: (row as any)?.status ?? null,
+      ops_status: (row as any)?.ops_status ?? null,
+      scheduled_date: (row as any)?.scheduled_date ?? null,
+      window_start: (row as any)?.window_start ?? null,
+      window_end: (row as any)?.window_end ?? null,
+    });
+  }
+
+  return rows.filter((row) => {
+    const type = String(row.notification_type ?? "").trim().toLowerCase();
+    if (!isJobNewWorkNotificationType(type)) return true;
+
+    const jobId = notificationJobId(row);
+    if (!jobId) return true;
+
+    // Preserve signal when job row is not currently readable.
+    const state = jobStateById.get(jobId);
+    if (!state) return true;
+
+    return isJobNewWorkStillActionable(state);
+  });
+}
+
 export async function listInternalNotifications(params: {
   limit?: number;
   onlyUnread?: boolean;
@@ -561,7 +650,13 @@ export async function listInternalNotifications(params: {
     awarenessRows
   );
 
-  const filteredRows = pendingProposalRows.filter((row) =>
+  const shouldApplyActionableNewWorkFilter =
+    params.filterKey === "new_job_notifications" && Boolean(params.onlyUnread);
+  const sourceRows = shouldApplyActionableNewWorkFilter
+    ? await filterActiveJobNewWorkVisibilityRows(supabase, pendingProposalRows)
+    : pendingProposalRows;
+
+  const filteredRows = sourceRows.filter((row) =>
     matchesInternalNotificationFilter(row.notification_type, params.filterKey)
   );
 
@@ -691,7 +786,11 @@ export async function listInternalNewWorkRequestAwareness(params: {
     supabase,
     newWorkRows
   );
-  const dedupedProposalRows = dedupeProposalVisibilityRows(pendingProposalRows);
+  const activeJobNewWorkRows = await filterActiveJobNewWorkVisibilityRows(
+    supabase,
+    pendingProposalRows
+  );
+  const dedupedProposalRows = dedupeProposalVisibilityRows(activeJobNewWorkRows);
   const dedupedRows = dedupeJobIntakeVisibilityRows(dedupedProposalRows).slice(0, limit);
 
   return dedupedRows.map((row) => ({
@@ -785,7 +884,12 @@ export async function getInternalUnreadNotificationBadgeCount(params: {
     awarenessRows as NotificationRow[]
   );
 
-  const visibilityRows = dedupeProposalVisibilityRows(pendingProposalRows);
+  const activeJobNewWorkRows = await filterActiveJobNewWorkVisibilityRows(
+    supabase,
+    pendingProposalRows
+  );
+
+  const visibilityRows = dedupeProposalVisibilityRows(activeJobNewWorkRows);
   return visibilityRows.length;
 }
 
