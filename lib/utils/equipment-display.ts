@@ -7,6 +7,8 @@ export const EQUIPMENT_ROLE_LABELS: Record<string, string> = {
   furnace: "Furnace",
   heat_pump: "Heat Pump",
   package_unit: "Pack Unit",
+  mini_split_outdoor: "Mini-Split Outdoor",
+  mini_split_head: "Mini-Split Indoor Head",
   other: "Other",
 };
 

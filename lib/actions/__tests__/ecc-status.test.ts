@@ -138,7 +138,11 @@ describe("evaluateEccOpsStatus", () => {
       correctionResolutionEvent: null,
     });
 
-    expect(forceSetOpsStatusMock).toHaveBeenCalledWith("job-1", "failed");
+    expect(forceSetOpsStatusMock).toHaveBeenCalledWith(
+      "job-1",
+      "failed",
+      expect.objectContaining({ timing: undefined })
+    );
     expect(forceSetOpsStatusMock).toHaveBeenCalledTimes(1);
     expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
   });
@@ -161,7 +165,11 @@ describe("evaluateEccOpsStatus", () => {
       correctionResolutionEvent: { id: "event-1" },
     });
 
-    expect(forceSetOpsStatusMock).toHaveBeenCalledWith("job-1", "invoice_required");
+    expect(forceSetOpsStatusMock).toHaveBeenCalledWith(
+      "job-1",
+      "invoice_required",
+      expect.objectContaining({ timing: undefined })
+    );
     expect(forceSetOpsStatusMock).toHaveBeenCalledTimes(1);
     expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
   });
@@ -184,7 +192,11 @@ describe("evaluateEccOpsStatus", () => {
       correctionResolutionEvent: { id: "event-1" },
     });
 
-    expect(forceSetOpsStatusMock).toHaveBeenCalledWith("job-1", "closed");
+    expect(forceSetOpsStatusMock).toHaveBeenCalledWith(
+      "job-1",
+      "closed",
+      expect.objectContaining({ timing: undefined })
+    );
     expect(forceSetOpsStatusMock).toHaveBeenCalledTimes(1);
     expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
   });
@@ -219,7 +231,11 @@ describe("evaluateEccOpsStatus", () => {
       correctionResolutionEvent: null,
     });
 
-    expect(forceSetOpsStatusMock).toHaveBeenCalledWith("job-1", "closed");
+    expect(forceSetOpsStatusMock).toHaveBeenCalledWith(
+      "job-1",
+      "closed",
+      expect.objectContaining({ timing: undefined })
+    );
     expect(forceSetOpsStatusMock).toHaveBeenCalledTimes(1);
     expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
   });
@@ -293,7 +309,11 @@ describe("evaluateEccOpsStatus", () => {
 
     // anyPass=false, anyFail=false → not allRequiredPassed, not anyRequiredFail
     // field_complete=true → paperwork_required fallback
-    expect(setOpsStatusIfNotManualMock).toHaveBeenCalledWith("job-1", "paperwork_required");
+    expect(setOpsStatusIfNotManualMock).toHaveBeenCalledWith(
+      "job-1",
+      "paperwork_required",
+      expect.objectContaining({ timing: undefined })
+    );
     expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
   });
 
@@ -364,7 +384,11 @@ describe("evaluateEccOpsStatus", () => {
       correctionResolutionEvent: null,
     });
 
-    expect(forceSetOpsStatusMock).toHaveBeenCalledWith("job-1", "closed");
+    expect(forceSetOpsStatusMock).toHaveBeenCalledWith(
+      "job-1",
+      "closed",
+      expect.objectContaining({ timing: undefined })
+    );
     expect(forceSetOpsStatusMock).toHaveBeenCalledTimes(1);
   });
 });

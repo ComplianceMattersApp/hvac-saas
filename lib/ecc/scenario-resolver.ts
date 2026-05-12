@@ -90,6 +90,11 @@ function hasAny(types: string[], values: string[]) {
   return values.some((v) => types.includes(v));
 }
 
+export function isDuctlessMiniSplitSystem(systemEquipment: EquipmentLike[] | null | undefined): boolean {
+  const types = normalizeTypes(systemEquipment ?? []);
+  return has(types, "mini_split_head");
+}
+
 export function resolveEccScenario(args: {
   projectType: string | null | undefined;
   systemEquipment: EquipmentLike[] | null | undefined;
@@ -104,11 +109,10 @@ export function resolveEccScenario(args: {
   const hasHeatPump = has(types, "heat_pump");
   const hasPackage = has(types, "package_unit");
   const hasMiniSplitOutdoor = has(types, "mini_split_outdoor");
-  const hasMiniSplitHead = has(types, "mini_split_head");
 
-  const isMiniSplit = hasMiniSplitOutdoor || hasMiniSplitHead;
+  const isMiniSplit = isDuctlessMiniSplitSystem(args.systemEquipment);
   const isSplitLike =
-    hasCondenser || hasCoil || hasFurnace || hasAirHandler || hasHeatPump;
+    hasCondenser || hasCoil || hasFurnace || hasAirHandler || hasHeatPump || hasMiniSplitOutdoor;
 
   if (projectType === "new_construction") {
     return {

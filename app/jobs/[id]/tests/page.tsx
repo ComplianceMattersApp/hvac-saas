@@ -1,7 +1,7 @@
 // app/jobs/[id]/tests/page
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { resolveEccScenario } from "@/lib/ecc/scenario-resolver";
+import { isDuctlessMiniSplitSystem, resolveEccScenario } from "@/lib/ecc/scenario-resolver";
 import Link from "next/link";
 import PrintButton from "@/components/ui/PrintButton";
 import SubmitButton from "@/components/SubmitButton";
@@ -35,6 +35,7 @@ import {
   normalizeProjectTypeToRuleProfile,
   isPackageSystem,
 } from "@/lib/ecc/rule-profiles";
+import { isEccTestApplicableToSystem } from "@/lib/ecc/test-applicability";
 import { isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import { buildEquipmentSummaryLine } from "@/lib/utils/equipment-summary";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
@@ -78,16 +79,6 @@ function getTestDisplayLabel(testType: string, packageSystem: boolean) {
   }
 
   return baseLabel;
-}
-
-function isTestExcludedForHeatOnly(testType: string) {
-  const normalized = String(testType ?? "").trim().toLowerCase();
-  return normalized === "airflow" || normalized === "refrigerant_charge";
-}
-
-function isTestApplicableToSystem(testType: string, heatOnlySystem: boolean) {
-  if (!heatOnlySystem) return true;
-  return !isTestExcludedForHeatOnly(testType);
 }
 
 function getRequiredTestStatusForSystem(job: any, systemId: string, testType: EccTestType) {
@@ -756,12 +747,17 @@ export default async function JobTestsPage({
   const selectedSystemEquipment =
     equipmentBySystemId.get(canonicalId(selectedSystemId)) ?? [];
   const selectedSystemIsHeatOnly = isHeatOnlySystemEquipment(selectedSystemEquipment);
+  const selectedSystemIsDuctlessMiniSplit = isDuctlessMiniSplitSystem(selectedSystemEquipment);
+  const selectedSystemApplicability = {
+    heatOnlySystem: selectedSystemIsHeatOnly,
+    ductlessMiniSplit: selectedSystemIsDuctlessMiniSplit,
+  };
   const manualAddTestsForSystem = manualAddTests.filter((test) =>
-    isTestApplicableToSystem(String(test.code), selectedSystemIsHeatOnly)
+    isEccTestApplicableToSystem(String(test.code), selectedSystemApplicability)
   );
 
   const focusedType =
-    focusedTypeRaw && !isTestApplicableToSystem(focusedTypeRaw, selectedSystemIsHeatOnly)
+    focusedTypeRaw && !isEccTestApplicableToSystem(focusedTypeRaw, selectedSystemApplicability)
       ? ""
       : focusedTypeRaw;
 
@@ -778,7 +774,7 @@ export default async function JobTestsPage({
   const baselineRequiredTests = suggestedTests
     .filter((t) => t.required)
     .map((t) => t.testType)
-    .filter((testType) => isTestApplicableToSystem(testType, selectedSystemIsHeatOnly));
+    .filter((testType) => isEccTestApplicableToSystem(testType, selectedSystemApplicability));
 
   const parentRequiredOutcomes = new Map<EccTestType, "pass" | "fail" | "unknown">();
   for (const testType of baselineRequiredTests) {
@@ -810,7 +806,7 @@ export default async function JobTestsPage({
     : [];
 
   const applicableSystemRunTestTypes = systemRunTestTypes.filter((testType) =>
-    isTestApplicableToSystem(testType, selectedSystemIsHeatOnly)
+    isEccTestApplicableToSystem(testType, selectedSystemApplicability)
   );
 
   const visibleTestTypes = Array.from(
@@ -979,9 +975,10 @@ const defaultHeatingOutputBtu =
       });
 
     const systemIsHeatOnly = isHeatOnlySystemEquipment(systemEquipment);
+    const systemIsDuctlessMiniSplit = isDuctlessMiniSplitSystem(systemEquipment);
 
-    const runAirflow = systemIsHeatOnly ? null : pickLatestRunForSystem(job, "airflow", systemId);
-    const runDuct = pickLatestRunForSystem(job, "duct_leakage", systemId);
+    const runAirflow = systemIsHeatOnly || systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "airflow", systemId);
+    const runDuct = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "duct_leakage", systemId);
     const runRefrigerant = systemIsHeatOnly ? null : pickLatestRunForSystem(job, "refrigerant_charge", systemId);
 
     const packageSystem = isPackageSystem(systemEquipment);
@@ -1008,6 +1005,7 @@ const defaultHeatingOutputBtu =
       runDuct,
       runRefrigerant,
       systemIsHeatOnly,
+      systemIsDuctlessMiniSplit,
       packageSystem,
       packageEquipment,
       indoorEquipment,
@@ -1169,7 +1167,9 @@ const defaultHeatingOutputBtu =
                             </>
                           ) : (
                             <>
-                              <div className="font-semibold text-slate-900">Indoor Equipment</div>
+                              <div className="font-semibold text-slate-900">
+                                {sys.systemIsDuctlessMiniSplit ? "Mini-Split Indoor Head Equipment" : "Indoor Equipment"}
+                              </div>
                               {sys.indoorEquipment.length > 0 ? (
                                 sys.indoorEquipment.map((eq: any, index: number) => (
                                   <div key={String(eq?.id ?? `indoor-${sys.systemId}-${index}`)}>
@@ -1180,7 +1180,9 @@ const defaultHeatingOutputBtu =
                                 <div>—</div>
                               )}
 
-                              <div className="font-semibold text-slate-900 pt-1 print:pt-0.5">Condenser</div>
+                              <div className="font-semibold text-slate-900 pt-1 print:pt-0.5">
+                                {sys.systemIsDuctlessMiniSplit ? "Mini-Split Outdoor Equipment" : "Condenser"}
+                              </div>
                               {sys.outdoorEquipment.length > 0 ? (
                                 sys.outdoorEquipment.map((eq: any, index: number) => (
                                   <div key={String(eq?.id ?? `outdoor-${sys.systemId}-${index}`)}>
@@ -1212,7 +1214,9 @@ const defaultHeatingOutputBtu =
                     <div>
                       <span className="font-semibold text-slate-950">Airflow Summary:</span>
                       <div className="mt-1 space-y-1 text-slate-800">
-                        {sys.systemIsHeatOnly ? (
+                        {sys.systemIsDuctlessMiniSplit ? (
+                          <div>Not applicable for ductless mini split systems.</div>
+                        ) : sys.systemIsHeatOnly ? (
                           <div>Not applicable for heat-only system (no cooling equipment).</div>
                         ) : (
                           <>
@@ -1226,8 +1230,14 @@ const defaultHeatingOutputBtu =
                     <div>
                       <span className="font-semibold text-slate-950">Duct Leakage Summary:</span>
                       <div className="mt-1 space-y-1 text-slate-800">
-                        <div>Entered duct leakage value: {fmtValue(sys.runDuct?.data?.measured_duct_leakage_cfm, "CFM")}</div>
-                        <div>Result: {sys.runDuct ? getEffectiveResultLabel(sys.runDuct) : "No run"}</div>
+                        {sys.systemIsDuctlessMiniSplit ? (
+                          <div>Not applicable for ductless mini split systems.</div>
+                        ) : (
+                          <>
+                            <div>Entered duct leakage value: {fmtValue(sys.runDuct?.data?.measured_duct_leakage_cfm, "CFM")}</div>
+                            <div>Result: {sys.runDuct ? getEffectiveResultLabel(sys.runDuct) : "No run"}</div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

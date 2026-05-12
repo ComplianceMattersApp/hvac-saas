@@ -58,4 +58,23 @@ describe("buildEquipmentSummaryLine", () => {
     expect(line).toContain("Model: -");
     expect(line).toContain("Serial: -");
   });
+
+  it("keeps explicit mini-split labels in summary output", () => {
+    const outdoor = buildEquipmentSummaryLine({
+      equipment_role: "mini_split_outdoor",
+      manufacturer: "Mitsubishi",
+      model: "MXZ",
+      serial: "ODU-1",
+    });
+
+    const indoor = buildEquipmentSummaryLine({
+      equipment_role: "mini_split_head",
+      manufacturer: "Mitsubishi",
+      model: "MSZ",
+      serial: "IDU-1",
+    });
+
+    expect(outdoor).toContain("Mini-Split Outdoor");
+    expect(indoor).toContain("Mini-Split Indoor Head");
+  });
 });
