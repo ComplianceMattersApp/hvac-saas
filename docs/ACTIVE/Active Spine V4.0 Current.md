@@ -21,6 +21,40 @@ Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No co
 
 Current Program Status Note (May 2026)
 
+- Visit Scope / Work Items and Estimate Line Item smart-entry closeout is complete and pushed (May 2026):
+  - Work Items / Visit Scope smart entry:
+    - `/jobs/new` Step 5 now supports smarter Pricebook-assisted Work Item entry.
+    - Users can search/select active Pricebook items or add manual Work Items.
+    - Pricebook selection can prefill Work Item title, description, expected/default price, unit label, item type, and category.
+    - Work Items remain editable after selection and manual Work Items remain supported.
+    - Work Items remain operational visit scope, not billing records.
+    - Expected Work Item price remains a planning/default value only and does not auto-bill.
+  - `/jobs/new` flow clarification:
+    - Step 3 is classification/setup.
+    - Step 5 owns Reason for Visit / Dispatch Notes and Work Items.
+    - Entry flow was polished to reduce duplicate entry and form fatigue.
+  - `/jobs/[id]` polish:
+    - Visit Scope summary is compacted into an operational summary.
+    - Top job-detail header/work-needed area no longer repeats visit reason multiple times.
+    - Shared Notes visibility follows final rule: hidden for `hvac_service`; visible for non-HVAC internal modes (ECC/Hybrid/Master).
+    - Timeline, Internal Notes / Team Notes, and Visit Scope remain active narrative/work-summary surfaces.
+  - Estimate Line Item smart entry:
+    - Draft estimate line-item entry now uses one unified smart-entry surface.
+    - Users can search/select Pricebook items or manually type estimate lines from the same entry surface.
+    - Pricebook selection can prefill estimate line name, description, type, category, unit label, quantity, and unit price.
+    - Manual estimate lines remain supported.
+    - Estimate Lines remain proposed commercial scope and are not Work Items or Invoice Charges.
+    - No estimate email/PDF/customer approval/customer portal/conversion/payment/Stripe tenant payment/QBO behavior was added.
+  - Boundaries preserved:
+    - no schema changes
+    - no migrations
+    - no invoice import behavior change from Work Items
+    - no payment execution
+    - no ECC behavior change
+    - no contractor authority change
+    - no RLS/auth change
+    - no Support Console behavior change
+
 - HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 is complete and pushed (May 2026):
   - Added mode-aware Ops presentation for HVAC Service accounts.
   - In `hvac_service` mode, the primary contractor filter/search area is replaced with a compact Team Work Snapshot and a Work by Technician summary.

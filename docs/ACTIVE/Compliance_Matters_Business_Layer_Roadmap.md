@@ -318,6 +318,49 @@ Data/model decision:
 - Product mode should live in a dedicated account-level settings table, likely `account_settings`.
 - `product_mode` values:
   - `hybrid`
+
+### 3.7.2 Smart-entry closeout snapshot (May 2026)
+
+The Work Items / Visit Scope and Estimate Line Item smart-entry slices are complete and closed at the current quality bar.
+
+Work Items / Visit Scope closeout:
+- `/jobs/new` Step 5 supports smarter Pricebook-assisted Work Item entry.
+- Users can search/select active Pricebook items or add manual Work Items.
+- Pricebook selection can prefill Work Item title, description, expected/default price, unit label, item type, and category.
+- Work Items remain editable after selection.
+- Manual Work Items remain supported.
+- Work Items remain operational visit scope and are not billing records.
+- Expected Work Item price remains a planning/default value only and does not auto-bill.
+
+`/jobs/new` flow clarification closeout:
+- Step 3 is classification/setup.
+- Step 5 owns Reason for Visit / Dispatch Notes and Work Items.
+- Page flow polish reduced duplicate entry and form fatigue.
+
+`/jobs/[id]` polish closeout:
+- Visit Scope summary is compacted into an operational summary.
+- Top job-detail header/work-needed area no longer repeats visit reason multiple times.
+- Shared Notes follows final implemented visibility rule: hidden for `hvac_service`, visible for non-HVAC internal modes (ECC/Hybrid/Master).
+- Timeline, Internal Notes / Team Notes, and Visit Scope remain active narrative/work-summary surfaces.
+
+Estimate Line Item smart-entry closeout:
+- Draft estimate line-item entry now uses one unified smart-entry surface.
+- Users can search/select Pricebook items or manually type estimate lines from one entry surface.
+- Pricebook selection can prefill estimate line name, description, type, category, unit label, quantity, and unit price.
+- Manual estimate lines remain supported.
+- Estimate Lines remain proposed commercial scope.
+- Estimate Lines are not Work Items and are not Invoice Charges.
+- No estimate email, PDF, customer approval, customer portal estimate visibility, estimate-to-job conversion, estimate-to-invoice conversion, payment execution, Stripe tenant payment behavior, or QBO behavior was added.
+
+Boundary confirmation for this closeout:
+- no schema changes
+- no migrations
+- no invoice import behavior change from Work Items
+- no payment execution changes
+- no ECC behavior changes
+- no contractor authority changes
+- no RLS/auth/permission changes
+- no Support Console behavior changes
   - `hvac_service`
   - `ecc_hers`
 - `product_mode` should remain nullable in first implementation for safe rollout.

@@ -301,6 +301,52 @@ If any item here conflicts with the active spine, the spine wins.
   - schedule-only updates now preserve omitted permit fields server-side in `updateJobScheduleFromForm`.
   - omitted schedule-form submits no longer clear `permit_number`, `jurisdiction`, or `permit_date`.
   - no scheduling source-of-truth, lifecycle, notification, or queue semantics changes were made.
+
+### 2.3.7 Work Item and Estimate smart-entry closeout confirmation (completed)
+
+- Work Items / Visit Scope smart entry is complete:
+  - `/jobs/new` Step 5 supports Pricebook-assisted Work Item entry plus manual Work Item entry.
+  - Pricebook selection can prefill Work Item title, description, expected/default price, unit label, item type, and category.
+  - Work Items remain editable after selection.
+  - Work Items remain operational visit scope and not billing records.
+  - Expected Work Item price remains planning/default only and does not auto-bill.
+
+- `/jobs/new` flow clarification is complete:
+  - Step 3 is classification/setup.
+  - Step 5 owns Reason for Visit / Dispatch Notes and Work Items.
+  - Flow polish reduced duplicate entry/form fatigue.
+
+- `/jobs/[id]` polish is complete:
+  - Visit Scope summary compacted into an operational summary.
+  - Header/work-needed area no longer repeats visit reason multiple times.
+  - Shared Notes final visibility rule is active: hidden for `hvac_service`; visible for non-HVAC internal modes (ECC/Hybrid/Master).
+  - Timeline, Internal Notes / Team Notes, and Visit Scope remain active narrative/work-summary surfaces.
+
+- Estimate Line Item smart entry is complete:
+  - Draft estimate line-item entry now uses one unified smart-entry surface.
+  - Users can search/select Pricebook items or manually type estimate lines in the same entry flow.
+  - Pricebook selection can prefill estimate line name, description, type, category, unit label, quantity, and unit price.
+  - Manual estimate lines remain supported.
+  - Estimate Lines remain proposed commercial scope, not Work Items, and not Invoice Charges.
+
+- Confirmed non-expansions for this closeout:
+  - no estimate email enablement
+  - no PDF generation
+  - no customer approval/e-signature
+  - no customer portal estimate visibility
+  - no estimate-to-job conversion
+  - no estimate-to-invoice conversion
+  - no payment execution changes
+  - no Stripe tenant payment changes
+  - no QBO behavior changes
+
+- Boundary preservation confirmed:
+  - no schema changes
+  - no migrations
+  - no auth/RLS/permission changes
+  - no contractor authority changes
+  - no ECC behavior changes
+  - no Support Console behavior changes
   - secondary signals
   - assignment display
   - notifications

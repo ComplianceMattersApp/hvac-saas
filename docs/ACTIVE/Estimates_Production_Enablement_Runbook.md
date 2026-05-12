@@ -34,6 +34,13 @@ The latest clean-run Estimates rehearsal closed the earlier enabled-mode render-
 - Estimate Pricebook Editable Defaults V1 closeout is complete on the guarded internal baseline and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries.
 - Customer Estimate Profile Entry V1 closeout is complete on the guarded internal baseline (commits `bcfa9f7`, `b977c89`) and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries.
 - Job-context Estimate Entry Wiring V1 closeout is complete on the guarded internal baseline (commit `92df487`) and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries. Internal operators can now initiate estimate drafts from the job detail workspace with `customer_id`, `location_id`, `origin_job_id`, and `service_case_id` context carried into `/estimates/new`.
+- Estimate Line Item Smart Entry closeout is complete on the guarded internal baseline (commit `939b04d`) and does not alter runbook gates, production disabled-state behavior, or deferred/non-goal boundaries:
+	- draft estimate line-item entry now uses one unified smart-entry surface
+	- users can search/select active Pricebook items or manually type estimate lines from one entry area
+	- Pricebook selection can prefill estimate line name, description, type, category, unit label, quantity, and unit price
+	- manual estimate lines remain supported
+	- Estimate Lines remain proposed commercial scope and are not Work Items or Invoice Charges
+	- no estimate email/PDF/customer approval/customer portal/conversion/payment/Stripe tenant payment/QBO behavior was added
 
 ### Locked internal-only boundaries for this runbook
 

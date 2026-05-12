@@ -223,8 +223,14 @@ Pricebook-backed drafting should stay aligned to that boundary:
 	- Work Item expected/default price does not auto-bill.
 	- `/jobs/new` flow ownership is clarified: Step 3 is classification/setup; Step 5 owns Reason for Visit and Work Items.
 	- `/jobs/[id]` Visit Scope and top summary/header were compacted for readability (duplicate visit-reason echoes removed; Work Needed summarizes Work Items only).
-	- Shared Notes is now hidden from internal job detail for all internal product modes because it has no current operational use.
-	- Estimates were not changed and remain a separate future consideration.
+	- Shared Notes follows the final implemented rule on internal job detail: hidden for `hvac_service`; visible for non-HVAC internal modes (ECC/Hybrid/Master).
+	- Estimate Line Item smart-entry closeout is complete and remains model-separated from Visit Scope:
+		- draft estimate line-item entry now uses one unified smart-entry surface
+		- users can search/select Pricebook items or manually type estimate lines from one entry surface
+		- Pricebook selection can prefill estimate line name, description, type, category, unit label, quantity, and unit price
+		- manual estimate lines remain supported
+		- Estimate Lines remain proposed commercial scope, not Work Items, and not Invoice Charges
+		- no estimate email/PDF/customer approval/customer portal/conversion/payment/Stripe tenant payment/QBO behavior was added
 	- Non-change boundaries preserved: no schema/migrations, no auth/RLS/permission changes, no contractor-authority changes, no invoice issue/send/payment behavior changes, no ECC behavior changes, and no Work Item save/edit ownership change.
 
 Future end-of-road UX review note (deferred):
