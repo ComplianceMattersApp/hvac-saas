@@ -85,10 +85,10 @@ export default function EquipmentEditCard({
                 {showHeatingCapacity && eq.heating_output_btu ? (
                   <div>Heating: {Number(eq.heating_output_btu).toLocaleString()} BTU/h</div>
                 ) : showHeatingCapacity && eq.heating_capacity_kbtu ? (
-                  <div>Capacity: {eq.heating_capacity_kbtu} KBTU/h</div>
+                  <div>Heating Input: {eq.heating_capacity_kbtu} KBTU/h</div>
                 ) : null}
                 {showHeatingCapacity && eq.heating_efficiency_percent ? (
-                  <div>Efficiency: {eq.heating_efficiency_percent}%</div>
+                  <div>Efficiency / AFUE: {eq.heating_efficiency_percent}%</div>
                 ) : null}
                 {!showHeatingCapacity && eq.tonnage ? <div>Tonnage: {eq.tonnage}</div> : null}
                 {showRefrigerant && eq.refrigerant_type ? <div>Refrigerant: {eq.refrigerant_type}</div> : null}
@@ -245,19 +245,24 @@ export default function EquipmentEditCard({
                 className="mb-1.5 block text-xs font-medium text-gray-700"
                 htmlFor={showHeatingCapacity ? `hc-${eq.id}` : `ton-${eq.id}`}
               >
-                {showHeatingCapacity ? "Heating Capacity (KBTU/h)" : "Tonnage"}
+                {showHeatingCapacity ? "Heating Input (KBTU/h)" : "Tonnage"}
               </label>
               {showHeatingCapacity ? (
-                <input
-                  id={`hc-${eq.id}`}
-                  name="heating_capacity_kbtu"
-                  type="number"
-                  step="1"
-                  min="0"
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  defaultValue={eq.heating_capacity_kbtu ?? ""}
-                  placeholder="120"
-                />
+                <>
+                  <input
+                    id={`hc-${eq.id}`}
+                    name="heating_capacity_kbtu"
+                    type="number"
+                    step="1"
+                    min="0"
+                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    defaultValue={eq.heating_capacity_kbtu ?? ""}
+                    placeholder="120"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Enter thousands of BTU/h, for example 66 for 66,000 BTU/h.
+                  </p>
+                </>
               ) : (
                 <input
                   id={`ton-${eq.id}`}
@@ -293,7 +298,7 @@ export default function EquipmentEditCard({
             {showHeatingCapacity && (
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`eff-${eq.id}`}>
-                  Efficiency %
+                  Efficiency / AFUE %
                 </label>
                 <input
                   id={`eff-${eq.id}`}

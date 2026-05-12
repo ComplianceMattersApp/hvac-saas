@@ -97,7 +97,7 @@ export default function EquipmentCreateForm({
 
               <div>
                 <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor={showHeatingCapacity ? "heating_capacity_kbtu" : "tonnage"}>
-                  {showHeatingCapacity ? "Heating Capacity (KBTU/h)" : "Tonnage"} (optional)
+                  {showHeatingCapacity ? "Heating Input (KBTU/h)" : "Tonnage"} (optional)
                 </label>
                 <input
                   id={showHeatingCapacity ? "heating_capacity_kbtu" : "tonnage"}
@@ -108,6 +108,11 @@ export default function EquipmentCreateForm({
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   placeholder={showHeatingCapacity ? "120" : "5"}
                 />
+                {showHeatingCapacity ? (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Enter thousands of BTU/h, for example 66 for 66,000 BTU/h.
+                  </p>
+                ) : null}
               </div>
 
               {showHeatingCapacity && (
@@ -130,7 +135,7 @@ export default function EquipmentCreateForm({
               {showHeatingCapacity && (
                 <div>
                   <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="heating_efficiency_percent">
-                    Efficiency % (optional)
+                    Efficiency / AFUE % (optional)
                   </label>
                   <input
                     id="heating_efficiency_percent"

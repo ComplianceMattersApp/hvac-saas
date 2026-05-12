@@ -2855,7 +2855,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                             className="rounded-md border border-slate-300 p-2"
                             placeholder={
                               componentUsesHeatingCapacity(c.type)
-                                ? "Heating Capacity (KBTU/h) (optional)"
+                                ? "Heating Input (KBTU/h) (optional)"
                                 : "Tonnage (optional)"
                             }
                             value={c.tonnage}
@@ -2875,7 +2875,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                           {componentUsesHeatingCapacity(c.type) && (
                             <input
                               className="rounded-md border border-slate-300 p-2"
-                              placeholder="Efficiency % (e.g. 80 for AFUE 80) (optional)"
+                              placeholder="Efficiency / AFUE % (e.g. 80) (optional)"
                               type="number"
                               min="1"
                               max="100"

@@ -35,7 +35,8 @@ import {
   normalizeProjectTypeToRuleProfile,
   isPackageSystem,
 } from "@/lib/ecc/rule-profiles";
-import { equipmentRoleLabel, isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
+import { isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
+import { buildEquipmentSummaryLine } from "@/lib/utils/equipment-summary";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
@@ -238,12 +239,7 @@ function formatBusinessDateTimeUS(value?: string | null) {
 }
 
 function equipmentSummaryLine(eq: any) {
-  const rawType = String(eq?.equipment_role ?? eq?.component_type ?? "").trim();
-  const equipmentType = rawType ? equipmentRoleLabel(rawType) : "—";
-  const manufacturer = fallbackText(eq?.manufacturer);
-  const model = fallbackText(eq?.model);
-  const serial = fallbackText(eq?.serial);
-  return `${equipmentType} | Manufacturer: ${manufacturer} | Model: ${model} | Serial: ${serial}`;
+  return buildEquipmentSummaryLine(eq);
 }
 
 function canonicalId(value: unknown) {
@@ -1581,7 +1577,7 @@ const defaultHeatingOutputBtu =
             <div className="text-xs text-slate-700">
               {isHeatOnlySystem ? (
                 <>
-                  Suggested heating capacity: <span className="font-medium">{fmtValue(defaultHeatingCapacityKbtu, "KBTU/h")}</span>
+                  Suggested heating input: <span className="font-medium">{fmtValue(defaultHeatingCapacityKbtu, "KBTU/h")}</span>
                 </>
               ) : (
                 <>
@@ -1768,7 +1764,7 @@ const defaultHeatingOutputBtu =
               <div className="font-semibold text-slate-800">System Reference</div>
               <div>{selectedSystemName}</div>
               {isHeatOnlySystem ? (
-                <div>Suggested heating capacity: {fmtValue(defaultHeatingCapacityKbtu, "KBTU/h")}</div>
+                <div>Suggested heating input: {fmtValue(defaultHeatingCapacityKbtu, "KBTU/h")}</div>
               ) : (
                 <div>Suggested tonnage: {fmtValue(defaultSystemTonnage, "ton")}</div>
               )}
