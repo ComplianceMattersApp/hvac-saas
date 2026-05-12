@@ -123,7 +123,7 @@ type LedgerLocationRow = {
 };
 
 const CLOSEOUT_BLOCKED_STATUSES = '("pending_info","pending_office_review","failed","retest_needed","on_hold")';
-const CLOSEOUT_EXCLUDED_STATUSES = '("pending_info","pending_office_review","failed","retest_needed","on_hold","closed")';
+const CLOSEOUT_EXCLUDED_STATUSES = '("pending_info","on_hold","closed")';
 const CERT_BLOCKED_STATUSES = '("failed","retest_needed","pending_office_review")';
 
 const JOB_BASE_SELECT =

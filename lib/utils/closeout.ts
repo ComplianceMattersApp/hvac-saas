@@ -8,10 +8,13 @@ export type CloseoutProjectionInput = {
 
 const BLOCKED_CLOSEOUT_STATUSES = new Set([
   "pending_info",
-  "pending_office_review",
+  "on_hold",
+]);
+
+const ECC_FAILURE_STATUSES = new Set([
   "failed",
   "retest_needed",
-  "on_hold",
+  "pending_office_review",
 ]);
 
 export function getCloseoutNeeds(job: CloseoutProjectionInput) {
@@ -19,11 +22,7 @@ export function getCloseoutNeeds(job: CloseoutProjectionInput) {
   const opsStatus = String(job.ops_status ?? "").toLowerCase();
   const isService = jobType === "service";
   const isEcc = jobType === "ecc";
-  const isFailureFlow =
-    isEcc &&
-    (opsStatus === "failed" ||
-      opsStatus === "retest_needed" ||
-      opsStatus === "pending_office_review");
+  const isFailureFlow = isEcc && ECC_FAILURE_STATUSES.has(opsStatus);
   const isBlockedForCloseout = BLOCKED_CLOSEOUT_STATUSES.has(opsStatus);
   // Use lifecycle completion booleans as source-of-truth for closeout queue projection.
   const needsInvoice = !Boolean(job.invoice_complete);
