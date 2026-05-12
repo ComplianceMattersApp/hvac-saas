@@ -50,7 +50,11 @@ type AuthOwnerRow = {
   invited_at: string | null;
   email_confirmed_at: string | null;
   confirmed_at: string | null;
+  user_metadata: Record<string, unknown> | null;
 };
+
+const DEFAULT_INTERNAL_BUSINESS_DISPLAY_NAME = "Compliance Matters";
+const OWNER_CONSOLE_COMPANY_NAME_PLACEHOLDER = "Awaiting company setup";
 
 export type PlatformOwnerDashboardSummary = {
   totalAccounts: number;
@@ -215,6 +219,69 @@ function statusInSet(status: string | null, values: string[]) {
   return values.includes(normalized);
 }
 
+function readAuthMetadataString(
+  metadata: Record<string, unknown> | null,
+  key: string,
+): string | null {
+  if (!metadata || typeof metadata !== "object") return null;
+  const value = toCleanString((metadata as Record<string, unknown>)[key]);
+  return value || null;
+}
+
+function resolveCapturedSignupCompanyName(authOwner: AuthOwnerRow | null): string | null {
+  if (!authOwner?.user_metadata) return null;
+
+  const metadata = authOwner.user_metadata;
+  const candidate =
+    readAuthMetadataString(metadata, "business_display_name") ||
+    readAuthMetadataString(metadata, "businessDisplayName") ||
+    readAuthMetadataString(metadata, "company_name") ||
+    readAuthMetadataString(metadata, "companyName") ||
+    readAuthMetadataString(metadata, "organization_name") ||
+    readAuthMetadataString(metadata, "organizationName") ||
+    readAuthMetadataString(metadata, "company");
+
+  if (!candidate) return null;
+  return candidate;
+}
+
+function isUnsafePlatformDefaultName(value: string): boolean {
+  return value.trim().toLowerCase() === DEFAULT_INTERNAL_BUSINESS_DISPLAY_NAME.toLowerCase();
+}
+
+function resolveOwnerConsoleCompanyName(params: {
+  businessProfileDisplayName: string | null;
+  authOwner: AuthOwnerRow | null;
+  ownerEmail: string | null;
+  internalOwnerEmails: Set<string>;
+}): string {
+  const businessProfileDisplayName = toCleanString(params.businessProfileDisplayName);
+  const ownerEmail = toCleanString(params.ownerEmail).toLowerCase();
+  const isInternalOwner = Boolean(ownerEmail) && params.internalOwnerEmails.has(ownerEmail);
+
+  const capturedSignupCompanyName = toCleanString(
+    resolveCapturedSignupCompanyName(params.authOwner),
+  );
+
+  if (businessProfileDisplayName) {
+    if (!isUnsafePlatformDefaultName(businessProfileDisplayName) || isInternalOwner) {
+      return businessProfileDisplayName;
+    }
+
+    if (capturedSignupCompanyName) {
+      return capturedSignupCompanyName;
+    }
+
+    return OWNER_CONSOLE_COMPANY_NAME_PLACEHOLDER;
+  }
+
+  if (capturedSignupCompanyName) {
+    return capturedSignupCompanyName;
+  }
+
+  return OWNER_CONSOLE_COMPANY_NAME_PLACEHOLDER;
+}
+
 export function isCurrentPlatformOwnerAccountRow(row: PlatformOwnerDashboardRow) {
   return statusInSet(row.entitlementStatus, ["active", "trial", "grace"]);
 }
@@ -302,6 +369,7 @@ export function buildPlatformOwnerDashboardModel(input: {
   internalUsers: InternalUserRow[];
   ownerProfiles: ProfileRow[];
   ownerAuthUsers: AuthOwnerRow[];
+  internalOwnerEmails?: Set<string>;
 }): PlatformOwnerDashboardModel {
   const settingsByOwner = new Map(
     input.accountSettings.map((row) => [toCleanString(row.account_owner_user_id), row]),
@@ -336,10 +404,16 @@ export function buildPlatformOwnerDashboardModel(input: {
       const ownerProfile = ownerProfilesById.get(ownerId) ?? null;
       const ownerAuthUser = ownerAuthUsersById.get(ownerId) ?? null;
       const userCounts = userCountsByOwner.get(ownerId) ?? { totalUsers: 0, activeUsers: 0 };
+      const ownerEmail = toCleanString(ownerProfile?.email) || toCleanString(ownerAuthUser?.email) || null;
 
       return {
-        company: toCleanString(profile.display_name) || "Unnamed account",
-        ownerEmail: toCleanString(ownerProfile?.email) || toCleanString(ownerAuthUser?.email) || null,
+        company: resolveOwnerConsoleCompanyName({
+          businessProfileDisplayName: toCleanString(profile.display_name) || null,
+          authOwner: ownerAuthUser,
+          ownerEmail,
+          internalOwnerEmails: input.internalOwnerEmails ?? new Set<string>(),
+        }),
+        ownerEmail,
         ownerName: toCleanString(ownerProfile?.full_name) || null,
         accountOwnerUserId: ownerId,
         productMode: normalizeProductMode(settings?.product_mode),
@@ -396,6 +470,10 @@ async function listAuthUsersByIds(admin: any, userIds: string[]) {
         invited_at: toCleanString(user?.invited_at) || null,
         email_confirmed_at: toCleanString(user?.email_confirmed_at) || null,
         confirmed_at: toCleanString(user?.confirmed_at) || null,
+        user_metadata:
+          user?.user_metadata && typeof user.user_metadata === "object"
+            ? (user.user_metadata as Record<string, unknown>)
+            : null,
       });
       wanted.delete(id);
     }
@@ -409,6 +487,7 @@ async function listAuthUsersByIds(admin: any, userIds: string[]) {
 
 export async function loadPlatformOwnerDashboardModel(params: { admin: any }) {
   const admin = params.admin;
+  const internalOwnerEmails = parseInternalAccountEmails(process.env);
 
   const [{ data: businessProfiles, error: businessProfilesError }, { data: accountSettings, error: accountSettingsError }, { data: entitlements, error: entitlementsError }, { data: internalUsers, error: internalUsersError }] = await Promise.all([
     admin
@@ -446,5 +525,6 @@ export async function loadPlatformOwnerDashboardModel(params: { admin: any }) {
     internalUsers: Array.isArray(internalUsers) ? internalUsers : [],
     ownerProfiles: Array.isArray(ownerProfiles) ? ownerProfiles : [],
     ownerAuthUsers,
+    internalOwnerEmails,
   });
 }

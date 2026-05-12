@@ -64,6 +64,7 @@ describe("platform owner dashboard model", () => {
           invited_at: "2026-05-01T01:00:00.000Z",
           email_confirmed_at: null,
           confirmed_at: null,
+          user_metadata: null,
         },
       ],
     });
@@ -551,5 +552,95 @@ describe("friendly display helpers", () => {
     expect(formatOwnerConsoleDate("2026-05-10T13:10:00.000Z")).toMatch(/^\d{2}-\d{2}-\d{4}$/);
     expect(formatOwnerConsoleDate(null)).toBe("-");
     expect(formatOwnerConsoleDate("not-a-date")).toBe("-");
+  });
+});
+
+describe("owner console company fallback", () => {
+  function buildBaseInput() {
+    return {
+      businessProfiles: [
+        {
+          account_owner_user_id: "owner-1",
+          display_name: "Tenant Company",
+          billing_mode: "external_billing",
+          created_at: "2026-05-01T00:00:00.000Z",
+          updated_at: "2026-05-01T00:00:00.000Z",
+        },
+      ],
+      accountSettings: [],
+      entitlements: [],
+      internalUsers: [],
+      ownerProfiles: [{ id: "owner-1", email: "owner@example.com", full_name: "Owner" }],
+      ownerAuthUsers: [
+        {
+          id: "owner-1",
+          email: "owner@example.com",
+          invited_at: null,
+          email_confirmed_at: null,
+          confirmed_at: null,
+          user_metadata: null as Record<string, unknown> | null,
+        },
+      ],
+    };
+  }
+
+  it("prefers tenant business profile display name when present", () => {
+    const input = buildBaseInput();
+    const model = buildPlatformOwnerDashboardModel(input);
+
+    expect(model.rows[0]?.company).toBe("Tenant Company");
+  });
+
+  it("uses captured signup/provisioning company name when business profile shows platform default", () => {
+    const input = buildBaseInput();
+    input.businessProfiles[0] = {
+      ...input.businessProfiles[0],
+      display_name: "Compliance Matters",
+    };
+    input.ownerAuthUsers[0] = {
+      ...input.ownerAuthUsers[0],
+      user_metadata: {
+        business_display_name: "Angkor Heating and Air",
+      },
+    };
+
+    const model = buildPlatformOwnerDashboardModel(input);
+
+    expect(model.rows[0]?.company).toBe("Angkor Heating and Air");
+  });
+
+  it("uses neutral placeholder when no tenant-safe company name is available", () => {
+    const input = buildBaseInput();
+    input.businessProfiles[0] = {
+      ...input.businessProfiles[0],
+      display_name: "Compliance Matters",
+    };
+
+    const model = buildPlatformOwnerDashboardModel(input);
+
+    expect(model.rows[0]?.company).toBe("Awaiting company setup");
+  });
+
+  it("keeps platform/internal account company when explicitly internal", () => {
+    const input = buildBaseInput();
+    input.businessProfiles[0] = {
+      ...input.businessProfiles[0],
+      display_name: "Compliance Matters",
+    };
+    input.ownerProfiles[0] = {
+      ...input.ownerProfiles[0],
+      email: "internal@example.com",
+    };
+    input.ownerAuthUsers[0] = {
+      ...input.ownerAuthUsers[0],
+      email: "internal@example.com",
+    };
+
+    const model = buildPlatformOwnerDashboardModel({
+      ...input,
+      internalOwnerEmails: new Set(["internal@example.com"]),
+    });
+
+    expect(model.rows[0]?.company).toBe("Compliance Matters");
   });
 });
