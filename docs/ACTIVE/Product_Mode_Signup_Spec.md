@@ -265,6 +265,24 @@ HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 closeout snapsho
 - No new Related Company / Source model is introduced in this slice.
 - Non-change boundaries preserved: no schema/migrations/Supabase/RLS/auth/security/contractor-authority/portal-rule/notification/billing-engine/report-calculation/source-of-truth changes.
 
+Related Companies V1 planning snapshot (2026-05-12):
+
+- Decision: do not reuse `contractor_id` for Service-side related companies/sources.
+- HVAC Service-only future scope unless explicitly expanded; ECC/HERS and Hybrid/Master behavior remains unchanged.
+- V1 target: internal tracking only with account-scoped reusable related-company directory plus job/work-order relationship link.
+- V1 relationship types:
+   - Home Warranty Company
+   - Property Manager
+   - Builder
+   - Realtor
+   - Insurance
+   - Referral Source
+   - Other
+- V1 allows optional contact details and notes.
+- V1 excludes: portal access, authority model changes, contractor_id writes, billing behavior changes, `billing_recipient` changes, invoice/payment changes, notification behavior changes.
+- Deferred: service-case/customer/location defaults, billing responsibility workflows, estimate/invoice sharing, portal access, approval workflows, notifications, external party accounts.
+- Planning-only boundary: no schema changes, no migrations, no Supabase commands, no auth/RLS changes.
+
 Product Mode Signup Links V1 closeout snapshot (2026-05-10):
 
 - Product-specific public signup entry links are implemented.

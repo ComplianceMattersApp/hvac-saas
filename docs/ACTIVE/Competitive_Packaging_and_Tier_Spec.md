@@ -202,6 +202,7 @@ Recommended classification by capability:
 | Contractor intake/job-add | Pro included; optional Growth add-on | Hidden by default | included/add-on (ECC) / parked (HVAC default) | Not core to HVAC V0 |
 | Contractor correction submissions | Pro included; optional Growth add-on | Hidden by default | included/add-on (ECC) / parked (HVAC default) | ECC retest chain feature |
 | Retest-ready workflow | Pro included | Hidden/de-emphasized by default | included (ECC Pro) / parked (HVAC default) | HVAC uses return-visit/follow-up model |
+| Related Companies (internal tracking) | Not primary | HVAC Service V1 candidate | included (HVAC baseline candidate) / later (ECC, if explicitly expanded) | Separate from `contractor_id`; no portal/authority/billing behavior in V1 |
 | Estimates/quoting | Optional add-on later | Standard+ when production-ready | later | Enablement remains separately gated |
 | Advanced pricebook | Growth+ | Growth+ | included by tier | Shared commercial enhancement |
 | Recurring services | Later; optional | Growth/Pro target | later | Built later, not active now |
@@ -211,6 +212,12 @@ Recommended classification by capability:
 | Support console read-only | Optional premium add-on | Optional premium add-on | later | Runbook-gated operationally |
 | Customer portal | Future add-on only | Future add-on only | parked | Separate customer/location visibility design required |
 | QBO sync | Future add-on only | Future add-on only | later | Downstream integration only |
+
+Related Companies packaging boundary note (planning):
+
+- Related Companies V1 is positioned as internal HVAC Service tracking, not external-party access.
+- V1 must remain separated from contractor authority (`contractor_id`) and from billing truth behavior.
+- Advanced capabilities (billing responsibility workflows, estimate/invoice sharing, notifications, portal/external-party accounts) remain later tier/add-on roadmap work.
 
 ## 9. Competitive Positioning Summary
 

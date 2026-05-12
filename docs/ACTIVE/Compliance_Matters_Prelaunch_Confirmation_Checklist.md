@@ -453,6 +453,50 @@ If any item here conflicts with the active spine, the spine wins.
   - no billing engine/invoice/payment/Stripe/QBO/report-calculation changes
   - no source-of-truth changes and no codebase split
 
+### 2.3.11 Related Companies V1 planning (future HVAC Service feature; no implementation in this slice)
+- Decision: do not reuse `contractor_id` for Service-side related companies/sources.
+- Reason: contractor model is authority/workflow-coupled (portal visibility, contractor workflows, emails, duplicate matching, billing defaults).
+- Product scope: HVAC Service only unless explicitly expanded later.
+- Explicit unchanged behavior:
+  - Hybrid / Master / All-in-One unchanged
+  - ECC/HERS contractor behavior unchanged
+- V1 planned scope:
+  - internal tracking only
+  - account-scoped reusable related-company directory
+  - job/work-order relationship link
+  - relationship types:
+    - Home Warranty Company
+    - Property Manager
+    - Builder
+    - Realtor
+    - Insurance
+    - Referral Source
+    - Other
+  - optional contact details and notes
+- V1 planned exclusions:
+  - no portal access
+  - no authority model changes
+  - no contractor_id writes
+  - no billing behavior changes
+  - no `billing_recipient` changes
+  - no invoice/payment behavior changes
+  - no notification behavior changes
+- Deferred:
+  - service-case/customer/location-level defaults
+  - billing responsibility workflows
+  - estimate/invoice sharing
+  - portal access
+  - approval workflows
+  - notifications
+  - external party accounts
+- Planning-pass boundary:
+  - no schema changes
+  - no migrations
+  - no Supabase commands
+  - no auth/RLS changes
+  - no contractor authority changes
+  - no billing/payment/Stripe/QBO changes
+
 Roadmap-forward note:
 - Future backlog: Line Item Source Consolidation / Pricebook-style Entry.
 - Long-term direction should reduce duplicate/similar line-item entry paths and favor selecting from Pricebook or adding manual line items through the same clean Pricebook-like entry pattern.

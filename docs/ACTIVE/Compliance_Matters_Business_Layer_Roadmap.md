@@ -448,6 +448,36 @@ HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 closeout note:
 - Future service-side external-company/source/bill-to modeling remains separate backlog and was not introduced in this slice.
 - Boundaries preserved: no schema/migrations/Supabase/RLS/auth/security/contractor-authority/portal-rule/notification/billing-engine/report/source-of-truth changes.
 
+Related Companies V1 (future HVAC Service feature) planning note:
+
+- Naming: `Related Companies`.
+- Decision: Service-side third-party company/source tracking must not reuse `jobs.contractor_id`.
+- Rationale: contractor model is authority-coupled and behavior-coupled (portal visibility, contractor workflows, email paths, duplicate matching, billing defaults).
+- Product scope: HVAC Service mode only unless explicitly expanded later.
+- Explicit non-change scope: ECC/HERS contractor behavior unchanged; Hybrid/Master/All-in-One unchanged.
+- V1 recommended scope:
+  - internal tracking only
+  - account-scoped reusable related-company directory
+  - job/work-order-level relationship link
+  - relationship types: Home Warranty Company, Property Manager, Builder, Realtor, Insurance, Referral Source, Other
+  - optional contact details and notes
+- V1 hard exclusions:
+  - no portal access
+  - no authority model changes
+  - no contractor_id writes
+  - no billing behavior changes (`billing_recipient` and billing truth unchanged)
+  - no invoice/payment behavior changes
+  - no notification behavior changes
+- Deferred phases:
+  - service-case/customer/location defaults
+  - billing responsibility workflows
+  - estimate/invoice sharing
+  - portal access
+  - approval workflows
+  - notifications
+  - external party accounts
+- Planning-only guardrail: no schema changes, no migrations, no Supabase commands, no auth/RLS changes in this planning pass.
+
 Owner Signup Visibility V1 closeout note:
 
 - Owner Signup Visibility V1 is implemented as a read-only allowlisted observability slice.

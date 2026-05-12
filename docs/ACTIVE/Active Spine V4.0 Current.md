@@ -73,6 +73,26 @@ Current Program Status Note (May 2026)
   - This slice does not introduce a new Related Company / Source model; future home-warranty/property-manager/referral/bill-to modeling remains separate backlog.
   - Explicit non-changes preserved: no schema/migration/Supabase/RLS/auth/authority/portal-rule/notification/billing-engine/report-calculation/source-of-truth changes.
 
+- Related Companies V1 (future HVAC Service feature) planning is documented (May 2026):
+  - Decision: do not reuse `contractor_id` for Service-side home warranty companies, property managers, builders, realtors, insurance companies, referral sources, or third-party bill-to contacts.
+  - Reason: contractor model carries authority/workflow effects (portal visibility, contractor workflows, emails, duplicate matching, billing defaults) and is not a passive related-company/source model.
+  - Product scope: HVAC Service mode only unless explicitly expanded later.
+  - Explicit non-changes: Hybrid / Master / All-in-One behavior unchanged; ECC/HERS contractor behavior unchanged.
+  - Recommended V1 shape:
+    - internal tracking only
+    - account-scoped reusable related-company directory
+    - job/work-order-level relationship link
+    - relationship types: Home Warranty Company, Property Manager, Builder, Realtor, Insurance, Referral Source, Other
+    - optional contact details and notes
+  - V1 exclusions:
+    - no portal access
+    - no authority model
+    - no contractor_id writes
+    - no billing behavior change (`billing_recipient` and billing truth unchanged)
+    - no invoice/payment/notification behavior change
+  - Deferred to later phases: service-case/customer/location defaults, billing responsibility workflows, estimate/invoice sharing, portal access, approval workflows, notifications, external party accounts.
+  - Planning-only boundary: no schema changes, no migrations, no Supabase commands, no auth/RLS changes.
+
 - Field Bus Improvement Passes closeout is complete and pushed (May 2026):
   - New Job Alert lifecycle cleanup:
     - New job/new work alerts no longer act as active unread awareness once scheduled, finalized, rejected, or otherwise handled.
