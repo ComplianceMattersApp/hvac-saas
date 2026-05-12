@@ -37,6 +37,11 @@ function addressLine(j: any) {
   return addr || city || "No address";
 }
 
+function contractorDisplayName(j: any) {
+  const contractor = Array.isArray(j?.contractors) ? j.contractors[0] : j?.contractors;
+  return String(contractor?.name ?? "").trim() || "Unassigned contractor";
+}
+
 function jobTitle(j: any) {
   return String(j?.title ?? "").trim() || `Job ${String(j?.id ?? "").slice(0, 8)}`;
 }
@@ -149,6 +154,7 @@ export default async function CallListPage({
             const addr = addressLine(j);
             const title = jobTitle(j);
             const badge = jobTypeBadge(j);
+            const contractorName = contractorDisplayName(j);
             const createdMs = j.created_at ? new Date(j.created_at).getTime() : null;
             const ageDays =
               createdMs != null
@@ -171,8 +177,8 @@ export default async function CallListPage({
                 key={jobId}
                 className="rounded-xl border border-l-4 border-slate-200 border-l-blue-900/25 bg-white px-4 py-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.45)] transition-colors hover:border-slate-300 hover:border-l-blue-900/35 sm:px-5"
               >
-                <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1.08fr)_minmax(22rem,0.92fr)] md:items-start md:gap-5">
-                  {/* Left: job + customer */}
+                <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(16rem,1.05fr)_minmax(14rem,0.72fr)_minmax(18rem,0.9fr)] lg:items-start lg:gap-5">
+                  {/* Left: job + customer + contractor */}
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
@@ -193,13 +199,19 @@ export default async function CallListPage({
                       ) : null}
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-800">{name}</div>
-                    <div className="mt-1 text-sm leading-5 text-slate-500">{addr}</div>
+                    <div className="mt-2 grid gap-1 text-sm leading-5 text-slate-500">
+                      <div>
+                        <span className={labelClass}>Contractor</span>
+                        <div className="font-medium text-slate-700">{contractorName}</div>
+                      </div>
+                      <div>{addr}</div>
+                    </div>
                   </div>
 
-                  {/* Right: contact + schedule */}
-                  <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+                  {/* Center: contact + schedule status */}
+                  <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
                     {phone ? (
-                      <div className="grid gap-1.5 sm:grid-cols-[5.25rem_minmax(0,1fr)] sm:items-center">
+                      <div className="grid gap-1.5">
                         <span className={labelClass}>Phone</span>
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
                           {phoneHref ? (
@@ -227,82 +239,83 @@ export default async function CallListPage({
                         </div>
                       </div>
                     ) : (
-                      <div className="grid gap-1.5 sm:grid-cols-[5.25rem_minmax(0,1fr)] sm:items-center">
+                      <div className="grid gap-1.5">
                         <span className={labelClass}>Phone</span>
                         <span className="text-sm text-slate-400">No phone on file</span>
                       </div>
                     )}
-                    <div className="grid gap-1.5 sm:grid-cols-[5.25rem_minmax(0,1fr)] sm:items-start">
-                      <span className={`${labelClass} pt-1`}>Schedule</span>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={subtleChipClass}>
-                            {scheduledText ?? "Not scheduled"}
-                          </span>
-                          <details className="group">
-                            <summary className={`${outlineActionClass} cursor-pointer list-none gap-1.5`}>
-                              <span>Scheduler</span>
-                              <span className="text-[10px] text-slate-400 transition-transform duration-150 group-open:rotate-180" aria-hidden="true">
-                                v
-                              </span>
-                            </summary>
-                            <form action={updateJobScheduleFromForm} className="mt-2 space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.35)]">
-                              <input type="hidden" name="job_id" value={jobId} />
-                              <input type="hidden" name="permit_number" value={String(j?.permit_number ?? "")} />
-                              <input type="hidden" name="jurisdiction" value={String(j?.jurisdiction ?? "")} />
-                              <input type="hidden" name="permit_date" value={String(j?.permit_date ?? "")} />
-                              <input type="hidden" name="return_to" value={returnTo} />
-
-                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                                <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                  Date
-                                  <input
-                                    type="date"
-                                    name="scheduled_date"
-                                    defaultValue={String(j?.scheduled_date ?? "")}
-                                    className={fieldClass}
-                                  />
-                                </label>
-                                <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                  Start
-                                  <input
-                                    type="time"
-                                    name="window_start"
-                                    defaultValue={timeToTimeInput(j?.window_start)}
-                                    className={fieldClass}
-                                  />
-                                </label>
-                                <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                  End
-                                  <input
-                                    type="time"
-                                    name="window_end"
-                                    defaultValue={timeToTimeInput(j?.window_end)}
-                                    className={fieldClass}
-                                  />
-                                </label>
-                              </div>
-
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <button type="submit" className={primaryActionClass}>
-                                  Save Schedule
-                                </button>
-                                <button
-                                  type="submit"
-                                  name="unschedule"
-                                  value="1"
-                                  className={outlineActionClass}
-                                >
-                                  Clear
-                                </button>
-                              </div>
-                              <p className="text-[10px] text-slate-500">Uses the same scheduling rules as Job Workspace.</p>
-                            </form>
-                          </details>
-                        </div>
-                      </div>
+                    <div className="grid gap-1.5">
+                      <span className={labelClass}>Schedule</span>
+                      <span className={subtleChipClass}>
+                        {scheduledText ?? "Not scheduled"}
+                      </span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5 sm:pl-[5.25rem]">
+                  </div>
+
+                  {/* Right: workflow actions */}
+                  <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+                    <span className={labelClass}>Actions</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <details className="group">
+                        <summary className={`${outlineActionClass} cursor-pointer list-none gap-1.5`}>
+                          <span>Scheduler</span>
+                          <span className="text-[10px] text-slate-400 transition-transform duration-150 group-open:rotate-180" aria-hidden="true">
+                            v
+                          </span>
+                        </summary>
+                        <form action={updateJobScheduleFromForm} className="mt-2 space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.35)]">
+                          <input type="hidden" name="job_id" value={jobId} />
+                          <input type="hidden" name="permit_number" value={String(j?.permit_number ?? "")} />
+                          <input type="hidden" name="jurisdiction" value={String(j?.jurisdiction ?? "")} />
+                          <input type="hidden" name="permit_date" value={String(j?.permit_date ?? "")} />
+                          <input type="hidden" name="return_to" value={returnTo} />
+
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                            <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                              Date
+                              <input
+                                type="date"
+                                name="scheduled_date"
+                                defaultValue={String(j?.scheduled_date ?? "")}
+                                className={fieldClass}
+                              />
+                            </label>
+                            <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                              Start
+                              <input
+                                type="time"
+                                name="window_start"
+                                defaultValue={timeToTimeInput(j?.window_start)}
+                                className={fieldClass}
+                              />
+                            </label>
+                            <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                              End
+                              <input
+                                type="time"
+                                name="window_end"
+                                defaultValue={timeToTimeInput(j?.window_end)}
+                                className={fieldClass}
+                              />
+                            </label>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <button type="submit" className={primaryActionClass}>
+                              Save Schedule
+                            </button>
+                            <button
+                              type="submit"
+                              name="unschedule"
+                              value="1"
+                              className={outlineActionClass}
+                            >
+                              Clear
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-slate-500">Uses the same scheduling rules as Job Workspace.</p>
+                        </form>
+                      </details>
                       <form action={logCustomerContactAttemptFromForm}>
                         <input type="hidden" name="job_id" value={jobId} />
                         <input type="hidden" name="method" value="call" />

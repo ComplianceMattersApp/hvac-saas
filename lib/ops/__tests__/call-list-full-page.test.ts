@@ -40,6 +40,12 @@ describe("/ops/call-list page", () => {
     expect(callListPageSource).toContain('eq("status", "open")');
   });
 
+  it("includes and renders the contractor name in the call-list card context", () => {
+    expect(callListPageSource).toContain("contractors(name)");
+    expect(callListPageSource).toContain("contractorDisplayName");
+    expect(callListPageSource).toContain("Contractor");
+  });
+
   it("queries are account-scoped (no limit hardcoded — all items fetched)", () => {
     // No .limit() call means all need_to_schedule jobs are shown
     expect(callListPageSource).not.toContain(".limit(");
