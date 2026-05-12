@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import { createClient } from "../../lib/supabase/client";
@@ -251,6 +252,25 @@ export default function LoginPage() {
           {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
+
+      <div className="rounded-lg border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-3 dark:border-gray-800 dark:bg-gray-950/30">
+        <p className="text-center text-sm font-medium text-gray-900 dark:text-gray-100">New to Compliance Matters?</p>
+        <p className="mt-1 text-center text-xs text-gray-600 dark:text-gray-400">Choose your signup path:</p>
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Link
+            href="/signup/service"
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-indigo-300 bg-gradient-to-r from-indigo-600 to-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-px hover:from-indigo-500 hover:to-blue-500 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 dark:border-indigo-700 dark:from-indigo-700 dark:to-blue-700 dark:text-white dark:hover:from-indigo-600 dark:hover:to-blue-600"
+          >
+            Sign up for HVAC Service
+          </Link>
+          <Link
+            href="/signup/ecc"
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-300 bg-gradient-to-r from-emerald-600 to-emerald-500 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-px hover:from-emerald-500 hover:to-emerald-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 dark:border-emerald-700 dark:from-emerald-700 dark:to-emerald-600 dark:text-white dark:hover:from-emerald-600 dark:hover:to-emerald-500"
+          >
+            Sign up for ECC / Compliance Testing
+          </Link>
+        </div>
+      </div>
 
       <p className="text-xs text-gray-400 dark:text-gray-500">
         If you don&apos;t have an account, please contact your administrator.
