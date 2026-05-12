@@ -1578,14 +1578,7 @@ const visitScopeBadgeItemCount = visitScopeBadgeItems.length;
 const visitScopeBadgeFirstTitle = visitScopeBadgeItems[0]?.title ?? "";
 const visitScopeBadgeMainText = visitScopeBadgeItemCount > 0
   ? `${visitScopeBadgeItemCount} item${visitScopeBadgeItemCount === 1 ? "" : "s"} · ${visitScopeBadgeFirstTitle}${visitScopeBadgeItemCount > 1 ? ` + ${visitScopeBadgeItemCount - 1} more` : ""}`
-  : visitScopeSummary
-    ? "Summary added"
-    : "No work details yet";
-const visitScopeBadgeSubtext = visitScopeBadgeItemCount > 0
-  ? visitScopeSummary
-    ? "Summary added"
-    : null
-  : visitScopeHeaderPreview.lead || null;
+  : "No work items yet";
 
 const canShowReleaseAndReevaluate = [
   "pending_info",
@@ -2503,27 +2496,16 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
     <div className="mt-3 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <div className="min-w-0 max-w-3xl">
+        <p className="max-w-xl text-sm leading-6 text-slate-600">
+          Manage scheduling, field progress, and closeout for this job.
+        </p>
         <h1 className="text-[clamp(1.35rem,2vw,1.85rem)] font-semibold tracking-[-0.02em] text-slate-950">
           {normalizeRetestLinkedJobTitle(job.title) || "Operational job workspace"}
         </h1>
-        <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-600">
-          Manage scheduling, field progress, and closeout for this job.
-        </p>
         {!isFieldComplete ? (
           <p className="mt-1 text-xs text-slate-500">
             {!hasFullSchedule ? "Next: set a schedule to dispatch." : "Scheduled — use the field status buttons when work begins."}
           </p>
-        ) : null}
-        {visitScopeHeaderPreview.hasContent ? (
-          <div className="mt-2 flex max-w-2xl flex-wrap items-center gap-1.5 text-xs text-slate-600">
-            <span className="font-semibold uppercase tracking-[0.1em] text-slate-500">Visit</span>
-            <span className="font-medium text-slate-700">{visitScopeHeaderPreview.lead}</span>
-            {visitScopeHeaderPreview.itemCount > 0 ? (
-              <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                {visitScopeHeaderPreview.itemCount} item{visitScopeHeaderPreview.itemCount === 1 ? "" : "s"}
-              </span>
-            ) : null}
-          </div>
         ) : null}
         {isInternalUser && String(job.job_type ?? "").toLowerCase() === "ecc" && promotedCompanionHeader.hasPromotedCompanion ? (
           <div className="mt-2 flex max-w-2xl flex-wrap items-center gap-1.5 text-xs text-emerald-700">
@@ -2621,9 +2603,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div className="mt-4 border-t border-slate-200/60 pt-3">
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Needed</div>
             <div className="mt-1 text-sm font-semibold leading-5 text-slate-900">{visitScopeBadgeMainText}</div>
-            {visitScopeBadgeSubtext ? (
-              <div className="mt-0.5 text-xs leading-5 text-slate-600">{visitScopeBadgeSubtext}</div>
-            ) : null}
             <a
               href="#visit-scope-section"
               className="mt-1.5 inline-block text-xs font-semibold text-slate-600 underline-offset-2 transition-colors hover:text-slate-900 hover:underline"
