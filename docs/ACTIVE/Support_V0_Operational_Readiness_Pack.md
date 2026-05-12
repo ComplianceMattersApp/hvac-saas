@@ -33,16 +33,16 @@ Support V0 closes operationally only when a formal ticketing/support system is i
 
 ### 2.0 Group 8A practical setup snapshot (owner-led)
 
-Status: ACTIVE, pending owner fill.
+Status: ACTIVE and filled (owner-led slim setup).
 
 | Practical field | Current value |
 |---|---|
-| Support email | `OWNER NEEDED` |
-| Support phone/text number | `OWNER NEEDED` |
-| Support hours + timezone | `OWNER NEEDED` |
-| After-hours S1 path | `OWNER NEEDED` |
-| Issue log location | `OWNER NEEDED` |
-| Named owner / first responder | `OWNER NEEDED` |
+| Support email | `eddie@compliancemattersca.com` |
+| Support phone/text number | `209-518-2383` |
+| Support hours + timezone | `Monday–Friday, 8 AM–5 PM Pacific Time` |
+| After-hours S1 path | `Call/text Eddie Castellanos directly for critical blockers only` |
+| Issue log location | `Owner-managed Google Sheet — "Compliance Matters Support V0 Issue Log"` |
+| Named owner / first responder | `Eddie Castellanos` |
 
 Group 8A rule:
 - If any field above remains `OWNER NEEDED`, controlled first-user support setup is not fully ready.
@@ -51,8 +51,8 @@ Group 8A rule:
 
 | Channel | Placeholder |
 |---|---|
-| Support email | `OWNER NEEDED` |
-| Support phone/text number | `OWNER NEEDED` |
+| Support email | `eddie@compliancemattersca.com` |
+| Support phone/text number | `209-518-2383` |
 | Preferred channel | Email for non-urgent issues; phone for S1/S2 blocked situations |
 
 ### 2.2 Practical setup prerequisites
@@ -70,12 +70,12 @@ Before controlled first-customer onboarding begins, the following live details m
 
 | Tier | Hours |
 |---|---|
-| Normal support hours | `OWNER NEEDED` |
-| After-hours / emergency | `OWNER NEEDED` (S1 issues only outside normal hours) |
+| Normal support hours | `Monday–Friday, 8 AM–5 PM Pacific Time` |
+| After-hours / emergency | `Call/text Eddie Castellanos directly for critical blockers only` |
 
 ### 2.4 Who receives support requests
 
-- **First responder:** Owner/operator (primary contact for all V0 issues)
+- **First responder:** Eddie Castellanos (owner/operator; primary contact for all V0 issues)
 - **Escalation:** Engineering review as needed per § 6 escalation tree
 - **No third-party support tier exists at V0.** All intake flows through the operator.
 
@@ -89,6 +89,9 @@ Inform testers before onboarding:
 ### 2.6 Issue log location
 
 During V0, issues should be recorded in one shared operational issue log, such as a spreadsheet or doc, while preserving the originating email thread for user-facing communication.
+
+Current V0 log location:
+- `Owner-managed Google Sheet — "Compliance Matters Support V0 Issue Log"`
 
 Recommended tracking rule:
 - customer-facing communication through email
@@ -132,28 +135,20 @@ Status:                          New / In Review / Engineering / Resolved / Clos
 
 Use this as the single shared issue log for Support V0. Keep user communication in email/phone, and keep triage state in this one log.
 
-Recommended location: `OWNER NEEDED` (single shared spreadsheet/doc path).
+Recommended owner-led V0 path:
+- Use a simple owner-operated spreadsheet in the Google Sheet named `Compliance Matters Support V0 Issue Log`.
+- Keep this slim format as the default V0 operating routine.
 
 ### 3A.1 Required columns
 
-1. Reported At
-2. Customer / Company
-3. Reporter
-4. Contact Channel
-5. Route / Page
-6. Workflow Area
-7. Expected Behavior
-8. Actual Behavior
-9. Category
-10. Severity
-11. Blocked?
-12. Workaround
-13. Owner
-14. Status
-15. Escalated to Build?
-16. Build Link / Reference
-17. Resolution Notes
-18. Closed At
+1. Date
+2. Company/User
+3. Issue or Question
+4. Category
+5. Severity
+6. Status
+7. Resolution / Next Step
+8. Build Work Needed?
 
 ### 3A.2 Allowed values
 
@@ -184,6 +179,8 @@ Do not escalate Training / Guidance-only issues, one-off Setup / Data issues, or
 Spreadsheet-style starter template is provided in:
 
 - `docs/ACTIVE/Support_V0_Issue_Log_Template.md`
+
+The same file also includes an optional fuller structure for future higher-volume support periods.
 
 ---
 
@@ -424,3 +421,16 @@ Group 3 is closed / monitoring.
 - Support V0 intake discipline is the correct path for any user-reported issues: use the intake template (§ 3), classify severity (§ 4), and escalate through the documented path before treating any feedback as build work.
 - Any feedback that suggests a platform gap should be classified as S3/S4 minimum and reviewed at the next planning slot before becoming a work item.
 - Controlled onboarding expansion (additional testers/users) remains owner-decision-gated; V0 support readiness is a prerequisite but not a trigger.
+
+---
+
+## Group 8 — Support / Owner Operations: Closeout Note (May 2026)
+
+Status: Closed / Monitoring — Owner-led Support V0 active.
+
+- Practical Support V0 setup values are now filled in §2.0.
+- Owner-led slim spreadsheet issue log is now the recommended operating path in §3A.
+- Daily active-tester and weekly stable-period cadence remains active in §8 and §9.
+- Escalation-to-build remains constrained to confirmed/reproducible bugs or repeated blocking UX issues.
+- Support Console remains parked and runbook-gated.
+- No impersonation, no support-side mutation, no tenant data edits, and no production support-console activation.

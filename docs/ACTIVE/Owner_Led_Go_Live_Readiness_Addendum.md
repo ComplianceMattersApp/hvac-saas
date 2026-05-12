@@ -25,6 +25,7 @@ Support V0 clarification:
 - Group 8A practical setup and issue-log template references:
    - `docs/ACTIVE/Support_V0_Operational_Readiness_Pack.md` (§2 and §3A)
    - `docs/ACTIVE/Support_V0_Issue_Log_Template.md`
+- Group 8 status: Closed / Monitoring — owner-led Support V0 active with a single-owner slim spreadsheet workflow.
 
 This addendum does **not** activate or change any deferred/gated implementation area, including:
 - Support Console production enablement
@@ -49,6 +50,13 @@ Operating model:
 
 Practical boundary:
 - The goal of early support is successful customer adoption and confidence, not building a formal support department process at this stage.
+- Current practical operating details (Group 8A):
+   - Support email: `eddie@compliancemattersca.com`
+   - Support phone/text: `209-518-2383`
+   - Support hours: `Monday–Friday, 8 AM–5 PM Pacific Time`
+   - After-hours S1 path: `Call/text Eddie Castellanos directly for critical blockers only`
+   - Issue log location: `Owner-managed Google Sheet — "Compliance Matters Support V0 Issue Log"`
+   - Named owner/first responder: `Eddie Castellanos`
 
 ---
 
