@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { computeFanWattDrawResult, formatFanEfficacy } from "@/lib/ecc/fan-watt-draw";
 
-type PreviewMode = "duct_leakage" | "airflow" | "refrigerant_charge";
+type PreviewMode = "duct_leakage" | "airflow" | "fan_watt_draw" | "refrigerant_charge";
 
 type Props = {
   mode: PreviewMode;
@@ -20,9 +21,9 @@ function toNumber(value: FormDataEntryValue | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function formatNum(value: number | null, unit?: string) {
+function formatNum(value: number | null, unit?: string, decimals = 1) {
   if (value == null) return "-";
-  const rendered = Number.isInteger(value) ? String(value) : value.toFixed(1);
+  const rendered = Number.isInteger(value) ? String(value) : value.toFixed(decimals);
   return unit ? `${rendered} ${unit}` : rendered;
 }
 
@@ -167,6 +168,57 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
             {overridePass ? (
               <div className="text-xs text-amber-700">Override pass is selected and will be applied only when saved.</div>
             ) : null}
+          </div>
+        );
+        return;
+      }
+
+      if (mode === "fan_watt_draw") {
+        const actualWatts = toNumber(fd.get("actual_tested_watts"));
+        const actualAirflow = toNumber(fd.get("actual_tested_airflow_cfm"));
+        const requiredEfficacy = toNumber(fd.get("required_fan_efficacy_w_per_cfm"));
+        const result = computeFanWattDrawResult({
+          actualTestedWatts: actualWatts,
+          actualTestedAirflowCfm: actualAirflow,
+          requiredFanEfficacyWPerCfm: requiredEfficacy,
+          registersFullyOpenAttested: fd.get("registers_fully_open_attested") === "on",
+          fanMaxSpeedAttested: fd.get("fan_max_speed_attested") === "on",
+          photoTakenAttested: fd.get("photo_taken_attested") === "on",
+          notes: String(fd.get("notes") ?? "").trim() || null,
+        });
+
+        const pass =
+          result.actual_fan_efficacy_w_per_cfm != null &&
+          result.required_fan_efficacy_w_per_cfm != null &&
+          result.actual_fan_efficacy_w_per_cfm <= result.required_fan_efficacy_w_per_cfm;
+
+        const tone: Tone =
+          result.actual_fan_efficacy_w_per_cfm == null || result.required_fan_efficacy_w_per_cfm == null
+            ? "pending"
+            : pass
+            ? "pass"
+            : "fail";
+
+        const label =
+          result.actual_fan_efficacy_w_per_cfm == null || result.required_fan_efficacy_w_per_cfm == null
+            ? "Pending inputs"
+            : pass
+            ? "Preview PASS"
+            : "Preview FAIL";
+
+        setContent(
+          <div className="min-h-[112px] rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-semibold text-slate-900">Live Preview (unsaved)</div>
+              <div className={`min-w-[120px] rounded-full border px-2 py-0.5 text-center text-xs font-medium ${statusClasses(tone)}`}>
+                {label}
+              </div>
+            </div>
+            <div>Actual Tested Watts: {formatNum(actualWatts, "W", 0)}</div>
+            <div>Actual Tested Airflow from MCH-23: {formatNum(actualAirflow, "CFM", 0)}</div>
+            <div>Required Fan Efficacy: {formatFanEfficacy(requiredEfficacy)} W/CFM</div>
+            <div>Actual Fan Efficacy: {formatFanEfficacy(result.actual_fan_efficacy_w_per_cfm)} W/CFM</div>
+            <div>Compliance Statement: {result.compliance_statement}</div>
           </div>
         );
         return;

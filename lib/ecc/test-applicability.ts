@@ -16,7 +16,7 @@ function isTestExcludedForHeatOnly(testType: string | EccTestType) {
 
 function isTestExcludedForDuctlessMiniSplit(testType: string | EccTestType) {
   const normalized = normalizeTestType(testType);
-  return normalized === "airflow" || normalized === "duct_leakage";
+  return normalized === "airflow" || normalized === "duct_leakage" || normalized === "fan_watt_draw";
 }
 
 export function isEccTestApplicableToSystem(

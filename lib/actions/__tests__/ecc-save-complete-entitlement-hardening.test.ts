@@ -63,10 +63,12 @@ type ActionName =
   | "markRefrigerantChargeExemptFromForm"
   | "saveRefrigerantChargeDataFromForm"
   | "saveAirflowDataFromForm"
+  | "saveFanWattDrawDataFromForm"
   | "saveDuctLeakageDataFromForm"
   | "completeEccTestRunFromForm"
   | "saveAndCompleteDuctLeakageFromForm"
   | "saveAndCompleteAirflowFromForm"
+  | "saveAndCompleteFanWattDrawFromForm"
   | "saveAndCompleteRefrigerantChargeFromForm";
 
 function buildMarkRefrigerantChargeExemptFormData() {
@@ -152,10 +154,24 @@ const actions: Array<{ name: ActionName; buildFormData: () => FormData }> = [
   { name: "markRefrigerantChargeExemptFromForm", buildFormData: buildMarkRefrigerantChargeExemptFormData },
   { name: "saveRefrigerantChargeDataFromForm", buildFormData: buildSaveRefrigerantFormData },
   { name: "saveAirflowDataFromForm", buildFormData: buildSaveAirflowFormData },
+  { name: "saveFanWattDrawDataFromForm", buildFormData: () => {
+      const formData = buildSaveAirflowFormData();
+      formData.set("actual_tested_watts", "346");
+      formData.set("actual_tested_airflow_cfm", "788");
+      formData.set("required_fan_efficacy_w_per_cfm", "0.45");
+      return formData;
+    } },
   { name: "saveDuctLeakageDataFromForm", buildFormData: buildSaveDuctLeakageFormData },
   { name: "completeEccTestRunFromForm", buildFormData: buildCompleteRunFormData },
   { name: "saveAndCompleteDuctLeakageFromForm", buildFormData: buildSaveAndCompleteDuctFormData },
   { name: "saveAndCompleteAirflowFromForm", buildFormData: buildSaveAndCompleteAirflowFormData },
+  { name: "saveAndCompleteFanWattDrawFromForm", buildFormData: () => {
+      const formData = buildSaveAndCompleteAirflowFormData();
+      formData.set("actual_tested_watts", "346");
+      formData.set("actual_tested_airflow_cfm", "788");
+      formData.set("required_fan_efficacy_w_per_cfm", "0.45");
+      return formData;
+    } },
   { name: "saveAndCompleteRefrigerantChargeFromForm", buildFormData: buildSaveAndCompleteRefrigerantFormData },
 ];
 

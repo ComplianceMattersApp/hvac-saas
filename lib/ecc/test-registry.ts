@@ -124,8 +124,8 @@ export const ECC_TEST_REGISTRY: Record<EccTestType, EccTestDefinition> = {
 
   fan_watt_draw: {
     code: "fan_watt_draw",
-    label: "Fan Watt Draw",
-    shortLabel: "Watt Draw",
+    label: "Fan Efficacy / Watt Verification",
+    shortLabel: "Fan Efficacy",
     family: "ecc",
     active: true,
     allowManualAdd: true,

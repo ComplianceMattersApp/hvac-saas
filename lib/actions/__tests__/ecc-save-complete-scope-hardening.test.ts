@@ -194,6 +194,16 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     await expect(saveAirflowDataFromForm(buildSaveAirflowFormData())).rejects.toThrow("ALLOW_PATH_REACHED");
   });
 
+  it("allows same-account internal saveFanWattDrawDataFromForm past scoped ECC preflight", async () => {
+    createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
+    const { saveFanWattDrawDataFromForm } = await import("@/lib/actions/job-actions");
+    const formData = buildSaveAirflowFormData();
+    formData.set("actual_tested_watts", "346");
+    formData.set("actual_tested_airflow_cfm", "788");
+    formData.set("required_fan_efficacy_w_per_cfm", "0.45");
+    await expect(saveFanWattDrawDataFromForm(formData)).rejects.toThrow("ALLOW_PATH_REACHED");
+  });
+
   it("allows same-account internal completeEccTestRunFromForm past scoped ECC preflight", async () => {
     createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
     const { completeEccTestRunFromForm } = await import("@/lib/actions/job-actions");
@@ -214,6 +224,16 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     await expect(saveAndCompleteAirflowFromForm(buildSaveAndCompleteAirflowFormData())).rejects.toThrow(
       "ALLOW_PATH_REACHED",
     );
+  });
+
+  it("allows same-account internal saveAndCompleteFanWattDrawFromForm past scoped ECC preflight", async () => {
+    createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
+    const { saveAndCompleteFanWattDrawFromForm } = await import("@/lib/actions/job-actions");
+    const formData = buildSaveAndCompleteAirflowFormData();
+    formData.set("actual_tested_watts", "346");
+    formData.set("actual_tested_airflow_cfm", "788");
+    formData.set("required_fan_efficacy_w_per_cfm", "0.45");
+    await expect(saveAndCompleteFanWattDrawFromForm(formData)).rejects.toThrow("ALLOW_PATH_REACHED");
   });
 
   it("allows same-account internal saveAndCompleteRefrigerantChargeFromForm past scoped ECC preflight", async () => {

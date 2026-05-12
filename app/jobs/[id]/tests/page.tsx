@@ -19,9 +19,11 @@ import {
   deleteEccTestRunFromForm,
   saveDuctLeakageDataFromForm,
   saveAirflowDataFromForm,
+  saveFanWattDrawDataFromForm,
   saveRefrigerantChargeDataFromForm,
   saveAndCompleteDuctLeakageFromForm,
   saveAndCompleteAirflowFromForm,
+  saveAndCompleteFanWattDrawFromForm,
   saveAndCompleteRefrigerantChargeFromForm,
 } from "@/lib/actions/job-actions";
 
@@ -36,6 +38,7 @@ import {
   isPackageSystem,
 } from "@/lib/ecc/rule-profiles";
 import { isEccTestApplicableToSystem } from "@/lib/ecc/test-applicability";
+import { formatFanEfficacy } from "@/lib/ecc/fan-watt-draw";
 import { isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import { buildEquipmentSummaryLine } from "@/lib/utils/equipment-summary";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
@@ -728,10 +731,13 @@ export default async function JobTestsPage({
 
   const runDL = selectedSystemId ? pickRunForSystem(job, "duct_leakage", selectedSystemId) : null;
   const runAF = selectedSystemId ? pickRunForSystem(job, "airflow", selectedSystemId) : null;
+  const runFan = selectedSystemId ? pickRunForSystem(job, "fan_watt_draw", selectedSystemId) : null;
   const runRC = selectedSystemId ? pickRunForSystem(job, "refrigerant_charge", selectedSystemId) : null;
   const ductSaveFormId = runDL ? `duct-save-${runDL.id}` : "";
   const ductDeleteFormId = runDL ? `duct-delete-${runDL.id}` : "";
   const airflowSaveFormId = runAF ? `airflow-save-${runAF.id}` : "";
+  const fanSaveFormId = runFan ? `fan-save-${runFan.id}` : "";
+  const fanDeleteFormId = runFan ? `fan-delete-${runFan.id}` : "";
   const rcSaveFormId = runRC ? `rc-save-${runRC.id}` : "";
 
   const normalizedProfile = normalizeProjectTypeToRuleProfile(job.project_type);
@@ -818,6 +824,7 @@ export default async function JobTestsPage({
     focusedType !== "custom" &&
     focusedType !== "duct_leakage" &&
     focusedType !== "airflow" &&
+    focusedType !== "fan_watt_draw" &&
     focusedType !== "refrigerant_charge"
       ? (focusedType as EccTestType)
       : null;
@@ -914,6 +921,9 @@ const defaultHeatingOutputBtu =
     ? Number(defaultHeatingCapacityKbtu) * 1000
     : ""));
 
+const defaultFanActualAirflowCfm =
+  runFan?.data?.actual_tested_airflow_cfm ?? runAF?.data?.measured_total_cfm ?? "";
+
   const carriedForwardDL = !runDL && carriedForwardPassedTypes.includes("duct_leakage");
   const carriedForwardAF = !runAF && carriedForwardPassedTypes.includes("airflow");
   const carriedForwardRC = !runRC && carriedForwardPassedTypes.includes("refrigerant_charge");
@@ -978,6 +988,7 @@ const defaultHeatingOutputBtu =
     const systemIsDuctlessMiniSplit = isDuctlessMiniSplitSystem(systemEquipment);
 
     const runAirflow = systemIsHeatOnly || systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "airflow", systemId);
+    const runFan = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "fan_watt_draw", systemId);
     const runDuct = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "duct_leakage", systemId);
     const runRefrigerant = systemIsHeatOnly ? null : pickLatestRunForSystem(job, "refrigerant_charge", systemId);
 
@@ -1002,6 +1013,7 @@ const defaultHeatingOutputBtu =
       systemId,
       systemName: String(sys.name ?? "System").trim() || "System",
       runAirflow,
+      runFan,
       runDuct,
       runRefrigerant,
       systemIsHeatOnly,
@@ -1222,6 +1234,31 @@ const defaultHeatingOutputBtu =
                           <>
                             <div>Measured Airflow: {fmtValue(sys.runAirflow?.data?.measured_total_cfm, "CFM")}</div>
                             <div>Result: {sys.runAirflow ? getEffectiveResultLabel(sys.runAirflow) : "No run"}</div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="font-semibold text-slate-950">Forced Air System Fan Efficacy Measurement:</span>
+                      <div className="mt-1 space-y-1 text-slate-800">
+                        {sys.systemIsDuctlessMiniSplit ? (
+                          <div>Not applicable for ductless mini split systems.</div>
+                        ) : !sys.runFan ? (
+                          <div>No fan efficacy run found for this system.</div>
+                        ) : (
+                          <>
+                            <div>Actual Tested Watts: {fmtValue(sys.runFan?.data?.actual_tested_watts, "W")}</div>
+                            <div>
+                              Actual Tested Airflow from MCH-23: {fmtValue(sys.runFan?.data?.actual_tested_airflow_cfm, "CFM")}
+                            </div>
+                            <div>
+                              Required Fan Efficacy: {formatFanEfficacy(sys.runFan?.computed?.required_fan_efficacy_w_per_cfm ?? sys.runFan?.data?.required_fan_efficacy_w_per_cfm ?? null)} W/CFM
+                            </div>
+                            <div>
+                              Actual Fan Efficacy: {formatFanEfficacy(sys.runFan?.computed?.actual_fan_efficacy_w_per_cfm ?? null)} W/CFM
+                            </div>
+                            <div>Compliance Statement: {fallbackText(sys.runFan?.computed?.compliance_statement)}</div>
                           </>
                         )}
                       </div>
@@ -2119,6 +2156,188 @@ const defaultHeatingOutputBtu =
                     </button>
                   </form>
                 </div>
+              </>
+            )}
+          </div>
+        ) : null}
+
+        {/* =========================
+            FAN EFFICACY / WATT VERIFICATION
+            ========================= */}
+        {focusedType === "fan_watt_draw" ? (
+          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="font-medium">Fan Efficacy / Watt Verification</div>
+                <div className="mt-1 text-sm">
+                  <span className="font-medium">Result:</span>{" "}
+                  {runFan
+                    ? getEffectiveResultLabel(runFan)
+                    : "Not started"}
+                </div>
+              </div>
+              <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
+                {runFan?.updated_at ? new Date(runFan.updated_at).toLocaleString() : null}
+              </div>
+            </div>
+
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <div className="font-semibold text-slate-800">System Reference</div>
+              <div>{selectedSystemName}</div>
+              <div>Actual Tested Airflow from MCH-23: {fmtValue(defaultFanActualAirflowCfm, "CFM")}</div>
+            </div>
+
+            {!runFan ? (
+              <form action={addEccTestRunFromForm} className="flex items-center gap-2">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="system_id" value={selectedSystemId} />
+                <input type="hidden" name="test_type" value="fan_watt_draw" />
+                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                  Create Fan Efficacy Run
+                </SubmitButton>
+              </form>
+            ) : (
+              <>
+                <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
+                <form id={fanSaveFormId} action={saveFanWattDrawDataFromForm} className="grid gap-3 border-t pt-3">
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runFan.id} />
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`fan-watts-${runFan.id}`}>
+                        Actual Tested Watts
+                      </label>
+                      <input
+                        id={`fan-watts-${runFan.id}`}
+                        name="actual_tested_watts"
+                        type="number"
+                        step="0.01"
+                        required
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runFan.data?.actual_tested_watts ?? ""}
+                        placeholder="Required for completion"
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`fan-airflow-${runFan.id}`}>
+                        Actual Tested Airflow from MCH-23 (CFM)
+                      </label>
+                      <input
+                        id={`fan-airflow-${runFan.id}`}
+                        name="actual_tested_airflow_cfm"
+                        type="number"
+                        step="0.01"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runFan.data?.actual_tested_airflow_cfm ?? defaultFanActualAirflowCfm}
+                        placeholder="Required for completion"
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`fan-required-${runFan.id}`}>
+                        Required Fan Efficacy (Watts/CFM)
+                      </label>
+                      <input
+                        id={`fan-required-${runFan.id}`}
+                        name="required_fan_efficacy_w_per_cfm"
+                        type="number"
+                        step="0.01"
+                        required
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runFan.data?.required_fan_efficacy_w_per_cfm ?? 0.45}
+                        placeholder="0.45"
+                      />
+                    </div>
+
+                    <div className="grid gap-1 sm:col-span-2">
+                      <label className="text-sm font-medium" htmlFor={`fan-notes-${runFan.id}`}>
+                        Notes (optional)
+                      </label>
+                      <input
+                        id={`fan-notes-${runFan.id}`}
+                        name="notes"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runFan.data?.notes ?? ""}
+                        placeholder="Optional diagnostic notes"
+                      />
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        name="registers_fully_open_attested"
+                        defaultChecked={!!runFan.data?.registers_fully_open_attested}
+                      />
+                      All registers fully open during the diagnostic test
+                    </label>
+
+                    <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        name="fan_max_speed_attested"
+                        defaultChecked={!!runFan.data?.fan_max_speed_attested}
+                      />
+                      System fan set at maximum speed during the diagnostic test
+                    </label>
+
+                    <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        name="photo_taken_attested"
+                        defaultChecked={!!runFan.data?.photo_taken_attested}
+                      />
+                      Photo Taken — attestation only
+                    </label>
+                  </div>
+                </form>
+
+                <EccLivePreview mode="fan_watt_draw" formId={fanSaveFormId} projectType={job.project_type} />
+
+                <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <div>Actual Tested Watts: {fmtValue(runFan.data?.actual_tested_watts, "W")}</div>
+                  <div>Actual Tested Airflow from MCH-23: {fmtValue(runFan.data?.actual_tested_airflow_cfm, "CFM")}</div>
+                  <div>Required Fan Efficacy: {formatFanEfficacy(runFan.computed?.required_fan_efficacy_w_per_cfm ?? runFan.data?.required_fan_efficacy_w_per_cfm ?? null)} W/CFM</div>
+                  <div>Actual Fan Efficacy: {formatFanEfficacy(runFan.computed?.actual_fan_efficacy_w_per_cfm ?? null)} W/CFM</div>
+                  <div>Compliance Statement: {fallbackText(runFan.computed?.compliance_statement)}</div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                  <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
+                    {runFan.is_completed && "✅ Test completed"}
+                  </span>
+                  <SubmitButton
+                    form={fanSaveFormId}
+                    formNoValidate
+                    loadingText="Saving..."
+                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                  >
+                    Save Draft
+                  </SubmitButton>
+                  <SubmitButton
+                    form={fanSaveFormId}
+                    loadingText="Saving & completing..."
+                    formAction={saveAndCompleteFanWattDrawFromForm}
+                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  >
+                    Complete Test
+                  </SubmitButton>
+                  <button
+                    type="submit"
+                    form={fanDeleteFormId}
+                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+
+                <form id={fanDeleteFormId} action={deleteEccTestRunFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runFan.id} />
+                </form>
               </>
             )}
           </div>
