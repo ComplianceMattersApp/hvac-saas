@@ -188,12 +188,12 @@ export const ECC_TEST_REGISTRY: Record<EccTestType, EccTestDefinition> = {
 
   qii_insulation: {
     code: "qii_insulation",
-    label: "QII Insulation Installation",
-    shortLabel: "QII Insulation",
+    label: "QII / ENV-22 Insulation Verification",
+    shortLabel: "QII / ENV-22",
     family: "envelope",
-    active: false,
-    allowManualAdd: false,
-    allowInCustomProfile: false,
+    active: true,
+    allowManualAdd: true,
+    allowInCustomProfile: true,
     supportsNotApplicable: true,
     requiresReasonWhenNotApplicable: true,
     rendererKey: "qii_insulation",

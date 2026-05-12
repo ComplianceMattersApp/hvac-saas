@@ -62,6 +62,10 @@ import {
   buildLocalMechanicalExhaustPayload,
   ensureLocalMechanicalExhaustCompletionFields,
 } from "@/lib/ecc/local-mechanical-exhaust";
+import {
+  buildQiiEnv22InsulationPayload,
+  ensureQiiEnv22InsulationCompletionFields,
+} from "@/lib/ecc/qii-env22-insulation";
 import type { JobStatus } from "@/lib/types/job";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { mapToCanonicalRole, sanitizeEquipmentFields } from "@/lib/utils/equipment-domain";
@@ -5352,6 +5356,96 @@ export async function saveAndCompleteLocalMechanicalExhaustFromForm(formData: Fo
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
   redirectToTests({ jobId, testType: "local_mechanical_exhaust", systemId });
+}
+
+export async function saveQiiEnv22InsulationDataFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  const payload = buildQiiEnv22InsulationPayload(formData);
+
+  const supabase = await createClient();
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
+
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data: payload.data,
+      computed: payload.computed,
+      computed_pass: payload.computedPass,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  await evaluateEccOpsStatus(jobId);
+  revalidateEccProjectionConsumers(jobId);
+  redirectToTests({ jobId, testType: "qii_insulation", systemId });
+}
+
+export async function saveAndCompleteQiiEnv22InsulationFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  ensureQiiEnv22InsulationCompletionFields(formData);
+  const payload = buildQiiEnv22InsulationPayload(formData);
+
+  const supabase = await createClient();
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
+
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data: payload.data,
+      computed: payload.computed,
+      computed_pass: payload.computedPass,
+      override_pass: null,
+      override_reason: null,
+      updated_at: new Date().toISOString(),
+      is_completed: true,
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+
+  await evaluateEccOpsStatus(jobId);
+  revalidateEccProjectionConsumers(jobId);
+  redirectToTests({ jobId, testType: "qii_insulation", systemId });
 }
 
 function parseOverrideSelectionFromForm(formData: FormData) {

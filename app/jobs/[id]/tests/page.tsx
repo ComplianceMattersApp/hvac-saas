@@ -30,6 +30,8 @@ import {
   saveAndCompleteAirFilterDeviceFromForm,
   saveLocalMechanicalExhaustDataFromForm,
   saveAndCompleteLocalMechanicalExhaustFromForm,
+  saveQiiEnv22InsulationDataFromForm,
+  saveAndCompleteQiiEnv22InsulationFromForm,
   saveAndCompleteRefrigerantChargeFromForm,
 } from "@/lib/actions/job-actions";
 
@@ -58,6 +60,7 @@ function getEffectiveResultLabel(t: any) {
   if (t.computed?.status === "blocked") return "BLOCKED (conditions)";
   if (t.computed_pass === true) return "PASS";
   if (t.computed_pass === false) return "FAIL";
+  if (t.is_completed === true) return "Verified";
   return "Not computed";
 }
 
@@ -230,6 +233,28 @@ function firstNonBlank(...values: unknown[]) {
     if (rendered) return rendered;
   }
   return "";
+}
+
+function parseQiiInsulationEntries(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry) => entry && typeof entry === "object");
+}
+
+function qiiStatusLabel(value: unknown) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "pass") return "Pass";
+  if (normalized === "fail") return "Fail";
+  if (normalized === "partial") return "Partial";
+  if (normalized === "needs_correction") return "Needs Correction";
+  if (normalized === "not_applicable") return "Not Applicable";
+  return "Not Started";
+}
+
+function qiiYesNoLabel(value: unknown) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "yes") return "Yes";
+  if (normalized === "no") return "No";
+  return "Unknown";
 }
 
 function formatBusinessDateTimeUS(value?: string | null) {
@@ -751,6 +776,7 @@ export default async function JobTestsPage({
   const runFan = selectedSystemId ? pickRunForSystem(job, "fan_watt_draw", selectedSystemId) : null;
   const runAhri = selectedSystemId ? pickRunForSystem(job, "ahri_verification", selectedSystemId) : null;
   const runLocalExhaust = selectedSystemId ? pickRunForSystem(job, "local_mechanical_exhaust", selectedSystemId) : null;
+  const runQiiInsulation = selectedSystemId ? pickRunForSystem(job, "qii_insulation", selectedSystemId) : null;
   const runFilter = selectedSystemId ? pickRunForSystem(job, "air_filter_device", selectedSystemId) : null;
   const runRC = selectedSystemId ? pickRunForSystem(job, "refrigerant_charge", selectedSystemId) : null;
   const ductSaveFormId = runDL ? `duct-save-${runDL.id}` : "";
@@ -762,9 +788,13 @@ export default async function JobTestsPage({
   const ahriDeleteFormId = runAhri ? `ahri-delete-${runAhri.id}` : "";
   const localExhaustSaveFormId = runLocalExhaust ? `local-exhaust-save-${runLocalExhaust.id}` : "";
   const localExhaustDeleteFormId = runLocalExhaust ? `local-exhaust-delete-${runLocalExhaust.id}` : "";
+  const qiiSaveFormId = runQiiInsulation ? `qii-save-${runQiiInsulation.id}` : "";
+  const qiiDeleteFormId = runQiiInsulation ? `qii-delete-${runQiiInsulation.id}` : "";
   const filterSaveFormId = runFilter ? `filter-save-${runFilter.id}` : "";
   const filterDeleteFormId = runFilter ? `filter-delete-${runFilter.id}` : "";
   const rcSaveFormId = runRC ? `rc-save-${runRC.id}` : "";
+  const qiiEntries = parseQiiInsulationEntries(runQiiInsulation?.data?.insulation_entries);
+  const qiiRowCount = Math.max(1, qiiEntries.length + 1);
 
   const normalizedProfile = normalizeProjectTypeToRuleProfile(job.project_type);
   const manualAddTests = getActiveManualAddTests();
@@ -856,6 +886,7 @@ export default async function JobTestsPage({
     focusedType !== "fan_watt_draw" &&
     focusedType !== "ahri_verification" &&
     focusedType !== "local_mechanical_exhaust" &&
+    focusedType !== "qii_insulation" &&
     focusedType !== "air_filter_device" &&
     focusedType !== "refrigerant_charge"
       ? (focusedType as EccTestType)
@@ -1063,6 +1094,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
     const runFan = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "fan_watt_draw", systemId);
     const runAhri = pickLatestRunForSystem(job, "ahri_verification", systemId);
     const runLocalExhaust = pickLatestRunForSystem(job, "local_mechanical_exhaust", systemId);
+    const runQiiInsulation = pickLatestRunForSystem(job, "qii_insulation", systemId);
     const runFilter = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "air_filter_device", systemId);
     const runDuct = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "duct_leakage", systemId);
     const runRefrigerant = systemIsHeatOnly ? null : pickLatestRunForSystem(job, "refrigerant_charge", systemId);
@@ -1091,6 +1123,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       runFan,
       runAhri,
       runLocalExhaust,
+      runQiiInsulation,
       runFilter,
       runDuct,
       runRefrigerant,
@@ -1348,6 +1381,40 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                             <div>
                               Airflow Compliance Statement: {fallbackText(sys.runLocalExhaust?.computed?.airflow_compliance_statement)}
                             </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="font-semibold text-slate-950">QII / ENV-22 Insulation Verification:</span>
+                      <div className="mt-1 space-y-1 text-slate-800">
+                        {!sys.runQiiInsulation ? (
+                          <div>No QII insulation verification run found for this system.</div>
+                        ) : (
+                          <>
+                            <div>Project Basis Note: {fallbackText(sys.runQiiInsulation?.data?.qii_project_basis_note)}</div>
+                            <div>Verified By: {fallbackText(sys.runQiiInsulation?.data?.verified_by_name)}</div>
+                            <div>Verified Date: {fallbackText(sys.runQiiInsulation?.data?.verified_at)}</div>
+                            <div>Overall Status: {qiiStatusLabel(sys.runQiiInsulation?.data?.overall_qii_status)}</div>
+                            <div>
+                              Entry Count: {fmtValue(sys.runQiiInsulation?.computed?.entry_count)}
+                            </div>
+                            <div>
+                              Compliance Statement: {fallbackText(sys.runQiiInsulation?.computed?.compliance_statement)}
+                            </div>
+                            <div>
+                              Failed Locations: {Array.isArray(sys.runQiiInsulation?.computed?.failed_locations) && sys.runQiiInsulation.computed.failed_locations.length > 0 ? sys.runQiiInsulation.computed.failed_locations.join(", ") : "None"}
+                            </div>
+                            {parseQiiInsulationEntries(sys.runQiiInsulation?.data?.insulation_entries).length > 0 ? (
+                              <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-2">
+                                {parseQiiInsulationEntries(sys.runQiiInsulation?.data?.insulation_entries).map((entry: any, entryIndex: number) => (
+                                  <div key={`qii-report-entry-${sys.systemId}-${entryIndex}`}>
+                                    {entryIndex + 1}. {fallbackText(entry?.insulation_location)} | {fallbackText(entry?.insulation_type)} | Status: {qiiStatusLabel(entry?.verification_status)} | Required R: {fallbackText(entry?.required_r_value)} | Installed R: {fallbackText(entry?.installed_r_value)}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
                           </>
                         )}
                       </div>
@@ -3203,6 +3270,233 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 <form id={localExhaustDeleteFormId} action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runLocalExhaust.id} />
+                </form>
+              </>
+            )}
+          </div>
+        ) : null}
+
+        {/* =========================
+            QII / ENV-22 INSULATION VERIFICATION
+            ========================= */}
+        {focusedType === "qii_insulation" ? (
+          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="font-medium">QII / ENV-22 Insulation Verification</div>
+                <div className="mt-1 text-sm text-slate-700">
+                  Document each insulation location and verification outcome using ENV-22 field checks.
+                </div>
+                <div className="mt-1 text-sm">
+                  <span className="font-medium">Result:</span>{" "}
+                  {runQiiInsulation ? getEffectiveResultLabel(runQiiInsulation) : "Not started"}
+                </div>
+              </div>
+              <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
+                {runQiiInsulation?.updated_at ? new Date(runQiiInsulation.updated_at).toLocaleString() : null}
+              </div>
+            </div>
+
+            {!runQiiInsulation ? (
+              <form action={addEccTestRunFromForm} className="flex items-center gap-2">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="system_id" value={selectedSystemId} />
+                <input type="hidden" name="test_type" value="qii_insulation" />
+                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                  Create QII / ENV-22 Run
+                </SubmitButton>
+              </form>
+            ) : (
+              <>
+                <div className="text-sm font-semibold text-slate-900">Top-Level Verification Inputs</div>
+                <form id={qiiSaveFormId} action={saveQiiEnv22InsulationDataFromForm} className="grid gap-3 border-t pt-3">
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runQiiInsulation.id} />
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid gap-1 sm:col-span-2">
+                      <label className="text-sm font-medium" htmlFor={`qii-project-basis-${runQiiInsulation.id}`}>
+                        Project Basis Note
+                      </label>
+                      <textarea
+                        id={`qii-project-basis-${runQiiInsulation.id}`}
+                        name="qii_project_basis_note"
+                        rows={2}
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runQiiInsulation.data?.qii_project_basis_note ?? ""}
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`qii-verified-by-${runQiiInsulation.id}`}>
+                        Verified By
+                      </label>
+                      <input
+                        id={`qii-verified-by-${runQiiInsulation.id}`}
+                        name="verified_by_name"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runQiiInsulation.data?.verified_by_name ?? ""}
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`qii-verified-at-${runQiiInsulation.id}`}>
+                        Verified Date
+                      </label>
+                      <input
+                        id={`qii-verified-at-${runQiiInsulation.id}`}
+                        name="verified_at"
+                        type="date"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runQiiInsulation.data?.verified_at ?? ""}
+                      />
+                    </div>
+
+                    <div className="grid gap-1 sm:col-span-2">
+                      <label className="text-sm font-medium" htmlFor={`qii-overall-status-${runQiiInsulation.id}`}>
+                        Overall QII Status
+                      </label>
+                      <select
+                        id={`qii-overall-status-${runQiiInsulation.id}`}
+                        name="overall_qii_status"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runQiiInsulation.data?.overall_qii_status ?? "not_started"}
+                      >
+                        <option value="not_started">Not Started</option>
+                        <option value="partial">Partial</option>
+                        <option value="pass">Pass</option>
+                        <option value="fail">Fail</option>
+                        <option value="not_applicable">Not Applicable</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+                    <div className="text-sm font-semibold text-slate-900">Insulation Entries</div>
+                    {Array.from({ length: qiiRowCount }).map((_, rowIndex) => {
+                      const row = qiiEntries[rowIndex] ?? {};
+                      return (
+                        <div key={`qii-row-${rowIndex}`} className="space-y-2 rounded-md border border-slate-200 bg-white p-3">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Row {rowIndex + 1}</div>
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <input name="insulation_location[]" className="w-full rounded-md border px-3 py-2" placeholder="Insulation location" defaultValue={row.insulation_location ?? ""} />
+                            <input name="insulation_type[]" className="w-full rounded-md border px-3 py-2" placeholder="Insulation type" defaultValue={row.insulation_type ?? ""} />
+                            <input name="insulation_brand[]" className="w-full rounded-md border px-3 py-2" placeholder="Brand" defaultValue={row.insulation_brand ?? ""} />
+                            <input name="required_r_value[]" className="w-full rounded-md border px-3 py-2" placeholder="Required R-Value" defaultValue={row.required_r_value ?? ""} />
+                            <input name="installed_r_value[]" className="w-full rounded-md border px-3 py-2" placeholder="Installed R-Value" defaultValue={row.installed_r_value ?? ""} />
+                            <input name="required_depth[]" className="w-full rounded-md border px-3 py-2" placeholder="Required depth" defaultValue={row.required_depth ?? ""} />
+                            <input name="observed_depth[]" className="w-full rounded-md border px-3 py-2" placeholder="Observed depth" defaultValue={row.observed_depth ?? ""} />
+                            <input name="depth_unit[]" className="w-full rounded-md border px-3 py-2" placeholder="Depth unit" defaultValue={row.depth_unit ?? "in"} />
+
+                            <select name="manufacturer_label_provided[]" className="w-full rounded-md border px-3 py-2" defaultValue={row.manufacturer_label_provided ?? "unknown"}>
+                              <option value="unknown">Manufacturer label provided?</option>
+                              <option value="yes">Yes</option>
+                              <option value="no">No</option>
+                            </select>
+
+                            <select name="loose_fill_coverage_chart_confirmed[]" className="w-full rounded-md border px-3 py-2" defaultValue={row.loose_fill_coverage_chart_confirmed ?? "unknown"}>
+                              <option value="unknown">Coverage chart confirmed?</option>
+                              <option value="yes">Yes</option>
+                              <option value="no">No</option>
+                            </select>
+
+                            <select name="loose_fill_density_verified[]" className="w-full rounded-md border px-3 py-2" defaultValue={row.loose_fill_density_verified ?? "unknown"}>
+                              <option value="unknown">Loose-fill density verified?</option>
+                              <option value="yes">Yes</option>
+                              <option value="no">No</option>
+                            </select>
+
+                            <input name="loose_fill_depth_locations_checked[]" className="w-full rounded-md border px-3 py-2" placeholder="Loose-fill depth locations checked" defaultValue={row.loose_fill_depth_locations_checked ?? ""} />
+
+                            <select name="loose_fill_attic_rulers_installed[]" className="w-full rounded-md border px-3 py-2" defaultValue={row.loose_fill_attic_rulers_installed ?? "unknown"}>
+                              <option value="unknown">Attic rulers installed?</option>
+                              <option value="yes">Yes</option>
+                              <option value="no">No</option>
+                            </select>
+
+                            <select name="verification_status[]" className="w-full rounded-md border px-3 py-2" defaultValue={row.verification_status ?? "not_started"}>
+                              <option value="not_started">Verification status</option>
+                              <option value="pass">Pass</option>
+                              <option value="fail">Fail</option>
+                              <option value="needs_correction">Needs Correction</option>
+                              <option value="not_applicable">Not Applicable</option>
+                            </select>
+
+                            <textarea name="correction_notes[]" rows={2} className="w-full rounded-md border px-3 py-2 sm:col-span-2" placeholder="Correction notes (required when status is fail or needs correction)" defaultValue={row.correction_notes ?? ""} />
+                            <textarea name="entry_notes[]" rows={2} className="w-full rounded-md border px-3 py-2 sm:col-span-2" placeholder="Entry notes" defaultValue={row.entry_notes ?? ""} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid gap-1">
+                    <label className="text-sm font-medium" htmlFor={`qii-general-notes-${runQiiInsulation.id}`}>
+                      General Notes
+                    </label>
+                    <textarea
+                      id={`qii-general-notes-${runQiiInsulation.id}`}
+                      name="general_notes"
+                      rows={3}
+                      className="w-full rounded-md border px-3 py-2"
+                      defaultValue={runQiiInsulation.data?.general_notes ?? ""}
+                    />
+                  </div>
+                </form>
+
+                <div className="text-sm font-semibold text-slate-900">QII Summary</div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 space-y-1">
+                  <div>Overall QII Status: {qiiStatusLabel(runQiiInsulation.data?.overall_qii_status)}</div>
+                  <div>Entry Count: {fmtValue(runQiiInsulation.computed?.entry_count)}</div>
+                  <div>Compliance Statement: {fallbackText(runQiiInsulation.computed?.compliance_statement)}</div>
+                  <div>
+                    Failed Locations: {Array.isArray(runQiiInsulation.computed?.failed_locations) && runQiiInsulation.computed.failed_locations.length > 0 ? runQiiInsulation.computed.failed_locations.join(", ") : "None"}
+                  </div>
+                </div>
+
+                {qiiEntries.length > 0 ? (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 space-y-1">
+                    {qiiEntries.map((entry: any, index: number) => (
+                      <div key={`qii-summary-entry-${index}`}>
+                        {index + 1}. {fallbackText(entry?.insulation_location)} | {fallbackText(entry?.insulation_type)} | Status: {qiiStatusLabel(entry?.verification_status)} | Label: {qiiYesNoLabel(entry?.manufacturer_label_provided)} | Coverage Chart: {qiiYesNoLabel(entry?.loose_fill_coverage_chart_confirmed)}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                  <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
+                    {runQiiInsulation.is_completed && "✅ Verification completed"}
+                  </span>
+                  <SubmitButton
+                    form={qiiSaveFormId}
+                    formNoValidate
+                    loadingText="Saving..."
+                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                  >
+                    Save Draft
+                  </SubmitButton>
+                  <SubmitButton
+                    form={qiiSaveFormId}
+                    loadingText="Saving & completing..."
+                    formAction={saveAndCompleteQiiEnv22InsulationFromForm}
+                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  >
+                    Complete Verification
+                  </SubmitButton>
+                  <button
+                    type="submit"
+                    form={qiiDeleteFormId}
+                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+
+                <form id={qiiDeleteFormId} action={deleteEccTestRunFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runQiiInsulation.id} />
                 </form>
               </>
             )}
