@@ -18,7 +18,11 @@ export type VisitScopeDraftItem = Omit<VisitScopeItem, "details"> & {
 export type VisitScopePricebookTemplateItem = {
   id: string;
   item_name: string;
+  item_type?: string | null;
+  category?: string | null;
   default_description: string | null;
+  default_unit_price?: number | null;
+  unit_label?: string | null;
 };
 
 type Props = {
@@ -46,6 +50,17 @@ function toDraftItems(
           jobType === "ecc" && item.kind === "companion_service"
             ? "companion_service"
             : "primary",
+        source_pricebook_item_id:
+          sanitizeVisitScopeItemId(item.source_pricebook_item_id) ?? null,
+        expected_unit_price:
+          item.expected_unit_price === null || item.expected_unit_price === undefined
+            ? null
+            : Number.isFinite(Number(item.expected_unit_price))
+              ? Math.max(0, Number(item.expected_unit_price))
+              : null,
+        unit_label: String(item.unit_label ?? "").trim() || null,
+        item_type: String(item.item_type ?? "").trim() || null,
+        category: String(item.category ?? "").trim() || null,
         promoted_service_job_id: String(item.promoted_service_job_id ?? "").trim() || null,
         promoted_at: String(item.promoted_at ?? "").trim() || null,
         promoted_by_user_id: String(item.promoted_by_user_id ?? "").trim() || null,
@@ -81,7 +96,7 @@ export default function VisitScopeBuilder({
 }: Props) {
   const [summary, setSummary] = useState(String(initialSummary ?? ""));
   const [items, setItems] = useState<VisitScopeDraftItem[]>(() => toDraftItems(initialItems, jobType));
-  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [quickEntryValue, setQuickEntryValue] = useState("");
   const [showEccOptionalScope, setShowEccOptionalScope] = useState(() => {
     const seededItems = toDraftItems(initialItems, jobType);
     const hasSummary = String(initialSummary ?? "").trim().length > 0;
@@ -94,18 +109,41 @@ export default function VisitScopeBuilder({
         .map((item) => ({
           id: String(item.id ?? "").trim(),
           item_name: String(item.item_name ?? "").trim(),
+          item_type: String(item.item_type ?? "").trim() || null,
+          category: String(item.category ?? "").trim() || null,
           default_description: String(item.default_description ?? "").trim() || null,
+          default_unit_price:
+            item.default_unit_price === null || item.default_unit_price === undefined
+              ? null
+              : Number(item.default_unit_price) >= 0
+                ? Number(item.default_unit_price)
+                : null,
+          unit_label: String(item.unit_label ?? "").trim() || null,
         }))
         .filter((item) => item.id && item.item_name),
     [pricebookTemplateItems],
   );
+
+  const filteredPricebookTemplates = useMemo(() => {
+    const query = quickEntryValue.trim().toLowerCase();
+    if (!query) return availablePricebookTemplates.slice(0, 6);
+    return availablePricebookTemplates
+      .filter((item) => {
+        const searchCorpus = [item.item_name, item.default_description, item.item_type, item.category]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return searchCorpus.includes(query);
+      })
+      .slice(0, 8);
+  }, [availablePricebookTemplates, quickEntryValue]);
 
   useEffect(() => {
     const seededItems = toDraftItems(initialItems, jobType);
     const hasSummary = String(initialSummary ?? "").trim().length > 0;
     setSummary(String(initialSummary ?? ""));
     setItems(seededItems);
-    setSelectedTemplateId("");
+    setQuickEntryValue("");
     setShowEccOptionalScope(jobType === "service" || hasSummary || seededItems.length > 0);
   }, [jobType, resetKey]);
 
@@ -138,6 +176,14 @@ export default function VisitScopeBuilder({
         title: item.title.trim(),
         details: item.details.trim(),
         kind: jobType === "ecc" ? item.kind : "primary",
+        source_pricebook_item_id: sanitizeVisitScopeItemId(item.source_pricebook_item_id),
+        expected_unit_price:
+          item.expected_unit_price === null || item.expected_unit_price === undefined || Number.isNaN(Number(item.expected_unit_price))
+            ? null
+            : Math.max(0, Number(item.expected_unit_price)),
+        unit_label: String(item.unit_label ?? "").trim() || null,
+        item_type: String(item.item_type ?? "").trim() || null,
+        category: String(item.category ?? "").trim() || null,
         promoted_service_job_id: String(item.promoted_service_job_id ?? "").trim() || null,
         promoted_at: String(item.promoted_at ?? "").trim() || null,
         promoted_by_user_id: String(item.promoted_by_user_id ?? "").trim() || null,
@@ -156,8 +202,60 @@ export default function VisitScopeBuilder({
         title: "",
         details: "",
         kind: "primary",
+        source_pricebook_item_id: null,
+        expected_unit_price: null,
+        unit_label: null,
+        item_type: null,
+        category: null,
       },
     ]);
+  }
+
+  function addManualItemFromQuickEntry() {
+    const title = quickEntryValue.trim();
+    if (!title) {
+      addItem();
+      return;
+    }
+
+    setItems((prev) => {
+      const targetIndex = prev.findIndex(
+        (item) => item.title.trim().length === 0 && item.details.trim().length === 0,
+      );
+
+      if (targetIndex >= 0) {
+        return prev.map((item, index) =>
+          index === targetIndex
+            ? {
+                ...item,
+                title,
+                source_pricebook_item_id: null,
+              }
+            : item,
+        );
+      }
+
+      if (prev.length >= VISIT_SCOPE_ITEM_LIMIT) {
+        return prev;
+      }
+
+      return [
+        ...prev,
+        {
+          id: createVisitScopeItemId(),
+          title,
+          details: "",
+          kind: "primary",
+          source_pricebook_item_id: null,
+          expected_unit_price: null,
+          unit_label: null,
+          item_type: null,
+          category: null,
+        },
+      ];
+    });
+
+    setQuickEntryValue("");
   }
 
   function patchItem(itemId: string, patch: Partial<VisitScopeDraftItem>) {
@@ -180,11 +278,8 @@ export default function VisitScopeBuilder({
     });
   }
 
-  function applyPricebookTemplate() {
-    if (!selectedTemplateId) return;
-
-    const selectedTemplate = availablePricebookTemplates.find((item) => item.id === selectedTemplateId);
-    if (!selectedTemplate) return;
+  function applyPricebookTemplate(selectedTemplate: VisitScopePricebookTemplateItem) {
+    if (!selectedTemplate?.id) return;
 
     setItems((prev) => {
       const targetIndex = prev.findIndex(
@@ -198,6 +293,14 @@ export default function VisitScopeBuilder({
                 ...item,
                 title: selectedTemplate.item_name,
                 details: selectedTemplate.default_description ?? "",
+                source_pricebook_item_id: selectedTemplate.id,
+                expected_unit_price:
+                  selectedTemplate.default_unit_price === null || selectedTemplate.default_unit_price === undefined
+                    ? null
+                    : Math.max(0, Number(selectedTemplate.default_unit_price)),
+                unit_label: selectedTemplate.unit_label ?? null,
+                item_type: selectedTemplate.item_type ?? null,
+                category: selectedTemplate.category ?? null,
               }
             : item,
         );
@@ -214,9 +317,19 @@ export default function VisitScopeBuilder({
           title: selectedTemplate.item_name,
           details: selectedTemplate.default_description ?? "",
           kind: "primary",
+          source_pricebook_item_id: selectedTemplate.id,
+          expected_unit_price:
+            selectedTemplate.default_unit_price === null || selectedTemplate.default_unit_price === undefined
+              ? null
+              : Math.max(0, Number(selectedTemplate.default_unit_price)),
+          unit_label: selectedTemplate.unit_label ?? null,
+          item_type: selectedTemplate.item_type ?? null,
+          category: selectedTemplate.category ?? null,
         },
       ];
     });
+
+    setQuickEntryValue("");
   }
 
   return (
@@ -264,71 +377,99 @@ export default function VisitScopeBuilder({
       </div>
 
       <div className="space-y-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="text-sm font-medium text-slate-900">
-              {jobType === "service" ? "Work Items" : "Optional trip notes"}
-            </div>
-            <div className="text-xs text-slate-500">
-              {jobType === "service"
-                ? "Work Items define what belongs to this visit. They can help build an invoice later, but they are not billing records."
-                : "Use when you know companion work, field expectations, or a note worth carrying into dispatch."}
-            </div>
-            {jobType === "service" ? (
-              <div className="mt-1 text-xs text-slate-600">
-                Scope first: confirm the work for this visit, then complete closeout and billing.
-              </div>
-            ) : null}
-            {availablePricebookTemplates.length > 0 ? (
-              <div className="mt-1 text-xs text-slate-600">
-                Pricebook is a starting template. Work Item is the actual work for this visit. Invoice Charges are reviewed billed copies created later.
-              </div>
-            ) : null}
+        <div className="space-y-1">
+          <div className="text-sm font-medium text-slate-900">
+            {jobType === "service" ? "Work Items" : "Optional trip notes"}
+          </div>
+          <div className="text-xs text-slate-500">
+            {jobType === "service"
+              ? "Work Items define what belongs to this visit. They can help build an invoice later, but they are not billing records."
+              : "Use when you know companion work, field expectations, or a note worth carrying into dispatch."}
           </div>
           {availablePricebookTemplates.length > 0 ? (
-            <div className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 sm:max-w-lg">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Start from Pricebook template
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <select
-                  value={selectedTemplateId}
-                  onChange={(event) => setSelectedTemplateId(event.target.value)}
-                  className="min-w-[14rem] flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
-                >
-                  <option value="">Select a template...</option>
-                  {availablePricebookTemplates.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.item_name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={applyPricebookTemplate}
-                  disabled={!selectedTemplateId}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Use Template
-                </button>
-              </div>
+            <div className="text-xs text-slate-500">
+              Pricebook is a starting template. Work Item is the actual work for this visit. Invoice Charges are reviewed billed copies created later.
             </div>
           ) : null}
-          <button
-            type="button"
-            onClick={addItem}
-            disabled={items.length >= VISIT_SCOPE_ITEM_LIMIT}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Add Work Item
-          </button>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+          <div className="space-y-2">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+              Work Item Entry
+            </div>
+            <input
+              type="text"
+              value={quickEntryValue}
+              onChange={(event) => setQuickEntryValue(event.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+              placeholder={availablePricebookTemplates.length > 0 ? "Search Pricebook or type a manual Work Item" : "Type a Work Item"}
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-slate-500">
+                Pick a match below or add the typed item as a new visit line.
+              </p>
+              <button
+                type="button"
+                onClick={addManualItemFromQuickEntry}
+                className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+              >
+                Add Typed Item
+              </button>
+            </div>
+
+            {availablePricebookTemplates.length > 0 && filteredPricebookTemplates.length > 0 ? (
+              <div className="space-y-2 pt-1">
+                {filteredPricebookTemplates.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => applyPricebookTemplate(item)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-left shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-medium text-slate-900">{item.item_name}</div>
+                        <div className="mt-0.5 text-xs text-slate-500">
+                          {[item.item_type, item.category, item.unit_label].filter(Boolean).join(" · ") || "Pricebook match"}
+                        </div>
+                      </div>
+                      {item.default_unit_price !== null && item.default_unit_price !== undefined ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                          ${Number(item.default_unit_price).toFixed(2)}
+                        </span>
+                      ) : null}
+                    </div>
+                    {item.default_description ? (
+                      <div className="mt-2 text-xs leading-5 text-slate-600">{item.default_description}</div>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={addItem}
+                disabled={items.length >= VISIT_SCOPE_ITEM_LIMIT}
+                className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Add Work Item
+              </button>
+            </div>
+          </div>
         </div>
 
         {items.map((item, index) => (
           <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.35)]">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Item {index + 1}
+              <div className="flex items-center gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Item {index + 1}</div>
+                <div className="text-sm font-semibold text-slate-900">
+                  {item.title.trim() || "Untitled Work Item"}
+                  {item.expected_unit_price !== null && item.expected_unit_price !== undefined ? ` — $${Number(item.expected_unit_price).toFixed(2)}` : ""}
+                </div>
               </div>
               <button
                 type="button"
@@ -385,6 +526,68 @@ export default function VisitScopeBuilder({
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
                 placeholder={jobType === "service" ? "What should the tech complete or verify before leaving?" : "Optional field note for the ECC trip"}
               />
+            </div>
+
+            <div className="mt-2.5 grid gap-2.5 md:grid-cols-4">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Expected Price</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={item.expected_unit_price ?? ""}
+                  onChange={(event) => {
+                    const raw = event.target.value.trim();
+                    if (!raw) {
+                      patchItem(item.id, { expected_unit_price: null });
+                      return;
+                    }
+
+                    const parsed = Number.parseFloat(raw);
+                    if (!Number.isFinite(parsed) || parsed < 0) {
+                      patchItem(item.id, { expected_unit_price: null });
+                      return;
+                    }
+
+                    patchItem(item.id, { expected_unit_price: Number(parsed.toFixed(2)) });
+                  }}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Unit Label</label>
+                <input
+                  type="text"
+                  value={item.unit_label ?? ""}
+                  onChange={(event) => patchItem(item.id, { unit_label: event.target.value || null })}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                  placeholder="each"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Type</label>
+                <input
+                  type="text"
+                  value={item.item_type ?? ""}
+                  onChange={(event) => patchItem(item.id, { item_type: event.target.value || null })}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                  placeholder="service"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Category</label>
+                <input
+                  type="text"
+                  value={item.category ?? ""}
+                  onChange={(event) => patchItem(item.id, { category: event.target.value || null })}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                  placeholder="Diagnostic"
+                />
+              </div>
             </div>
 
             <div className="mt-2 flex items-center justify-between gap-3">

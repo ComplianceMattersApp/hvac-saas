@@ -92,4 +92,58 @@ describe("visit scope durable item ids", () => {
       promoted_by_user_id: "user-123",
     });
   });
+
+  it("preserves optional pricebook metadata and expected unit price", () => {
+    const sourcePricebookId = "b98cf45f-6452-4ee6-ae94-3da666fd5218";
+    const rows = sanitizeVisitScopeItems([
+      {
+        id: "41b4c6ff-c941-4911-8b5d-c9f196efa733",
+        title: "Service Diagnostic",
+        details: "Confirm control board behavior",
+        kind: "primary",
+        source_pricebook_item_id: sourcePricebookId,
+        expected_unit_price: "89",
+        unit_label: "each",
+        item_type: "diagnostic",
+        category: "Diagnostic",
+      },
+    ]);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      source_pricebook_item_id: sourcePricebookId,
+      expected_unit_price: 89,
+      unit_label: "each",
+      item_type: "diagnostic",
+      category: "Diagnostic",
+    });
+  });
+
+  it("normalizes malformed expected unit price values safely", () => {
+    const rows = sanitizeVisitScopeItems([
+      {
+        title: "Invalid negative",
+        details: null,
+        kind: "primary",
+        expected_unit_price: -10,
+      },
+      {
+        title: "Invalid text",
+        details: null,
+        kind: "primary",
+        expected_unit_price: "abc",
+      },
+      {
+        title: "Currency format",
+        details: null,
+        kind: "primary",
+        expected_unit_price: "$129.995",
+      },
+    ]);
+
+    expect(rows).toHaveLength(3);
+    expect(rows[0].expected_unit_price).toBeNull();
+    expect(rows[1].expected_unit_price).toBeNull();
+    expect(rows[2].expected_unit_price).toBe(130);
+  });
 });

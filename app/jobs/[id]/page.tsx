@@ -1131,7 +1131,7 @@ export default async function JobDetailPage({
   const visitScopePricebookTemplatesPromise = timedPhase("visitScopePricebookTemplatesRead", async () => {
     const { data: pricebookRows, error: pricebookRowsErr } = await supabase
       .from("pricebook_items")
-      .select("id, item_name, default_description")
+      .select("id, item_name, item_type, category, default_description, default_unit_price, unit_label")
       .eq("account_owner_user_id", internalUser.account_owner_user_id)
       .eq("is_active", true)
       .order("item_name", { ascending: true });
@@ -1142,7 +1142,14 @@ export default async function JobDetailPage({
       .map((row: any) => ({
         id: String(row?.id ?? "").trim(),
         item_name: String(row?.item_name ?? "").trim(),
+        item_type: String(row?.item_type ?? "").trim() || null,
+        category: String(row?.category ?? "").trim() || null,
         default_description: String(row?.default_description ?? "").trim() || null,
+        default_unit_price:
+          row?.default_unit_price === null || row?.default_unit_price === undefined
+            ? null
+            : Number(row.default_unit_price),
+        unit_label: String(row?.unit_label ?? "").trim() || null,
       }))
       .filter((row) => row.id && row.item_name);
   });
@@ -1542,6 +1549,11 @@ let visitScopeItems = [] as Array<{
   title: string;
   details: string | null;
   kind: "primary" | "companion_service";
+  source_pricebook_item_id?: string | null;
+  expected_unit_price?: number | null;
+  unit_label?: string | null;
+  item_type?: string | null;
+  category?: string | null;
   promoted_service_job_id?: string | null;
   promoted_at?: string | null;
   promoted_by_user_id?: string | null;
@@ -4104,28 +4116,28 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 {isInternalUser ? (
   <div id="visit-scope-section" className="mt-6 rounded-2xl border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)]">
     <div className="space-y-3">
-      {job.job_type === "service" ? (
-        <div className="rounded-xl border border-blue-200/80 bg-blue-50/75 px-3.5 py-3 text-sm leading-6 text-blue-900">
-          Start with the Work Items for this visit. Closeout and billing come after the work is ready.
+      {job.job_type === "service" && visitScopeCount === 0 ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+          Add Work Items before closeout or billing.
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Items (Visit Scope)</div>
-        {job.job_type === "service" ? (
-          <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-            {visitScopeCount > 0 ? "Work items set" : "No work items yet"}
-          </span>
-        ) : null}
-      </div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit Scope</div>
+            {job.job_type === "service" ? (
+              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                {visitScopeCount > 0 ? "Work Items Set" : "No Work Items Yet"}
+              </span>
+            ) : null}
+          </div>
+          <div className="text-xs leading-5 text-slate-500">Reason and work planned for this visit.</div>
+        </div>
 
-      <div className="text-xs leading-5 text-slate-600">
-        Work Items define what belongs to this visit. They can help build an invoice later, but they are not billing records.
-      </div>
-
-      <details className="group">
+        <details className="group">
           <summary className="inline-flex min-h-9 cursor-pointer list-none items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
-          {hasVisitScopeDefined ? "Edit Work Items" : "Add Work Items"}
+            {hasVisitScopeDefined ? "Edit Work Items" : "Add Work Items"}
           </summary>
 
           <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
@@ -4139,12 +4151,14 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               primaryButtonClass={primaryButtonClass}
             />
           </div>
-      </details>
+        </details>
+
+      </div>
 
       <div className="rounded-xl border border-slate-200/70 bg-white/92 px-4 py-3.5 shadow-[0_10px_20px_-30px_rgba(15,23,42,0.18)]">
       <div className="space-y-3.5">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Reason for Visit / Dispatch Notes</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Reason for Visit</div>
           <div className="mt-1 text-sm leading-6 text-slate-900">
             {visitScopeLeadText || "No visit brief saved yet."}
           </div>
@@ -4152,11 +4166,16 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
         {primaryVisitScopeItems.length > 0 ? (
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Items for this visit</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Items</div>
             <div className="mt-2 space-y-2.5">
               {primaryVisitScopeItems.map((item, index) => (
                 <div key={`primary-${index}-${item.title}`} className="space-y-1 border-l-2 border-slate-200 pl-3">
-                  <div className="text-sm font-semibold leading-5 text-slate-900">{item.title}</div>
+                  <div className="text-sm font-semibold leading-5 text-slate-900">
+                    {item.title}
+                    {item.expected_unit_price !== null && item.expected_unit_price !== undefined
+                      ? ` - $${Number(item.expected_unit_price).toFixed(2)}`
+                      : ""}
+                  </div>
                   {item.details ? (
                     <div className="text-sm leading-6 text-slate-600">{item.details}</div>
                   ) : null}

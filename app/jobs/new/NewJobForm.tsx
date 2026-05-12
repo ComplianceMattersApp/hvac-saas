@@ -138,6 +138,11 @@ type NewJobDraft = {
     title: string;
     details: string | null;
     kind: "primary" | "companion_service";
+    source_pricebook_item_id?: string | null;
+    expected_unit_price?: number | null;
+    unit_label?: string | null;
+    item_type?: string | null;
+    category?: string | null;
   }>;
 };
 
@@ -612,18 +617,18 @@ const [billingRecipient, setBillingRecipient] = useState<
         ? "ECC/HERS accounts use the ECC / Compliance Test family by default and presentation."
         : "Hybrid keeps both workflows available. Choose ECC or Service based on the visit you are creating.";
   const internalFlowSummary = isHvacServiceMode
-    ? "Select the customer and location, keep the work-order family primary, then add Work Items before scheduling."
+    ? "Select the customer and location, classify the visit, then add Work Items below."
     : "Select the customer and location, pick a job family, then add Work Items before scheduling.";
   const internalFlowStep2Label = isHvacServiceMode ? "Work order and relationship" : "Family and relationship";
-  const jobFamilyStepTitle = isHvacServiceMode ? "Work order family" : "Job family";
+  const jobFamilyStepTitle = isHvacServiceMode ? "Work Order Setup" : "Job family";
   const jobFamilyStepDescription = isHvacServiceMode
-    ? "HVAC Service accounts stay in the Service / Work Order family for internal intake."
+    ? "These fields classify the visit. Work instructions are added below."
     : productMode === "ecc_hers"
       ? "ECC/HERS accounts stay in the ECC / Compliance Test family for internal intake."
       : "Choose ECC or Service first so any relationship review stays inside the right intake lane.";
-  const jobFamilyControlLabel = isHvacServiceMode ? "Work Order Family" : "Job Family";
+  const jobFamilyControlLabel = isHvacServiceMode ? "Service / Work Order" : "Job Family";
   const serviceJobFamilyDescription = isHvacServiceMode
-    ? "Primary service/work-order workflow"
+    ? "Locked to Service"
     : "Standard service visit workflow";
   const eccJobFamilyDescription = isHvacServiceMode
     ? "Advanced compliance testing workflow"
@@ -921,6 +926,15 @@ const [billingRecipient, setBillingRecipient] = useState<
           title: item.title.trim(),
           details: item.details.trim() || null,
           kind: item.kind,
+          source_pricebook_item_id:
+            sanitizeVisitScopeItemId(item.source_pricebook_item_id) ?? null,
+          expected_unit_price:
+            item.expected_unit_price === null || item.expected_unit_price === undefined
+              ? null
+              : Math.max(0, Number(item.expected_unit_price)),
+          unit_label: String(item.unit_label ?? "").trim() || null,
+          item_type: String(item.item_type ?? "").trim() || null,
+          category: String(item.category ?? "").trim() || null,
         })),
       };
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
@@ -980,6 +994,17 @@ const [billingRecipient, setBillingRecipient] = useState<
             title: String(item.title ?? ""),
             details: String(item.details ?? ""),
             kind: item.kind === "companion_service" ? "companion_service" : "primary",
+            source_pricebook_item_id:
+              sanitizeVisitScopeItemId(item.source_pricebook_item_id) ?? null,
+            expected_unit_price:
+              item.expected_unit_price === null || item.expected_unit_price === undefined
+                ? null
+                : Number.isFinite(Number(item.expected_unit_price))
+                  ? Math.max(0, Number(item.expected_unit_price))
+                  : null,
+            unit_label: String(item.unit_label ?? "").trim() || null,
+            item_type: String(item.item_type ?? "").trim() || null,
+            category: String(item.category ?? "").trim() || null,
           }))
         : [],
     );
@@ -1431,7 +1456,6 @@ const [billingRecipient, setBillingRecipient] = useState<
         )}
 
         <div className="space-y-8">
-
         {!isInternalMode ? (
         <section className="space-y-3">
           <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Job Type</h2>
@@ -2181,12 +2205,6 @@ const [billingRecipient, setBillingRecipient] = useState<
 
               {jobType === "service" ? (
                 <div className="border-t border-slate-200/80 pt-4 space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-900">Service Details</label>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Service Type sets the broader service context. Visit Type sets this trip purpose. Work Items below define the operational work on site.
-                    </p>
-                  </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
@@ -2488,10 +2506,10 @@ const [billingRecipient, setBillingRecipient] = useState<
               {isInternalMode ? (
                 <div ref={visitScopeSectionRef}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 5</p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Work Items and job details</h2>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Visit Reason &amp; Work Items</h2>
                   <p className="mt-1 text-sm text-slate-500">
                     {jobType === "service"
-                      ? "Capture Reason for Visit / Dispatch Notes, then list Work Items for this visit."
+                      ? "Capture why this visit exists, then add the Work Items for this trip."
                       : "ECC testing can be created without work items; add optional companion work context only when this visit also includes service work."}
                   </p>
                 </div>

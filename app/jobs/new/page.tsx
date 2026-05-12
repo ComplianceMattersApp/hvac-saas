@@ -61,7 +61,11 @@ type ContractorMembershipRow = {
 type PricebookTemplateRow = {
   id: string | null;
   item_name: string | null;
+  item_type: string | null;
+  category: string | null;
   default_description: string | null;
+  default_unit_price: number | null;
+  unit_label: string | null;
 };
 
 function isUuid(v: string) {
@@ -105,7 +109,11 @@ export default async function NewJobPage(props: {
   let pricebookTemplateItems: Array<{
     id: string;
     item_name: string;
+    item_type: string | null;
+    category: string | null;
     default_description: string | null;
+    default_unit_price: number | null;
+    unit_label: string | null;
   }> = [];
   if (!myContractor?.id) {
     const { data: contractorRows, error } = await supabase
@@ -143,7 +151,7 @@ export default async function NewJobPage(props: {
     if (accountOwnerUserId && internalUserRow?.is_active !== false) {
       const { data: pricebookRows, error: pricebookRowsErr } = await supabase
         .from("pricebook_items")
-        .select("id, item_name, default_description")
+        .select("id, item_name, item_type, category, default_description, default_unit_price, unit_label")
         .eq("account_owner_user_id", accountOwnerUserId)
         .eq("is_active", true)
         .order("item_name", { ascending: true });
@@ -154,7 +162,14 @@ export default async function NewJobPage(props: {
         .map((row) => ({
           id: String(row?.id ?? "").trim(),
           item_name: String(row?.item_name ?? "").trim(),
+          item_type: String(row?.item_type ?? "").trim() || null,
+          category: String(row?.category ?? "").trim() || null,
           default_description: String(row?.default_description ?? "").trim() || null,
+          default_unit_price:
+            row?.default_unit_price === null || row?.default_unit_price === undefined
+              ? null
+              : Number(row.default_unit_price),
+          unit_label: String(row?.unit_label ?? "").trim() || null,
         }))
         .filter((row) => row.id && row.item_name);
     }

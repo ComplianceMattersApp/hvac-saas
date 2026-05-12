@@ -5,6 +5,11 @@ export type VisitScopeItem = {
   title: string;
   details: string | null;
   kind: VisitScopeItemKind;
+  source_pricebook_item_id?: string | null;
+  expected_unit_price?: number | null;
+  unit_label?: string | null;
+  item_type?: string | null;
+  category?: string | null;
   promoted_service_job_id?: string | null;
   promoted_at?: string | null;
   promoted_by_user_id?: string | null;
@@ -14,6 +19,10 @@ export const VISIT_SCOPE_ITEM_LIMIT = 8;
 const VISIT_SCOPE_SUMMARY_MAX = 600;
 const VISIT_SCOPE_ITEM_TITLE_MAX = 160;
 const VISIT_SCOPE_ITEM_DETAILS_MAX = 500;
+const VISIT_SCOPE_ITEM_UNIT_LABEL_MAX = 40;
+const VISIT_SCOPE_ITEM_ITEM_TYPE_MAX = 40;
+const VISIT_SCOPE_ITEM_CATEGORY_MAX = 80;
+const VISIT_SCOPE_ITEM_EXPECTED_PRICE_MAX = 99999999;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -25,6 +34,21 @@ export function isVisitScopeItemId(value: unknown): value is string {
 export function sanitizeVisitScopeItemId(value: unknown): string | null {
   const normalized = String(value ?? "").trim();
   return isVisitScopeItemId(normalized) ? normalized : null;
+}
+
+function sanitizeVisitScopeExpectedUnitPrice(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+
+  const parsed =
+    typeof value === "number"
+      ? value
+      : Number.parseFloat(String(value).replace(/\$/g, "").replace(/,/g, "").trim());
+
+  if (!Number.isFinite(parsed)) return null;
+  if (parsed < 0) return null;
+
+  const bounded = Math.min(parsed, VISIT_SCOPE_ITEM_EXPECTED_PRICE_MAX);
+  return Number(bounded.toFixed(2));
 }
 
 function buildFallbackUuidV4() {
@@ -68,6 +92,24 @@ export function sanitizeVisitScopeItems(value: unknown): VisitScopeItem[] {
       .trim()
       .replace(/\s+/g, " ")
       .slice(0, VISIT_SCOPE_ITEM_DETAILS_MAX);
+    const sourcePricebookItemId = sanitizeVisitScopeItemId(
+      (row as { source_pricebook_item_id?: unknown })?.source_pricebook_item_id,
+    );
+    const expectedUnitPrice = sanitizeVisitScopeExpectedUnitPrice(
+      (row as { expected_unit_price?: unknown })?.expected_unit_price,
+    );
+    const unitLabel = String((row as { unit_label?: unknown })?.unit_label ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, VISIT_SCOPE_ITEM_UNIT_LABEL_MAX);
+    const itemType = String((row as { item_type?: unknown })?.item_type ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, VISIT_SCOPE_ITEM_ITEM_TYPE_MAX);
+    const category = String((row as { category?: unknown })?.category ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, VISIT_SCOPE_ITEM_CATEGORY_MAX);
     const promotedServiceJobId = String(
       (row as { promoted_service_job_id?: unknown })?.promoted_service_job_id ?? "",
     ).trim();
@@ -86,6 +128,11 @@ export function sanitizeVisitScopeItems(value: unknown): VisitScopeItem[] {
       title,
       details: detailsValue || null,
       kind: normalizeVisitScopeItemKind((row as { kind?: unknown })?.kind),
+      source_pricebook_item_id: sourcePricebookItemId,
+      expected_unit_price: expectedUnitPrice,
+      unit_label: unitLabel || null,
+      item_type: itemType || null,
+      category: category || null,
       promoted_service_job_id: promotedServiceJobId || null,
       promoted_at: promotedAt || null,
       promoted_by_user_id: promotedByUserId || null,

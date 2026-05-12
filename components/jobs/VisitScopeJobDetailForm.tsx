@@ -38,6 +38,14 @@ export default function VisitScopeJobDetailForm({
       title: item.title,
       details: item.details ?? "",
       kind: item.kind,
+      source_pricebook_item_id: item.source_pricebook_item_id ?? null,
+      expected_unit_price: item.expected_unit_price ?? null,
+      unit_label: item.unit_label ?? null,
+      item_type: item.item_type ?? null,
+      category: item.category ?? null,
+      promoted_service_job_id: item.promoted_service_job_id ?? null,
+      promoted_at: item.promoted_at ?? null,
+      promoted_by_user_id: item.promoted_by_user_id ?? null,
     })),
   );
   const [error, setError] = useState<string | null>(null);
