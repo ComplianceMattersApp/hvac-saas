@@ -227,7 +227,7 @@ HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 closeout snapsho
 - ECC/HERS contractor filter/search behavior and contractor-related links/query params are preserved.
 - Hybrid / Master / All-in-One broad behavior is preserved (including contractor visibility).
 - On `/jobs/[id]`, HVAC Service keeps Timeline and Internal Notes / Team Notes visible.
-- Shared Notes remains in product and is de-emphasized/optional for HVAC Service only; it was not deleted.
+- Shared Notes is now hidden on internal `/jobs/[id]` across internal modes; it was not deleted from data history and contractor portal behavior remains unchanged.
 - `job_events` remains source-of-truth narrative history with no behavior changes.
 - Validation recorded:
    - TypeScript passed: `npx.cmd tsc --noEmit`.

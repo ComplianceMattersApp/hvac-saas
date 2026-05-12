@@ -215,6 +215,17 @@ Pricebook-backed drafting should stay aligned to that boundary:
 - Work Item Import Defaults Clarification V1 validation passed: `npx.cmd tsc --noEmit`; targeted tests (`2` files / `24` tests); and browser smoke confirming the helper copy appeared near Work Item import, imported Work Items still created draft Invoice Charges at qty `1.00` and unit price `$0.00`, imported charges remained editable, and issue behavior did not change.
 - Invoice Panel Hierarchy Polish V1 validation passed: `npx.cmd tsc --noEmit`; targeted tests (`2` files / `24` tests); and browser smoke confirming Work Item import rendered before Pricebook add, Work Item import remained recommended, Pricebook add remained fallback, manual add remained exception/fallback, import/pricebook/manual add paths all still worked, and issue behavior did not change.
 - Work Item-first Flow Copy Density Polish V1 validation passed: `npx.cmd tsc --noEmit`; targeted tests (`2` files / `24` tests); and browser smoke confirming desktop + narrow/mobile-ish rendering, no horizontal overflow on the inspected invoice surface, Work Item path still first, Pricebook fallback still present, manual add still exception/fresh-charge path, imported rows still rendered, and no behavior changes.
+- Visit Scope / Work Items Smart-Entry + Job Detail Polish closeout snapshot (2026-05-12):
+	- Work Items now support smarter Pricebook-assisted entry while preserving manual Work Item entry.
+	- Pricebook selection can prefill Work Item `title`, `details`, `expected_unit_price`, `unit_label`, `item_type`, and `category`.
+	- Work Items remain operational visit scope and are not billing records.
+	- Invoice Charges remain downstream reviewed billed truth; invoice import behavior was not changed.
+	- Work Item expected/default price does not auto-bill.
+	- `/jobs/new` flow ownership is clarified: Step 3 is classification/setup; Step 5 owns Reason for Visit and Work Items.
+	- `/jobs/[id]` Visit Scope and top summary/header were compacted for readability (duplicate visit-reason echoes removed; Work Needed summarizes Work Items only).
+	- Shared Notes is now hidden from internal job detail for all internal product modes because it has no current operational use.
+	- Estimates were not changed and remain a separate future consideration.
+	- Non-change boundaries preserved: no schema/migrations, no auth/RLS/permission changes, no contractor-authority changes, no invoice issue/send/payment behavior changes, no ECC behavior changes, and no Work Item save/edit ownership change.
 
 Future end-of-road UX review note (deferred):
 - If job detail remains too dense after broader completion, evaluate a job-owned billing workspace route such as `/jobs/[id]/billing` or `/jobs/[id]/invoice`.

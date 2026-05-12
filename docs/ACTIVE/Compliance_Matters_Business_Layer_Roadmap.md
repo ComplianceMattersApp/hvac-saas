@@ -647,6 +647,14 @@ Product Mode V2 production migration execution closeout (2026-05-10):
   - invoice/work-item helper language is trimmed and less technical
   - Work Item path remains primary, Pricebook remains fallback, manual add remains exception/fresh-charge path
   - behavior, transfer mechanics, and defaults remain unchanged
+- Visit Scope / Work Items Smart-Entry + Job Detail Polish closeout is complete (2026-05-12):
+  - Pricebook-assisted Work Item entry now supports prefill for title, description, expected/default price, unit label, type, and category, while manual Work Item entry remains supported.
+  - Work Items remain operational visit scope; Invoice Charges remain downstream reviewed billed truth.
+  - Invoice import behavior did not change; Work Item expected/default pricing does not auto-bill.
+  - `/jobs/new` ownership remains explicit: Step 3 is classification/setup; Step 5 owns visit reason and Work Items.
+  - `/jobs/[id]` Visit Scope and top summary/header were compacted for readability; Work Needed now summarizes Work Items only.
+  - Shared Notes is now hidden from internal `/jobs/[id]` across internal modes; Timeline and Internal Notes / Team Notes remain the active narrative surfaces.
+  - Estimates remain unchanged and deferred as separate scope.
 - This V1 assist preserves source-of-truth boundaries:
   - Pricebook = reusable defaults/templates
   - Visit Scope / Work Items = operational work scope
