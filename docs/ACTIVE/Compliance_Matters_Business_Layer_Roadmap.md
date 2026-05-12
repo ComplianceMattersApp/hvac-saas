@@ -735,6 +735,13 @@ Product Mode V2 production migration execution closeout (2026-05-10):
 - Jobs remain the actual visit / work execution unit; service_cases remain continuity truth; Work Items / Visit Scope remain the operational scope for each visit; invoices remain billed truth; payments remain collected truth where implemented.
 - Pricebook may assist later with agreement templates/defaults, but it must not become agreement truth.
 - Dedicated model source of truth: [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md).
+- Group 9A-2 (Maintenance Agreements Schema + RLS + Read Model V1) is implemented and pushed in commit `b126ff6`:
+  - migration: `supabase/migrations/20260512120000_maintenance_agreements_v1.sql`
+  - read model: `lib/maintenance-agreements/read-model.ts`
+  - tests: `lib/maintenance-agreements/__tests__/read-model.test.ts`
+  - validation passed: targeted Vitest (`7` tests), `git diff --check`, and `npx.cmd tsc --noEmit`
+  - boundaries preserved: no job linkage/generation, no calendar events, no invoices/payments, no Stripe tenant payment behavior, no QBO, no SMS, no portal, no UI mutation flow, and no production migration apply
+  - activation rule: backend foundation is committed in repo and remains not production-active until the migration is intentionally applied through the appropriate environment process
 
 ### Current status note (reporting/truth separation)
 - Internal invoice ledger collected-payment visibility is now implemented for internal invoicing report surfaces (including CSV export) as reporting/tracking only.
@@ -2602,7 +2609,7 @@ The following implementation groups have been closed as of May 2026.
 | 7 | Product Mode / Packaging Completion | Planned |
 | 7A | Pricing / Tiers / Seat Alignment | Planned � see Competitive_Packaging_and_Tier_Spec.md |
 | 8 | Support / Owner Operations | Planned |
-| 9A | Recurring Services / Maintenance Agreements | Planned - see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md) |
+| 9A | Recurring Services / Maintenance Agreements | Backend foundation committed in repo (Group 9A-2, `b126ff6`); not production-active until intentional migration apply - see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md) |
 | 9B | SMS / On-My-Way Messaging | Planned |
 | 9C | Tenant Customer Payments / Stripe Customer Payment Execution | Planned |
 | 9D | Customer Portal | Planned |

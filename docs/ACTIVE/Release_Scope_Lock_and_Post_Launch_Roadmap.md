@@ -124,7 +124,7 @@ The following remain intentionally deferred/parked (not blockers for owner-relea
 3. First-owner provisioning apply/invites outside controlled runbook operation.
 4. Tenant customer payment execution (online checkout/payment rail at tenant invoice layer; later Stripe-first invoice acceptance, separate from platform subscription billing).
 5. QBO integration (last-last, optional downstream accounting sync/export only).
-6. Recurring services / maintenance agreements (customer-owned agreement V1; manual prep only; no automatic job generation; see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md)).
+6. Recurring services / maintenance agreements (customer-owned agreement V1; Group 9A-2 backend foundation is committed in repo in `b126ff6` with no automatic job generation; remains not production-active until migration `20260512120000_maintenance_agreements_v1.sql` is intentionally applied through the environment process; see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md)).
 7. Customer portal (requires separate customer/location-scoped external visibility design).
 8. Service worker/offline/native app-store packaging.
 9. Product-mode configuration next slices (admin mutation/edit UI, signup capture, tier/add-on enforcement, and full mode-aware navigation/report/starter-kit behavior).
@@ -640,7 +640,7 @@ Active planned groups in priority sequence:
 | 7 | Product Mode / Packaging Completion | Planned |
 | 7A | Pricing / Tiers / Seat Alignment | Planned — see `docs/ACTIVE/Competitive_Packaging_and_Tier_Spec.md` |
 | 8 | Support / Owner Operations | Planned |
-| 9A | Recurring Services / Maintenance Agreements | Planned - see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md) |
+| 9A | Recurring Services / Maintenance Agreements | Backend foundation committed in repo (Group 9A-2, `b126ff6`); not production-active until intentional migration apply - see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md) |
 | 9B | SMS / On-My-Way Messaging | Planned |
 | 9C | Tenant Customer Payments / Stripe Customer Payment Execution | Planned |
 | 9D | Customer Portal | Planned |

@@ -2,7 +2,7 @@
 
 Status: ACTIVE PLANNING SPEC  
 Owner lane: Group 9A - Recurring Services / Maintenance Agreements  
-Scope: model and implementation guidance only; no schema has been created by this spec.
+Scope: model guidance plus Group 9A-2 backend foundation closeout documentation. Backend foundation is committed in repo but is not production-active until migration apply is intentionally executed through the environment process.
 
 ## Purpose
 
@@ -11,6 +11,40 @@ Maintenance Agreements V1 defines the future customer-owned recurring service ag
 The V1 goal is simple: let an operator track recurring service obligations for a customer, optionally tied to one primary location, and manually create normal Jobs / Work Orders when a visit is due.
 
 This spec is intentionally not a billing, payment, portal, SMS, or automation design.
+
+## Group 9A-2 Closeout Snapshot (implemented in repo, not production-active)
+
+Group 9A-2 (Maintenance Agreements Schema + RLS + Read Model V1) is implemented and pushed in commit `b126ff6`.
+
+Recorded implementation artifacts:
+
+- Migration file: `supabase/migrations/20260512120000_maintenance_agreements_v1.sql`
+- Read model: `lib/maintenance-agreements/read-model.ts`
+- Tests: `lib/maintenance-agreements/__tests__/read-model.test.ts`
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__/read-model.test.ts` passed (`7` tests).
+- `git diff --check` passed.
+- `npx.cmd tsc --noEmit` passed.
+
+Boundaries preserved in Group 9A-2:
+
+- no job linkage
+- no job generation
+- no calendar events
+- no invoices
+- no payments
+- no Stripe tenant payment behavior
+- no QBO
+- no SMS
+- no portal
+- no UI mutation flow
+- no production migration apply
+
+Environment activation rule:
+
+- Maintenance Agreements V1 backend foundation is committed in repo, but it is not production-active until `20260512120000_maintenance_agreements_v1.sql` is intentionally applied through the appropriate environment process.
 
 ## Naming
 
