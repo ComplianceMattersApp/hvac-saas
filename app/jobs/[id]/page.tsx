@@ -4302,7 +4302,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <CollapsibleHeader
           title="Attachments"
           subtitle="Uploaded files and shareable job records."
-          meta="Deferred"
         />
       </summary>
       <div className={`${workspaceDetailsDividerClass} px-0 pb-0`}>
@@ -4328,7 +4327,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <CollapsibleHeader
           title="Follow-Up History"
           subtitle={followUpHistorySummaryText}
-          meta="Recent attempts loading"
         />
       </summary>
 
@@ -4537,7 +4535,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {/* Shared Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} meta="Notes load below" />
+            <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -4577,7 +4575,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {/* Internal Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} meta="Notes load below" />
+            <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -4685,7 +4683,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <CollapsibleHeader
               title={timelineTitle}
               subtitle={timelineSummaryText}
-              meta="History loads below"
             />
           </summary>
 
