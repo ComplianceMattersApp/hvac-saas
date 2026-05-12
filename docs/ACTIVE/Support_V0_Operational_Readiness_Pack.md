@@ -31,12 +31,28 @@ Support V0 closes operationally only when a formal ticketing/support system is i
 
 ## 2. Support Contact SOP
 
+### 2.0 Group 8A practical setup snapshot (owner-led)
+
+Status: ACTIVE, pending owner fill.
+
+| Practical field | Current value |
+|---|---|
+| Support email | `OWNER NEEDED` |
+| Support phone/text number | `OWNER NEEDED` |
+| Support hours + timezone | `OWNER NEEDED` |
+| After-hours S1 path | `OWNER NEEDED` |
+| Issue log location | `OWNER NEEDED` |
+| Named owner / first responder | `OWNER NEEDED` |
+
+Group 8A rule:
+- If any field above remains `OWNER NEEDED`, controlled first-user support setup is not fully ready.
+
 ### 2.1 Contact channels
 
 | Channel | Placeholder |
 |---|---|
-| Support email | `support@[domain]` _(to be confirmed before tester onboarding)_ |
-| Support phone | `[phone number]` _(to be confirmed before tester onboarding)_ |
+| Support email | `OWNER NEEDED` |
+| Support phone/text number | `OWNER NEEDED` |
 | Preferred channel | Email for non-urgent issues; phone for S1/S2 blocked situations |
 
 ### 2.2 Practical setup prerequisites
@@ -54,8 +70,8 @@ Before controlled first-customer onboarding begins, the following live details m
 
 | Tier | Hours |
 |---|---|
-| Normal support hours | `[Mon–Fri, 8 AM–5 PM [timezone]]` _(to be confirmed)_ |
-| After-hours / emergency | S1 issues only — contact via `[phone/on-call channel]` outside normal hours |
+| Normal support hours | `OWNER NEEDED` |
+| After-hours / emergency | `OWNER NEEDED` (S1 issues only outside normal hours) |
 
 ### 2.4 Who receives support requests
 
@@ -109,6 +125,65 @@ Intake notes:
 Assigned severity (operator):    S1 / S2 / S3 / S4
 Status:                          New / In Review / Engineering / Resolved / Closed
 ```
+
+---
+
+## 3A. Lightweight Issue Log Template (Spreadsheet-Style)
+
+Use this as the single shared issue log for Support V0. Keep user communication in email/phone, and keep triage state in this one log.
+
+Recommended location: `OWNER NEEDED` (single shared spreadsheet/doc path).
+
+### 3A.1 Required columns
+
+1. Reported At
+2. Customer / Company
+3. Reporter
+4. Contact Channel
+5. Route / Page
+6. Workflow Area
+7. Expected Behavior
+8. Actual Behavior
+9. Category
+10. Severity
+11. Blocked?
+12. Workaround
+13. Owner
+14. Status
+15. Escalated to Build?
+16. Build Link / Reference
+17. Resolution Notes
+18. Closed At
+
+### 3A.2 Allowed values
+
+Category values:
+- Training / Guidance
+- Setup / Data
+- UX Polish
+- Confirmed Bug
+- Future Feature
+
+Severity values:
+- S1 Critical
+- S2 High
+- S3 Normal
+- S4 Low
+
+### 3A.3 Escalation-to-build rule
+
+Only escalate to build work when one of the following is true:
+
+1. Confirmed/reproducible bug with clear expected vs actual behavior.
+2. Repeated blocking UX issue (same blocking confusion/polish issue appears repeatedly and impacts user progress).
+
+Do not escalate Training / Guidance-only issues, one-off Setup / Data issues, or Future Feature requests as immediate build work.
+
+### 3A.4 Template file
+
+Spreadsheet-style starter template is provided in:
+
+- `docs/ACTIVE/Support_V0_Issue_Log_Template.md`
 
 ---
 

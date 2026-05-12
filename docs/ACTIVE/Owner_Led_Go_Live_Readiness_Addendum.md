@@ -22,6 +22,9 @@ Support V0 clarification:
 - Practical onboarding setup still requires live contact details, support hours, after-hours S1 path, issue log location, and owner/first responder identity.
 - Controlled onboarding can proceed once those practical details are filled.
 - Support V0 does not close operationally until a formal ticketing/support system or equivalent support process is enabled later.
+- Group 8A practical setup and issue-log template references:
+   - `docs/ACTIVE/Support_V0_Operational_Readiness_Pack.md` (§2 and §3A)
+   - `docs/ACTIVE/Support_V0_Issue_Log_Template.md`
 
 This addendum does **not** activate or change any deferred/gated implementation area, including:
 - Support Console production enablement
