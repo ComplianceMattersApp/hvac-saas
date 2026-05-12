@@ -1370,11 +1370,12 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                             <div>System Name: {fallbackText(sys.runLocalExhaust?.data?.system_name)}</div>
                             <div>Manufacturer: {fallbackText(sys.runLocalExhaust?.data?.manufacturer_name)}</div>
                             <div>System Type: {fallbackText(sys.runLocalExhaust?.data?.system_type)}</div>
-                            <div>HVI/AHAM Model Number: {fallbackText(sys.runLocalExhaust?.data?.hvi_aham_model_number)}</div>
+                            <div className="text-slate-500 italic text-xs mt-2">Directory Research Values:</div>
+                            <div>HVI/AHAM Directory Model Number: {fallbackText(sys.runLocalExhaust?.data?.hvi_aham_model_number)}</div>
                             <div>
-                              HVI/AHAM Rated Airflow: {fmtValue(sys.runLocalExhaust?.data?.hvi_aham_rated_airflow_cfm, "CFM")}
+                              HVI/AHAM Directory Rated Airflow: {fmtValue(sys.runLocalExhaust?.data?.hvi_aham_rated_airflow_cfm, "CFM")}
                             </div>
-                            <div>HVI/AHAM Sound Rating: {fallbackText(sys.runLocalExhaust?.data?.hvi_aham_sound_rating)}</div>
+                            <div>HVI/AHAM Directory Sound Rating: {fallbackText(sys.runLocalExhaust?.data?.hvi_aham_sound_rating)}</div>
                             <div>Minimum Airflow: {fmtValue(sys.runLocalExhaust?.data?.minimum_airflow_cfm, "CFM")}</div>
                             <div>Operation Schedule: {fallbackText(sys.runLocalExhaust?.data?.operation_schedule)}</div>
                             <div>Notes: {fallbackText(sys.runLocalExhaust?.data?.notes)}</div>
@@ -3166,61 +3167,78 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             ) : (
               <>
                 <div className="text-sm font-semibold text-slate-900">Structured Documentation Inputs</div>
-                <form id={localExhaustSaveFormId} action={saveLocalMechanicalExhaustDataFromForm} className="grid gap-3 border-t pt-3">
+                <form id={localExhaustSaveFormId} action={saveLocalMechanicalExhaustDataFromForm} className="grid gap-4 border-t pt-3">
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runLocalExhaust.id} />
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`lme-building-type-${runLocalExhaust.id}`}>Building Type</label>
-                      <input id={`lme-building-type-${runLocalExhaust.id}`} name="building_type" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.building_type ?? ""} />
+                  {/* Field Capture Section */}
+                  <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-3">
+                    <div className="text-sm font-semibold text-blue-900 mb-1">Field Capture</div>
+                    <div className="text-xs text-blue-800 mb-3">Records kitchen and system details captured on-site during the visit.</div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`lme-building-type-${runLocalExhaust.id}`}>Building Type</label>
+                        <input id={`lme-building-type-${runLocalExhaust.id}`} name="building_type" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.building_type ?? ""} />
+                      </div>
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`lme-kitchen-area-${runLocalExhaust.id}`}>Total Kitchen Floor Area</label>
+                        <input id={`lme-kitchen-area-${runLocalExhaust.id}`} name="total_kitchen_floor_area" type="number" step="0.1" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.total_kitchen_floor_area ?? ""} />
+                      </div>
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`lme-ceiling-height-${runLocalExhaust.id}`}>Kitchen Average Ceiling Height</label>
+                        <input id={`lme-ceiling-height-${runLocalExhaust.id}`} name="kitchen_average_ceiling_height" type="number" step="0.1" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.kitchen_average_ceiling_height ?? ""} />
+                      </div>
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`lme-kitchen-type-${runLocalExhaust.id}`}>Kitchen Type</label>
+                        <input id={`lme-kitchen-type-${runLocalExhaust.id}`} name="kitchen_type" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.kitchen_type ?? ""} placeholder="Non-Enclosed" />
+                      </div>
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`lme-system-name-${runLocalExhaust.id}`}>System Name / Location</label>
+                        <input id={`lme-system-name-${runLocalExhaust.id}`} name="system_name" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.system_name ?? ""} />
+                      </div>
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`lme-manufacturer-${runLocalExhaust.id}`}>Manufacturer Name</label>
+                        <input id={`lme-manufacturer-${runLocalExhaust.id}`} name="manufacturer_name" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.manufacturer_name ?? ""} />
+                      </div>
+                      <div className="grid gap-1 sm:col-span-2">
+                        <label className="text-sm font-medium" htmlFor={`lme-system-type-${runLocalExhaust.id}`}>System Type</label>
+                        <input id={`lme-system-type-${runLocalExhaust.id}`} name="system_type" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.system_type ?? ""} />
+                      </div>
                     </div>
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`lme-kitchen-area-${runLocalExhaust.id}`}>Total Kitchen Floor Area</label>
-                      <input id={`lme-kitchen-area-${runLocalExhaust.id}`} name="total_kitchen_floor_area" type="number" step="0.1" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.total_kitchen_floor_area ?? ""} />
+                  </div>
+
+                  {/* HVI/AHAM Directory Research Section */}
+                  <div className="rounded-md border border-amber-100 bg-amber-50 px-3 py-3">
+                    <div className="text-sm font-semibold text-amber-900 mb-1">HVI/AHAM Directory Research</div>
+                    <div className="text-xs text-amber-800 mb-3">Verified later from HVI or AHAM directory and online research. These values are not field-measured.</div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`lme-model-${runLocalExhaust.id}`}>Directory Listed Model Number</label>
+                        <input id={`lme-model-${runLocalExhaust.id}`} name="hvi_aham_model_number" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.hvi_aham_model_number ?? ""} />
+                      </div>
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`lme-rated-airflow-${runLocalExhaust.id}`}>Directory Listed Rated Airflow (CFM)</label>
+                        <input id={`lme-rated-airflow-${runLocalExhaust.id}`} name="hvi_aham_rated_airflow_cfm" type="number" step="1" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.hvi_aham_rated_airflow_cfm ?? ""} />
+                      </div>
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`lme-sound-${runLocalExhaust.id}`}>Directory Listed Sound Rating</label>
+                        <input id={`lme-sound-${runLocalExhaust.id}`} name="hvi_aham_sound_rating" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.hvi_aham_sound_rating ?? ""} />
+                      </div>
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`lme-min-airflow-${runLocalExhaust.id}`}>Minimum Airflow (CFM)</label>
+                        <input id={`lme-min-airflow-${runLocalExhaust.id}`} name="minimum_airflow_cfm" type="number" step="1" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.minimum_airflow_cfm ?? ""} />
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Additional Notes Section */}
+                  <div className="grid gap-3">
                     <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`lme-ceiling-height-${runLocalExhaust.id}`}>Kitchen Average Ceiling Height</label>
-                      <input id={`lme-ceiling-height-${runLocalExhaust.id}`} name="kitchen_average_ceiling_height" type="number" step="0.1" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.kitchen_average_ceiling_height ?? ""} />
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`lme-kitchen-type-${runLocalExhaust.id}`}>Kitchen Type</label>
-                      <input id={`lme-kitchen-type-${runLocalExhaust.id}`} name="kitchen_type" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.kitchen_type ?? ""} placeholder="Non-Enclosed" />
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`lme-system-name-${runLocalExhaust.id}`}>System Name</label>
-                      <input id={`lme-system-name-${runLocalExhaust.id}`} name="system_name" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.system_name ?? ""} />
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`lme-manufacturer-${runLocalExhaust.id}`}>Manufacturer Name</label>
-                      <input id={`lme-manufacturer-${runLocalExhaust.id}`} name="manufacturer_name" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.manufacturer_name ?? ""} />
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`lme-system-type-${runLocalExhaust.id}`}>System Type</label>
-                      <input id={`lme-system-type-${runLocalExhaust.id}`} name="system_type" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.system_type ?? ""} />
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`lme-model-${runLocalExhaust.id}`}>HVI or AHAM Directory Listed Model Number</label>
-                      <input id={`lme-model-${runLocalExhaust.id}`} name="hvi_aham_model_number" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.hvi_aham_model_number ?? ""} />
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`lme-rated-airflow-${runLocalExhaust.id}`}>HVI or AHAM Directory Listed Rated Airflow (CFM)</label>
-                      <input id={`lme-rated-airflow-${runLocalExhaust.id}`} name="hvi_aham_rated_airflow_cfm" type="number" step="1" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.hvi_aham_rated_airflow_cfm ?? ""} />
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`lme-sound-${runLocalExhaust.id}`}>HVI or AHAM Directory Listed Sound Rating</label>
-                      <input id={`lme-sound-${runLocalExhaust.id}`} name="hvi_aham_sound_rating" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.hvi_aham_sound_rating ?? ""} />
-                    </div>
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`lme-min-airflow-${runLocalExhaust.id}`}>Minimum Airflow (CFM)</label>
-                      <input id={`lme-min-airflow-${runLocalExhaust.id}`} name="minimum_airflow_cfm" type="number" step="1" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.minimum_airflow_cfm ?? ""} />
-                    </div>
-                    <div className="grid gap-1 sm:col-span-2">
                       <label className="text-sm font-medium" htmlFor={`lme-schedule-${runLocalExhaust.id}`}>Operation Schedule</label>
                       <input id={`lme-schedule-${runLocalExhaust.id}`} name="operation_schedule" className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.operation_schedule ?? ""} />
                     </div>
-                    <div className="grid gap-1 sm:col-span-2">
+                    <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`lme-notes-${runLocalExhaust.id}`}>Notes</label>
                       <textarea id={`lme-notes-${runLocalExhaust.id}`} name="notes" rows={3} className="w-full rounded-md border px-3 py-2" defaultValue={runLocalExhaust.data?.notes ?? ""} />
                     </div>
@@ -3228,14 +3246,24 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </form>
 
                 <div className="text-sm font-semibold text-slate-900">Summary</div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <div>System Name: {fallbackText(runLocalExhaust.data?.system_name)}</div>
-                  <div>Manufacturer: {fallbackText(runLocalExhaust.data?.manufacturer_name)}</div>
-                  <div>System Type: {fallbackText(runLocalExhaust.data?.system_type)}</div>
-                  <div>HVI/AHAM Model Number: {fallbackText(runLocalExhaust.data?.hvi_aham_model_number)}</div>
-                  <div>HVI/AHAM Rated Airflow: {fmtValue(runLocalExhaust.data?.hvi_aham_rated_airflow_cfm, "CFM")}</div>
-                  <div>Minimum Airflow: {fmtValue(runLocalExhaust.data?.minimum_airflow_cfm, "CFM")}</div>
-                  <div>Airflow Compliance Statement: {fallbackText(runLocalExhaust.computed?.airflow_compliance_statement)}</div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 space-y-2">
+                  <div>
+                    <div className="font-medium text-slate-900">Field Capture:</div>
+                    <div className="ml-2 space-y-1">
+                      <div>System Name: {fallbackText(runLocalExhaust.data?.system_name)}</div>
+                      <div>Manufacturer: {fallbackText(runLocalExhaust.data?.manufacturer_name)}</div>
+                      <div>System Type: {fallbackText(runLocalExhaust.data?.system_type)}</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-slate-900">Directory Research:</div>
+                    <div className="ml-2 space-y-1">
+                      <div>HVI/AHAM Model Number: {fallbackText(runLocalExhaust.data?.hvi_aham_model_number)}</div>
+                      <div>HVI/AHAM Rated Airflow: {fmtValue(runLocalExhaust.data?.hvi_aham_rated_airflow_cfm, "CFM")}</div>
+                      <div>Minimum Airflow: {fmtValue(runLocalExhaust.data?.minimum_airflow_cfm, "CFM")}</div>
+                      <div>Airflow Compliance Statement: {fallbackText(runLocalExhaust.computed?.airflow_compliance_statement)}</div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
