@@ -439,6 +439,15 @@ HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 closeout note:
 - No tier/add-on unlock behavior was introduced in this slice; future ECC-plus-Service unlock remains roadmap/backlog only.
 - Boundaries preserved: no schema/migrations/Supabase command/RLS/auth/security/source-of-truth/contractor-authority/billing/payment/report-calculation behavior change, and no codebase split.
 
+`/jobs/new` HVAC Service Contractor-Control Visibility Tightening V1 closeout note:
+
+- Completed as a presentation/form-state safety slice for HVAC Service internal intake only.
+- `hvac_service` hides contractor assignment selector and contractor billing option on `/jobs/new`.
+- Hidden-field safety clamps stale `contractor_id` and stale contractor billing selection in HVAC Service mode.
+- `ecc_hers` and `hybrid` are intentionally unchanged.
+- Future service-side external-company/source/bill-to modeling remains separate backlog and was not introduced in this slice.
+- Boundaries preserved: no schema/migrations/Supabase/RLS/auth/security/contractor-authority/portal-rule/notification/billing-engine/report/source-of-truth changes.
+
 Owner Signup Visibility V1 closeout note:
 
 - Owner Signup Visibility V1 is implemented as a read-only allowlisted observability slice.

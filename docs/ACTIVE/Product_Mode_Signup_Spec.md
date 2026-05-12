@@ -255,6 +255,16 @@ HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 closeout snapsho
 - Future cross-family unlock for ECC accounts remains roadmap-only tier/add-on work and is not active in this implementation.
 - Non-change boundaries preserved: no schema/migration/Supabase/RLS/auth/security/source-of-truth/authority/billing/report behavior changes.
 
+`/jobs/new` HVAC Service Contractor-Control Visibility Tightening V1 closeout snapshot (2026-05-12):
+
+- In `hvac_service` internal intake mode only, `/jobs/new` now hides:
+   - contractor assignment selector (`contractor_id` UI)
+   - billing recipient contractor option (`Contractor (company)`)
+- HVAC Service hidden-field safety clamps stale contractor assignment and stale contractor billing selection.
+- `ecc_hers` and `hybrid` behavior is unchanged.
+- No new Related Company / Source model is introduced in this slice.
+- Non-change boundaries preserved: no schema/migrations/Supabase/RLS/auth/security/contractor-authority/portal-rule/notification/billing-engine/report-calculation/source-of-truth changes.
+
 Product Mode Signup Links V1 closeout snapshot (2026-05-10):
 
 - Product-specific public signup entry links are implemented.

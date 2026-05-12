@@ -355,6 +355,7 @@ export default function NewJobForm({
   const router = useRouter();
   const isInternalMode = !isContractorMode;
   const isHybridProductMode = productMode === "hybrid";
+  const isHvacServiceInternalMode = isInternalMode && productMode === "hvac_service";
   const hasSeededCustomer = Boolean(existingCustomer?.id);
   const isCustomerContextInternalMode =
     isInternalMode && customerContextMode && Boolean(existingCustomer?.id);
@@ -632,6 +633,18 @@ const [billingRecipient, setBillingRecipient] = useState<
     if (jobType === modeSafeJobType) return;
     setJobType(modeSafeJobType);
   }, [jobType, modeSafeJobType]);
+
+  useEffect(() => {
+    if (!isHvacServiceInternalMode) return;
+
+    if (contractorId) {
+      setContractorId("");
+    }
+
+    if (billingRecipient === "contractor") {
+      setBillingRecipient("customer");
+    }
+  }, [billingRecipient, contractorId, isHvacServiceInternalMode]);
 
   const selectedCustomer = useMemo(
     () => guidedCustomers.find((c) => c.id === selectedCustomerId) ?? null,
@@ -929,7 +942,7 @@ const [billingRecipient, setBillingRecipient] = useState<
     setWindowStart(d.windowStart ?? "");
     setWindowEnd(d.windowEnd ?? "");
     setScheduledDate(d.scheduledDate ?? "");
-    setContractorId(d.contractorId ?? "");
+    setContractorId(isHvacServiceInternalMode ? "" : (d.contractorId ?? ""));
     setJobType(
       resolveRestoredDraftJobType({
         draftJobType: d.jobType,
@@ -941,7 +954,12 @@ const [billingRecipient, setBillingRecipient] = useState<
     setServiceCaseKind(d.serviceCaseKind ?? "reactive");
     setServiceVisitType(d.serviceVisitType ?? "diagnostic");
     setServiceVisitOutcome(d.serviceVisitOutcome ?? "follow_up_required");
-    setBillingRecipient(d.billingRecipient ?? (myContractor?.id ? "contractor" : "customer"));
+    const restoredBillingRecipient = d.billingRecipient ?? (myContractor?.id ? "contractor" : "customer");
+    setBillingRecipient(
+      isHvacServiceInternalMode && restoredBillingRecipient === "contractor"
+        ? "customer"
+        : restoredBillingRecipient,
+    );
     setProjectType(d.projectType ?? "alteration");
 
     setBillingName(d.billingName ?? "");
@@ -1385,7 +1403,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             </div>
             <input type="hidden" name="contractor_id" value={myContractor.id} />
           </>
-        ) : (
+        ) : !isHvacServiceInternalMode ? (
           <div className="rounded-xl border border-slate-200/80 bg-white p-4 space-y-2">
             <label className="block text-sm font-medium text-slate-900">Contractor (optional)</label>
             <select
@@ -1408,6 +1426,8 @@ const [billingRecipient, setBillingRecipient] = useState<
               ))}
             </select>
           </div>
+        ) : (
+          <input type="hidden" name="contractor_id" value="" />
         )}
 
         <div className="space-y-8">
@@ -2616,20 +2636,22 @@ const [billingRecipient, setBillingRecipient] = useState<
                 <label className="block text-sm font-medium text-slate-900">Billing Recipient</label>
 
             <div className="flex flex-col gap-2">
-              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-                <input
-                  type="radio"
-                  name="_billingRecipientUi"
-                  value="contractor"
-                  checked={billingRecipient === "contractor"}
-                  onChange={() => setBillingRecipient("contractor")}
-                  disabled={Boolean(!myContractor?.id && !contractorId)}
-                />
-                Contractor (company)
-                {!myContractor?.id && !contractorId && (
-                  <span className="text-xs text-slate-500">(select contractor first)</span>
-                )}
-              </label>
+              {!isHvacServiceInternalMode ? (
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                  <input
+                    type="radio"
+                    name="_billingRecipientUi"
+                    value="contractor"
+                    checked={billingRecipient === "contractor"}
+                    onChange={() => setBillingRecipient("contractor")}
+                    disabled={Boolean(!myContractor?.id && !contractorId)}
+                  />
+                  Contractor (company)
+                  {!myContractor?.id && !contractorId && (
+                    <span className="text-xs text-slate-500">(select contractor first)</span>
+                  )}
+                </label>
+              ) : null}
 
               <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                 <input

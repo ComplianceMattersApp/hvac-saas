@@ -438,6 +438,21 @@ If any item here conflicts with the active spine, the spine wins.
   - no report dataset/calculation changes
   - no feature deletion and no codebase split
 
+### 2.3.10 `/jobs/new` HVAC Service Contractor-Control Visibility Tightening V1 (completed)
+- Scope: HVAC Service internal intake presentation/form-state safety only.
+- `hvac_service` now hides contractor assignment selector and contractor billing option on `/jobs/new`.
+- Stale hidden-field safety is enforced for HVAC Service:
+  - stale `contractor_id` does not submit
+  - stale `billing_recipient=contractor` is clamped to `customer`
+- `ecc_hers` and `hybrid` behavior remains unchanged.
+- No Related Company / Source model was added in this slice.
+- Explicit non-changes:
+  - no schema/migrations/Supabase commands
+  - no RLS/auth/security/contractor-authority/portal-rule changes
+  - no notification behavior changes
+  - no billing engine/invoice/payment/Stripe/QBO/report-calculation changes
+  - no source-of-truth changes and no codebase split
+
 Roadmap-forward note:
 - Future backlog: Line Item Source Consolidation / Pricebook-style Entry.
 - Long-term direction should reduce duplicate/similar line-item entry paths and favor selecting from Pricebook or adding manual line items through the same clean Pricebook-like entry pattern.

@@ -65,6 +65,14 @@ Current Program Status Note (May 2026)
     - no feature deletion and no codebase split
   - Future cross-family ECC-plus-Service availability remains a tier/add-on roadmap item and is not active in this slice.
 
+- `/jobs/new` HVAC Service Contractor-Control Visibility Tightening V1 is complete and pushed (May 2026):
+  - HVAC Service internal intake now hides contractor assignment and contractor billing-recipient controls by default on `/jobs/new`.
+  - Hidden-form safety now prevents stale `contractor_id` and stale `billing_recipient=contractor` submission in HVAC Service mode.
+  - ECC/HERS behavior remains unchanged.
+  - Hybrid / Master / All-in-One behavior remains unchanged.
+  - This slice does not introduce a new Related Company / Source model; future home-warranty/property-manager/referral/bill-to modeling remains separate backlog.
+  - Explicit non-changes preserved: no schema/migration/Supabase/RLS/auth/authority/portal-rule/notification/billing-engine/report-calculation/source-of-truth changes.
+
 - Field Bus Improvement Passes closeout is complete and pushed (May 2026):
   - New Job Alert lifecycle cleanup:
     - New job/new work alerts no longer act as active unread awareness once scheduled, finalized, rejected, or otherwise handled.
