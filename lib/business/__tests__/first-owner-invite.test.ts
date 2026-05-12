@@ -112,7 +112,13 @@ describe("orchestrateFirstOwnerInvite", () => {
   it("reports INVITE_SEND_FAILED after successful metadata write", async () => {
     const deps = makeDeps({
       sendInvite: vi.fn(async () => {
-        throw new Error("invite service unavailable");
+        const error = new Error("invite service unavailable") as Error & {
+          status?: number;
+          code?: string;
+        };
+        error.status = 422;
+        error.code = "validation_failed";
+        throw error;
       }),
     });
 
@@ -129,5 +135,41 @@ describe("orchestrateFirstOwnerInvite", () => {
     expect(deps.sendInvite).toHaveBeenCalledTimes(1);
     expect(result.inviteSent).toBe(false);
     expect(result.errors[0]?.code).toBe("INVITE_SEND_FAILED");
+    expect(result.errors[0]?.details).toContain("status=422");
+    expect(result.errors[0]?.details).toContain("validation_failed");
+  });
+
+  it("falls back to existing-user setup link when invite send fails", async () => {
+    const deps = makeDeps({
+      sendInvite: vi.fn(async () => {
+        const error = new Error("User already registered") as Error & { status?: number };
+        error.status = 422;
+        throw error;
+      }),
+      sendSetupLink: vi.fn(async () => undefined),
+    });
+
+    const result = await orchestrateFirstOwnerInvite({
+      apply: true,
+      email: "owner@example.com",
+      resendInvite: true,
+      authUserId: "owner-1",
+      accountOwnerUserId: "owner-1",
+      deps,
+    });
+
+    expect(deps.setUserMetadata).toHaveBeenCalledTimes(1);
+    expect(deps.sendInvite).toHaveBeenCalledTimes(1);
+    expect(deps.sendSetupLink).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authUserId: "owner-1",
+        email: "owner@example.com",
+        redirectTo: "https://example.test/auth/callback",
+      }),
+    );
+    expect(result.inviteSent).toBe(false);
+    expect(result.setupLinkSent).toBe(true);
+    expect(result.deliveryMethod).toBe("recovery_setup_link");
+    expect(result.errors).toEqual([]);
   });
 });

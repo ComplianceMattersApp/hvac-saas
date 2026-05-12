@@ -14,6 +14,7 @@ import {
 import { sendPlatformOwnerSignupNotification } from "@/lib/business/platform-owner-signup-notification";
 import type { ProductMode } from "@/lib/business/product-mode-defaults";
 import type { PricebookSeedInsertRow } from "@/lib/business/pricebook-seeding";
+import { sendInviteEmail } from "@/lib/email/smtp";
 import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
 import type {
   SelfServeFieldErrors,
@@ -49,10 +50,17 @@ function resolveSignupPath(value: ProductMode | null): "generic" | "service" | "
 
 function resolveInviteStatus(inviteResult: {
   inviteSent: boolean;
+  setupLinkSent?: boolean;
+  deliveryMethod?: string;
   inviteSkippedReason?: string;
   errors: Array<{ code: string }>;
 }) {
   if (inviteResult.inviteSent) return "invite_sent";
+  if (inviteResult.setupLinkSent) {
+    return inviteResult.deliveryMethod === "recovery_setup_link"
+      ? "setup_link_sent:recovery"
+      : "setup_link_sent";
+  }
   if (inviteResult.errors.length > 0) {
     return `invite_error:${inviteResult.errors.map((error) => error.code).join(",")}`;
   }
@@ -67,6 +75,15 @@ function submittedNeutralState(): SelfServeOnboardingState {
     status: "submitted",
     message: "If eligible, we will email a secure setup link with next steps.",
   };
+}
+
+function extractActionLink(data: unknown) {
+  return (
+    (data as any)?.properties?.action_link ||
+    (data as any)?.properties?.actionLink ||
+    (data as any)?.action_link ||
+    null
+  );
 }
 
 function createProvisioningClientFromAdmin(admin: any): FirstOwnerProvisioningClient {
@@ -442,6 +459,38 @@ function createRealDeps(): SelfServeOnboardingDeps {
       });
       if (error) throw error;
     },
+    sendSetupLink: async ({ email, redirectTo }) => {
+      const { data, error } = await admin.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: {
+          redirectTo,
+        },
+      });
+
+      if (error) throw error;
+
+      const actionLink = extractActionLink(data);
+      if (!actionLink) {
+        throw new Error("SETUP_LINK_MISSING");
+      }
+
+      const html = `
+        <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height: 1.4;">
+          <h2>Complete your Compliance Matters account setup</h2>
+          <p>Use the link below to finish account setup and set your password.</p>
+          <p><a href="${actionLink}">Continue setup</a></p>
+          <p>If the button does not work, copy and paste this link:</p>
+          <p style="word-break: break-all;">${actionLink}</p>
+        </div>
+      `;
+
+      await sendInviteEmail({
+        to: email,
+        subject: "Complete your Compliance Matters account setup",
+        html,
+      });
+    },
     resolveInviteRedirectTo,
     nowIso: () => new Date().toISOString(),
   };
@@ -598,6 +647,14 @@ export async function submitSelfServeOnboardingForm(
       deps.log("self-serve onboarding invite failed", {
         email,
         errorCodes: inviteResult.errors.map((error) => error.code),
+        errors: inviteResult.errors,
+      });
+    } else if (inviteResult.warnings.length > 0) {
+      deps.log("self-serve onboarding invite recovered with setup link", {
+        email,
+        accountOwnerUserId: provisioning.accountOwnerUserId,
+        deliveryMethod: inviteResult.deliveryMethod ?? null,
+        warnings: inviteResult.warnings,
       });
     }
 
