@@ -5,6 +5,7 @@ import { endOfMonth, format as formatDate, parseISO, startOfMonth } from 'date-f
 import CalendarMonthGrid from './CalendarMonthGrid';
 import CalendarDispatchGrid from './CalendarDispatchGrid';
 import CalendarDragJobLink from './CalendarDragJobLink';
+import CalendarOpenJobButton from './CalendarOpenJobButton';
 import { CALENDAR_STATUS_LEGEND, calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
 import {
   CALENDAR_TECH_FILTER_UNASSIGNED,
@@ -604,9 +605,13 @@ function DetailPanel(props: {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link href={`/jobs/${job.id}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+          <CalendarOpenJobButton
+            href={`/jobs/${job.id}`}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            loadingLabel="Opening..."
+          >
             Open Job
-          </Link>
+          </CalendarOpenJobButton>
           {customerId ? (
             <Link href={`/customers/${customerId}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
               Open Customer

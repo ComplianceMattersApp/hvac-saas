@@ -381,8 +381,8 @@ export async function getDispatchCalendarData(params: {
   }
   const mode = params.mode === 'week' ? 'week' : 'day';
   const anchorDate = normalizeAnchorDate(params.anchorDate);
-  const dispatchAttentionWindowStart = addDaysYmd(laTodayYmd(), -7);
-  const dispatchAttentionWindowEnd = addDaysYmd(laTodayYmd(), 21);
+  const dispatchAttentionWindowStart = addDaysYmd(anchorDate, -7);
+  const dispatchAttentionWindowEnd = addDaysYmd(anchorDate, 21);
   const dispatchRange = resolveDispatchDateRange({
     mode,
     anchorDate,
