@@ -734,6 +734,7 @@ Product Mode V2 production migration execution closeout (2026-05-10):
 - Maintenance Agreements / Recurring Services V1 should be modeled as a customer-owned recurring service agreement, optionally anchored to a primary location, that plans future visits but is not itself a job, service_case, or billing record.
 - Jobs remain the actual visit / work execution unit; service_cases remain continuity truth; Work Items / Visit Scope remain the operational scope for each visit; invoices remain billed truth; payments remain collected truth where implemented.
 - Pricebook may assist later with agreement templates/defaults, but it must not become agreement truth.
+- Dedicated model source of truth: [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md).
 
 ### Current status note (reporting/truth separation)
 - Internal invoice ledger collected-payment visibility is now implemented for internal invoicing report surfaces (including CSV export) as reporting/tracking only.
@@ -2601,7 +2602,7 @@ The following implementation groups have been closed as of May 2026.
 | 7 | Product Mode / Packaging Completion | Planned |
 | 7A | Pricing / Tiers / Seat Alignment | Planned � see Competitive_Packaging_and_Tier_Spec.md |
 | 8 | Support / Owner Operations | Planned |
-| 9A | Recurring Services / Maintenance Agreements | Planned |
+| 9A | Recurring Services / Maintenance Agreements | Planned - see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md) |
 | 9B | SMS / On-My-Way Messaging | Planned |
 | 9C | Tenant Customer Payments / Stripe Customer Payment Execution | Planned |
 | 9D | Customer Portal | Planned |

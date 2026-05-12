@@ -17,6 +17,9 @@ Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Laun
 
 Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No codebase split. No customer portal in current scope. Deferred and runbook-gated items remain parked unless explicitly reopened.
 
+**Maintenance Agreements / Recurring Services V1:**
+Group 9A planning source of truth is [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md). The preferred future domain/table name is `maintenance_agreements`; avoid `service_contracts` because existing service-contract language classifies service cases/jobs and is not customer-owned agreement truth.
+
 **Owner-Completion Cycle Closeout (May 2026):** All areas in the owner-release completion matrix are confirmed closed at current quality bar. Next work is treated as post-launch/future-roadmap work unless the owner explicitly reopens a release-scope item. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for the canonical decision surface.
 
 Current Program Status Note (May 2026)
