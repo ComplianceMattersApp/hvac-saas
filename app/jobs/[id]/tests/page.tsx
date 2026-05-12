@@ -40,6 +40,7 @@ import {
   getTestDefinition,
   type EccTestType,
 } from "@/lib/ecc/test-registry";
+import { getEccReportScopedTestTypes, isEccTestInReportScope } from "@/lib/ecc/report-scope";
 import {
   getRequiredTestsForSystem,
   normalizeProjectTypeToRuleProfile,
@@ -61,7 +62,7 @@ function getEffectiveResultLabel(t: any) {
   if (t.computed_pass === true) return "PASS";
   if (t.computed_pass === false) return "FAIL";
   if (t.is_completed === true) return "Verified";
-  return "Not computed";
+  return "Draft";
 }
 
 function getEffectiveResultState(run: any): "pass" | "fail" | "unknown" {
@@ -128,8 +129,8 @@ function getRequiredTestStatusForSystem(job: any, systemId: string, testType: Ec
   if (run.is_completed !== true) {
     return {
       state: runDataKeys > 0 ? ("saved" as const) : ("open" as const),
-      label: runDataKeys > 0 ? "Saved" : "Open",
-      tone: "border-blue-200 bg-blue-50 text-blue-700",
+      label: runDataKeys > 0 ? "Draft" : "Draft",
+      tone: "border-slate-200 bg-slate-50 text-slate-600",
       run,
     };
   }
@@ -163,11 +164,30 @@ function getRequiredTestStatusForSystem(job: any, systemId: string, testType: Ec
 
   return {
     state: "unknown" as const,
-    label: "Not computed",
-    tone: "border-slate-200 bg-slate-50 text-slate-700",
+    label: "Needs review",
+    tone: "border-slate-200 bg-slate-50 text-slate-600",
     run,
   };
 }
+
+const eccPageShellClass =
+  "mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden space-y-5 px-3 py-4 text-slate-900 sm:px-5 lg:px-6 print:max-w-none print:p-0";
+const eccPanelClass =
+  "min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.34)] sm:p-5";
+const eccSoftPanelClass =
+  "rounded-xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4";
+const eccWorkspaceCardClass =
+  "min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.32)] space-y-4 sm:p-5";
+const eccOfficeCardClass =
+  "min-w-0 rounded-xl border border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))] p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.32)] space-y-4 sm:p-5";
+const eccUtilityLabelClass =
+  "text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+const eccActionRowClass =
+  "flex flex-col gap-2 border-t border-slate-200 pt-3 sm:flex-row sm:flex-wrap sm:items-center";
+const eccSecondaryButtonClass =
+  "inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 sm:w-auto";
+const eccPrimaryButtonClass =
+  "inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 sm:w-auto";
 
 function pickRunForSystem(job: any, testType: string, systemId: string) {
   const runs = (job?.ecc_test_runs ?? []).filter(
@@ -1089,6 +1109,32 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
     const systemIsHeatOnly = isHeatOnlySystemEquipment(systemEquipment);
     const systemIsDuctlessMiniSplit = isDuctlessMiniSplitSystem(systemEquipment);
+    const systemApplicability = {
+      heatOnlySystem: systemIsHeatOnly,
+      ductlessMiniSplit: systemIsDuctlessMiniSplit,
+    };
+    const systemSuggestedTests = resolveEccScenario({
+      projectType: job.project_type,
+      systemEquipment,
+    }).suggestedTests.filter((test) =>
+      isEccTestApplicableToSystem(test.testType, systemApplicability)
+    );
+    const systemRunTestTypes = Array.from(
+      new Set(
+        (job.ecc_test_runs ?? [])
+          .filter((run: any) => String(run.system_id ?? "") === String(systemId))
+          .map((run: any) => String(run.test_type ?? "").trim())
+          .filter((testType: string) =>
+            Boolean(testType) &&
+            Boolean(getTestDefinition(testType)) &&
+            isEccTestApplicableToSystem(testType, systemApplicability)
+          )
+      )
+    );
+    const reportScopedTestTypes = getEccReportScopedTestTypes({
+      suggestedTests: systemSuggestedTests,
+      runTestTypes: systemRunTestTypes,
+    });
 
     const runAirflow = systemIsHeatOnly || systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "airflow", systemId);
     const runFan = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "fan_watt_draw", systemId);
@@ -1127,6 +1173,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       runFilter,
       runDuct,
       runRefrigerant,
+      showAirflowReport: isEccTestInReportScope(reportScopedTestTypes, "airflow"),
+      showFanReport: isEccTestInReportScope(reportScopedTestTypes, "fan_watt_draw"),
+      showAhriReport: isEccTestInReportScope(reportScopedTestTypes, "ahri_verification"),
+      showLocalExhaustReport: isEccTestInReportScope(reportScopedTestTypes, "local_mechanical_exhaust"),
+      showQiiInsulationReport: isEccTestInReportScope(reportScopedTestTypes, "qii_insulation"),
+      showFilterReport: isEccTestInReportScope(reportScopedTestTypes, "air_filter_device"),
+      showDuctReport: isEccTestInReportScope(reportScopedTestTypes, "duct_leakage"),
+      showRefrigerantReport: isEccTestInReportScope(reportScopedTestTypes, "refrigerant_charge"),
       systemIsHeatOnly,
       systemIsDuctlessMiniSplit,
       packageSystem,
@@ -1140,7 +1194,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
   });
 
     return (
-      <div className="mx-auto w-full min-w-0 max-w-4xl overflow-x-hidden rounded-2xl border border-gray-200/80 bg-white/80 p-4 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.3)] space-y-6 sm:p-6 print:max-w-none print:rounded-none print:border-0 print:bg-white print:p-0 print:shadow-none">
+      <div className={eccPageShellClass}>
           {notice === "rc_exempt_reason_required" && (
       <div className="mb-4 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         Select <span className="font-semibold">Package unit</span> or{" "}
@@ -1148,30 +1202,33 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         refrigerant charge exempt.
       </div>
     )}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between print:hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:p-5 print:hidden">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">ECC Workspace</div>
-          <h1 className="mt-1 text-2xl font-bold tracking-[-0.02em] text-slate-950">{normalizeRetestLinkedJobTitle(job.title) || "Job"}</h1>
-          <div className="mt-1 text-sm text-slate-600">{job.city ?? "—"}</div>
+          <div className={eccUtilityLabelClass}>ECC Workspace</div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{normalizeRetestLinkedJobTitle(job.title) || "Job"}</h1>
+          <div className="mt-1 text-sm text-slate-600">{job.city ?? "N/A"}</div>
         </div>
 
-        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-          <label htmlFor="completion-report-toggle" className="inline-flex w-full cursor-pointer items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-center text-sm font-medium text-slate-800 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto">
+        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
+          <label htmlFor="completion-report-toggle" className={eccSecondaryButtonClass}>
             View Completion Report
           </label>
-          <PrintButton className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto" />
-          <Link href={`/jobs/${job.id}/info?f=equipment`} className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-center text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto">
+          <PrintButton className={eccSecondaryButtonClass} />
+          <Link href={`/jobs/${job.id}/info?f=equipment`} className={eccSecondaryButtonClass}>
             Add / View Equipment
           </Link>
-          <Link href={`/jobs/${job.id}`} className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-center text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto">
-            ← Back to Job
+          <Link href={`/jobs/${job.id}`} className={eccSecondaryButtonClass}>
+            &larr; Back to Job
           </Link>
         </div>
       </div>
 
+      </div>
+
       <input id="completion-report-toggle" type="checkbox" className="peer sr-only" />
-      <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700 print:hidden">
-        Completion report is collapsed by default to keep test entry focused.
+      <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.32)] print:hidden">
+        Completion output is collapsed so the workspace stays focused.
         <label htmlFor="completion-report-toggle" className="ml-1 cursor-pointer font-medium text-slate-900 underline">
           Expand report
         </label>
@@ -1181,7 +1238,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       <div className="hidden border-b border-slate-400 pb-2 print:block">
         <h1 className="text-lg font-bold text-slate-950">{internalBusinessDisplayName} Test Results</h1>
       </div>
-      <section className="rounded-lg border border-slate-400 bg-white p-5 space-y-4 text-slate-900 print:rounded-none print:border-slate-500 print:p-3 print:space-y-3">
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.34)] space-y-4 text-slate-900 print:rounded-none print:border-slate-500 print:p-3 print:space-y-3 print:shadow-none">
         <div>
           <h2 className="text-lg font-bold text-slate-950 print:text-base">Customer / Job Info</h2>
           <p className="text-sm text-slate-700 print:text-xs">Who and where for this CHEERS packet.</p>
@@ -1240,11 +1297,11 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         </div>
       </section>
 
-      <section id="cheers-fast-view" className="rounded-lg border border-slate-400 bg-slate-50 p-5 space-y-5 text-slate-900 print:border-0 print:bg-white print:p-0 print:space-y-4">
+      <section id="cheers-fast-view" className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.34)] space-y-5 text-slate-900 print:border-0 print:bg-white print:p-0 print:space-y-4 print:shadow-none">
         <div className="flex items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold text-slate-950 print:text-base">Results</h2>
-            <p className="text-sm text-slate-700 print:text-xs">Read-only summary from ECC canonical test data, grouped by system.</p>
+            <p className="text-sm text-slate-700 print:text-xs">Read-only summary from saved ECC test results, grouped by system.</p>
           </div>
         </div>
 
@@ -1263,7 +1320,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 index > 0 && Boolean(sys.runRefrigerant) && !isRefrigerantException;
 
               return (
-                <div key={sys.systemId} className={`break-inside-avoid rounded-md border border-slate-300 bg-white p-4 space-y-4 shadow-sm print:rounded-none print:border-slate-500 print:p-3 print:space-y-3 print:shadow-none ${shouldForcePrintBreak ? "print:break-before-page" : ""}`}>
+                <div key={sys.systemId} className={`break-inside-avoid rounded-xl border border-slate-200 bg-white p-4 space-y-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.34)] print:rounded-none print:border-slate-500 print:p-3 print:space-y-3 print:shadow-none ${shouldForcePrintBreak ? "print:break-before-page" : ""}`}>
                   <div className="text-sm font-bold text-slate-950 print:text-[13px]">{sys.systemName}</div>
 
                   <div className="grid gap-3 text-sm text-slate-900 print:gap-2 print:text-[12px]">
@@ -1334,6 +1391,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       )}
                     </div>
 
+                    {sys.showAhriReport ? (
                     <div>
                       <span className="font-semibold text-slate-950">AHRI Matched System Verification (Office):</span>
                       <div className="mt-1 space-y-1 text-slate-800">
@@ -1353,7 +1411,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         )}
                       </div>
                     </div>
+                    ) : null}
 
+                    {sys.showLocalExhaustReport ? (
                     <div>
                       <span className="font-semibold text-slate-950">Local Mechanical Exhaust Verification:</span>
                       <div className="mt-1 space-y-1 text-slate-800">
@@ -1386,7 +1446,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         )}
                       </div>
                     </div>
+                    ) : null}
 
+                    {sys.showQiiInsulationReport ? (
                     <div>
                       <span className="font-semibold text-slate-950">QII / ENV-22 Insulation Verification:</span>
                       <div className="mt-1 space-y-1 text-slate-800">
@@ -1420,7 +1482,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         )}
                       </div>
                     </div>
+                    ) : null}
 
+                    {sys.showAirflowReport ? (
                     <div>
                       <span className="font-semibold text-slate-950">Airflow Summary:</span>
                       <div className="mt-1 space-y-1 text-slate-800">
@@ -1438,7 +1502,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         )}
                       </div>
                     </div>
+                    ) : null}
 
+                    {sys.showFanReport ? (
                     <div>
                       <span className="font-semibold text-slate-950">Forced Air System Fan Efficacy Measurement:</span>
                       <div className="mt-1 space-y-1 text-slate-800">
@@ -1463,7 +1529,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         )}
                       </div>
                     </div>
+                    ) : null}
 
+                    {sys.showFilterReport ? (
                     <div>
                       <span className="font-semibold text-slate-950">Air Filter Device Verification:</span>
                       <div className="mt-1 space-y-1 text-slate-800">
@@ -1499,7 +1567,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         )}
                       </div>
                     </div>
+                    ) : null}
 
+                    {sys.showDuctReport ? (
                     <div>
                       <span className="font-semibold text-slate-950">Duct Leakage Summary:</span>
                       <div className="mt-1 space-y-1 text-slate-800">
@@ -1515,8 +1585,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         )}
                       </div>
                     </div>
+                    ) : null}
                   </div>
 
+                  {sys.showRefrigerantReport ? (
                   <div className="rounded-md border border-slate-300 bg-slate-100 p-3 space-y-3 print:rounded-none print:border-slate-400 print:bg-white print:p-2.5 print:space-y-2">
                     <div className="text-sm font-bold text-slate-950 print:text-[13px]">Refrigerant Charge — Full Detailed Result</div>
 
@@ -1556,13 +1628,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                             <li>Evaporator Saturation Temperature: {fmtValue(rcData.evaporator_sat_temp_f, "°F")}</li>
                             <li>Measured Superheat: {fmtValue(rcComputed.measured_superheat_f, "°F")}</li>
                             <li>ECC requirement result: {refrigerantRequirementResultG(sys.runRefrigerant)}</li>
-                            <li>Manufacturer specification statement: Superheat manufacturer target is not stored in canonical ECC run data; evaluation uses the configured ECC threshold in computed rules.</li>
+                            <li>Manufacturer specification statement: Superheat manufacturer target is not stored for this run; evaluation uses the configured ECC threshold.</li>
                             <li>Compliance Statement: {refrigerantComplianceG(sys.runRefrigerant)}</li>
                           </ol>
                         </div>
                       </>
                     )}
                   </div>
+                  ) : null}
                 </div>
               );
             })}
@@ -1572,7 +1645,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
       </div>
 
-      <section className="min-w-0 rounded-2xl border border-gray-200/80 bg-white p-4 shadow-[0_20px_40px_-34px_rgba(15,23,42,0.28)] space-y-5 sm:p-5 print:hidden">
+      <section className={`${eccPanelClass} space-y-5 print:hidden`}>
         <div>
           <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-950">ECC Tests</h2>
           <p className="text-sm text-slate-600">
@@ -1581,8 +1654,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         </div>
 
         {/* System selector */}
-        <div className="rounded-xl border border-gray-200/80 bg-slate-50/40 p-3 space-y-3 sm:p-4">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Select Location</div>
+        <div className={`${eccSoftPanelClass} space-y-3`}>
+          <div className={eccUtilityLabelClass}>Selected System</div>
 
           <div className="-mx-1 overflow-x-auto pb-1 sm:mx-0 sm:overflow-visible sm:pb-0">
             <div className="flex w-max min-w-full gap-2 px-1 sm:w-auto sm:min-w-0 sm:flex-wrap sm:px-0">
@@ -1592,10 +1665,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <Link
                     key={sys.id}
                     href={withS(focusedType || undefined, String(sys.id))}
-                    className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium transition-colors ${
+                    className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-semibold transition-colors ${
                       isActive
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+                        ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                        : "border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50"
                     }`}
                   >
                     {sys.name}
@@ -1674,12 +1747,12 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 )}
 
                 {selectedSystemId ? (
-          <div className="rounded-xl border border-gray-200/80 bg-white p-4 space-y-4">
+          <div className={`${eccPanelClass} space-y-4`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-slate-900">Required and active tests</div>
-                <div className="text-xs text-muted-foreground">
-                  Unified lifecycle list for this system:{" "}
+                <div className="text-base font-semibold tracking-tight text-slate-950">Required and Active Tests</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  Required tests plus any selected add-ons for this system:{" "}
                   <span className="font-medium">
                     {normalizedProfile === "alteration"
                       ? "Alteration"
@@ -1690,7 +1763,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
 
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs font-medium text-slate-500">
                 {systems.find((s: any) => String(s.id) === String(selectedSystemId))?.name ?? "Selected system"}
               </div>
             </div>
@@ -1727,10 +1800,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
   return (
       <div
       key={testType}
-      className="flex min-w-0 flex-col gap-3 rounded-lg border border-gray-200 bg-white px-3 py-3 shadow-sm transition-all duration-150 hover:bg-gray-50 hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:px-4"
+      className="flex min-w-0 flex-col gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 hover:bg-slate-50/60 sm:flex-row sm:items-center sm:justify-between sm:px-4"
     >
       <div className="min-w-0">
-        <div className="font-medium">
+        <div className="font-semibold text-slate-950">
           {getTestDisplayLabel(testType, packageSystem)}
           {carriedForward ? (
             <span className="ml-2 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
@@ -1746,7 +1819,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             </span>
           )}
         </div>
-        <div className="text-xs text-muted-foreground">
+        <div className="mt-1 text-xs leading-5 text-slate-500">
           {carriedForward
             ? "Passed on parent visit; no retest entry required"
             : status.state === "required"
@@ -1763,13 +1836,13 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             ? "Completed and passed"
             : status.state === "fail"
             ? "Completed and failed"
-            : "Tracked on this system"}
+            : "Needs review before closeout"}
         </div>
       </div>
 
       <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
         {carriedForward ? (
-          <span className="inline-flex w-full items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 sm:w-auto">
+            <span className="inline-flex w-full items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 sm:w-auto">
             No retest needed
           </span>
         ) : status.state === "required" ? (
@@ -1777,14 +1850,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="system_id" value={selectedSystemId} />
             <input type="hidden" name="test_type" value={testType} />
-            <SubmitButton loadingText="Starting..." className="inline-flex w-full items-center justify-center rounded-md border px-3 py-1.5 text-xs font-medium bg-white hover:bg-gray-50 sm:w-auto">
+            <SubmitButton loadingText="Starting..." className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto">
               Start Test
             </SubmitButton>
           </form>
         ) : (
           <Link
             href={testHref}
-            className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 shadow-sm transition-colors hover:bg-slate-100 sm:w-auto"
+            className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
           >
             Open Workspace
           </Link>
@@ -1804,24 +1877,25 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </div>
             )}
 
-            <div className="rounded-lg border border-sky-200 bg-sky-50/70 p-3 space-y-3">
+            {officeVerificationTypes.length > 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">Office Verifications</div>
+                  <div className={eccUtilityLabelClass}>Office Verification</div>
                   <div className="text-sm font-semibold text-slate-900">AHRI Matched System Verification</div>
                 </div>
-                <span className="rounded-full border border-sky-300 bg-white px-2 py-1 text-[11px] font-medium text-sky-700">
-                  Office verification
+                <span className="rounded-full border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600">
+                  Not field measured
                 </span>
               </div>
 
-              <div className="text-xs text-slate-700 space-y-1">
+              <div className="space-y-1 text-xs text-slate-700">
                 <div>Use the captured equipment model numbers to confirm the installed combination is AHRI listed.</div>
                 <div>Enter the AHRI certificate/reference number used for CHEERS.</div>
                 <div>This is an office verification, not a field-measured test.</div>
               </div>
 
-              <div className="rounded-md border border-sky-200 bg-white px-3 py-2 text-xs text-slate-700">
+              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
                 <div className="font-semibold text-slate-900">Equipment model readiness</div>
                 <div className="mt-1 grid gap-1">
                   {ahriModelReadinessRows.map((row) => (
@@ -1845,14 +1919,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="system_id" value={selectedSystemId} />
                     <input type="hidden" name="test_type" value="ahri_verification" />
-                    <SubmitButton loadingText="Creating..." className="inline-flex min-h-9 items-center rounded-md bg-slate-900 px-3 py-2 text-xs text-white hover:bg-slate-800">
+                    <SubmitButton loadingText="Creating..." className="inline-flex min-h-9 items-center rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
                       Start AHRI Office Verification
                     </SubmitButton>
                   </form>
                 ) : (
                   <Link
                     href={`/jobs/${job.id}/tests?s=${selectedSystemId}&t=ahri_verification`}
-                    className="inline-flex min-h-9 items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-50"
+                    className="inline-flex min-h-9 items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50"
                   >
                     Open AHRI Workspace
                   </Link>
@@ -1863,12 +1937,11 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </span>
               </div>
 
-              {officeVerificationTypes.length === 0 ? null : (
-                <div className="text-xs text-slate-600">
-                  Additional office verification runs are tracked separately from field-measured tests.
-                </div>
-              )}
+              <div className="text-xs text-slate-600">
+                Additional office verification runs are tracked separately from field-measured tests.
+              </div>
             </div>
+            ) : null}
 
             {isRetestChild && parentFailedComparisonRows.length > 0 ? (
               <div className="rounded-md border border-red-200 bg-red-50 px-3 py-3 space-y-2">
@@ -1901,15 +1974,15 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </div>
             ) : null}
 
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              Scenario: {scenarioCode.replaceAll("_", " ")}
+            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+              Rule profile: {scenarioCode.replaceAll("_", " ")}
             </div>
           </div>
         ) : null}
 
         {selectedSystemId ? (
-            <div className="rounded-xl border border-gray-200/80 bg-slate-50/40 p-3 space-y-3 sm:p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Equipment Reference</div>
+            <div className={`${eccSoftPanelClass} space-y-3`}>
+            <div className={eccUtilityLabelClass}>Equipment Reference</div>
             <div className="text-sm font-medium text-slate-900">System: {selectedSystemName}</div>
             {equipmentReferenceItems.length > 0 ? (
               <div className="space-y-1 text-xs text-slate-700">
@@ -1944,8 +2017,13 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
         {/* Add Test panel */}
         {selectedSystemId && focusedType === "custom" ? (
-          <div className="rounded-xl border border-gray-200/80 bg-white p-3 space-y-3 sm:p-4">
-            <div className="text-sm font-semibold">Add Test</div>
+          <div className={`${eccPanelClass} space-y-3`}>
+            <div>
+              <div className="text-sm font-semibold text-slate-950">Add Test</div>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Add selected tests when the project scope requires extra documentation for this system.
+              </p>
+            </div>
 
             <form action={addEccTestRunFromForm} className="grid gap-3">
               <input type="hidden" name="job_id" value={job.id} />
@@ -1973,7 +2051,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   ))}
                 </select>
 
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-slate-500">
                   This ties the new test run to a specific system/location.
                 </div>
               </div>
@@ -2007,7 +2085,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 ) : null}
               </div>
 
-              <SubmitButton loadingText="Adding..." className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 sm:w-fit">
+              <SubmitButton loadingText="Adding..." className={eccPrimaryButtonClass}>
                 Add Test
               </SubmitButton>
             </form>
@@ -2018,13 +2096,13 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         {selectedSystemId ? (
           <Link
             href={focusedType === "custom" ? withS(undefined) : withS("custom")}
-            className={`w-full rounded-md px-4 py-3 flex items-center justify-between border transition-colors ${
+            className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 shadow-sm transition-colors ${
               focusedType === "custom"
                 ? "border-slate-900 bg-slate-900 text-white"
-                : "border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+                : "border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50"
             }`}
           >
-            <div className="font-medium">Add Test</div>
+            <div className="font-semibold">Add Test</div>
             <span className="text-xs">{focusedType === "custom" ? "▲" : "▼"}</span>
           </Link>
         ) : (
@@ -2057,7 +2135,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="test_type" value={focusedCustomTestType} />
-                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                <SubmitButton loadingText="Creating..." className={eccPrimaryButtonClass}>
                   Create Run
                 </SubmitButton>
               </form>
@@ -2096,7 +2174,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             DUCT LEAKAGE
             ========================= */}
         {focusedType === "duct_leakage" ? (
-          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+          <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium">Duct Leakage</div>
@@ -2139,7 +2217,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="test_type" value="duct_leakage" />
 
-                  <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                  <SubmitButton loadingText="Creating..." className={eccPrimaryButtonClass}>
                     Create Duct Leakage Run
                   </SubmitButton>
                 </form>
@@ -2280,7 +2358,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="test_run_id" value={runDL.id} />
                 </form>
 
-                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                <div className={eccActionRowClass}>
                   <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
                     {runDL.is_completed && "✅ Test completed"}
                   </span>
@@ -2288,7 +2366,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={ductSaveFormId}
                     formNoValidate
                     loadingText="Saving..."
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Save Draft
                   </SubmitButton>
@@ -2296,14 +2374,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={ductSaveFormId}
                     loadingText="Saving & completing..."
                     formAction={saveAndCompleteDuctLeakageFromForm}
-                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                    className={eccPrimaryButtonClass}
                   >
                     Complete Test
                   </SubmitButton>
                   <button
                     type="submit"
                     form={ductDeleteFormId}
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Delete
                   </button>
@@ -2318,7 +2396,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             AIRFLOW
             ========================= */}
         {focusedType === "airflow" ? (
-          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+          <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium">Airflow</div>
@@ -2356,7 +2434,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="test_type" value="airflow" />
-                  <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                  <SubmitButton loadingText="Creating..." className={eccPrimaryButtonClass}>
                     Create Airflow Run
                   </SubmitButton>
                 </form>
@@ -2477,14 +2555,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <div>Measured Total Airflow: {fmtValue(runAF.data?.measured_total_cfm, "CFM")}</div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                <div className={eccActionRowClass}>
                   <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
                     {runAF.is_completed && "✅ Test completed"}
                   </span>
                   <SubmitButton
                     form={airflowSaveFormId}
                     loadingText="Saving..."
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Save Draft
                   </SubmitButton>
@@ -2492,14 +2570,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={airflowSaveFormId}
                     formAction={saveAndCompleteAirflowFromForm}
                     loadingText="Saving & completing..."
-                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                    className={eccPrimaryButtonClass}
                   >
                     Complete Test
                   </SubmitButton>
                   <form action={deleteEccTestRunFromForm}>
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runAF.id} />
-                    <button type="submit" className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50">
+                    <button type="submit" className={eccSecondaryButtonClass}>
                       Delete
                     </button>
                   </form>
@@ -2513,7 +2591,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             FAN EFFICACY / WATT VERIFICATION
             ========================= */}
         {focusedType === "fan_watt_draw" ? (
-          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+          <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium">Fan Efficacy / Watt Verification</div>
@@ -2540,7 +2618,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="test_type" value="fan_watt_draw" />
-                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                <SubmitButton loadingText="Creating..." className={eccPrimaryButtonClass}>
                   Create Fan Efficacy Run
                 </SubmitButton>
               </form>
@@ -2653,7 +2731,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <div>Compliance Statement: {fallbackText(runFan.computed?.compliance_statement)}</div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                <div className={eccActionRowClass}>
                   <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
                     {runFan.is_completed && "✅ Test completed"}
                   </span>
@@ -2661,7 +2739,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={fanSaveFormId}
                     formNoValidate
                     loadingText="Saving..."
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Save Draft
                   </SubmitButton>
@@ -2669,14 +2747,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={fanSaveFormId}
                     loadingText="Saving & completing..."
                     formAction={saveAndCompleteFanWattDrawFromForm}
-                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                    className={eccPrimaryButtonClass}
                   >
                     Complete Test
                   </SubmitButton>
                   <button
                     type="submit"
                     form={fanDeleteFormId}
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Delete
                   </button>
@@ -2695,7 +2773,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             AIR FILTER DEVICE VERIFICATION
             ========================= */}
         {focusedType === "air_filter_device" ? (
-          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+          <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium">Air Filter Device Verification</div>
@@ -2719,7 +2797,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="test_type" value="air_filter_device" />
-                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                <SubmitButton loadingText="Creating..." className={eccPrimaryButtonClass}>
                   Create Air Filter Run
                 </SubmitButton>
               </form>
@@ -2861,7 +2939,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <div>Compliance Statement: {fallbackText(runFilter.computed?.compliance_statement)}</div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                <div className={eccActionRowClass}>
                   <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
                     {runFilter.is_completed && "✅ Test completed"}
                   </span>
@@ -2869,7 +2947,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={filterSaveFormId}
                     formNoValidate
                     loadingText="Saving..."
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Save Draft
                   </SubmitButton>
@@ -2877,14 +2955,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={filterSaveFormId}
                     loadingText="Saving & completing..."
                     formAction={saveAndCompleteAirFilterDeviceFromForm}
-                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                    className={eccPrimaryButtonClass}
                   >
                     Complete Test
                   </SubmitButton>
                   <button
                     type="submit"
                     form={filterDeleteFormId}
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Delete
                   </button>
@@ -2903,7 +2981,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             AHRI MATCHED SYSTEM VERIFICATION (OFFICE)
             ========================= */}
         {focusedType === "ahri_verification" ? (
-          <div className="min-w-0 rounded-lg border border-sky-200 bg-sky-50/60 p-4 space-y-4">
+          <div className={eccOfficeCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium text-slate-900">AHRI Matched System Verification</div>
@@ -2929,7 +3007,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="test_type" value="ahri_verification" />
-                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                <SubmitButton loadingText="Creating..." className={eccPrimaryButtonClass}>
                   Create AHRI Verification Run
                 </SubmitButton>
               </form>
@@ -3096,7 +3174,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <div>Compliance Statement: {fallbackText(runAhri.computed?.compliance_statement)}</div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                <div className={eccActionRowClass}>
                   <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
                     {runAhri.is_completed && "✅ Verification completed"}
                   </span>
@@ -3104,7 +3182,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={ahriSaveFormId}
                     formNoValidate
                     loadingText="Saving..."
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Save Draft
                   </SubmitButton>
@@ -3112,14 +3190,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={ahriSaveFormId}
                     loadingText="Saving & completing..."
                     formAction={saveAndCompleteAhriVerificationFromForm}
-                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                    className={eccPrimaryButtonClass}
                   >
                     Complete Verification
                   </SubmitButton>
                   <button
                     type="submit"
                     form={ahriDeleteFormId}
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Delete
                   </button>
@@ -3138,7 +3216,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             LOCAL MECHANICAL EXHAUST VERIFICATION
             ========================= */}
         {focusedType === "local_mechanical_exhaust" ? (
-          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+          <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium">Local Mechanical Exhaust Verification</div>
@@ -3160,7 +3238,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="test_type" value="local_mechanical_exhaust" />
-                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                <SubmitButton loadingText="Creating..." className={eccPrimaryButtonClass}>
                   Create Local Mechanical Exhaust Run
                 </SubmitButton>
               </form>
@@ -3173,9 +3251,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="test_run_id" value={runLocalExhaust.id} />
 
                   {/* Field Capture Section */}
-                  <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-3">
-                    <div className="text-sm font-semibold text-blue-900 mb-1">Field Capture</div>
-                    <div className="text-xs text-blue-800 mb-3">Records kitchen and system details captured on-site during the visit.</div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                    <div className="mb-1 text-sm font-semibold text-slate-950">Field Capture</div>
+                    <div className="mb-3 text-xs text-slate-600">Kitchen and system details captured on-site during the visit.</div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="grid gap-1">
                         <label className="text-sm font-medium" htmlFor={`lme-building-type-${runLocalExhaust.id}`}>Building Type</label>
@@ -3209,9 +3287,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </div>
 
                   {/* HVI/AHAM Directory Research Section */}
-                  <div className="rounded-md border border-amber-100 bg-amber-50 px-3 py-3">
-                    <div className="text-sm font-semibold text-amber-900 mb-1">HVI/AHAM Directory Research</div>
-                    <div className="text-xs text-amber-800 mb-3">Verified later from HVI or AHAM directory and online research. These values are not field-measured.</div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                    <div className="mb-1 text-sm font-semibold text-slate-950">HVI/AHAM Directory Research</div>
+                    <div className="mb-3 text-xs text-slate-600">Entered after HVI/AHAM directory or online verification. These values are not field measured.</div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="grid gap-1">
                         <label className="text-sm font-medium" htmlFor={`lme-model-${runLocalExhaust.id}`}>Directory Listed Model Number</label>
@@ -3246,7 +3324,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </form>
 
                 <div className="text-sm font-semibold text-slate-900">Summary</div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 space-y-2">
+                <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
                   <div>
                     <div className="font-medium text-slate-900">Field Capture:</div>
                     <div className="ml-2 space-y-1">
@@ -3266,7 +3344,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                <div className={eccActionRowClass}>
                   <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
                     {runLocalExhaust.is_completed && "✅ Verification completed"}
                   </span>
@@ -3274,7 +3352,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={localExhaustSaveFormId}
                     formNoValidate
                     loadingText="Saving..."
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Save Draft
                   </SubmitButton>
@@ -3282,14 +3360,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={localExhaustSaveFormId}
                     loadingText="Saving & completing..."
                     formAction={saveAndCompleteLocalMechanicalExhaustFromForm}
-                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                    className={eccPrimaryButtonClass}
                   >
                     Complete Verification
                   </SubmitButton>
                   <button
                     type="submit"
                     form={localExhaustDeleteFormId}
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Delete
                   </button>
@@ -3308,7 +3386,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             QII / ENV-22 INSULATION VERIFICATION
             ========================= */}
         {focusedType === "qii_insulation" ? (
-          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+          <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium">QII / ENV-22 Insulation Verification</div>
@@ -3330,14 +3408,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="system_id" value={selectedSystemId} />
                 <input type="hidden" name="test_type" value="qii_insulation" />
-                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                <SubmitButton loadingText="Creating..." className={eccPrimaryButtonClass}>
                   Create QII / ENV-22 Run
                 </SubmitButton>
               </form>
             ) : (
               <>
                 <div className="text-sm font-semibold text-slate-900">Top-Level Verification Inputs</div>
-                <form id={qiiSaveFormId} action={saveQiiEnv22InsulationDataFromForm} className="grid gap-3 border-t pt-3">
+                <form id={qiiSaveFormId} action={saveQiiEnv22InsulationDataFromForm} className="grid gap-3 border-t border-slate-200 pt-3">
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runQiiInsulation.id} />
@@ -3400,14 +3478,20 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                   </div>
 
-                  <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
-                    <div className="text-sm font-semibold text-slate-900">Insulation Entries</div>
+                  <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Insulation Entries</div>
+                      <div className="mt-1 text-xs text-slate-500">Add each inspected location with status and correction notes where needed.</div>
+                    </div>
                     {Array.from({ length: qiiRowCount }).map((_, rowIndex) => {
                       const row = qiiEntries[rowIndex] ?? {};
                       return (
-                        <div key={`qii-row-${rowIndex}`} className="space-y-2 rounded-md border border-slate-200 bg-white p-3">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">Row {rowIndex + 1}</div>
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div key={`qii-row-${rowIndex}`} className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className={eccUtilityLabelClass}>Entry {rowIndex + 1}</div>
+                            <div className="text-xs font-medium text-slate-500">{qiiStatusLabel(row.verification_status)}</div>
+                          </div>
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                             <input name="insulation_location[]" className="w-full rounded-md border px-3 py-2" placeholder="Insulation location" defaultValue={row.insulation_location ?? ""} />
                             <input name="insulation_type[]" className="w-full rounded-md border px-3 py-2" placeholder="Insulation type" defaultValue={row.insulation_type ?? ""} />
                             <input name="insulation_brand[]" className="w-full rounded-md border px-3 py-2" placeholder="Brand" defaultValue={row.insulation_brand ?? ""} />
@@ -3451,8 +3535,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                               <option value="not_applicable">Not Applicable</option>
                             </select>
 
-                            <textarea name="correction_notes[]" rows={2} className="w-full rounded-md border px-3 py-2 sm:col-span-2" placeholder="Correction notes (required when status is fail or needs correction)" defaultValue={row.correction_notes ?? ""} />
-                            <textarea name="entry_notes[]" rows={2} className="w-full rounded-md border px-3 py-2 sm:col-span-2" placeholder="Entry notes" defaultValue={row.entry_notes ?? ""} />
+                            <textarea name="correction_notes[]" rows={2} className="w-full rounded-md border px-3 py-2 sm:col-span-2 lg:col-span-3" placeholder="Correction notes (required when status is fail or needs correction)" defaultValue={row.correction_notes ?? ""} />
+                            <textarea name="entry_notes[]" rows={2} className="w-full rounded-md border px-3 py-2 sm:col-span-2 lg:col-span-3" placeholder="Entry notes" defaultValue={row.entry_notes ?? ""} />
                           </div>
                         </div>
                       );
@@ -3474,7 +3558,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </form>
 
                 <div className="text-sm font-semibold text-slate-900">QII Summary</div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 space-y-1">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 space-y-1">
                   <div>Overall QII Status: {qiiStatusLabel(runQiiInsulation.data?.overall_qii_status)}</div>
                   <div>Entry Count: {fmtValue(runQiiInsulation.computed?.entry_count)}</div>
                   <div>Compliance Statement: {fallbackText(runQiiInsulation.computed?.compliance_statement)}</div>
@@ -3484,16 +3568,19 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
 
                 {qiiEntries.length > 0 ? (
-                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 space-y-1">
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 space-y-2">
                     {qiiEntries.map((entry: any, index: number) => (
-                      <div key={`qii-summary-entry-${index}`}>
-                        {index + 1}. {fallbackText(entry?.insulation_location)} | {fallbackText(entry?.insulation_type)} | Status: {qiiStatusLabel(entry?.verification_status)} | Label: {qiiYesNoLabel(entry?.manufacturer_label_provided)} | Coverage Chart: {qiiYesNoLabel(entry?.loose_fill_coverage_chart_confirmed)}
+                      <div key={`qii-summary-entry-${index}`} className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
+                        <div className="font-medium text-slate-900">{index + 1}. {fallbackText(entry?.insulation_location)}</div>
+                        <div className="mt-1 text-xs text-slate-600">
+                          {fallbackText(entry?.insulation_type)} &middot; Status: {qiiStatusLabel(entry?.verification_status)} &middot; Label: {qiiYesNoLabel(entry?.manufacturer_label_provided)} &middot; Coverage Chart: {qiiYesNoLabel(entry?.loose_fill_coverage_chart_confirmed)}
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : null}
 
-                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                <div className={eccActionRowClass}>
                   <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
                     {runQiiInsulation.is_completed && "✅ Verification completed"}
                   </span>
@@ -3501,7 +3588,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={qiiSaveFormId}
                     formNoValidate
                     loadingText="Saving..."
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Save Draft
                   </SubmitButton>
@@ -3509,14 +3596,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={qiiSaveFormId}
                     loadingText="Saving & completing..."
                     formAction={saveAndCompleteQiiEnv22InsulationFromForm}
-                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                    className={eccPrimaryButtonClass}
                   >
                     Complete Verification
                   </SubmitButton>
                   <button
                     type="submit"
                     form={qiiDeleteFormId}
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Delete
                   </button>
@@ -3535,7 +3622,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             REFRIGERANT CHARGE
             ========================= */}
         {focusedType === "refrigerant_charge" ? (
-          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+          <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium">Refrigerant Charge</div>
@@ -3573,7 +3660,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="test_type" value="refrigerant_charge" />
-                  <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                  <SubmitButton loadingText="Creating..." className={eccPrimaryButtonClass}>
                     Create Refrigerant Charge Run
                   </SubmitButton>
                 </form>
@@ -3856,14 +3943,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                <div className={eccActionRowClass}>
                   <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
                     {runRC.is_completed && "✅ Test completed"}
                   </span>
                   <SubmitButton
                     form={rcSaveFormId}
                     loadingText="Saving..."
-                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                    className={eccSecondaryButtonClass}
                   >
                     Save Draft
                   </SubmitButton>
@@ -3871,14 +3958,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     form={rcSaveFormId}
                     formAction={saveAndCompleteRefrigerantChargeFromForm}
                     loadingText="Saving & completing..."
-                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                    className={eccPrimaryButtonClass}
                   >
                     Complete Test
                   </SubmitButton>
                   <form action={deleteEccTestRunFromForm}>
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runRC.id} />
-                    <button type="submit" className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50">
+                    <button type="submit" className={eccSecondaryButtonClass}>
                       Delete
                     </button>
                   </form>
