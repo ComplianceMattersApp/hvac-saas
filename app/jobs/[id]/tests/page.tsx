@@ -895,7 +895,6 @@ export default async function JobTestsPage({
     new Set([...(requiredTests as string[]), ...applicableSystemRunTestTypes, ...carriedForwardPassedTypes])
   ) as EccTestType[];
 
-  const officeVerificationTypes = visibleTestTypes.filter((testType) => testType === "ahri_verification");
   const visibleFieldTestTypes = visibleTestTypes.filter((testType) => testType !== "ahri_verification");
 
   const focusedCustomTestType =
@@ -1057,16 +1056,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       run: pickParentRunForSelectedSystem(testType),
     }))
     .filter((row) => getEffectiveResultState(row.run) === "fail");
-
-  const equipmentReferenceItems = selectedSystemEquipment
-    .slice()
-    .sort((a: any, b: any) => {
-      const at = new Date(a?.created_at ?? 0).getTime();
-      const bt = new Date(b?.created_at ?? 0).getTime();
-      if (at !== bt) return at - bt;
-      return String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
-    })
-    .slice(0, 3);
 
   function effectiveResult(run: any): "pass" | "fail" | "unknown" {
     if (!run) return "unknown";
@@ -1877,72 +1866,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </div>
             )}
 
-            {officeVerificationTypes.length > 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-3">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <div className={eccUtilityLabelClass}>Office Verification</div>
-                  <div className="text-sm font-semibold text-slate-900">AHRI Matched System Verification</div>
-                </div>
-                <span className="rounded-full border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600">
-                  Not field measured
-                </span>
-              </div>
-
-              <div className="space-y-1 text-xs text-slate-700">
-                <div>Use the captured equipment model numbers to confirm the installed combination is AHRI listed.</div>
-                <div>Enter the AHRI certificate/reference number used for CHEERS.</div>
-                <div>This is an office verification, not a field-measured test.</div>
-              </div>
-
-              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
-                <div className="font-semibold text-slate-900">Equipment model readiness</div>
-                <div className="mt-1 grid gap-1">
-                  {ahriModelReadinessRows.map((row) => (
-                    <div key={row.label}>
-                      {row.label}: <span className={row.value ? "text-slate-900" : "text-amber-700"}>{row.value || "Missing"}</span>
-                    </div>
-                  ))}
-                </div>
-                {ahriMissingModelRows.length > 0 ? (
-                  <div className="mt-2 text-amber-700">
-                    Missing model information may prevent AHRI verification.
-                  </div>
-                ) : (
-                  <div className="mt-2 text-emerald-700">All tracked model fields are captured.</div>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-2 items-center">
-                {!runAhri ? (
-                  <form action={addEccTestRunFromForm}>
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <input type="hidden" name="system_id" value={selectedSystemId} />
-                    <input type="hidden" name="test_type" value="ahri_verification" />
-                    <SubmitButton loadingText="Creating..." className="inline-flex min-h-9 items-center rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
-                      Start AHRI Office Verification
-                    </SubmitButton>
-                  </form>
-                ) : (
-                  <Link
-                    href={`/jobs/${job.id}/tests?s=${selectedSystemId}&t=ahri_verification`}
-                    className="inline-flex min-h-9 items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50"
-                  >
-                    Open AHRI Workspace
-                  </Link>
-                )}
-
-                <span className="text-xs text-slate-600">
-                  Status: {runAhri ? ahriStatusLabel(runAhri.data?.ahri_status) : "Not started"}
-                </span>
-              </div>
-
-              <div className="text-xs text-slate-600">
-                Additional office verification runs are tracked separately from field-measured tests.
-              </div>
-            </div>
-            ) : null}
-
             {isRetestChild && parentFailedComparisonRows.length > 0 ? (
               <div className="rounded-md border border-red-200 bg-red-50 px-3 py-3 space-y-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-red-800">Parent Failed Results (Read-only)</div>
@@ -1976,41 +1899,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
             <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
               Rule profile: {scenarioCode.replaceAll("_", " ")}
-            </div>
-          </div>
-        ) : null}
-
-        {selectedSystemId ? (
-            <div className={`${eccSoftPanelClass} space-y-3`}>
-            <div className={eccUtilityLabelClass}>Equipment Reference</div>
-            <div className="text-sm font-medium text-slate-900">System: {selectedSystemName}</div>
-            {equipmentReferenceItems.length > 0 ? (
-              <div className="space-y-1 text-xs text-slate-700">
-                {equipmentReferenceItems.map((eq: any, index: number) => (
-                  <div key={String(eq?.id ?? `${selectedSystemId}-ref-${index}`)} className="break-words">
-                    {equipmentSummaryLine(eq)}
-                  </div>
-                ))}
-                {selectedSystemEquipment.length > equipmentReferenceItems.length ? (
-                  <div className="text-slate-600">+{selectedSystemEquipment.length - equipmentReferenceItems.length} more item(s)</div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="text-xs text-slate-600">No equipment linked to this system yet.</div>
-            )}
-            <div className="text-xs text-slate-700">
-              {isHeatOnlySystem ? (
-                <>
-                  Suggested heating input: <span className="font-medium">{fmtValue(defaultHeatingCapacityKbtu, "KBTU/h")}</span>
-                </>
-              ) : (
-                <>
-                  Suggested tonnage default: <span className="font-medium">{fmtValue(defaultSystemTonnage, "ton")}</span>
-                </>
-              )}
-            </div>
-            <div className="text-xs text-slate-600">
-              AHRI verification is office/computer verified later. Capture accurate equipment manufacturer, model, and serial data in equipment records.
             </div>
           </div>
         ) : null}
@@ -3014,6 +2902,23 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             ) : (
               <>
                 <div className="text-sm font-semibold text-slate-900">Office Verification Inputs</div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
+                  <div className="font-semibold text-slate-900">Equipment model readiness</div>
+                  <div className="mt-1 grid gap-1">
+                    {ahriModelReadinessRows.map((row) => (
+                      <div key={row.label}>
+                        {row.label}: <span className={row.value ? "text-slate-900" : "text-amber-700"}>{row.value || "Missing"}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {ahriMissingModelRows.length > 0 ? (
+                    <div className="mt-2 text-amber-700">
+                      Missing model information may prevent AHRI verification.
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-emerald-700">All tracked model fields are captured.</div>
+                  )}
+                </div>
                 <form id={ahriSaveFormId} action={saveAhriVerificationDataFromForm} className="grid gap-3 border-t pt-3">
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
