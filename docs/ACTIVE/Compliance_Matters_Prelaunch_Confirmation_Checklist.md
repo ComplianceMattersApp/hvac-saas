@@ -678,6 +678,50 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
   - issued/void invoice states keep builder/edit controls hidden
   - invoice/payment wording remains tracking-only and does not imply live charging
 - Before launch (post-deploy), operators should verify this path in production UI:
+
+### ECC verification expansion + closeout queue correction closeout (completed)
+- ECC verification expansion thread is complete and documentation is now aligned to shipped baseline behavior.
+- Completed shipped areas:
+  - mini split/ductless applicability baseline and labels
+  - Fan Efficacy / Watt Verification V1
+  - Air Filter Device Verification V1
+  - All New selected-test set expansion
+  - AHRI Matched System Verification V1
+  - Local Mechanical Exhaust Verification V1 with Field Capture vs HVI/AHAM Directory Research grouping
+  - New Construction per-run editable Duct Leakage and Air Flow targets
+  - QII / ENV-22 Insulation Verification V1
+  - ECC test workspace visual/presentation polish
+  - ECC report scope hygiene (optional unselected tests suppressed)
+  - failed ECC invoice closeout queue behavior restoration
+- Confirmed behavior-level outcomes:
+  - AHRI remains office-side verification, `computed_pass` stays neutral/null, and does not alter `jobs.ops_status` in V1
+  - AHRI helper/readiness guidance appears only in AHRI workflow scope
+  - Local Mechanical Exhaust directory values are explicitly treated as directory/online research, not field-measured values
+  - completed documentation-style tests (including QII-style flows) display `Verified` instead of `Not computed`
+  - redundant Equipment Reference card is removed where Equipment Summary already exists in Results system card
+  - report output reflects actual scope-of-work (required, selected, or existing runs), not full potential test universe
+  - failed ECC jobs remain failed for closeout logic even when invoice is sent; billing follow-up remains visible and correctly bucketed
+- Validation summary recorded:
+  - targeted tests passed across applicability, Fan Efficacy, Air Filter, All New profiles, AHRI, Local Mechanical Exhaust, QII, report scope, closeout queue behavior, ECC status, and related scope/entitlement hardening where applicable
+  - `npx.cmd tsc --noEmit` checks passed
+  - owner/authenticated browser smoke confirmed QII completion status, LME field-vs-directory distinction, AHRI scope cleanup, report scope hygiene, Equipment Reference removal, closeout queue correction behavior, and ECC test-screen visual pass
+- Explicit preserved boundaries:
+  - no schema changes
+  - no migrations
+  - no RLS/auth changes
+  - no contractor authority changes
+  - no payment execution changes
+  - no billing execution changes
+  - no estimates/support console behavior changes
+  - no ECC source-of-truth redesign (`ecc_test_runs` remains verification truth, `jobs.ops_status` remains projection)
+  - AHRI/QII remain non-gating unless explicitly designed as a future pass
+- Remaining parked items:
+  - AHRI full website/API lookup remains future
+  - AHRI attachment/screenshot-specific implementation remains future
+  - QII remains selectable/ad hoc (not universal default-required)
+  - AHRI/QII closeout-gate decisions remain future explicit passes
+  - broader ECC report/export/PDF formatting polish remains future
+  - native/app-store packaging remains parked
   - Service intake structured-scope requirement
   - ECC optional scope behavior
   - Build Invoice from Visit Scope draft builder

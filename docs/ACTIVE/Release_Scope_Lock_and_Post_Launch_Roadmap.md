@@ -38,6 +38,25 @@ Field bus closeout documentation note (May 2026):
    - `/ops/call-list` dedicated full page and polish
    - schedule update permit-field preservation in `updateJobScheduleFromForm`
 
+ECC verification expansion closeout note (May 2026):
+- Active documentation now records completed ECC verification expansion passes for:
+   - mini split/ductless applicability clarification and preserved labeling
+   - Fan Efficacy / Watt Verification V1
+   - Air Filter Device Verification V1
+   - All New selected-test baseline expansion
+   - AHRI Matched System Verification V1 (office-side verification)
+   - Local Mechanical Exhaust Verification V1 with Field Capture vs HVI/AHAM Directory Research separation
+   - New Construction per-run editable Duct Leakage and Air Flow targets
+   - QII / ENV-22 Insulation Verification V1
+   - ECC workspace/test-screen polish
+   - ECC report-scope hygiene and redundant Equipment Reference removal
+   - failed ECC invoice closeout queue behavior restoration in closeout projection
+- Boundaries remain locked:
+   - no schema/migration/RLS/auth/contractor-authority redesign
+   - no billing or payment execution behavior expansion
+   - `ecc_test_runs` remains ECC verification truth and `jobs.ops_status` remains operational projection
+   - AHRI/QII remain non-gating in current scope unless explicitly designed later
+
 Execution companion note: for practical first-customer support posture and expansion-lane classification guardrails, see `docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md`.
 
 ---
@@ -112,7 +131,7 @@ The following remain intentionally deferred/parked (not blockers for owner-relea
 10. Mode-aware navigation rendering.
 11. Mode-aware starter kits.
 12. Mode-aware report presets.
-13. Additional ECC test expansion beyond current accepted scope.
+13. Additional ECC test expansion beyond current accepted scope (current accepted scope includes AHRI, Local Mechanical Exhaust, QII, Fan Efficacy, and Air Filter Device verification).
 14. Full case-level timeline / case_events expansion.
 15. Notification test expansion / badge optimization hardening.
 16. Broad performance campaign unless daily use surfaces specific real issues.

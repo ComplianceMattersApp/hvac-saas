@@ -108,6 +108,26 @@ The following foundations are **shared across both product versions**:
 
 **This version emphasizes:**
 
+Current shipped ECC verification baseline note (May 2026):
+- ECC verification expansion baseline now includes shipped selected/add-on workflows for:
+  - AHRI Matched System Verification (office-side)
+  - Local Mechanical Exhaust Verification
+  - QII / ENV-22 Insulation Verification
+  - Fan Efficacy / Watt Verification
+  - Air Filter Device Verification
+- Applicability and scope behavior now explicitly preserve:
+  - mini split ductless applicability trigger on `Mini-Split Indoor Head`
+  - package-system refrigerant-charge exclusion
+  - per-run editable Duct Leakage and Air Flow targets without mutating global defaults
+- Report/output baseline preserves scope hygiene:
+  - optional unselected test sections are suppressed unless required, selected, or backed by a run
+  - redundant Equipment Reference presentation was removed where Equipment Summary already serves the Results card
+  - AHRI helper/readiness guidance is scoped to AHRI workflow only
+- Source-of-truth and closeout boundaries remain unchanged:
+  - `ecc_test_runs` remains ECC verification truth
+  - `jobs.ops_status` remains operational projection
+  - AHRI and QII remain non-gating documentation/office flows unless explicitly redesigned in a future pass
+
 - **Contractor Intake / Workflow**
   - Contractor portal for submission of new work requests (proposal intake)
   - Contractor users invited per-job (limited role; no schedule authority)

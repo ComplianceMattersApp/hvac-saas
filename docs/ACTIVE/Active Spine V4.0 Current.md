@@ -223,6 +223,94 @@ Current Program Status Note (May 2026)
   - use short-lived feature branches from current `main`, merge back only after validation, then retire the branch
   - Supabase sandbox environment remains usable; only the stale Git branch was retired
 
+- Field Bus / ECC Verification Expansion + Closeout Queue Correction closeout is complete (May 2026):
+  - Mini split / ductless applicability baseline:
+    - equipment labels remain `Mini-Split Outdoor` and `Mini-Split Indoor Head`
+    - `Mini-Split Indoor Head` is the ductless trigger
+    - `Mini-Split Outdoor` alone does not force ductless-only behavior
+    - ductless mini split systems use Refrigerant Charge only
+    - Mini-Split Outdoor + Air Handler remains ducted behavior unless explicitly configured otherwise
+    - multiple Mini-Split Indoor Head records can share one System Label
+  - Fan Efficacy / Watt Verification V1:
+    - structured Forced Air System Fan Efficacy / Watt Verification is shipped
+    - captures tested watts, tested airflow from MCH-23, required efficacy, actual efficacy, and compliance statement
+    - calculation remains `actual_fan_efficacy = tested_watts / tested_airflow_cfm`
+    - CHEERS/report output renders values; this is not treated as volts x amps estimation
+  - Air Filter Device Verification V1:
+    - selectable Air Filter Device / Filter Face Area verification is shipped
+    - stores entered and computed values in `ecc_test_runs` JSON
+    - computed values include nominal face area, required minimum face area, and face-area compliance result
+    - report output renders entered and computed values
+  - All New selected-test baseline:
+    - All New forced-air/split set includes Duct Leakage, Air Flow, Fan Efficacy, Air Filter Device, and Refrigerant Charge when applicable
+    - Duct Leakage default target remains 5 percent unless edited per run
+    - Air Flow default target remains 350 CFM/ton unless edited per run
+    - package-unit refrigerant-charge exclusion remains preserved
+    - mini split ductless remains Refrigerant Charge only
+  - AHRI Matched System Verification V1:
+    - office-side AHRI verification workflow is shipped
+    - AHRI remains non-field-measured verification
+    - new/empty AHRI runs can prefill model fields from captured equipment
+    - saved AHRI values are not overwritten by equipment-derived defaults
+    - AHRI remains stored in `ecc_test_runs` JSON with `computed_pass = null`
+    - AHRI does not affect `jobs.ops_status` in V1
+    - report/CHEERS output includes AHRI office verification when AHRI is in scope
+    - AHRI helper/readiness guidance is scoped to AHRI workflow only
+  - Local Mechanical Exhaust Verification V1:
+    - selectable add-on (not default-required) is shipped
+    - workspace distinguishes Field Capture inputs from HVI/AHAM Directory Research inputs
+    - directory values are explicitly treated as office/directory research, not field-measured values
+    - report output labels directory research values clearly
+  - New Construction per-run editable targets:
+    - Duct Leakage percentage target and Airflow CFM/ton target are editable per run
+    - defaults remain profile-driven when not edited
+    - edited values are saved on that `ecc_test_run` only and do not mutate profile defaults
+    - report output shows the target used
+  - QII / ENV-22 Insulation Verification V1:
+    - selectable add-on (not default-required) is shipped
+    - supports top-level verification fields plus repeatable insulation-area rows in `ecc_test_runs` JSON
+    - completion guards are enforced (row minimum, required row fields, correction-note requirements, pass/fail consistency)
+    - completed documentation-style tests now display as `Verified` rather than `Not computed`
+  - ECC test workspace premium polish:
+    - improved visual hierarchy, spacing, labels, status readability, report readability, and mobile usability
+    - office verifications remain visually distinct from field-measured tests
+    - no behavior/calculation/applicability/save-complete/report-data/ops-status changes were introduced by polish
+  - ECC report scope hygiene:
+    - completion/report output suppresses optional unselected tests instead of rendering `No run found`
+    - optional/selectable sections appear only when required, selected/added, or backed by an existing run
+    - suppressed when unselected: AHRI, Local Mechanical Exhaust, QII, Fan Efficacy, Air Filter Device
+    - Add Test dropdown behavior remains unchanged
+    - redundant Equipment Reference card is removed where Equipment Summary already serves the results card
+    - AHRI helper/readiness language is limited to AHRI workflow scope
+  - Failed ECC invoice closeout queue behavior is restored:
+    - failed ECC plus invoice not sent remains in Failed bucket and Closeout Queue
+    - failed ECC plus invoice sent remains Failed bucket only
+    - failed ECC is not treated as certs/CHEERS-complete because invoice was sent
+    - failed ECC still blocks clean certification closeout
+    - external invoice tracking remains controlled by `invoice_complete`
+    - fix was in closeout projection/ledger filtering, not ECC test logic or invoice execution
+  - Validation snapshot for this closeout:
+    - targeted implementation tests passed across applicability, Fan Efficacy, Air Filter, All New profiles, AHRI, Local Mechanical Exhaust, QII, report scope, closeout queue behavior, ECC status, and scope/entitlement hardening where applicable
+    - TypeScript checks passed
+    - owner-authenticated browser smoke confirmed QII completion status behavior, LME field-vs-directory distinction, report-scope hygiene, AHRI scope cleanup, Equipment Reference redundancy removal, failed-ECC closeout queue behavior, and ECC workspace visual pass
+  - Explicit preserved boundaries:
+    - no schema changes
+    - no migrations
+    - no RLS/auth changes
+    - no contractor authority changes
+    - no billing execution changes
+    - no payment execution changes
+    - no estimates/support console behavior changes
+    - no ECC source-of-truth redesign (`ecc_test_runs` remains ECC truth, `jobs.ops_status` remains operational projection)
+    - AHRI/QII are not closeout gates unless separately designed in a future pass
+  - Parked/future items remain explicit:
+    - no full AHRI website/API lookup implementation yet
+    - no AHRI attachment/screenshot-specific extension yet
+    - QII remains selectable/ad hoc, not universal default-required
+    - any AHRI/QII closeout-gate decision is a separate future pass
+    - broader ECC report/export/PDF formatting remains future polish
+    - native/app-store packaging remains future/parked
+
 1. System Identity
 
 Compliance Matters Software is an:
