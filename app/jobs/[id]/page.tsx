@@ -23,6 +23,7 @@ import {
   type JobStatus,
   createRetestJobFromForm,
   promoteCompanionScopeToServiceJobFromForm,
+  addPublicNoteFromForm,
   addInternalNoteFromForm,
   getOnTheWayUndoEligibility,
   revertOnTheWayFromForm,
@@ -98,6 +99,7 @@ import DeferredServiceChainPanelBody from "./_components/DeferredServiceChainPan
 import DeferredAddAssigneeForm from "./_components/DeferredAddAssigneeForm";
 import ContactLoggingQuickActions from "./_components/ContactLoggingQuickActions";
 import DeferredTimelineBody from "./_components/DeferredTimelineBody";
+import DeferredSharedNotesBody from "./_components/DeferredSharedNotesBody";
 import DeferredInternalNotesBody from "./_components/DeferredInternalNotesBody";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
@@ -1706,8 +1708,11 @@ const eccSummaryText = job.ecc_test_runs?.length
   ? "Recorded test history with direct workspace access."
   : "No ECC runs recorded yet.";
 // Slice 5D: section titles still use chain metadata (cheap); counts/dates deferred.
+const sharedNotesTitle = hasDirectNarrativeChain ? "Shared Notes Across Job Chain" : "Shared Notes";
 const internalNotesTitle = hasDirectNarrativeChain ? "Internal Notes Across Job Chain" : "Internal Notes";
 const timelineTitle = hasDirectNarrativeChain ? "Job Chain Timeline" : "Timeline";
+const isHvacServiceMode = productMode === "hvac_service";
+const sharedNotesSummaryText = "Notes stream below.";
 const internalNotesSummaryText = "Notes stream below.";
 const timelineSummaryText = "History loads below.";
 
@@ -4534,6 +4539,48 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
     <section className="order-1 space-y-4 xl:order-5">
       <div className="space-y-4">
+        {/* Shared Notes */}
+        {!isHvacServiceMode ? (
+          <details className={workspaceDetailsClass}>
+            <summary className="cursor-pointer list-none">
+              <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} />
+            </summary>
+
+            <div className={`${workspaceDetailsDividerClass} space-y-2`}>
+
+  <form action={addPublicNoteFromForm} className="mb-4 space-y-3">
+    <input type="hidden" name="job_id" value={job.id} />
+    <input type="hidden" name="tab" value={tab} />
+
+    <textarea
+      name="note"
+      rows={3}
+      placeholder="Add a note visible to the contractor..."
+      className={workspaceTextareaClass}
+    />
+
+    <div className="flex justify-end">
+      <SubmitButton
+        loadingText="Adding note..."
+        className={secondaryButtonClass}
+      >
+        Save shared note
+      </SubmitButton>
+    </div>
+  </form>
+
+  <Suspense fallback={<NarrativeNotesBodyFallback />}>
+    <DeferredSharedNotesBody
+      jobId={String(job.id)}
+      timelineJobIds={narrativeScopeJobIds}
+      hasDirectNarrativeChain={hasDirectNarrativeChain}
+      emptyStateClassName={workspaceEmptyStateClass}
+    />
+  </Suspense>
+            </div>
+          </details>
+        ) : null}
+
         {/* Internal Notes */}
         <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
