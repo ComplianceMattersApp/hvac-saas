@@ -2384,6 +2384,12 @@ return (
                 {isPanelExpanded("call_list") ? "Show less" : "View all"}
               </Link>
             ) : null}
+            <Link
+              href={`/ops/call-list${contractor ? `?contractor=${encodeURIComponent(contractor)}` : ""}`}
+              className={inlineSectionLinkClass}
+            >
+              Full page
+            </Link>
           </div>
         </div>
         {callListVisibleJobs.length === 0 ? (
