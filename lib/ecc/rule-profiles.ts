@@ -171,6 +171,17 @@ export const ECC_RULE_PROFILES: Record<RuleProfileCode, RuleProfile> = {
         },
       },
       {
+        testType: "air_filter_device",
+        required: true,
+        supportsNotApplicable: true,
+        threshold: {
+          targetValue: "face_area_min_design_airflow_div_150_times_144",
+          unit: "lookup",
+          operator: "lookup",
+          notes: "Face area must satisfy design airflow-based minimum area requirement.",
+        },
+      },
+      {
         testType: "refrigerant_charge",
         required: true,
         supportsNotApplicable: true,

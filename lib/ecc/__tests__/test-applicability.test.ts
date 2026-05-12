@@ -16,6 +16,8 @@ describe("isEccTestApplicableToSystem", () => {
 
     expect(manualAddForDuctless).not.toContain("duct_leakage");
     expect(manualAddForDuctless).not.toContain("airflow");
+    expect(manualAddForDuctless).not.toContain("fan_watt_draw");
+    expect(manualAddForDuctless).not.toContain("air_filter_device");
     expect(manualAddForDuctless).toContain("refrigerant_charge");
   });
 
@@ -31,6 +33,8 @@ describe("isEccTestApplicableToSystem", () => {
 
     expect(manualAddForDucted).toContain("duct_leakage");
     expect(manualAddForDucted).toContain("airflow");
+    expect(manualAddForDucted).toContain("fan_watt_draw");
+    expect(manualAddForDucted).toContain("air_filter_device");
     expect(manualAddForDucted).toContain("refrigerant_charge");
   });
 });

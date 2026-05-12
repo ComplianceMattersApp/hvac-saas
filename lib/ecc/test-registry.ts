@@ -10,6 +10,7 @@ export type VerificationFamily =
 export type EccTestType =
   | "duct_leakage"
   | "airflow"
+  | "air_filter_device"
   | "refrigerant_charge"
   | "fan_watt_draw"
   | "ahri_verification"
@@ -90,6 +91,21 @@ export const ECC_TEST_REGISTRY: Record<EccTestType, EccTestDefinition> = {
     rendererKey: "airflow",
     computeKey: "airflow",
     sortOrder: 20,
+  },
+
+  air_filter_device: {
+    code: "air_filter_device",
+    label: "Air Filter Device Verification",
+    shortLabel: "Air Filter",
+    family: "ecc",
+    active: true,
+    allowManualAdd: true,
+    allowInCustomProfile: true,
+    supportsNotApplicable: true,
+    requiresReasonWhenNotApplicable: true,
+    rendererKey: "air_filter_device",
+    computeKey: "air_filter_device",
+    sortOrder: 25,
   },
 
   refrigerant_charge: {

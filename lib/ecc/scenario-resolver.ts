@@ -254,6 +254,10 @@ export function resolveEccScenario(args: {
             threshold: { value: 350, unit: "cfm_per_ton", operator: "gte" },
           },
           {
+            testType: "air_filter_device",
+            required: true,
+          },
+          {
             testType: "fan_watt_draw",
             required: true,
           },
@@ -270,6 +274,14 @@ export function resolveEccScenario(args: {
             testType: "duct_leakage",
             required: true,
             threshold: { value: 5, unit: "percent", operator: "lte" },
+          },
+          {
+            testType: "air_filter_device",
+            required: true,
+          },
+          {
+            testType: "fan_watt_draw",
+            required: true,
           },
         ],
         notes: [],
@@ -305,6 +317,10 @@ export function resolveEccScenario(args: {
             threshold: { value: 350, unit: "cfm_per_ton", operator: "gte" },
           },
           {
+            testType: "air_filter_device",
+            required: true,
+          },
+          {
             testType: "refrigerant_charge",
             required: true,
           },
@@ -330,6 +346,10 @@ export function resolveEccScenario(args: {
             testType: "airflow",
             required: true,
             threshold: { value: 350, unit: "cfm_per_ton", operator: "gte" },
+          },
+          {
+            testType: "air_filter_device",
+            required: true,
           },
           {
             testType: "refrigerant_charge",

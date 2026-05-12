@@ -71,4 +71,30 @@ describe("resolveEccScenario mini split trigger alignment", () => {
       "refrigerant_charge",
     ]);
   });
+
+  it("all_new forced-air split includes duct leakage, airflow, fan efficacy, air filter, and refrigerant", () => {
+    const result = resolveEccScenario({
+      projectType: "all_new",
+      systemEquipment: [{ component_type: "outdoor_unit" }, { component_type: "air_handler" }],
+    });
+
+    expect(result.scenario).toBe("all_new_ductwork_plus_split_system");
+    expect(result.suggestedTests.map((test) => test.testType)).toEqual([
+      "duct_leakage",
+      "airflow",
+      "air_filter_device",
+      "refrigerant_charge",
+      "fan_watt_draw",
+    ]);
+  });
+
+  it("all_new mini-split remains refrigerant-charge only", () => {
+    const result = resolveEccScenario({
+      projectType: "all_new",
+      systemEquipment: [{ component_type: "mini_split_head" }, { component_type: "mini_split_outdoor" }],
+    });
+
+    expect(result.scenario).toBe("mini_split");
+    expect(result.suggestedTests.map((test) => test.testType)).toEqual(["refrigerant_charge"]);
+  });
 });

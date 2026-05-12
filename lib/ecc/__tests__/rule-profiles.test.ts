@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getThresholdRuleForTest, normalizeProjectTypeToRuleProfile } from "@/lib/ecc/rule-profiles";
+import {
+  getRequiredTestsForSystem,
+  getThresholdRuleForTest,
+  normalizeProjectTypeToRuleProfile,
+} from "@/lib/ecc/rule-profiles";
 
 describe("rule-profiles airflow threshold normalization", () => {
   it("maps airflow threshold to 350 CFM/ton for new-prescriptive aliases", () => {
@@ -22,5 +26,31 @@ describe("rule-profiles airflow threshold normalization", () => {
     expect(normalizeProjectTypeToRuleProfile("alteration")).toBe("alteration");
     expect(threshold?.unit).toBe("cfm_per_ton");
     expect(threshold?.targetValue).toBe(300);
+  });
+
+  it("requires all-new standard forced-air set including fan and air filter", () => {
+    const required = getRequiredTestsForSystem({
+      projectType: "all_new",
+      systemEquipment: [{ component_type: "outdoor_unit" }, { component_type: "air_handler" }],
+    });
+
+    expect(required).toEqual(
+      expect.arrayContaining([
+        "duct_leakage",
+        "airflow",
+        "fan_watt_draw",
+        "air_filter_device",
+        "refrigerant_charge",
+      ]),
+    );
+  });
+
+  it("excludes refrigerant charge for package-unit systems", () => {
+    const required = getRequiredTestsForSystem({
+      projectType: "all_new",
+      systemEquipment: [{ component_type: "package_unit" }],
+    });
+
+    expect(required).not.toContain("refrigerant_charge");
   });
 });

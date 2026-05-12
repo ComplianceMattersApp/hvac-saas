@@ -151,6 +151,18 @@ function buildSaveAndCompleteRefrigerantFormData() {
   return formData;
 }
 
+function buildSaveAirFilterFormData() {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
+  formData.set("test_run_id", "run-1");
+  formData.set("system_id", "system-1");
+  formData.set("design_airflow_cfm", "900");
+  formData.set("nominal_depth_inches", "2");
+  formData.set("nominal_length_inches", "20");
+  formData.set("nominal_width_inches", "20");
+  return formData;
+}
+
 describe("internal ECC save/save-complete same-account hardening", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -236,6 +248,22 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     await expect(saveAndCompleteFanWattDrawFromForm(formData)).rejects.toThrow("ALLOW_PATH_REACHED");
   });
 
+  it("allows same-account internal saveAirFilterDeviceDataFromForm past scoped ECC preflight", async () => {
+    createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
+    const { saveAirFilterDeviceDataFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveAirFilterDeviceDataFromForm(buildSaveAirFilterFormData())).rejects.toThrow(
+      "ALLOW_PATH_REACHED",
+    );
+  });
+
+  it("allows same-account internal saveAndCompleteAirFilterDeviceFromForm past scoped ECC preflight", async () => {
+    createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
+    const { saveAndCompleteAirFilterDeviceFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveAndCompleteAirFilterDeviceFromForm(buildSaveAirFilterFormData())).rejects.toThrow(
+      "ALLOW_PATH_REACHED",
+    );
+  });
+
   it("allows same-account internal saveAndCompleteRefrigerantChargeFromForm past scoped ECC preflight", async () => {
     createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
     const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
@@ -265,6 +293,19 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     const { saveAirflowDataFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(saveAirflowDataFromForm(buildSaveAirflowFormData())).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?notice=not_authorized",
+    );
+    expect(writeCalls.filter((call) => call.table === "ecc_test_runs")).toHaveLength(0);
+  });
+
+  it("denies cross-account internal saveAirFilterDeviceDataFromForm before ecc_test_runs writes", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalEccJobForMutationMock.mockResolvedValue(null);
+
+    const { saveAirFilterDeviceDataFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(saveAirFilterDeviceDataFromForm(buildSaveAirFilterFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
     );
     expect(writeCalls.filter((call) => call.table === "ecc_test_runs")).toHaveLength(0);
@@ -311,6 +352,19 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     expect(writeCalls.filter((call) => call.table === "ecc_test_runs")).toHaveLength(0);
   });
 
+  it("denies cross-account internal saveAndCompleteAirFilterDeviceFromForm before ecc_test_runs writes", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalEccJobForMutationMock.mockResolvedValue(null);
+
+    const { saveAndCompleteAirFilterDeviceFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(saveAndCompleteAirFilterDeviceFromForm(buildSaveAirFilterFormData())).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?notice=not_authorized",
+    );
+    expect(writeCalls.filter((call) => call.table === "ecc_test_runs")).toHaveLength(0);
+  });
+
   it("denies cross-account internal saveAndCompleteRefrigerantChargeFromForm before ecc_test_runs writes", async () => {
     const { supabase, writeCalls } = makeDenySupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
@@ -345,6 +399,19 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     const { saveAirflowDataFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(saveAirflowDataFromForm(buildSaveAirflowFormData())).rejects.toThrow(
+      "Active internal user required.",
+    );
+    expect(writeCalls.filter((call) => call.table === "ecc_test_runs")).toHaveLength(0);
+  });
+
+  it("denies non-internal saveAirFilterDeviceDataFromForm before ecc_test_runs writes", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
+
+    const { saveAirFilterDeviceDataFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(saveAirFilterDeviceDataFromForm(buildSaveAirFilterFormData())).rejects.toThrow(
       "Active internal user required.",
     );
     expect(writeCalls.filter((call) => call.table === "ecc_test_runs")).toHaveLength(0);
@@ -386,6 +453,19 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(saveAndCompleteAirflowFromForm(buildSaveAndCompleteAirflowFormData())).rejects.toThrow(
+      "Active internal user required.",
+    );
+    expect(writeCalls.filter((call) => call.table === "ecc_test_runs")).toHaveLength(0);
+  });
+
+  it("denies non-internal saveAndCompleteAirFilterDeviceFromForm before ecc_test_runs writes", async () => {
+    const { supabase, writeCalls } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
+
+    const { saveAndCompleteAirFilterDeviceFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(saveAndCompleteAirFilterDeviceFromForm(buildSaveAirFilterFormData())).rejects.toThrow(
       "Active internal user required.",
     );
     expect(writeCalls.filter((call) => call.table === "ecc_test_runs")).toHaveLength(0);

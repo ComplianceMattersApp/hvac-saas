@@ -64,11 +64,13 @@ type ActionName =
   | "saveRefrigerantChargeDataFromForm"
   | "saveAirflowDataFromForm"
   | "saveFanWattDrawDataFromForm"
+  | "saveAirFilterDeviceDataFromForm"
   | "saveDuctLeakageDataFromForm"
   | "completeEccTestRunFromForm"
   | "saveAndCompleteDuctLeakageFromForm"
   | "saveAndCompleteAirflowFromForm"
   | "saveAndCompleteFanWattDrawFromForm"
+  | "saveAndCompleteAirFilterDeviceFromForm"
   | "saveAndCompleteRefrigerantChargeFromForm";
 
 function buildMarkRefrigerantChargeExemptFormData() {
@@ -150,6 +152,18 @@ function buildSaveAndCompleteRefrigerantFormData() {
   return formData;
 }
 
+function buildSaveAirFilterFormData() {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
+  formData.set("test_run_id", "run-1");
+  formData.set("system_id", "system-1");
+  formData.set("design_airflow_cfm", "900");
+  formData.set("nominal_depth_inches", "2");
+  formData.set("nominal_length_inches", "20");
+  formData.set("nominal_width_inches", "20");
+  return formData;
+}
+
 const actions: Array<{ name: ActionName; buildFormData: () => FormData }> = [
   { name: "markRefrigerantChargeExemptFromForm", buildFormData: buildMarkRefrigerantChargeExemptFormData },
   { name: "saveRefrigerantChargeDataFromForm", buildFormData: buildSaveRefrigerantFormData },
@@ -161,6 +175,7 @@ const actions: Array<{ name: ActionName; buildFormData: () => FormData }> = [
       formData.set("required_fan_efficacy_w_per_cfm", "0.45");
       return formData;
     } },
+  { name: "saveAirFilterDeviceDataFromForm", buildFormData: buildSaveAirFilterFormData },
   { name: "saveDuctLeakageDataFromForm", buildFormData: buildSaveDuctLeakageFormData },
   { name: "completeEccTestRunFromForm", buildFormData: buildCompleteRunFormData },
   { name: "saveAndCompleteDuctLeakageFromForm", buildFormData: buildSaveAndCompleteDuctFormData },
@@ -172,6 +187,7 @@ const actions: Array<{ name: ActionName; buildFormData: () => FormData }> = [
       formData.set("required_fan_efficacy_w_per_cfm", "0.45");
       return formData;
     } },
+  { name: "saveAndCompleteAirFilterDeviceFromForm", buildFormData: buildSaveAirFilterFormData },
   { name: "saveAndCompleteRefrigerantChargeFromForm", buildFormData: buildSaveAndCompleteRefrigerantFormData },
 ];
 

@@ -20,10 +20,12 @@ import {
   saveDuctLeakageDataFromForm,
   saveAirflowDataFromForm,
   saveFanWattDrawDataFromForm,
+  saveAirFilterDeviceDataFromForm,
   saveRefrigerantChargeDataFromForm,
   saveAndCompleteDuctLeakageFromForm,
   saveAndCompleteAirflowFromForm,
   saveAndCompleteFanWattDrawFromForm,
+  saveAndCompleteAirFilterDeviceFromForm,
   saveAndCompleteRefrigerantChargeFromForm,
 } from "@/lib/actions/job-actions";
 
@@ -38,6 +40,7 @@ import {
   isPackageSystem,
 } from "@/lib/ecc/rule-profiles";
 import { isEccTestApplicableToSystem } from "@/lib/ecc/test-applicability";
+import { formatAreaSquareInches } from "@/lib/ecc/air-filter-device";
 import { formatFanEfficacy } from "@/lib/ecc/fan-watt-draw";
 import { isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import { buildEquipmentSummaryLine } from "@/lib/utils/equipment-summary";
@@ -732,12 +735,15 @@ export default async function JobTestsPage({
   const runDL = selectedSystemId ? pickRunForSystem(job, "duct_leakage", selectedSystemId) : null;
   const runAF = selectedSystemId ? pickRunForSystem(job, "airflow", selectedSystemId) : null;
   const runFan = selectedSystemId ? pickRunForSystem(job, "fan_watt_draw", selectedSystemId) : null;
+  const runFilter = selectedSystemId ? pickRunForSystem(job, "air_filter_device", selectedSystemId) : null;
   const runRC = selectedSystemId ? pickRunForSystem(job, "refrigerant_charge", selectedSystemId) : null;
   const ductSaveFormId = runDL ? `duct-save-${runDL.id}` : "";
   const ductDeleteFormId = runDL ? `duct-delete-${runDL.id}` : "";
   const airflowSaveFormId = runAF ? `airflow-save-${runAF.id}` : "";
   const fanSaveFormId = runFan ? `fan-save-${runFan.id}` : "";
   const fanDeleteFormId = runFan ? `fan-delete-${runFan.id}` : "";
+  const filterSaveFormId = runFilter ? `filter-save-${runFilter.id}` : "";
+  const filterDeleteFormId = runFilter ? `filter-delete-${runFilter.id}` : "";
   const rcSaveFormId = runRC ? `rc-save-${runRC.id}` : "";
 
   const normalizedProfile = normalizeProjectTypeToRuleProfile(job.project_type);
@@ -825,6 +831,7 @@ export default async function JobTestsPage({
     focusedType !== "duct_leakage" &&
     focusedType !== "airflow" &&
     focusedType !== "fan_watt_draw" &&
+    focusedType !== "air_filter_device" &&
     focusedType !== "refrigerant_charge"
       ? (focusedType as EccTestType)
       : null;
@@ -989,6 +996,7 @@ const defaultFanActualAirflowCfm =
 
     const runAirflow = systemIsHeatOnly || systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "airflow", systemId);
     const runFan = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "fan_watt_draw", systemId);
+    const runFilter = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "air_filter_device", systemId);
     const runDuct = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "duct_leakage", systemId);
     const runRefrigerant = systemIsHeatOnly ? null : pickLatestRunForSystem(job, "refrigerant_charge", systemId);
 
@@ -1014,6 +1022,7 @@ const defaultFanActualAirflowCfm =
       systemName: String(sys.name ?? "System").trim() || "System",
       runAirflow,
       runFan,
+      runFilter,
       runDuct,
       runRefrigerant,
       systemIsHeatOnly,
@@ -1259,6 +1268,42 @@ const defaultFanActualAirflowCfm =
                               Actual Fan Efficacy: {formatFanEfficacy(sys.runFan?.computed?.actual_fan_efficacy_w_per_cfm ?? null)} W/CFM
                             </div>
                             <div>Compliance Statement: {fallbackText(sys.runFan?.computed?.compliance_statement)}</div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="font-semibold text-slate-950">Air Filter Device Verification:</span>
+                      <div className="mt-1 space-y-1 text-slate-800">
+                        {sys.systemIsDuctlessMiniSplit ? (
+                          <div>Not applicable for ductless mini split systems.</div>
+                        ) : !sys.runFilter ? (
+                          <div>No air filter device verification run found for this system.</div>
+                        ) : (
+                          <>
+                            <div>
+                              Filter Location / Description: {fallbackText(sys.runFilter?.data?.filter_location_description)}
+                            </div>
+                            <div>Rack Type: {fallbackText(sys.runFilter?.data?.rack_type)}</div>
+                            <div>Design Airflow: {fmtValue(sys.runFilter?.data?.design_airflow_cfm, "CFM")}</div>
+                            <div>Nominal Depth: {fmtValue(sys.runFilter?.data?.nominal_depth_inches, "in")}</div>
+                            <div>Nominal Length: {fmtValue(sys.runFilter?.data?.nominal_length_inches, "in")}</div>
+                            <div>Nominal Width: {fmtValue(sys.runFilter?.data?.nominal_width_inches, "in")}</div>
+                            <div>
+                              Calculated Face Area: {formatAreaSquareInches(sys.runFilter?.computed?.calculated_nominal_face_area_sq_in ?? null)} in²
+                            </div>
+                            <div>
+                              Required Minimum Face Area: {formatAreaSquareInches(sys.runFilter?.computed?.required_minimum_face_area_sq_in ?? null)} in²
+                            </div>
+                            <div>
+                              Face Area Compliance: {String(sys.runFilter?.computed?.face_area_compliance ?? "pending")
+                                .replaceAll("_", " ")
+                                .replace(/\b\w/g, (m) => m.toUpperCase())}
+                            </div>
+                            <div>
+                              Design Allowable Pressure Drop: {fmtValue(sys.runFilter?.data?.design_allowable_pressure_drop_iwc, "in. W.C.")}
+                            </div>
                           </>
                         )}
                       </div>
@@ -1631,6 +1676,9 @@ const defaultFanActualAirflowCfm =
                   Suggested tonnage default: <span className="font-medium">{fmtValue(defaultSystemTonnage, "ton")}</span>
                 </>
               )}
+            </div>
+            <div className="text-xs text-slate-600">
+              AHRI verification is office/computer verified later. Capture accurate equipment manufacturer, model, and serial data in equipment records.
             </div>
           </div>
         ) : null}
@@ -2337,6 +2385,214 @@ const defaultFanActualAirflowCfm =
                 <form id={fanDeleteFormId} action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runFan.id} />
+                </form>
+              </>
+            )}
+          </div>
+        ) : null}
+
+        {/* =========================
+            AIR FILTER DEVICE VERIFICATION
+            ========================= */}
+        {focusedType === "air_filter_device" ? (
+          <div className="min-w-0 rounded-lg border bg-white p-4 space-y-4">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="font-medium">Air Filter Device Verification</div>
+                <div className="mt-1 text-sm">
+                  <span className="font-medium">Result:</span>{" "}
+                  {runFilter ? getEffectiveResultLabel(runFilter) : "Not started"}
+                </div>
+              </div>
+              <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
+                {runFilter?.updated_at ? new Date(runFilter.updated_at).toLocaleString() : null}
+              </div>
+            </div>
+
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <div className="font-semibold text-slate-800">System Reference</div>
+              <div>{selectedSystemName}</div>
+            </div>
+
+            {!runFilter ? (
+              <form action={addEccTestRunFromForm} className="flex items-center gap-2">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="system_id" value={selectedSystemId} />
+                <input type="hidden" name="test_type" value="air_filter_device" />
+                <SubmitButton loadingText="Creating..." className="rounded-md bg-black px-4 py-2 text-white text-sm">
+                  Create Air Filter Run
+                </SubmitButton>
+              </form>
+            ) : (
+              <>
+                <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
+                <form id={filterSaveFormId} action={saveAirFilterDeviceDataFromForm} className="grid gap-3 border-t pt-3">
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runFilter.id} />
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid gap-1 sm:col-span-2">
+                      <label className="text-sm font-medium" htmlFor={`filter-location-${runFilter.id}`}>
+                        Filter Location / Description
+                      </label>
+                      <input
+                        id={`filter-location-${runFilter.id}`}
+                        name="filter_location_description"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runFilter.data?.filter_location_description ?? ""}
+                        placeholder="Return grille, filter cabinet, etc."
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`filter-rack-${runFilter.id}`}>
+                        Rack Type
+                      </label>
+                      <input
+                        id={`filter-rack-${runFilter.id}`}
+                        name="rack_type"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runFilter.data?.rack_type ?? ""}
+                        placeholder="1-inch throwaway, media cabinet, etc."
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`filter-airflow-${runFilter.id}`}>
+                        Design Airflow CFM
+                      </label>
+                      <input
+                        id={`filter-airflow-${runFilter.id}`}
+                        name="design_airflow_cfm"
+                        type="number"
+                        step="0.01"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runFilter.data?.design_airflow_cfm ?? ""}
+                        placeholder="Required for completion"
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`filter-depth-${runFilter.id}`}>
+                        Nominal Depth, inches
+                      </label>
+                      <input
+                        id={`filter-depth-${runFilter.id}`}
+                        name="nominal_depth_inches"
+                        type="number"
+                        step="0.01"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runFilter.data?.nominal_depth_inches ?? ""}
+                        placeholder="Required for completion"
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`filter-length-${runFilter.id}`}>
+                        Nominal Length, inches
+                      </label>
+                      <input
+                        id={`filter-length-${runFilter.id}`}
+                        name="nominal_length_inches"
+                        type="number"
+                        step="0.01"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runFilter.data?.nominal_length_inches ?? ""}
+                        placeholder="Required for completion"
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`filter-width-${runFilter.id}`}>
+                        Nominal Width, inches
+                      </label>
+                      <input
+                        id={`filter-width-${runFilter.id}`}
+                        name="nominal_width_inches"
+                        type="number"
+                        step="0.01"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runFilter.data?.nominal_width_inches ?? ""}
+                        placeholder="Required for completion"
+                      />
+                    </div>
+
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`filter-drop-${runFilter.id}`}>
+                        Design Allowable Pressure Drop, inches W.C.
+                      </label>
+                      <input
+                        id={`filter-drop-${runFilter.id}`}
+                        name="design_allowable_pressure_drop_iwc"
+                        type="number"
+                        step="0.01"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runFilter.data?.design_allowable_pressure_drop_iwc ?? ""}
+                      />
+                    </div>
+
+                    <div className="grid gap-1 sm:col-span-2">
+                      <label className="text-sm font-medium" htmlFor={`filter-notes-${runFilter.id}`}>
+                        Notes (optional)
+                      </label>
+                      <input
+                        id={`filter-notes-${runFilter.id}`}
+                        name="notes"
+                        className="w-full rounded-md border px-3 py-2"
+                        defaultValue={runFilter.data?.notes ?? ""}
+                        placeholder="Optional diagnostic notes"
+                      />
+                    </div>
+                  </div>
+                </form>
+
+                <EccLivePreview mode="air_filter_device" formId={filterSaveFormId} projectType={job.project_type} />
+
+                <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <div>Calculated Face Area: {formatAreaSquareInches(runFilter.computed?.calculated_nominal_face_area_sq_in ?? null)} in²</div>
+                  <div>Required Minimum Face Area: {formatAreaSquareInches(runFilter.computed?.required_minimum_face_area_sq_in ?? null)} in²</div>
+                  <div>
+                    Face Area Compliance: {String(runFilter.computed?.face_area_compliance ?? "pending")
+                      .replaceAll("_", " ")
+                      .replace(/\b\w/g, (m) => m.toUpperCase())}
+                  </div>
+                  <div>Compliance Statement: {fallbackText(runFilter.computed?.compliance_statement)}</div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 items-center pt-3 border-t">
+                  <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
+                    {runFilter.is_completed && "✅ Test completed"}
+                  </span>
+                  <SubmitButton
+                    form={filterSaveFormId}
+                    formNoValidate
+                    loadingText="Saving..."
+                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                  >
+                    Save Draft
+                  </SubmitButton>
+                  <SubmitButton
+                    form={filterSaveFormId}
+                    loadingText="Saving & completing..."
+                    formAction={saveAndCompleteAirFilterDeviceFromForm}
+                    className="inline-flex min-h-10 items-center rounded-md bg-black px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  >
+                    Complete Test
+                  </SubmitButton>
+                  <button
+                    type="submit"
+                    form={filterDeleteFormId}
+                    className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm bg-white hover:bg-gray-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+
+                <form id={filterDeleteFormId} action={deleteEccTestRunFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runFilter.id} />
                 </form>
               </>
             )}

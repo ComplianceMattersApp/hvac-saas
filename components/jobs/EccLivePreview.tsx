@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { computeAirFilterDeviceResult, formatAreaSquareInches } from "@/lib/ecc/air-filter-device";
 import { computeFanWattDrawResult, formatFanEfficacy } from "@/lib/ecc/fan-watt-draw";
 
-type PreviewMode = "duct_leakage" | "airflow" | "fan_watt_draw" | "refrigerant_charge";
+type PreviewMode = "duct_leakage" | "airflow" | "fan_watt_draw" | "air_filter_device" | "refrigerant_charge";
 
 type Props = {
   mode: PreviewMode;
@@ -218,6 +219,55 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
             <div>Actual Tested Airflow from MCH-23: {formatNum(actualAirflow, "CFM", 0)}</div>
             <div>Required Fan Efficacy: {formatFanEfficacy(requiredEfficacy)} W/CFM</div>
             <div>Actual Fan Efficacy: {formatFanEfficacy(result.actual_fan_efficacy_w_per_cfm)} W/CFM</div>
+            <div>Compliance Statement: {result.compliance_statement}</div>
+          </div>
+        );
+        return;
+      }
+
+      if (mode === "air_filter_device") {
+        const designAirflowCfm = toNumber(fd.get("design_airflow_cfm"));
+        const nominalLengthInches = toNumber(fd.get("nominal_length_inches"));
+        const nominalWidthInches = toNumber(fd.get("nominal_width_inches"));
+
+        const result = computeAirFilterDeviceResult({
+          filterLocationDescription: String(fd.get("filter_location_description") ?? "").trim() || null,
+          rackType: String(fd.get("rack_type") ?? "").trim() || null,
+          designAirflowCfm,
+          nominalDepthInches: toNumber(fd.get("nominal_depth_inches")),
+          nominalLengthInches,
+          nominalWidthInches,
+          designAllowablePressureDropIwc: toNumber(fd.get("design_allowable_pressure_drop_iwc")),
+          notes: String(fd.get("notes") ?? "").trim() || null,
+        });
+
+        const tone: Tone =
+          result.face_area_compliance === "pending"
+            ? "pending"
+            : result.face_area_compliance === "complies"
+            ? "pass"
+            : "fail";
+
+        const label =
+          result.face_area_compliance === "pending"
+            ? "Pending inputs"
+            : result.face_area_compliance === "complies"
+            ? "Preview PASS"
+            : "Preview FAIL";
+
+        setContent(
+          <div className="min-h-[112px] rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-semibold text-slate-900">Live Preview (unsaved)</div>
+              <div className={`min-w-[120px] rounded-full border px-2 py-0.5 text-center text-xs font-medium ${statusClasses(tone)}`}>
+                {label}
+              </div>
+            </div>
+            <div>Design Airflow: {formatNum(designAirflowCfm, "CFM", 0)}</div>
+            <div>Nominal Length: {formatNum(nominalLengthInches, "in")}</div>
+            <div>Nominal Width: {formatNum(nominalWidthInches, "in")}</div>
+            <div>Calculated Face Area: {formatAreaSquareInches(result.calculated_nominal_face_area_sq_in)} in²</div>
+            <div>Required Minimum Face Area: {formatAreaSquareInches(result.required_minimum_face_area_sq_in)} in²</div>
             <div>Compliance Statement: {result.compliance_statement}</div>
           </div>
         );
