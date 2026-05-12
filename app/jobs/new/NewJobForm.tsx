@@ -1532,8 +1532,24 @@ const [billingRecipient, setBillingRecipient] = useState<
                       Start by typing a customer name. Results update live with address context so you can select confidently.
                     </p>
                   </div>
-                    <div className="rounded-full border border-blue-200 bg-white/80 px-3 py-1 text-[11px] font-medium text-blue-800 shadow-sm">
-                      Live recognition
+                    <div className="flex flex-col items-end gap-2 flex-none">
+                      <div className="rounded-full border border-blue-200 bg-white/80 px-3 py-1 text-[11px] font-medium text-blue-800 shadow-sm">
+                        Live recognition
+                      </div>
+                      <button
+                        type="button"
+                        id="create-new-customer-shortcut"
+                        onClick={() => {
+                          resetRelationshipDecision();
+                          setCreateNewCustomer(true);
+                          setSelectedCustomerId("");
+                          setLocationMode(null);
+                          setLocationId("");
+                        }}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-all duration-150 hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                      >
+                        + New Customer
+                      </button>
                     </div>
                   </div>
 
@@ -1610,23 +1626,6 @@ const [billingRecipient, setBillingRecipient] = useState<
                           : "Start typing to search customers."}
                       </div>
                     )}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                    <p className="text-xs text-slate-500">No confident match? Start a clean record instead.</p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        resetRelationshipDecision();
-                        setCreateNewCustomer(true);
-                        setSelectedCustomerId("");
-                        setLocationMode(null);
-                        setLocationId("");
-                      }}
-                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                    >
-                      Create new customer
-                    </button>
                   </div>
                 </div>
               ) : null}
