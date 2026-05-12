@@ -358,6 +358,33 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirmed: `proxy.ts` is the active and correct routing convention for this project under Next.js 16.
   - Next.js 16.0.0 officially renamed `middleware.ts` to `proxy.ts`; `middleware.ts` is deprecated.
   - Root `proxy.ts` exports `function proxy(req: NextRequest)` — the correct named export form — and is wired and executing.
+
+### 2.3.8 HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 (completed)
+- Scope is complete and treated as a mode-aware presentation/readability polish.
+- HVAC Service `/ops` first impression now uses Team Work Snapshot + Work by Technician in place of the primary contractor filter/search block.
+- Existing job search remains available for HVAC Service.
+- HVAC Service operational copy in the affected Ops surface is team/work oriented where applicable.
+- HVAC Service `/jobs/[id]` retains Timeline and Internal Notes / Team Notes visibility.
+- Shared Notes remains available and was only de-emphasized/optional for HVAC Service mode.
+- ECC/HERS behavior remains preserved:
+  - contractor filter/search remains visible/usable
+  - contractor links/query params remain functional
+  - Shared Notes behavior is unchanged
+- Hybrid / Master / All-in-One behavior remains preserved:
+  - broad behavior and contractor visibility remain intact
+  - Shared Notes remains present
+  - no clutter/broken-link regression was observed in smoke
+- Validation recorded:
+  - TypeScript passed: `npx.cmd tsc --noEmit`
+  - browser smoke passed for HVAC Service, ECC/HERS, and Hybrid / Master / All-in-One checks
+  - no console errors and no hydration issues were reported during smoke
+- Explicit non-changes:
+  - no schema/migration/Supabase command activity
+  - no auth/RLS/permission/contractor-authority changes
+  - no source-of-truth ownership changes and no `job_events` mutation
+  - no billing/payment/Stripe/QBO changes
+  - no report dataset/calculation changes
+  - no feature deletion or codebase split
   - Do not add `middleware.ts`; `proxy.ts` is the correct baseline convention for this app.
 - Confirmed: protected unauthenticated deep links preserve `?next=` return path for tested routes:
   - `/ops` → `/login?next=%2Fops`

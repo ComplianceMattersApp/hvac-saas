@@ -415,6 +415,19 @@ HVAC Service Surface Cleanup V1 closeout note:
 - ECC/HERS and Hybrid visibility behavior is preserved.
 - No permissions/security/RLS/contractor-authority/billing/report/data behavior changed.
 
+HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 closeout note:
+
+- Completed as a presentation-focused HVAC Service-first polish for `/ops` and `/jobs/[id]`.
+- In `hvac_service` mode, `/ops` now presents Team Work Snapshot + Work by Technician in place of the primary contractor filter/search block, with existing job search still available.
+- HVAC Service operational framing now reads as team/work oriented where applicable.
+- ECC/HERS contractor filter/search, contractor links, and contractor query-param behavior remain preserved.
+- Hybrid / Master / All-in-One broad visibility behavior remains preserved, including contractor visibility.
+- `/jobs/[id]` keeps Timeline and Internal Notes / Team Notes visible.
+- Shared Notes remains available and was only de-emphasized/optional for HVAC Service mode; it was not removed from the shared platform.
+- Source-of-truth boundaries remain intact (`job_events` unchanged; no lifecycle/test-truth authority changes).
+- Validation recorded: TypeScript passed (`npx.cmd tsc --noEmit`), browser smoke passed across HVAC Service + ECC/HERS + Hybrid coverage, and no console/hydration issues were reported.
+- Non-change boundaries remain explicit: no schema/migration/Supabase command work, no auth/RLS/authority changes, no billing/payment/Stripe/QBO changes, and no report-calculation changes.
+
 Owner Signup Visibility V1 closeout note:
 
 - Owner Signup Visibility V1 is implemented as a read-only allowlisted observability slice.

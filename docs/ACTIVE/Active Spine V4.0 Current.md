@@ -21,6 +21,32 @@ Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No co
 
 Current Program Status Note (May 2026)
 
+- HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 is complete and pushed (May 2026):
+  - Added mode-aware Ops presentation for HVAC Service accounts.
+  - In `hvac_service` mode, the primary contractor filter/search area is replaced with a compact Team Work Snapshot and a Work by Technician summary.
+  - HVAC Service operational scope language is now team/work oriented where applicable, while existing job search remains available.
+  - ECC/HERS contractor filtering/search behavior is preserved, including contractor-related links/query params.
+  - Hybrid / Master / All-in-One broad behavior is preserved, including contractor visibility.
+  - Job detail behavior for HVAC Service keeps Timeline and Internal Notes / Team Notes visible.
+  - Shared Notes is de-emphasized/optional for HVAC Service only and was not removed; ECC/HERS and Hybrid behavior is preserved.
+  - `job_events` behavior remains unchanged.
+  - Validation recorded:
+    - TypeScript passed: `npx.cmd tsc --noEmit`.
+    - Browser smoke passed across HVAC Service, ECC/HERS, and Hybrid / Master / All-in-One coverage for `/ops` and `/jobs/[id]` expectations.
+    - No console or hydration issues were reported during smoke.
+  - Explicit non-changes:
+    - no schema changes
+    - no migrations
+    - no Supabase commands
+    - no RLS/auth changes
+    - no source-of-truth changes
+    - no `job_events` mutation
+    - no contractor authority changes
+    - no billing/payment/Stripe/QBO behavior changes
+    - no report calculation changes
+    - no codebase split
+    - no feature deletion
+
 - Field Bus Improvement Passes closeout is complete and pushed (May 2026):
   - New Job Alert lifecycle cleanup:
     - New job/new work alerts no longer act as active unread awareness once scheduled, finalized, rejected, or otherwise handled.

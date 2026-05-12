@@ -219,6 +219,30 @@ HVAC Service Surface Cleanup V1 closeout snapshot (2026-05-10):
 - No functionality was deleted and direct routes remain reachable.
 - No permissions/security/RLS/auth scope, contractor-authority, billing/payment/QBO, report dataset/calculation, or Product Mode schema/provisioning behavior changed.
 
+HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 closeout snapshot (2026-05-12):
+
+- Implemented as a mode-aware presentation polish for HVAC Service-first operations and job detail readability.
+- In `hvac_service` mode on `/ops`, primary contractor filter/search presentation is replaced by Team Work Snapshot + Work by Technician, while existing job search remains available.
+- HVAC Service scope language on the Ops surface is team/work oriented where applicable.
+- ECC/HERS contractor filter/search behavior and contractor-related links/query params are preserved.
+- Hybrid / Master / All-in-One broad behavior is preserved (including contractor visibility).
+- On `/jobs/[id]`, HVAC Service keeps Timeline and Internal Notes / Team Notes visible.
+- Shared Notes remains in product and is de-emphasized/optional for HVAC Service only; it was not deleted.
+- `job_events` remains source-of-truth narrative history with no behavior changes.
+- Validation recorded:
+   - TypeScript passed: `npx.cmd tsc --noEmit`.
+   - Browser smoke passed for HVAC Service, ECC/HERS, and Hybrid / Master / All-in-One expected behavior.
+   - No console/hydration issues were reported.
+- Explicit non-changes:
+   - no schema or migration work
+   - no Supabase command work
+   - no RLS/auth/scope changes
+   - no contractor authority changes
+   - no billing/payment/Stripe/QBO changes
+   - no report calculation changes
+   - no source-of-truth ownership change
+   - no feature deletion
+
 Product Mode Signup Links V1 closeout snapshot (2026-05-10):
 
 - Product-specific public signup entry links are implemented.
