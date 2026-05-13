@@ -176,6 +176,61 @@ Watch items:
 - Count-state transitions (linked → eligible → counted, or reversal flows) are not wired yet. Future count mutation handlers and reversal UI tooling remain parked for V2 or later.
 - Once link helpers are wired into runtime/UI (future), test coverage should expand to include prefix-filtering, pagination, and performance characteristics.
 
+## Group 9A-9C Closeout Snapshot (create link row when work order is created from service plan)
+
+Group 9A-9C (Create Link Row When Work Order Is Created from Service Plan) is implemented and pushed in commit `071915a`.
+
+Recorded implementation artifacts:
+
+- New action: `createMaintenanceAgreementVisitLinkFromJobCreation` in `lib/maintenance-agreements/agreement-actions.ts`
+- Form capture: `maintenance_agreement_id` hidden input in `app/jobs/new/NewJobForm.tsx`
+- Link creation hooks: calls after each of three job creation paths in `lib/actions/job-actions.ts`
+- Tests: added 2 new tests for link creation behavior in `lib/maintenance-agreements/__tests__/agreement-actions.test.ts`
+
+Recorded behavior:
+
+- When a normal Job / Work Order is created from Service Plan prefill, a durable link row is created in `maintenance_agreement_visits`
+- Link row uses: `link_source = 'service_plan_prefill'`, `count_status = 'linked'`, `counts_toward_visit_balance = false`
+- Link creation is **non-blocking**: silently fails on invalid scopes, never blocks job creation
+- Agreement record remains unchanged; `next_due_date` not advanced; visit balance not deducted; no automatic counting
+
+Recorded safety and scope validation:
+
+- Feature flag `ENABLE_MAINTENANCE_AGREEMENTS` must be enabled
+- Internal user required via `internal_users` table lookup
+- Strict `account_owner_user_id` matching on agreement, job, and customer
+- Job/agreement must belong to same customer
+- Duplicate links handled gracefully (ON CONFLICT)
+- Invalid/out-of-scope agreement silently skipped (non-blocking)
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`40` tests total; 2 new link creation tests added)
+- `npx.cmd tsc --noEmit` passed
+- `git diff --check` passed (no blocking issues)
+
+Boundaries preserved in Group 9A-9C:
+
+- no automatic counting logic
+- no automatic due-date advancement
+- no visit-balance deduction
+- no invoice/payment behavior
+- no Supabase commands executed
+- no production migration apply
+- no production writes
+- no feature flag changes
+
+Environment activation rule:
+
+- Link creation is committed in repo and active immediately after migration `20260513110000_maintenance_agreement_visits_link_foundation.sql` is applied
+- Feature flag `ENABLE_MAINTENANCE_AGREEMENTS` controls prefill availability; once flag enabled and link table exists, link creation occurs automatically on job creation from service plan prefill
+
+Watch items:
+
+- Current RLS policy scopes job ownership through `jobs.customer_id` to `customers.owner_user_id` match. Jobs without customer linkage will silently fail link creation.
+- Link creation runs silently with no logging; future internal warning/logging infrastructure may help troubleshooting when feature goes live
+- Count-state transitions and reversal tooling remain parked for V2 or later
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.

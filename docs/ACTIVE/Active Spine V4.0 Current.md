@@ -25,6 +25,20 @@ Group 9A-9A model decisions are now documented there: future linkage should pref
 
 Current Program Status Note (May 2026)
 
+- Group 9A-9C Link-Row Creation When Job Is Created from Service Plan is complete and pushed in commit `071915a`:
+  - new action: `createMaintenanceAgreementVisitLinkFromJobCreation` in `lib/maintenance-agreements/agreement-actions.ts`
+  - automatic link creation after normal job creation succeeds via three job creation paths in `lib/actions/job-actions.ts`
+  - form capture of `maintenance_agreement_id` in `app/jobs/new/NewJobForm.tsx`
+  - link row created with: `link_source='service_plan_prefill'`, `count_status='linked'`, `counts_toward_visit_balance=false`
+  - strict scope validation: feature flag `ENABLE_MAINTENANCE_AGREEMENTS`, internal user required, account/agreement/job/customer scope matching
+  - non-blocking failure: invalid scopes/flag off/missing IDs silently skipped without blocking job creation
+  - agreement record unchanged, `next_due_date` not advanced, visit balance not deducted, no automatic counting
+  - link creation runs after each of three job creation paths: customer follow-up, customer new location, new customer
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`40` tests; 2 new link creation tests added), `npx.cmd tsc --noEmit` passed, `git diff --check` passed
+  - boundaries preserved: no automatic counting/due-date/balance logic/Supabase commands/production migration apply/production writes/feature-flag changes
+  - watch items: job ownership scoping via `jobs.customer_id` linkage (will need review if model broadens); link creation runs silently after each of three job creation paths; count-state transitions and reversal tooling remain parked
+  - link-row creation is committed in repo and active immediately after link-table migration is applied; runs on every job creation from service plan prefill when flag is enabled
+
 - Group 9A-9B Maintenance Agreement Visits Link Table Foundation is complete and pushed in commit `6bf7329`:
   - new link table: `maintenance_agreement_visits` in migration `supabase/migrations/20260513110000_maintenance_agreement_visits_link_foundation.sql`
   - durable `(agreement_id, job_id)` unique link with lifecycle fields (`link_source`, `count_status`, `counted_at`, `reversed_at`, reversal audit trail)
