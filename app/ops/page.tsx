@@ -35,6 +35,8 @@ import {
   type OperationalReportingJob,
 } from "@/lib/ops/operational-reporting";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
+import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
+import { summarizeMaintenanceAgreementsForAccount } from "@/lib/maintenance-agreements/read-model";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -2273,6 +2275,9 @@ const opsSupportTextClass =
 const opsQueueChipClass =
   "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium leading-5 shadow-sm transition-colors sm:py-1 sm:text-[11px] sm:leading-none";
 
+const servicePlanSummaryCountClass =
+  "rounded-lg border border-slate-200 bg-white/90 px-2.5 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
+
 function sectionCountPill(count: number, tone: "neutral" | "danger" = "neutral") {
   const className =
     tone === "danger"
@@ -2281,6 +2286,27 @@ function sectionCountPill(count: number, tone: "neutral" | "danger" = "neutral")
 
   return <span className={className}>{count} jobs</span>;
 }
+
+const maintenanceAgreementsEnabled = isMaintenanceAgreementsEnabled();
+let servicePlanSummary: Awaited<ReturnType<typeof summarizeMaintenanceAgreementsForAccount>> | null = null;
+if (maintenanceAgreementsEnabled) {
+  try {
+    servicePlanSummary = await summarizeMaintenanceAgreementsForAccount({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } catch {
+    servicePlanSummary = null;
+  }
+}
+
+const dueIn8To30Days = servicePlanSummary
+  ? Math.max(
+      0,
+      Number(servicePlanSummary.due_counts.due_in_next_30_days ?? 0) -
+        Number(servicePlanSummary.due_counts.due_in_next_7_days ?? 0),
+    )
+  : 0;
 
 if (opsTimingEnabled) console.log(`[ops:totalBeforeRender] ${Date.now() - _t_total}ms`);
 return (
@@ -2424,6 +2450,49 @@ return (
         </form>
       </div>
     </section>
+
+    {maintenanceAgreementsEnabled && servicePlanSummary ? (
+      <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70 sm:p-3.5">
+        <div className="mb-2.5 flex items-end justify-between gap-2 border-b border-slate-200/80 pb-2.5">
+          <div>
+            <div className={`${opsUtilityLabelClass} text-slate-500`}>Planning</div>
+            <div className="text-[15px] font-semibold tracking-tight text-slate-950">Service Plans</div>
+          </div>
+          <div className="text-[11px] text-slate-500">As of {servicePlanSummary.as_of_date}</div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <div className={servicePlanSummaryCountClass}>
+            <div className={`${opsUtilityLabelClass} text-slate-500`}>Active Plans</div>
+            <div className="mt-1 text-base font-semibold text-slate-900 tabular-nums">{servicePlanSummary.status_counts.active}</div>
+          </div>
+          <div className={servicePlanSummaryCountClass}>
+            <div className={`${opsUtilityLabelClass} text-rose-700`}>Overdue</div>
+            <div className="mt-1 text-base font-semibold text-rose-700 tabular-nums">{servicePlanSummary.due_counts.overdue}</div>
+          </div>
+          <div className={servicePlanSummaryCountClass}>
+            <div className={`${opsUtilityLabelClass} text-amber-700`}>Due Today</div>
+            <div className="mt-1 text-base font-semibold text-amber-700 tabular-nums">{servicePlanSummary.due_counts.due_today}</div>
+          </div>
+          <div className={servicePlanSummaryCountClass}>
+            <div className={`${opsUtilityLabelClass} text-blue-700`}>Due in 1-7 Days</div>
+            <div className="mt-1 text-base font-semibold text-blue-700 tabular-nums">{servicePlanSummary.due_counts.due_in_next_7_days}</div>
+          </div>
+          <div className={servicePlanSummaryCountClass}>
+            <div className={`${opsUtilityLabelClass} text-cyan-700`}>Due in 8-30 Days</div>
+            <div className="mt-1 text-base font-semibold text-cyan-700 tabular-nums">{dueIn8To30Days}</div>
+          </div>
+          <div className={servicePlanSummaryCountClass}>
+            <div className={`${opsUtilityLabelClass} text-slate-600`}>Not Scheduled</div>
+            <div className="mt-1 text-base font-semibold text-slate-700 tabular-nums">{servicePlanSummary.due_counts.not_scheduled_active}</div>
+          </div>
+        </div>
+
+        <div className="mt-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] leading-5 text-slate-600 sm:text-[12px] sm:leading-4">
+          Service plan counts are planning visibility only. Work orders are created separately.
+        </div>
+      </section>
+    ) : null}
 
     {showContractorSignalsSection ? (
       <section id="system-alerts" className={`rounded-2xl border p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-3.5 ${hasActiveSystemAlerts || signal ? "border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))]" : "border-slate-300/75 bg-slate-50/75"}`}>
