@@ -25,6 +25,19 @@ Group 9A-9A model decisions are now documented there: future linkage should pref
 
 Current Program Status Note (May 2026)
 
+- Group 9A-9B Maintenance Agreement Visits Link Table Foundation is complete and pushed in commit `6bf7329`:
+  - new link table: `maintenance_agreement_visits` in migration `supabase/migrations/20260513110000_maintenance_agreement_visits_link_foundation.sql`
+  - durable `(agreement_id, job_id)` unique link with lifecycle fields (`link_source`, `count_status`, `counted_at`, `reversed_at`, reversal audit trail)
+  - link-source values: `service_plan_prefill`, `manual`, `system_future` — distinguishes prefill vs manual vs future origins
+  - count-status lifecycle: `linked`, `eligible`, `counted`, `excluded`, `reversed` — enables future reversibility without V1 count mutations
+  - RLS: SELECT/INSERT/UPDATE account-scoped policies; no DELETE policy
+  - read helpers in `lib/maintenance-agreements/read-model.ts`: `listMaintenanceAgreementVisitsForAgreement`, `listMaintenanceAgreementLinksForJob`, `summarizeMaintenanceAgreementVisitLinksForAgreement`
+  - 4 new vitest-passed link-helper tests added to `lib/maintenance-agreements/__tests__/read-model.test.ts`
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`38` tests), `npx.cmd tsc --noEmit` passed, `git diff --check` passed
+  - boundaries preserved: no UI/routes/automatic counting/due-date/balance logic/Supabase commands/production migration apply/production writes/feature-flag changes
+  - watch items: job-ownership scoping via customer_id linkage (will need review if model broadens); count-state transitions and reversal tooling remain parked
+  - link-table foundation is committed in repo but not production-active until migration apply is intentionally executed
+
 - Group 9A-8B Service Plans Read-Only Drilldown Page + Ops Link is complete and pushed:
   - new read-only internal/account-scoped `/service-plans` route added in `app/service-plans/page.tsx` with loading state in `app/service-plans/loading.tsx`
   - `/ops` Service Plans summary card now includes `View Service Plans` when feature-gated

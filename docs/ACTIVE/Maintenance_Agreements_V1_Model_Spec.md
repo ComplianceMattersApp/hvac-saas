@@ -88,6 +88,94 @@ Potential future ledger events (V2 planning):
 - no SMS/customer portal/QBO
 - no renewal automation
 
+## Group 9A-9B Closeout Snapshot (maintenance agreement visits link table foundation + read helpers implemented in repo)
+
+Group 9A-9B (Maintenance Agreement Visits Link Table Foundation) is implemented and pushed in commit `6bf7329`.
+
+Recorded implementation artifacts:
+
+- New migration: `supabase/migrations/20260513110000_maintenance_agreement_visits_link_foundation.sql`
+- New link table: `maintenance_agreement_visits` in `public` schema
+- Read helpers: extended `lib/maintenance-agreements/read-model.ts` with link-table helpers
+- Tests: extended `lib/maintenance-agreements/__tests__/read-model.test.ts` with 4 new link-helper tests
+
+Recorded table purpose:
+
+- Durable link table connecting Maintenance Agreements / Service Plans to Jobs / Work Orders
+- Not a job replacement or agreement truth replacement
+- Not billing/payment truth
+- Link source values distinguish prefill vs manual vs future system origins
+- Count status lifecycle enables future reversibility without implementing count mutations in V1
+
+Recorded table schema:
+
+- Primary key: `(agreement_id, job_id)` — ensures one-link-per-agreement-job pair
+- Core fields:
+  - `link_source`: enum `service_plan_prefill` | `manual` | `system_future` — origin of link creation
+  - `count_status`: enum `linked` | `eligible` | `counted` | `excluded` | `reversed` — lifecycle state
+  - `counts_toward_visit_balance`: boolean — controls V1 "used visits" projection
+  - `counted_at`, `counted_by_user_id` — marks when link moved to `counted` status
+  - `reversed_at`, `reversed_by_user_id`, `reversal_reason` — future reversal audit trail fields (not populated in V1)
+- New links default to `count_status='linked'` and `counts_toward_visit_balance=false`
+- Links with `count_status='counted'` and `counts_toward_visit_balance=true` project into used visits
+- Excluded/reversed links do not count as used visits
+
+Recorded RLS policy model:
+
+- SELECT policy: account-scoped via strict `account_owner_user_id` match on both agreement and job through their respective customer/account relationships
+- INSERT policy: account-scoped via explicit `account_owner_user_id` match (requires job to be customer-linked and agreement to belong to the same account owner)
+- UPDATE policy: account-scoped via same account-owner-user-id match
+- DELETE policy: intentionally absent (no delete path in V1 — use reversal status instead)
+- Index coverage: account_owner_user_id, agreement_id, job_id, count_status for fast queries
+
+Recorded read helpers:
+
+- `listMaintenanceAgreementVisitsForAgreement(params)`: lists all links for a given agreement, optionally filtered by count_status
+- `listMaintenanceAgreementLinksForJob(params)`: lists all links for a given job, optionally filtered by count_status
+- `summarizeMaintenanceAgreementVisitLinksForAgreement(params)`: projects summary counts (linked/eligible/counted/excluded/reversed/used_visits) from link table for an agreement
+- All helpers enforce account-owner-user-id scoping and safe-empty returns on missing scope
+
+Recorded behavior:
+
+- New links do not count by default (`count_status='linked'`, `counts_toward_visit_balance=false`)
+- Used visits project only from links with `count_status='counted'` and `counts_toward_visit_balance=true`
+- Excluded/reversed status preserves link history without counting
+- No automatic counting wired in V1 (remains parked)
+- No DELETE policy — reversals use status updates only
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`38` tests total; 4 new visit-link tests added).
+- `npx.cmd tsc --noEmit` passed.
+- `git diff --check` passed (no blocking issues; normal LF/CRLF warnings only).
+
+Boundaries preserved in Group 9A-9B:
+
+- no UI changes
+- no new routes
+- no job creation wiring
+- no automatic counting logic
+- no automatic due-date advancement
+- no visit-balance deduction
+- no recurrence engine
+- no invoice/payment behavior
+- no Stripe/QBO/SMS/customer portal behavior
+- no Supabase commands executed
+- no production migration apply
+- no production writes
+- no feature flag changes
+
+Environment activation rule:
+
+- Link table foundation is committed in repo, but is not production-active until migration `20260513110000_maintenance_agreement_visits_link_foundation.sql` is intentionally applied through the appropriate environment process.
+- Runtime wiring (count logic, UI interaction, or automatic transitions) remains parked for future implementation.
+
+Watch items:
+
+- Current RLS policy scopes job ownership through `jobs.customer_id` to `customers.owner_user_id` match. Jobs without a customer linkage will fail the INSERT policy check until/if model assumptions broaden to accept job-agency or job-system-assigned cases.
+- Count-state transitions (linked → eligible → counted, or reversal flows) are not wired yet. Future count mutation handlers and reversal UI tooling remain parked for V2 or later.
+- Once link helpers are wired into runtime/UI (future), test coverage should expand to include prefix-filtering, pagination, and performance characteristics.
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.
