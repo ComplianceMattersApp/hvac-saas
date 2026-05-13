@@ -1191,10 +1191,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             refrigerant charge exempt.
           </div>
         )}
-        {notice === "airflow_override_reason_required" && (
+        {(notice === "override_reason_required" || notice === "airflow_override_reason_required") && (
           <div className="mb-4 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Enter an <span className="font-semibold">override reason</span> before using
-            airflow pass override.
+            Enter an <span className="font-semibold">override reason</span> before completing this test.
           </div>
         )}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:p-5 print:hidden">

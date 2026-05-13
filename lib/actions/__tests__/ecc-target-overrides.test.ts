@@ -61,9 +61,18 @@ function makeCapturingSupabase() {
             maybeSingle: vi.fn(async () => ({ data: resolveData(), error: null })),
             update: vi.fn((payload: any) => {
               captured.push({ table, method: "update", payload });
+              const selectNode = {
+                maybeSingle: vi.fn(async () => ({ data: { id: "run-1" }, error: null })),
+                single: vi.fn(async () => ({ data: { id: "run-1" }, error: null })),
+              };
               return {
                 eq: vi.fn(() => ({
-                  eq: vi.fn(() => Promise.resolve({ error: null })),
+                  eq: vi.fn(() => ({
+                    select: vi.fn(() => selectNode),
+                    maybeSingle: vi.fn(async () => ({ data: { id: "run-1" }, error: null })),
+                    single: vi.fn(async () => ({ data: { id: "run-1" }, error: null })),
+                    then: (resolve: any) => resolve({ error: null }),
+                  })),
                 })),
               };
             }),
@@ -175,7 +184,7 @@ describe("ECC target override persistence", () => {
 
     const { saveAirflowDataFromForm } = await import("@/lib/actions/job-actions");
     await expect(saveAirflowDataFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1&notice=airflow_override_reason_required",
+      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1&notice=override_reason_required",
     );
 
     expect(captured.filter((entry) => entry.table === "ecc_test_runs" && entry.method === "update")).toHaveLength(0);
@@ -197,7 +206,7 @@ describe("ECC target override persistence", () => {
 
     const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
     await expect(saveAndCompleteAirflowFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1&notice=airflow_override_reason_required",
+      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1&notice=override_reason_required",
     );
 
     expect(captured.filter((entry) => entry.table === "ecc_test_runs" && entry.method === "update")).toHaveLength(0);
@@ -228,5 +237,119 @@ describe("ECC target override persistence", () => {
       "Field verified airflow delivered despite instrumentation drift.",
     );
     expect(update?.payload.is_completed).toBe(true);
+  });
+
+  it("redirects with validation notice when duct manual override is selected without reason (save)", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("test_run_id", "run-1");
+    formData.set("system_id", "system-1");
+    formData.set("project_type", "all_new");
+    formData.set("airflow_method", "cooling");
+    formData.set("tonnage", "2");
+    formData.set("measured_duct_leakage_cfm", "50");
+    formData.set("override", "pass");
+    formData.set("override_reason", "");
+
+    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveDuctLeakageDataFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=override_reason_required",
+    );
+
+    expect(captured.filter((entry) => entry.table === "ecc_test_runs" && entry.method === "update")).toHaveLength(0);
+  });
+
+  it("redirects with validation notice when duct manual override is selected without reason (save and complete)", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("test_run_id", "run-1");
+    formData.set("system_id", "system-1");
+    formData.set("project_type", "all_new");
+    formData.set("airflow_method", "cooling");
+    formData.set("tonnage", "2");
+    formData.set("measured_duct_leakage_cfm", "50");
+    formData.set("override", "fail");
+    formData.set("override_reason", "   ");
+
+    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveAndCompleteDuctLeakageFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=override_reason_required",
+    );
+
+    expect(captured.filter((entry) => entry.table === "ecc_test_runs" && entry.method === "update")).toHaveLength(0);
+  });
+
+  it("preserves duct manual override complete behavior when reason is provided", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("test_run_id", "run-1");
+    formData.set("system_id", "system-1");
+    formData.set("project_type", "all_new");
+    formData.set("airflow_method", "cooling");
+    formData.set("tonnage", "2");
+    formData.set("measured_duct_leakage_cfm", "50");
+    formData.set("override", "pass");
+    formData.set("override_reason", "Inspector-approved field condition override.");
+
+    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveAndCompleteDuctLeakageFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
+    );
+
+    const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
+    expect(update?.payload.override_pass).toBe(true);
+    expect(update?.payload.override_reason).toBe("Inspector-approved field condition override.");
+    expect(update?.payload.is_completed).toBe(true);
+  });
+
+  it("redirects with validation notice when manual override action is selected without reason", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("test_run_id", "run-1");
+    formData.set("system_id", "system-1");
+    formData.set("test_type", "duct_leakage");
+    formData.set("override", "pass");
+    formData.set("override_reason", "");
+
+    const { saveEccTestOverrideFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveEccTestOverrideFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=override_reason_required",
+    );
+
+    expect(captured.filter((entry) => entry.table === "ecc_test_runs" && entry.method === "update")).toHaveLength(0);
+  });
+
+  it("preserves manual override action behavior when reason is provided", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("test_run_id", "run-1");
+    formData.set("system_id", "system-1");
+    formData.set("test_type", "duct_leakage");
+    formData.set("override", "fail");
+    formData.set("override_reason", "Verified fail override reason.");
+
+    const { saveEccTestOverrideFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveEccTestOverrideFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
+    );
+
+    const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
+    expect(update?.payload.override_pass).toBe(false);
+    expect(update?.payload.override_reason).toBe("Verified fail override reason.");
   });
 });

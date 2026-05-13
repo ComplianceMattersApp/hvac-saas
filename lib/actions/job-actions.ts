@@ -2179,6 +2179,21 @@ function redirectToTests(opts: {
   redirect(qs ? `/jobs/${jobId}/tests?${qs}` : `/jobs/${jobId}/tests`);
 }
 
+function resolveOverrideSelectionFromForm(formData: FormData) {
+  const override = String(formData.get("override") || "none").trim().toLowerCase();
+  const reasonRaw = String(formData.get("override_reason") || "").trim();
+
+  let overridePass: boolean | null = null;
+  if (override === "pass") overridePass = true;
+  else if (override === "fail") overridePass = false;
+
+  return {
+    overridePass,
+    overrideReason: overridePass !== null ? reasonRaw : null,
+    missingReason: overridePass !== null && !reasonRaw,
+  };
+}
+
 function revalidateEccProjectionConsumers(jobId: string) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/tests`);
@@ -3686,11 +3701,19 @@ export async function saveEccTestOverrideFromForm(formData: FormData) {
   if (!jobId) throw new Error("Missing job_id");
   if (!testRunId) throw new Error("Missing test_run_id");
 
-  const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
-
   // ✅ validate testType against allowed pills
   const allowed = new Set(["duct_leakage", "airflow", "refrigerant_charge", "custom"]);
   const testType = allowed.has(testTypeRaw) ? testTypeRaw : "";
+  const { overridePass, overrideReason, missingReason } = resolveOverrideSelectionFromForm(formData);
+
+  if (missingReason) {
+    redirectToTests({
+      jobId,
+      testType,
+      systemId: systemIdRaw || null,
+      notice: "override_reason_required",
+    });
+  }
 
   const supabase = await createClient();
   const scoped = await requireInternalEccTestsAccess({
@@ -4870,7 +4893,7 @@ export async function saveAirflowDataFromForm(formData: FormData) {
       jobId,
       testType: "airflow",
       systemId: systemIdFromForm,
-      notice: "airflow_override_reason_required",
+      notice: "override_reason_required",
     });
   }
 
@@ -5385,24 +5408,6 @@ export async function saveAndCompleteQiiEnv22InsulationFromForm(formData: FormDa
   redirectToTests({ jobId, testType: "qii_insulation", systemId });
 }
 
-function parseOverrideSelectionFromForm(formData: FormData) {
-  const override = String(formData.get("override") || "none").trim().toLowerCase();
-  const reasonRaw = String(formData.get("override_reason") || "").trim();
-
-  let overridePass: boolean | null = null;
-  if (override === "pass") overridePass = true;
-  else if (override === "fail") overridePass = false;
-
-  if (overridePass !== null && !reasonRaw) {
-    throw new Error("Override reason is required when manual override is selected.");
-  }
-
-  return {
-    overridePass,
-    overrideReason: overridePass !== null ? reasonRaw : null,
-  };
-}
-
 function resolveAirflowCfmPerTon(projectType: string, formData?: FormData): number {
   const formValueRaw = formData ? String(formData.get("cfm_per_ton_target") || "").trim() : "";
   const formValue = formValueRaw ? Number(formValueRaw) : null;
@@ -5425,13 +5430,23 @@ function resolveAirflowCfmPerTon(projectType: string, formData?: FormData): numb
 export async function saveDuctLeakageDataFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
+  const systemIdFromForm = String(formData.get("system_id") || "").trim() || null;
   const projectType = String(formData.get("project_type") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
   if (!testRunId) throw new Error("Missing test_run_id");
 
   const { data, computed, computedPass } = computeDuctLeakagePayload(formData, projectType);
-  const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
+  const { overridePass, overrideReason, missingReason } = resolveOverrideSelectionFromForm(formData);
+
+  if (missingReason) {
+    redirectToTests({
+      jobId,
+      testType: "duct_leakage",
+      systemId: systemIdFromForm,
+      notice: "override_reason_required",
+    });
+  }
 
   const supabase = await createClient();
   const scoped = await requireInternalEccTestsAccess({
@@ -5464,7 +5479,7 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
     supabase,
     jobId,
     testRunId,
-    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+    systemIdFromForm,
   });
 
   await evaluateEccOpsStatus(jobId);
@@ -5688,6 +5703,7 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
 
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
+  const systemIdFromForm = String(formData.get("system_id") || "").trim() || null;
   const projectType = String(formData.get("project_type") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
@@ -5696,7 +5712,16 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
   ensureMeasuredDuctLeakagePresentForCompletion(formData);
 
   const { data, computed, computedPass } = computeDuctLeakagePayload(formData, projectType);
-  const { overridePass, overrideReason } = parseOverrideSelectionFromForm(formData);
+  const { overridePass, overrideReason, missingReason } = resolveOverrideSelectionFromForm(formData);
+
+  if (missingReason) {
+    redirectToTests({
+      jobId,
+      testType: "duct_leakage",
+      systemId: systemIdFromForm,
+      notice: "override_reason_required",
+    });
+  }
 
   const supabase = await createClient();
   const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
@@ -5711,7 +5736,7 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
     supabase,
     jobId,
     testRunId,
-    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+    systemIdFromForm,
   });
 
   let visitId: string | null = null;
@@ -5812,7 +5837,7 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
       jobId,
       testType: "airflow",
       systemId: systemIdFromForm,
-      notice: "airflow_override_reason_required",
+      notice: "override_reason_required",
     });
   }
 
