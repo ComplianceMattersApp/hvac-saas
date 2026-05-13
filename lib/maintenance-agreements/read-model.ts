@@ -205,6 +205,12 @@ export type MaintenanceAgreementVisitCountReviewSummary = {
   used_visits: number;
 };
 
+export type MaintenanceAgreementSuggestedNextDueProjection = {
+  suggested_next_due_date: string | null;
+  manual_scheduling_required: boolean;
+  seasonal_window_placeholder: string;
+};
+
 type SupabaseLike = {
   from(table: string): any;
 };
@@ -275,6 +281,27 @@ function addDaysToYmd(ymd: string, days: number) {
   if (Number.isNaN(date.getTime())) return ymd;
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function addMonthsToYmd(ymd: string, months: number) {
+  if (!isValidYmd(ymd)) return ymd;
+
+  const [yearText, monthText, dayText] = ymd.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return ymd;
+  }
+
+  const targetMonthAnchor = new Date(Date.UTC(year, month - 1, 1));
+  targetMonthAnchor.setUTCMonth(targetMonthAnchor.getUTCMonth() + months);
+  const targetYear = targetMonthAnchor.getUTCFullYear();
+  const targetMonth = targetMonthAnchor.getUTCMonth();
+  const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const clampedDay = Math.min(day, lastDayOfTargetMonth);
+  const result = new Date(Date.UTC(targetYear, targetMonth, clampedDay));
+  return result.toISOString().slice(0, 10);
 }
 
 function normalizeDrilldownFilter(
@@ -418,6 +445,53 @@ export function classifyMaintenanceAgreementDueState(input: {
   if (nextDueDate < today) return "overdue";
   if (nextDueDate === today) return "due_today";
   return "upcoming";
+}
+
+export function projectMaintenanceAgreementSuggestedNextDue(input: {
+  frequency?: string | null;
+  nextDueDate?: string | null;
+  countedCompletionDate?: string | null;
+}): MaintenanceAgreementSuggestedNextDueProjection {
+  const seasonalWindowPlaceholder =
+    "Seasonal window support planned for template-driven Service Plans.";
+
+  const frequency = toCleanString(input.frequency).toLowerCase();
+  const nextDueDate = toCleanString(input.nextDueDate);
+  const countedCompletionDate = toCleanString(input.countedCompletionDate);
+
+  const intervalMonths =
+    frequency === "monthly"
+      ? 1
+      : frequency === "quarterly"
+      ? 3
+      : frequency === "semi_annual"
+      ? 6
+      : frequency === "annual"
+      ? 12
+      : null;
+
+  if (frequency === "custom" || !isValidYmd(nextDueDate) || intervalMonths === null) {
+    return {
+      suggested_next_due_date: null,
+      manual_scheduling_required: true,
+      seasonal_window_placeholder: seasonalWindowPlaceholder,
+    };
+  }
+
+  let suggested = addMonthsToYmd(nextDueDate, intervalMonths);
+  if (isValidYmd(countedCompletionDate)) {
+    let guard = 0;
+    while (suggested <= countedCompletionDate && guard < 120) {
+      suggested = addMonthsToYmd(suggested, intervalMonths);
+      guard += 1;
+    }
+  }
+
+  return {
+    suggested_next_due_date: suggested,
+    manual_scheduling_required: false,
+    seasonal_window_placeholder: seasonalWindowPlaceholder,
+  };
 }
 
 function normalizeAgreementRow(row: MaintenanceAgreementRow): MaintenanceAgreementRow {

@@ -11,6 +11,7 @@ import {
   listMaintenanceAgreementsForLocation,
   listMaintenanceAgreementVisitsForAgreement,
   listUpcomingOverdueMaintenanceAgreements,
+  projectMaintenanceAgreementSuggestedNextDue,
   projectMaintenanceAgreementVisitCountReview,
   resolveScopedMaintenanceAgreementJobPrefill,
   summarizeMaintenanceAgreementVisitLinksForAgreement,
@@ -382,6 +383,113 @@ describe("classifyMaintenanceAgreementDueState", () => {
   it("keeps non-active or missing-date agreements out of due classification", () => {
     expect(classifyMaintenanceAgreementDueState({ status: "paused", nextDueDate: "2026-05-11" })).toBe("inactive");
     expect(classifyMaintenanceAgreementDueState({ status: "active", nextDueDate: null })).toBe("not_scheduled");
+  });
+});
+
+describe("projectMaintenanceAgreementSuggestedNextDue", () => {
+  it("projects monthly next due suggestion", () => {
+    const result = projectMaintenanceAgreementSuggestedNextDue({
+      frequency: "monthly",
+      nextDueDate: "2026-01-15",
+      countedCompletionDate: "2026-01-20",
+    });
+
+    expect(result).toMatchObject({
+      suggested_next_due_date: "2026-02-15",
+      manual_scheduling_required: false,
+    });
+  });
+
+  it("projects quarterly next due suggestion", () => {
+    const result = projectMaintenanceAgreementSuggestedNextDue({
+      frequency: "quarterly",
+      nextDueDate: "2026-02-01",
+      countedCompletionDate: "2026-02-10",
+    });
+
+    expect(result.suggested_next_due_date).toBe("2026-05-01");
+    expect(result.manual_scheduling_required).toBe(false);
+  });
+
+  it("projects semi annual next due suggestion", () => {
+    const result = projectMaintenanceAgreementSuggestedNextDue({
+      frequency: "semi_annual",
+      nextDueDate: "2026-03-10",
+      countedCompletionDate: "2026-04-01",
+    });
+
+    expect(result.suggested_next_due_date).toBe("2026-09-10");
+    expect(result.manual_scheduling_required).toBe(false);
+  });
+
+  it("projects annual next due suggestion", () => {
+    const result = projectMaintenanceAgreementSuggestedNextDue({
+      frequency: "annual",
+      nextDueDate: "2026-06-15",
+      countedCompletionDate: "2026-06-16",
+    });
+
+    expect(result.suggested_next_due_date).toBe("2027-06-15");
+    expect(result.manual_scheduling_required).toBe(false);
+  });
+
+  it("rolls forward until suggestion is after counted completion date", () => {
+    const result = projectMaintenanceAgreementSuggestedNextDue({
+      frequency: "quarterly",
+      nextDueDate: "2026-01-01",
+      countedCompletionDate: "2026-08-15",
+    });
+
+    expect(result.suggested_next_due_date).toBe("2026-10-01");
+    expect(result.manual_scheduling_required).toBe(false);
+  });
+
+  it("returns manual scheduling required for custom frequency", () => {
+    const result = projectMaintenanceAgreementSuggestedNextDue({
+      frequency: "custom",
+      nextDueDate: "2026-06-15",
+      countedCompletionDate: "2026-06-20",
+    });
+
+    expect(result.suggested_next_due_date).toBeNull();
+    expect(result.manual_scheduling_required).toBe(true);
+  });
+
+  it("returns manual scheduling required when next due date is missing", () => {
+    const result = projectMaintenanceAgreementSuggestedNextDue({
+      frequency: "monthly",
+      nextDueDate: null,
+      countedCompletionDate: "2026-06-20",
+    });
+
+    expect(result.suggested_next_due_date).toBeNull();
+    expect(result.manual_scheduling_required).toBe(true);
+  });
+
+  it("does not mutate visit count status or used visit projection inputs", () => {
+    const link = makeAgreementVisitLink({
+      id: "immutable-link",
+      count_status: "counted",
+      counts_toward_visit_balance: true,
+    });
+    const job = makeJob({ id: "immutable-job", status: "completed", field_complete: true });
+    const beforeStatus = link.count_status;
+    const beforeCountsToward = link.counts_toward_visit_balance;
+    const beforeLabel = projectMaintenanceAgreementVisitCountReview({ link, job });
+
+    const result = projectMaintenanceAgreementSuggestedNextDue({
+      frequency: "monthly",
+      nextDueDate: "2026-06-15",
+      countedCompletionDate: "2026-06-20",
+    });
+
+    const afterLabel = projectMaintenanceAgreementVisitCountReview({ link, job });
+
+    expect(result.suggested_next_due_date).toBe("2026-07-15");
+    expect(link.count_status).toBe(beforeStatus);
+    expect(link.counts_toward_visit_balance).toBe(beforeCountsToward);
+    expect(beforeLabel).toBe("counted");
+    expect(afterLabel).toBe("counted");
   });
 });
 

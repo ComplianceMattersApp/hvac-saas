@@ -94,6 +94,7 @@ import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import {
   listMaintenanceAgreementLinksForJob,
+  projectMaintenanceAgreementSuggestedNextDue,
   projectMaintenanceAgreementVisitCountReview,
 } from "@/lib/maintenance-agreements/read-model";
 
@@ -173,6 +174,20 @@ function formatDateTimeLAFromIso(iso: string) {
 function formatDateDisplay(date?: string | null) {
   if (!date) return "";
   return date;
+}
+
+function formatYmdDisplay(value?: string | null) {
+  const ymd = String(value ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return "";
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(`${ymd}T00:00:00Z`));
+  } catch {
+    return ymd;
+  }
 }
 
 function formatTimeDisplay(time?: string | null) {
@@ -1551,6 +1566,15 @@ const showInternalInvoicePanel =
 const maintenanceAgreementsEnabled = isMaintenanceAgreementsEnabled();
 let markVisitCountedLinkId: string | null = null;
 let markVisitCountedAgreementName: string | null = null;
+let suggestedNextDueProjection: {
+  agreementName: string;
+  suggestedNextDueDate: string | null;
+  manualSchedulingRequired: boolean;
+  seasonalWindowPlaceholder: string;
+} | null = null;
+const shouldShowSuggestedNextDueProjection =
+  banner === "maintenance_visit_count_saved" ||
+  banner === "maintenance_visit_count_already_counted";
 
 if (maintenanceAgreementsEnabled && job.job_type === "service") {
   const maintenanceLinks = await listMaintenanceAgreementLinksForJob({
@@ -1559,6 +1583,9 @@ if (maintenanceAgreementsEnabled && job.job_type === "service") {
     jobId: String(job.id ?? ""),
     limit: 25,
   });
+
+  let suggestedAgreementId: string | null = null;
+  let suggestedCompletionDate: string | null = null;
 
   if (maintenanceLinks.length > 0) {
     for (const link of maintenanceLinks) {
@@ -1588,6 +1615,39 @@ if (maintenanceAgreementsEnabled && job.job_type === "service") {
         markVisitCountedAgreementName = "Service Plan";
         break;
       }
+
+      if (
+        !suggestedAgreementId &&
+        countStatus === "counted" &&
+        Boolean(link.counts_toward_visit_balance)
+      ) {
+        suggestedAgreementId = String(link.agreement_id ?? "").trim() || null;
+        suggestedCompletionDate = String(link.counted_at ?? "").trim().slice(0, 10) || null;
+      }
+    }
+  }
+
+  if (shouldShowSuggestedNextDueProjection && suggestedAgreementId) {
+    const { data: suggestedAgreement } = await supabase
+      .from("maintenance_agreements")
+      .select("id, agreement_name, frequency, next_due_date")
+      .eq("account_owner_user_id", internalUser.account_owner_user_id)
+      .eq("id", suggestedAgreementId)
+      .maybeSingle();
+
+    if (suggestedAgreement?.id) {
+      const projection = projectMaintenanceAgreementSuggestedNextDue({
+        frequency: String(suggestedAgreement.frequency ?? ""),
+        nextDueDate: String(suggestedAgreement.next_due_date ?? ""),
+        countedCompletionDate: suggestedCompletionDate,
+      });
+
+      suggestedNextDueProjection = {
+        agreementName: String(suggestedAgreement.agreement_name ?? "").trim() || "Service Plan",
+        suggestedNextDueDate: projection.suggested_next_due_date,
+        manualSchedulingRequired: projection.manual_scheduling_required,
+        seasonalWindowPlaceholder: projection.seasonal_window_placeholder,
+      };
     }
   }
 }
@@ -4621,6 +4681,23 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div className="mt-3">
             <MarkVisitCountedActionButton jobId={String(job.id)} linkId={markVisitCountedLinkId} />
           </div>
+        </div>
+      ) : null}
+
+      {suggestedNextDueProjection ? (
+        <div className="mt-4 rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 text-slate-900">
+          <div className="text-sm font-semibold text-blue-900">Suggested next due date</div>
+          <p className="mt-1 text-xs leading-5 text-blue-900/90">
+            This is a suggestion only. Confirming next due date will be added later.
+          </p>
+          <div className="mt-2 text-sm font-semibold text-blue-900">
+            {suggestedNextDueProjection.manualSchedulingRequired
+              ? "Manual scheduling required."
+              : formatYmdDisplay(suggestedNextDueProjection.suggestedNextDueDate) || "Manual scheduling required."}
+          </div>
+          <p className="mt-1 text-xs leading-5 text-blue-900/90">
+            {suggestedNextDueProjection.seasonalWindowPlaceholder}
+          </p>
         </div>
       ) : null}
 
