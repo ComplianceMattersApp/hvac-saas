@@ -57,6 +57,11 @@ ECC verification expansion closeout note (May 2026):
    - `ecc_test_runs` remains ECC verification truth and `jobs.ops_status` remains operational projection
    - AHRI/QII remain non-gating in current scope unless explicitly designed later
 
+Maintenance agreements read-only projection closeout note (May 2026):
+- Group 9A-10B is complete in commit `0588a26` and documented as read-only Visit Count Review visibility on `/service-plans`.
+- Recorded projection labels include: `No linked visits`, `Linked`, `Eligible for count review`, `Counted`, `Excluded`, `Reversed`, `Not eligible`.
+- Boundaries remain explicit: no count-status mutation, no `Mark Visit Counted` action, no automatic counting, no due-date advancement, and no visit-balance deduction.
+
 Execution companion note: for practical first-customer support posture and expansion-lane classification guardrails, see `docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md`.
 
 ---

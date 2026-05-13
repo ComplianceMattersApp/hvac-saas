@@ -286,6 +286,58 @@ Boundaries preserved in Group 9A-9E:
 - no Stripe/QBO/SMS/customer portal behavior
 - no production migration apply
 
+## Group 9A-10B Closeout Snapshot (service plan count eligibility read-only projection)
+
+Group 9A-10B (Service Plan Count Eligibility Read-Only Projection) is implemented, validated, and pushed in commit `0588a26`.
+
+Recorded behavior:
+
+- `/service-plans` now shows a read-only `Visit Count Review` column.
+- Projection labels include:
+	- `No linked visits`
+	- `Linked`
+	- `Eligible for count review`
+	- `Counted`
+	- `Excluded`
+	- `Reversed`
+	- `Not eligible`
+- Projection remains read-only and does not mutate visit-link lifecycle.
+- Used visits still derive only from link rows where:
+	- `count_status = counted`
+	- `counts_toward_visit_balance = true`
+
+Validation recorded:
+
+- Browser smoke passed with `ENABLE_MAINTENANCE_AGREEMENTS=true`:
+	- `/service-plans` renders
+	- `Visit Count Review` column appears
+	- `No linked visits` label appears where expected
+	- `Linked` / `Not eligible` badges render for linked plans
+	- no `Mark Visit Counted` button exists
+	- no forms/actions for counting exist
+	- filters work
+	- customer links work
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`45` tests).
+- `npx.cmd tsc --noEmit` passed.
+- `git diff --check` passed.
+
+Boundaries preserved in Group 9A-10B:
+
+- no count-status mutation
+- no automatic counting on completion
+- no `Mark Visit Counted` action yet
+- no due-date advancement
+- no visit-balance deduction
+- no mutable remaining-visit counter
+- no billing/payment behavior
+- no customer portal/SMS/QBO behavior
+- no recurrence generation
+
+Watch items:
+
+- No-show and duplicate are handled defensively but are not first-class lifecycle enums yet.
+- Partial Work Items still need a future per-item completion model before automatic counting would be safe.
+
 Future parked enhancement note:
 
 - Service Plan creation should later be template-driven.

@@ -44,6 +44,11 @@ It extends it.
 - **Invoice** = billed commercial scope
 - **Payment** = money collected against an internal invoice, when payment capability exists
 
+Maintenance agreements closeout note (May 2026):
+- Group 9A-10B Service Plan Count Eligibility projection is now documented as read-only visibility on `/service-plans`.
+- Visit Count Review labels (`No linked visits`, `Linked`, `Eligible for count review`, `Counted`, `Excluded`, `Reversed`, `Not eligible`) are display-only in this slice.
+- No count mutation, no automatic counting, no due-date advancement, and no visit-balance deduction were introduced.
+
 ---
 
 ## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version

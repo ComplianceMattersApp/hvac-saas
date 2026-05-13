@@ -26,6 +26,13 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Group 9A-10B Service Plan Count Eligibility Read-Only Projection is complete and pushed in commit `0588a26`:
+  - `/service-plans` now shows a read-only `Visit Count Review` column with labels: `No linked visits`, `Linked`, `Eligible for count review`, `Counted`, `Excluded`, `Reversed`, and `Not eligible`
+  - projection is display-only: no count-status mutation, no `Mark Visit Counted` action, no automatic counting, no due-date advancement, and no visit-balance deduction
+  - used visits remain derived only from links where `count_status='counted'` and `counts_toward_visit_balance=true`
+  - validation recorded: browser smoke passed (`/service-plans` render, labels/badges, no count-action UI, filters/customer links), `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`45` tests), `npx.cmd tsc --noEmit` passed, and `git diff --check` passed
+  - watch items: no-show and duplicate remain defensive/non-first-class lifecycle enums; Partial Work Items still need per-item completion modeling before safe automatic counting
+
 - Group 9A-9E Service Plan Work Items Prefill + Link Creation Runtime Fix is complete and pushed in commit `c4a08d9`:
   - agreement create/edit now persists default Work Items in addition to summary text
   - customer agreement forms now support default `Visit Scope / Work Items`
