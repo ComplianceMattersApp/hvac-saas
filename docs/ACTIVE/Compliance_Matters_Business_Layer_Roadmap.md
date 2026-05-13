@@ -735,6 +735,14 @@ Product Mode V2 production migration execution closeout (2026-05-10):
 - Jobs remain the actual visit / work execution unit; service_cases remain continuity truth; Work Items / Visit Scope remain the operational scope for each visit; invoices remain billed truth; payments remain collected truth where implemented.
 - Pricebook may assist later with agreement templates/defaults, but it must not become agreement truth.
 - Dedicated model source of truth: [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md).
+- Group 9A-3 (Customer Profile Read-Only Agreement Display) is implemented and pushed in commit `09edc9f`:
+  - feature flag: `lib/maintenance-agreements/agreement-exposure.ts` (`ENABLE_MAINTENANCE_AGREEMENTS`, defaults `false`)
+  - customer profile section: `app/customers/[id]/page.tsx`
+  - tests: `lib/maintenance-agreements/__tests__/agreement-exposure.test.ts` (14 tests; 21 total)
+  - validation passed: targeted Vitest (`21` tests) and `npx.cmd tsc --noEmit`
+  - production guard: flag defaults `false`; production never reads `maintenance_agreements` before migration apply
+  - boundaries preserved: no create/edit agreements, no job generation, no calendar, no invoices/payments, no portal
+  - visual sandbox smoke with flag enabled is a watch item
 - Group 9A-2 (Maintenance Agreements Schema + RLS + Read Model V1) is implemented and pushed in commit `b126ff6`:
   - migration: `supabase/migrations/20260512120000_maintenance_agreements_v1.sql`
   - read model: `lib/maintenance-agreements/read-model.ts`
@@ -2609,7 +2617,7 @@ The following implementation groups have been closed as of May 2026.
 | 7 | Product Mode / Packaging Completion | Planned |
 | 7A | Pricing / Tiers / Seat Alignment | Planned � see Competitive_Packaging_and_Tier_Spec.md |
 | 8 | Support / Owner Operations | Planned |
-| 9A | Recurring Services / Maintenance Agreements | Backend foundation committed in repo (Group 9A-2, `b126ff6`); not production-active until intentional migration apply - see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md) |
+| 9A | Recurring Services / Maintenance Agreements | Group 9A-3 read-only customer profile section committed (`09edc9f`), gated by `ENABLE_MAINTENANCE_AGREEMENTS` (default `false`); Group 9A-2 backend foundation in `b126ff6`; not production-active until intentional migration apply - see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md) |
 | 9B | SMS / On-My-Way Messaging | Planned |
 | 9C | Tenant Customer Payments / Stripe Customer Payment Execution | Planned |
 | 9D | Customer Portal | Planned |

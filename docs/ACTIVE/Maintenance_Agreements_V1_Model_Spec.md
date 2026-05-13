@@ -12,6 +12,45 @@ The V1 goal is simple: let an operator track recurring service obligations for a
 
 This spec is intentionally not a billing, payment, portal, SMS, or automation design.
 
+## Group 9A-3 Closeout Snapshot (read-only customer profile section, not production-active)
+
+Group 9A-3 (Customer Profile Read-Only Agreement Display) is implemented and pushed in commit `09edc9f`.
+
+Recorded implementation artifacts:
+
+- Feature flag: `lib/maintenance-agreements/agreement-exposure.ts`
+- Customer profile section: `app/customers/[id]/page.tsx` (guarded read + display section)
+- Tests: `lib/maintenance-agreements/__tests__/agreement-exposure.test.ts`
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`21` tests: 14 exposure + 7 read-model).
+- `npx.cmd tsc --noEmit` passed.
+
+Production guard:
+
+- The section is gated by `isMaintenanceAgreementsEnabled()` reading `ENABLE_MAINTENANCE_AGREEMENTS`.
+- Default is `false`. Production never attempts a read against `maintenance_agreements` until the flag is explicitly enabled after migration apply.
+- Secondary guard: the read call is wrapped in a `try/catch` that returns `[]` on error.
+
+Boundaries preserved in Group 9A-3:
+
+- no create/edit agreements
+- no job generation from agreements
+- no calendar events
+- no invoices or payments
+- no Stripe tenant payment behavior
+- no QBO
+- no SMS
+- no customer portal exposure
+- no production migration apply
+
+Watch item:
+
+- Visual sandbox smoke with `ENABLE_MAINTENANCE_AGREEMENTS=true` was not completed in this session. Smoke to confirm: empty state renders, page does not crash, existing jobs/service-case/history sections still render.
+
+---
+
 ## Group 9A-2 Closeout Snapshot (implemented in repo, not production-active)
 
 Group 9A-2 (Maintenance Agreements Schema + RLS + Read Model V1) is implemented and pushed in commit `b126ff6`.

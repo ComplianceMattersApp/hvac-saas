@@ -24,6 +24,16 @@ Group 9A planning source of truth is [Maintenance_Agreements_V1_Model_Spec.md](.
 
 Current Program Status Note (May 2026)
 
+- Group 9A-3 Customer Profile Read-Only Agreement Display is complete and pushed in commit `09edc9f`:
+  - feature flag: `lib/maintenance-agreements/agreement-exposure.ts` (`ENABLE_MAINTENANCE_AGREEMENTS`, defaults `false`)
+  - customer profile: `app/customers/[id]/page.tsx` — guarded read + Maintenance Agreements section (internal viewer + flag on only)
+  - tests: `lib/maintenance-agreements/__tests__/agreement-exposure.test.ts` (14 tests; 21 total with read-model)
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`21` tests), `npx.cmd tsc --noEmit` passed
+  - production guard: `ENABLE_MAINTENANCE_AGREEMENTS` defaults `false`; production does not attempt reads before migration apply
+  - boundaries preserved: no create/edit agreements, no job generation, no calendar events, no invoices/payments, no Stripe tenant payment behavior, no QBO, no SMS, no portal
+  - visual sandbox smoke with flag enabled is a watch item (session ended before live flag-on smoke)
+  - activation rule: set `ENABLE_MAINTENANCE_AGREEMENTS=true` in `.env.local` on sandbox to exercise the section
+
 - Group 9A-2 Maintenance Agreements backend foundation is complete and pushed in repo (`b126ff6`):
   - migration: `supabase/migrations/20260512120000_maintenance_agreements_v1.sql`
   - read model: `lib/maintenance-agreements/read-model.ts`
