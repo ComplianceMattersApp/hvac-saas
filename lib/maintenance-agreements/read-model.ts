@@ -137,6 +137,54 @@ export type MaintenanceAgreementDrilldownResult = {
   rows: MaintenanceAgreementDrilldownRow[];
 };
 
+export const MAINTENANCE_AGREEMENT_VISIT_LINK_SOURCES = [
+  "service_plan_prefill",
+  "manual",
+  "system_future",
+] as const;
+
+export const MAINTENANCE_AGREEMENT_VISIT_COUNT_STATUSES = [
+  "linked",
+  "eligible",
+  "counted",
+  "excluded",
+  "reversed",
+] as const;
+
+export type MaintenanceAgreementVisitLinkSource =
+  (typeof MAINTENANCE_AGREEMENT_VISIT_LINK_SOURCES)[number];
+export type MaintenanceAgreementVisitCountStatus =
+  (typeof MAINTENANCE_AGREEMENT_VISIT_COUNT_STATUSES)[number];
+
+export type MaintenanceAgreementVisitLinkRow = {
+  id: string;
+  account_owner_user_id: string;
+  agreement_id: string;
+  job_id: string;
+  link_source: MaintenanceAgreementVisitLinkSource | string;
+  count_status: MaintenanceAgreementVisitCountStatus | string;
+  counts_toward_visit_balance: boolean;
+  counted_at: string | null;
+  counted_by_user_id: string | null;
+  reversed_at: string | null;
+  reversed_by_user_id: string | null;
+  reversal_reason: string | null;
+  created_at: string;
+  created_by_user_id: string;
+  updated_at: string;
+  updated_by_user_id: string | null;
+};
+
+export type MaintenanceAgreementVisitLinkSummary = {
+  total_links: number;
+  linked_links: number;
+  eligible_links: number;
+  counted_links: number;
+  excluded_links: number;
+  reversed_links: number;
+  used_visits: number;
+};
+
 type SupabaseLike = {
   from(table: string): any;
 };
@@ -168,6 +216,20 @@ type DrilldownMaintenanceAgreementsParams = ListMaintenanceAgreementsParams & {
   today?: string | null;
   filter?: MaintenanceAgreementDrilldownFilter | string | null;
   limit?: number | null;
+};
+
+type ListMaintenanceAgreementVisitLinksForAgreementParams = ListMaintenanceAgreementsParams & {
+  agreementId: string | null | undefined;
+  limit?: number | null;
+};
+
+type ListMaintenanceAgreementVisitLinksForJobParams = ListMaintenanceAgreementsParams & {
+  jobId: string | null | undefined;
+  limit?: number | null;
+};
+
+type SummarizeMaintenanceAgreementVisitLinksParams = ListMaintenanceAgreementsParams & {
+  agreementId: string | null | undefined;
 };
 
 function toCleanString(value: string | null | undefined) {
@@ -347,10 +409,39 @@ function normalizeAgreementRow(row: MaintenanceAgreementRow): MaintenanceAgreeme
   };
 }
 
+function normalizeMaintenanceAgreementVisitLinkRow(
+  row: MaintenanceAgreementVisitLinkRow,
+): MaintenanceAgreementVisitLinkRow {
+  return {
+    ...row,
+    counts_toward_visit_balance: Boolean(row.counts_toward_visit_balance),
+  };
+}
+
 async function runAgreementQuery(query: any) {
   const { data, error } = await query;
   if (error) throw error;
   return ((data ?? []) as MaintenanceAgreementRow[]).map(normalizeAgreementRow);
+}
+
+async function runMaintenanceAgreementVisitLinkQuery(query: any) {
+  const { data, error } = await query;
+  if (error) throw error;
+  return ((data ?? []) as MaintenanceAgreementVisitLinkRow[]).map(
+    normalizeMaintenanceAgreementVisitLinkRow,
+  );
+}
+
+function createEmptyMaintenanceAgreementVisitLinkSummary(): MaintenanceAgreementVisitLinkSummary {
+  return {
+    total_links: 0,
+    linked_links: 0,
+    eligible_links: 0,
+    counted_links: 0,
+    excluded_links: 0,
+    reversed_links: 0,
+    used_visits: 0,
+  };
 }
 
 export async function listMaintenanceAgreementsForCustomer(params: ListForCustomerParams) {
@@ -367,6 +458,120 @@ export async function listMaintenanceAgreementsForCustomer(params: ListForCustom
       .order("next_due_date", { ascending: true })
       .order("created_at", { ascending: false }),
   );
+}
+
+export async function listMaintenanceAgreementVisitsForAgreement(
+  params: ListMaintenanceAgreementVisitLinksForAgreementParams,
+) {
+  const accountOwnerUserId = toCleanString(params.accountOwnerUserId);
+  const agreementId = toCleanString(params.agreementId);
+  if (!accountOwnerUserId || !agreementId) return [];
+
+  return runMaintenanceAgreementVisitLinkQuery(
+    params.supabase
+      .from("maintenance_agreement_visits")
+      .select(
+        [
+          "id",
+          "account_owner_user_id",
+          "agreement_id",
+          "job_id",
+          "link_source",
+          "count_status",
+          "counts_toward_visit_balance",
+          "counted_at",
+          "counted_by_user_id",
+          "reversed_at",
+          "reversed_by_user_id",
+          "reversal_reason",
+          "created_at",
+          "created_by_user_id",
+          "updated_at",
+          "updated_by_user_id",
+        ].join(", "),
+      )
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("agreement_id", agreementId)
+      .order("created_at", { ascending: false })
+      .limit(normalizeLimit(params.limit)),
+  );
+}
+
+export async function listMaintenanceAgreementLinksForJob(
+  params: ListMaintenanceAgreementVisitLinksForJobParams,
+) {
+  const accountOwnerUserId = toCleanString(params.accountOwnerUserId);
+  const jobId = toCleanString(params.jobId);
+  if (!accountOwnerUserId || !jobId) return [];
+
+  return runMaintenanceAgreementVisitLinkQuery(
+    params.supabase
+      .from("maintenance_agreement_visits")
+      .select(
+        [
+          "id",
+          "account_owner_user_id",
+          "agreement_id",
+          "job_id",
+          "link_source",
+          "count_status",
+          "counts_toward_visit_balance",
+          "counted_at",
+          "counted_by_user_id",
+          "reversed_at",
+          "reversed_by_user_id",
+          "reversal_reason",
+          "created_at",
+          "created_by_user_id",
+          "updated_at",
+          "updated_by_user_id",
+        ].join(", "),
+      )
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("job_id", jobId)
+      .order("created_at", { ascending: false })
+      .limit(normalizeLimit(params.limit)),
+  );
+}
+
+export async function summarizeMaintenanceAgreementVisitLinksForAgreement(
+  params: SummarizeMaintenanceAgreementVisitLinksParams,
+): Promise<MaintenanceAgreementVisitLinkSummary> {
+  const accountOwnerUserId = toCleanString(params.accountOwnerUserId);
+  const agreementId = toCleanString(params.agreementId);
+  if (!accountOwnerUserId || !agreementId) return createEmptyMaintenanceAgreementVisitLinkSummary();
+
+  const { data, error } = await params.supabase
+    .from("maintenance_agreement_visits")
+    .select("count_status, counts_toward_visit_balance")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("agreement_id", agreementId);
+
+  if (error) throw error;
+
+  const rows = (data ?? []) as Array<{
+    count_status?: string | null;
+    counts_toward_visit_balance?: boolean | null;
+  }>;
+  const summary = createEmptyMaintenanceAgreementVisitLinkSummary();
+  summary.total_links = rows.length;
+
+  for (const row of rows) {
+    const countStatus = toCleanString(row.count_status).toLowerCase();
+    const countsTowardVisitBalance = Boolean(row.counts_toward_visit_balance);
+
+    if (countStatus === "linked") summary.linked_links += 1;
+    if (countStatus === "eligible") summary.eligible_links += 1;
+    if (countStatus === "counted") summary.counted_links += 1;
+    if (countStatus === "excluded") summary.excluded_links += 1;
+    if (countStatus === "reversed") summary.reversed_links += 1;
+
+    if (countStatus === "counted" && countsTowardVisitBalance) {
+      summary.used_visits += 1;
+    }
+  }
+
+  return summary;
 }
 
 export async function listMaintenanceAgreementsForLocation(params: ListForLocationParams) {

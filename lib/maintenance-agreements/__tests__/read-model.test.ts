@@ -5,11 +5,14 @@ import {
   isMaintenanceAgreementFrequency,
   isMaintenanceAgreementStatus,
   isMaintenanceAgreementType,
+  listMaintenanceAgreementLinksForJob,
   listMaintenanceAgreementDrilldownForAccount,
   listMaintenanceAgreementsForCustomer,
   listMaintenanceAgreementsForLocation,
+  listMaintenanceAgreementVisitsForAgreement,
   listUpcomingOverdueMaintenanceAgreements,
   resolveScopedMaintenanceAgreementJobPrefill,
+  summarizeMaintenanceAgreementVisitLinksForAgreement,
   summarizeMaintenanceAgreementsForAccount,
 } from "@/lib/maintenance-agreements/read-model";
 
@@ -39,6 +42,25 @@ type MockAgreement = {
   updated_at: string;
 };
 
+type MockAgreementVisitLink = {
+  id: string;
+  account_owner_user_id: string;
+  agreement_id: string;
+  job_id: string;
+  link_source: string;
+  count_status: string;
+  counts_toward_visit_balance: boolean;
+  counted_at: string | null;
+  counted_by_user_id: string | null;
+  reversed_at: string | null;
+  reversed_by_user_id: string | null;
+  reversal_reason: string | null;
+  created_at: string;
+  created_by_user_id: string;
+  updated_at: string;
+  updated_by_user_id: string | null;
+};
+
 function makeAgreement(input: Partial<MockAgreement> & { id: string }): MockAgreement {
   return {
     account_owner_user_id: ACCOUNT_OWNER,
@@ -59,6 +81,29 @@ function makeAgreement(input: Partial<MockAgreement> & { id: string }): MockAgre
     updated_by_user_id: "user-1",
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
+    ...input,
+  };
+}
+
+function makeAgreementVisitLink(
+  input: Partial<MockAgreementVisitLink> & { id: string },
+): MockAgreementVisitLink {
+  return {
+    account_owner_user_id: ACCOUNT_OWNER,
+    agreement_id: "agreement-1",
+    job_id: "job-1",
+    link_source: "manual",
+    count_status: "linked",
+    counts_toward_visit_balance: false,
+    counted_at: null,
+    counted_by_user_id: null,
+    reversed_at: null,
+    reversed_by_user_id: null,
+    reversal_reason: null,
+    created_at: "2026-05-12T10:00:00Z",
+    created_by_user_id: "user-1",
+    updated_at: "2026-05-12T10:00:00Z",
+    updated_by_user_id: null,
     ...input,
   };
 }
@@ -210,6 +255,54 @@ function makeSupabaseMockWithLookups(input: {
         },
         limit: (value: number) => {
           calls.push({ table, op: "limit", value });
+          limitValue = value;
+          return build();
+        },
+        then: (resolve: any, reject?: any) => Promise.resolve(exec()).then(resolve, reject),
+      });
+
+      return build();
+    },
+  };
+
+  return { supabase, calls };
+}
+
+function makeSupabaseMockForVisitLinks(rows: MockAgreementVisitLink[]) {
+  const calls: Array<{ op: string; column?: string; value?: unknown }> = [];
+
+  const supabase = {
+    from(table: string) {
+      calls.push({ op: "from", value: table });
+      const filters: Array<[string, unknown]> = [];
+      let limitValue: number | null = null;
+
+      const exec = () => {
+        let data = [...rows];
+        for (const [column, value] of filters) {
+          data = data.filter((row) => (row as any)[column] === value);
+        }
+        data.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+        if (limitValue !== null) data = data.slice(0, limitValue);
+        return { data, error: null };
+      };
+
+      const build = (): any => ({
+        select: (value: string) => {
+          calls.push({ op: "select", value });
+          return build();
+        },
+        eq: (column: string, value: unknown) => {
+          calls.push({ op: "eq", column, value });
+          filters.push([column, value]);
+          return build();
+        },
+        order: (column: string, value: unknown) => {
+          calls.push({ op: "order", column, value });
+          return build();
+        },
+        limit: (value: number) => {
+          calls.push({ op: "limit", value });
           limitValue = value;
           return build();
         },
@@ -570,6 +663,110 @@ describe("maintenance agreement read model", () => {
     });
 
     expect(result).toEqual({ as_of_date: "2026-05-12", rows: [] });
+    expect(calls).toEqual([]);
+  });
+
+  it("lists maintenance agreement visit links for an agreement with account scope", async () => {
+    const { supabase, calls } = makeSupabaseMockForVisitLinks([
+      makeAgreementVisitLink({ id: "link-1", agreement_id: "agreement-1", job_id: "job-1" }),
+      makeAgreementVisitLink({ id: "link-2", agreement_id: "agreement-2", job_id: "job-2" }),
+      makeAgreementVisitLink({ id: "link-3", account_owner_user_id: "other-owner", agreement_id: "agreement-1" }),
+    ]);
+
+    const rows = await listMaintenanceAgreementVisitsForAgreement({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      agreementId: "agreement-1",
+      limit: 25,
+    });
+
+    expect(rows.map((row) => row.id)).toEqual(["link-1"]);
+    expect(calls).toContainEqual({ op: "eq", column: "account_owner_user_id", value: ACCOUNT_OWNER });
+    expect(calls).toContainEqual({ op: "eq", column: "agreement_id", value: "agreement-1" });
+  });
+
+  it("lists maintenance agreement links for a job with account scope", async () => {
+    const { supabase, calls } = makeSupabaseMockForVisitLinks([
+      makeAgreementVisitLink({ id: "job-link-1", agreement_id: "agreement-1", job_id: "job-1" }),
+      makeAgreementVisitLink({ id: "job-link-2", agreement_id: "agreement-1", job_id: "job-2" }),
+    ]);
+
+    const rows = await listMaintenanceAgreementLinksForJob({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      jobId: "job-1",
+      limit: 10,
+    });
+
+    expect(rows.map((row) => row.id)).toEqual(["job-link-1"]);
+    expect(calls).toContainEqual({ op: "eq", column: "job_id", value: "job-1" });
+  });
+
+  it("summarizes visit link counts and used visits from counted rows only", async () => {
+    const { supabase } = makeSupabaseMockForVisitLinks([
+      makeAgreementVisitLink({ id: "s-linked", agreement_id: "agreement-s", count_status: "linked" }),
+      makeAgreementVisitLink({ id: "s-eligible", agreement_id: "agreement-s", count_status: "eligible" }),
+      makeAgreementVisitLink({ id: "s-counted-1", agreement_id: "agreement-s", count_status: "counted", counts_toward_visit_balance: true }),
+      makeAgreementVisitLink({ id: "s-counted-2", agreement_id: "agreement-s", count_status: "counted", counts_toward_visit_balance: false }),
+      makeAgreementVisitLink({ id: "s-excluded", agreement_id: "agreement-s", count_status: "excluded" }),
+      makeAgreementVisitLink({ id: "s-reversed", agreement_id: "agreement-s", count_status: "reversed" }),
+      makeAgreementVisitLink({ id: "other-agreement", agreement_id: "agreement-other", count_status: "counted", counts_toward_visit_balance: true }),
+    ]);
+
+    const summary = await summarizeMaintenanceAgreementVisitLinksForAgreement({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      agreementId: "agreement-s",
+    });
+
+    expect(summary).toEqual({
+      total_links: 6,
+      linked_links: 1,
+      eligible_links: 1,
+      counted_links: 2,
+      excluded_links: 1,
+      reversed_links: 1,
+      used_visits: 1,
+    });
+  });
+
+  it("returns safe empty visit-link results when required scope is missing", async () => {
+    const { supabase, calls } = makeSupabaseMockForVisitLinks([
+      makeAgreementVisitLink({ id: "link-skip" }),
+    ]);
+
+    await expect(
+      listMaintenanceAgreementVisitsForAgreement({
+        supabase,
+        accountOwnerUserId: "",
+        agreementId: "agreement-1",
+      }),
+    ).resolves.toEqual([]);
+
+    await expect(
+      listMaintenanceAgreementLinksForJob({
+        supabase,
+        accountOwnerUserId: ACCOUNT_OWNER,
+        jobId: "",
+      }),
+    ).resolves.toEqual([]);
+
+    await expect(
+      summarizeMaintenanceAgreementVisitLinksForAgreement({
+        supabase,
+        accountOwnerUserId: " ",
+        agreementId: "agreement-1",
+      }),
+    ).resolves.toEqual({
+      total_links: 0,
+      linked_links: 0,
+      eligible_links: 0,
+      counted_links: 0,
+      excluded_links: 0,
+      reversed_links: 0,
+      used_visits: 0,
+    });
+
     expect(calls).toEqual([]);
   });
 });
