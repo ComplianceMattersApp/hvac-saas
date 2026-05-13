@@ -352,3 +352,117 @@ export async function updateMaintenanceAgreementFromForm(customerPath: string, f
   revalidatePath(customerPath);
   redirect(`${customerPath}?maSaved=updated`);
 }
+
+/**
+ * Create a link row in maintenance_agreement_visits when a job is created from a service plan prefill.
+ * This is called internally during job creation flow and does not throw or redirect.
+ * Returns true if link was created, false if skipped (silently fails on invalid scopes).
+ */
+export async function createMaintenanceAgreementVisitLinkFromJobCreation(params: {
+  agreementId: string;
+  jobId: string;
+  createdByUserId: string;
+}): Promise<boolean> {
+  try {
+    // Feature flag check
+    if (!isMaintenanceAgreementsEnabled()) {
+      return false;
+    }
+
+    const agreementId = cleanString(params.agreementId);
+    const jobId = cleanString(params.jobId);
+    const createdByUserId = cleanString(params.createdByUserId);
+
+    if (!agreementId || !jobId || !createdByUserId) {
+      return false;
+    }
+
+    const supabase = await createClient();
+
+    // Get current user and validate they're internal
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id;
+    if (!userId) {
+      return false;
+    }
+
+    const { data: internalUserRow, error: internalUserErr } = await supabase
+      .from("internal_users")
+      .select("account_owner_user_id, is_active")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (internalUserErr || !internalUserRow?.account_owner_user_id) {
+      return false;
+    }
+
+    const accountOwnerUserId = cleanString(internalUserRow.account_owner_user_id);
+
+    // Validate agreement belongs to account scope
+    const { data: agreement, error: agreementErr } = await supabase
+      .from("maintenance_agreements")
+      .select("id, customer_id, account_owner_user_id")
+      .eq("id", agreementId)
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .maybeSingle();
+
+    if (agreementErr || !agreement?.id) {
+      return false;
+    }
+
+    const agreementCustomerId = cleanString(agreement.customer_id ?? "");
+    if (!agreementCustomerId) {
+      return false;
+    }
+
+    // Validate job belongs to same account/customer scope
+    const { data: job, error: jobErr } = await supabase
+      .from("jobs")
+      .select("id, customer_id")
+      .eq("id", jobId)
+      .maybeSingle();
+
+    if (jobErr || !job?.id) {
+      return false;
+    }
+
+    const jobCustomerId = cleanString(job.customer_id ?? "");
+
+    // Job must belong to same customer as agreement
+    if (jobCustomerId !== agreementCustomerId) {
+      return false;
+    }
+
+    // Create link row with ON CONFLICT DO NOTHING for duplicate-safe behavior
+    const linkPayload = {
+      account_owner_user_id: accountOwnerUserId,
+      agreement_id: agreementId,
+      job_id: jobId,
+      link_source: "service_plan_prefill",
+      count_status: "linked",
+      counts_toward_visit_balance: false,
+      created_by_user_id: createdByUserId,
+      updated_by_user_id: createdByUserId,
+    };
+
+    const { error: linkErr } = await supabase
+      .from("maintenance_agreement_visits")
+      .insert(linkPayload)
+      .select("id")
+      .maybeSingle();
+
+    // Handle duplicate key constraint gracefully (on conflict for unique (agreement_id, job_id))
+    // A 23505 error code means unique constraint violation, which we treat as success (idempotent)
+    if (linkErr) {
+      const isDuplicateConstraint = linkErr.code === "23505";
+      if (!isDuplicateConstraint) {
+        return false;
+      }
+    }
+
+    return true;
+  } catch {
+    // Silently fail on any error; don't block job creation
+    return false;
+  }
+}

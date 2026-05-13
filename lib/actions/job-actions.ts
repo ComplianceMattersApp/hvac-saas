@@ -13,6 +13,7 @@ import { forceSetOpsStatus } from "@/lib/actions/ops-status";
 import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
 import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-case-reconciliation";
 import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions/job-event-meta";
+import { createMaintenanceAgreementVisitLinkFromJobCreation } from "@/lib/maintenance-agreements/agreement-actions";
 import {
   createContractorIntakeProposalAwarenessNotification,
   insertInternalNotificationForEvent,
@@ -6723,6 +6724,8 @@ export async function createJobFromForm(formData: FormData) {
       ? relationshipActionRaw
       : "new_case";
 
+  const maintenanceAgreementIdRaw = String(formData.get("maintenance_agreement_id") || "").trim();
+
   const rawJobType = String(formData.get("job_type") || "").trim().toLowerCase();
   const relationshipJobType = normalizeIntakeJobType(rawJobType);
 
@@ -7771,8 +7774,18 @@ function canContractorWriteEvent(event_type: string) {
       serviceCaseWriteClient: canonicalWriteClient,
     });
 
- await postCreate(created.id, followUpServiceCaseId ? "customer_follow_up" : "customer");
- return;
+  await postCreate(created.id, followUpServiceCaseId ? "customer_follow_up" : "customer");
+
+  // Attempt to create maintenance agreement visit link if this job came from service plan prefill
+  if (maintenanceAgreementIdRaw && userId) {
+    await createMaintenanceAgreementVisitLinkFromJobCreation({
+      agreementId: maintenanceAgreementIdRaw,
+      jobId: created.id,
+      createdByUserId: userId,
+    });
+  }
+
+  return;
   }
 
   // Contractor proposal seam:
@@ -8051,6 +8064,16 @@ if (existingCustomerId && !existingLocationId) {
   });
 
   await postCreate(created.id, "customer_new_location");
+
+  // Attempt to create maintenance agreement visit link if this job came from service plan prefill
+  if (maintenanceAgreementIdRaw && userId) {
+    await createMaintenanceAgreementVisitLinkFromJobCreation({
+      agreementId: maintenanceAgreementIdRaw,
+      jobId: created.id,
+      createdByUserId: userId,
+    });
+  }
+
   return;
 }
 
@@ -8164,6 +8187,16 @@ const created = await createJob({
 
 const banner = reused ? "customer_reused" : "customer_created";
 await postCreate(created.id, banner);
+
+// Attempt to create maintenance agreement visit link if this job came from service plan prefill
+if (maintenanceAgreementIdRaw && userId) {
+  await createMaintenanceAgreementVisitLinkFromJobCreation({
+    agreementId: maintenanceAgreementIdRaw,
+    jobId: created.id,
+    createdByUserId: userId,
+  });
+}
+
 return;
 }
 

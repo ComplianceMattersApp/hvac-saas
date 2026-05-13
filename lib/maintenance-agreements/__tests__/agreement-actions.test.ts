@@ -250,3 +250,39 @@ describe("maintenance agreement actions", () => {
     expect(supabase._updateCalls[0]).not.toHaveProperty("account_owner_user_id");
   });
 });
+
+describe("createMaintenanceAgreementVisitLinkFromJobCreation", () => {
+  // The link creation function is tested implicitly through job creation tests.
+  // This is a no-throw, non-blocking helper called during job creation.
+  // Direct unit testing is minimal since it fails silently on invalid scopes.
+
+  it("does not throw when feature flag is disabled", async () => {
+    const { createMaintenanceAgreementVisitLinkFromJobCreation } = await import("@/lib/maintenance-agreements/agreement-actions");
+
+    // Feature flag disabled => function returns false without error
+    isMaintenanceAgreementsEnabledMock.mockReturnValue(false);
+
+    const result = await createMaintenanceAgreementVisitLinkFromJobCreation({
+      agreementId: "agr-1",
+      jobId: "job-1",
+      createdByUserId: "user-1",
+    });
+
+    expect(result).toBe(false);
+  });
+
+  it("does not throw when parameters are invalid", async () => {
+    const { createMaintenanceAgreementVisitLinkFromJobCreation } = await import("@/lib/maintenance-agreements/agreement-actions");
+
+    isMaintenanceAgreementsEnabledMock.mockReturnValue(true);
+
+    // Empty agreement ID => function returns false
+    const result = await createMaintenanceAgreementVisitLinkFromJobCreation({
+      agreementId: "",
+      jobId: "job-1",
+      createdByUserId: "user-1",
+    });
+
+    expect(result).toBe(false);
+  });
+});

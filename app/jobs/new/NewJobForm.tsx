@@ -1476,6 +1476,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       <form action={createJobFromForm} className="space-y-8" onSubmit={handleFormSubmit} aria-busy={isSubmitting}>
         <input type="hidden" name="relationship_action" value={shouldShowRelationshipStep ? relationshipAction : "new_case"} />
         <input type="hidden" name="relationship_job_id" value={selectedRelationshipJob?.id ?? ""} />
+        <input type="hidden" name="maintenance_agreement_id" value={maintenanceAgreementPrefill?.agreement_id ?? ""} />
         {isCustomerContextInternalMode && customerContextSource ? (
           <input type="hidden" name="intake_source" value={customerContextSource} />
         ) : null}
