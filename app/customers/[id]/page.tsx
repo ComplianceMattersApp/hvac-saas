@@ -26,6 +26,8 @@ import {
   classifyMaintenanceAgreementDueState,
   type MaintenanceAgreementRow,
 } from "@/lib/maintenance-agreements/read-model";
+import VisitScopeBuilder from "@/components/jobs/VisitScopeBuilder";
+import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 
 
 type CustomerRow = {
@@ -176,6 +178,14 @@ function makeTelHref(phone?: string | null) {
   const digits = String(phone ?? "").replace(/[^\d+]/g, "");
   if (!digits) return null;
   return `tel:${digits}`;
+}
+
+function sanitizeAgreementDefaultVisitScopeItems(value: unknown) {
+  try {
+    return sanitizeVisitScopeItems(value);
+  } catch {
+    return [];
+  }
 }
 
 function makeSmsHref(phone?: string | null) {
@@ -1296,11 +1306,13 @@ export default async function CustomerDetailPage(props: {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Default Visit Scope Summary (Optional)</label>
-                  <textarea
-                    name="default_visit_scope_summary"
-                    rows={2}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Default Visit Scope / Work Items (Optional)</label>
+                  <VisitScopeBuilder
+                    jobType="service"
+                    summaryName="default_visit_scope_summary"
+                    itemsName="default_visit_scope_items_json"
+                    initialSummary=""
+                    initialItems={[]}
                   />
                 </div>
 
@@ -1544,12 +1556,13 @@ export default async function CustomerDetailPage(props: {
                           </div>
 
                           <div className="md:col-span-2">
-                            <label className="mb-1 block text-xs font-medium text-slate-700">Default Visit Scope Summary (Optional)</label>
-                            <textarea
-                              name="default_visit_scope_summary"
-                              rows={2}
-                              defaultValue={String(agr.default_visit_scope_summary ?? "")}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                            <label className="mb-1 block text-xs font-medium text-slate-700">Default Visit Scope / Work Items (Optional)</label>
+                            <VisitScopeBuilder
+                              jobType="service"
+                              summaryName="default_visit_scope_summary"
+                              itemsName="default_visit_scope_items_json"
+                              initialSummary={String(agr.default_visit_scope_summary ?? "")}
+                              initialItems={sanitizeAgreementDefaultVisitScopeItems(agr.default_visit_scope_items)}
                             />
                           </div>
 

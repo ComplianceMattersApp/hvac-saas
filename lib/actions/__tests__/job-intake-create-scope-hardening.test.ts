@@ -26,6 +26,7 @@ type InsertCall = {
 type FixtureOptions = {
   throwOnJobsInsert?: boolean;
   contractorId?: string | null;
+  accountSettingsProductMode?: "hybrid" | "ecc_hers" | "hvac_service" | null;
 };
 
 vi.mock("next/navigation", () => ({
@@ -87,6 +88,7 @@ function buildIntakeFormData() {
 function buildInternalServiceIntakeFormData(options?: {
   visitScopeSummary?: string;
   visitScopeItemsJson?: string;
+  maintenanceAgreementId?: string;
 }) {
   const formData = new FormData();
   formData.set("job_type", "service");
@@ -95,6 +97,11 @@ function buildInternalServiceIntakeFormData(options?: {
   formData.set("location_id", "loc-1");
   formData.set("visit_scope_summary", options?.visitScopeSummary ?? "");
   formData.set("visit_scope_items_json", options?.visitScopeItemsJson ?? "[]");
+  if (options?.maintenanceAgreementId) {
+    formData.set("maintenance_agreement_id", options.maintenanceAgreementId);
+    formData.set("service_case_kind", "maintenance");
+    formData.set("service_visit_type", "maintenance");
+  }
   return formData;
 }
 
@@ -162,6 +169,9 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
       }
 
       if (table === "customers") {
+        if (selected.trim() === "id") {
+          return { data: { id: "cust-1" }, error: null };
+        }
         if (selected.includes("owner_user_id")) {
           return { data: { id: "cust-1", owner_user_id: "owner-1" }, error: null };
         }
@@ -195,7 +205,40 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
       }
 
       if (table === "jobs") {
+        const byId = filters.find((filter) => filter.column === "id");
+        if (byId && byId.value === "job-1" && selected.includes("customer_id")) {
+          return {
+            data: {
+              id: "job-1",
+              customer_id: "cust-1",
+            },
+            error: null,
+          };
+        }
         return { data: null, error: null };
+      }
+
+      if (table === "maintenance_agreements") {
+        return {
+          data: {
+            id: "52851fbf-0e65-482d-868a-1c858521d128",
+            customer_id: "cust-1",
+            account_owner_user_id: "owner-1",
+          },
+          error: null,
+        };
+      }
+
+      if (table === "account_settings") {
+        return {
+          data: options.accountSettingsProductMode
+            ? {
+                account_owner_user_id: "owner-1",
+                product_mode: options.accountSettingsProductMode,
+              }
+            : null,
+          error: null,
+        };
       }
 
       return { data: null, error: null };
@@ -215,6 +258,15 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
             parent_job_id: null,
             title: "Intake Smoke Test Job",
             job_notes: null,
+          },
+          error: null,
+        };
+      }
+
+      if (table === "service_cases") {
+        return {
+          data: {
+            id: "case-1",
           },
           error: null,
         };
@@ -350,6 +402,76 @@ describe("job intake create same-account hardening", () => {
     expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1" }),
     );
+  });
+
+  it("preserves service job type for service-plan intake under ecc_hers mode", async () => {
+    const fixture = buildSupabaseFixture({
+      throwOnJobsInsert: true,
+      accountSettingsProductMode: "ecc_hers",
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(
+        buildInternalServiceIntakeFormData({
+          maintenanceAgreementId: "52851fbf-0e65-482d-868a-1c858521d128",
+          visitScopeItemsJson: JSON.stringify([
+            { title: "Inspect outdoor unit", details: "Clean as needed", kind: "primary" },
+          ]),
+        }),
+      ),
+    ).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    const jobsInsert = fixture.insertCalls.find((call) => call.table === "jobs");
+    expect(jobsInsert).toBeTruthy();
+    expect(jobsInsert?.payload).toMatchObject({
+      job_type: "service",
+      service_visit_type: "maintenance",
+    });
+  });
+
+  it("creates maintenance agreement link row before post-create redirect", async () => {
+    const previousMaintenanceFlag = process.env.ENABLE_MAINTENANCE_AGREEMENTS;
+    process.env.ENABLE_MAINTENANCE_AGREEMENTS = "true";
+
+    const fixture = buildSupabaseFixture({
+      throwOnJobsInsert: false,
+      accountSettingsProductMode: "ecc_hers",
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    try {
+      await expect(
+        createJobFromForm(
+          buildInternalServiceIntakeFormData({
+            maintenanceAgreementId: "52851fbf-0e65-482d-868a-1c858521d128",
+            visitScopeItemsJson: JSON.stringify([{ title: "Inspect blower", kind: "primary" }]),
+          }),
+        ),
+      ).rejects.toThrow("REDIRECT:/jobs/job-1?banner=job_created");
+
+      expect(
+        fixture.writeCalls.some((call) => call.table === "maintenance_agreement_visits" && call.method === "insert"),
+      ).toBe(true);
+    } finally {
+      process.env.ENABLE_MAINTENANCE_AGREEMENTS = previousMaintenanceFlag;
+    }
   });
 
   it("allows internal create when entitlement is valid trial", async () => {

@@ -11,6 +11,7 @@ import {
   MAINTENANCE_AGREEMENT_STATUSES,
   MAINTENANCE_AGREEMENT_TYPES,
 } from "@/lib/maintenance-agreements/read-model";
+import { sanitizeVisitScopeItems, type VisitScopeItem } from "@/lib/jobs/visit-scope";
 
 type MutationResult =
   | { success: true; agreementId: string }
@@ -26,6 +27,7 @@ type CreateMaintenanceAgreementParams = {
   renewalDate?: string | null;
   primaryLocationId?: string | null;
   defaultVisitScopeSummary?: string | null;
+  defaultVisitScopeItemsJson?: string | null;
   internalNotes?: string | null;
 };
 
@@ -68,6 +70,23 @@ function parseEnumValue(value: unknown, allowedValues: readonly string[], fieldL
     return { ok: false as const, error: `${fieldLabel} is invalid.` };
   }
   return { ok: true as const, value: normalized };
+}
+
+function parseVisitScopeItemsJson(value: unknown) {
+  const normalized = cleanString(value);
+  if (!normalized) {
+    return { ok: true as const, value: [] as VisitScopeItem[] };
+  }
+
+  try {
+    const parsed = JSON.parse(normalized);
+    return { ok: true as const, value: sanitizeVisitScopeItems(parsed) };
+  } catch {
+    return {
+      ok: false as const,
+      error: "Default Work Items must be valid visit scope items.",
+    };
+  }
 }
 
 async function resolveMutationScope(customerIdRaw: string) {
@@ -186,6 +205,11 @@ export async function createMaintenanceAgreement(
   const renewalDateResult = parseOptionalDate(params.renewalDate, "Renewal date");
   if (!renewalDateResult.ok) return { success: false, error: renewalDateResult.error };
 
+  const defaultVisitScopeItemsResult = parseVisitScopeItemsJson(params.defaultVisitScopeItemsJson);
+  if (!defaultVisitScopeItemsResult.ok) {
+    return { success: false, error: defaultVisitScopeItemsResult.error };
+  }
+
   const primaryLocationId = nullableString(params.primaryLocationId);
   const locationScopeResult = await validatePrimaryLocationScope({
     admin: scope.admin,
@@ -208,6 +232,7 @@ export async function createMaintenanceAgreement(
     renewal_date: renewalDateResult.value,
     primary_location_id: primaryLocationId,
     default_visit_scope_summary: nullableString(params.defaultVisitScopeSummary),
+    default_visit_scope_items: defaultVisitScopeItemsResult.value,
     internal_notes: nullableString(params.internalNotes),
     created_by_user_id: scope.userId,
     updated_by_user_id: scope.userId,
@@ -268,6 +293,11 @@ export async function updateMaintenanceAgreement(
   const renewalDateResult = parseOptionalDate(params.renewalDate, "Renewal date");
   if (!renewalDateResult.ok) return { success: false, error: renewalDateResult.error };
 
+  const defaultVisitScopeItemsResult = parseVisitScopeItemsJson(params.defaultVisitScopeItemsJson);
+  if (!defaultVisitScopeItemsResult.ok) {
+    return { success: false, error: defaultVisitScopeItemsResult.error };
+  }
+
   const primaryLocationId = nullableString(params.primaryLocationId);
   const locationScopeResult = await validatePrimaryLocationScope({
     admin: scope.admin,
@@ -290,6 +320,7 @@ export async function updateMaintenanceAgreement(
       renewal_date: renewalDateResult.value,
       primary_location_id: primaryLocationId,
       default_visit_scope_summary: nullableString(params.defaultVisitScopeSummary),
+      default_visit_scope_items: defaultVisitScopeItemsResult.value,
       internal_notes: nullableString(params.internalNotes),
       status: statusResult.value,
       updated_by_user_id: scope.userId,
@@ -321,6 +352,7 @@ function toCreateParams(formData: FormData): CreateMaintenanceAgreementParams {
     renewalDate: nullableString(formData.get("renewal_date")),
     primaryLocationId: nullableString(formData.get("primary_location_id")),
     defaultVisitScopeSummary: nullableString(formData.get("default_visit_scope_summary")),
+    defaultVisitScopeItemsJson: nullableString(formData.get("default_visit_scope_items_json")),
     internalNotes: nullableString(formData.get("internal_notes")),
   };
 }
@@ -362,6 +394,7 @@ export async function createMaintenanceAgreementVisitLinkFromJobCreation(params:
   agreementId: string;
   jobId: string;
   createdByUserId: string;
+  accountOwnerUserId?: string;
 }): Promise<boolean> {
   try {
     // Feature flag check
@@ -377,29 +410,27 @@ export async function createMaintenanceAgreementVisitLinkFromJobCreation(params:
       return false;
     }
 
-    const supabase = await createClient();
+    const admin = createAdminClient();
 
-    // Get current user and validate they're internal
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
-    if (!userId) {
-      return false;
+    let accountOwnerUserId = cleanString(params.accountOwnerUserId ?? "");
+
+    // If accountOwnerUserId is not provided, look it up from internal_users
+    if (!accountOwnerUserId) {
+      const { data: internalUserRow, error: internalUserErr } = await admin
+        .from("internal_users")
+        .select("account_owner_user_id, is_active")
+        .eq("user_id", createdByUserId)
+        .maybeSingle();
+
+      if (internalUserErr || !internalUserRow?.account_owner_user_id || internalUserRow.is_active === false) {
+        return false;
+      }
+
+      accountOwnerUserId = cleanString(internalUserRow.account_owner_user_id);
     }
-
-    const { data: internalUserRow, error: internalUserErr } = await supabase
-      .from("internal_users")
-      .select("account_owner_user_id, is_active")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (internalUserErr || !internalUserRow?.account_owner_user_id) {
-      return false;
-    }
-
-    const accountOwnerUserId = cleanString(internalUserRow.account_owner_user_id);
 
     // Validate agreement belongs to account scope
-    const { data: agreement, error: agreementErr } = await supabase
+    const { data: agreement, error: agreementErr } = await admin
       .from("maintenance_agreements")
       .select("id, customer_id, account_owner_user_id")
       .eq("id", agreementId)
@@ -415,8 +446,7 @@ export async function createMaintenanceAgreementVisitLinkFromJobCreation(params:
       return false;
     }
 
-    // Validate job belongs to same account/customer scope
-    const { data: job, error: jobErr } = await supabase
+    const { data: job, error: jobErr } = await admin
       .from("jobs")
       .select("id, customer_id")
       .eq("id", jobId)
@@ -433,6 +463,17 @@ export async function createMaintenanceAgreementVisitLinkFromJobCreation(params:
       return false;
     }
 
+    const { data: scopedCustomer, error: customerErr } = await admin
+      .from("customers")
+      .select("id")
+      .eq("id", agreementCustomerId)
+      .eq("owner_user_id", accountOwnerUserId)
+      .maybeSingle();
+
+    if (customerErr || !scopedCustomer?.id) {
+      return false;
+    }
+
     // Create link row with ON CONFLICT DO NOTHING for duplicate-safe behavior
     const linkPayload = {
       account_owner_user_id: accountOwnerUserId,
@@ -445,7 +486,7 @@ export async function createMaintenanceAgreementVisitLinkFromJobCreation(params:
       updated_by_user_id: createdByUserId,
     };
 
-    const { error: linkErr } = await supabase
+    const { error: linkErr } = await admin
       .from("maintenance_agreement_visits")
       .insert(linkPayload)
       .select("id")

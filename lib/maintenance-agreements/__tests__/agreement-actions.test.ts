@@ -102,6 +102,123 @@ function makeAdminClient(params?: {
   };
 }
 
+function makeLinkAdminClient(params?: {
+  internalUserFound?: boolean;
+  internalUserActive?: boolean;
+  agreementFound?: boolean;
+  jobFound?: boolean;
+  customerFound?: boolean;
+  duplicateErrorCode?: string | null;
+}) {
+  const internalUserFound = params?.internalUserFound ?? true;
+  const internalUserActive = params?.internalUserActive ?? true;
+  const agreementFound = params?.agreementFound ?? true;
+  const jobFound = params?.jobFound ?? true;
+  const customerFound = params?.customerFound ?? true;
+  const duplicateErrorCode = params?.duplicateErrorCode ?? null;
+  const insertCalls: unknown[] = [];
+
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "internal_users") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: internalUserFound
+                  ? {
+                      account_owner_user_id: "owner-1",
+                      is_active: internalUserActive,
+                    }
+                  : null,
+                error: null,
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "maintenance_agreements") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: agreementFound
+                    ? {
+                        id: "agr-1",
+                        customer_id: "cust-1",
+                        account_owner_user_id: "owner-1",
+                      }
+                    : null,
+                  error: null,
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "jobs") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: jobFound
+                  ? {
+                      id: "job-1",
+                      customer_id: "cust-1",
+                    }
+                  : null,
+                error: null,
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "customers") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: customerFound ? { id: "cust-1" } : null,
+                  error: null,
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "maintenance_agreement_visits") {
+        return {
+          insert: vi.fn((payload: unknown) => {
+            insertCalls.push(payload);
+            return {
+              select: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: duplicateErrorCode ? null : { id: "link-1" },
+                  error: duplicateErrorCode
+                    ? {
+                        code: duplicateErrorCode,
+                        message: "duplicate key value violates unique constraint",
+                      }
+                    : null,
+                })),
+              })),
+            };
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected admin table ${table}`);
+    }),
+    _insertCalls: insertCalls,
+  };
+}
+
 const { createMaintenanceAgreement, updateMaintenanceAgreement } = await import(
   "@/lib/maintenance-agreements/agreement-actions"
 );
@@ -194,6 +311,13 @@ describe("maintenance agreement actions", () => {
       startDate: "2026-05-01",
       renewalDate: "",
       defaultVisitScopeSummary: "Summary",
+      defaultVisitScopeItemsJson: JSON.stringify([
+        {
+          title: " Inspect condenser coil ",
+          details: " Clean as needed ",
+          kind: "primary",
+        },
+      ]),
       internalNotes: "Internal",
     });
 
@@ -207,7 +331,36 @@ describe("maintenance agreement actions", () => {
       agreement_type: "service_plan",
       frequency: "annual",
       renewal_date: null,
+      default_visit_scope_items: [
+        {
+          title: "Inspect condenser coil",
+          details: "Clean as needed",
+          kind: "primary",
+        },
+      ],
     });
+  });
+
+  it("rejects invalid default work items safely", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(makeAdminClient());
+
+    const result = await createMaintenanceAgreement({
+      customerId: "cust-1",
+      agreementName: "Plan Invalid Items",
+      agreementType: "service_plan",
+      frequency: "annual",
+      nextDueDate: "2026-10-01",
+      startDate: "2026-05-01",
+      defaultVisitScopeItemsJson: "{not-json}",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Default Work Items must be valid visit scope items.",
+    });
+    expect(supabase._insertCalls).toHaveLength(0);
   });
 
   it("updates allowed fields and rejects invalid status", async () => {
@@ -236,6 +389,13 @@ describe("maintenance agreement actions", () => {
       frequency: "quarterly",
       nextDueDate: "2026-06-01",
       startDate: "2026-05-01",
+      defaultVisitScopeItemsJson: JSON.stringify([
+        {
+          title: " Replace filter ",
+          details: " 16x25x1 ",
+          kind: "primary",
+        },
+      ]),
       status: "active",
     });
 
@@ -245,6 +405,13 @@ describe("maintenance agreement actions", () => {
       agreement_name: "Plan C",
       status: "active",
       updated_by_user_id: "user-1",
+      default_visit_scope_items: [
+        {
+          title: "Replace filter",
+          details: "16x25x1",
+          kind: "primary",
+        },
+      ],
     });
     expect(supabase._updateCalls[0]).not.toHaveProperty("customer_id");
     expect(supabase._updateCalls[0]).not.toHaveProperty("account_owner_user_id");
@@ -284,5 +451,56 @@ describe("createMaintenanceAgreementVisitLinkFromJobCreation", () => {
     });
 
     expect(result).toBe(false);
+  });
+
+  it("creates a link row when admin-scoped validation passes", async () => {
+    const { createMaintenanceAgreementVisitLinkFromJobCreation } = await import("@/lib/maintenance-agreements/agreement-actions");
+
+    isMaintenanceAgreementsEnabledMock.mockReturnValue(true);
+    const admin = makeLinkAdminClient();
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await createMaintenanceAgreementVisitLinkFromJobCreation({
+      agreementId: "agr-1",
+      jobId: "job-1",
+      createdByUserId: "user-1",
+    });
+
+    expect(result).toBe(true);
+    expect(admin._insertCalls).toHaveLength(1);
+    expect(admin._insertCalls[0]).toMatchObject({
+      account_owner_user_id: "owner-1",
+      agreement_id: "agr-1",
+      job_id: "job-1",
+      link_source: "service_plan_prefill",
+      count_status: "linked",
+      counts_toward_visit_balance: false,
+      created_by_user_id: "user-1",
+      updated_by_user_id: "user-1",
+    });
+  });
+
+  it("uses the provided owner scope without requiring an internal user lookup", async () => {
+    const { createMaintenanceAgreementVisitLinkFromJobCreation } = await import("@/lib/maintenance-agreements/agreement-actions");
+
+    isMaintenanceAgreementsEnabledMock.mockReturnValue(true);
+    const admin = makeLinkAdminClient({ internalUserFound: false });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await createMaintenanceAgreementVisitLinkFromJobCreation({
+      agreementId: "agr-1",
+      jobId: "job-1",
+      createdByUserId: "user-1",
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result).toBe(true);
+    expect(admin.from).not.toHaveBeenCalledWith("internal_users");
+    expect(admin._insertCalls).toHaveLength(1);
+    expect(admin._insertCalls[0]).toMatchObject({
+      account_owner_user_id: "owner-1",
+      agreement_id: "agr-1",
+      job_id: "job-1",
+    });
   });
 });

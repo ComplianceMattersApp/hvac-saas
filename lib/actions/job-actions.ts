@@ -6904,11 +6904,15 @@ if (!canonicalOwnerUserId) {
     accountOwnerUserId: canonicalOwnerUserId,
   });
 
-  jobType = lockInternalIntakeJobTypeForProductMode({
-    requestedJobType: jobType,
-    productMode,
-    isContractorUser,
-  });
+  const shouldForceServicePlanJobType = !isContractorUser && Boolean(maintenanceAgreementIdRaw);
+
+  jobType = shouldForceServicePlanJobType
+    ? "service"
+    : lockInternalIntakeJobTypeForProductMode({
+        requestedJobType: jobType,
+        productMode,
+        isContractorUser,
+      });
 
   jurisdiction = jobType === "service" ? null : (jurisdictionRaw || null);
   permit_date = jobType === "service" ? null : (permitDateRaw || null);
@@ -7774,16 +7778,17 @@ function canContractorWriteEvent(event_type: string) {
       serviceCaseWriteClient: canonicalWriteClient,
     });
 
-  await postCreate(created.id, followUpServiceCaseId ? "customer_follow_up" : "customer");
-
   // Attempt to create maintenance agreement visit link if this job came from service plan prefill
   if (maintenanceAgreementIdRaw && userId) {
     await createMaintenanceAgreementVisitLinkFromJobCreation({
       agreementId: maintenanceAgreementIdRaw,
       jobId: created.id,
       createdByUserId: userId,
+      accountOwnerUserId: canonicalOwnerUserId,
     });
   }
+
+  await postCreate(created.id, followUpServiceCaseId ? "customer_follow_up" : "customer");
 
   return;
   }
@@ -8063,16 +8068,17 @@ if (existingCustomerId && !existingLocationId) {
     serviceCaseWriteClient: canonicalWriteClient,
   });
 
-  await postCreate(created.id, "customer_new_location");
-
   // Attempt to create maintenance agreement visit link if this job came from service plan prefill
   if (maintenanceAgreementIdRaw && userId) {
     await createMaintenanceAgreementVisitLinkFromJobCreation({
       agreementId: maintenanceAgreementIdRaw,
       jobId: created.id,
       createdByUserId: userId,
+      accountOwnerUserId: canonicalOwnerUserId,
     });
   }
+
+  await postCreate(created.id, "customer_new_location");
 
   return;
 }
@@ -8185,17 +8191,18 @@ const created = await createJob({
   serviceCaseWriteClient: canonicalWriteClient,
 });
 
-const banner = reused ? "customer_reused" : "customer_created";
-await postCreate(created.id, banner);
-
 // Attempt to create maintenance agreement visit link if this job came from service plan prefill
 if (maintenanceAgreementIdRaw && userId) {
   await createMaintenanceAgreementVisitLinkFromJobCreation({
     agreementId: maintenanceAgreementIdRaw,
     jobId: created.id,
     createdByUserId: userId,
+    accountOwnerUserId: canonicalOwnerUserId,
   });
 }
+
+const banner = reused ? "customer_reused" : "customer_created";
+await postCreate(created.id, banner);
 
 return;
 }
