@@ -48,6 +48,25 @@ export type MaintenanceAgreementFrequency = (typeof MAINTENANCE_AGREEMENT_FREQUE
 export type MaintenanceAgreementStatus = (typeof MAINTENANCE_AGREEMENT_STATUSES)[number];
 export type MaintenanceAgreementDueState = "overdue" | "due_today" | "upcoming" | "not_scheduled" | "inactive";
 
+export type MaintenanceAgreementSummary = {
+  as_of_date: string;
+  total_count: number;
+  status_counts: {
+    active: number;
+    draft: number;
+    paused: number;
+    expired: number;
+    cancelled: number;
+  };
+  due_counts: {
+    overdue: number;
+    due_today: number;
+    due_in_next_7_days: number;
+    due_in_next_30_days: number;
+    not_scheduled_active: number;
+  };
+};
+
 export type MaintenanceAgreementRow = {
   id: string;
   account_owner_user_id: string;
@@ -97,6 +116,10 @@ type ListUpcomingOverdueParams = ListMaintenanceAgreementsParams & {
   limit?: number | null;
 };
 
+type SummarizeMaintenanceAgreementsParams = ListMaintenanceAgreementsParams & {
+  today?: string | null;
+};
+
 function toCleanString(value: string | null | undefined) {
   return String(value ?? "").trim();
 }
@@ -108,6 +131,39 @@ function isValidYmd(value: string | null | undefined) {
 function normalizeLimit(value: number | null | undefined) {
   if (!Number.isFinite(value ?? NaN)) return 100;
   return Math.min(Math.max(Math.trunc(Number(value)), 1), 500);
+}
+
+function resolveAsOfDate(today: string | null | undefined) {
+  if (isValidYmd(today)) return toCleanString(today);
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addDaysToYmd(ymd: string, days: number) {
+  const date = new Date(`${ymd}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return ymd;
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function createEmptyMaintenanceAgreementSummary(asOfDate: string): MaintenanceAgreementSummary {
+  return {
+    as_of_date: asOfDate,
+    total_count: 0,
+    status_counts: {
+      active: 0,
+      draft: 0,
+      paused: 0,
+      expired: 0,
+      cancelled: 0,
+    },
+    due_counts: {
+      overdue: 0,
+      due_today: 0,
+      due_in_next_7_days: 0,
+      due_in_next_30_days: 0,
+      not_scheduled_active: 0,
+    },
+  };
 }
 
 export function isMaintenanceAgreementType(value: string | null | undefined): value is MaintenanceAgreementType {
@@ -211,4 +267,65 @@ export async function listUpcomingOverdueMaintenanceAgreements(params: ListUpcom
       today: params.today,
     }),
   }));
+}
+
+export async function summarizeMaintenanceAgreementsForAccount(
+  params: SummarizeMaintenanceAgreementsParams,
+): Promise<MaintenanceAgreementSummary> {
+  const accountOwnerUserId = toCleanString(params.accountOwnerUserId);
+  const asOfDate = resolveAsOfDate(params.today);
+  if (!accountOwnerUserId) {
+    return createEmptyMaintenanceAgreementSummary(asOfDate);
+  }
+
+  const { data, error } = await params.supabase
+    .from("maintenance_agreements")
+    .select("status, next_due_date")
+    .eq("account_owner_user_id", accountOwnerUserId);
+
+  if (error) throw error;
+
+  const rows = (data ?? []) as Array<{ status?: string | null; next_due_date?: string | null }>;
+  const summary = createEmptyMaintenanceAgreementSummary(asOfDate);
+  const next7Date = addDaysToYmd(asOfDate, 7);
+  const next30Date = addDaysToYmd(asOfDate, 30);
+
+  summary.total_count = rows.length;
+
+  for (const row of rows) {
+    const status = toCleanString(row.status).toLowerCase();
+    if (status === "active") summary.status_counts.active += 1;
+    if (status === "draft") summary.status_counts.draft += 1;
+    if (status === "paused") summary.status_counts.paused += 1;
+    if (status === "expired") summary.status_counts.expired += 1;
+    if (status === "cancelled") summary.status_counts.cancelled += 1;
+
+    if (status !== "active") continue;
+
+    const dueState = classifyMaintenanceAgreementDueState({
+      status,
+      nextDueDate: row.next_due_date ?? null,
+      today: asOfDate,
+    });
+
+    if (dueState === "overdue") {
+      summary.due_counts.overdue += 1;
+      continue;
+    }
+    if (dueState === "due_today") {
+      summary.due_counts.due_today += 1;
+      continue;
+    }
+    if (dueState === "not_scheduled") {
+      summary.due_counts.not_scheduled_active += 1;
+      continue;
+    }
+    if (dueState !== "upcoming") continue;
+
+    const nextDueDate = toCleanString(row.next_due_date);
+    if (nextDueDate <= next7Date) summary.due_counts.due_in_next_7_days += 1;
+    if (nextDueDate <= next30Date) summary.due_counts.due_in_next_30_days += 1;
+  }
+
+  return summary;
 }

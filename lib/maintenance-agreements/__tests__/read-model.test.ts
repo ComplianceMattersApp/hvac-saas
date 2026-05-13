@@ -8,6 +8,7 @@ import {
   listMaintenanceAgreementsForCustomer,
   listMaintenanceAgreementsForLocation,
   listUpcomingOverdueMaintenanceAgreements,
+  summarizeMaintenanceAgreementsForAccount,
 } from "@/lib/maintenance-agreements/read-model";
 
 const ACCOUNT_OWNER = "owner-1";
@@ -236,6 +237,78 @@ describe("maintenance agreement read model", () => {
       }),
     ).resolves.toEqual([]);
 
+    expect(calls).toEqual([]);
+  });
+
+  it("summarizes status counts and due buckets for active agreements only", async () => {
+    const { supabase, calls } = makeSupabaseMock([
+      makeAgreement({ id: "active-overdue", status: "active", next_due_date: "2026-05-11" }),
+      makeAgreement({ id: "active-today", status: "active", next_due_date: "2026-05-12" }),
+      makeAgreement({ id: "active-next-7", status: "active", next_due_date: "2026-05-19" }),
+      makeAgreement({ id: "active-next-30", status: "active", next_due_date: "2026-06-11" }),
+      makeAgreement({ id: "active-beyond-30", status: "active", next_due_date: "2026-06-12" }),
+      makeAgreement({ id: "active-no-date", status: "active", next_due_date: null }),
+      makeAgreement({ id: "draft", status: "draft", next_due_date: "2026-05-10" }),
+      makeAgreement({ id: "paused", status: "paused", next_due_date: "2026-05-10" }),
+      makeAgreement({ id: "expired", status: "expired", next_due_date: "2026-05-10" }),
+      makeAgreement({ id: "cancelled", status: "cancelled", next_due_date: "2026-05-10" }),
+    ]);
+
+    const summary = await summarizeMaintenanceAgreementsForAccount({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      today: "2026-05-12",
+    });
+
+    expect(summary).toEqual({
+      as_of_date: "2026-05-12",
+      total_count: 10,
+      status_counts: {
+        active: 6,
+        draft: 1,
+        paused: 1,
+        expired: 1,
+        cancelled: 1,
+      },
+      due_counts: {
+        overdue: 1,
+        due_today: 1,
+        due_in_next_7_days: 1,
+        due_in_next_30_days: 2,
+        not_scheduled_active: 1,
+      },
+    });
+
+    expect(calls).toContainEqual({ op: "eq", column: "account_owner_user_id", value: ACCOUNT_OWNER });
+  });
+
+  it("returns safe empty summary and avoids querying when account scope is missing", async () => {
+    const { supabase, calls } = makeSupabaseMock([makeAgreement({ id: "a-1" })]);
+
+    const summary = await summarizeMaintenanceAgreementsForAccount({
+      supabase,
+      accountOwnerUserId: " ",
+      today: "2026-05-12",
+    });
+
+    expect(summary).toEqual({
+      as_of_date: "2026-05-12",
+      total_count: 0,
+      status_counts: {
+        active: 0,
+        draft: 0,
+        paused: 0,
+        expired: 0,
+        cancelled: 0,
+      },
+      due_counts: {
+        overdue: 0,
+        due_today: 0,
+        due_in_next_7_days: 0,
+        due_in_next_30_days: 0,
+        not_scheduled_active: 0,
+      },
+    });
     expect(calls).toEqual([]);
   });
 });
