@@ -16,7 +16,6 @@ import {
   updateJobContractorFromForm,
   updateJobScheduleFromForm,
   advanceJobStatusFromForm,
-  updateJobTypeFromForm,
   updateJobServiceContractFromForm,
   createNextServiceVisitFromForm,
   completeDataEntryFromForm,
@@ -3956,41 +3955,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               ) : null}
 
               <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <details className="group w-full rounded-xl border border-slate-200/80 bg-white p-4 text-sm shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90">
-                  <summary className="cursor-pointer list-none">
-                    <CollapsibleHeader
-                      title="Change Job Type"
-                      subtitle="Switch between service and ECC workflows."
-                    />
-                  </summary>
-
-                  <form
-                    action={updateJobTypeFromForm}
-                    className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center"
-                  >
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <p className="text-xs text-slate-600">
-                      Current type: {job.job_type ?? "service"}
-                    </p>
-
-                    <select
-                      name="job_type"
-                      defaultValue={job.job_type ?? "service"}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                    >
-                      <option value="service">Service</option>
-                      <option value="ecc">ECC</option>
-                    </select>
-
-                    <SubmitButton
-                      loadingText="Updating..."
-                      className={primaryButtonClass}
-                    >
-                      Update
-                    </SubmitButton>
-                  </form>
-                </details>
-
                 <details className="group w-full rounded-xl border border-slate-200/80 bg-white p-4 text-sm shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90">
                   <summary className="cursor-pointer list-none">
                     <CollapsibleHeader
