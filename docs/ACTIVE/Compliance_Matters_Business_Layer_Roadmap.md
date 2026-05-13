@@ -311,9 +311,18 @@ The following product-configuration work is **explicitly parked** and **not in c
     - sanitized summary/work-item defaults copied into editable job intake form state
     - non-blocking safe fallback when agreement prefill is invalid/unavailable
     - existing normal create flow preserved (no job/agreement persisted linkage)
+  - Group 9A-8B Service Plans read-only drilldown page + ops link is implemented and pushed with:
+    - new internal/account-scoped read-only `/service-plans` route
+    - feature-gated `View Service Plans` link in the existing `/ops` Service Plans summary card
+    - `/ops` kept summary-only (no full drilldown query added there)
+    - account-scoped, capped drilldown helper in `lib/maintenance-agreements/read-model.ts`
+    - read-only row shape for customer/location/status/type/frequency/next due/due state
+    - customer name links to existing customer detail pages
+    - filters: all, active, overdue, due today, due 1-7 days, due 8-30 days, not scheduled, inactive
   - Summary output includes status counts, due buckets, `total_count`, and `as_of_date` with strict account scoping and active-only due queue semantics.
-  - Service Plan counts and due/overdue summary logic are implemented in the repo/read model and exposed on `/ops` as a read-only card; no broader user-facing Service Plans module dashboard exists yet.
+  - Service Plan counts and due/overdue summary logic are implemented in the repo/read model and exposed on `/ops` as a read-only card, and the internal read-only `/service-plans` drilldown is now available behind feature gating.
   - Maintenance Agreements create/edit is implemented in repo and sandbox-ready behind feature gating, but production remains inactive until migration apply and flag enablement are intentionally approved.
+  - Warning/watch item: full manual browser click-through of every `/service-plans` filter chip remains open; helper bucket logic is covered by targeted tests.
 - Tenant payment execution (Stripe subscription/checkout; parked)
 - QBO integration (optional downstream; parked)
 - Support Console production enablement (parked)

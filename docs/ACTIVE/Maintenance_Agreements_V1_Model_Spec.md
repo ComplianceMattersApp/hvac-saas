@@ -12,6 +12,63 @@ The V1 goal is simple: let an operator track recurring service obligations for a
 
 This spec is intentionally not a billing, payment, portal, SMS, or automation design.
 
+## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
+
+Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.
+
+Recorded implementation artifacts:
+
+- New read-only route: `app/service-plans/page.tsx`
+- Optional route loading state: `app/service-plans/loading.tsx`
+- Ops link placement: `app/ops/page.tsx` (Service Plans summary card)
+- Account-scoped drilldown helper: `listMaintenanceAgreementDrilldownForAccount` in `lib/maintenance-agreements/read-model.ts`
+- Targeted test expansion: `lib/maintenance-agreements/__tests__/read-model.test.ts`
+
+Recorded behavior:
+
+- `/ops` Service Plans summary card now includes `View Service Plans` when feature-gated.
+- `/ops` remains summary-only; full list read happens only on `/service-plans`.
+- `/service-plans` is internal/account-scoped and read-only.
+- `/service-plans` remains feature-gated behind `ENABLE_MAINTENANCE_AGREEMENTS`.
+- Drilldown helper is account-scoped and capped.
+- Page shows read-only plan rows with customer/location/status/type/frequency/next due/due state.
+- Customer names link to existing customer detail pages.
+- Filters exposed on `/service-plans`:
+	- all
+	- active
+	- overdue
+	- due today
+	- due 1-7 days
+	- due 8-30 days
+	- not scheduled
+	- inactive
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`34` tests).
+- `npx.cmd tsc --noEmit` passed.
+- `git diff --check` passed (no blocking errors).
+- Browser smoke passed:
+	- flag off: `/ops` hides Service Plans link and `/service-plans` fails closed/redirects
+	- flag on: `/ops` link visible and `/service-plans` renders rows/customer links
+	- inactive filter verified
+	- `/ops` continuity confirmed
+
+Boundaries preserved in Group 9A-8B:
+
+- no create/edit on drilldown page
+- no Create Work Order action on drilldown page
+- no job generation
+- no due date advancement
+- no visit-balance deduction
+- no invoice/payment behavior
+- no Stripe/QBO/SMS/customer portal behavior
+- no heavier ops drilldown query
+
+Watch item:
+
+- Full manual click-through of every filter chip was not performed in browser smoke; helper bucket logic is covered by tests.
+
 ## Group 9A-7B Closeout Snapshot (manual Create Work Order from Service Plan prefill V1 implemented in repo)
 
 Group 9A-7B (Manual Create Work Order from Service Plan Prefill V1) is implemented and pushed in commit `3c186e5`.

@@ -24,6 +24,17 @@ Group 9A planning source of truth is [Maintenance_Agreements_V1_Model_Spec.md](.
 
 Current Program Status Note (May 2026)
 
+- Group 9A-8B Service Plans Read-Only Drilldown Page + Ops Link is complete and pushed:
+  - new read-only internal/account-scoped `/service-plans` route added in `app/service-plans/page.tsx` with loading state in `app/service-plans/loading.tsx`
+  - `/ops` Service Plans summary card now includes `View Service Plans` when feature-gated
+  - `/ops` remains summary-only; full list read executes only on `/service-plans`
+  - drilldown helper `listMaintenanceAgreementDrilldownForAccount` implemented in `lib/maintenance-agreements/read-model.ts` with targeted coverage in `lib/maintenance-agreements/__tests__/read-model.test.ts`
+  - read-only row shape includes customer/location/status/type/frequency/next due/due state, and customer names link to existing customer detail pages
+  - filters on `/service-plans`: `all`, `active`, `overdue`, `due_today`, `due_1_7_days`, `due_8_30_days`, `not_scheduled`, `inactive`
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`34` tests), `npx.cmd tsc --noEmit` passed, `git diff --check` passed; browser smoke passed for flag-off fail-closed behavior, flag-on link visibility/route render/customer links, inactive-filter check, and `/ops` continuity
+  - boundaries preserved: no create/edit on drilldown, no Create Work Order action on drilldown, no job generation, no due-date advancement, no visit-balance deduction, no invoice/payment/Stripe/QBO/SMS/customer-portal behavior, and no heavier `/ops` drilldown query
+  - watch item: full manual click-through of every filter chip was not completed in browser smoke; helper bucket logic is covered by tests
+
 - Group 9A-7B Manual Create Work Order from Service Plan Prefill V1 is complete and pushed in commit `3c186e5`:
   - customer profile maintenance agreement cards now expose compact `Create Work Order` entry points when feature-gated
   - link payload remains lightweight: `customer_id` + `maintenance_agreement_id`
