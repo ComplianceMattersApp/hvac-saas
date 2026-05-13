@@ -1,6 +1,6 @@
 # Maintenance Agreements / Recurring Services V1 Model Spec
 
-Status: ACTIVE PLANNING SPEC  
+Status: ACTIVE IMPLEMENTATION TRACKING SPEC
 Owner lane: Group 9A - Recurring Services / Maintenance Agreements  
 Scope: model guidance plus Group 9A-2 backend foundation closeout documentation. Backend foundation is committed in repo but is not production-active until migration apply is intentionally executed through the environment process.
 
@@ -11,6 +11,61 @@ Maintenance Agreements V1 defines the future customer-owned recurring service ag
 The V1 goal is simple: let an operator track recurring service obligations for a customer, optionally tied to one primary location, and manually create normal Jobs / Work Orders when a visit is due.
 
 This spec is intentionally not a billing, payment, portal, SMS, or automation design.
+
+## Group 9A-4 Closeout Snapshot (create/edit V1 implemented in repo, sandbox-ready behind feature gating)
+
+Group 9A-4 (Maintenance Agreement Create/Edit V1) is implemented and pushed in commit `9f81d6f`.
+
+Recorded implementation artifacts:
+
+- Server actions: `lib/maintenance-agreements/agreement-actions.ts`
+- Customer profile create/edit forms: `app/customers/[id]/page.tsx`
+- Tests: `lib/maintenance-agreements/__tests__/agreement-actions.test.ts`
+
+Recorded create fields:
+
+- `agreement_name`
+- `agreement_type`
+- `frequency`
+- `next_due_date`
+- `start_date`
+- `renewal_date` (optional)
+- `primary_location_id` (optional)
+- `default_visit_scope_summary` (optional)
+- `internal_notes` (optional)
+
+Recorded edit fields:
+
+- same fields as create
+- `status`
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`26` tests).
+- `npx.cmd tsc --noEmit` passed.
+- Browser smoke passed for create and edit flow, including:
+	- `maSaved=created` and `maSaved=updated` redirect states
+	- updated card content showing renamed agreement and `Active` status
+	- existing customer profile sections still rendering after mutation flows
+
+Boundaries preserved in Group 9A-4:
+
+- no delete
+- no customer reassignment
+- no preferred technician UI
+- no multi-location support
+- no job generation
+- no calendar events
+- no invoices or payments
+- no Stripe tenant payment behavior
+- no QBO
+- no SMS
+- no customer portal exposure
+- no production migration apply or flag enablement
+
+Implementation status statement:
+
+- Maintenance Agreements create/edit is implemented in repo and sandbox-ready behind feature gating, but production remains inactive until migration apply and flag enablement are intentionally approved.
 
 ## Group 9A-3 Closeout Snapshot (read-only customer profile section, not production-active)
 

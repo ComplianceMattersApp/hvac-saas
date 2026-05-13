@@ -24,6 +24,17 @@ Group 9A planning source of truth is [Maintenance_Agreements_V1_Model_Spec.md](.
 
 Current Program Status Note (May 2026)
 
+- Group 9A-4 Maintenance Agreement Create/Edit V1 is complete and pushed in commit `9f81d6f`:
+  - server actions: `lib/maintenance-agreements/agreement-actions.ts`
+  - customer profile create/edit UI: `app/customers/[id]/page.tsx`
+  - tests: `lib/maintenance-agreements/__tests__/agreement-actions.test.ts`
+  - internal-only create/edit preserves account/customer/location scope and mutates allowed fields only
+  - recorded allowed create fields: `agreement_name`, `agreement_type`, `frequency`, `next_due_date`, `start_date`, optional `renewal_date`, optional `primary_location_id`, optional `default_visit_scope_summary`, optional `internal_notes`
+  - recorded allowed edit fields: create fields plus `status`
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`26` tests), `npx.cmd tsc --noEmit` passed, browser smoke passed create/edit flow with `maSaved=created` and `maSaved=updated`
+  - boundaries preserved: no delete, no customer reassignment, no preferred technician UI, no multi-location support, no job generation, no calendar events, no invoices/payments, no Stripe tenant payment behavior, no QBO, no SMS, no portal
+  - implementation status statement: Maintenance Agreements create/edit is implemented in repo and sandbox-ready behind feature gating, but production remains inactive until migration apply and flag enablement are intentionally approved.
+
 - Group 9A-3 Customer Profile Read-Only Agreement Display is complete and pushed in commit `09edc9f`:
   - feature flag: `lib/maintenance-agreements/agreement-exposure.ts` (`ENABLE_MAINTENANCE_AGREEMENTS`, defaults `false`)
   - customer profile: `app/customers/[id]/page.tsx` — guarded read + Maintenance Agreements section (internal viewer + flag on only)

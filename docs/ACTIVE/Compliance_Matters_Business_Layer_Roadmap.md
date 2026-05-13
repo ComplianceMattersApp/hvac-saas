@@ -298,7 +298,11 @@ The following product-configuration work is **explicitly parked** and **not in c
   - Controlled smoke estimate created and verified: `8796f8fc-04fb-4c53-bb05-15ab98ab31b4` (`EST-20260510-414FB343`) with one manual line item and total `$123.45`.
   - Boundaries remained intact: no outbound email/PDF/public links/contractor-customer exposure/conversion/payment/Stripe-tenant/QBO/Product Mode/Support Console changes.
   - Warning/watch item: intermittent `net::ERR_ABORTED` browser-log events appeared during navigation/action transitions; required smoke outcomes persisted successfully.
-- Recurring maintenance agreements / service subscriptions (capability exists; not in release scope)
+- Recurring maintenance agreements / service subscriptions (capability exists; not in release scope).
+  - Group 9A-2 backend foundation is committed (`b126ff6`).
+  - Group 9A-3 customer profile read-only display is committed (`09edc9f`).
+  - Group 9A-4 customer profile create/edit V1 is committed (`9f81d6f`) and sandbox-ready behind feature gating.
+  - Maintenance Agreements create/edit is implemented in repo and sandbox-ready behind feature gating, but production remains inactive until migration apply and flag enablement are intentionally approved.
 - Tenant payment execution (Stripe subscription/checkout; parked)
 - QBO integration (optional downstream; parked)
 - Support Console production enablement (parked)
