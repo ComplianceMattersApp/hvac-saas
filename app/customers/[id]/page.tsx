@@ -13,6 +13,12 @@ import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { listEstimatesByAccount, type EstimateListItem } from "@/lib/estimates/estimate-read";
 import { requireInternalUser, isInternalAccessError } from "@/lib/auth/internal-user";
+import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
+import {
+  listMaintenanceAgreementsForCustomer,
+  classifyMaintenanceAgreementDueState,
+  type MaintenanceAgreementRow,
+} from "@/lib/maintenance-agreements/read-model";
 
 
 type CustomerRow = {
@@ -497,6 +503,24 @@ export default async function CustomerDetailPage(props: {
   const callHref = makeTelHref(customer.phone);
   const smsHref = makeSmsHref(customer.phone);
   const customerBillingAddress = billingAddressLine(customer);
+
+  // Maintenance Agreements: load only for internal viewers when the flag is on
+  // The maintenance_agreements table does not exist in production yet. The flag
+  // defaults to false, so production reads are never attempted.
+  let customerAgreements: MaintenanceAgreementRow[] = [];
+  const maintenanceAgreementsEnabled = isInternalViewer && isMaintenanceAgreementsEnabled();
+  if (maintenanceAgreementsEnabled) {
+    try {
+      customerAgreements = await listMaintenanceAgreementsForCustomer({
+        supabase,
+        accountOwnerUserId: visibilityScope.accountOwnerUserId,
+        customerId,
+      });
+    } catch {
+      // Fail safely — table may not exist in this environment
+      customerAgreements = [];
+    }
+  }
 
   // Estimates: load only for internal viewers when estimates are enabled
   let customerEstimates: EstimateListItem[] = [];
@@ -1126,6 +1150,99 @@ export default async function CustomerDetailPage(props: {
                     </Link>
                   </div>
                 ))}
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        {/* Maintenance Agreements — internal only, visible when ENABLE_MAINTENANCE_AGREEMENTS is on */}
+        {isInternalViewer && maintenanceAgreementsEnabled ? (
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">Maintenance Agreements</h2>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Active and upcoming maintenance agreements for this customer.
+              </p>
+            </div>
+
+            {customerAgreements.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6">
+                <p className="text-sm text-slate-500">No maintenance agreements yet.</p>
+                <p className="mt-1 text-xs text-slate-400">Agreement setup will be added in a later slice.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {customerAgreements.map((agr) => {
+                  const dueState = classifyMaintenanceAgreementDueState({
+                    status: agr.status,
+                    nextDueDate: agr.next_due_date,
+                  });
+                  const dueStateBadge = {
+                    overdue: "border-red-200 bg-red-50 text-red-700",
+                    due_today: "border-amber-200 bg-amber-50 text-amber-700",
+                    upcoming: "border-blue-200 bg-blue-50 text-blue-700",
+                    not_scheduled: "border-slate-200 bg-slate-100 text-slate-600",
+                    inactive: "border-slate-200 bg-slate-100 text-slate-500",
+                  } as const;
+                  const dueStateLabel = {
+                    overdue: "Overdue",
+                    due_today: "Due Today",
+                    upcoming: "Upcoming",
+                    not_scheduled: "Not Scheduled",
+                    inactive: "Inactive",
+                  } as const;
+                  const statusBadge = agr.status === "active"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200 bg-slate-100 text-slate-600";
+
+                  return (
+                    <div
+                      key={agr.id}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-1">
+                          <div className="text-sm font-medium text-slate-900">
+                            {agr.agreement_name}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={[
+                                "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                                statusBadge,
+                              ].join(" ")}
+                            >
+                              {String(agr.status).charAt(0).toUpperCase() + String(agr.status).slice(1)}
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              {String(agr.agreement_type).replace(/_/g, " ")}
+                            </span>
+                            <span className="text-slate-300">&middot;</span>
+                            <span className="text-xs text-slate-500">
+                              {String(agr.frequency).replace(/_/g, " ")}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          {agr.next_due_date ? (
+                            <span
+                              className={[
+                                "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+                                dueStateBadge[dueState],
+                              ].join(" ")}
+                            >
+                              {dueStateLabel[dueState]} &mdash; {formatDate(agr.next_due_date)}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
+                              No due date
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>
