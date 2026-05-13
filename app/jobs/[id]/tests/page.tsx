@@ -1184,13 +1184,19 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
     return (
       <div className={eccPageShellClass}>
-          {notice === "rc_exempt_reason_required" && (
-      <div className="mb-4 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Select <span className="font-semibold">Package unit</span> or{" "}
-        <span className="font-semibold">Conditions not met</span> before marking
-        refrigerant charge exempt.
-      </div>
-    )}
+        {notice === "rc_exempt_reason_required" && (
+          <div className="mb-4 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Select <span className="font-semibold">Package unit</span> or{" "}
+            <span className="font-semibold">Conditions not met</span> before marking
+            refrigerant charge exempt.
+          </div>
+        )}
+        {notice === "airflow_override_reason_required" && (
+          <div className="mb-4 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Enter an <span className="font-semibold">override reason</span> before using
+            airflow pass override.
+          </div>
+        )}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:p-5 print:hidden">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">

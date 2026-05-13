@@ -51,22 +51,35 @@ function makeCapturingSupabase() {
     captured,
     supabase: {
       from(table: string) {
-        if (table !== "ecc_test_runs") {
-          throw new Error(`UNEXPECTED_TABLE:${table}`);
-        }
-
-        const query: any = {
-          update: vi.fn((payload: any) => {
-            captured.push({ table, method: "update", payload });
-            return {
-              eq: vi.fn(() => ({
-                eq: vi.fn(() => Promise.resolve({ error: null })),
-              })),
-            };
-          }),
+        const chainNode = (resolveData: () => any): any => {
+          const node: any = {
+            select: vi.fn(() => chainNode(resolveData)),
+            eq: vi.fn(() => chainNode(resolveData)),
+            order: vi.fn(() => chainNode(resolveData)),
+            limit: vi.fn(() => chainNode(resolveData)),
+            single: vi.fn(async () => ({ data: resolveData(), error: null })),
+            maybeSingle: vi.fn(async () => ({ data: resolveData(), error: null })),
+            update: vi.fn((payload: any) => {
+              captured.push({ table, method: "update", payload });
+              return {
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => Promise.resolve({ error: null })),
+                })),
+              };
+            }),
+          };
+          return node;
         };
 
-        return query;
+        if (table === "job_visits") {
+          return chainNode(() => ({ id: "visit-1", visit_number: 1 }));
+        }
+
+        if (table === "ecc_test_runs") {
+          return chainNode(() => ({ id: "run-1", data: {}, system_id: "system-1", visit_id: null }));
+        }
+
+        throw new Error(`UNEXPECTED_TABLE:${table}`);
       },
     },
   };
@@ -144,5 +157,76 @@ describe("ECC target override persistence", () => {
     expect(update?.payload.data.cfm_per_ton_target).toBe(380);
     expect(update?.payload.computed.required_total_cfm).toBe(760);
     expect(update?.payload.computed_pass).toBe(true);
+  });
+
+  it("redirects with validation notice when airflow override is enabled without reason (save)", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("test_run_id", "run-1");
+    formData.set("system_id", "system-1");
+    formData.set("project_type", "all_new");
+    formData.set("tonnage", "2");
+    formData.set("measured_total_cfm", "760");
+    formData.set("airflow_override_pass", "true");
+    formData.set("airflow_override_reason", "   ");
+
+    const { saveAirflowDataFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveAirflowDataFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1&notice=airflow_override_reason_required",
+    );
+
+    expect(captured.filter((entry) => entry.table === "ecc_test_runs" && entry.method === "update")).toHaveLength(0);
+  });
+
+  it("redirects with validation notice when airflow override is enabled without reason (save and complete)", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("test_run_id", "run-1");
+    formData.set("system_id", "system-1");
+    formData.set("project_type", "all_new");
+    formData.set("tonnage", "2");
+    formData.set("measured_total_cfm", "760");
+    formData.set("airflow_override_pass", "true");
+    formData.set("airflow_override_reason", "");
+
+    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveAndCompleteAirflowFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1&notice=airflow_override_reason_required",
+    );
+
+    expect(captured.filter((entry) => entry.table === "ecc_test_runs" && entry.method === "update")).toHaveLength(0);
+  });
+
+  it("preserves successful airflow override complete behavior when reason is provided", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("test_run_id", "run-1");
+    formData.set("system_id", "system-1");
+    formData.set("project_type", "all_new");
+    formData.set("tonnage", "2");
+    formData.set("measured_total_cfm", "760");
+    formData.set("airflow_override_pass", "true");
+    formData.set("airflow_override_reason", "Field verified airflow delivered despite instrumentation drift.");
+
+    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveAndCompleteAirflowFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1",
+    );
+
+    const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
+    expect(update?.payload.override_pass).toBe(true);
+    expect(update?.payload.override_reason).toBe(
+      "Field verified airflow delivered despite instrumentation drift.",
+    );
+    expect(update?.payload.is_completed).toBe(true);
   });
 });

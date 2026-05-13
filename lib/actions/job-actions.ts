@@ -2163,14 +2163,17 @@ function redirectToTests(opts: {
   jobId: string;
   testType?: string | null;
   systemId?: string | null;
+  notice?: string | null;
 }) {
   const { jobId } = opts;
   const testType = String(opts.testType ?? "").trim();
   const systemId = String(opts.systemId ?? "").trim();
+  const notice = String(opts.notice ?? "").trim();
 
   const q = new URLSearchParams();
   if (testType) q.set("t", testType);
   if (systemId) q.set("s", systemId);
+  if (notice) q.set("notice", notice);
 
   const qs = q.toString();
   redirect(qs ? `/jobs/${jobId}/tests?${qs}` : `/jobs/${jobId}/tests`);
@@ -4822,6 +4825,7 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
 export async function saveAirflowDataFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
+  const systemIdFromForm = String(formData.get("system_id") || "").trim() || null;
   const projectType = String(formData.get("project_type") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
@@ -4862,7 +4866,12 @@ export async function saveAirflowDataFromForm(formData: FormData) {
   const airflowOverrideReason = String(formData.get("airflow_override_reason") || "").trim();
 
   if (airflowOverridePass && !airflowOverrideReason) {
-    throw new Error("Airflow override reason is required when override is enabled.");
+    redirectToTests({
+      jobId,
+      testType: "airflow",
+      systemId: systemIdFromForm,
+      notice: "airflow_override_reason_required",
+    });
   }
 
   const data = {
@@ -4915,7 +4924,7 @@ export async function saveAirflowDataFromForm(formData: FormData) {
     supabase,
     jobId,
     testRunId,
-    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+    systemIdFromForm,
   });
 
   await evaluateEccOpsStatus(jobId);
@@ -5759,6 +5768,7 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
 
   const jobId = String(formData.get("job_id") || "").trim();
   const testRunId = String(formData.get("test_run_id") || "").trim();
+  const systemIdFromForm = String(formData.get("system_id") || "").trim() || null;
   const projectType = String(formData.get("project_type") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
@@ -5798,7 +5808,12 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
   const airflowOverrideReason = String(formData.get("airflow_override_reason") || "").trim();
 
   if (airflowOverridePass && !airflowOverrideReason) {
-    throw new Error("Airflow override reason is required when override is enabled.");
+    redirectToTests({
+      jobId,
+      testType: "airflow",
+      systemId: systemIdFromForm,
+      notice: "airflow_override_reason_required",
+    });
   }
 
   const data = {
@@ -5833,7 +5848,7 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
     supabase,
     jobId,
     testRunId,
-    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+    systemIdFromForm,
   });
 
   let visitId: string | null = null;
