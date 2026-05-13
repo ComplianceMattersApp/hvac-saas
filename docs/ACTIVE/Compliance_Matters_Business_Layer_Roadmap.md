@@ -322,7 +322,7 @@ The following product-configuration work is **explicitly parked** and **not in c
   - Summary output includes status counts, due buckets, `total_count`, and `as_of_date` with strict account scoping and active-only due queue semantics.
   - Service Plan counts and due/overdue summary logic are implemented in the repo/read model and exposed on `/ops` as a read-only card, and the internal read-only `/service-plans` drilldown is now available behind feature gating.
   - Maintenance Agreements create/edit is implemented in repo and sandbox-ready behind feature gating, but production remains inactive until migration apply and flag enablement are intentionally approved.
-  - Warning/watch item: full manual browser click-through of every `/service-plans` filter chip remains open; helper bucket logic is covered by targeted tests.
+  - Browser smoke confirmation: flag off hides Service Plans link and `/service-plans` fails closed, flag on shows the `/ops` link and renders `/service-plans` rows/customer links, all filter chips manually tested successfully, and `/ops` continuity remained intact.
 - Tenant payment execution (Stripe subscription/checkout; parked)
 - QBO integration (optional downstream; parked)
 - Support Console production enablement (parked)

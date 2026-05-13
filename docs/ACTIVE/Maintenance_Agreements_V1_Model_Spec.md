@@ -48,11 +48,11 @@ Validation recorded:
 - `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`34` tests).
 - `npx.cmd tsc --noEmit` passed.
 - `git diff --check` passed (no blocking errors).
-- Browser smoke passed:
-	- flag off: `/ops` hides Service Plans link and `/service-plans` fails closed/redirects
-	- flag on: `/ops` link visible and `/service-plans` renders rows/customer links
-	- inactive filter verified
-	- `/ops` continuity confirmed
+- Browser smoke:
+	- flag off: Ops hides Service Plans link; /service-plans redirects/fails closed
+	- flag on: Ops link visible; /service-plans renders rows and customer links
+	- all filter chips manually tested successfully
+	- Ops continuity confirmed
 
 Boundaries preserved in Group 9A-8B:
 
@@ -67,7 +67,7 @@ Boundaries preserved in Group 9A-8B:
 
 Watch item:
 
-- Full manual click-through of every filter chip was not performed in browser smoke; helper bucket logic is covered by tests.
+- Helper bucket logic remains covered by targeted tests alongside manual browser filter-chip validation.
 
 ## Group 9A-7B Closeout Snapshot (manual Create Work Order from Service Plan prefill V1 implemented in repo)
 
