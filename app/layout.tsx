@@ -94,6 +94,7 @@ export default async function RootLayout({
   }
 
   const primaryJobCtaLabel = productMode === "hvac_service" ? "+ New Work Order" : "+ New Job";
+  const showOperationalNotificationAwareness = !isInternalUser || productMode !== "hvac_service";
 
   const userMetadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
   const accountDisplayName = resolveHumanDisplayName({
@@ -169,7 +170,7 @@ export default async function RootLayout({
 
                   {/* Utility links — fixed right */}
                   <div className="hidden shrink-0 items-center gap-2 sm:flex">
-                    {isInternalUser && (
+                    {isInternalUser && showOperationalNotificationAwareness && (
                       <Link
                         href="/ops/notifications"
                         className={shellUtilityLinkClass}
@@ -224,6 +225,7 @@ export default async function RootLayout({
                       isInternalUser={isInternalUser}
                       isAdmin={isAdmin}
                       isEstimatesEnabled={estimatesEnabled}
+                      showOperationalNotificationAwareness={showOperationalNotificationAwareness}
                       unreadNotificationCount={unreadNotificationCount}
                       unreadNotificationBadgeLabel={unreadNotificationBadgeLabel}
                       primaryJobCtaLabel={primaryJobCtaLabel}

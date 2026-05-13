@@ -1752,6 +1752,7 @@ const hasActiveSystemAlerts = visibleSignalCards.some((card) => card.count > 0);
 const showContractorFilter = (contractors ?? []).length > 0;
 const showContractorFilterInPrimary = showContractorFilter && !isHvacServiceMode;
 const showContractorSignalsSection = visibleSignalCards.length > 0 || Boolean(signal);
+const showOperationalNotificationAwareness = !isHvacServiceMode && showContractorSignalsSection;
 
 const activeQueueLabel = OPS_TABS.find((t) => t.key === bucket)?.label ?? bucket;
 const activeSignalLabel =
@@ -2499,7 +2500,7 @@ return (
       </section>
     ) : null}
 
-    {showContractorSignalsSection ? (
+    {showOperationalNotificationAwareness ? (
       <section id="system-alerts" className={`rounded-2xl border p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-3.5 ${hasActiveSystemAlerts || signal ? "border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))]" : "border-slate-300/75 bg-slate-50/75"}`}>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>

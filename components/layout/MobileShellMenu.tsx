@@ -9,6 +9,7 @@ type Props = {
   isInternalUser: boolean;
   isAdmin: boolean;
   isEstimatesEnabled: boolean;
+  showOperationalNotificationAwareness: boolean;
   unreadNotificationCount: number;
   unreadNotificationBadgeLabel: string;
   primaryJobCtaLabel: string;
@@ -21,6 +22,7 @@ export default function MobileShellMenu({
   isInternalUser,
   isAdmin,
   isEstimatesEnabled,
+  showOperationalNotificationAwareness,
   unreadNotificationCount,
   unreadNotificationBadgeLabel,
   primaryJobCtaLabel,
@@ -99,7 +101,7 @@ export default function MobileShellMenu({
           >
             Search Customers
           </Link>
-          {isInternalUser ? (
+          {isInternalUser && showOperationalNotificationAwareness ? (
             <Link
               href="/ops/notifications"
               onClick={() => setOpen(false)}
