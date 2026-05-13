@@ -11,6 +11,7 @@ import {
   listMaintenanceAgreementsForLocation,
   listMaintenanceAgreementVisitsForAgreement,
   listUpcomingOverdueMaintenanceAgreements,
+  projectMaintenanceAgreementVisitCountReview,
   resolveScopedMaintenanceAgreementJobPrefill,
   summarizeMaintenanceAgreementVisitLinksForAgreement,
   summarizeMaintenanceAgreementsForAccount,
@@ -61,6 +62,16 @@ type MockAgreementVisitLink = {
   updated_by_user_id: string | null;
 };
 
+type MockJob = {
+  id: string;
+  status: string | null;
+  ops_status: string | null;
+  job_type: string | null;
+  field_complete: boolean | null;
+  service_visit_type: string | null;
+  service_visit_outcome: string | null;
+};
+
 function makeAgreement(input: Partial<MockAgreement> & { id: string }): MockAgreement {
   return {
     account_owner_user_id: ACCOUNT_OWNER,
@@ -104,6 +115,18 @@ function makeAgreementVisitLink(
     created_by_user_id: "user-1",
     updated_at: "2026-05-12T10:00:00Z",
     updated_by_user_id: null,
+    ...input,
+  };
+}
+
+function makeJob(input: Partial<MockJob> & { id: string }): MockJob {
+  return {
+    status: "open",
+    ops_status: "scheduled",
+    job_type: "service",
+    field_complete: false,
+    service_visit_type: "maintenance",
+    service_visit_outcome: null,
     ...input,
   };
 }
@@ -184,6 +207,8 @@ function makeSupabaseMock(rows: MockAgreement[]) {
 
 function makeSupabaseMockWithLookups(input: {
   agreements: MockAgreement[];
+  visitLinks?: MockAgreementVisitLink[];
+  jobs?: MockJob[];
   customers?: Array<{
     id: string;
     full_name?: string | null;
@@ -204,6 +229,8 @@ function makeSupabaseMockWithLookups(input: {
 
   const tableRows: Record<string, any[]> = {
     maintenance_agreements: input.agreements,
+    maintenance_agreement_visits: input.visitLinks ?? [],
+    jobs: input.jobs ?? [],
     customers: input.customers ?? [],
     locations: input.locations ?? [],
   };
@@ -664,6 +691,111 @@ describe("maintenance agreement read model", () => {
 
     expect(result).toEqual({ as_of_date: "2026-05-12", rows: [] });
     expect(calls).toEqual([]);
+  });
+
+  it("projects linked service-plan visits for count review without changing used visits", async () => {
+    const { supabase } = makeSupabaseMockWithLookups({
+      agreements: [makeAgreement({ id: "agreement-review" })],
+      visitLinks: [
+        makeAgreementVisitLink({ id: "linked-scheduled", agreement_id: "agreement-review", job_id: "job-scheduled" }),
+        makeAgreementVisitLink({ id: "linked-complete", agreement_id: "agreement-review", job_id: "job-complete" }),
+        makeAgreementVisitLink({ id: "eligible-invoice", agreement_id: "agreement-review", job_id: "job-invoice", count_status: "eligible" }),
+        makeAgreementVisitLink({ id: "counted", agreement_id: "agreement-review", job_id: "job-counted", count_status: "counted", counts_toward_visit_balance: true }),
+        makeAgreementVisitLink({ id: "excluded", agreement_id: "agreement-review", job_id: "job-excluded", count_status: "excluded" }),
+        makeAgreementVisitLink({ id: "reversed", agreement_id: "agreement-review", job_id: "job-reversed", count_status: "reversed" }),
+        makeAgreementVisitLink({ id: "cancelled", agreement_id: "agreement-review", job_id: "job-cancelled" }),
+        makeAgreementVisitLink({ id: "non-service", agreement_id: "agreement-review", job_id: "job-ecc" }),
+      ],
+      jobs: [
+        makeJob({ id: "job-scheduled", status: "open", field_complete: false }),
+        makeJob({ id: "job-complete", status: "completed", field_complete: true, ops_status: "invoice_required" }),
+        makeJob({ id: "job-invoice", status: "completed", field_complete: true, ops_status: "invoice_required" }),
+        makeJob({ id: "job-counted", status: "completed", field_complete: true, ops_status: "closed" }),
+        makeJob({ id: "job-excluded", status: "completed", field_complete: true, ops_status: "closed" }),
+        makeJob({ id: "job-reversed", status: "completed", field_complete: true, ops_status: "closed" }),
+        makeJob({ id: "job-cancelled", status: "cancelled", field_complete: true, ops_status: "closed" }),
+        makeJob({ id: "job-ecc", status: "completed", field_complete: true, job_type: "ecc", ops_status: "closed" }),
+      ],
+      customers: [{ id: CUSTOMER_ID, full_name: "Taylor Customer" }],
+    });
+
+    const result = await listMaintenanceAgreementDrilldownForAccount({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      today: "2026-05-12",
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].visit_count_review).toEqual({
+      total_links: 8,
+      linked_links: 1,
+      eligible_for_count_review_links: 2,
+      counted_links: 1,
+      excluded_links: 1,
+      reversed_links: 1,
+      not_eligible_links: 2,
+      used_visits: 1,
+    });
+  });
+
+  it("classifies count review labels from link and job state without mutating count status", () => {
+    expect(
+      projectMaintenanceAgreementVisitCountReview({
+        link: makeAgreementVisitLink({ id: "scheduled" }),
+        job: makeJob({ id: "job-scheduled", status: "open", field_complete: false }),
+      }),
+    ).toBe("linked");
+
+    expect(
+      projectMaintenanceAgreementVisitCountReview({
+        link: makeAgreementVisitLink({ id: "completed" }),
+        job: makeJob({ id: "job-completed", status: "completed", field_complete: false, ops_status: "invoice_required" }),
+      }),
+    ).toBe("eligible_for_count_review");
+
+    expect(
+      projectMaintenanceAgreementVisitCountReview({
+        link: makeAgreementVisitLink({ id: "field-complete" }),
+        job: makeJob({ id: "job-field-complete", status: "in_process", field_complete: true, ops_status: "invoice_required" }),
+      }),
+    ).toBe("eligible_for_count_review");
+
+    expect(
+      projectMaintenanceAgreementVisitCountReview({
+        link: makeAgreementVisitLink({ id: "counted", count_status: "counted", counts_toward_visit_balance: true }),
+        job: makeJob({ id: "job-counted", status: "completed", field_complete: true }),
+      }),
+    ).toBe("counted");
+
+    expect(
+      projectMaintenanceAgreementVisitCountReview({
+        link: makeAgreementVisitLink({ id: "excluded", count_status: "excluded" }),
+        job: makeJob({ id: "job-excluded", status: "completed", field_complete: true }),
+      }),
+    ).toBe("excluded");
+
+    expect(
+      projectMaintenanceAgreementVisitCountReview({
+        link: makeAgreementVisitLink({ id: "reversed", count_status: "reversed" }),
+        job: makeJob({ id: "job-reversed", status: "completed", field_complete: true }),
+      }),
+    ).toBe("reversed");
+
+    for (const job of [
+      makeJob({ id: "job-cancelled", status: "cancelled", field_complete: true }),
+      makeJob({ id: "job-failed", status: "failed", field_complete: true }),
+      makeJob({ id: "job-blocked", status: "completed", field_complete: true, ops_status: "on_hold" }),
+      makeJob({ id: "job-no-show", status: "completed", field_complete: true, service_visit_outcome: "no_show" }),
+      makeJob({ id: "job-duplicate", status: "completed", field_complete: true, service_visit_outcome: "duplicate" }),
+      makeJob({ id: "job-ecc", status: "completed", field_complete: true, job_type: "ecc" }),
+    ]) {
+      expect(
+        projectMaintenanceAgreementVisitCountReview({
+          link: makeAgreementVisitLink({ id: `link-${job.id}` }),
+          job,
+        }),
+      ).toBe("not_eligible");
+    }
   });
 
   it("lists maintenance agreement visit links for an agreement with account scope", async () => {

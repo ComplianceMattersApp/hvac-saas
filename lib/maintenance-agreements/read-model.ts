@@ -130,6 +130,7 @@ export type MaintenanceAgreementDrilldownRow = {
   frequency: string;
   next_due_date: string | null;
   due_state: MaintenanceAgreementDueState;
+  visit_count_review: MaintenanceAgreementVisitCountReviewSummary;
 };
 
 export type MaintenanceAgreementDrilldownResult = {
@@ -182,6 +183,25 @@ export type MaintenanceAgreementVisitLinkSummary = {
   counted_links: number;
   excluded_links: number;
   reversed_links: number;
+  used_visits: number;
+};
+
+export type MaintenanceAgreementVisitCountReviewLabel =
+  | "linked"
+  | "eligible_for_count_review"
+  | "counted"
+  | "excluded"
+  | "reversed"
+  | "not_eligible";
+
+export type MaintenanceAgreementVisitCountReviewSummary = {
+  total_links: number;
+  linked_links: number;
+  eligible_for_count_review_links: number;
+  counted_links: number;
+  excluded_links: number;
+  reversed_links: number;
+  not_eligible_links: number;
   used_visits: number;
 };
 
@@ -418,6 +438,16 @@ function normalizeMaintenanceAgreementVisitLinkRow(
   };
 }
 
+type MaintenanceAgreementVisitProjectionJob = {
+  id?: string | null;
+  status?: string | null;
+  ops_status?: string | null;
+  job_type?: string | null;
+  field_complete?: boolean | null;
+  service_visit_type?: string | null;
+  service_visit_outcome?: string | null;
+};
+
 async function runAgreementQuery(query: any) {
   const { data, error } = await query;
   if (error) throw error;
@@ -442,6 +472,121 @@ function createEmptyMaintenanceAgreementVisitLinkSummary(): MaintenanceAgreement
     reversed_links: 0,
     used_visits: 0,
   };
+}
+
+function createEmptyMaintenanceAgreementVisitCountReviewSummary(): MaintenanceAgreementVisitCountReviewSummary {
+  return {
+    total_links: 0,
+    linked_links: 0,
+    eligible_for_count_review_links: 0,
+    counted_links: 0,
+    excluded_links: 0,
+    reversed_links: 0,
+    not_eligible_links: 0,
+    used_visits: 0,
+  };
+}
+
+const DISQUALIFYING_JOB_STATUSES = new Set([
+  "cancelled",
+  "canceled",
+  "failed",
+  "no_show",
+  "no-show",
+  "duplicate",
+  "incomplete",
+]);
+
+const DISQUALIFYING_OPS_STATUSES = new Set([
+  "cancelled",
+  "canceled",
+  "failed",
+  "no_show",
+  "no-show",
+  "duplicate",
+  "incomplete",
+  "pending_info",
+  "on_hold",
+  "retest_needed",
+  "pending_office_review",
+]);
+
+const DISQUALIFYING_SERVICE_OUTCOMES = new Set([
+  "cancelled",
+  "canceled",
+  "failed",
+  "no_show",
+  "no-show",
+  "duplicate",
+  "incomplete",
+]);
+
+export function projectMaintenanceAgreementVisitCountReview(input: {
+  link: Pick<MaintenanceAgreementVisitLinkRow, "count_status" | "counts_toward_visit_balance">;
+  job?: MaintenanceAgreementVisitProjectionJob | null;
+}): MaintenanceAgreementVisitCountReviewLabel {
+  const countStatus = toCleanString(input.link.count_status).toLowerCase();
+  const countsTowardVisitBalance = Boolean(input.link.counts_toward_visit_balance);
+
+  if (countStatus === "counted" && countsTowardVisitBalance) return "counted";
+  if (countStatus === "excluded") return "excluded";
+  if (countStatus === "reversed") return "reversed";
+
+  if ((countStatus !== "linked" && countStatus !== "eligible") || countsTowardVisitBalance) {
+    return "not_eligible";
+  }
+
+  const job = input.job;
+  if (!job) return "linked";
+
+  const jobType = toCleanString(job.job_type).toLowerCase();
+  if (jobType !== "service") return "not_eligible";
+
+  const status = toCleanString(job.status).toLowerCase();
+  const opsStatus = toCleanString(job.ops_status).toLowerCase();
+  const serviceOutcome = toCleanString(job.service_visit_outcome).toLowerCase();
+
+  if (
+    DISQUALIFYING_JOB_STATUSES.has(status) ||
+    DISQUALIFYING_OPS_STATUSES.has(opsStatus) ||
+    DISQUALIFYING_SERVICE_OUTCOMES.has(serviceOutcome)
+  ) {
+    return "not_eligible";
+  }
+
+  const fieldComplete = Boolean(job.field_complete) || status === "completed";
+  return fieldComplete ? "eligible_for_count_review" : "linked";
+}
+
+function summarizeMaintenanceAgreementVisitCountReviewRows(
+  links: MaintenanceAgreementVisitLinkRow[],
+  jobsById: Map<string, MaintenanceAgreementVisitProjectionJob>,
+): MaintenanceAgreementVisitCountReviewSummary {
+  const summary = createEmptyMaintenanceAgreementVisitCountReviewSummary();
+  summary.total_links = links.length;
+
+  for (const link of links) {
+    const label = projectMaintenanceAgreementVisitCountReview({
+      link,
+      job: jobsById.get(toCleanString(link.job_id)) ?? null,
+    });
+
+    if (label === "linked") summary.linked_links += 1;
+    if (label === "eligible_for_count_review") summary.eligible_for_count_review_links += 1;
+    if (label === "counted") summary.counted_links += 1;
+    if (label === "excluded") summary.excluded_links += 1;
+    if (label === "reversed") summary.reversed_links += 1;
+    if (label === "not_eligible") summary.not_eligible_links += 1;
+
+    if (
+      toCleanString(link.count_status).toLowerCase() === "counted" &&
+      Boolean(link.counts_toward_visit_balance)
+    ) {
+      summary.used_visits += 1;
+    }
+  }
+
+  return summary;
 }
 
 export async function listMaintenanceAgreementsForCustomer(params: ListForCustomerParams) {
@@ -730,6 +875,9 @@ export async function listMaintenanceAgreementDrilldownForAccount(
   const locationIds = Array.from(
     new Set(rows.map((row) => toCleanString(row.primary_location_id)).filter(Boolean)),
   );
+  const agreementIds = Array.from(
+    new Set(rows.map((row) => toCleanString(row.id)).filter(Boolean)),
+  );
 
   const customerDisplayById = new Map<string, string>();
   if (customerIds.length > 0) {
@@ -774,6 +922,66 @@ export async function listMaintenanceAgreementDrilldownForAccount(
     }
   }
 
+  const linksByAgreementId = new Map<string, MaintenanceAgreementVisitLinkRow[]>();
+  const jobsById = new Map<string, MaintenanceAgreementVisitProjectionJob>();
+
+  if (agreementIds.length > 0) {
+    const { data: linkRows, error: linkError } = await params.supabase
+      .from("maintenance_agreement_visits")
+      .select(
+        [
+          "id",
+          "account_owner_user_id",
+          "agreement_id",
+          "job_id",
+          "link_source",
+          "count_status",
+          "counts_toward_visit_balance",
+          "counted_at",
+          "counted_by_user_id",
+          "reversed_at",
+          "reversed_by_user_id",
+          "reversal_reason",
+          "created_at",
+          "created_by_user_id",
+          "updated_at",
+          "updated_by_user_id",
+        ].join(", "),
+      )
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .in("agreement_id", agreementIds);
+
+    if (linkError) throw linkError;
+
+    const links = ((linkRows ?? []) as MaintenanceAgreementVisitLinkRow[]).map(
+      normalizeMaintenanceAgreementVisitLinkRow,
+    );
+    const jobIds = Array.from(new Set(links.map((link) => toCleanString(link.job_id)).filter(Boolean)));
+
+    if (jobIds.length > 0) {
+      const { data: jobRows, error: jobError } = await params.supabase
+        .from("jobs")
+        .select("id, status, ops_status, job_type, field_complete, service_visit_type, service_visit_outcome")
+        .in("id", jobIds);
+
+      if (jobError) throw jobError;
+
+      for (const job of (jobRows ?? []) as MaintenanceAgreementVisitProjectionJob[]) {
+        const id = toCleanString(job.id);
+        if (!id) continue;
+        jobsById.set(id, job);
+      }
+    }
+
+    for (const link of links) {
+      const agreementId = toCleanString(link.agreement_id);
+      if (!agreementId) continue;
+      const bucket = linksByAgreementId.get(agreementId) ?? [];
+      bucket.push(link);
+      linksByAgreementId.set(agreementId, bucket);
+    }
+  }
+
   const mappedRows: MaintenanceAgreementDrilldownRow[] = rows
     .map((row) => {
       const id = toCleanString(row.id);
@@ -800,6 +1008,10 @@ export async function listMaintenanceAgreementDrilldownForAccount(
         frequency: toCleanString(row.frequency) || "custom",
         next_due_date: nextDueDate,
         due_state: dueState,
+        visit_count_review: summarizeMaintenanceAgreementVisitCountReviewRows(
+          linksByAgreementId.get(id) ?? [],
+          jobsById,
+        ),
       };
     })
     .filter((row) => row.id && row.customer_id)

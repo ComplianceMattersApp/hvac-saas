@@ -67,6 +67,36 @@ function statusClass(value: string) {
   return "bg-slate-100 text-slate-700";
 }
 
+function countReviewClass(value: string) {
+  if (value === "eligible_for_count_review") return "bg-amber-100 text-amber-800";
+  if (value === "counted") return "bg-emerald-100 text-emerald-700";
+  if (value === "excluded" || value === "reversed") return "bg-slate-200 text-slate-700";
+  if (value === "not_eligible") return "bg-rose-100 text-rose-700";
+  return "bg-blue-100 text-blue-700";
+}
+
+function formatCountReviewLabel(value: string) {
+  if (value === "eligible_for_count_review") return "Eligible for count review";
+  if (value === "not_eligible") return "Not eligible";
+  return titleCase(value);
+}
+
+type ServicePlanDrilldownRow = Awaited<
+  ReturnType<typeof listMaintenanceAgreementDrilldownForAccount>
+>["rows"][number];
+
+function getCountReviewBadges(row: ServicePlanDrilldownRow) {
+  const summary = row.visit_count_review;
+  return [
+    { key: "eligible_for_count_review", count: summary.eligible_for_count_review_links },
+    { key: "linked", count: summary.linked_links },
+    { key: "counted", count: summary.counted_links },
+    { key: "excluded", count: summary.excluded_links },
+    { key: "reversed", count: summary.reversed_links },
+    { key: "not_eligible", count: summary.not_eligible_links },
+  ].filter((item) => item.count > 0);
+}
+
 export default async function ServicePlansPage({
   searchParams,
 }: {
@@ -164,10 +194,13 @@ export default async function ServicePlansPage({
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Due State</th>
                   <th className="px-4 py-3">Next Due</th>
+                  <th className="px-4 py-3">Visit Count Review</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {result.rows.map((row) => (
+                {result.rows.map((row) => {
+                  const countReviewBadges = getCountReviewBadges(row);
+                  return (
                   <tr key={row.id} className="align-top">
                     <td className="px-4 py-3">
                       <div className="font-semibold text-slate-900">{row.agreement_name}</div>
@@ -197,8 +230,25 @@ export default async function ServicePlansPage({
                       </span>
                     </td>
                     <td className="px-4 py-3 font-medium text-slate-700">{formatYmd(row.next_due_date)}</td>
+                    <td className="px-4 py-3">
+                      {countReviewBadges.length === 0 ? (
+                        <span className="text-xs font-medium text-slate-400">No linked visits</span>
+                      ) : (
+                        <div className="flex max-w-[260px] flex-wrap gap-1.5">
+                          {countReviewBadges.map((item) => (
+                            <span
+                              key={item.key}
+                              className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${countReviewClass(item.key)}`}
+                            >
+                              {formatCountReviewLabel(item.key)} {item.count}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
