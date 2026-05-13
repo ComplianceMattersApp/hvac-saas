@@ -47,7 +47,9 @@ It extends it.
 Maintenance agreements closeout note (May 2026):
 - Group 9A-10B Service Plan Count Eligibility projection is now documented as read-only visibility on `/service-plans`.
 - Visit Count Review labels (`No linked visits`, `Linked`, `Eligible for count review`, `Counted`, `Excluded`, `Reversed`, `Not eligible`) are display-only in this slice.
-- No count mutation, no automatic counting, no due-date advancement, and no visit-balance deduction were introduced.
+- Group 9A-10C Manual Mark Visit Counted on Job Detail is now implemented in commit `1b69336` with visibility closure fix in `2ae1a4b`.
+- `Mark Visit Counted` remains manual/operator-confirmed, updates only the targeted `maintenance_agreement_visits` row count fields, and does not mutate agreement or advance `next_due_date`.
+- Boundaries remain: no automatic counting, no due-date advancement, no visit-balance deduction automation, and no invoice/payment behavior.
 
 ---
 
@@ -332,6 +334,11 @@ The following product-configuration work is **explicitly parked** and **not in c
     - runtime ordering fix: link creation now executes before `postCreate(...)` redirect
     - link row created as `link_source=service_plan_prefill`, `count_status=linked`, `counts_toward_visit_balance=false`
     - boundaries preserved: no automatic counting, no due-date advancement, no visit-balance deduction, no invoice/payment behavior
+  - Group 9A-10B Service Plan count eligibility read-only projection is implemented and pushed (`0588a26`) with `/service-plans` Visit Count Review labels and no mutation actions in that slice.
+  - Group 9A-10C Manual Mark Visit Counted on Job Detail is implemented and pushed (`1b69336`) with visibility closure fix (`2ae1a4b`) moving the action surface into always-visible job-detail scope.
+    - action is manual/operator-confirmed and shown only for eligible linked maintenance jobs
+    - action mutates only `maintenance_agreement_visits` (`count_status=counted`, `counts_toward_visit_balance=true`, counted audit fields)
+    - agreement remains unchanged, `next_due_date` is not advanced, and no invoice/payment behavior is added
   - Summary output includes status counts, due buckets, `total_count`, and `as_of_date` with strict account scoping and active-only due queue semantics.
   - Service Plan counts and due/overdue summary logic are implemented in the repo/read model and exposed on `/ops` as a read-only card, and the internal read-only `/service-plans` drilldown is now available behind feature gating.
   - Group 9A-9A docs/model decisions are recorded for future implementation:
@@ -2660,7 +2667,7 @@ The following implementation groups have been closed as of May 2026.
 | 7 | Product Mode / Packaging Completion | Planned |
 | 7A | Pricing / Tiers / Seat Alignment | Planned � see Competitive_Packaging_and_Tier_Spec.md |
 | 8 | Support / Owner Operations | Planned |
-| 9A | Recurring Services / Maintenance Agreements | Group 9A-2 backend foundation committed in `b126ff6`; Group 9A-3 read-only customer profile section committed in `09edc9f`; Group 9A-4 customer profile create/edit V1 committed in `9f81d6f`; Group 9A-5B due/overdue summary read model committed in `lib/maintenance-agreements/read-model.ts`; Group 9A-6 feature-gated read-only ops Service Plans card committed in `1776042`; Group 9A-7B manual Create Work Order from Service Plan prefill V1 committed in `3c186e5`; Group 9A-8B read-only Service Plans drilldown route plus ops link implemented and pushed; Group 9A-9A docs/model decisions recorded (preferred linkage, counting gate, derived balance, manual next_due_date, V2-ledger parked); Group 9A-9B link-table foundation implemented and pushed in commit `6bf7329` with new `maintenance_agreement_visits` table in migration `20260513110000_maintenance_agreement_visits_link_foundation.sql`, read helpers (`listMaintenanceAgreementVisitsForAgreement`, `listMaintenanceAgreementLinksForJob`, `summarizeMaintenanceAgreementVisitLinksForAgreement`), account-scoped RLS policies, and 4 new vitest-passed link-helper tests; feature gated by `ENABLE_MAINTENANCE_AGREEMENTS` (default `false`); no automatic job generation, no persisted linkage wired, no automatic counting, no production migration apply; production remains inactive until migration apply and flag enablement are intentionally approved; Group 9A-9C link-row creation when job is created from service plan implemented and pushed in commit `071915a` with automatic link creation after job succeeds, link_source='service_plan_prefill', count_status='linked', counts_toward_visit_balance=false, non-blocking failure on invalid scopes, strict account/agreement/job scope validation, and 2 new vitest-passed link creation tests - see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md) |
+| 9A | Recurring Services / Maintenance Agreements | Group 9A-2/3/4/5B/6/7B/8B/9A/9B/9C/9E/10B/10C closeout is documented, including read-only count eligibility (`0588a26`) plus manual `Mark Visit Counted` (`1b69336`) with always-visible placement fix (`2ae1a4b`); boundaries remain no automatic counting/no due-date advancement/no invoice-payment behavior; production remains inactive until migration apply and flag enablement are intentionally approved - see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md) |
 | 9B | SMS / On-My-Way Messaging | Planned |
 | 9C | Tenant Customer Payments / Stripe Customer Payment Execution | Planned |
 | 9D | Customer Portal | Planned |

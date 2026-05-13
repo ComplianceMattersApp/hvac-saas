@@ -26,9 +26,18 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Group 9A-10C Manual Mark Visit Counted on Job Detail is complete and pushed in commit `1b69336`, with visibility closure fix in commit `2ae1a4b`:
+  - eligible linked maintenance jobs now surface `Service Plan Visit Count Review` and `Mark Visit Counted` in always-visible job-detail scope
+  - action remains manual/operator-confirmed and updates only the target `maintenance_agreement_visits` link row count fields (`count_status='counted'`, `counts_toward_visit_balance=true`, counted audit fields)
+  - agreement record remains unchanged, `next_due_date` is not advanced, and no invoice/payment behavior is introduced
+  - already-counted jobs do not re-show `Mark Visit Counted`
+  - browser smoke recorded end-to-end on job `d39a96d9-e699-45fe-b545-2968202441b9` / link `82b44fd5-86c5-459b-a893-037b37a968a1` with before/after link-row state change (`linked` -> `counted`) and `/service-plans` projection shift from eligible to counted
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__ job-detail-operational-entitlement-hardening.test.ts` passed (`77` tests), `npx.cmd tsc --noEmit` passed, `git diff --check` passed
+  - boundaries preserved: no automatic counting, no automatic due-date advancement, no recurrence engine, no invoice/payment behavior, no Stripe/QBO/SMS/customer portal behavior, no renewal automation, and no mutable remaining-visit counter
+
 - Group 9A-10B Service Plan Count Eligibility Read-Only Projection is complete and pushed in commit `0588a26`:
   - `/service-plans` now shows a read-only `Visit Count Review` column with labels: `No linked visits`, `Linked`, `Eligible for count review`, `Counted`, `Excluded`, `Reversed`, and `Not eligible`
-  - projection is display-only: no count-status mutation, no `Mark Visit Counted` action, no automatic counting, no due-date advancement, and no visit-balance deduction
+  - projection labels are display-only; count mutation is handled only through the explicit manual 10C job-detail action
   - used visits remain derived only from links where `count_status='counted'` and `counts_toward_visit_balance=true`
   - validation recorded: browser smoke passed (`/service-plans` render, labels/badges, no count-action UI, filters/customer links), `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`45` tests), `npx.cmd tsc --noEmit` passed, and `git diff --check` passed
   - watch items: no-show and duplicate remain defensive/non-first-class lifecycle enums; Partial Work Items still need per-item completion modeling before safe automatic counting

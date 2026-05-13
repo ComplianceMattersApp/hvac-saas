@@ -346,6 +346,66 @@ Future parked enhancement note:
 - `next_due_date` should later auto-calculate from `start_date + template frequency`, with operator override.
 - `renewal_date` should later derive from plan term/payment option.
 
+## Group 9A-10C Closeout Snapshot (manual Mark Visit Counted on job detail)
+
+Group 9A-10C (Manual Mark Visit Counted on Job Detail) is implemented and pushed in commit `1b69336`, with visibility closure fix pushed in commit `2ae1a4b`.
+
+Recorded behavior:
+
+- Eligible linked maintenance jobs on job detail now surface `Service Plan Visit Count Review` with `Mark Visit Counted` action.
+- Action is operator-confirmed with exact copy:
+	- `This will count this completed maintenance job as one used visit for this Service Plan. It will not create an invoice, collect payment, or advance the next due date. Continue?`
+- Action mutates only `maintenance_agreement_visits` for the targeted link row:
+	- `count_status = counted`
+	- `counts_toward_visit_balance = true`
+	- `counted_at = now`
+	- `counted_by_user_id = current internal user`
+	- `updated_by_user_id = current internal user`
+- Agreement record is not mutated.
+- `next_due_date` is not advanced.
+- No invoice or payment behavior is introduced.
+- No automatic counting is introduced.
+- Already-counted jobs do not re-show the action.
+
+Recorded root cause and fix:
+
+- Initial 10C action surface rendered inside collapsed `Edit Job details` container.
+- Result: jobs could be logically eligible but not visibly actionable in normal workflow.
+- Fix in `2ae1a4b` moved `Service Plan Visit Count Review` into always-visible job-detail scope while preserving existing eligibility gates and shared projection logic.
+
+Browser smoke recorded:
+
+- Job: `d39a96d9-e699-45fe-b545-2968202441b9`
+- Link row: `82b44fd5-86c5-459b-a893-037b37a968a1`
+- Before:
+	- `count_status = linked`
+	- `counts_toward_visit_balance = false`
+	- `counted_at = null`
+- After:
+	- `count_status = counted`
+	- `counts_toward_visit_balance = true`
+	- `counted_at` populated
+	- `counted_by_user_id` populated
+- `/service-plans` projection moved from `Eligible for count review` to `Counted` for the affected agreement.
+- Agreement `next_due_date` remained `2026-06-15`.
+- No invoice/payment side effects were observed.
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__ job-detail-operational-entitlement-hardening.test.ts` passed (`77` tests).
+- `npx.cmd tsc --noEmit` passed.
+- `git diff --check` passed.
+
+Boundaries preserved in Group 9A-10C:
+
+- no automatic counting
+- no automatic due-date advancement
+- no recurrence engine
+- no invoice/payment behavior
+- no Stripe/QBO/SMS/customer portal behavior
+- no renewal automation
+- no mutable remaining-visit counter
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.
