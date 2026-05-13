@@ -15,6 +15,13 @@ import { listEstimatesByAccount, type EstimateListItem } from "@/lib/estimates/e
 import { requireInternalUser, isInternalAccessError } from "@/lib/auth/internal-user";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import {
+  createMaintenanceAgreementFromForm,
+  updateMaintenanceAgreementFromForm,
+} from "@/lib/maintenance-agreements/agreement-actions";
+import {
+  MAINTENANCE_AGREEMENT_FREQUENCIES,
+  MAINTENANCE_AGREEMENT_STATUSES,
+  MAINTENANCE_AGREEMENT_TYPES,
   listMaintenanceAgreementsForCustomer,
   classifyMaintenanceAgreementDueState,
   type MaintenanceAgreementRow,
@@ -177,6 +184,14 @@ function makeSmsHref(phone?: string | null) {
   return `sms:${digits}`;
 }
 
+function safeDecodeMessage(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function normalizeOpsStatus(v?: string | null) {
   return String(v ?? "").trim().toLowerCase();
 }
@@ -263,7 +278,7 @@ function summaryOrder() {
 
 export default async function CustomerDetailPage(props: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ err?: string }>;
+  searchParams?: Promise<{ err?: string; maSaved?: string; maError?: string }>;
 }) {
   const supabase = await createClient();
 
@@ -282,12 +297,17 @@ export default async function CustomerDetailPage(props: {
   const { id } = await props.params;
   const sp = props.searchParams ? await props.searchParams : {};
   const hasJobsError = sp.err === "has_jobs";
+  const maintenanceAgreementSaved = String(sp.maSaved ?? "").trim().toLowerCase();
+  const maintenanceAgreementError = String(sp.maError ?? "").trim();
 
   if (!id || !isUuid(id)) {
     redirect("/customers");
   }
 
   const customerId = id;
+  const customerPath = `/customers/${customerId}`;
+  const createAgreementAction = createMaintenanceAgreementFromForm.bind(null, customerPath);
+  const updateAgreementAction = updateMaintenanceAgreementFromForm.bind(null, customerPath);
 
   const customerSelect = `
       id,
@@ -548,6 +568,21 @@ export default async function CustomerDetailPage(props: {
         {hasJobsError && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             This customer has non-archived jobs and cannot be archived. Remove or archive all jobs first.
+          </div>
+        )}
+        {maintenanceAgreementSaved === "created" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Maintenance agreement created.
+          </div>
+        )}
+        {maintenanceAgreementSaved === "updated" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Maintenance agreement updated.
+          </div>
+        )}
+        {maintenanceAgreementError && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+            {safeDecodeMessage(maintenanceAgreementError)}
           </div>
         )}
         {/* Header */}
@@ -1165,6 +1200,130 @@ export default async function CustomerDetailPage(props: {
               </p>
             </div>
 
+            <details className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <summary className="cursor-pointer text-sm font-medium text-slate-900">
+                Add Maintenance Agreement
+              </summary>
+              <form action={createAgreementAction} className="mt-4 grid gap-3 md:grid-cols-2">
+                <input type="hidden" name="customer_id" value={customerId} />
+
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Agreement Name</label>
+                  <input
+                    name="agreement_name"
+                    required
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Agreement Type</label>
+                  <select
+                    name="agreement_type"
+                    defaultValue="maintenance"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  >
+                    {MAINTENANCE_AGREEMENT_TYPES.map((value) => (
+                      <option key={value} value={value}>
+                        {value.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Frequency</label>
+                  <select
+                    name="frequency"
+                    defaultValue="quarterly"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  >
+                    {MAINTENANCE_AGREEMENT_FREQUENCIES.map((value) => (
+                      <option key={value} value={value}>
+                        {value.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Next Due Date</label>
+                  <input
+                    type="date"
+                    name="next_due_date"
+                    required
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Start Date</label>
+                  <input
+                    type="date"
+                    name="start_date"
+                    required
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Renewal Date (Optional)</label>
+                  <input
+                    type="date"
+                    name="renewal_date"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Primary Location (Optional)</label>
+                  <select
+                    name="primary_location_id"
+                    defaultValue=""
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  >
+                    <option value="">No primary location</option>
+                    {locations.map((loc) => {
+                      const locId = String(loc.id ?? loc.location_id ?? "").trim();
+                      if (!locId) return null;
+                      return (
+                        <option key={locId} value={locId}>
+                          {locationDisplayName(loc)}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Default Visit Scope Summary (Optional)</label>
+                  <textarea
+                    name="default_visit_scope_summary"
+                    rows={2}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Internal Notes (Optional)</label>
+                  <textarea
+                    name="internal_notes"
+                    rows={3}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <button
+                    type="submit"
+                    className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                  >
+                    Save Maintenance Agreement
+                  </button>
+                </div>
+              </form>
+            </details>
+
             {customerAgreements.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6">
                 <p className="text-sm text-slate-500">No maintenance agreements yet.</p>
@@ -1262,6 +1421,152 @@ export default async function CustomerDetailPage(props: {
                           )}
                         </div>
                       </div>
+
+                      <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+                        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                          Edit
+                        </summary>
+                        <form action={updateAgreementAction} className="mt-3 grid gap-3 md:grid-cols-2">
+                          <input type="hidden" name="agreement_id" value={agr.id} />
+                          <input type="hidden" name="customer_id" value={customerId} />
+
+                          <div className="md:col-span-2">
+                            <label className="mb-1 block text-xs font-medium text-slate-700">Agreement Name</label>
+                            <input
+                              name="agreement_name"
+                              required
+                              defaultValue={agr.agreement_name}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-slate-700">Agreement Type</label>
+                            <select
+                              name="agreement_type"
+                              defaultValue={String(agr.agreement_type)}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                            >
+                              {MAINTENANCE_AGREEMENT_TYPES.map((value) => (
+                                <option key={value} value={value}>
+                                  {value.replace(/_/g, " ")}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-slate-700">Frequency</label>
+                            <select
+                              name="frequency"
+                              defaultValue={String(agr.frequency)}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                            >
+                              {MAINTENANCE_AGREEMENT_FREQUENCIES.map((value) => (
+                                <option key={value} value={value}>
+                                  {value.replace(/_/g, " ")}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-slate-700">Status</label>
+                            <select
+                              name="status"
+                              defaultValue={String(agr.status)}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                            >
+                              {MAINTENANCE_AGREEMENT_STATUSES.map((value) => (
+                                <option key={value} value={value}>
+                                  {value.replace(/_/g, " ")}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-slate-700">Next Due Date</label>
+                            <input
+                              type="date"
+                              name="next_due_date"
+                              required
+                              defaultValue={String(agr.next_due_date ?? "")}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-slate-700">Start Date</label>
+                            <input
+                              type="date"
+                              name="start_date"
+                              required
+                              defaultValue={String(agr.start_date ?? "")}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-slate-700">Renewal Date (Optional)</label>
+                            <input
+                              type="date"
+                              name="renewal_date"
+                              defaultValue={String(agr.renewal_date ?? "")}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-slate-700">Primary Location (Optional)</label>
+                            <select
+                              name="primary_location_id"
+                              defaultValue={String(agr.primary_location_id ?? "")}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                            >
+                              <option value="">No primary location</option>
+                              {locations.map((loc) => {
+                                const locId = String(loc.id ?? loc.location_id ?? "").trim();
+                                if (!locId) return null;
+                                return (
+                                  <option key={locId} value={locId}>
+                                    {locationDisplayName(loc)}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="mb-1 block text-xs font-medium text-slate-700">Default Visit Scope Summary (Optional)</label>
+                            <textarea
+                              name="default_visit_scope_summary"
+                              rows={2}
+                              defaultValue={String(agr.default_visit_scope_summary ?? "")}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="mb-1 block text-xs font-medium text-slate-700">Internal Notes (Optional)</label>
+                            <textarea
+                              name="internal_notes"
+                              rows={3}
+                              defaultValue={String(agr.internal_notes ?? "")}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <button
+                              type="submit"
+                              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                            >
+                              Save Changes
+                            </button>
+                          </div>
+                        </form>
+                      </details>
                     </div>
                   );
                 })}
