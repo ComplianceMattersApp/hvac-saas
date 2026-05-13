@@ -231,6 +231,69 @@ Watch items:
 - Link creation runs silently with no logging; future internal warning/logging infrastructure may help troubleshooting when feature goes live
 - Count-state transitions and reversal tooling remain parked for V2 or later
 
+## Group 9A-9E Closeout Snapshot (service plan Work Items prefill + link creation runtime fix)
+
+Group 9A-9E (Service Plan Work Items Prefill + Link Creation Runtime Fix) is implemented and pushed in commit `c4a08d9`.
+
+Recorded implementation artifacts:
+
+- Agreement mutation layer updates in `lib/maintenance-agreements/agreement-actions.ts`
+- Customer agreement form updates in `app/customers/[id]/page.tsx`
+- Job creation ordering fix in `lib/actions/job-actions.ts`
+- Test updates in `lib/maintenance-agreements/__tests__/agreement-actions.test.ts` and `lib/actions/__tests__/job-intake-create-scope-hardening.test.ts`
+
+Recorded behavior:
+
+- Service Plan / Maintenance Agreement default Work Items now persist on agreement create/update.
+- Agreement create/edit forms now support default Visit Scope / Work Items, not summary text only.
+- Service Plan Work Items prefill into `/jobs/new` Step 5 `Visit Reason & Work Items`.
+- Service-plan-origin job creation persists:
+	- `job_type = service`
+	- `service_visit_type = maintenance`
+	- `visit_scope_summary`
+	- `visit_scope_items`
+- `maintenance_agreement_visits` link row is created when service-plan-origin job creation succeeds.
+- Link row initialization remains:
+	- `link_source = service_plan_prefill`
+	- `count_status = linked`
+	- `counts_toward_visit_balance = false`
+
+Root cause and runtime fix:
+
+- Prior runtime ordering placed link creation after `postCreate(...)`.
+- `postCreate(...)` redirects, so link insertion after it was unreachable.
+- Fix moved link creation before `postCreate(...)` in job creation branches.
+
+Validation recorded:
+
+- `45/45` targeted tests passed.
+- `npx.cmd tsc --noEmit` passed.
+- `git diff --check` passed.
+- Browser smoke passed:
+	- seeded Service Plan default Work Items through app UI
+	- `/jobs/new` showed prefilled summary and Work Items
+	- submitted job persisted service/maintenance + visit scope fields
+	- `maintenance_agreement_visits` row created with linked/not-counted defaults
+
+Boundaries preserved in Group 9A-9E:
+
+- agreement record remains unchanged during job creation
+- no automatic counting
+- no due-date advancement
+- no visit-balance deduction
+- no invoice/payment behavior
+- no recurrence engine
+- no Stripe/QBO/SMS/customer portal behavior
+- no production migration apply
+
+Future parked enhancement note:
+
+- Service Plan creation should later be template-driven.
+- Agreement name, type, frequency, default Work Items, and cadence should come from selected templates.
+- `start_date` remains operator-entered.
+- `next_due_date` should later auto-calculate from `start_date + template frequency`, with operator override.
+- `renewal_date` should later derive from plan term/payment option.
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.

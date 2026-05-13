@@ -319,6 +319,14 @@ The following product-configuration work is **explicitly parked** and **not in c
     - read-only row shape for customer/location/status/type/frequency/next due/due state
     - customer name links to existing customer detail pages
     - filters: all, active, overdue, due today, due 1-7 days, due 8-30 days, not scheduled, inactive
+  - Group 9A-9E Service Plan Work Items prefill + link-creation runtime fix is implemented and pushed (`c4a08d9`) with:
+    - agreement default Work Items persisted on create/update
+    - agreement create/edit forms now supporting default Visit Scope / Work Items
+    - `/jobs/new` Step 5 prefill of summary + Work Items from agreement defaults
+    - service-plan-origin job persistence of `job_type=service`, `service_visit_type=maintenance`, `visit_scope_summary`, and `visit_scope_items`
+    - runtime ordering fix: link creation now executes before `postCreate(...)` redirect
+    - link row created as `link_source=service_plan_prefill`, `count_status=linked`, `counts_toward_visit_balance=false`
+    - boundaries preserved: no automatic counting, no due-date advancement, no visit-balance deduction, no invoice/payment behavior
   - Summary output includes status counts, due buckets, `total_count`, and `as_of_date` with strict account scoping and active-only due queue semantics.
   - Service Plan counts and due/overdue summary logic are implemented in the repo/read model and exposed on `/ops` as a read-only card, and the internal read-only `/service-plans` drilldown is now available behind feature gating.
   - Group 9A-9A docs/model decisions are recorded for future implementation:

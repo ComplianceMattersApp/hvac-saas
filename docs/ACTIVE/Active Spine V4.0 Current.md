@@ -20,10 +20,21 @@ Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No co
 **Maintenance Agreements / Recurring Services V1:**
 Group 9A planning source of truth is [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md). The preferred future domain/table name is `maintenance_agreements`; avoid `service_contracts` because existing service-contract language classifies service cases/jobs and is not customer-owned agreement truth.
 Group 9A-9A model decisions are now documented there: future linkage should prefer separate `maintenance_agreement_visits`, counting should occur only after linked maintenance work is completed/closed as valid, V1 visit balance should be derived from counted links (not mutable remaining counters), `next_due_date` remains manual in current scope, and full ledger remains parked for V2.
+Group 9A-9E closeout is now recorded there: agreement default Work Items persist on create/update, `/jobs/new` Step 5 prefill includes summary + Work Items for service-plan-origin intake, and maintenance-agreement link creation now runs before `postCreate(...)` redirect so runtime link insertion is reachable.
 
 **Owner-Completion Cycle Closeout (May 2026):** All areas in the owner-release completion matrix are confirmed closed at current quality bar. Next work is treated as post-launch/future-roadmap work unless the owner explicitly reopens a release-scope item. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for the canonical decision surface.
 
 Current Program Status Note (May 2026)
+
+- Group 9A-9E Service Plan Work Items Prefill + Link Creation Runtime Fix is complete and pushed in commit `c4a08d9`:
+  - agreement create/edit now persists default Work Items in addition to summary text
+  - customer agreement forms now support default `Visit Scope / Work Items`
+  - `/jobs/new` Step 5 now preloads service-plan summary + Work Items from agreement defaults
+  - service-plan-origin job creation persists `job_type='service'`, `service_visit_type='maintenance'`, `visit_scope_summary`, and `visit_scope_items`
+  - runtime root cause fixed: link creation moved before `postCreate(...)` redirect so link insertion is reachable
+  - created link row remains `link_source='service_plan_prefill'`, `count_status='linked'`, `counts_toward_visit_balance=false`
+  - validation recorded: `45/45` targeted tests passed, `npx.cmd tsc --noEmit` passed, `git diff --check` passed, and browser smoke passed end-to-end
+  - boundaries preserved: no automatic counting, no due-date advancement, no visit-balance deduction, no invoice/payment behavior, no recurrence engine
 
 - Group 9A-9C Link-Row Creation When Job Is Created from Service Plan is complete and pushed in commit `071915a`:
   - new action: `createMaintenanceAgreementVisitLinkFromJobCreation` in `lib/maintenance-agreements/agreement-actions.ts`
