@@ -60,3 +60,43 @@ export function renderSystemEmailLayout(args: {
     </div>
   `;
 }
+
+export function renderOperationalEmailLayout(args: {
+  title?: string | null;
+  bodyHtml: string;
+  companyDisplayName?: string | null;
+  companyLogoUrl?: string | null;
+  supportEmail?: string | null;
+  supportPhone?: string | null;
+}) {
+  const title = String(args.title ?? "").trim();
+  const companyDisplayName = String(args.companyDisplayName ?? "").trim() || "Compliance Matters";
+  const companyLogoUrl = String(args.companyLogoUrl ?? "").trim() || null;
+  const supportEmail = String(args.supportEmail ?? "").trim() || null;
+  const supportPhone = String(args.supportPhone ?? "").trim() || null;
+  const supportDetails = [supportEmail, supportPhone].filter(Boolean).join(" • ");
+
+  const headerBlock = companyLogoUrl
+    ? `<div style="margin-bottom: 16px; text-align: left;"><img src="${escapeHtml(companyLogoUrl)}" alt="${escapeHtml(companyDisplayName)} logo" width="220" height="220" style="width: 220px; max-width: 100%; height: auto; display: inline-block;" /></div>`
+    : `<div style="margin: 0 0 16px 0; font-size: 24px; line-height: 1.2; font-weight: 700; color: #111827;">${escapeHtml(companyDisplayName)}</div>`;
+
+  const titleBlock = title
+    ? `<h2 style="margin: 0 0 12px 0; font-size: 20px; line-height: 1.3; color: #111827;">${escapeHtml(title)}</h2>`
+    : "";
+
+  const supportBlock = supportDetails
+    ? `<p style="margin: 6px 0 0 0; color: #4b5563; font-size: 13px;">Questions or changes: ${escapeHtml(supportDetails)}</p>`
+    : "";
+
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827; max-width: 640px;">
+      ${headerBlock}
+      ${titleBlock}
+      <div>${args.bodyHtml}</div>
+      <p style="margin-top: 20px; color: #4b5563; font-size: 13px;">
+        This is an automated message from ${escapeHtml(companyDisplayName)}.
+      </p>
+      ${supportBlock}
+    </div>
+  `;
+}

@@ -63,6 +63,9 @@ vi.mock("@/lib/business/internal-business-profile", () => ({
 
 vi.mock("@/lib/email/layout", () => ({
   resolveAppUrl: vi.fn(() => "http://localhost:3000"),
+  renderOperationalEmailLayout: vi.fn((args: { title?: string | null; bodyHtml: string }) =>
+    `<html><h1>${String(args?.title ?? "")}</h1>${String(args?.bodyHtml ?? "")}</html>`,
+  ),
   renderSystemEmailLayout: vi.fn((args: { title?: string | null; bodyHtml: string }) =>
     `<html><h1>${String(args?.title ?? "")}</h1>${String(args?.bodyHtml ?? "")}</html>`,
   ),

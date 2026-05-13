@@ -68,6 +68,7 @@ vi.mock("@/lib/business/internal-business-profile", () => ({
 
 vi.mock("@/lib/email/layout", () => ({
   resolveAppUrl: vi.fn(() => "http://localhost:3000"),
+  renderOperationalEmailLayout: vi.fn(() => "<html></html>"),
   renderSystemEmailLayout: vi.fn(() => "<html></html>"),
   escapeHtml: vi.fn((value: string) => value),
 }));

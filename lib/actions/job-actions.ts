@@ -43,7 +43,8 @@ import {
 } from "@/lib/business/internal-business-profile";
 import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode-defaults";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
-import { renderSystemEmailLayout, escapeHtml, resolveAppUrl } from "@/lib/email/layout";
+import { renderOperationalEmailLayout, renderSystemEmailLayout, escapeHtml, resolveAppUrl } from "@/lib/email/layout";
+import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { resolveNotificationAccountOwnerUserId } from "@/lib/notifications/account-owner";
 import { assertAssignableInternalUser } from "@/lib/staffing/human-layer";
@@ -601,7 +602,7 @@ function formatServiceAddress(job: any) {
   return [line1, line2, cityStateZip].filter(Boolean).join(", ");
 }
 
-function buildCustomerScheduledEmailHtml(args: {
+export function buildCustomerScheduledEmailHtml(args: {
   customerName: string;
   customerPhone: string | null;
   customerEmail: string;
@@ -611,6 +612,7 @@ function buildCustomerScheduledEmailHtml(args: {
   serviceType: string | null;
   companyName: string | null;
   supportDisplayName: string;
+  companyLogoUrl: string | null;
   supportPhone: string | null;
   supportEmail: string | null;
 }) {
@@ -640,8 +642,12 @@ function buildCustomerScheduledEmailHtml(args: {
     ? `${escapeHtml(args.supportDisplayName)} (${escapeHtml(supportDetails)})`
     : escapeHtml(args.supportDisplayName);
 
-  return renderSystemEmailLayout({
+  return renderOperationalEmailLayout({
     title: "Your Job Is Scheduled",
+    companyDisplayName: args.supportDisplayName,
+    companyLogoUrl: args.companyLogoUrl,
+    supportEmail: args.supportEmail,
+    supportPhone: args.supportPhone,
     bodyHtml: `
       <p style="margin: 0 0 12px 0;">Your upcoming service has been scheduled.</p>
       <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
@@ -651,7 +657,7 @@ function buildCustomerScheduledEmailHtml(args: {
   });
 }
 
-function buildContractorScheduledEmailHtml(args: {
+export function buildContractorScheduledEmailHtml(args: {
   customerName: string;
   customerPhone: string | null;
   customerEmail: string | null;
@@ -663,6 +669,9 @@ function buildContractorScheduledEmailHtml(args: {
   portalJobUrl: string | null;
   companyName: string | null;
   supportDisplayName: string;
+  companyLogoUrl: string | null;
+  supportPhone: string | null;
+  supportEmail: string | null;
 }) {
   const details: string[] = [
     `<li><strong>Customer:</strong> ${escapeHtml(args.customerName)}</li>`,
@@ -695,8 +704,12 @@ function buildContractorScheduledEmailHtml(args: {
     ? `<p style="margin: 0 0 12px 0;">Portal Job Link: <a href="${escapeHtml(args.portalJobUrl)}">${escapeHtml(args.portalJobUrl)}</a></p>`
     : "";
 
-  return renderSystemEmailLayout({
+  return renderOperationalEmailLayout({
     title: `${args.supportDisplayName} Schedule`,
+    companyDisplayName: args.supportDisplayName,
+    companyLogoUrl: args.companyLogoUrl,
+    supportEmail: args.supportEmail,
+    supportPhone: args.supportPhone,
     bodyHtml: `
       <p style="margin: 0 0 12px 0;">A job has been scheduled or updated.</p>
       <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
@@ -1309,6 +1322,7 @@ async function sendCustomerScheduledEmailForJob({
       customer_last_name,
       customer_phone,
       customer_email,
+      customer_id,
       job_address,
       city,
       scheduled_date,
@@ -1316,7 +1330,8 @@ async function sendCustomerScheduledEmailForJob({
       window_end,
       contractor_id,
       contractors:contractor_id ( name, owner_user_id ),
-      locations:location_id (address_line1, address_line2, city, state, zip)
+      customers:customer_id ( owner_user_id ),
+      locations:location_id (address_line1, address_line2, city, state, zip, owner_user_id)
       `
     )
     .eq("id", jobId)
@@ -1349,15 +1364,18 @@ async function sendCustomerScheduledEmailForJob({
 
   const serviceTypeRaw = String(scheduledJob?.job_type ?? "").trim();
   const serviceType = serviceTypeRaw ? toTitleCase(serviceTypeRaw) : null;
-  const companyName = String((scheduledJob as any)?.contractors?.name ?? "").trim() || null;
-  const accountOwnerUserId = String((scheduledJob as any)?.contractors?.owner_user_id ?? "").trim();
-  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+  const accountOwnerUserId =
+    String((scheduledJob as any)?.customers?.owner_user_id ?? "").trim() ||
+    String((scheduledJob as any)?.locations?.owner_user_id ?? "").trim() ||
+    String((scheduledJob as any)?.contractors?.owner_user_id ?? "").trim();
+  const tenantIdentity = await resolveOperationalTenantIdentity({
     supabase,
     accountOwnerUserId,
   });
-  const supportDisplayName = internalBusinessIdentity.display_name;
-  const supportPhone = internalBusinessIdentity.support_phone;
-  const supportEmail = internalBusinessIdentity.support_email;
+  const supportDisplayName = tenantIdentity.displayName;
+  const supportPhone = tenantIdentity.supportPhone;
+  const supportEmail = tenantIdentity.supportEmail;
+  const companyName = tenantIdentity.displayName;
   const subjectDate = scheduledDateText && scheduledDateText !== "Not available"
     ? scheduledDateText
     : "Date TBD";
@@ -1408,6 +1426,7 @@ async function sendCustomerScheduledEmailForJob({
         serviceType,
         companyName,
         supportDisplayName,
+        companyLogoUrl: tenantIdentity.logoUrl,
         supportPhone,
         supportEmail,
       }),
@@ -1454,6 +1473,7 @@ async function sendContractorScheduledEmailForJob({
       customer_last_name,
       customer_phone,
       customer_email,
+      customer_id,
       job_address,
       city,
       scheduled_date,
@@ -1461,7 +1481,8 @@ async function sendContractorScheduledEmailForJob({
       window_end,
       contractor_id,
       contractors:contractor_id ( email, name, owner_user_id ),
-      locations:location_id (address_line1, address_line2, city, state, zip)
+      customers:customer_id ( owner_user_id ),
+      locations:location_id (address_line1, address_line2, city, state, zip, owner_user_id)
       `
     )
     .eq("id", jobId)
@@ -1505,13 +1526,18 @@ async function sendContractorScheduledEmailForJob({
   const serviceTypeRaw = String(scheduledJob?.job_type ?? "").trim();
   const serviceType = serviceTypeRaw ? toTitleCase(serviceTypeRaw) : null;
   const permitNumber = String(scheduledJob?.permit_number ?? "").trim() || null;
-  const companyName = String((scheduledJob as any)?.contractors?.name ?? "").trim() || null;
-  const accountOwnerUserId = String((scheduledJob as any)?.contractors?.owner_user_id ?? "").trim();
-  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+  const accountOwnerUserId =
+    String((scheduledJob as any)?.customers?.owner_user_id ?? "").trim() ||
+    String((scheduledJob as any)?.locations?.owner_user_id ?? "").trim() ||
+    String((scheduledJob as any)?.contractors?.owner_user_id ?? "").trim();
+  const tenantIdentity = await resolveOperationalTenantIdentity({
     supabase,
     accountOwnerUserId,
   });
-  const supportDisplayName = internalBusinessIdentity.display_name;
+  const supportDisplayName = tenantIdentity.displayName;
+  const supportPhone = tenantIdentity.supportPhone;
+  const supportEmail = tenantIdentity.supportEmail;
+  const companyName = tenantIdentity.displayName;
   const subjectDate = scheduledDateText && scheduledDateText !== "Not available"
     ? scheduledDateText
     : "Date TBD";
@@ -1567,6 +1593,9 @@ async function sendContractorScheduledEmailForJob({
         portalJobUrl,
         companyName,
         supportDisplayName,
+        companyLogoUrl: tenantIdentity.logoUrl,
+        supportPhone,
+        supportEmail,
       }),
     });
 

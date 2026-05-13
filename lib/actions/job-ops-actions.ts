@@ -29,7 +29,8 @@ import {
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
-import { resolveAppUrl, renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
+import { resolveAppUrl, renderOperationalEmailLayout, renderSystemEmailLayout, escapeHtml } from "@/lib/email/layout";
+import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
 import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-case-reconciliation";
@@ -331,6 +332,7 @@ function buildContractorReportEmailHtml(args: {
   contractorNote?: string | null;
   portalJobUrl?: string | null;
   supportDisplayName: string;
+  companyLogoUrl?: string | null;
   supportPhone?: string | null;
   supportEmail?: string | null;
 }) {
@@ -380,12 +382,12 @@ function buildContractorReportEmailHtml(args: {
     ? `<p style="margin: 14px 0 0 0;"><strong>Additional Note:</strong><br />${escapeHtml(note).replace(/\n/g, "<br />")}</p>`
     : "";
 
-  return renderSystemEmailLayout({
+  return renderOperationalEmailLayout({
     title: "ECC Test Report",
-    centerHeader: true,
-    logoWidthPx: 110,
-    logoMarginBottomPx: 10,
-    titleMarginBottomPx: 10,
+    companyDisplayName: args.supportDisplayName,
+    companyLogoUrl: String(args.companyLogoUrl ?? "").trim() || null,
+    supportEmail: args.supportEmail,
+    supportPhone: args.supportPhone,
     bodyHtml: `
       <p style="margin: 0 0 10px 0;"><strong>Status:</strong> Issues identified</p>
       <p style="margin: 0 0 12px 0; font-size: 13px; color: #475569;">${escapeHtml(args.title)}</p>
@@ -792,7 +794,7 @@ export async function sendContractorReport(input: {
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
-    .select("id, contractor_id, contractors:contractor_id ( email, owner_user_id )")
+    .select("id, contractor_id, customer_id, contractors:contractor_id ( email, owner_user_id ), customers:customer_id ( owner_user_id )")
     .eq("id", jobId)
     .single();
 
@@ -896,14 +898,16 @@ export async function sendContractorReport(input: {
     "Review and submit your response in the portal.";
   const resolvedNextStep = normalizeOptionalString(savedMeta?.next_step) ?? fallbackNextStep;
 
-  const accountOwnerUserId = String((job as any)?.contractors?.owner_user_id ?? "").trim();
-  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+  const accountOwnerUserId =
+    String((job as any)?.customers?.owner_user_id ?? "").trim() ||
+    String((job as any)?.contractors?.owner_user_id ?? "").trim();
+  const tenantIdentity = await resolveOperationalTenantIdentity({
     supabase,
     accountOwnerUserId,
   });
-  const supportDisplayName = internalBusinessIdentity.display_name;
-  const supportPhone = internalBusinessIdentity.support_phone;
-  const supportEmail = internalBusinessIdentity.support_email;
+  const supportDisplayName = tenantIdentity.displayName;
+  const supportPhone = tenantIdentity.supportPhone;
+  const supportEmail = tenantIdentity.supportEmail;
   const customerName = resolvedCustomerName;
   const jobAddress = resolvedLocationText;
   const subjectContext = jobAddress !== "Location not available" ? jobAddress : customerName;
@@ -924,6 +928,7 @@ export async function sendContractorReport(input: {
     contractorNote,
     portalJobUrl,
     supportDisplayName,
+    companyLogoUrl: tenantIdentity.logoUrl,
     supportPhone,
     supportEmail,
   });

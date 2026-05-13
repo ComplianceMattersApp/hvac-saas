@@ -20,7 +20,7 @@ import {
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from '@/lib/actions/job-evaluator';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 import { reconcileServiceCaseStatusAfterJobChange } from '@/lib/actions/service-case-reconciliation';
-import { renderSystemEmailLayout, escapeHtml } from '@/lib/email/layout';
+import { renderOperationalEmailLayout, renderSystemEmailLayout, escapeHtml } from '@/lib/email/layout';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { resolveNotificationAccountOwnerUserId } from '@/lib/notifications/account-owner';
 import { sanitizeVisitScopeItemId, sanitizeVisitScopeItems } from '@/lib/jobs/visit-scope';
@@ -471,6 +471,7 @@ type InternalInvoiceEmailAttemptKind = 'sent' | 'resent';
 
 function buildInternalInvoiceEmailBody(args: {
   businessName: string;
+  companyLogoUrl: string | null;
   supportEmail: string | null;
   supportPhone: string | null;
   invoice: InternalInvoiceRecord;
@@ -503,8 +504,12 @@ function buildInternalInvoiceEmailBody(args: {
   const supportLine = [args.supportEmail, args.supportPhone].filter(Boolean).map((value) => escapeHtml(String(value))).join(' • ');
   const notes = escapeHtml(String(args.invoice.notes ?? '').trim());
 
-  return renderSystemEmailLayout({
+  return renderOperationalEmailLayout({
     title: `Invoice ${invoiceNumber}`,
+    companyDisplayName: args.businessName,
+    companyLogoUrl: args.companyLogoUrl,
+    supportEmail: args.supportEmail,
+    supportPhone: args.supportPhone,
     bodyHtml: `
       <p style="margin: 0 0 12px 0;">Hello ${recipientName},</p>
       <p style="margin: 0 0 16px 0;">Your invoice for ${jobTitle} is ready.</p>
@@ -1629,6 +1634,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
   const subject = `${businessIdentity.display_name} invoice ${context.invoice.invoice_number}`;
   const body = buildInternalInvoiceEmailBody({
     businessName: businessIdentity.display_name,
+    companyLogoUrl: businessIdentity.logo_url,
     supportEmail: businessIdentity.support_email,
     supportPhone: businessIdentity.support_phone,
     invoice: context.invoice,
