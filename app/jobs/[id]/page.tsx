@@ -92,6 +92,11 @@ import {
   resolveJobDetailActor,
 } from "@/lib/actions/internal-job-detail-read-boundary";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
+import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
+import {
+  listMaintenanceAgreementLinksForJob,
+  projectMaintenanceAgreementVisitCountReview,
+} from "@/lib/maintenance-agreements/read-model";
 
 import DeferredJobAttachmentsInternal from "./_components/DeferredJobAttachmentsInternal";
 import DeferredCustomerAttemptsHistory from "./_components/DeferredCustomerAttemptsHistory";
@@ -119,6 +124,7 @@ import {
   getInterruptClearActionLabel,
 } from "@/lib/utils/ops-status";
 import InterruptStateFields from "./_components/InterruptStateFields";
+import MarkVisitCountedActionButton from "./_components/MarkVisitCountedActionButton";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -1542,6 +1548,50 @@ const showExternalDataEntryPrompt =
 const showInternalInvoicePanel =
   isInternalUser &&
   billingState.internalInvoicePanelEnabled;
+
+const maintenanceAgreementsEnabled = isMaintenanceAgreementsEnabled();
+let markVisitCountedLinkId: string | null = null;
+let markVisitCountedAgreementName: string | null = null;
+
+if (maintenanceAgreementsEnabled && job.job_type === "service") {
+  const maintenanceLinks = await listMaintenanceAgreementLinksForJob({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId: String(job.id ?? ""),
+    limit: 25,
+  });
+
+  if (maintenanceLinks.length > 0) {
+    for (const link of maintenanceLinks) {
+      const countStatus = String(link.count_status ?? "").trim().toLowerCase();
+      const countReviewLabel = projectMaintenanceAgreementVisitCountReview({
+        link: {
+          count_status: link.count_status,
+          counts_toward_visit_balance: link.counts_toward_visit_balance,
+        },
+        job: {
+          id: String(job.id ?? ""),
+          status: job.status,
+          ops_status: job.ops_status,
+          job_type: job.job_type,
+          field_complete: job.field_complete,
+          service_visit_type: job.service_visit_type,
+          service_visit_outcome: job.service_visit_outcome,
+        },
+      });
+
+      if (
+        (countStatus === "linked" || countStatus === "eligible") &&
+        !Boolean(link.counts_toward_visit_balance) &&
+        countReviewLabel === "eligible_for_count_review"
+      ) {
+        markVisitCountedLinkId = String(link.id ?? "").trim() || null;
+        markVisitCountedAgreementName = "Service Plan";
+        break;
+      }
+    }
+  }
+}
 
 const visitScopeSummary = sanitizeVisitScopeSummary((job as any).visit_scope_summary);
 let visitScopeItems = [] as Array<{
@@ -3073,6 +3123,62 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         />
       )}
 
+      {banner === "maintenance_visit_count_saved" && (
+        <FlashBanner
+          type="success"
+          message="Visit counted. This service plan link now contributes one used visit."
+        />
+      )}
+
+      {banner === "maintenance_visit_count_already_counted" && (
+        <FlashBanner
+          type="warning"
+          message="This visit is already counted."
+        />
+      )}
+
+      {banner === "maintenance_visit_count_unavailable" && (
+        <FlashBanner
+          type="warning"
+          message="Maintenance Agreements are currently unavailable."
+        />
+      )}
+
+      {banner === "maintenance_visit_count_missing_link" && (
+        <FlashBanner
+          type="warning"
+          message="Missing service-plan link for this job."
+        />
+      )}
+
+      {banner === "maintenance_visit_count_not_eligible" && (
+        <FlashBanner
+          type="warning"
+          message="Not eligible to count from the current lifecycle state."
+        />
+      )}
+
+      {banner === "maintenance_visit_count_excluded_or_reversed" && (
+        <FlashBanner
+          type="warning"
+          message="This link is excluded or reversed and cannot be counted."
+        />
+      )}
+
+      {banner === "maintenance_visit_count_out_of_scope" && (
+        <FlashBanner
+          type="warning"
+          message="Out of scope for this account or customer."
+        />
+      )}
+
+      {banner === "maintenance_visit_count_failed" && (
+        <FlashBanner
+          type="warning"
+          message="Could not mark this visit counted."
+        />
+      )}
+
       {banner === "internal_invoicing_billing_pending" && (
         <FlashBanner
           type="warning"
@@ -4524,6 +4630,21 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         timingEnabled={timingEnabled}
         onPhaseTiming={recordBlockingPhase}
       />
+
+      {markVisitCountedLinkId ? (
+        <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-slate-900">
+          <div className="text-sm font-semibold text-emerald-900">Service Plan Visit Count Review</div>
+          <p className="mt-1 text-xs leading-5 text-emerald-900/90">
+            This completed maintenance visit is eligible to count against
+            {" "}
+            <span className="font-semibold">{markVisitCountedAgreementName}</span>.
+            Counting is manual and operator-confirmed.
+          </p>
+          <div className="mt-3">
+            <MarkVisitCountedActionButton jobId={String(job.id)} linkId={markVisitCountedLinkId} />
+          </div>
+        </div>
+      ) : null}
 
       {job.job_notes ? (
         <div className={`${workspacePanelClass} p-4 text-gray-900`}>

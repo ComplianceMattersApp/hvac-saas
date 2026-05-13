@@ -5,6 +5,18 @@ const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 const resolveEntitlementMock = vi.fn();
 const isMaintenanceAgreementsEnabledMock = vi.fn();
+const redirectMock = vi.fn((to: string) => {
+  throw new Error(`REDIRECT:${to}`);
+});
+const revalidatePathMock = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  redirect: (to: string) => redirectMock(to),
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: (path: string) => revalidatePathMock(path),
+}));
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
@@ -217,6 +229,165 @@ function makeLinkAdminClient(params?: {
     }),
     _insertCalls: insertCalls,
   };
+}
+
+function makeMarkVisitCountedAdminClient(params?: {
+  linkExists?: boolean;
+  linkId?: string;
+  linkAccountOwnerUserId?: string;
+  linkAgreementId?: string;
+  linkJobId?: string;
+  linkCountStatus?: string;
+  linkCountsTowardVisitBalance?: boolean;
+  agreementExists?: boolean;
+  agreementStatus?: string;
+  agreementCustomerId?: string;
+  jobExists?: boolean;
+  jobType?: string;
+  jobStatus?: string;
+  jobOpsStatus?: string;
+  jobFieldComplete?: boolean;
+  jobServiceVisitType?: string;
+  jobServiceVisitOutcome?: string | null;
+  jobCustomerId?: string;
+  updateSucceeds?: boolean;
+  updateError?: string | null;
+}) {
+  const linkId = params?.linkId ?? "link-1";
+  const linkAccountOwnerUserId = params?.linkAccountOwnerUserId ?? "owner-1";
+  const linkAgreementId = params?.linkAgreementId ?? "agr-1";
+  const linkJobId = params?.linkJobId ?? "job-1";
+  const updateSucceeds = params?.updateSucceeds ?? true;
+  const updateError = params?.updateError ?? null;
+
+  let storedLink =
+    params?.linkExists === false
+      ? null
+      : {
+          id: linkId,
+          account_owner_user_id: linkAccountOwnerUserId,
+          agreement_id: linkAgreementId,
+          job_id: linkJobId,
+          count_status: params?.linkCountStatus ?? "linked",
+          counts_toward_visit_balance: params?.linkCountsTowardVisitBalance ?? false,
+        };
+
+  const updateCalls: unknown[] = [];
+
+  const visitSelectBuilder: any = {
+    eq: vi.fn(() => visitSelectBuilder),
+    maybeSingle: vi.fn(async () => ({
+      data: storedLink ? { ...storedLink } : null,
+      error: null,
+    })),
+  };
+
+  const visitUpdateBuilder: any = {
+    eq: vi.fn(() => visitUpdateBuilder),
+    in: vi.fn(() => visitUpdateBuilder),
+    select: vi.fn(() => ({
+      maybeSingle: vi.fn(async () => {
+        if (updateError) {
+          return { data: null, error: { message: updateError } };
+        }
+
+        const currentStatus = String(storedLink?.count_status ?? "").toLowerCase();
+        const currentCountsToward = Boolean(storedLink?.counts_toward_visit_balance);
+        const canUpdate =
+          Boolean(storedLink?.id) &&
+          (currentStatus === "linked" || currentStatus === "eligible") &&
+          !currentCountsToward &&
+          updateSucceeds;
+
+        if (!canUpdate) {
+          return { data: null, error: null };
+        }
+
+        storedLink = {
+          ...(storedLink as Record<string, unknown>),
+          count_status: "counted",
+          counts_toward_visit_balance: true,
+        } as typeof storedLink;
+
+        return {
+          data: { id: linkId },
+          error: null,
+        };
+      }),
+    })),
+  };
+
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "maintenance_agreement_visits") {
+        return {
+          select: vi.fn(() => visitSelectBuilder),
+          update: vi.fn((payload: unknown) => {
+            updateCalls.push(payload);
+            return visitUpdateBuilder;
+          }),
+        };
+      }
+
+      if (table === "jobs") {
+        const builder: any = {
+          eq: vi.fn(() => builder),
+          maybeSingle: vi.fn(async () => ({
+            data:
+              params?.jobExists === false
+                ? null
+                : {
+                    id: "job-1",
+                    customer_id: params?.jobCustomerId ?? "cust-1",
+                    job_type: params?.jobType ?? "service",
+                    status: params?.jobStatus ?? "completed",
+                    ops_status: params?.jobOpsStatus ?? "invoice_required",
+                    field_complete: params?.jobFieldComplete ?? true,
+                    service_visit_type: params?.jobServiceVisitType ?? "maintenance",
+                    service_visit_outcome: params?.jobServiceVisitOutcome ?? null,
+                  },
+            error: null,
+          })),
+        };
+
+        return {
+          select: vi.fn(() => builder),
+        };
+      }
+
+      if (table === "maintenance_agreements") {
+        const builder: any = {
+          eq: vi.fn(() => builder),
+          maybeSingle: vi.fn(async () => ({
+            data:
+              params?.agreementExists === false
+                ? null
+                : {
+                    id: linkAgreementId,
+                    account_owner_user_id: linkAccountOwnerUserId,
+                    customer_id: params?.agreementCustomerId ?? "cust-1",
+                    status: params?.agreementStatus ?? "active",
+                  },
+            error: null,
+          })),
+        };
+
+        return {
+          select: vi.fn(() => builder),
+        };
+      }
+
+      throw new Error(`Unexpected admin table ${table}`);
+    }),
+    _updateCalls: updateCalls,
+  };
+}
+
+async function expectRedirectError(work: () => Promise<unknown>) {
+  await expect(work()).rejects.toThrow(/REDIRECT:/);
+  const calls = redirectMock.mock.calls;
+  expect(calls.length).toBeGreaterThan(0);
+  return String(calls[calls.length - 1]?.[0] ?? "");
 }
 
 const { createMaintenanceAgreement, updateMaintenanceAgreement } = await import(
@@ -502,5 +673,174 @@ describe("createMaintenanceAgreementVisitLinkFromJobCreation", () => {
       agreement_id: "agr-1",
       job_id: "job-1",
     });
+  });
+});
+
+describe("markMaintenanceAgreementVisitCountedFromForm", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isMaintenanceAgreementsEnabledMock.mockReturnValue(true);
+    resolveEntitlementMock.mockResolvedValue({ authorized: true, reason: "ok" });
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-1",
+      internalUser: {
+        user_id: "user-1",
+        account_owner_user_id: "owner-1",
+      },
+    });
+    createClientMock.mockResolvedValue({});
+  });
+
+  it("marks an eligible maintenance visit link counted and revalidates detail + service plans", async () => {
+    const { markMaintenanceAgreementVisitCountedFromForm } = await import("@/lib/maintenance-agreements/agreement-actions");
+    const admin = makeMarkVisitCountedAdminClient();
+    createAdminClientMock.mockReturnValue(admin);
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("maintenance_agreement_visit_link_id", "link-1");
+
+    const target = await expectRedirectError(() =>
+      markMaintenanceAgreementVisitCountedFromForm(formData),
+    );
+
+    expect(target).toContain("banner=maintenance_visit_count_saved");
+    expect(admin._updateCalls).toHaveLength(1);
+    expect(admin._updateCalls[0]).toMatchObject({
+      count_status: "counted",
+      counts_toward_visit_balance: true,
+      counted_by_user_id: "user-1",
+      updated_by_user_id: "user-1",
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/jobs/job-1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/service-plans");
+  });
+
+  it("fails closed when feature flag is disabled", async () => {
+    const { markMaintenanceAgreementVisitCountedFromForm } = await import("@/lib/maintenance-agreements/agreement-actions");
+    isMaintenanceAgreementsEnabledMock.mockReturnValue(false);
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("maintenance_agreement_visit_link_id", "link-1");
+
+    const target = await expectRedirectError(() =>
+      markMaintenanceAgreementVisitCountedFromForm(formData),
+    );
+
+    expect(target).toContain("banner=maintenance_visit_count_unavailable");
+    expect(createAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("returns missing-link banner when no link row exists", async () => {
+    const { markMaintenanceAgreementVisitCountedFromForm } = await import("@/lib/maintenance-agreements/agreement-actions");
+    createAdminClientMock.mockReturnValue(makeMarkVisitCountedAdminClient({ linkExists: false }));
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("maintenance_agreement_visit_link_id", "link-1");
+
+    const target = await expectRedirectError(() =>
+      markMaintenanceAgreementVisitCountedFromForm(formData),
+    );
+
+    expect(target).toContain("banner=maintenance_visit_count_missing_link");
+  });
+
+  it("returns already-counted when link is already counted", async () => {
+    const { markMaintenanceAgreementVisitCountedFromForm } = await import("@/lib/maintenance-agreements/agreement-actions");
+    createAdminClientMock.mockReturnValue(
+      makeMarkVisitCountedAdminClient({
+        linkCountStatus: "counted",
+        linkCountsTowardVisitBalance: true,
+      }),
+    );
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("maintenance_agreement_visit_link_id", "link-1");
+
+    const target = await expectRedirectError(() =>
+      markMaintenanceAgreementVisitCountedFromForm(formData),
+    );
+
+    expect(target).toContain("banner=maintenance_visit_count_already_counted");
+  });
+
+  it("returns excluded-or-reversed when link status is excluded", async () => {
+    const { markMaintenanceAgreementVisitCountedFromForm } = await import("@/lib/maintenance-agreements/agreement-actions");
+    createAdminClientMock.mockReturnValue(
+      makeMarkVisitCountedAdminClient({
+        linkCountStatus: "excluded",
+      }),
+    );
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("maintenance_agreement_visit_link_id", "link-1");
+
+    const target = await expectRedirectError(() =>
+      markMaintenanceAgreementVisitCountedFromForm(formData),
+    );
+
+    expect(target).toContain("banner=maintenance_visit_count_excluded_or_reversed");
+  });
+
+  it("returns out-of-scope when account ownership does not match", async () => {
+    const { markMaintenanceAgreementVisitCountedFromForm } = await import("@/lib/maintenance-agreements/agreement-actions");
+    createAdminClientMock.mockReturnValue(
+      makeMarkVisitCountedAdminClient({
+        linkAccountOwnerUserId: "owner-2",
+      }),
+    );
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("maintenance_agreement_visit_link_id", "link-1");
+
+    const target = await expectRedirectError(() =>
+      markMaintenanceAgreementVisitCountedFromForm(formData),
+    );
+
+    expect(target).toContain("banner=maintenance_visit_count_out_of_scope");
+  });
+
+  it("returns not-eligible when job is not maintenance", async () => {
+    const { markMaintenanceAgreementVisitCountedFromForm } = await import("@/lib/maintenance-agreements/agreement-actions");
+    createAdminClientMock.mockReturnValue(
+      makeMarkVisitCountedAdminClient({
+        jobServiceVisitType: "repair",
+      }),
+    );
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("maintenance_agreement_visit_link_id", "link-1");
+
+    const target = await expectRedirectError(() =>
+      markMaintenanceAgreementVisitCountedFromForm(formData),
+    );
+
+    expect(target).toContain("banner=maintenance_visit_count_not_eligible");
+  });
+
+  it("returns not-eligible when job is not completed or field-complete", async () => {
+    const { markMaintenanceAgreementVisitCountedFromForm } = await import("@/lib/maintenance-agreements/agreement-actions");
+    createAdminClientMock.mockReturnValue(
+      makeMarkVisitCountedAdminClient({
+        jobStatus: "in_process",
+        jobFieldComplete: false,
+      }),
+    );
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("maintenance_agreement_visit_link_id", "link-1");
+
+    const target = await expectRedirectError(() =>
+      markMaintenanceAgreementVisitCountedFromForm(formData),
+    );
+
+    expect(target).toContain("banner=maintenance_visit_count_not_eligible");
   });
 });

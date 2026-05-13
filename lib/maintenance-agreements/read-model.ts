@@ -542,6 +542,9 @@ export function projectMaintenanceAgreementVisitCountReview(input: {
   const jobType = toCleanString(job.job_type).toLowerCase();
   if (jobType !== "service") return "not_eligible";
 
+  const serviceVisitType = toCleanString(job.service_visit_type).toLowerCase();
+  if (serviceVisitType !== "maintenance") return "not_eligible";
+
   const status = toCleanString(job.status).toLowerCase();
   const opsStatus = toCleanString(job.ops_status).toLowerCase();
   const serviceOutcome = toCleanString(job.service_visit_outcome).toLowerCase();

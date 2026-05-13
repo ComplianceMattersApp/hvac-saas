@@ -3,13 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { requireInternalUser } from "@/lib/auth/internal-user";
+import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import {
   MAINTENANCE_AGREEMENT_FREQUENCIES,
   MAINTENANCE_AGREEMENT_STATUSES,
   MAINTENANCE_AGREEMENT_TYPES,
+  projectMaintenanceAgreementVisitCountReview,
 } from "@/lib/maintenance-agreements/read-model";
 import { sanitizeVisitScopeItems, type VisitScopeItem } from "@/lib/jobs/visit-scope";
 
@@ -506,4 +507,253 @@ export async function createMaintenanceAgreementVisitLinkFromJobCreation(params:
     // Silently fail on any error; don't block job creation
     return false;
   }
+}
+
+function jobBannerPath(jobIdRaw: string, banner: string) {
+  const jobId = cleanString(jobIdRaw);
+  if (!jobId) return `/ops?banner=${encodeURIComponent(banner)}`;
+  return `/jobs/${encodeURIComponent(jobId)}?banner=${encodeURIComponent(banner)}`;
+}
+
+export async function markMaintenanceAgreementVisitCountedFromForm(formData: FormData): Promise<void> {
+  const jobId = cleanString(formData.get("job_id"));
+  const linkId = cleanString(formData.get("maintenance_agreement_visit_link_id"));
+
+  if (!jobId || !linkId) {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_missing_link"));
+  }
+
+  if (!isMaintenanceAgreementsEnabled()) {
+    revalidatePath(`/jobs/${jobId}`);
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_unavailable"));
+  }
+
+  const supabase = await createClient();
+
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    authz = await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      if (error.code === "AUTH_REQUIRED") {
+        redirect("/login");
+      }
+      redirect(`/jobs/${encodeURIComponent(jobId)}?notice=not_authorized`);
+    }
+    throw error;
+  }
+
+  const accountOwnerUserId = cleanString(authz.internalUser.account_owner_user_id);
+  const actingUserId = cleanString(authz.userId);
+
+  if (!accountOwnerUserId || !actingUserId) {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_out_of_scope"));
+  }
+
+  const entitlement = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId,
+    supabase,
+  });
+
+  if (!entitlement.authorized) {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_unavailable"));
+  }
+
+  const admin = createAdminClient();
+
+  const { data: linkRow, error: linkError } = await admin
+    .from("maintenance_agreement_visits")
+    .select(
+      [
+        "id",
+        "account_owner_user_id",
+        "agreement_id",
+        "job_id",
+        "count_status",
+        "counts_toward_visit_balance",
+      ].join(", "),
+    )
+    .eq("id", linkId)
+    .maybeSingle();
+
+  const link = (linkRow ?? null) as {
+    id?: string | null;
+    account_owner_user_id?: string | null;
+    agreement_id?: string | null;
+    job_id?: string | null;
+    count_status?: string | null;
+    counts_toward_visit_balance?: boolean | null;
+  } | null;
+
+  if (linkError) {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_failed"));
+  }
+
+  if (!link?.id) {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_missing_link"));
+  }
+
+  const scopedLinkAccountOwnerUserId = cleanString(link.account_owner_user_id);
+  const scopedLinkJobId = cleanString(link.job_id);
+  const scopedLinkAgreementId = cleanString(link.agreement_id);
+  const scopedLinkCountStatus = cleanString(link.count_status).toLowerCase();
+  const scopedLinkCountsToward = Boolean(link.counts_toward_visit_balance);
+
+  if (
+    !scopedLinkAccountOwnerUserId ||
+    scopedLinkAccountOwnerUserId !== accountOwnerUserId ||
+    !scopedLinkAgreementId ||
+    scopedLinkJobId !== jobId
+  ) {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_out_of_scope"));
+  }
+
+  if (scopedLinkCountStatus === "counted" && scopedLinkCountsToward) {
+    revalidatePath(`/jobs/${jobId}`);
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_already_counted"));
+  }
+
+  if (scopedLinkCountStatus === "excluded" || scopedLinkCountStatus === "reversed") {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_excluded_or_reversed"));
+  }
+
+  if ((scopedLinkCountStatus !== "linked" && scopedLinkCountStatus !== "eligible") || scopedLinkCountsToward) {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_not_eligible"));
+  }
+
+  const { data: jobRow, error: jobError } = await admin
+    .from("jobs")
+    .select(
+      [
+        "id",
+        "customer_id",
+        "job_type",
+        "status",
+        "ops_status",
+        "field_complete",
+        "service_visit_type",
+        "service_visit_outcome",
+      ].join(", "),
+    )
+    .eq("id", jobId)
+    .maybeSingle();
+
+  const job = (jobRow ?? null) as {
+    id?: string | null;
+    customer_id?: string | null;
+    job_type?: string | null;
+    status?: string | null;
+    ops_status?: string | null;
+    field_complete?: boolean | null;
+    service_visit_type?: string | null;
+    service_visit_outcome?: string | null;
+  } | null;
+
+  if (jobError || !job?.id) {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_out_of_scope"));
+  }
+
+  const { data: agreementRow, error: agreementError } = await admin
+    .from("maintenance_agreements")
+    .select("id, account_owner_user_id, customer_id, status")
+    .eq("id", scopedLinkAgreementId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  const agreement = (agreementRow ?? null) as {
+    id?: string | null;
+    account_owner_user_id?: string | null;
+    customer_id?: string | null;
+    status?: string | null;
+  } | null;
+
+  if (agreementError || !agreement?.id) {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_out_of_scope"));
+  }
+
+  const agreementStatus = cleanString(agreement.status).toLowerCase();
+  const agreementCustomerId = cleanString(agreement.customer_id);
+  const jobCustomerId = cleanString(job.customer_id);
+  if (!agreementCustomerId || !jobCustomerId || agreementCustomerId !== jobCustomerId) {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_out_of_scope"));
+  }
+
+  if (agreementStatus !== "active") {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_not_eligible"));
+  }
+
+  const projectedLabel = projectMaintenanceAgreementVisitCountReview({
+    link: {
+      count_status: scopedLinkCountStatus,
+      counts_toward_visit_balance: scopedLinkCountsToward,
+    },
+    job: {
+      id: job.id,
+      status: job.status,
+      ops_status: job.ops_status,
+      job_type: job.job_type,
+      field_complete: job.field_complete,
+      service_visit_type: job.service_visit_type,
+      service_visit_outcome: job.service_visit_outcome,
+    },
+  });
+
+  if (projectedLabel !== "eligible_for_count_review") {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_not_eligible"));
+  }
+
+  const nowIso = new Date().toISOString();
+
+  const { data: updatedLink, error: updateError } = await admin
+    .from("maintenance_agreement_visits")
+    .update({
+      count_status: "counted",
+      counts_toward_visit_balance: true,
+      counted_at: nowIso,
+      counted_by_user_id: actingUserId,
+      updated_by_user_id: actingUserId,
+    })
+    .eq("id", linkId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("job_id", jobId)
+    .eq("agreement_id", scopedLinkAgreementId)
+    .in("count_status", ["linked", "eligible"])
+    .eq("counts_toward_visit_balance", false)
+    .select("id")
+    .maybeSingle();
+
+  if (updateError) {
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_failed"));
+  }
+
+  if (!updatedLink?.id) {
+    const { data: recheckRow, error: recheckError } = await admin
+      .from("maintenance_agreement_visits")
+      .select("count_status, counts_toward_visit_balance")
+      .eq("id", linkId)
+      .maybeSingle();
+
+    const recheck = (recheckRow ?? null) as {
+      count_status?: string | null;
+      counts_toward_visit_balance?: boolean | null;
+    } | null;
+
+    if (recheckError) {
+      redirect(jobBannerPath(jobId, "maintenance_visit_count_failed"));
+    }
+
+    const recheckStatus = cleanString(recheck?.count_status).toLowerCase();
+    const recheckCountsToward = Boolean(recheck?.counts_toward_visit_balance);
+    if (recheckStatus === "counted" && recheckCountsToward) {
+      revalidatePath(`/jobs/${jobId}`);
+      revalidatePath(`/service-plans`);
+      redirect(jobBannerPath(jobId, "maintenance_visit_count_already_counted"));
+    }
+
+    redirect(jobBannerPath(jobId, "maintenance_visit_count_not_eligible"));
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/service-plans`);
+  redirect(jobBannerPath(jobId, "maintenance_visit_count_saved"));
 }

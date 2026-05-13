@@ -787,6 +787,7 @@ describe("maintenance agreement read model", () => {
       makeJob({ id: "job-blocked", status: "completed", field_complete: true, ops_status: "on_hold" }),
       makeJob({ id: "job-no-show", status: "completed", field_complete: true, service_visit_outcome: "no_show" }),
       makeJob({ id: "job-duplicate", status: "completed", field_complete: true, service_visit_outcome: "duplicate" }),
+      makeJob({ id: "job-non-maintenance", status: "completed", field_complete: true, service_visit_type: "repair" }),
       makeJob({ id: "job-ecc", status: "completed", field_complete: true, job_type: "ecc" }),
     ]) {
       expect(
