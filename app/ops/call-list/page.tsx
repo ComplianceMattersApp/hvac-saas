@@ -119,13 +119,13 @@ export default async function CallListPage({
             <span aria-hidden="true">&larr;</span> Back to Ops
           </Link>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Call List</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Unscheduled Work</h1>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-              Need to Schedule
+              Unscheduled
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-600">
-            Jobs waiting to be scheduled -{" "}
+            Jobs and work requests that still need a scheduled date, time window, or dispatch follow-up. {" "}
             <span className="font-semibold text-slate-800">{jobs.length}</span>{" "}
             {jobs.length === 1 ? "item" : "items"}
           </p>
@@ -135,7 +135,7 @@ export default async function CallListPage({
       {/* Empty state */}
       {jobs.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-          <p className="text-sm font-medium text-slate-500">No jobs waiting to be scheduled right now.</p>
+          <p className="text-sm font-medium text-slate-500">No unscheduled work right now.</p>
           <p className="mt-1 text-xs text-slate-400">Check back later or return to the Ops overview.</p>
           <Link
             href="/ops"

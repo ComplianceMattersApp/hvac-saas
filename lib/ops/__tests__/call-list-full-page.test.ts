@@ -17,12 +17,12 @@ describe("/ops call list — Full Page link", () => {
     expect(opsPageSource).toContain('href={`/ops/call-list');
   });
 
-  it("the Full page link label is present", () => {
-    expect(opsPageSource).toContain("Full page");
+  it("the View Unscheduled Work link label is present", () => {
+    expect(opsPageSource).toContain("View Unscheduled Work");
   });
 
   it("contractor filter is preserved in the Full page link href", () => {
-    expect(opsPageSource).toContain("encodeURIComponent(contractor)");
+    expect(opsPageSource).toContain("encodeURIComponent(contractorScopeFilter)");
   });
 });
 
@@ -98,11 +98,18 @@ describe("/ops/call-list page", () => {
   });
 
   it("empty state renders safely with a return-to-ops link", () => {
-    expect(callListPageSource).toContain("No jobs waiting to be scheduled right now.");
+    expect(callListPageSource).toContain("No unscheduled work right now.");
     expect(callListPageSource).toContain("Return to Ops");
   });
 
-  it("page heading is Call List", () => {
-    expect(callListPageSource).toContain(">Call List<");
+  it("page heading is Unscheduled Work", () => {
+    expect(callListPageSource).toContain(">Unscheduled Work<");
+  });
+
+  it("shows universal unscheduled helper copy and badge label", () => {
+    expect(callListPageSource).toContain("Unscheduled");
+    expect(callListPageSource).toContain(
+      "Jobs and work requests that still need a scheduled date, time window, or dispatch follow-up.",
+    );
   });
 });

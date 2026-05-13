@@ -2571,7 +2571,7 @@ return (
     <section className="grid grid-cols-1 gap-2.5 lg:grid-cols-3">
       <div className={`rounded-2xl border ${callListVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
         <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Call List</div>
+          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Unscheduled Work</div>
           <div className="flex items-center gap-3">
             {sectionCountPill(prioritizedCallListJobs.length)}
             {prioritizedCallListJobs.length > PREVIEW_LIMIT ? (
@@ -2593,12 +2593,12 @@ return (
               href={`/ops/call-list${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`}
               className={inlineSectionLinkClass}
             >
-              Full page
+              View Unscheduled Work
             </Link>
           </div>
         </div>
         {callListVisibleJobs.length === 0 ? (
-          quietSectionEmptyState("No jobs need scheduling right now.")
+          quietSectionEmptyState("No unscheduled work right now.")
         ) : (
           <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j, false, undefined, true))}</div>
         )}
