@@ -3952,7 +3952,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   </form>
               </details>
 
-              <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <div
+                className={`mt-4 grid grid-cols-1 gap-3 ${
+                  !isHvacServiceMode && job.job_type === "service" ? "lg:grid-cols-2" : "lg:grid-cols-1"
+                }`}
+              >
                 {!isHvacServiceMode ? (
                   <details className="group w-full rounded-xl border border-slate-200/80 bg-white p-4 text-sm shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90">
                     <summary className="cursor-pointer list-none">
