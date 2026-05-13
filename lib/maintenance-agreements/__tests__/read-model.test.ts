@@ -8,6 +8,7 @@ import {
   listMaintenanceAgreementsForCustomer,
   listMaintenanceAgreementsForLocation,
   listUpcomingOverdueMaintenanceAgreements,
+  resolveScopedMaintenanceAgreementJobPrefill,
   summarizeMaintenanceAgreementsForAccount,
 } from "@/lib/maintenance-agreements/read-model";
 
@@ -111,6 +112,10 @@ function makeSupabaseMock(rows: MockAgreement[]) {
           calls.push({ op: "limit", value });
           limitValue = value;
           return build();
+        },
+        maybeSingle: async () => {
+          const result = exec();
+          return { data: result.data[0] ?? null, error: result.error };
         },
         then: (resolve: any, reject?: any) => Promise.resolve(exec()).then(resolve, reject),
       });
@@ -310,5 +315,77 @@ describe("maintenance agreement read model", () => {
       },
     });
     expect(calls).toEqual([]);
+  });
+
+  it("resolves scoped prefill for jobs/new and sanitizes summary and items", async () => {
+    const { supabase } = makeSupabaseMock([
+      makeAgreement({
+        id: "prefill-1",
+        agreement_name: "Spring Service Plan",
+        next_due_date: "2026-05-20",
+        default_visit_scope_summary: "  Seasonal tune-up and safety check  ",
+        default_visit_scope_items: [
+          {
+            title: " Inspect condenser coil ",
+            details: " Clean as needed ",
+            kind: "primary",
+          },
+        ],
+      }),
+    ]);
+
+    const prefill = await resolveScopedMaintenanceAgreementJobPrefill({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      customerId: CUSTOMER_ID,
+      agreementId: "prefill-1",
+    });
+
+    expect(prefill).toMatchObject({
+      agreement_id: "prefill-1",
+      agreement_name: "Spring Service Plan",
+      customer_id: CUSTOMER_ID,
+      primary_location_id: LOCATION_ID,
+      next_due_date: "2026-05-20",
+      default_visit_scope_summary: "Seasonal tune-up and safety check",
+    });
+    expect(prefill?.default_visit_scope_items).toHaveLength(1);
+    expect(prefill?.default_visit_scope_items[0]?.title).toBe("Inspect condenser coil");
+  });
+
+  it("fails safe for invalid prefill work items and returns empty items", async () => {
+    const { supabase } = makeSupabaseMock([
+      makeAgreement({
+        id: "prefill-bad-items",
+        default_visit_scope_items: [
+          {
+            title: "",
+            details: "Only details triggers validation error",
+          },
+        ],
+      }),
+    ]);
+
+    const prefill = await resolveScopedMaintenanceAgreementJobPrefill({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      customerId: CUSTOMER_ID,
+      agreementId: "prefill-bad-items",
+    });
+
+    expect(prefill?.default_visit_scope_items).toEqual([]);
+  });
+
+  it("returns null when scoped prefill cannot be found", async () => {
+    const { supabase } = makeSupabaseMock([makeAgreement({ id: "other" })]);
+
+    const prefill = await resolveScopedMaintenanceAgreementJobPrefill({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      customerId: CUSTOMER_ID,
+      agreementId: "missing",
+    });
+
+    expect(prefill).toBeNull();
   });
 });

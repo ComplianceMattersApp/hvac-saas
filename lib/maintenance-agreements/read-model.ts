@@ -1,3 +1,9 @@
+import {
+  sanitizeVisitScopeItems,
+  sanitizeVisitScopeSummary,
+  type VisitScopeItem,
+} from "@/lib/jobs/visit-scope";
+
 export const MAINTENANCE_AGREEMENT_SELECT = [
   "id",
   "account_owner_user_id",
@@ -91,6 +97,16 @@ export type MaintenanceAgreementRow = {
 
 export type MaintenanceAgreementPlanningRow = MaintenanceAgreementRow & {
   due_state: MaintenanceAgreementDueState;
+};
+
+export type MaintenanceAgreementJobPrefill = {
+  agreement_id: string;
+  agreement_name: string;
+  next_due_date: string | null;
+  customer_id: string;
+  primary_location_id: string | null;
+  default_visit_scope_summary: string | null;
+  default_visit_scope_items: VisitScopeItem[];
 };
 
 type SupabaseLike = {
@@ -239,6 +255,67 @@ export async function listMaintenanceAgreementsForLocation(params: ListForLocati
       .order("next_due_date", { ascending: true })
       .order("created_at", { ascending: false }),
   );
+}
+
+export async function resolveScopedMaintenanceAgreementJobPrefill(params: {
+  supabase: SupabaseLike;
+  accountOwnerUserId: string | null | undefined;
+  customerId: string | null | undefined;
+  agreementId: string | null | undefined;
+}): Promise<MaintenanceAgreementJobPrefill | null> {
+  const accountOwnerUserId = toCleanString(params.accountOwnerUserId);
+  const customerId = toCleanString(params.customerId);
+  const agreementId = toCleanString(params.agreementId);
+  if (!accountOwnerUserId || !customerId || !agreementId) return null;
+
+  const { data, error } = await params.supabase
+    .from("maintenance_agreements")
+    .select(
+      [
+        "id",
+        "agreement_name",
+        "next_due_date",
+        "customer_id",
+        "primary_location_id",
+        "default_visit_scope_summary",
+        "default_visit_scope_items",
+      ].join(", "),
+    )
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("customer_id", customerId)
+    .eq("id", agreementId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const summary = sanitizeVisitScopeSummary(
+    (data as { default_visit_scope_summary?: unknown }).default_visit_scope_summary,
+  );
+
+  let items: VisitScopeItem[] = [];
+  try {
+    items = sanitizeVisitScopeItems(
+      (data as { default_visit_scope_items?: unknown }).default_visit_scope_items,
+    );
+  } catch {
+    items = [];
+  }
+
+  return {
+    agreement_id: String((data as { id?: unknown }).id ?? "").trim(),
+    agreement_name:
+      String((data as { agreement_name?: unknown }).agreement_name ?? "").trim() ||
+      "Service Plan",
+    next_due_date:
+      String((data as { next_due_date?: unknown }).next_due_date ?? "").trim() || null,
+    customer_id: String((data as { customer_id?: unknown }).customer_id ?? "").trim(),
+    primary_location_id:
+      String((data as { primary_location_id?: unknown }).primary_location_id ?? "").trim() ||
+      null,
+    default_visit_scope_summary: summary,
+    default_visit_scope_items: items,
+  };
 }
 
 export async function listUpcomingOverdueMaintenanceAgreements(params: ListUpcomingOverdueParams) {

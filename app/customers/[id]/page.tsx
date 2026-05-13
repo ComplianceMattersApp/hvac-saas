@@ -1419,6 +1419,12 @@ export default async function CustomerDetailPage(props: {
                               No due date
                             </span>
                           )}
+                          <Link
+                            href={`/jobs/new?source=customer&customer_id=${customerId}&maintenance_agreement_id=${agr.id}`}
+                            className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                          >
+                            Create Work Order
+                          </Link>
                         </div>
                       </div>
 

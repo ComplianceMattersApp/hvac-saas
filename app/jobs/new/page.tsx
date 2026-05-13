@@ -8,6 +8,8 @@ import {
   resolveProductModeForAccountOwnerId,
   type ProductMode,
 } from "@/lib/business/product-mode-defaults";
+import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
+import { resolveScopedMaintenanceAgreementJobPrefill } from "@/lib/maintenance-agreements/read-model";
 
 type ExistingCustomerRow = {
   id: string;
@@ -73,7 +75,13 @@ function isUuid(v: string) {
 }
 
 export default async function NewJobPage(props: {
-  searchParams?: Promise<{ customer_id?: string; source?: string; err?: string; proposal_id?: string }>;
+  searchParams?: Promise<{
+    customer_id?: string;
+    source?: string;
+    err?: string;
+    proposal_id?: string;
+    maintenance_agreement_id?: string;
+  }>;
 }) {
   const supabase = await createClient();
 
@@ -106,6 +114,7 @@ export default async function NewJobPage(props: {
 
   let contractors: Array<{ id: string; name: string }> = [];
   let productMode: ProductMode = "hybrid";
+  let accountOwnerUserId: string | null = null;
   let pricebookTemplateItems: Array<{
     id: string;
     item_name: string;
@@ -133,7 +142,7 @@ export default async function NewJobPage(props: {
 
     if (internalUserErr) throw new Error(internalUserErr.message);
 
-    const accountOwnerUserId = String(internalUserRow?.account_owner_user_id ?? "").trim();
+    accountOwnerUserId = String(internalUserRow?.account_owner_user_id ?? "").trim() || null;
     if (accountOwnerUserId) {
       const [resolvedJobType, resolvedProductMode] = await Promise.all([
         resolveDefaultJobTypeForAccountOwnerId({
@@ -180,6 +189,7 @@ export default async function NewJobPage(props: {
   const source = String(sp?.source ?? "").trim().toLowerCase();
   const errorCode = String(sp?.err ?? "").trim() || null;
   const submittedProposalId = String(sp?.proposal_id ?? "").trim() || null;
+  const maintenanceAgreementId = String(sp?.maintenance_agreement_id ?? "").trim();
   const requestedCustomerContext = source === "customer";
 
   // Optional: existing customer mode
@@ -190,6 +200,10 @@ export default async function NewJobPage(props: {
   // Internal guided mode lookup data
   let customerLookupRows: CustomerLookupRow[] = [];
   let locationLookupRows: LocationLookupRow[] = [];
+  let maintenanceAgreementPrefill = null as Awaited<
+    ReturnType<typeof resolveScopedMaintenanceAgreementJobPrefill>
+  >;
+  let maintenanceAgreementPrefillStatus: "unavailable" | null = null;
 
   if (customerId && isUuid(customerId)) {
     const { data: cRow, error: cErr } = await supabase
@@ -241,6 +255,33 @@ export default async function NewJobPage(props: {
     }
   }
 
+  if (!myContractor?.id && maintenanceAgreementId) {
+    const prefillEligible =
+      isMaintenanceAgreementsEnabled() &&
+      isUuid(customerId) &&
+      isUuid(maintenanceAgreementId) &&
+      Boolean(accountOwnerUserId);
+
+    if (!prefillEligible) {
+      maintenanceAgreementPrefillStatus = "unavailable";
+    } else {
+      try {
+        maintenanceAgreementPrefill = await resolveScopedMaintenanceAgreementJobPrefill({
+          supabase,
+          accountOwnerUserId,
+          customerId,
+          agreementId: maintenanceAgreementId,
+        });
+      } catch {
+        maintenanceAgreementPrefill = null;
+      }
+
+      if (!maintenanceAgreementPrefill) {
+        maintenanceAgreementPrefillStatus = "unavailable";
+      }
+    }
+  }
+
   return (
     <NewJobForm
       contractors={contractors}
@@ -256,6 +297,8 @@ export default async function NewJobPage(props: {
       initialJobType={initialJobType}
       productMode={productMode}
       pricebookTemplateItems={pricebookTemplateItems}
+      maintenanceAgreementPrefill={maintenanceAgreementPrefill}
+      maintenanceAgreementPrefillStatus={maintenanceAgreementPrefillStatus}
     />
   );
 }

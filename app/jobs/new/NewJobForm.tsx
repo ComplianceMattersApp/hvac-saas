@@ -69,6 +69,25 @@ type LocationLookupRow = {
 
 type MyContractor = { id: string; name: string } | null;
 
+type MaintenanceAgreementPrefill = {
+  agreement_id: string;
+  agreement_name: string;
+  next_due_date: string | null;
+  primary_location_id: string | null;
+  default_visit_scope_summary: string | null;
+  default_visit_scope_items: Array<{
+    id?: string;
+    title: string;
+    details: string | null;
+    kind?: "primary" | "companion_service";
+    source_pricebook_item_id?: string | null;
+    expected_unit_price?: number | null;
+    unit_label?: string | null;
+    item_type?: string | null;
+    category?: string | null;
+  }>;
+};
+
 type ComponentType =
   | "condenser_ac"
   | "coil"
@@ -305,6 +324,44 @@ function formatRelationshipWindow(job: RelationshipJobSummary) {
   return start && end ? `${start}-${end}` : null;
 }
 
+function formatPrefillDueDate(value?: string | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "No due date";
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return "No due date";
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function mapPrefillVisitScopeItems(
+  input: MaintenanceAgreementPrefill["default_visit_scope_items"],
+): VisitScopeDraftItem[] {
+  return input.map((item) => ({
+    id: sanitizeVisitScopeItemId(item.id) ?? createVisitScopeItemId(),
+    title: String(item.title ?? "").trim(),
+    details: String(item.details ?? "").trim(),
+    kind: (item.kind === "companion_service" ? "companion_service" : "primary") as
+      | "primary"
+      | "companion_service",
+    source_pricebook_item_id: sanitizeVisitScopeItemId(item.source_pricebook_item_id) ?? null,
+    expected_unit_price:
+      item.expected_unit_price === null || item.expected_unit_price === undefined
+        ? null
+        : Number.isFinite(Number(item.expected_unit_price))
+          ? Math.max(0, Number(item.expected_unit_price))
+          : null,
+    unit_label: String(item.unit_label ?? "").trim() || null,
+    item_type: String(item.item_type ?? "").trim() || null,
+    category: String(item.category ?? "").trim() || null,
+    promoted_service_job_id: null,
+    promoted_at: null,
+    promoted_by_user_id: null,
+  }));
+}
+
 function readValidDraft(): NewJobDraft | null {
   if (typeof window === "undefined") return null;
   try {
@@ -340,6 +397,8 @@ export default function NewJobForm({
   initialJobType,
   productMode = "hybrid",
   pricebookTemplateItems = [],
+  maintenanceAgreementPrefill,
+  maintenanceAgreementPrefillStatus = null,
 }: {
   contractors: Contractor[];
   existingCustomer?: ExistingCustomer | null;
@@ -354,16 +413,29 @@ export default function NewJobForm({
   initialJobType?: "ecc" | "service";
   productMode?: ProductMode;
   pricebookTemplateItems?: VisitScopePricebookTemplateItem[];
+  maintenanceAgreementPrefill?: MaintenanceAgreementPrefill | null;
+  maintenanceAgreementPrefillStatus?: "unavailable" | null;
 }) {
 
   const isContractorMode = Boolean(myContractor?.id);
   const router = useRouter();
   const isInternalMode = !isContractorMode;
+  const forceServicePrefillMode = Boolean(maintenanceAgreementPrefill && isInternalMode);
   const isHybridProductMode = productMode === "hybrid";
   const isHvacServiceInternalMode = isInternalMode && productMode === "hvac_service";
   const hasSeededCustomer = Boolean(existingCustomer?.id);
   const isCustomerContextInternalMode =
     isInternalMode && customerContextMode && Boolean(existingCustomer?.id);
+  const maintenancePrefillLocationId = String(
+    maintenanceAgreementPrefill?.primary_location_id ?? "",
+  ).trim();
+  const hasMaintenancePrefillLocation = Boolean(
+    maintenancePrefillLocationId && locations.some((row) => row.id === maintenancePrefillLocationId),
+  );
+  const maintenancePrefillItems = useMemo(
+    () => mapPrefillVisitScopeItems(maintenanceAgreementPrefill?.default_visit_scope_items ?? []),
+    [maintenanceAgreementPrefill?.default_visit_scope_items],
+  );
 
   const [guidedCustomerQuery, setGuidedCustomerQuery] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
@@ -377,8 +449,10 @@ export default function NewJobForm({
   );
   const [locationId, setLocationId] = useState<string>(() => {
     if (isCustomerContextInternalMode) {
+      if (hasMaintenancePrefillLocation) return maintenancePrefillLocationId;
       return locations.length === 1 ? locations[0].id : "";
     }
+    if (hasMaintenancePrefillLocation) return maintenancePrefillLocationId;
     return locations.length ? locations[0].id : "";
   });
   const [newLocationNickname, setNewLocationNickname] = useState("");
@@ -404,18 +478,20 @@ export default function NewJobForm({
     productMode,
     isInternalMode,
   });
-  const [jobType, setJobType] = useState<"ecc" | "service">(defaultJobType);
+  const [jobType, setJobType] = useState<"ecc" | "service">(
+    maintenanceAgreementPrefill ? "service" : defaultJobType,
+  );
   const modeSafeJobType = resolveModeSafeJobType({
-    requestedJobType: jobType,
-    productMode,
+    requestedJobType: forceServicePrefillMode ? "service" : jobType,
+    productMode: forceServicePrefillMode ? "hybrid" : productMode,
     isInternalMode,
   });
   const [serviceCaseKind, setServiceCaseKind] = useState<
     "reactive" | "callback" | "warranty" | "maintenance"
-  >("reactive");
+  >(maintenanceAgreementPrefill ? "maintenance" : "reactive");
   const [serviceVisitType, setServiceVisitType] = useState<
     "diagnostic" | "repair" | "return_visit" | "callback" | "maintenance"
-  >("diagnostic");
+  >(maintenanceAgreementPrefill ? "maintenance" : "diagnostic");
   const [serviceVisitOutcome, setServiceVisitOutcome] = useState<
     "resolved" | "follow_up_required" | "no_issue_found"
   >("follow_up_required");
@@ -440,8 +516,10 @@ const [billingRecipient, setBillingRecipient] = useState<
 
   // Optional equipment
   const [systems, setSystems] = useState<EquipmentSystem[]>([]);
-  const [visitScopeSummary, setVisitScopeSummary] = useState("");
-  const [visitScopeItems, setVisitScopeItems] = useState<VisitScopeDraftItem[]>([]);
+  const [visitScopeSummary, setVisitScopeSummary] = useState(
+    String(maintenanceAgreementPrefill?.default_visit_scope_summary ?? "").trim(),
+  );
+  const [visitScopeItems, setVisitScopeItems] = useState<VisitScopeDraftItem[]>(maintenancePrefillItems);
   const [visitScopeResetKey, setVisitScopeResetKey] = useState(0);
   const [visitScopeError, setVisitScopeError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1361,6 +1439,19 @@ const [billingRecipient, setBillingRecipient] = useState<
         }
         className="mb-5"
       />
+
+      {maintenanceAgreementPrefill ? (
+        <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          Prefilled from Service Plan: <span className="font-semibold">{maintenanceAgreementPrefill.agreement_name}</span>
+          {" "}
+          <span className="text-blue-700">(due {formatPrefillDueDate(maintenanceAgreementPrefill.next_due_date)})</span>.
+          Review and edit all fields before submitting.
+        </div>
+      ) : maintenanceAgreementPrefillStatus === "unavailable" ? (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Service Plan prefill was unavailable for this request. You can continue creating the work order manually.
+        </div>
+      ) : null}
 
       {draftFound && (
         <div className="mb-5 rounded-xl border border-slate-200/80 bg-white/85 p-4 space-y-3">
