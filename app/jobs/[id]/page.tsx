@@ -4631,8 +4631,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         onPhaseTiming={recordBlockingPhase}
       />
 
+      {job.job_notes ? (
+        <div className={`${workspacePanelClass} p-4 text-gray-900`}>
+          <div className="mb-2 text-sm font-semibold text-slate-950">Job Notes</div>
+          <div className="whitespace-pre-wrap rounded-xl border border-slate-200/80 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-800">
+            {job.job_notes}
+          </div>
+        </div>
+      ) : null}
+</details>
+
       {markVisitCountedLinkId ? (
-        <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-slate-900">
+        <div className="mt-4 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-slate-900">
           <div className="text-sm font-semibold text-emerald-900">Service Plan Visit Count Review</div>
           <p className="mt-1 text-xs leading-5 text-emerald-900/90">
             This completed maintenance visit is eligible to count against
@@ -4645,16 +4655,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </div>
         </div>
       ) : null}
-
-      {job.job_notes ? (
-        <div className={`${workspacePanelClass} p-4 text-gray-900`}>
-          <div className="mb-2 text-sm font-semibold text-slate-950">Job Notes</div>
-          <div className="whitespace-pre-wrap rounded-xl border border-slate-200/80 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-800">
-            {job.job_notes}
-          </div>
-        </div>
-      ) : null}
-</details>
 
  </div>
 
