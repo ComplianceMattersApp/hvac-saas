@@ -30,7 +30,11 @@ describe("Job detail UI hardening - job type switch", () => {
   it("keeps normal edit controls on job detail", () => {
     expect(jobDetailSource).toContain("Scheduling");
     expect(jobDetailSource).toContain("Service Details");
-    expect(jobDetailSource).toContain("Permit & Compliance");
+    expect(jobDetailSource).toContain("Permit Information");
+    expect(jobDetailSource).not.toContain("ECC permit fields and jurisdiction details.");
+    expect(jobDetailSource).toContain('name="permit_number"');
+    expect(jobDetailSource).toContain('name="permit_date"');
+    expect(jobDetailSource).toContain('name="jurisdiction"');
   });
 
   it("keeps creation-time job family selection available in /jobs/new", () => {
@@ -38,5 +42,8 @@ describe("Job detail UI hardening - job type switch", () => {
     expect(newJobFormSource).toContain('value="ecc"');
     expect(newJobFormSource).toContain('value="service"');
     expect(newJobFormSource).toContain('name="job_type"');
+    expect(newJobFormSource).toContain('name="permit_number"');
+    expect(newJobFormSource).toContain('name="permit_date"');
+    expect(newJobFormSource).toContain('name="jurisdiction"');
   });
 });

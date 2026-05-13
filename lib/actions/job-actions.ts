@@ -6829,9 +6829,9 @@ if (!canonicalOwnerUserId) {
         isContractorUser,
       });
 
-  jurisdiction = jobType === "service" ? null : (jurisdictionRaw || null);
-  permit_date = jobType === "service" ? null : (permitDateRaw || null);
-  permit_number = jobType === "service" ? null : (permitNumberRaw || null);
+  jurisdiction = jurisdictionRaw || null;
+  permit_date = permitDateRaw || null;
+  permit_number = permitNumberRaw || null;
 
   if (!isContractorUser && jobType === "service" && visit_scope_items.length === 0) {
     redirect("/jobs/new?err=visit_scope_required");
@@ -8993,16 +8993,14 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     next_ops_status = String(before?.ops_status ?? "").trim() || next_ops_status;
   }
 
-  const isServiceJob = String(before?.job_type ?? "").toLowerCase() === "service";
-
   const permit_number = hasPermitNumberInput
-    ? isServiceJob ? null : (permitNumberRaw || null)
+    ? (permitNumberRaw || null)
     : before?.permit_number ?? null;
   const jurisdiction = hasJurisdictionInput
-    ? isServiceJob ? null : (jurisdictionRaw || null)
+    ? (jurisdictionRaw || null)
     : before?.jurisdiction ?? null;
   const permit_date = hasPermitDateInput
-    ? isServiceJob ? null : (permitDateRaw || null)
+    ? (permitDateRaw || null)
     : before?.permit_date ?? null;
 
   const didPermitFieldsChange =

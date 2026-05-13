@@ -3895,64 +3895,62 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 </form>
               </div>
 
-              {job.job_type === "ecc" ? (
-                <details
-                  open
-                  className="group mt-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90"
-                >
-                    <summary className="cursor-pointer list-none">
-                      <CollapsibleHeader
-                        title="Permit & Compliance"
-                        subtitle="ECC permit fields and jurisdiction details."
-                      />
-                    </summary>
-                    <form action={updateJobScheduleFromForm} className="mt-3 space-y-3">
-                      <input type="hidden" name="job_id" value={job.id} />
-                      <input type="hidden" name="scheduled_date" value={displayDateLA(job.scheduled_date) ?? ""} />
-                      <input type="hidden" name="window_start" value={timeToTimeInput(job.window_start) ?? ""} />
-                      <input type="hidden" name="window_end" value={timeToTimeInput(job.window_end) ?? ""} />
+              <details
+                open
+                className="group mt-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90"
+              >
+                  <summary className="cursor-pointer list-none">
+                    <CollapsibleHeader
+                      title="Permit Information"
+                      subtitle="Permit Number, Jurisdiction, and Permit Date."
+                    />
+                  </summary>
+                  <form action={updateJobScheduleFromForm} className="mt-3 space-y-3">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="scheduled_date" value={displayDateLA(job.scheduled_date) ?? ""} />
+                    <input type="hidden" name="window_start" value={timeToTimeInput(job.window_start) ?? ""} />
+                    <input type="hidden" name="window_end" value={timeToTimeInput(job.window_end) ?? ""} />
 
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="space-y-1">
-                          <label className={workspaceFieldLabelClass}>Permit #</label>
-                          <input
-                            name="permit_number"
-                            defaultValue={job.permit_number ?? ""}
-                            placeholder="Optional"
-                            className={workspaceInputClass}
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className={workspaceFieldLabelClass}>Jurisdiction</label>
-                          <input
-                            name="jurisdiction"
-                            defaultValue={(job as any).jurisdiction ?? ""}
-                            placeholder="City or county permit office"
-                            className={workspaceInputClass}
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className={workspaceFieldLabelClass}>Permit Date</label>
-                          <input
-                            type="date"
-                            name="permit_date"
-                            defaultValue={(job as any).permit_date ?? ""}
-                            className={workspaceInputClass}
-                          />
-                        </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <label className={workspaceFieldLabelClass}>Permit Number</label>
+                        <input
+                          name="permit_number"
+                          defaultValue={job.permit_number ?? ""}
+                          placeholder="Optional"
+                          className={workspaceInputClass}
+                        />
                       </div>
 
-                      <SubmitButton
-                        loadingText="Saving..."
-                        className={primaryButtonClass}
-                      >
-                        Save Permit Info
-                      </SubmitButton>
-                    </form>
-                </details>
-              ) : null}
+                      <div className="space-y-1">
+                        <label className={workspaceFieldLabelClass}>Jurisdiction</label>
+                        <input
+                          name="jurisdiction"
+                          defaultValue={(job as any).jurisdiction ?? ""}
+                          placeholder="City or county permit office"
+                          className={workspaceInputClass}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className={workspaceFieldLabelClass}>Permit Date</label>
+                        <input
+                          type="date"
+                          name="permit_date"
+                          defaultValue={(job as any).permit_date ?? ""}
+                          className={workspaceInputClass}
+                        />
+                      </div>
+                    </div>
+
+                    <SubmitButton
+                      loadingText="Saving..."
+                      className={primaryButtonClass}
+                    >
+                      Save Permit Info
+                    </SubmitButton>
+                  </form>
+              </details>
 
               <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {!isHvacServiceMode ? (

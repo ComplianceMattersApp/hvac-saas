@@ -252,6 +252,14 @@ function buildScheduleOnlyFormData() {
   return formData;
 }
 
+function buildScheduleWithPermitFormData() {
+  const formData = buildScheduleOnlyFormData();
+  formData.set("permit_number", "SERVICE-777");
+  formData.set("jurisdiction", "Oakland");
+  formData.set("permit_date", "2026-04-26");
+  return formData;
+}
+
 describe("internal same-account lifecycle scheduling hardening", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -419,6 +427,44 @@ describe("internal same-account lifecycle scheduling hardening", () => {
         permit_number: "PERMIT-123",
         jurisdiction: "Sacramento",
         permit_date: "2026-04-15",
+      }),
+    );
+  });
+
+  it("allows service schedule updates to write provided permit fields", async () => {
+    const { supabase, jobsUpdates, jobEvents } = makeSchedulePreservationFixture({
+      job_type: "service",
+      permit_number: "LEGACY-100",
+      jurisdiction: "Stockton",
+      permit_date: "2026-04-02",
+    });
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobScheduleFromForm } = await import("@/lib/actions/job-actions");
+
+    await updateJobScheduleFromForm(buildScheduleWithPermitFormData());
+
+    expect(jobsUpdates).toHaveLength(1);
+    expect(jobsUpdates[0]).toEqual(
+      expect.objectContaining({
+        permit_number: "SERVICE-777",
+        jurisdiction: "Oakland",
+        permit_date: "2026-04-26",
+      }),
+    );
+    expect(jobEvents[0]?.meta).toEqual(
+      expect.objectContaining({
+        before: expect.objectContaining({
+          permit_number: "LEGACY-100",
+          jurisdiction: "Stockton",
+          permit_date: "2026-04-02",
+        }),
+        after: expect.objectContaining({
+          permit_number: "SERVICE-777",
+          jurisdiction: "Oakland",
+          permit_date: "2026-04-26",
+        }),
       }),
     );
   });

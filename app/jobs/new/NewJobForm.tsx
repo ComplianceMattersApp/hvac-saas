@@ -1659,6 +1659,37 @@ const [billingRecipient, setBillingRecipient] = useState<
 
             </div>
           ) : null}
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+            <label className="block text-sm font-medium text-slate-900">Permit Information</label>
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-slate-900">Permit Number</label>
+              <input
+                type="text"
+                name="permit_number"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-900">Jurisdiction</label>
+                <input
+                  type="text"
+                  name="jurisdiction"
+                  placeholder="City or county permit office"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-900">Permit Date</label>
+                <input
+                  type="date"
+                  name="permit_date"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+                />
+              </div>
+            </div>
+          </div>
         </section>
         ) : null}
 
@@ -2347,6 +2378,37 @@ const [billingRecipient, setBillingRecipient] = useState<
 
                 </div>
               ) : null}
+
+              <div className="border-t border-slate-200/80 pt-4 space-y-3">
+                <label className="block text-sm font-medium text-slate-900">Permit Information</label>
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-slate-900">Permit Number</label>
+                  <input
+                    type="text"
+                    name="permit_number"
+                    className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-slate-900">Jurisdiction</label>
+                    <input
+                      type="text"
+                      name="jurisdiction"
+                      placeholder="City or county permit office"
+                      className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-slate-900">Permit Date</label>
+                    <input
+                      type="date"
+                      name="permit_date"
+                      className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
         ) : null}
