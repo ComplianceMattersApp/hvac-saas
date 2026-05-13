@@ -24,6 +24,17 @@ Group 9A planning source of truth is [Maintenance_Agreements_V1_Model_Spec.md](.
 
 Current Program Status Note (May 2026)
 
+- Group 9A-6 Service Plans Ops Read-Only Card is complete and pushed in commit `1776042`:
+  - ops surface: feature-gated read-only Service Plans summary card on `/ops` in `app/ops/page.tsx`
+  - read model source: `summarizeMaintenanceAgreementsForAccount`
+  - card counts: `Active Plans`, `Overdue`, `Due Today`, `Due in 1-7 Days`, `Due in 8-30 Days`, `Not Scheduled`
+  - helper copy: "Service plan counts are planning visibility only. Work orders are created separately."
+  - fail-safe behavior: `/ops` remains functional and card stays hidden/non-blocking if summary read fails
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`28` tests), `npx.cmd tsc --noEmit` passed, `git diff --check` passed; browser smoke passed for flag off/on visibility expectations and existing-section continuity
+  - boundaries preserved: no schema/migration/Supabase/production/flag/job/calendar/invoice/payment/portal/create-edit-from-ops changes
+  - implementation status statement: Service Plan counts and due/overdue summary logic are implemented in the repo/read model and exposed on `/ops` as a read-only card, but no broader user-facing Service Plans module dashboard exists yet.
+  - watch items: `as_of_date` currently reflects server date resolution; due windows remain intentionally exclusive (`1-7`, `8-30`)
+
 - Group 9A-5B Service Plan Due/Overdue Summary Read Model is complete and pushed:
   - read model: `summarizeMaintenanceAgreementsForAccount` in `lib/maintenance-agreements/read-model.ts`
   - tests: `lib/maintenance-agreements/__tests__/read-model.test.ts` expanded for mixed status counts, due boundaries, active-only due buckets, and safe empty/default scope behavior

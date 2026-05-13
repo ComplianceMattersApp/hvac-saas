@@ -12,6 +12,55 @@ The V1 goal is simple: let an operator track recurring service obligations for a
 
 This spec is intentionally not a billing, payment, portal, SMS, or automation design.
 
+## Group 9A-6 Closeout Snapshot (ops read-only service plans card implemented in repo)
+
+Group 9A-6 (Service Plans Ops Read-Only Card) is implemented and pushed in commit `1776042`.
+
+Recorded implementation artifacts:
+
+- Ops page card: `app/ops/page.tsx`
+- Read model source: `summarizeMaintenanceAgreementsForAccount`
+
+Recorded behavior:
+
+- `/ops` now has a feature-gated, read-only Service Plans summary card.
+- Card renders only when `ENABLE_MAINTENANCE_AGREEMENTS` is enabled.
+- Card shows: `Active Plans`, `Overdue`, `Due Today`, `Due in 1-7 Days`, `Due in 8-30 Days`, `Not Scheduled`.
+- Card helper copy: "Service plan counts are planning visibility only. Work orders are created separately."
+- Read failure is fail-safe: `/ops` still renders and the card is hidden/non-blocking.
+- No actions/buttons/routes were added.
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`28` tests).
+- `npx.cmd tsc --noEmit` passed.
+- `git diff --check` passed.
+- Browser smoke passed:
+	- flag off: `/ops` rendered, card hidden, existing sections still rendered
+	- flag on: `/ops` rendered, card visible, counts rendered, existing sections still rendered
+
+Boundaries preserved in Group 9A-6:
+
+- no schema changes
+- no migrations
+- no Supabase commands
+- no production writes
+- no feature flag changes
+- no job generation
+- no calendar events
+- no invoice/payment behavior
+- no Stripe/QBO/SMS/customer portal behavior
+- no create/edit from Ops
+
+Implementation status statement:
+
+- Service Plan counts and due/overdue summary logic are implemented in the repo/read model and now exposed on `/ops` as a feature-gated read-only card, but no broader user-facing Service Plans module dashboard exists yet.
+
+Watch items:
+
+- `as_of_date` currently reflects server date resolution; standardize business-timezone date source later if needed.
+- Due windows are intentionally exclusive: `1-7` and `8-30`.
+
 ## Group 9A-5B Closeout Snapshot (due/overdue summary read model implemented in repo)
 
 Group 9A-5B (Service Plan Due/Overdue Summary Read Model) is implemented, committed, and pushed.
