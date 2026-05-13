@@ -406,6 +406,118 @@ Boundaries preserved in Group 9A-10C:
 - no renewal automation
 - no mutable remaining-visit counter
 
+## Group 9A-11A Model Snapshot (service plan due-window and next-due suggestion planning)
+
+Group 9A-11A is a docs/model decision pass only. No implementation changes are included in this slice.
+
+Guiding product principle:
+
+- Simple first. Helpful next. Automation last.
+
+Core rule:
+
+- Counting a Service Plan visit must not automatically advance `maintenance_agreements.next_due_date`.
+- Any future next-due write remains explicit and operator-confirmed.
+
+Two supported future cadence models:
+
+- Interval cadence:
+	- `monthly`
+	- `quarterly`
+	- `semi_annual`
+	- `annual`
+	- `custom` (manual scheduling)
+- Seasonal service-window cadence:
+	- Spring AC maintenance windows
+	- Fall heat maintenance windows
+	- custom seasonal windows
+
+Interval suggestion algorithm (future read-only suggestion model):
+
+- Use cadence-preserving hybrid logic:
+	- Start with current `agreement.next_due_date`.
+	- Add the agreement frequency interval.
+	- If the result is on or before the counted job completion date, roll forward by the same interval until the suggested date is after the counted completion date.
+- Frequency interval mapping:
+	- `monthly` = +1 month
+	- `quarterly` = +3 months
+	- `semi_annual` = +6 months
+	- `annual` = +12 months
+	- `custom` = no automatic suggestion; manual scheduling required
+
+Seasonal service-window model (future template-driven model):
+
+- Future Service Plan templates should define:
+	- season/window name
+	- `window_start_month/day`
+	- `window_end_month/day`
+	- `reminder_lead_days`
+	- default Work Items
+	- cadence label
+- Example windows:
+	- Spring AC Maintenance: March 1 to May 31, reminders starting 30 days before window open
+	- Fall Heat Maintenance: September 1 to November 30, reminders starting 30 days before window open
+
+Due-state language decision:
+
+- Seasonal window UX should prefer:
+	- `Upcoming`
+	- `In Service Window`
+	- `Overdue`
+	- `Manual scheduling required`
+- Avoid date-only language that implies only a single fixed due date for seasonal plans.
+
+Suggested placement order (future implementation sequence):
+
+- First placement: job detail after `Mark Visit Counted` success, in or near `Service Plan Visit Count Review`.
+- Next mirrors:
+	- customer profile Service Plan card
+	- `/service-plans` drilldown
+- Later: due-window queue views used by office scheduling workflows.
+
+Future confirmation action model (parked for later slice):
+
+- A separate `Confirm Next Due Date` / `Confirm Next Window` action may update:
+	- `maintenance_agreements.next_due_date`
+	- `maintenance_agreements.updated_by_user_id`
+	- `updated_at` via normal DB behavior
+- Confirm action should not mutate:
+	- `maintenance_agreement_visits`
+	- invoices
+	- payments
+	- jobs
+	- service cases
+
+Agreement status gating decision:
+
+- Future confirm action: active agreements only.
+- `paused`, `expired`, `cancelled`, and `draft` should block confirm writes.
+- Suggestion/read-only guidance may still display informationally when useful.
+
+Template alignment decision (future):
+
+- Service Plan creation should become template-driven.
+- Template should supply:
+	- agreement name
+	- type and frequency
+	- default Work Items
+	- cadence model (interval or seasonal window)
+- Operator should still enter `start_date`.
+- `next_due_date` may be suggested from `start_date + cadence` in future flows.
+- `renewal_date` should later derive from purchased plan term/payment option.
+
+Explicit non-goals for Group 9A-11A:
+
+- no automatic due-date advancement
+- no recurrence engine
+- no automatic job generation
+- no invoice/payment behavior
+- no billing behavior
+- no customer portal/SMS/QBO behavior
+- no renewal automation
+- no template implementation in this slice
+- no seasonal-window schema implementation in this slice
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.

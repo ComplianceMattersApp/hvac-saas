@@ -49,6 +49,9 @@ Maintenance agreements closeout note (May 2026):
 - Visit Count Review labels (`No linked visits`, `Linked`, `Eligible for count review`, `Counted`, `Excluded`, `Reversed`, `Not eligible`) are display-only in this slice.
 - Group 9A-10C Manual Mark Visit Counted on Job Detail is now implemented in commit `1b69336` with visibility closure fix in `2ae1a4b`.
 - `Mark Visit Counted` remains manual/operator-confirmed, updates only the targeted `maintenance_agreement_visits` row count fields, and does not mutate agreement or advance `next_due_date`.
+- Group 9A-11A Service Plan Due Window / Next Due Model planning is now documented as docs/model-only with two future cadence tracks: interval cadence and seasonal service-window cadence.
+- 9A-11A keeps the core rule that counting does not auto-advance `next_due_date`; suggestion-first (read-only) is preferred before any future explicit confirm-write action.
+- Seasonal due language is planned as `Upcoming`, `In Service Window`, `Overdue`, and `Manual scheduling required` instead of date-only messaging.
 - Boundaries remain: no automatic counting, no due-date advancement, no visit-balance deduction automation, and no invoice/payment behavior.
 
 ---

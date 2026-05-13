@@ -26,6 +26,13 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Group 9A-11A Service Plan Due Window / Next Due Model is documented as planning-only (no implementation changes) with the following model decisions:
+  - counting a service-plan visit does not auto-advance `maintenance_agreements.next_due_date`
+  - future cadence supports both interval suggestions (monthly/quarterly/semi_annual/annual/custom-manual) and seasonal service windows (Spring/Fall/custom)
+  - seasonal due-state language should favor `Upcoming`, `In Service Window`, `Overdue`, and `Manual scheduling required`
+  - suggestion-first read model is preferred; any future due-date write remains explicit operator confirmation and active-status gated only
+  - boundaries preserved: no automatic due-date advancement, no recurrence engine, no auto job generation, no invoice/payment behavior, and no portal/SMS/QBO behavior
+
 - Group 9A-10C Manual Mark Visit Counted on Job Detail is complete and pushed in commit `1b69336`, with visibility closure fix in commit `2ae1a4b`:
   - eligible linked maintenance jobs now surface `Service Plan Visit Count Review` and `Mark Visit Counted` in always-visible job-detail scope
   - action remains manual/operator-confirmed and updates only the target `maintenance_agreement_visits` link row count fields (`count_status='counted'`, `counts_toward_visit_balance=true`, counted audit fields)
