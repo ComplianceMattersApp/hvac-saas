@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCustomerScheduledEmailHtml } from "@/lib/actions/job-actions";
+import { buildCustomerScheduledEmailHtml } from "@/lib/email/operational-scheduled-email";
 
 describe("buildCustomerScheduledEmailHtml", () => {
   it("renders tenant logo + tenant display name branding, not hardcoded platform logo", () => {

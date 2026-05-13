@@ -7,6 +7,7 @@ const revalidatePathMock = vi.fn();
 const refreshMock = vi.fn();
 const sendEmailMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
+const resolveNotificationAccountOwnerUserIdMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -70,6 +71,11 @@ vi.mock("@/lib/actions/job-event-meta", () => ({
 
 vi.mock("@/lib/email/sendEmail", () => ({
   sendEmail: (...args: unknown[]) => sendEmailMock(...args),
+}));
+
+vi.mock("@/lib/notifications/account-owner", () => ({
+  resolveNotificationAccountOwnerUserId: (...args: unknown[]) =>
+    resolveNotificationAccountOwnerUserIdMock(...args),
 }));
 
 function makeDenySupabaseFixture() {
@@ -262,6 +268,7 @@ describe("internal same-account lifecycle scheduling hardening", () => {
     });
 
     sendEmailMock.mockResolvedValue(undefined);
+    resolveNotificationAccountOwnerUserIdMock.mockResolvedValue("owner-1");
     resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
       authorized: true,
       reason: "allowed_active",
@@ -515,5 +522,157 @@ describe("internal same-account lifecycle scheduling hardening", () => {
 
     expect(writeCalls.filter((call) => ["jobs", "job_events"].includes(call.table))).toHaveLength(0);
     expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("returns safe schedule_saved_notification_failed banner when scheduled-email side effects throw", async () => {
+    const jobUpdates: Record<string, unknown>[] = [];
+    const jobEvents: Record<string, unknown>[] = [];
+    let jobSelectCount = 0;
+
+    const before = {
+      scheduled_date: null,
+      window_start: null,
+      window_end: null,
+      ops_status: "need_to_schedule",
+      job_type: "service",
+      status: "open",
+      field_complete: false,
+      permit_number: null,
+      jurisdiction: null,
+      permit_date: null,
+      pending_info_reason: null,
+      follow_up_date: null,
+      next_action_note: null,
+      action_required_by: null,
+    };
+
+    const scheduledSnapshot = {
+      id: "job-1",
+      job_type: "service",
+      customer_first_name: "Eddie",
+      customer_last_name: "Test",
+      customer_phone: null,
+      customer_email: "eddie@compliancemattersca.com",
+      job_address: "123 Main",
+      city: "Town",
+      scheduled_date: "2026-04-23",
+      window_start: "08:00",
+      window_end: "10:00",
+      contractor_id: null,
+      contractors: null,
+      customers: { owner_user_id: "owner-1" },
+      locations: { owner_user_id: "owner-1" },
+    };
+
+    const supabase = {
+      from(table: string) {
+        if (table === "jobs") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                single: vi.fn(async () => {
+                  jobSelectCount += 1;
+                  if (jobSelectCount === 1) return { data: before, error: null };
+                  return { data: scheduledSnapshot, error: null };
+                }),
+              })),
+            })),
+            update: vi.fn((payload: Record<string, unknown>) => {
+              jobUpdates.push(payload);
+              return {
+                eq: vi.fn(() => ({
+                  select: vi.fn(() => ({
+                    single: vi.fn(async () => ({ data: { id: "job-1" }, error: null })),
+                  })),
+                })),
+              };
+            }),
+          };
+        }
+
+        if (table === "job_events") {
+          return {
+            insert: vi.fn(async (payload: Record<string, unknown>) => {
+              jobEvents.push(payload);
+              return { error: null };
+            }),
+          };
+        }
+
+        if (table === "notifications") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  contains: vi.fn(() => ({
+                    in: vi.fn(() => ({
+                      order: vi.fn(() => ({
+                        limit: vi.fn(() => ({
+                          maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+                        })),
+                      })),
+                    })),
+                  })),
+                  eq: vi.fn(() => ({
+                    eq: vi.fn(() => ({
+                      in: vi.fn(() => ({
+                        order: vi.fn(() => ({
+                          limit: vi.fn(() => ({
+                            maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+                          })),
+                        })),
+                      })),
+                    })),
+                  })),
+                })),
+              })),
+            })),
+            insert: vi.fn(() => ({
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({ data: { id: "notif-1" }, error: null })),
+              })),
+            })),
+          };
+        }
+
+        if (table === "internal_business_profiles") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: {
+                    account_owner_user_id: "owner-1",
+                    display_name: "Tenant Co",
+                    support_email: null,
+                    support_phone: null,
+                    logo_url: null,
+                    billing_mode: "external_billing",
+                    created_at: "",
+                    updated_at: "",
+                  },
+                  error: null,
+                })),
+              })),
+            })),
+          };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveNotificationAccountOwnerUserIdMock.mockRejectedValueOnce(new Error("owner resolution failed"));
+
+    const { updateJobScheduleFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(updateJobScheduleFromForm(buildScheduleFormData())).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?banner=schedule_saved_notification_failed",
+    );
+
+    expect(resolveNotificationAccountOwnerUserIdMock).toHaveBeenCalled();
+    expect(jobUpdates).toHaveLength(1);
+    expect(jobEvents.length).toBeGreaterThan(0);
   });
 });
