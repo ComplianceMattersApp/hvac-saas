@@ -5,6 +5,7 @@ import {
   isMaintenanceAgreementFrequency,
   isMaintenanceAgreementStatus,
   isMaintenanceAgreementType,
+  listMaintenanceAgreementDrilldownForAccount,
   listMaintenanceAgreementsForCustomer,
   listMaintenanceAgreementsForLocation,
   listUpcomingOverdueMaintenanceAgreements,
@@ -69,6 +70,7 @@ function makeSupabaseMock(rows: MockAgreement[]) {
     from(table: string) {
       calls.push({ op: "from", value: table });
       const filters: Array<[string, unknown]> = [];
+      const inFilters: Array<[string, unknown[]]> = [];
       const lteFilters: Array<[string, string]> = [];
       let limitValue: number | null = null;
 
@@ -76,6 +78,9 @@ function makeSupabaseMock(rows: MockAgreement[]) {
         let data = [...rows];
         for (const [column, value] of filters) {
           data = data.filter((row) => (row as any)[column] === value);
+        }
+        for (const [column, values] of inFilters) {
+          data = data.filter((row) => values.includes((row as any)[column]));
         }
         for (const [column, value] of lteFilters) {
           data = data.filter((row) => String((row as any)[column] ?? "") <= value);
@@ -99,6 +104,11 @@ function makeSupabaseMock(rows: MockAgreement[]) {
           filters.push([column, value]);
           return build();
         },
+        in: (column: string, value: unknown[]) => {
+          calls.push({ op: "in", column, value });
+          inFilters.push([column, value]);
+          return build();
+        },
         lte: (column: string, value: string) => {
           calls.push({ op: "lte", column, value });
           lteFilters.push([column, value]);
@@ -116,6 +126,92 @@ function makeSupabaseMock(rows: MockAgreement[]) {
         maybeSingle: async () => {
           const result = exec();
           return { data: result.data[0] ?? null, error: result.error };
+        },
+        then: (resolve: any, reject?: any) => Promise.resolve(exec()).then(resolve, reject),
+      });
+
+      return build();
+    },
+  };
+
+  return { supabase, calls };
+}
+
+function makeSupabaseMockWithLookups(input: {
+  agreements: MockAgreement[];
+  customers?: Array<{
+    id: string;
+    full_name?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+  }>;
+  locations?: Array<{
+    id: string;
+    nickname?: string | null;
+    address_line1?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip?: string | null;
+    postal_code?: string | null;
+  }>;
+}) {
+  const calls: Array<{ table: string; op: string; column?: string; value?: unknown }> = [];
+
+  const tableRows: Record<string, any[]> = {
+    maintenance_agreements: input.agreements,
+    customers: input.customers ?? [],
+    locations: input.locations ?? [],
+  };
+
+  const supabase = {
+    from(table: string) {
+      const rows = tableRows[table] ?? [];
+      const eqFilters: Array<[string, unknown]> = [];
+      const inFilters: Array<[string, unknown[]]> = [];
+      let limitValue: number | null = null;
+
+      const exec = () => {
+        let data = [...rows];
+        for (const [column, value] of eqFilters) {
+          data = data.filter((row) => row[column] === value);
+        }
+        for (const [column, values] of inFilters) {
+          data = data.filter((row) => values.includes(row[column]));
+        }
+        if (table === "maintenance_agreements") {
+          data.sort((a, b) => {
+            const due = String(a.next_due_date ?? "").localeCompare(String(b.next_due_date ?? ""));
+            if (due !== 0) return due;
+            return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+          });
+        }
+        if (limitValue !== null) data = data.slice(0, limitValue);
+        return { data, error: null };
+      };
+
+      const build = (): any => ({
+        select: (value: string) => {
+          calls.push({ table, op: "select", value });
+          return build();
+        },
+        eq: (column: string, value: unknown) => {
+          calls.push({ table, op: "eq", column, value });
+          eqFilters.push([column, value]);
+          return build();
+        },
+        in: (column: string, value: unknown[]) => {
+          calls.push({ table, op: "in", column, value });
+          inFilters.push([column, value]);
+          return build();
+        },
+        order: (column: string, value: unknown) => {
+          calls.push({ table, op: "order", column, value });
+          return build();
+        },
+        limit: (value: number) => {
+          calls.push({ table, op: "limit", value });
+          limitValue = value;
+          return build();
         },
         then: (resolve: any, reject?: any) => Promise.resolve(exec()).then(resolve, reject),
       });
@@ -387,5 +483,93 @@ describe("maintenance agreement read model", () => {
     });
 
     expect(prefill).toBeNull();
+  });
+
+  it("returns account-scoped drilldown rows and enriched customer/location display", async () => {
+    const { supabase, calls } = makeSupabaseMockWithLookups({
+      agreements: [
+        makeAgreement({
+          id: "d-1",
+          status: "active",
+          next_due_date: "2026-05-11",
+          agreement_name: "Bronze Plan",
+        }),
+        makeAgreement({ id: "d-2", account_owner_user_id: "other-owner", customer_id: "customer-2" }),
+      ],
+      customers: [{ id: CUSTOMER_ID, first_name: "Ava", last_name: "Stone" }],
+      locations: [
+        {
+          id: LOCATION_ID,
+          nickname: "Main Home",
+          address_line1: "101 Pine St",
+          city: "Austin",
+          state: "TX",
+          zip: "78701",
+        },
+      ],
+    });
+
+    const result = await listMaintenanceAgreementDrilldownForAccount({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      today: "2026-05-12",
+      filter: "all",
+      limit: 100,
+    });
+
+    expect(result.as_of_date).toBe("2026-05-12");
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({
+      id: "d-1",
+      customer_display_name: "Ava Stone",
+      primary_location_display: "Main Home - 101 Pine St, Austin TX 78701",
+      due_state: "overdue",
+    });
+    expect(calls).toContainEqual({
+      table: "maintenance_agreements",
+      op: "eq",
+      column: "account_owner_user_id",
+      value: ACCOUNT_OWNER,
+    });
+  });
+
+  it("applies due-window drilldown filters and caps the limit", async () => {
+    const { supabase, calls } = makeSupabaseMockWithLookups({
+      agreements: [
+        makeAgreement({ id: "window-1", status: "active", next_due_date: "2026-05-15" }),
+        makeAgreement({ id: "window-2", status: "active", next_due_date: "2026-05-24" }),
+      ],
+      customers: [{ id: CUSTOMER_ID, full_name: "Taylor Customer" }],
+    });
+
+    const result = await listMaintenanceAgreementDrilldownForAccount({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      today: "2026-05-12",
+      filter: "due_8_30_days",
+      limit: 999,
+    });
+
+    expect(result.rows.map((row) => row.id)).toEqual(["window-2"]);
+    expect(calls).toContainEqual({
+      table: "maintenance_agreements",
+      op: "limit",
+      value: 500,
+    });
+  });
+
+  it("fails safe for missing account scope in drilldown helper", async () => {
+    const { supabase, calls } = makeSupabaseMockWithLookups({
+      agreements: [makeAgreement({ id: "skip" })],
+    });
+
+    const result = await listMaintenanceAgreementDrilldownForAccount({
+      supabase,
+      accountOwnerUserId: "  ",
+      today: "2026-05-12",
+    });
+
+    expect(result).toEqual({ as_of_date: "2026-05-12", rows: [] });
+    expect(calls).toEqual([]);
   });
 });

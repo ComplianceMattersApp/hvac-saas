@@ -2458,7 +2458,12 @@ return (
             <div className={`${opsUtilityLabelClass} text-slate-500`}>Planning</div>
             <div className="text-[15px] font-semibold tracking-tight text-slate-950">Service Plans</div>
           </div>
-          <div className="text-[11px] text-slate-500">As of {servicePlanSummary.as_of_date}</div>
+          <div className="flex items-center gap-2">
+            <div className="text-[11px] text-slate-500">As of {servicePlanSummary.as_of_date}</div>
+            <Link href="/service-plans" className={sectionActionLinkClass}>
+              View Service Plans
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
