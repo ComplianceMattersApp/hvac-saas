@@ -3955,47 +3955,49 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               ) : null}
 
               <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <details className="group w-full rounded-xl border border-slate-200/80 bg-white p-4 text-sm shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90">
-                  <summary className="cursor-pointer list-none">
-                    <CollapsibleHeader
-                      title="Change Contractor"
-                      subtitle="Reassign job ownership to a different contractor."
-                    />
-                  </summary>
+                {!isHvacServiceMode ? (
+                  <details className="group w-full rounded-xl border border-slate-200/80 bg-white p-4 text-sm shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90">
+                    <summary className="cursor-pointer list-none">
+                      <CollapsibleHeader
+                        title="Change Contractor"
+                        subtitle="Reassign job ownership to a different contractor."
+                      />
+                    </summary>
 
-                  <div className="mt-3">
-                    <form action={updateJobContractorFromForm} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                      <input type="hidden" name="job_id" value={job.id} />
-                      <input type="hidden" name="tab" value="info" />
-                      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=info`} />
+                    <div className="mt-3">
+                      <form action={updateJobContractorFromForm} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="tab" value="info" />
+                        <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=info`} />
 
-                      <div className="flex-1">
-                        <label className={workspaceFieldLabelClass}>
-                          Assigned contractor
-                        </label>
-                        <select
-                          name="contractor_id"
-                          defaultValue={job.contractor_id ?? ""}
-                          className={workspaceInputClass}
+                        <div className="flex-1">
+                          <label className={workspaceFieldLabelClass}>
+                            Assigned contractor
+                          </label>
+                          <select
+                            name="contractor_id"
+                            defaultValue={job.contractor_id ?? ""}
+                            className={workspaceInputClass}
+                          >
+                            <option value="">— No contractor ({internalBusinessDisplayName}) —</option>
+                            {(contractors ?? []).map((contractor: any) => (
+                              <option key={contractor.id} value={contractor.id}>
+                                {contractor.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <SubmitButton
+                          loadingText="Saving..."
+                          className={secondaryButtonClass}
                         >
-                          <option value="">— No contractor ({internalBusinessDisplayName}) —</option>
-                          {(contractors ?? []).map((contractor: any) => (
-                            <option key={contractor.id} value={contractor.id}>
-                              {contractor.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <SubmitButton
-                        loadingText="Saving..."
-                        className={secondaryButtonClass}
-                      >
-                        Save contractor
-                      </SubmitButton>
-                    </form>
-                  </div>
-                </details>
+                          Save contractor
+                        </SubmitButton>
+                      </form>
+                    </div>
+                  </details>
+                ) : null}
 
                 {job.job_type === "service" ? (
                   <details className="group w-full rounded-xl border border-slate-200/80 bg-white p-4 text-sm shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90">

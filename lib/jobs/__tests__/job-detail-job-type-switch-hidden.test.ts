@@ -22,9 +22,13 @@ describe("Job detail UI hardening - job type switch", () => {
     expect(jobDetailSource).not.toContain("action={updateJobTypeFromForm}");
   });
 
+  it("keeps mode-aware contractor switch visibility on job detail", () => {
+    expect(jobDetailSource).toContain("!isHvacServiceMode ? (");
+    expect(jobDetailSource).toContain("Change Contractor");
+  });
+
   it("keeps normal edit controls on job detail", () => {
     expect(jobDetailSource).toContain("Scheduling");
-    expect(jobDetailSource).toContain("Change Contractor");
     expect(jobDetailSource).toContain("Service Details");
     expect(jobDetailSource).toContain("Permit & Compliance");
   });
