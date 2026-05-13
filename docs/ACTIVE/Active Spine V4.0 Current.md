@@ -24,6 +24,32 @@ Group 9A planning source of truth is [Maintenance_Agreements_V1_Model_Spec.md](.
 
 Current Program Status Note (May 2026)
 
+- Group 9A-7B Manual Create Work Order from Service Plan Prefill V1 is complete and pushed in commit `3c186e5`:
+  - customer profile maintenance agreement cards now expose compact `Create Work Order` entry points when feature-gated
+  - link payload remains lightweight: `customer_id` + `maintenance_agreement_id`
+  - `/jobs/new` now performs server-side scoped agreement prefill resolution only when:
+    - `ENABLE_MAINTENANCE_AGREEMENTS` is enabled
+    - internal context is present
+    - ids are valid UUIDs
+    - account/customer scope matches
+  - no Work Item JSON is passed in URL params
+  - `NewJobForm` prefill includes editable customer/location/service defaults and safe agreement context banner:
+    - customer preselection
+    - primary location preselection when valid
+    - service defaults with `service_case_kind=maintenance` and `service_visit_type=maintenance`
+    - reason/dispatch notes from agreement default summary
+    - sanitized default Work Items when valid
+    - non-persisted agreement context line (name + due date)
+  - invalid/unavailable agreement prefill fails safely with non-blocking warning and normal intake continuity
+  - submit remains existing create flow (`createJobFromForm`) and creates normal job/work order
+  - agreement records are not mutated by job creation
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__ lib/jobs/__tests__/new-job-defaults.test.ts` passed (`4` files / `36` tests), `npx.cmd tsc --noEmit` passed, browser smoke passed for link visibility, prefill behavior, normal create, unchanged agreement state, invalid-id fallback, and surface continuity
+  - boundaries preserved: no schema/migration/Supabase/production/feature-flag change; no automatic jobs/calendar/invoice/payment/Stripe/QBO/SMS/customer portal behavior; no due-date advancement; no visit-balance deduction; no persisted job/agreement linkage
+  - watch items:
+    - ECC-locked product-mode UI can still show ECC-oriented presentation copy while service-plan prefill applies service/maintenance defaults
+    - relationship-context logs briefly showed both ECC and Service during dev interaction transitions; final create succeeded
+    - sandbox/local smoke created test job `bb30cd33-f4a4-4a02-a006-98a9319f77d6`
+
 - Group 9A-6 Service Plans Ops Read-Only Card is complete and pushed in commit `1776042`:
   - ops surface: feature-gated read-only Service Plans summary card on `/ops` in `app/ops/page.tsx`
   - read model source: `summarizeMaintenanceAgreementsForAccount`

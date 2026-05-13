@@ -12,6 +12,77 @@ The V1 goal is simple: let an operator track recurring service obligations for a
 
 This spec is intentionally not a billing, payment, portal, SMS, or automation design.
 
+## Group 9A-7B Closeout Snapshot (manual Create Work Order from Service Plan prefill V1 implemented in repo)
+
+Group 9A-7B (Manual Create Work Order from Service Plan Prefill V1) is implemented and pushed in commit `3c186e5`.
+
+Recorded implementation artifacts:
+
+- Customer profile entry point: `app/customers/[id]/page.tsx`
+- `/jobs/new` server-side resolver: `app/jobs/new/page.tsx`
+- Form prefill wiring: `app/jobs/new/NewJobForm.tsx`
+- Scoped prefill read model helper: `lib/maintenance-agreements/read-model.ts`
+- Targeted resolver tests: `lib/maintenance-agreements/__tests__/read-model.test.ts`
+
+Recorded behavior:
+
+- Maintenance Agreement cards now expose a compact `Create Work Order` entry point when feature-gated.
+- Link uses lightweight params only: `customer_id` and `maintenance_agreement_id`.
+- No Work Item JSON is passed through URL params.
+- `/jobs/new` resolves service-plan prefill server-side only when all of the following are true:
+	- `ENABLE_MAINTENANCE_AGREEMENTS` is enabled
+	- internal context is present
+	- ids are valid UUIDs
+	- account/customer scope matches
+- `NewJobForm` receives safe prefill props and remains fully editable by operator:
+	- customer preselection
+	- primary location preselection when valid
+	- service defaults
+	- `service_case_kind = maintenance`
+	- `service_visit_type = maintenance`
+	- Reason for Visit from agreement default summary
+	- sanitized default Work Items when valid
+	- non-persisted agreement context banner (name + due date)
+- Invalid/unavailable agreement prefill fails safely with a non-blocking warning.
+- Submit path remains the existing normal create flow (`createJobFromForm`), creating a normal job/work order.
+- Agreement record is not mutated by job creation.
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__ lib/jobs/__tests__/new-job-defaults.test.ts` passed (`4` files, `36` tests).
+- `npx.cmd tsc --noEmit` passed.
+- Browser smoke passed with `ENABLE_MAINTENANCE_AGREEMENTS=true`:
+	- `Create Work Order` link visible on agreement card
+	- `/jobs/new` opened with service-plan prefill banner
+	- customer/location preselected
+	- maintenance defaults present
+	- reason/dispatch notes prefilled
+	- normal job created via existing flow
+	- agreement unchanged after submit
+	- invalid agreement id failed safely
+	- existing customer profile and `/jobs/new` still rendered
+
+Boundaries preserved in Group 9A-7B:
+
+- no schema changes
+- no migrations
+- no Supabase commands
+- no production writes
+- no feature flag changes
+- no automatic job generation
+- no calendar events
+- no invoice/payment behavior
+- no Stripe/QBO/SMS/customer portal behavior
+- no next due date advancement
+- no visit-balance deduction
+- no persisted job/agreement linkage
+
+Watch items:
+
+- ECC-locked product-mode UI can still show ECC-oriented presentation copy while service-plan prefill applies service/maintenance defaults.
+- Relationship-context logs briefly showed both ECC and Service during dev interaction transitions; final create succeeded.
+- Sandbox/local smoke created test job `bb30cd33-f4a4-4a02-a006-98a9319f77d6`.
+
 ## Group 9A-6 Closeout Snapshot (ops read-only service plans card implemented in repo)
 
 Group 9A-6 (Service Plans Ops Read-Only Card) is implemented and pushed in commit `1776042`.

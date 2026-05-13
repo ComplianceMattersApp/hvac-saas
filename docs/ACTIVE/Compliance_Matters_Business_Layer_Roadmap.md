@@ -304,6 +304,13 @@ The following product-configuration work is **explicitly parked** and **not in c
   - Group 9A-4 customer profile create/edit V1 is committed (`9f81d6f`) and sandbox-ready behind feature gating.
   - Group 9A-5B service plan due/overdue summary read model is implemented, committed, and pushed (`summarizeMaintenanceAgreementsForAccount` in `lib/maintenance-agreements/read-model.ts` with targeted test expansion in `lib/maintenance-agreements/__tests__/read-model.test.ts`).
   - Group 9A-6 ops read-only Service Plans summary card is implemented and pushed (`1776042`) in `app/ops/page.tsx`, feature-gated by `ENABLE_MAINTENANCE_AGREEMENTS`, and fail-safe when the read model call fails.
+  - Group 9A-7B manual Create Work Order from Service Plan prefill V1 is implemented and pushed (`3c186e5`) with:
+    - compact agreement-card entry point on customer profile
+    - lightweight URL params only (`customer_id`, `maintenance_agreement_id`)
+    - server-side scoped prefill resolution on `/jobs/new`
+    - sanitized summary/work-item defaults copied into editable job intake form state
+    - non-blocking safe fallback when agreement prefill is invalid/unavailable
+    - existing normal create flow preserved (no job/agreement persisted linkage)
   - Summary output includes status counts, due buckets, `total_count`, and `as_of_date` with strict account scoping and active-only due queue semantics.
   - Service Plan counts and due/overdue summary logic are implemented in the repo/read model and exposed on `/ops` as a read-only card; no broader user-facing Service Plans module dashboard exists yet.
   - Maintenance Agreements create/edit is implemented in repo and sandbox-ready behind feature gating, but production remains inactive until migration apply and flag enablement are intentionally approved.
