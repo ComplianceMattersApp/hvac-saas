@@ -321,6 +321,12 @@ The following product-configuration work is **explicitly parked** and **not in c
     - filters: all, active, overdue, due today, due 1-7 days, due 8-30 days, not scheduled, inactive
   - Summary output includes status counts, due buckets, `total_count`, and `as_of_date` with strict account scoping and active-only due queue semantics.
   - Service Plan counts and due/overdue summary logic are implemented in the repo/read model and exposed on `/ops` as a read-only card, and the internal read-only `/service-plans` drilldown is now available behind feature gating.
+  - Group 9A-9A docs/model decisions are recorded for future implementation:
+    - preferred linkage shape is separate `maintenance_agreement_visits` table, not direct `jobs.maintenance_agreement_id` as long-term primary truth
+    - visit counts only after linked maintenance work is completed/closed as valid maintenance work
+    - V1 visit-balance projection should be derived from counted link rows (not mutable remaining counters)
+    - `next_due_date` remains manual for current scope; future advancement requires explicit operator confirmation or a clearly designed completion flow
+    - full visit-balance ledger is parked for V2 unless real reversal/adjustment/renewal pressure requires first-class ledger events
   - Maintenance Agreements create/edit is implemented in repo and sandbox-ready behind feature gating, but production remains inactive until migration apply and flag enablement are intentionally approved.
   - Browser smoke confirmation: flag off hides Service Plans link and `/service-plans` fails closed, flag on shows the `/ops` link and renders `/service-plans` rows/customer links, all filter chips manually tested successfully, and `/ops` continuity remained intact.
 - Tenant payment execution (Stripe subscription/checkout; parked)

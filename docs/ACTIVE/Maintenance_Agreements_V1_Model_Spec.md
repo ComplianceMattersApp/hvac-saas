@@ -12,6 +12,82 @@ The V1 goal is simple: let an operator track recurring service obligations for a
 
 This spec is intentionally not a billing, payment, portal, SMS, or automation design.
 
+## Group 9A-9A Model Snapshot (service plan job linkage + visit balance planning decisions)
+
+Group 9A-9A is a docs/model decision pass only. No implementation changes are included in this slice.
+
+### Preferred linkage model (future implementation target)
+
+- Preferred long-term model is a separate linkage table, likely `maintenance_agreement_visits`.
+- Do not use direct `jobs.maintenance_agreement_id` as the primary long-term source of truth for visit accounting.
+- Purpose of the future link table: connect a Maintenance Agreement / Service Plan to actual Jobs / Work Orders created from or counted toward the plan.
+
+Suggested future fields for `maintenance_agreement_visits`:
+
+- `agreement_id`
+- `job_id`
+- `created_at`
+- `created_by_user_id`
+- `link_source`
+- `counts_toward_visit_balance`
+- `counted_at`
+- `counted_by_user_id`
+- `count_status`
+- `reversed_at` (optional future)
+- `reversed_by_user_id` (optional future)
+- `reversal_reason` (optional future)
+
+Count status lifecycle (future):
+
+- `linked`
+- `eligible`
+- `counted`
+- `excluded`
+- `reversed`
+
+### Counting and balance rules
+
+- A visit should count against the plan only after linked maintenance work is completed/closed as valid maintenance work.
+- Do not count at agreement creation, work-order creation, scheduling, or work start.
+- V1 balance model should be derived from valid counted link rows plus agreement term/included-visit configuration when that configuration is added later.
+- Do not store mutable "remaining visits" as source-of-truth in V1.
+
+### Due-date and lifecycle handling rules
+
+- `next_due_date` remains manual in current scope.
+- Later advancement should require explicit operator confirmation or a clearly designed completion workflow.
+- No automatic `next_due_date` advancement in current scope.
+
+Cancellation/reschedule/duplicate handling rules:
+
+- cancelled jobs do not count
+- no-show jobs do not count unless explicitly marked valid later
+- rescheduled same job does not double-count
+- duplicate jobs are prevented by unique agreement/job linkage plus `count_status` rules
+- reversal tooling is future
+
+### Ledger decision (parked)
+
+- Full visit balance ledger is parked for V2 unless real reversal/adjustment/renewal pressure requires first-class audit events.
+
+Potential future ledger events (V2 planning):
+
+- `visits_granted`
+- `visit_used`
+- `visit_reversed`
+- `visit_adjusted`
+- `renewal_granted`
+
+### Explicit non-goals for current scope
+
+- no automatic recurrence engine
+- no automatic due-date advancement
+- no visit-balance deduction yet
+- no billing/payment execution
+- no recurring billing
+- no SMS/customer portal/QBO
+- no renewal automation
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.

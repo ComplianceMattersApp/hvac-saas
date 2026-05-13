@@ -19,6 +19,7 @@ Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No co
 
 **Maintenance Agreements / Recurring Services V1:**
 Group 9A planning source of truth is [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md). The preferred future domain/table name is `maintenance_agreements`; avoid `service_contracts` because existing service-contract language classifies service cases/jobs and is not customer-owned agreement truth.
+Group 9A-9A model decisions are now documented there: future linkage should prefer separate `maintenance_agreement_visits`, counting should occur only after linked maintenance work is completed/closed as valid, V1 visit balance should be derived from counted links (not mutable remaining counters), `next_due_date` remains manual in current scope, and full ledger remains parked for V2.
 
 **Owner-Completion Cycle Closeout (May 2026):** All areas in the owner-release completion matrix are confirmed closed at current quality bar. Next work is treated as post-launch/future-roadmap work unless the owner explicitly reopens a release-scope item. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for the canonical decision surface.
 
