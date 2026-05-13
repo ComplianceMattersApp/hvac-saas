@@ -1173,6 +1173,23 @@ export default async function CustomerDetailPage(props: {
             ) : (
               <div className="space-y-2">
                 {customerAgreements.map((agr) => {
+                  const primaryLocationMatch = locations.find((loc) => {
+                    const locId = String(loc.id ?? loc.location_id ?? "").trim();
+                    return locId && locId === String(agr.primary_location_id ?? "").trim();
+                  });
+                  let primaryLocationLabel: string | null = null;
+                  if (primaryLocationMatch) {
+                    const label = locationDisplayName(primaryLocationMatch);
+                    const address = locationAddressLine(primaryLocationMatch);
+                    if (address && label && label !== "Location") {
+                      primaryLocationLabel = `${label} (${address})`;
+                    } else if (address) {
+                      primaryLocationLabel = address;
+                    } else if (label && label !== "Location") {
+                      primaryLocationLabel = label;
+                    }
+                  }
+
                   const dueState = classifyMaintenanceAgreementDueState({
                     status: agr.status,
                     nextDueDate: agr.next_due_date,
@@ -1222,6 +1239,11 @@ export default async function CustomerDetailPage(props: {
                               {String(agr.frequency).replace(/_/g, " ")}
                             </span>
                           </div>
+                          {primaryLocationLabel ? (
+                            <div className="text-xs text-slate-500">
+                              Primary location: {primaryLocationLabel}
+                            </div>
+                          ) : null}
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           {agr.next_due_date ? (
