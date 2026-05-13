@@ -24,6 +24,15 @@ Group 9A planning source of truth is [Maintenance_Agreements_V1_Model_Spec.md](.
 
 Current Program Status Note (May 2026)
 
+- Group 9A-5B Service Plan Due/Overdue Summary Read Model is complete and pushed:
+  - read model: `summarizeMaintenanceAgreementsForAccount` in `lib/maintenance-agreements/read-model.ts`
+  - tests: `lib/maintenance-agreements/__tests__/read-model.test.ts` expanded for mixed status counts, due boundaries, active-only due buckets, and safe empty/default scope behavior
+  - summary output includes: status counts (`active`, `draft`, `paused`, `expired`, `cancelled`), due counts (`overdue`, `due_today`, `due_in_next_7_days`, `due_in_next_30_days`, `not_scheduled_active`), `total_count`, and `as_of_date`
+  - rules preserved: strict `account_owner_user_id` scoping, inactive-status exclusion from due queue buckets, single as-of date resolution for consistent calculations
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`28` tests), `npx.cmd tsc --noEmit` passed, `git diff --check` passed aside from LF/CRLF warnings
+  - boundaries preserved: no UI/routes/ops-card/schema/migration/Supabase/production/flag/job/calendar/invoice/payment/portal behavior changes
+  - implementation status statement: Service Plan counts and due/overdue summary logic are implemented in the repo/read model, but no user-facing module dashboard or Ops card exists yet.
+
 - Group 9A-4 Maintenance Agreement Create/Edit V1 is complete and pushed in commit `9f81d6f`:
   - server actions: `lib/maintenance-agreements/agreement-actions.ts`
   - customer profile create/edit UI: `app/customers/[id]/page.tsx`

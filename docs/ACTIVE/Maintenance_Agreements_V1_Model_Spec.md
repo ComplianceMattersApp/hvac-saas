@@ -12,6 +12,61 @@ The V1 goal is simple: let an operator track recurring service obligations for a
 
 This spec is intentionally not a billing, payment, portal, SMS, or automation design.
 
+## Group 9A-5B Closeout Snapshot (due/overdue summary read model implemented in repo)
+
+Group 9A-5B (Service Plan Due/Overdue Summary Read Model) is implemented, committed, and pushed.
+
+Recorded implementation artifacts:
+
+- Read model summary function: `summarizeMaintenanceAgreementsForAccount` in `lib/maintenance-agreements/read-model.ts`
+- Tests: `lib/maintenance-agreements/__tests__/read-model.test.ts`
+
+Recorded summary output:
+
+- `status_counts`: `active`, `draft`, `paused`, `expired`, `cancelled`
+- `due_counts`: `overdue`, `due_today`, `due_in_next_7_days`, `due_in_next_30_days`, `not_scheduled_active`
+- `total_count`
+- `as_of_date`
+
+Recorded rules:
+
+- strict `account_owner_user_id` scoping
+- due buckets include active agreements only
+- inactive statuses are excluded from due queue buckets
+- `not_scheduled_active` means active with missing/invalid `next_due_date`
+- as-of date is resolved once for consistent due-state calculations
+- missing/invalid scope returns safe empty/default summary
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`28` tests).
+- `npx.cmd tsc --noEmit` passed.
+- `git diff --check` passed aside from normal LF/CRLF warnings.
+
+Boundaries preserved in Group 9A-5B:
+
+- existing customer/location/upcoming list behavior unchanged
+- no UI changes
+- no new routes
+- no ops card
+- no schema changes
+- no migrations
+- no Supabase commands
+- no production writes
+- no feature flag changes
+- no job generation
+- no calendar events
+- no invoices/payments
+- no Stripe/QBO/SMS/customer portal behavior
+
+Implementation status statement:
+
+- Service Plan counts and due/overdue summary logic are implemented in the repo/read model, but no user-facing module dashboard or Ops card exists yet.
+
+Watch item:
+
+- Due-window buckets are currently exclusive/non-overlapping by design. Future UI labels should avoid confusion by using explicit ranges such as Overdue, Due Today, Due in 1-7 Days, and Due in 8-30 Days, or otherwise clearly explain counting logic.
+
 ## Group 9A-4 Closeout Snapshot (create/edit V1 implemented in repo, sandbox-ready behind feature gating)
 
 Group 9A-4 (Maintenance Agreement Create/Edit V1) is implemented and pushed in commit `9f81d6f`.
