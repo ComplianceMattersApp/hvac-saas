@@ -4693,7 +4693,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <div className="mt-4 rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 text-slate-900">
           <div className="text-sm font-semibold text-blue-900">Suggested next due date</div>
           <p className="mt-1 text-xs leading-5 text-blue-900/90">
-            This is a suggestion only. Confirming next due date will be added later.
+            This is a suggestion only. Use Confirm Next Due Date when you are ready to update the Service Plan next due date. Confirming does not create a job, schedule an appointment, create an invoice, or collect payment.
           </p>
           <div className="mt-2 text-sm font-semibold text-blue-900">
             {suggestedNextDueProjection.manualSchedulingRequired

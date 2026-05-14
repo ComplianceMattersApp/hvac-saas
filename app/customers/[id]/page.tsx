@@ -1339,7 +1339,7 @@ export default async function CustomerDetailPage(props: {
             {customerAgreements.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6">
                 <p className="text-sm text-slate-500">No maintenance agreements yet.</p>
-                <p className="mt-1 text-xs text-slate-400">Agreement setup will be added in a later slice.</p>
+                <p className="mt-1 text-xs text-slate-400">Use Add Maintenance Agreement to create one for this customer.</p>
               </div>
             ) : (
               <div className="space-y-2">
