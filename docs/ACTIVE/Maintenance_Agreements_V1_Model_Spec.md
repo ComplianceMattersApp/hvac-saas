@@ -936,6 +936,110 @@ Recommended implementation sequence:
 - 9A-13B-D: make read-only next-due context persistent and hide confirm after link confirmation
 - Browser smoke only after full idempotency path is wired in sandbox
 
+## Group 9A-13B-B Closeout Snapshot (next due confirmation metadata foundation)
+
+Group 9A-13B-B (Next Due Confirmation Metadata Foundation) is implemented and pushed in commit `91d900a`.
+
+Recorded migration artifact:
+
+- File: `supabase/migrations/20260514120000_maintenance_agreement_visits_next_due_confirmation_metadata.sql`
+- Adds four nullable metadata columns to `maintenance_agreement_visits`:
+	- `next_due_confirmed_at` timestamptz nullable
+	- `next_due_confirmed_by_user_id` uuid nullable, FK to `auth.users(id)` ON DELETE SET NULL
+	- `confirmed_next_due_date` date nullable
+	- `baseline_next_due_date` date nullable
+- No existing rows backfilled.
+- No count_status or agreement mutation changes in this slice.
+- No delete policy changes.
+
+Recorded read-model artifacts:
+
+- `MaintenanceAgreementVisitLinkRow` type extended with four metadata fields.
+- `normalizeMaintenanceAgreementVisitLinkRow` extended to normalize metadata fields safely to `string | null`.
+- New export: `hasMaintenanceAgreementVisitConfirmedNextDue(link)` — returns confirmed boolean from `next_due_confirmed_at` or `confirmed_next_due_date`.
+- Four metadata fields added to `select(...)` lists in:
+	- `listMaintenanceAgreementVisitsForAgreement`
+	- `listMaintenanceAgreementLinksForJob`
+	- Drilldown link projection used by `listMaintenanceAgreementDrilldownForAccount`
+- No UI behavior changes in this slice.
+- No Confirm Next Due Date action behavior expanded.
+
+Recorded test coverage:
+
+- `MockAgreementVisitLink` type updated with four metadata fields.
+- `makeAgreementVisitLink` default values set to null for all four metadata fields.
+- Existing list-visits-for-agreement test verifies new fields are selected and returned as null.
+- New test: missing metadata means unconfirmed (`hasMaintenanceAgreementVisitConfirmedNextDue` returns false).
+- New test: populated metadata means confirmed (`hasMaintenanceAgreementVisitConfirmedNextDue` returns true).
+- Existing count/used-visit projections verified unchanged.
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (70/70)
+- `npx.cmd tsc --noEmit` passed
+- `git diff --check` passed
+- `git status --short` clean
+- Commit `91d900a` pushed to `origin/main`
+
+Boundaries preserved in Group 9A-13B-B:
+
+- no UI behavior changes
+- no Confirm Next Due Date action behavior changes
+- no agreement mutation changes
+- no count_status lifecycle changes
+- no automatic due-date advancement
+- no recurrence engine
+- no invoice/payment/calendar behavior
+- no feature flag changes
+- no production migration apply
+- no production writes
+
+## Group 9A-13B-B1 Sandbox Migration Apply + Verification Closeout
+
+Group 9A-13B-B1 (Sandbox Migration Apply + Verification) is complete.
+
+Preflight:
+
+- Branch: `main`
+- Working tree: clean
+- Linked sandbox ref: `kvpesjdukqwwlgpkzfjm` (CMTest)
+- Production ref not targeted: `ornrnvxtwwtulohqwxop` (ComplianceMatters)
+
+Migration applied to sandbox:
+
+- `20260514120000_maintenance_agreement_visits_next_due_confirmation_metadata.sql`
+- Confirmed in migration history: local and remote both show `20260514120000`
+
+Post-apply data verification:
+
+- Existing row count: 8
+- Non-null count for all four new metadata fields: 0 (no backfill occurred)
+- Sample existing rows: all four metadata fields are null
+- No errors querying any of the four new columns
+
+Supplemental Docker-backed schema verification (completed after Docker became available):
+
+- `supabase db dump --linked --schema public` executed successfully
+- All four metadata columns confirmed present and nullable in dump
+- FK confirmed: `maintenance_agreement_visits_next_due_confirmed_by_user_id_fkey` → `auth.users(id)` ON DELETE SET NULL
+- RLS confirmed enabled: `ALTER TABLE public.maintenance_agreement_visits ENABLE ROW LEVEL SECURITY` present in dump
+- Policies confirmed present:
+	- `maintenance_agreement_visits_select_account_scope`
+	- `maintenance_agreement_visits_insert_account_scope`
+	- `maintenance_agreement_visits_update_account_scope`
+- No DELETE policy found on `maintenance_agreement_visits`
+- Temporary dump file removed before closeout
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (70/70)
+- `npx.cmd tsc --noEmit` passed
+- `git diff --check` passed
+- `git status --short` clean
+- No migration apply was run in the supplemental verification pass
+- No data written in either verification pass
+- Production migration not applied
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.

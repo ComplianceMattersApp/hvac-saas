@@ -111,6 +111,18 @@ Maintenance agreements read-only projection closeout note (May 2026):
 - 9A-13B-A stale-state rule remains required: agreement `next_due_date` must match `baseline_next_due_date` before write or fail safely with refresh/review guidance.
 - 9A-13B-A recommended sequence: 13B-B schema/read-model/tests, 13B-C safe confirm write of agreement plus link metadata, 13B-D persistent read-only context and post-confirm action suppression, then browser smoke in sandbox.
 - 9A-13B-A non-goals preserved: no automatic due-date advancement, no recurring job generation, no seasonal-window implementation, no invoice/payment behavior, no portal/SMS/QBO behavior, no reversal/adjustment UI, and no broad event-log expansion in this slice.
+- Group 9A-13B-B Next Due Confirmation Metadata Foundation is implemented and pushed in commit `91d900a` with sandbox migration applied in 9A-13B-B1.
+- 9A-13B-B migration: `20260514120000_maintenance_agreement_visits_next_due_confirmation_metadata.sql` adds four nullable metadata columns to `maintenance_agreement_visits`:
+  - `next_due_confirmed_at` timestamptz nullable
+  - `next_due_confirmed_by_user_id` uuid nullable, FK to `auth.users(id)` ON DELETE SET NULL
+  - `confirmed_next_due_date` date nullable
+  - `baseline_next_due_date` date nullable
+- 9A-13B-B read model: type and normalizer extended with four metadata fields; `hasMaintenanceAgreementVisitConfirmedNextDue(link)` exported; fields added to all relevant visit-link `select(...)` lists.
+- 9A-13B-B tests: 70/70 passed including confirmed/unconfirmed metadata helper tests with no count/used-visit projection changes.
+- 9A-13B-B boundaries: no UI changes, no confirm action expansion, no agreement mutation, no count_status lifecycle changes, no feature-flag changes, no production migration apply, no production writes.
+- 9A-13B-B1 sandbox verification result: sandbox ref `kvpesjdukqwwlgpkzfjm`; production ref `ornrnvxtwwtulohqwxop` not targeted; migration `20260514120000` applied and confirmed in history.
+- 9A-13B-B1 Docker-backed schema dump confirmed: all four columns exist and are nullable; FK `maintenance_agreement_visits_next_due_confirmed_by_user_id_fkey` references `auth.users(id)` ON DELETE SET NULL; RLS enabled; `select_account_scope`, `insert_account_scope`, `update_account_scope` policies present; no DELETE policy exists.
+- 9A-13B-B1 data verification: 8 existing rows; all four new metadata fields remain null across all rows; no backfill occurred; no production writes in either pass.
 - Group 9A-11A Service Plan Due Window / Next Due Model is documented as planning-only (no implementation) with two future cadence tracks: interval cadence and seasonal service-window cadence.
 - 9A-11A preserves the locked rule that counting does not auto-advance `next_due_date`; future flow is suggestion-first, with any write path parked behind explicit operator confirmation.
 - Boundaries remain explicit: no automatic counting, no due-date advancement, and no visit-balance deduction.

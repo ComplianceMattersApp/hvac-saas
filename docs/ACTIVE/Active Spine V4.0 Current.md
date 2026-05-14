@@ -26,6 +26,16 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Group 9A-13B-B Next Due Confirmation Metadata Foundation is complete and pushed in commit `91d900a`; sandbox migration applied and Docker-verified in 9A-13B-B1:
+  - migration `20260514120000_maintenance_agreement_visits_next_due_confirmation_metadata.sql` adds four nullable metadata columns to `maintenance_agreement_visits`
+  - fields: `next_due_confirmed_at` (timestamptz), `next_due_confirmed_by_user_id` (uuid, FK to `auth.users(id)` ON DELETE SET NULL), `confirmed_next_due_date` (date), `baseline_next_due_date` (date)
+  - no existing rows backfilled; all four fields null across 8 sandbox rows
+  - read model extended: `MaintenanceAgreementVisitLinkRow` type updated, normalizer extended, `hasMaintenanceAgreementVisitConfirmedNextDue(link)` exported, fields added to all relevant visit-link `select(...)` lists
+  - tests: 70/70 passed including confirmed/unconfirmed metadata helper tests; count/used-visit projections unchanged; confirm action behavior unchanged
+  - Docker-backed schema dump verified: all four columns present and nullable; FK ON DELETE SET NULL confirmed; RLS enabled; `select_account_scope`, `insert_account_scope`, `update_account_scope` policies confirmed; no DELETE policy found
+  - sandbox ref `kvpesjdukqwwlgpkzfjm` targeted; production ref `ornrnvxtwwtulohqwxop` not targeted; production migration not applied
+  - boundaries: no UI changes, no confirm action expansion, no agreement mutation, no count_status changes, no feature-flag changes, no production writes
+
 - Group 9A-13B-A Next Due Idempotency Model Docs is complete as docs/model-only (no implementation changes):
   - audit finding recorded: current Suggested Next Due/Confirm visibility is banner-gated plus counted-link-gated; persistent confirm without durable idempotency can allow repeated next-due advancement from the same counted link
   - recommended outcome C adopted: add durable idempotency marker before persistent confirm

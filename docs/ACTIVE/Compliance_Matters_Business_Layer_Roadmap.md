@@ -82,6 +82,18 @@ Maintenance agreements closeout note (May 2026):
 - 9A-13B-A stale-state rule remains required: agreement `next_due_date` must match `baseline_next_due_date` at confirm time or fail safely with refresh/review guidance.
 - 9A-13B-A recommended sequence: 13B-B schema/read-model/test foundation, 13B-C safe confirm write of agreement plus link metadata, 13B-D persistent read-only context plus post-confirm hide of action, then browser smoke in sandbox.
 - 9A-13B-A boundaries preserved: no automatic advancement, no recurring generation, no seasonal-window implementation, no invoice/payment behavior, no portal/SMS/QBO behavior, no reversal/adjustment UI, and no broad event-log expansion in this slice.
+- Group 9A-13B-B Next Due Confirmation Metadata Foundation is implemented and pushed in commit `91d900a`.
+- 9A-13B-B migration added four nullable metadata columns to `maintenance_agreement_visits`: `next_due_confirmed_at`, `next_due_confirmed_by_user_id`, `confirmed_next_due_date`, `baseline_next_due_date`.
+- 9A-13B-B `next_due_confirmed_by_user_id` FK references `auth.users(id)` ON DELETE SET NULL; all four columns are nullable with no backfill.
+- 9A-13B-B read model exposes all four fields and exports `hasMaintenanceAgreementVisitConfirmedNextDue(link)` helper for confirmed/unconfirmed projection.
+- 9A-13B-B added tests for metadata field mapping, confirmed state, and unconfirmed state without changing count/used-visit projections or confirm action behavior.
+- 9A-13B-B validation: 70/70 tests passed, `npx.cmd tsc --noEmit` clean, `git diff --check` clean, working tree clean.
+- 9A-13B-B boundaries: no UI behavior changes, no confirm action expansion, no agreement mutation, no count_status changes, no feature-flag changes, no production migration apply, and no production writes.
+- Group 9A-13B-B1 sandbox migration apply and Docker-backed schema verification is complete.
+- 9A-13B-B1 sandbox ref `kvpesjdukqwwlgpkzfjm` (CMTest); production ref `ornrnvxtwwtulohqwxop` not targeted.
+- 9A-13B-B1 Docker-backed schema dump confirmed: all four metadata columns present and nullable, FK with ON DELETE SET NULL verified, RLS enabled, SELECT/INSERT/UPDATE policies confirmed, no DELETE policy found.
+- 9A-13B-B1 post-apply data check: 8 existing rows, non-null count for all four new fields is 0, no backfill, no data mutations in either verification pass.
+- 9A-13B-B1 production migration not applied.
 - 9A-11A keeps the core rule that counting does not auto-advance `next_due_date`; suggestion-first (read-only) is preferred before any future explicit confirm-write action.
 - Seasonal due language is planned as `Upcoming`, `In Service Window`, `Overdue`, and `Manual scheduling required` instead of date-only messaging.
 - Boundaries remain: no automatic counting, no due-date advancement, no visit-balance deduction automation, and no invoice/payment behavior.
