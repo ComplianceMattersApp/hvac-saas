@@ -358,6 +358,48 @@ function displayLocation(row: {
   return cityStateZip || null;
 }
 
+function cleanUnknownString(value: unknown) {
+  return typeof value === "string" ? toCleanString(value) : null;
+}
+
+function normalizePrefillDefaultVisitScopeItems(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((row) => {
+      const record = (row ?? {}) as Record<string, unknown>;
+
+      const normalizedTitle =
+        cleanUnknownString(record.title)
+        || cleanUnknownString(record.item_name)
+        || cleanUnknownString(record.name)
+        || cleanUnknownString(record.details)
+        || cleanUnknownString(record.description)
+        || cleanUnknownString(record.default_description);
+
+      const normalizedDetails =
+        cleanUnknownString(record.details)
+        || cleanUnknownString(record.description)
+        || cleanUnknownString(record.default_description);
+
+      return {
+        id: record.id,
+        title: normalizedTitle,
+        details: normalizedDetails,
+        kind: record.kind,
+        source_pricebook_item_id: record.source_pricebook_item_id ?? record.pricebook_item_id ?? null,
+        expected_unit_price: record.expected_unit_price ?? record.default_unit_price ?? null,
+        unit_label: record.unit_label,
+        item_type: record.item_type,
+        category: record.category,
+        promoted_service_job_id: record.promoted_service_job_id,
+        promoted_at: record.promoted_at,
+        promoted_by_user_id: record.promoted_by_user_id,
+      };
+    })
+    .filter((row) => toCleanString(row.title) || toCleanString(row.details));
+}
+
 function matchesDrilldownFilter(input: {
   filter: MaintenanceAgreementDrilldownFilter;
   dueState: MaintenanceAgreementDueState;
@@ -851,7 +893,9 @@ export async function resolveScopedMaintenanceAgreementJobPrefill(params: {
   let items: VisitScopeItem[] = [];
   try {
     items = sanitizeVisitScopeItems(
-      (data as { default_visit_scope_items?: unknown }).default_visit_scope_items,
+      normalizePrefillDefaultVisitScopeItems(
+        (data as { default_visit_scope_items?: unknown }).default_visit_scope_items,
+      ),
     );
   } catch {
     items = [];

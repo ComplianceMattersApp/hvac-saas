@@ -677,14 +677,46 @@ describe("maintenance agreement read model", () => {
     expect(prefill?.default_visit_scope_items[0]?.title).toBe("Inspect condenser coil");
   });
 
+  it("normalizes legacy prefill work item aliases for jobs/new", async () => {
+    const { supabase } = makeSupabaseMock([
+      makeAgreement({
+        id: "prefill-legacy-shape",
+        default_visit_scope_items: [
+          {
+            item_name: " Diagnose compressor hard-start ",
+            description: " Verify amp draw and capacitor values ",
+            pricebook_item_id: "2d08fdcb-dfa3-4228-a2f0-779b2e87db6d",
+            default_unit_price: 189,
+          },
+        ],
+      }),
+    ]);
+
+    const prefill = await resolveScopedMaintenanceAgreementJobPrefill({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      customerId: CUSTOMER_ID,
+      agreementId: "prefill-legacy-shape",
+    });
+
+    expect(prefill?.default_visit_scope_items).toEqual([
+      expect.objectContaining({
+        title: "Diagnose compressor hard-start",
+        details: "Verify amp draw and capacitor values",
+        source_pricebook_item_id: "2d08fdcb-dfa3-4228-a2f0-779b2e87db6d",
+        expected_unit_price: 189,
+      }),
+    ]);
+  });
+
   it("fails safe for invalid prefill work items and returns empty items", async () => {
     const { supabase } = makeSupabaseMock([
       makeAgreement({
         id: "prefill-bad-items",
         default_visit_scope_items: [
           {
-            title: "",
-            details: "Only details triggers validation error",
+            title: "   ",
+            details: "   ",
           },
         ],
       }),
