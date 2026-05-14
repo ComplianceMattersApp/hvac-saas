@@ -26,6 +26,17 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Group 9A-11C-A Confirm Next Due Date Model Docs is complete (docs/model-only; no implementation changes):
+  - first confirm action location is job detail, directly under or near the read-only suggestion block
+  - customer profile and `/service-plans` confirm actions remain parked until job-detail V1 confirm behavior is proven
+  - core rule locked: suggested next due date never auto-writes; any agreement `next_due_date` change must be explicit and operator-confirmed
+  - planned preconditions include: active internal user, active agreement, counted/counts-toward link row, interval suggestion present, strict account/customer scope match, and stale-state guard requiring unchanged baseline `next_due_date`
+  - planned mutation contract is narrow: update only agreement `next_due_date` + `updated_by_user_id` (normal `updated_at` behavior), with no mutation of links/jobs/service cases and no calendar/invoice/payment side effects
+  - stale-state behavior is fail-safe with refresh-required guidance: `This suggestion is out of date. Refresh and review the latest next due date before confirming.`
+  - custom/manual frequency remains no-confirm with `Manual scheduling required.`
+  - seasonal-window confirm behavior remains parked until template/window schema is approved
+  - non-goals remain explicit: no automatic date advancement, no recurrence engine, no automatic job generation, no calendar events, no invoice/payment behavior, no portal/SMS/QBO behavior, no renewal automation, and no non-job-detail confirm surfaces yet
+
 - Group 9A-11B Read-Only Suggested Next Due / Due Window Projection is complete and pushed in commit `d627b91`:
   - counted maintenance-job detail now renders a read-only `Suggested next due date` block
   - projection copy is explicit: `This is a suggestion only. Confirming next due date will be added later.`

@@ -53,6 +53,11 @@ Maintenance agreements closeout note (May 2026):
 - Group 9A-11B Read-Only Suggested Next Due projection is implemented in commit `d627b91` and browser-validated on counted maintenance-job detail.
 - 9A-11B suggestion block remains read-only and explicitly non-mutating: no `Confirm Next Due Date` action, no agreement `next_due_date` write, no automatic due-date advancement, and no invoice/payment behavior.
 - 9A-11B projection supports interval frequencies (`monthly`, `quarterly`, `semi_annual`, `annual`) with cadence-preserving roll-forward from current `next_due_date`; `custom`/missing next due falls back to `Manual scheduling required.`
+- Group 9A-11C-A Confirm Next Due Date planning audit is now documented as docs/model-only (no implementation in this slice).
+- 9A-11C-A records job-detail-first confirm placement (under/near suggestion block), with customer profile and `/service-plans` confirm surfaces parked until V1 is proven.
+- 9A-11C-A locks explicit preconditions for future confirm writes: active internal user, active agreement, counted/counts-toward link, interval suggestion present, full account/customer scope match, and stale-state guard requiring unchanged baseline `next_due_date`.
+- 9A-11C-A mutation contract is narrow: future confirm may update only agreement `next_due_date` + `updated_by_user_id` (with normal `updated_at` behavior) and must not mutate links/jobs/service cases or create calendar/invoice/payment records.
+- 9A-11C-A keeps seasonal-window confirm behavior parked until template/window schema exists; custom/manual remains no-confirm with manual scheduling guidance.
 - 9A-11A keeps the core rule that counting does not auto-advance `next_due_date`; suggestion-first (read-only) is preferred before any future explicit confirm-write action.
 - Seasonal due language is planned as `Upcoming`, `In Service Window`, `Overdue`, and `Manual scheduling required` instead of date-only messaging.
 - Boundaries remain: no automatic counting, no due-date advancement, no visit-balance deduction automation, and no invoice/payment behavior.

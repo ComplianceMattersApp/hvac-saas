@@ -65,6 +65,12 @@ Maintenance agreements read-only projection closeout note (May 2026):
 - Group 9A-11B is complete in commit `d627b91`: counted-job detail now renders a read-only `Suggested next due date` projection block.
 - 9A-11B projection is suggestion-only (explicit copy), introduces no `Confirm Next Due Date` action, does not mutate agreement `next_due_date`, does not auto-advance cadence, and adds no invoice/payment behavior.
 - 9A-11B projection supports interval frequencies (`monthly`, `quarterly`, `semi_annual`, `annual`) with cadence-preserving roll-forward from existing `next_due_date`; `custom`/missing date falls back to `Manual scheduling required.`
+- Group 9A-11C-A Confirm Next Due Date planning audit is documented as docs/model-only (no implementation changes in this slice).
+- 9A-11C-A sets first confirm placement to job detail under/near the suggestion block; customer profile and `/service-plans` confirm surfaces remain parked until job-detail V1 is proven.
+- 9A-11C-A locks the core rule that suggested next due date never auto-writes and any `next_due_date` change must be explicit and operator-confirmed.
+- 9A-11C-A preconditions for future confirm write include: active internal user, active agreement, counted/counts-toward link row, interval suggestion availability, strict account/customer scope match, and stale-state guard requiring unchanged baseline `next_due_date`.
+- 9A-11C-A write contract is narrow: update agreement `next_due_date` + `updated_by_user_id` only (normal `updated_at`), with no link/job/service-case/calendar/invoice/payment mutation.
+- 9A-11C-A keeps seasonal-window confirm behavior parked until template/window schema approval and keeps custom/manual as no-confirm/manual-scheduling guidance.
 - Group 9A-11A Service Plan Due Window / Next Due Model is documented as planning-only (no implementation) with two future cadence tracks: interval cadence and seasonal service-window cadence.
 - 9A-11A preserves the locked rule that counting does not auto-advance `next_due_date`; future flow is suggestion-first, with any write path parked behind explicit operator confirmation.
 - Boundaries remain explicit: no automatic counting, no due-date advancement, and no visit-balance deduction.

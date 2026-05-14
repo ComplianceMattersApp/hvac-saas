@@ -586,6 +586,81 @@ Boundaries preserved in Group 9A-11B:
 - no automatic job generation
 - no customer portal/SMS/QBO behavior
 
+## Group 9A-11C-A Model Snapshot (confirm next due date planning audit)
+
+Group 9A-11C-A is a docs/model update only. No implementation changes are included in this slice.
+
+First action location decision:
+
+- First confirm action location is job detail, directly under or near the read-only `Suggested next due date` block.
+- Customer profile agreement-card confirm action is parked until job-detail V1 confirm behavior is proven.
+- `/service-plans` confirm action is parked until job-detail V1 confirm behavior is proven.
+- Seasonal due-window queue confirm behavior remains parked until template/window schema exists.
+
+Core rule:
+
+- Suggested next due date must never auto-write.
+- Any update to `maintenance_agreements.next_due_date` must be explicit and operator-confirmed.
+
+Required preconditions for future confirm action:
+
+- Maintenance Agreements feature exposure enabled.
+- Active internal user context present.
+- Agreement status is `active`.
+- Link row is `counted` and `counts_toward_visit_balance = true`.
+- Suggested next due date exists.
+- Agreement frequency is interval-based (`monthly`, `quarterly`, `semi_annual`, `annual`), not manual/custom.
+- Account/customer scope matches across job, link, agreement, and customer.
+- Agreement `next_due_date` still matches the value used when the suggestion was calculated.
+
+Mutation contract (future confirm action):
+
+- May update only:
+	- `maintenance_agreements.next_due_date`
+	- `maintenance_agreements.updated_by_user_id`
+	- `updated_at` via normal DB behavior
+- Must not mutate:
+	- `maintenance_agreement_visits`
+	- `jobs`
+	- `service_cases`
+	- calendar events
+	- invoices
+	- payments
+
+Optimistic concurrency / stale-state rule:
+
+- If agreement `next_due_date` changed after suggestion render, confirm action must fail safely and block the write.
+- User should be prompted to refresh and review the latest suggestion before retrying.
+- Suggested UX message:
+	- `This suggestion is out of date. Refresh and review the latest next due date before confirming.`
+
+Confirmation copy decision:
+
+- `This will update the Service Plan next due date to [date]. It will not create a job, schedule an appointment, create an invoice, collect payment, or renew the plan. Continue?`
+
+Custom/manual frequency decision:
+
+- No confirm action should render.
+- `Manual scheduling required.` remains the only guidance.
+
+Seasonal-window decision:
+
+- Seasonal-window confirm behavior remains parked in this slice.
+- Future behavior should likely confirm a next service window, not a single `next_due_date`.
+- Revisit only after template/window schema is approved.
+
+Explicit non-goals for Group 9A-11C-A:
+
+- no automatic date advancement
+- no recurrence engine
+- no automatic job generation
+- no calendar events
+- no invoice/payment behavior
+- no customer portal/SMS/QBO behavior
+- no renewal automation
+- no customer profile confirm action yet
+- no `/service-plans` confirm action yet
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.
