@@ -816,10 +816,10 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
 
   const admin = createAdminClient();
 
-  // Verify link exists and is counted
+  // Verify link exists and is counted; also fetch metadata fields for idempotency guard
   const { data: linkRow, error: linkError } = await admin
     .from("maintenance_agreement_visits")
-    .select("id, account_owner_user_id, job_id, agreement_id, count_status, counts_toward_visit_balance")
+    .select("id, account_owner_user_id, job_id, agreement_id, count_status, counts_toward_visit_balance, next_due_confirmed_at, confirmed_next_due_date")
     .eq("job_id", jobId)
     .eq("agreement_id", agreementId)
     .maybeSingle();
@@ -834,6 +834,14 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
 
   if (linkAccountOwnerUserId !== accountOwnerUserId || linkCountStatus !== "counted" || !linkCountsToward) {
     redirect(jobBannerPath(jobId, "confirm_next_due_not_counted"));
+  }
+
+  // Idempotency guard: prevent repeat next-due advancement from the same counted visit
+  const linkNextDueConfirmedAt = cleanString(linkRow.next_due_confirmed_at ?? "");
+  const linkConfirmedNextDueDate = cleanString(linkRow.confirmed_next_due_date ?? "");
+  if (linkNextDueConfirmedAt || linkConfirmedNextDueDate) {
+    revalidatePath(`/jobs/${jobId}`);
+    redirect(jobBannerPath(jobId, "confirm_next_due_already_confirmed"));
   }
 
   // Verify agreement exists and is active
@@ -907,6 +915,34 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
 
   if (!updatedAgreement?.id) {
     redirect(jobBannerPath(jobId, "confirm_next_due_update_failed"));
+  }
+
+  // Write link-level confirmation metadata; .is guard prevents partial double-write in race condition
+  const nowIso = new Date().toISOString();
+  const { data: updatedLink, error: linkUpdateError } = await admin
+    .from("maintenance_agreement_visits")
+    .update({
+      baseline_next_due_date: baselineNextDueDate,
+      confirmed_next_due_date: suggestedNextDueDate,
+      next_due_confirmed_at: nowIso,
+      next_due_confirmed_by_user_id: actingUserId,
+      updated_by_user_id: actingUserId,
+    })
+    .eq("id", linkRow.id)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("agreement_id", agreementId)
+    .is("next_due_confirmed_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (linkUpdateError) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_update_failed"));
+  }
+
+  if (!updatedLink?.id) {
+    // Concurrent confirm already wrote metadata for this link
+    revalidatePath(`/jobs/${jobId}`);
+    redirect(jobBannerPath(jobId, "confirm_next_due_already_confirmed"));
   }
 
   revalidatePath(`/jobs/${jobId}`);
