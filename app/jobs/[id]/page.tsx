@@ -93,6 +93,7 @@ import {
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import {
+  hasMaintenanceAgreementVisitConfirmedNextDue,
   listMaintenanceAgreementLinksForJob,
   projectMaintenanceAgreementSuggestedNextDue,
   projectMaintenanceAgreementVisitCountReview,
@@ -189,6 +190,14 @@ function formatYmdDisplay(value?: string | null) {
   } catch {
     return ymd;
   }
+}
+
+function formatDateOnlyUs(value?: string | null) {
+  const ymd = String(value ?? "").trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!match) return "";
+  const [, year, month, day] = match;
+  return `${month}/${day}/${year}`;
 }
 
 function formatTimeDisplay(time?: string | null) {
@@ -1575,9 +1584,11 @@ let suggestedNextDueProjection: {
   manualSchedulingRequired: boolean;
   seasonalWindowPlaceholder: string;
 } | null = null;
-const shouldShowSuggestedNextDueProjection =
-  banner === "maintenance_visit_count_saved" ||
-  banner === "maintenance_visit_count_already_counted";
+let confirmedNextDueContext: {
+  agreementName: string;
+  confirmedNextDueDate: string | null;
+  baselineNextDueDate: string | null;
+} | null = null;
 
 if (maintenanceAgreementsEnabled && job.job_type === "service") {
   const maintenanceLinks = await listMaintenanceAgreementLinksForJob({
@@ -1589,9 +1600,31 @@ if (maintenanceAgreementsEnabled && job.job_type === "service") {
 
   let suggestedAgreementId: string | null = null;
   let suggestedCompletionDate: string | null = null;
+  let countedLinkConfirmedNextDueDate: string | null = null;
+  let countedLinkBaselineNextDueDate: string | null = null;
+  let countedLinkAlreadyConfirmed = false;
 
   if (maintenanceLinks.length > 0) {
+    const newestCountedLink = maintenanceLinks.find((link) => {
+      const countStatus = String(link.count_status ?? "").trim().toLowerCase();
+      return countStatus === "counted" && Boolean(link.counts_toward_visit_balance);
+    });
+
+    if (newestCountedLink) {
+      suggestedAgreementId = String(newestCountedLink.agreement_id ?? "").trim() || null;
+      suggestedCompletionDate = String(newestCountedLink.counted_at ?? "").trim().slice(0, 10) || null;
+      countedLinkConfirmedNextDueDate =
+        String(newestCountedLink.confirmed_next_due_date ?? "").trim() || null;
+      countedLinkBaselineNextDueDate =
+        String(newestCountedLink.baseline_next_due_date ?? "").trim() || null;
+      countedLinkAlreadyConfirmed = hasMaintenanceAgreementVisitConfirmedNextDue(newestCountedLink);
+    }
+
     for (const link of maintenanceLinks) {
+      if (suggestedAgreementId) {
+        break;
+      }
+
       const countStatus = String(link.count_status ?? "").trim().toLowerCase();
       const countReviewLabel = projectMaintenanceAgreementVisitCountReview({
         link: {
@@ -1618,19 +1651,10 @@ if (maintenanceAgreementsEnabled && job.job_type === "service") {
         markVisitCountedAgreementName = "Service Plan";
         break;
       }
-
-      if (
-        !suggestedAgreementId &&
-        countStatus === "counted" &&
-        Boolean(link.counts_toward_visit_balance)
-      ) {
-        suggestedAgreementId = String(link.agreement_id ?? "").trim() || null;
-        suggestedCompletionDate = String(link.counted_at ?? "").trim().slice(0, 10) || null;
-      }
     }
   }
 
-  if (shouldShowSuggestedNextDueProjection && suggestedAgreementId) {
+  if (suggestedAgreementId) {
     const { data: suggestedAgreement } = await supabase
       .from("maintenance_agreements")
       .select("id, agreement_name, frequency, next_due_date")
@@ -1653,6 +1677,14 @@ if (maintenanceAgreementsEnabled && job.job_type === "service") {
         manualSchedulingRequired: projection.manual_scheduling_required,
         seasonalWindowPlaceholder: projection.seasonal_window_placeholder,
       };
+
+      if (countedLinkAlreadyConfirmed) {
+        confirmedNextDueContext = {
+          agreementName: suggestedNextDueProjection.agreementName,
+          confirmedNextDueDate: countedLinkConfirmedNextDueDate,
+          baselineNextDueDate: countedLinkBaselineNextDueDate,
+        };
+      }
     }
   }
 }
@@ -4674,7 +4706,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       ) : null}
 </details>
 
-      {markVisitCountedLinkId ? (
+      {markVisitCountedLinkId && !suggestedNextDueProjection ? (
         <div className="mt-4 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-slate-900">
           <div className="text-sm font-semibold text-emerald-900">Service Plan Visit Count Review</div>
           <p className="mt-1 text-xs leading-5 text-emerald-900/90">
@@ -4692,28 +4724,44 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       {suggestedNextDueProjection ? (
         <div className="mt-4 rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 text-slate-900">
           <div className="text-sm font-semibold text-blue-900">Suggested next due date</div>
-          <p className="mt-1 text-xs leading-5 text-blue-900/90">
-            This is a suggestion only. Use Confirm Next Due Date when you are ready to update the Service Plan next due date. Confirming does not create a job, schedule an appointment, create an invoice, or collect payment.
-          </p>
-          <div className="mt-2 text-sm font-semibold text-blue-900">
-            {suggestedNextDueProjection.manualSchedulingRequired
-              ? "Manual scheduling required."
-              : formatYmdDisplay(suggestedNextDueProjection.suggestedNextDueDate) || "Manual scheduling required."}
-          </div>
-          <p className="mt-1 text-xs leading-5 text-blue-900/90">
-            {suggestedNextDueProjection.seasonalWindowPlaceholder}
-          </p>
-          {!suggestedNextDueProjection.manualSchedulingRequired && suggestedNextDueProjection.suggestedNextDueDate ? (
-            <div className="mt-3">
-              <ConfirmNextDueDateActionButton
-                jobId={String(job.id)}
-                agreementId={suggestedNextDueProjection.agreementId}
-                suggestedNextDueDate={suggestedNextDueProjection.suggestedNextDueDate}
-                baselineNextDueDate={suggestedNextDueProjection.baselineNextDueDate || ""}
-                displayDate={formatYmdDisplay(suggestedNextDueProjection.suggestedNextDueDate) || suggestedNextDueProjection.suggestedNextDueDate}
-              />
-            </div>
-          ) : null}
+          {confirmedNextDueContext ? (
+            <>
+              <p className="mt-1 text-xs leading-5 text-blue-900/90">
+                Next due date already confirmed for this counted visit.
+              </p>
+              <div className="mt-2 text-sm font-semibold text-blue-900">
+                Confirmed: {formatDateOnlyUs(confirmedNextDueContext.confirmedNextDueDate) || "Manual scheduling required."}
+              </div>
+              <div className="mt-1 text-xs leading-5 text-blue-900/90">
+                Previous due date: {formatDateOnlyUs(confirmedNextDueContext.baselineNextDueDate) || "Not recorded."}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-xs leading-5 text-blue-900/90">
+                This is a suggestion only. Use Confirm Next Due Date when you are ready to update the Service Plan next due date. Confirming does not create a job, schedule an appointment, create an invoice, or collect payment.
+              </p>
+              <div className="mt-2 text-sm font-semibold text-blue-900">
+                {suggestedNextDueProjection.manualSchedulingRequired
+                  ? "Manual scheduling required."
+                  : formatYmdDisplay(suggestedNextDueProjection.suggestedNextDueDate) || "Manual scheduling required."}
+              </div>
+              <p className="mt-1 text-xs leading-5 text-blue-900/90">
+                {suggestedNextDueProjection.seasonalWindowPlaceholder}
+              </p>
+              {!suggestedNextDueProjection.manualSchedulingRequired && suggestedNextDueProjection.suggestedNextDueDate ? (
+                <div className="mt-3">
+                  <ConfirmNextDueDateActionButton
+                    jobId={String(job.id)}
+                    agreementId={suggestedNextDueProjection.agreementId}
+                    suggestedNextDueDate={suggestedNextDueProjection.suggestedNextDueDate}
+                    baselineNextDueDate={suggestedNextDueProjection.baselineNextDueDate || ""}
+                    displayDate={formatYmdDisplay(suggestedNextDueProjection.suggestedNextDueDate) || suggestedNextDueProjection.suggestedNextDueDate}
+                  />
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       ) : null}
 
