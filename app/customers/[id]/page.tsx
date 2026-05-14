@@ -288,7 +288,7 @@ function summaryOrder() {
 
 export default async function CustomerDetailPage(props: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ err?: string; maSaved?: string; maError?: string }>;
+  searchParams?: Promise<{ err?: string; maSaved?: string; maError?: string; maFocus?: string }>;
 }) {
   const supabase = await createClient();
 
@@ -309,6 +309,7 @@ export default async function CustomerDetailPage(props: {
   const hasJobsError = sp.err === "has_jobs";
   const maintenanceAgreementSaved = String(sp.maSaved ?? "").trim().toLowerCase();
   const maintenanceAgreementError = String(sp.maError ?? "").trim();
+  const maintenanceAgreementFocusId = String(sp.maFocus ?? "").trim();
 
   if (!id || !isUuid(id)) {
     redirect("/customers");
@@ -1386,7 +1387,13 @@ export default async function CustomerDetailPage(props: {
                   return (
                     <div
                       key={agr.id}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                      id={`maintenance-agreement-${agr.id}`}
+                      className={[
+                        "rounded-xl border bg-slate-50 px-4 py-3 scroll-mt-24",
+                        maintenanceAgreementFocusId === agr.id
+                          ? "border-blue-300 ring-2 ring-blue-100"
+                          : "border-slate-200",
+                      ].join(" ")}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 space-y-1">

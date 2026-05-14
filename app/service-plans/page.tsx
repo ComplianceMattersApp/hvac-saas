@@ -97,6 +97,13 @@ function getCountReviewBadges(row: ServicePlanDrilldownRow) {
   ].filter((item) => item.count > 0);
 }
 
+function buildCustomerPlanHref(row: ServicePlanDrilldownRow) {
+  const agreementId = String(row.id ?? "").trim();
+  const customerId = String(row.customer_id ?? "").trim();
+  const hash = `maintenance-agreement-${agreementId}`;
+  return `/customers/${encodeURIComponent(customerId)}?maFocus=${encodeURIComponent(agreementId)}#${hash}`;
+}
+
 export default async function ServicePlansPage({
   searchParams,
 }: {
@@ -145,6 +152,9 @@ export default async function ServicePlansPage({
             <h1 className="mt-1 text-[22px] font-semibold tracking-tight text-slate-950">Service Plans</h1>
             <p className="mt-1 text-sm text-slate-600">
               Read-only service plan visibility for planning and follow-up.
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Open a plan to edit details, create work orders, or manage default Work Items from the customer profile.
             </p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-right">
@@ -203,9 +213,22 @@ export default async function ServicePlansPage({
                   return (
                   <tr key={row.id} className="align-top">
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-900">{row.agreement_name}</div>
+                      <Link
+                        href={buildCustomerPlanHref(row)}
+                        className="font-semibold text-slate-900 underline-offset-4 hover:text-slate-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                      >
+                        {row.agreement_name}
+                      </Link>
                       <div className="mt-1 text-xs text-slate-500">
                         {titleCase(row.frequency)} • {titleCase(row.agreement_type)}
+                      </div>
+                      <div className="mt-2">
+                        <Link
+                          href={buildCustomerPlanHref(row)}
+                          className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-[background-color,border-color,color] hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                        >
+                          Manage on Customer
+                        </Link>
                       </div>
                     </td>
                     <td className="px-4 py-3">
