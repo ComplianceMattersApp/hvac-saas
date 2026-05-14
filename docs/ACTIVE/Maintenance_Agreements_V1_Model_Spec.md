@@ -1118,6 +1118,69 @@ Boundaries preserved in Group 9A-13B-C / 13B-C1:
 - no production writes
 - no feature-flag changes
 
+## Group 9A-13B-D1 / 13B-D2 Closeout Snapshot (persistent next-due context + banner/date display consistency)
+
+Group 9A-13B-D1 (Persistent Next Due Context on Job Detail) is implemented and pushed in commit `ba18ff3`.
+
+Recorded D1 behavior:
+
+- Job detail next-due context is now derived from durable counted-link state, not transient banner state.
+- Counted unconfirmed link:
+	- shows `Suggested next due date`
+	- shows `Confirm Next Due Date`
+- Counted confirmed link:
+	- shows read-only confirmed context
+	- hides `Confirm Next Due Date`
+- Confirmed read-only copy:
+	- `Next due date already confirmed for this counted visit.`
+	- `Confirmed: MM/DD/YYYY`
+	- `Previous due date: MM/DD/YYYY`
+- `Mark Visit Counted` behavior is preserved for eligible uncounted links.
+
+Validation recorded for 13B-D1:
+
+- `npx.cmd tsc --noEmit` passed
+- `git diff --check` passed
+- browser smoke passed for confirmed and unconfirmed counted-job states
+
+Group 9A-13B-D2 (Confirm Next Due Banner Mapping + Date Display Consistency) is implemented and pushed in commit `b5f7bd8`.
+
+Recorded D2 behavior:
+
+- Added explicit banner mappings:
+	- `confirm_next_due_saved`: `Service Plan next due date updated.`
+	- `confirm_next_due_already_confirmed`: `This visit has already confirmed the Service Plan next due date.`
+	- `confirm_next_due_stale_state`: `This suggestion is out of date. Refresh and review the latest next due date before confirming.`
+	- `confirm_next_due_not_counted`: `This visit must be counted before confirming the next due date.`
+	- `confirm_next_due_unavailable`: `Service Plan next due confirmation is currently unavailable.`
+	- `confirm_next_due_update_failed`: `Could not update the Service Plan next due date. Please try again.`
+- Unified job-detail Service Plan next-due display to `MM/DD/YYYY` using date-only parsing.
+- Suggested panel and confirm dialog display now use date-only `MM/DD/YYYY` formatting.
+- Stored values and hidden form values remain `YYYY-MM-DD`.
+- No date calculation logic changed.
+- No server action behavior changed.
+
+Validation recorded for 13B-D2:
+
+- `npx.cmd tsc --noEmit` passed
+- `git diff --check` passed
+- browser smoke confirmed `MM/DD/YYYY` display and confirm-next-due banner copy
+
+Boundaries preserved in Group 9A-13B-D1 / 13B-D2:
+
+- no automatic due-date advancement
+- no recurrence engine
+- no automatic job generation
+- no invoice/payment behavior
+- no customer portal/SMS/QBO
+- no customer profile confirm surface
+- no `/service-plans` confirm surface
+- no schema changes
+- no migrations
+- no Supabase commands
+- no production writes
+- no feature-flag changes
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.

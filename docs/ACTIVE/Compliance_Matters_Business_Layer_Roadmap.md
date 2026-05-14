@@ -104,6 +104,27 @@ Maintenance agreements closeout note (May 2026):
 - Display-only follow-up fix is pushed in commit `fb621c7`: confirm dialog now formats date-only `YYYY-MM-DD` directly as `MM/DD/YYYY` (example `2026-08-15` -> `08/15/2026`) without timezone shifting.
 - Display fix boundaries: stored values and hidden form values remain `YYYY-MM-DD`; no date calculation changes; no server action behavior changes.
 - 13B-C/C1 validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` 71/71 passed, `npx.cmd tsc --noEmit` clean, `git diff --check` clean, working tree clean after push.
+- Group 9A-13B-D1 Persistent Next Due Context on Job Detail is implemented and pushed in commit `ba18ff3`.
+- 9A-13B-D1 job detail now derives Service Plan next-due context from durable counted-link state, not transient banner state.
+- 9A-13B-D1 counted unconfirmed link behavior: shows `Suggested next due date` and `Confirm Next Due Date`.
+- 9A-13B-D1 counted confirmed link behavior: shows read-only confirmed context and hides `Confirm Next Due Date`.
+- 9A-13B-D1 confirmed read-only copy:
+  - `Next due date already confirmed for this counted visit.`
+  - `Confirmed: MM/DD/YYYY`
+  - `Previous due date: MM/DD/YYYY`
+- 9A-13B-D1 preserves `Mark Visit Counted` behavior for eligible uncounted links and does not duplicate/compete with that panel.
+- 9A-13B-D1 validation recorded: `npx.cmd tsc --noEmit` clean, `git diff --check` clean, browser smoke passed for confirmed and unconfirmed counted job states.
+- Group 9A-13B-D2 Confirm Next Due Banner Mapping + Date Display Consistency is implemented and pushed in commit `b5f7bd8`.
+- 9A-13B-D2 adds explicit `confirm_next_due_*` banner mappings on job detail:
+  - `confirm_next_due_saved`: `Service Plan next due date updated.`
+  - `confirm_next_due_already_confirmed`: `This visit has already confirmed the Service Plan next due date.`
+  - `confirm_next_due_stale_state`: `This suggestion is out of date. Refresh and review the latest next due date before confirming.`
+  - `confirm_next_due_not_counted`: `This visit must be counted before confirming the next due date.`
+  - `confirm_next_due_unavailable`: `Service Plan next due confirmation is currently unavailable.`
+  - `confirm_next_due_update_failed`: `Could not update the Service Plan next due date. Please try again.`
+- 9A-13B-D2 unifies job-detail next-due display formatting to `MM/DD/YYYY` using date-only parsing for suggestion and confirm dialog display text.
+- 9A-13B-D2 keeps stored values and hidden form values as `YYYY-MM-DD`; no date calculation logic changed; no server action behavior changed.
+- 9A-13B-D2 validation recorded: `npx.cmd tsc --noEmit` clean, `git diff --check` clean, browser smoke confirmed `MM/DD/YYYY` display and banner copy.
 - 9A-11A keeps the core rule that counting does not auto-advance `next_due_date`; suggestion-first (read-only) is preferred before any future explicit confirm-write action.
 - Seasonal due language is planned as `Upcoming`, `In Service Window`, `Overdue`, and `Manual scheduling required` instead of date-only messaging.
 - Boundaries remain: no automatic counting, no due-date advancement, no visit-balance deduction automation, and no invoice/payment behavior.

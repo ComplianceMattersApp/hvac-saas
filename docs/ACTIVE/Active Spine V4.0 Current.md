@@ -43,6 +43,31 @@ Current Program Status Note (May 2026)
   - no stored-value changes, no hidden-form-value changes, no date-calculation changes, and no server action behavior changes
   - validation recorded: `npx.cmd tsc --noEmit` passed, `git diff --check` passed, working tree clean after push
 
+- Group 9A-13B-D1 Persistent Next Due Context on Job Detail is complete and pushed in commit `ba18ff3`:
+  - job detail now derives next-due context from durable counted-link state, not transient banner state
+  - counted unconfirmed link shows `Suggested next due date` and `Confirm Next Due Date`
+  - counted confirmed link shows read-only confirmed context and hides `Confirm Next Due Date`
+  - confirmed read-only copy is locked as:
+    - `Next due date already confirmed for this counted visit.`
+    - `Confirmed: MM/DD/YYYY`
+    - `Previous due date: MM/DD/YYYY`
+  - `Mark Visit Counted` behavior for eligible uncounted links is preserved
+  - no server action/schema/persistence/feature-flag changes
+  - validation recorded: `npx.cmd tsc --noEmit` passed, `git diff --check` passed, browser smoke passed for confirmed and unconfirmed counted-job states
+
+- Group 9A-13B-D2 Confirm Next Due Banner Mapping + Date Display Consistency is complete and pushed in commit `b5f7bd8`:
+  - added explicit confirm-next-due banner mappings:
+    - `confirm_next_due_saved`: `Service Plan next due date updated.`
+    - `confirm_next_due_already_confirmed`: `This visit has already confirmed the Service Plan next due date.`
+    - `confirm_next_due_stale_state`: `This suggestion is out of date. Refresh and review the latest next due date before confirming.`
+    - `confirm_next_due_not_counted`: `This visit must be counted before confirming the next due date.`
+    - `confirm_next_due_unavailable`: `Service Plan next due confirmation is currently unavailable.`
+    - `confirm_next_due_update_failed`: `Could not update the Service Plan next due date. Please try again.`
+  - unified job-detail next-due display to `MM/DD/YYYY` using date-only parsing for suggestion panel and confirm dialog display text
+  - stored values and hidden form values remain `YYYY-MM-DD`
+  - no date-calculation logic changes and no server action behavior changes
+  - validation recorded: `npx.cmd tsc --noEmit` passed, `git diff --check` passed, browser smoke confirmed `MM/DD/YYYY` display and banner copy
+
 - Group 9A-13B-B Next Due Confirmation Metadata Foundation is complete and pushed in commit `91d900a`; sandbox migration applied and Docker-verified in 9A-13B-B1:
   - migration `20260514120000_maintenance_agreement_visits_next_due_confirmation_metadata.sql` adds four nullable metadata columns to `maintenance_agreement_visits`
   - fields: `next_due_confirmed_at` (timestamptz), `next_due_confirmed_by_user_id` (uuid, FK to `auth.users(id)` ON DELETE SET NULL), `confirmed_next_due_date` (date), `baseline_next_due_date` (date)
