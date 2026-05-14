@@ -26,6 +26,23 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Group 9A-13B-C Safe Confirm Write (agreement + link metadata idempotency truth) is complete and pushed in commit `3e8c769` with 9A-13B-C1 browser smoke closeout:
+  - confirm now writes both surfaces on success: `maintenance_agreements.next_due_date` and `maintenance_agreement_visits` confirmation metadata (`baseline_next_due_date`, `confirmed_next_due_date`, `next_due_confirmed_at`, `next_due_confirmed_by_user_id`)
+  - link metadata is the idempotency truth: counted link can confirm once; repeat confirm from same counted link is blocked with `confirm_next_due_already_confirmed`
+  - stale-state guard remains active and unchanged
+  - confirm remains job-detail-only in this slice; no customer profile confirm surface, no `/service-plans` confirm surface, no persistent next-due expansion yet
+  - browser smoke fixture: `job_id=f6600de6-63d9-4551-94c1-a0b3a8db9a5c`, `agreement_id=454b3737-fa39-46be-8925-45131a571693`, `link_row_id=307cc7d6-5ef2-4d06-bf8c-25fa828b4d66`
+  - first confirm outcome: `confirm_next_due_saved`, agreement next due advanced `2026-07-15` -> `2026-08-15`, all four link metadata fields populated, link count flags unchanged (`count_status=counted`, `counts_toward_visit_balance=true`), job remained `completed/invoice_required`, invoices remained `0`
+  - repeat confirm outcome: blocked with `confirm_next_due_already_confirmed`
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (71/71), `npx.cmd tsc --noEmit` passed, `git diff --check` passed, working tree clean after push
+  - boundaries preserved: no automatic due-date advancement, no recurrence engine, no automatic job generation, no invoice/payment behavior, no customer portal/SMS/QBO behavior
+
+- Display-only follow-up fix for confirm dialog date rendering is complete and pushed in commit `fb621c7`:
+  - fixed date-only display shift by formatting `YYYY-MM-DD` directly as `MM/DD/YYYY` in confirm dialog
+  - example: stored `2026-08-15` now displays `08/15/2026`
+  - no stored-value changes, no hidden-form-value changes, no date-calculation changes, and no server action behavior changes
+  - validation recorded: `npx.cmd tsc --noEmit` passed, `git diff --check` passed, working tree clean after push
+
 - Group 9A-13B-B Next Due Confirmation Metadata Foundation is complete and pushed in commit `91d900a`; sandbox migration applied and Docker-verified in 9A-13B-B1:
   - migration `20260514120000_maintenance_agreement_visits_next_due_confirmation_metadata.sql` adds four nullable metadata columns to `maintenance_agreement_visits`
   - fields: `next_due_confirmed_at` (timestamptz), `next_due_confirmed_by_user_id` (uuid, FK to `auth.users(id)` ON DELETE SET NULL), `confirmed_next_due_date` (date), `baseline_next_due_date` (date)

@@ -94,6 +94,16 @@ Maintenance agreements closeout note (May 2026):
 - 9A-13B-B1 Docker-backed schema dump confirmed: all four metadata columns present and nullable, FK with ON DELETE SET NULL verified, RLS enabled, SELECT/INSERT/UPDATE policies confirmed, no DELETE policy found.
 - 9A-13B-B1 post-apply data check: 8 existing rows, non-null count for all four new fields is 0, no backfill, no data mutations in either verification pass.
 - 9A-13B-B1 production migration not applied.
+- Group 9A-13B-C Safe Confirm Write (agreement + link metadata) is implemented and pushed in commit `3e8c769`.
+- 9A-13B-C confirm now writes both surfaces together on success: `maintenance_agreements.next_due_date` plus link metadata (`baseline_next_due_date`, `confirmed_next_due_date`, `next_due_confirmed_at`, `next_due_confirmed_by_user_id`).
+- 9A-13B-C link metadata is now the idempotency truth: a counted link can confirm once; repeat confirm from the same link is blocked with `confirm_next_due_already_confirmed`.
+- 9A-13B-C keeps stale-state guard intact and keeps confirm surface job-detail-only (no customer profile confirm, no `/service-plans` confirm, no persistent next-due expansion in this slice).
+- Group 9A-13B-C1 browser smoke validated idempotent behavior on fixture `job_id=f6600de6-63d9-4551-94c1-a0b3a8db9a5c` / `agreement_id=454b3737-fa39-46be-8925-45131a571693` / `link_row_id=307cc7d6-5ef2-4d06-bf8c-25fa828b4d66`.
+- 9A-13B-C1 first confirm redirected with `confirm_next_due_saved`, advanced agreement `next_due_date` from `2026-07-15` to `2026-08-15`, wrote all four link metadata fields, and kept link/job/invoice side effects unchanged (`count_status=counted`, `counts_toward_visit_balance=true`, job `completed/invoice_required`, invoices `0`).
+- 9A-13B-C1 repeat confirm redirected with `confirm_next_due_already_confirmed`.
+- Display-only follow-up fix is pushed in commit `fb621c7`: confirm dialog now formats date-only `YYYY-MM-DD` directly as `MM/DD/YYYY` (example `2026-08-15` -> `08/15/2026`) without timezone shifting.
+- Display fix boundaries: stored values and hidden form values remain `YYYY-MM-DD`; no date calculation changes; no server action behavior changes.
+- 13B-C/C1 validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` 71/71 passed, `npx.cmd tsc --noEmit` clean, `git diff --check` clean, working tree clean after push.
 - 9A-11A keeps the core rule that counting does not auto-advance `next_due_date`; suggestion-first (read-only) is preferred before any future explicit confirm-write action.
 - Seasonal due language is planned as `Upcoming`, `In Service Window`, `Overdue`, and `Manual scheduling required` instead of date-only messaging.
 - Boundaries remain: no automatic counting, no due-date advancement, no visit-balance deduction automation, and no invoice/payment behavior.

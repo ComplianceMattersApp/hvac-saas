@@ -1040,6 +1040,84 @@ Validation recorded:
 - No data written in either verification pass
 - Production migration not applied
 
+## Group 9A-13B-C / 13B-C1 Closeout Snapshot (idempotent confirm write + browser smoke + display formatting fix)
+
+Group 9A-13B-C (safe confirm write using link metadata idempotency truth) is implemented and pushed in commit `3e8c769`.
+
+Group 9A-13B-C1 browser smoke validated idempotent confirm behavior on fixture records:
+
+- `job_id = f6600de6-63d9-4551-94c1-a0b3a8db9a5c`
+- `agreement_id = 454b3737-fa39-46be-8925-45131a571693`
+- `link_row_id = 307cc7d6-5ef2-4d06-bf8c-25fa828b4d66`
+
+Recorded behavior in this closeout:
+
+- Confirm Next Due Date now writes both surfaces together on success:
+	- `maintenance_agreements.next_due_date`
+	- `maintenance_agreement_visits` next-due confirmation metadata fields
+- Metadata written on success:
+	- `baseline_next_due_date`
+	- `confirmed_next_due_date`
+	- `next_due_confirmed_at`
+	- `next_due_confirmed_by_user_id`
+- Link metadata is the idempotency truth for this action.
+- A counted visit can confirm next due once.
+- Repeat confirm from the same counted visit is blocked with banner `confirm_next_due_already_confirmed`.
+- Existing stale-state guard remains intact.
+- Confirm surface remains job-detail-only in this slice.
+- No customer profile confirm surface.
+- No `/service-plans` confirm surface.
+- No persistent next-due UI expansion yet.
+
+Recorded browser smoke outcome:
+
+- First confirm redirected with `?banner=confirm_next_due_saved`.
+- Agreement `next_due_date` moved from `2026-07-15` to `2026-08-15`.
+- Link metadata captured expected values:
+	- `confirmed_next_due_date = 2026-08-15`
+	- `baseline_next_due_date = 2026-07-15`
+	- `next_due_confirmed_at` populated
+	- `next_due_confirmed_by_user_id` populated
+- Link count flags remained unchanged:
+	- `count_status = counted`
+	- `counts_toward_visit_balance = true`
+- Job remained `completed / invoice_required`.
+- Invoices created remained `0`.
+- Repeat confirm redirected with `?banner=confirm_next_due_already_confirmed`.
+
+Display-only follow-up fix:
+
+- Commit `fb621c7` fixed confirm-dialog date rendering for date-only values.
+- Root cause: timezone shift risk when date-only values were interpreted via JavaScript Date parsing.
+- Fix behavior: dialog now formats `YYYY-MM-DD` directly as `MM/DD/YYYY`.
+- Example: stored `2026-08-15` displays as `08/15/2026`.
+- Stored values and hidden form values remain `YYYY-MM-DD`.
+- No date calculation changes.
+- No server action behavior changes.
+
+Validation recorded for 13B-C / 13B-C1 and display fix:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (71/71)
+- `npx.cmd tsc --noEmit` passed
+- `git diff --check` passed
+- `git status --short` clean after push
+
+Boundaries preserved in Group 9A-13B-C / 13B-C1:
+
+- no automatic due-date advancement
+- no recurrence engine
+- no automatic job generation
+- no invoice/payment behavior changes
+- no customer portal/SMS/QBO behavior
+- no customer profile confirm surface
+- no `/service-plans` confirm surface
+- no persistent next-due UI expansion yet
+- no schema changes
+- no migrations
+- no Supabase commands
+- no production writes
+- no feature-flag changes
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.

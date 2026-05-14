@@ -123,6 +123,16 @@ Maintenance agreements read-only projection closeout note (May 2026):
 - 9A-13B-B1 sandbox verification result: sandbox ref `kvpesjdukqwwlgpkzfjm`; production ref `ornrnvxtwwtulohqwxop` not targeted; migration `20260514120000` applied and confirmed in history.
 - 9A-13B-B1 Docker-backed schema dump confirmed: all four columns exist and are nullable; FK `maintenance_agreement_visits_next_due_confirmed_by_user_id_fkey` references `auth.users(id)` ON DELETE SET NULL; RLS enabled; `select_account_scope`, `insert_account_scope`, `update_account_scope` policies present; no DELETE policy exists.
 - 9A-13B-B1 data verification: 8 existing rows; all four new metadata fields remain null across all rows; no backfill occurred; no production writes in either pass.
+- Group 9A-13B-C Safe Confirm Write (agreement next due + link confirmation metadata) is complete in commit `3e8c769`.
+- 9A-13B-C now writes agreement `next_due_date` and link metadata together (`baseline_next_due_date`, `confirmed_next_due_date`, `next_due_confirmed_at`, `next_due_confirmed_by_user_id`), with link metadata serving as idempotency truth.
+- 9A-13B-C idempotency lock: a counted visit confirms once; repeat confirm from the same counted link is blocked with `confirm_next_due_already_confirmed`.
+- 9A-13B-C stale-state guard remains active and confirm remains job-detail-only (no customer profile confirm, no `/service-plans` confirm, no persistent next-due expansion yet).
+- Group 9A-13B-C1 browser smoke validated idempotent behavior on fixture `job_id=f6600de6-63d9-4551-94c1-a0b3a8db9a5c` / `agreement_id=454b3737-fa39-46be-8925-45131a571693` / `link_row_id=307cc7d6-5ef2-4d06-bf8c-25fa828b4d66`.
+- 9A-13B-C1 first confirm produced `confirm_next_due_saved`, moved agreement `next_due_date` `2026-07-15` -> `2026-08-15`, populated all four link metadata fields, and preserved side-effect boundaries (`count_status=counted`, `counts_toward_visit_balance=true`, job `completed/invoice_required`, invoices `0`).
+- 9A-13B-C1 repeat confirm produced `confirm_next_due_already_confirmed`.
+- Display-only follow-up fix is complete in commit `fb621c7`: confirm dialog now formats date-only `YYYY-MM-DD` directly to `MM/DD/YYYY` (example `2026-08-15` -> `08/15/2026`) without timezone shifting.
+- Display fix boundaries: no storage changes, no hidden-form value changes, no date-calculation changes, and no server action behavior changes.
+- Validation recorded for 13B-C/C1 + display fix: `npx.cmd vitest run lib/maintenance-agreements/__tests__` 71/71 passed, `npx.cmd tsc --noEmit` clean, `git diff --check` clean, `git status --short` clean after push.
 - Group 9A-11A Service Plan Due Window / Next Due Model is documented as planning-only (no implementation) with two future cadence tracks: interval cadence and seasonal service-window cadence.
 - 9A-11A preserves the locked rule that counting does not auto-advance `next_due_date`; future flow is suggestion-first, with any write path parked behind explicit operator confirmation.
 - Boundaries remain explicit: no automatic counting, no due-date advancement, and no visit-balance deduction.
