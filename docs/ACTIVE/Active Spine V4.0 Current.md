@@ -26,6 +26,14 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
+  - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
+  - Job Detail Location Preview Deferral (`4ecf127`) moved Street View/static map lookup behind `Suspense` around `TimedJobLocationPreview`; immediate fallback preserves address context plus `Navigate` and `Open in Maps` while map imagery resolves after first paint.
+  - this is responsiveness/perceived-performance only; no source-of-truth ownership, lifecycle behavior, `/ops` queue behavior, Service Plans behavior, invoice/payment behavior, portal/SMS/QBO behavior, schema/migration state, auth/RLS, entitlement, or feature-flag behavior changed.
+  - validation recorded: `npx.cmd tsc --noEmit` passed, `git diff --check` passed, browser smoke passed on service and Service Plan-linked job paths.
+  - caveat: dedicated ECC-negative smoke should continue during normal ongoing testing; the location-preview deferral is job-type neutral.
+  - guardrail framing: these are shared job-detail responsiveness improvements that preserve neutral actor boundaries and scalable operational truth for future marketplace-style evolution.
+
 - Group 9A-14B Service Plans Drilldown Navigation Polish is complete and pushed in commit `f05bc29`:
   - `/service-plans` remains read-only
   - Service Plan names now deep-link to focused customer agreement cards using `/customers/{customerId}?maFocus={agreementId}#maintenance-agreement-{agreementId}`

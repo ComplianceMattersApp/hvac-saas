@@ -171,6 +171,13 @@ If any item here conflicts with the active spine, the spine wins.
 
 ### 2.3.5 Performance/responsiveness closeout (current pass) and active backlog
 - The focused performance/responsiveness intervention batch is complete for the current pass and is now closed for this pass.
+- Additional job-detail responsiveness closeout is complete in commits `655d83b` and `4ecf127`:
+  - Service Closeout Read De-Dupe (`655d83b`): removed duplicate blocking job read from `ServiceStatusActions`; parent job detail now passes already-loaded `jobType` and `opsStatus`.
+  - Job Detail Location Preview Deferral (`4ecf127`): Street View/static map lookup is deferred behind `Suspense`, and immediate fallback preserves address context plus `Navigate` and `Open in Maps`.
+  - scope/boundary confirmation: responsiveness/perceived-performance only; no source-of-truth, lifecycle, `/ops`, Service Plans, invoice/payment, portal, SMS, QBO, schema, migration, auth/RLS, entitlement, or feature-flag behavior changes.
+  - validation recorded: `npx.cmd tsc --noEmit` passed, `git diff --check` passed, browser smoke passed for service and Service Plan-linked job paths.
+  - caveat: dedicated ECC-negative smoke should continue as part of normal ongoing testing; location preview deferral itself is job-type neutral.
+  - guardrail framing: this is documented as shared job-detail responsiveness hardening that preserves neutral actor boundaries and scalable operational truth.
 - Completed/current baseline from this pass:
   - field action timing instrumentation
   - job detail render timing instrumentation
