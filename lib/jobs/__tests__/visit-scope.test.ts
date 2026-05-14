@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildVisitScopeReadModel,
+  hasStructuredVisitScopeItemsJson,
   isVisitScopeItemId,
   parseVisitScopeItemsJson,
   sanitizeVisitScopeItems,
@@ -145,5 +146,28 @@ describe("visit scope durable item ids", () => {
     expect(rows[0].expected_unit_price).toBeNull();
     expect(rows[1].expected_unit_price).toBeNull();
     expect(rows[2].expected_unit_price).toBe(130);
+  });
+
+  it("treats prefilled structured service payload as valid", () => {
+    const payload = JSON.stringify([
+      {
+        id: "41b4c6ff-c941-4911-8b5d-c9f196efa733",
+        title: "Inspect condenser coil",
+        details: "Capture photos and note any corrosion",
+        kind: "primary",
+        source_pricebook_item_id: "b98cf45f-6452-4ee6-ae94-3da666fd5218",
+        expected_unit_price: 129,
+        unit_label: "each",
+        item_type: "service",
+        category: "Maintenance",
+      },
+    ]);
+
+    expect(hasStructuredVisitScopeItemsJson(payload)).toBe(true);
+  });
+
+  it("treats empty or malformed scope payload as invalid", () => {
+    expect(hasStructuredVisitScopeItemsJson("[]")).toBe(false);
+    expect(hasStructuredVisitScopeItemsJson("not-json")).toBe(false);
   });
 });

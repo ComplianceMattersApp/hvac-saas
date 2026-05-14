@@ -19,6 +19,7 @@ import VisitScopeBuilder, {
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client";
 import {
   createVisitScopeItemId,
+  hasStructuredVisitScopeItemsJson,
   sanitizeVisitScopeItemId,
 } from "@/lib/jobs/visit-scope";
 import {
@@ -1169,8 +1170,9 @@ const [billingRecipient, setBillingRecipient] = useState<
     }
 
     if (isInternalMode && modeSafeJobType === "service") {
-      const nonEmptyItems = visitScopeItems.filter((item) => item.title.trim() || item.details.trim());
-      if (nonEmptyItems.length === 0) {
+      const formData = new FormData(event.currentTarget);
+      const serializedItems = String(formData.get("visit_scope_items_json") ?? "").trim();
+      if (!hasStructuredVisitScopeItemsJson(serializedItems)) {
         event.preventDefault();
         setVisitScopeError("Add at least one structured Work Item before creating a Service job.");
         window.requestAnimationFrame(() => {

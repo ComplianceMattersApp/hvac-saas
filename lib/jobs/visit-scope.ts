@@ -160,6 +160,14 @@ export function parseVisitScopeItemsJson(value: unknown): VisitScopeItem[] {
   return sanitizeVisitScopeItems(parsed);
 }
 
+export function hasStructuredVisitScopeItemsJson(value: unknown): boolean {
+  try {
+    return parseVisitScopeItemsJson(value).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function hasVisitScopeContent(summary: string | null, items: VisitScopeItem[]) {
   return Boolean(summary) || items.length > 0;
 }
