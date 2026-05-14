@@ -125,6 +125,7 @@ import {
 } from "@/lib/utils/ops-status";
 import InterruptStateFields from "./_components/InterruptStateFields";
 import MarkVisitCountedActionButton from "./_components/MarkVisitCountedActionButton";
+import ConfirmNextDueDateActionButton from "./_components/ConfirmNextDueDateActionButton";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -1568,7 +1569,9 @@ let markVisitCountedLinkId: string | null = null;
 let markVisitCountedAgreementName: string | null = null;
 let suggestedNextDueProjection: {
   agreementName: string;
+  agreementId: string;
   suggestedNextDueDate: string | null;
+  baselineNextDueDate: string | null;
   manualSchedulingRequired: boolean;
   seasonalWindowPlaceholder: string;
 } | null = null;
@@ -1644,7 +1647,9 @@ if (maintenanceAgreementsEnabled && job.job_type === "service") {
 
       suggestedNextDueProjection = {
         agreementName: String(suggestedAgreement.agreement_name ?? "").trim() || "Service Plan",
+        agreementId: String(suggestedAgreement.id ?? "").trim(),
         suggestedNextDueDate: projection.suggested_next_due_date,
+        baselineNextDueDate: String(suggestedAgreement.next_due_date ?? "").trim(),
         manualSchedulingRequired: projection.manual_scheduling_required,
         seasonalWindowPlaceholder: projection.seasonal_window_placeholder,
       };
@@ -4698,6 +4703,17 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <p className="mt-1 text-xs leading-5 text-blue-900/90">
             {suggestedNextDueProjection.seasonalWindowPlaceholder}
           </p>
+          {!suggestedNextDueProjection.manualSchedulingRequired && suggestedNextDueProjection.suggestedNextDueDate ? (
+            <div className="mt-3">
+              <ConfirmNextDueDateActionButton
+                jobId={String(job.id)}
+                agreementId={suggestedNextDueProjection.agreementId}
+                suggestedNextDueDate={suggestedNextDueProjection.suggestedNextDueDate}
+                baselineNextDueDate={suggestedNextDueProjection.baselineNextDueDate || ""}
+                displayDate={formatYmdDisplay(suggestedNextDueProjection.suggestedNextDueDate) || suggestedNextDueProjection.suggestedNextDueDate}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 

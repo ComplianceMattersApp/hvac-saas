@@ -757,3 +757,160 @@ export async function markMaintenanceAgreementVisitCountedFromForm(formData: For
   revalidatePath(`/service-plans`);
   redirect(jobBannerPath(jobId, "maintenance_visit_count_saved"));
 }
+
+/**
+ * Confirm and apply the suggested next due date to a maintenance agreement.
+ * This action updates only agreement.next_due_date and updated_by_user_id.
+ * Stale-state guard prevents writes if agreement.next_due_date changed after suggestion render.
+ */
+export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: FormData): Promise<void> {
+  const jobId = cleanString(formData.get("job_id"));
+  const agreementId = cleanString(formData.get("agreement_id"));
+  const suggestedNextDueDate = cleanString(formData.get("suggested_next_due_date"));
+  const baselineNextDueDate = cleanString(formData.get("baseline_next_due_date"));
+
+  if (!jobId || !agreementId || !suggestedNextDueDate || !baselineNextDueDate) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_missing_params"));
+  }
+
+  // Validate date formats
+  if (!DATE_RE.test(suggestedNextDueDate) || !DATE_RE.test(baselineNextDueDate)) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_invalid_date"));
+  }
+
+  if (!isMaintenanceAgreementsEnabled()) {
+    revalidatePath(`/jobs/${jobId}`);
+    redirect(jobBannerPath(jobId, "confirm_next_due_unavailable"));
+  }
+
+  const supabase = await createClient();
+
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    authz = await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      if (error.code === "AUTH_REQUIRED") {
+        redirect("/login");
+      }
+      redirect(`/jobs/${encodeURIComponent(jobId)}?notice=not_authorized`);
+    }
+    throw error;
+  }
+
+  const accountOwnerUserId = cleanString(authz.internalUser.account_owner_user_id);
+  const actingUserId = cleanString(authz.userId);
+
+  if (!accountOwnerUserId || !actingUserId) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_out_of_scope"));
+  }
+
+  const entitlement = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId,
+    supabase,
+  });
+
+  if (!entitlement.authorized) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_unavailable"));
+  }
+
+  const admin = createAdminClient();
+
+  // Verify link exists and is counted
+  const { data: linkRow, error: linkError } = await admin
+    .from("maintenance_agreement_visits")
+    .select("id, account_owner_user_id, job_id, agreement_id, count_status, counts_toward_visit_balance")
+    .eq("job_id", jobId)
+    .eq("agreement_id", agreementId)
+    .maybeSingle();
+
+  if (linkError || !linkRow?.id) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_missing_link"));
+  }
+
+  const linkAccountOwnerUserId = cleanString(linkRow.account_owner_user_id);
+  const linkCountStatus = cleanString(linkRow.count_status).toLowerCase();
+  const linkCountsToward = Boolean(linkRow.counts_toward_visit_balance);
+
+  if (linkAccountOwnerUserId !== accountOwnerUserId || linkCountStatus !== "counted" || !linkCountsToward) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_not_counted"));
+  }
+
+  // Verify agreement exists and is active
+  const { data: agreementRow, error: agreementError } = await admin
+    .from("maintenance_agreements")
+    .select("id, account_owner_user_id, customer_id, status, frequency, next_due_date")
+    .eq("id", agreementId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (agreementError || !agreementRow?.id) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_agreement_not_found"));
+  }
+
+  const agreementAccountOwnerUserId = cleanString(agreementRow.account_owner_user_id);
+  const agreementStatus = cleanString(agreementRow.status).toLowerCase();
+  const agreementFrequency = cleanString(agreementRow.frequency).toLowerCase();
+  const currentAgreementNextDueDate = cleanString(agreementRow.next_due_date ?? "");
+
+  // Verify scope and status
+  if (agreementAccountOwnerUserId !== accountOwnerUserId || agreementStatus !== "active") {
+    redirect(jobBannerPath(jobId, "confirm_next_due_agreement_inactive"));
+  }
+
+  // Verify frequency is interval-based (not custom/manual)
+  const INTERVAL_FREQUENCIES = ["monthly", "quarterly", "semi_annual", "annual"] as const;
+  if (!INTERVAL_FREQUENCIES.includes(agreementFrequency as any)) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_custom_frequency"));
+  }
+
+  // Stale-state guard: verify agreement.next_due_date still matches baseline
+  if (currentAgreementNextDueDate !== baselineNextDueDate) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_stale_state"));
+  }
+
+  // Verify job customer matches agreement customer
+  const { data: jobRow, error: jobError } = await admin
+    .from("jobs")
+    .select("id, customer_id")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobError || !jobRow?.id) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_job_not_found"));
+  }
+
+  const jobCustomerId = cleanString(jobRow.customer_id ?? "");
+  const agreementCustomerId = cleanString(agreementRow.customer_id ?? "");
+
+  if (!jobCustomerId || !agreementCustomerId || jobCustomerId !== agreementCustomerId) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_scope_mismatch"));
+  }
+
+  // Update agreement with new next_due_date
+  const { data: updatedAgreement, error: updateError } = await admin
+    .from("maintenance_agreements")
+    .update({
+      next_due_date: suggestedNextDueDate,
+      updated_by_user_id: actingUserId,
+    })
+    .eq("id", agreementId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("customer_id", agreementCustomerId)
+    .eq("status", "active")
+    .select("id")
+    .maybeSingle();
+
+  if (updateError) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_update_failed"));
+  }
+
+  if (!updatedAgreement?.id) {
+    redirect(jobBannerPath(jobId, "confirm_next_due_update_failed"));
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/service-plans`);
+  revalidatePath(`/customers/${agreementCustomerId}`);
+  redirect(jobBannerPath(jobId, "confirm_next_due_saved"));
+}
