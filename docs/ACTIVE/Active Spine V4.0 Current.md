@@ -26,6 +26,16 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Group 9A-13A Service Plan Work Items Prefill Structured Validation Fix is complete and pushed in commit `a116c1e`:
+  - root cause addressed: legacy/default Service Plan Work Item shapes (`item_name`, `description`, `pricebook_item_id`, `default_unit_price`) could degrade `/jobs/new` prefill into blank/Untitled Work Item behavior and trigger structured Work Item submit blocking
+  - fix implemented in Service Plan prefill read path: normalize legacy/default Work Item shapes before sanitization so valid data survives into canonical Work Item fields
+  - browser smoke recorded on sandbox fixture: customer `8e3c6860-e4c3-4a93-83cb-2e91c49f883f`, agreement `52851fbf-0e65-482d-868a-1c858521d128`, created job `99c1acff-6d38-4aa9-ade0-954a50a14998`
+  - smoke outcome: meaningful Work Item title rendered (`Legacy Compressor Diagnostic`), submit succeeded without manual Pricebook reselection, persisted canonical `visit_scope_items` included populated source pricebook id and expected unit price `189`
+  - side-effect checks recorded: no invoice/payment rows created, agreement `next_due_date` remained `2026-06-15`, and new link row remained `linked` and not counted
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__/read-model.test.ts lib/jobs/__tests__/new-job-defaults.test.ts` passed (`35/35`), `npx.cmd tsc --noEmit` passed, `git diff --check` passed, working tree clean
+  - boundaries preserved: no visit-counting mutation, no next-due-date mutation, no invoice/payment behavior change, no schema/migration/flag changes, and no recurrence/job-generation changes
+  - watch item: temporary sandbox auth user cleanup may remain due to sandbox delete error; this is sandbox cleanup scope only and not product behavior scope
+
 - Group 9A-11C-B Confirm Next Due Date action on job detail for interval-based maintenance agreements is complete and pushed in commit `c30cbac`:
   - job detail now shows explicit blue `Confirm Next Due Date` action button for counted Service Plan visits with valid interval-based suggested next due dates
   - action appears only for: active agreements, counted links with `counts_toward_visit_balance=true`, interval frequencies (`monthly`, `quarterly`, `semi_annual`, `annual`), and feature-flag enabled

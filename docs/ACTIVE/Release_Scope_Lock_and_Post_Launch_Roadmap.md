@@ -82,6 +82,22 @@ Maintenance agreements read-only projection closeout note (May 2026):
 - 9A-11C-B browser smoke deferred with justification: unit test coverage sufficient (stale-state guard, precondition validation, mutation contract verification tested); browser click-through smoke should be performed later in staging with ready authenticated fixture.
 - 9A-11C-B keeps customer profile and `/service-plans` confirm actions parked until job-detail V1 is proven in real usage.
 - 9A-11C-B keeps seasonal-window confirm behavior parked until template/window schema approval.
+- Group 9A-13A Service Plan Work Items Prefill Structured Validation Fix is complete in commit `a116c1e` and browser-smoke validated in sandbox/local workflow.
+- 9A-13A root cause: legacy/default Service Plan Work Item shapes (`item_name`, `description`, `pricebook_item_id`, `default_unit_price`) could degrade `/jobs/new` prefill into blank/Untitled Work Item behavior and trigger structured Work Item submit blocking.
+- 9A-13A fix: normalize legacy/default Work Item shapes in Service Plan prefill read path before sanitization so valid legacy/default data survives into canonical Work Item fields.
+- 9A-13A browser smoke evidence recorded:
+   - customer `8e3c6860-e4c3-4a93-83cb-2e91c49f883f`
+   - agreement `52851fbf-0e65-482d-868a-1c858521d128`
+   - created job `99c1acff-6d38-4aa9-ade0-954a50a14998`
+   - rendered Work Item title `Legacy Compressor Diagnostic` (not Untitled)
+   - submit succeeded without manual Pricebook reselection
+   - persisted canonical `visit_scope_items` with populated source pricebook id and expected unit price `189`
+   - no invoice/payment rows created
+   - agreement `next_due_date` unchanged at `2026-06-15`
+   - new link row remained `linked` and not counted
+- 9A-13A validation recorded: targeted tests 35/35 passing, tsc clean, git diff clean, and working tree clean.
+- 9A-13A boundaries preserved: no visit-counting changes, no next-due-date changes, no invoice/payment behavior changes, no schema/migration/flag changes, and no recurrence/job-generation changes.
+- 9A-13A watch item: temporary sandbox auth user cleanup may remain due to sandbox delete error; this is sandbox cleanup scope only and not product behavior scope.
 - Group 9A-11A Service Plan Due Window / Next Due Model is documented as planning-only (no implementation) with two future cadence tracks: interval cadence and seasonal service-window cadence.
 - 9A-11A preserves the locked rule that counting does not auto-advance `next_due_date`; future flow is suggestion-first, with any write path parked behind explicit operator confirmation.
 - Boundaries remain explicit: no automatic counting, no due-date advancement, and no visit-balance deduction.

@@ -806,6 +806,66 @@ Watch items:
 - Customer profile and `/service-plans` confirm surfaces remain parked for future implementation
 - Multi-surface confirms deferred per user requirements
 
+## Group 9A-13A Closeout Snapshot (service-plan prefill structured Work Item validation fix)
+
+Group 9A-13A (Service Plan Work Items Prefill Structured Validation Fix) is implemented and pushed in commit `a116c1e`.
+
+Recorded root cause:
+
+- Service Plan default Work Items could be stored in legacy/default shapes (`item_name`, `description`, `pricebook_item_id`, `default_unit_price`) instead of canonical fields (`title`, `details`, `source_pricebook_item_id`, `expected_unit_price`).
+- During `/jobs/new` prefill, these legacy/default shapes could degrade into blank/untitled Work Item behavior.
+- Client-side submit gate could then block Service job creation with: `Add at least one structured Work Item before creating a Service job.`
+
+Recorded implementation artifacts:
+
+- Read-path normalization added in `lib/maintenance-agreements/read-model.ts` before prefill sanitization.
+- Regression coverage added in `lib/maintenance-agreements/__tests__/read-model.test.ts` for legacy/default shape aliases.
+
+Recorded fix behavior:
+
+- Service Plan prefill now normalizes legacy/default Work Item keys into canonical structured Work Item fields before `sanitizeVisitScopeItems`.
+- Valid legacy/default Work Item data survives into `/jobs/new` prefill and renders meaningful titles.
+- `/jobs/new` can submit without manual Pricebook reselection when prefilled Service Plan Work Item data is valid.
+
+Browser smoke validation recorded (sandbox/local):
+
+- customer id: `8e3c6860-e4c3-4a93-83cb-2e91c49f883f`
+- agreement id: `52851fbf-0e65-482d-868a-1c858521d128`
+- created job id: `99c1acff-6d38-4aa9-ade0-954a50a14998`
+- rendered Work Item title: `Legacy Compressor Diagnostic` (not `Untitled Work Item`)
+- submit succeeded without manual Pricebook reselection
+- persisted `visit_scope_items` included:
+	- `title = Legacy Compressor Diagnostic`
+	- `details = Validate compressor hard-start and capacitor tolerance`
+	- `source_pricebook_item_id` populated
+	- `expected_unit_price = 189`
+- side-effect checks:
+	- no invoice/payment rows created
+	- agreement `next_due_date` remained `2026-06-15`
+	- new maintenance-agreement link row remained `linked` and not counted
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__/read-model.test.ts lib/jobs/__tests__/new-job-defaults.test.ts` passed (`35/35` tests)
+- `npx.cmd tsc --noEmit` passed
+- `git diff --check` passed
+- `git status --short` clean
+
+Boundaries preserved in Group 9A-13A:
+
+- no visit-counting changes
+- no next-due-date changes
+- no invoice/payment behavior changes
+- no schema changes
+- no migrations
+- no feature flag changes
+- no recurrence/job-generation changes
+- no Supabase production writes
+
+Watch item:
+
+- A temporary sandbox auth user may remain due to sandbox cleanup delete error; this is sandbox cleanup scope only and not product behavior scope.
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.

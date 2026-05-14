@@ -68,6 +68,12 @@ Maintenance agreements closeout note (May 2026):
 - 9A-11C-B test coverage includes 6 scenarios: success update, stale-state protection, custom frequency blocking, inactive agreement blocking, non-counted link blocking, feature flag enforcement.
 - 9A-11C-B validation: 67/67 unit tests passing, tsc clean, git diff clean, working tree clean, commit pushed to origin/main.
 - 9A-11C-B browser smoke deferred: unit test coverage sufficient (stale-state guard + all preconditions + side-effect isolation tested); browser click-through should be performed later in staging.
+- Group 9A-13A Service Plan Work Items Prefill Structured Validation Fix is implemented in commit `a116c1e` and browser-smoke validated.
+- 9A-13A root cause: legacy/default Service Plan Work Item shapes (`item_name`, `description`, `pricebook_item_id`, `default_unit_price`) could degrade prefill into blank/Untitled Work Item behavior and trip structured Work Item submit validation on `/jobs/new`.
+- 9A-13A fix: normalize legacy/default Work Item shapes in the Service Plan prefill read path before sanitization so valid data survives into canonical Work Item fields.
+- 9A-13A browser smoke recorded successful no-reselect submit from prefilled Service Plan fixture, persisted canonical `visit_scope_items`, no invoice/payment side effects, unchanged agreement `next_due_date`, and new link row remaining `linked` (not counted).
+- 9A-13A validation: targeted tests 35/35 passed, `npx.cmd tsc --noEmit` clean, `git diff --check` clean, working tree clean.
+- 9A-13A boundaries preserved: no visit-counting mutation, no next-due mutation, no invoice/payment behavior change, no schema/migration/flag changes, and no recurrence/job-generation changes.
 - 9A-11A keeps the core rule that counting does not auto-advance `next_due_date`; suggestion-first (read-only) is preferred before any future explicit confirm-write action.
 - Seasonal due language is planned as `Upcoming`, `In Service Window`, `Overdue`, and `Manual scheduling required` instead of date-only messaging.
 - Boundaries remain: no automatic counting, no due-date advancement, no visit-balance deduction automation, and no invoice/payment behavior.
