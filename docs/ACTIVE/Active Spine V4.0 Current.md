@@ -26,6 +26,20 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Group 9A-11C-B Confirm Next Due Date action on job detail for interval-based maintenance agreements is complete and pushed in commit `c30cbac`:
+  - job detail now shows explicit blue `Confirm Next Due Date` action button for counted Service Plan visits with valid interval-based suggested next due dates
+  - action appears only for: active agreements, counted links with `counts_toward_visit_balance=true`, interval frequencies (`monthly`, `quarterly`, `semi_annual`, `annual`), and feature-flag enabled
+  - action is blocked/hidden for: custom/manual frequencies (manual-scheduling guidance shown instead), inactive agreements, non-counted links, stale baseline (optimistic concurrency guard), disabled feature flag, out-of-scope records
+  - confirmation dialog copy is explicit: `This will update the Service Plan next due date to [date]. It will not create a job, schedule an appointment, create an invoice, collect payment, or renew the plan. Continue?`
+  - stale-state protection implemented: server action compares current `maintenance_agreements.next_due_date` to `baselineNextDueDate` passed from form; fails with `confirm_next_due_stale_state` banner if values diverge, preventing race conditions in concurrent scenarios
+  - mutation contract is narrow: updates only `maintenance_agreements.next_due_date` (to suggested value) and `updated_by_user_id` (to current internal user), with normal `updated_at` behavior; does not mutate links/jobs/service cases or create calendar/invoice/payment records
+  - revalidates affected surfaces on success: `/jobs/{jobId}`, `/service-plans`, `/customers/{customerId}`
+  - test coverage: 6 new confirm scenarios (success update, stale-state protection, custom frequency blocking, inactive agreement blocking, non-counted link blocking, feature flag enforcement) plus 61 existing suite tests, all passing (67/67 total)
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (67/67 tests), `npx.cmd tsc --noEmit` passed, `git diff --check` passed, working tree clean, commit pushed to origin/main
+  - browser smoke testing deferred with justification: unit test coverage sufficient (stale-state guard, precondition validation, mutation contract verification tested); browser click-through smoke should be performed later in staging with ready authenticated fixture
+  - boundaries preserved: no automatic date advancement, no recurrence engine, no automatic job generation, no calendar events, no invoice/payment behavior, no portal/SMS/QBO behavior, no renewal automation, no customer profile/service-plans confirm actions yet (parked), no seasonal-window confirm yet (parked)
+  - implementation status: job-detail-first confirm action is now live; customer profile and `/service-plans` confirm actions remain parked until job-detail V1 is proven in real usage
+
 - Group 9A-11C-A Confirm Next Due Date Model Docs is complete (docs/model-only; no implementation changes):
   - first confirm action location is job detail, directly under or near the read-only suggestion block
   - customer profile and `/service-plans` confirm actions remain parked until job-detail V1 confirm behavior is proven

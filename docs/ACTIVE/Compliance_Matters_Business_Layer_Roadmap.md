@@ -58,6 +58,16 @@ Maintenance agreements closeout note (May 2026):
 - 9A-11C-A locks explicit preconditions for future confirm writes: active internal user, active agreement, counted/counts-toward link, interval suggestion present, full account/customer scope match, and stale-state guard requiring unchanged baseline `next_due_date`.
 - 9A-11C-A mutation contract is narrow: future confirm may update only agreement `next_due_date` + `updated_by_user_id` (with normal `updated_at` behavior) and must not mutate links/jobs/service cases or create calendar/invoice/payment records.
 - 9A-11C-A keeps seasonal-window confirm behavior parked until template/window schema exists; custom/manual remains no-confirm with manual scheduling guidance.
+- Group 9A-11C-B Confirm Next Due Date action on job detail is now implemented and pushed in commit `c30cbac`.
+- 9A-11C-B adds explicit operator-confirmed `Confirm Next Due Date` action on job detail for counted Service Plans with interval-based suggested due dates.
+- 9A-11C-B action renders only for: active agreements, counted links with `counts_toward_visit_balance=true`, interval frequencies (`monthly`, `quarterly`, `semi_annual`, `annual`), and feature-flag enabled.
+- 9A-11C-B action is blocked/hidden for: custom/manual frequencies, inactive agreements, non-counted links, stale baseline (optimistic concurrency guard), disabled feature flag, out-of-scope records.
+- 9A-11C-B confirmation copy is explicit: "This will update the Service Plan next due date to [date]. It will not create a job, schedule an appointment, create an invoice, collect payment, or renew the plan. Continue?"
+- 9A-11C-B stale-state protection compares current `maintenance_agreements.next_due_date` to `baselineNextDueDate` passed from form; fails with `confirm_next_due_stale_state` banner if values diverge.
+- 9A-11C-B mutation contract is narrow: updates only `maintenance_agreements.next_due_date` and `updated_by_user_id`; does not mutate links/jobs/service cases or create calendar/invoice/payment records.
+- 9A-11C-B test coverage includes 6 scenarios: success update, stale-state protection, custom frequency blocking, inactive agreement blocking, non-counted link blocking, feature flag enforcement.
+- 9A-11C-B validation: 67/67 unit tests passing, tsc clean, git diff clean, working tree clean, commit pushed to origin/main.
+- 9A-11C-B browser smoke deferred: unit test coverage sufficient (stale-state guard + all preconditions + side-effect isolation tested); browser click-through should be performed later in staging.
 - 9A-11A keeps the core rule that counting does not auto-advance `next_due_date`; suggestion-first (read-only) is preferred before any future explicit confirm-write action.
 - Seasonal due language is planned as `Upcoming`, `In Service Window`, `Overdue`, and `Manual scheduling required` instead of date-only messaging.
 - Boundaries remain: no automatic counting, no due-date advancement, no visit-balance deduction automation, and no invoice/payment behavior.

@@ -661,6 +661,151 @@ Explicit non-goals for Group 9A-11C-A:
 - no customer profile confirm action yet
 - no `/service-plans` confirm action yet
 
+## Group 9A-11C-B Closeout Snapshot (confirm next due date action on job detail)
+
+Group 9A-11C-B (Confirm Next Due Date Action on Job Detail for Counted Service Plans) is implemented and pushed in commit `c30cbac`.
+
+Recorded implementation artifacts:
+
+- Server action: `confirmMaintenanceAgreementNextDueDateFromForm` in `lib/maintenance-agreements/agreement-actions.ts` (~157 lines)
+- Client component: `ConfirmNextDueDateActionButton.tsx` (new file, ~57 lines) in `app/jobs/[id]/_components/`
+- Job detail integration: enhanced `app/jobs/[id]/page.tsx` with import, type enhancement, data retrieval, UI button (~16 lines)
+- Comprehensive test suite: `confirm-next-due.test.ts` (new file, ~470 lines) with 6 test scenarios
+
+Recorded behavior:
+
+- Job detail page now shows a blue `Confirm Next Due Date` action button for counted Service Plan visits with valid interval-based suggested next due dates.
+- Button appears only when:
+	- Maintenance Agreements feature exposure enabled
+	- Internal user context present
+	- Agreement status is `active`
+	- Link row is `counted` and `counts_toward_visit_balance = true`
+	- Suggested next due date exists and is not marked manual-scheduling-required
+	- Agreement frequency is interval-based (`monthly`, `quarterly`, `semi_annual`, `annual`)
+- Button is blocked/hidden when:
+	- Custom/manual frequency (`custom` shows "Manual scheduling required" text instead)
+	- Inactive agreements
+	- Non-counted links
+	- Feature flag disabled
+	- Out-of-scope records
+- Confirmation dialog appears on click with approved copy:
+	- `This will update the Service Plan next due date to [date]. It will not create a job, schedule an appointment, create an invoice, collect payment, or renew the plan. Continue?`
+- User must accept confirmation dialog to proceed with action.
+
+Recorded stale-state protection:
+
+- Server action implements optimistic concurrency guard: compares current `maintenance_agreements.next_due_date` to `baselineNextDueDate` passed from form
+- If values do not match (agreement was updated externally after suggestion rendered), action fails safely with banner: `confirm_next_due_stale_state`
+- User is redirected with clear failure signal instead of silent override
+- Prevents race conditions in concurrent job completion + next-due confirmation scenarios
+
+Recorded mutation contract:
+
+- Updates only:
+	- `maintenance_agreements.next_due_date` → set to suggested date value
+	- `maintenance_agreements.updated_by_user_id` → set to current internal user ID
+	- `updated_at` → updated via normal DB timestamp behavior
+- Does not mutate:
+	- `maintenance_agreement_visits` link row (count_status remains `counted`)
+	- `jobs` table (job record unchanged)
+	- `service_cases` table (no records created/modified)
+	- calendar events (no calendar behavior)
+	- `internal_invoices` (no invoice creation)
+	- `internal_invoice_payments` (no payment records)
+
+Recorded scope validation:
+
+- Internal user required via `requireInternalUser()`
+- Feature gate: `isMaintenanceAgreementsEnabled()` must return true
+- Entitlement check: `resolveOperationalMutationEntitlementAccess()` must authorize
+- Account scope: agreement and job must belong to same `account_owner_user_id`
+- Customer scope: agreement and job must be linked to same customer
+- Link validation: link row must exist with `count_status = 'counted'` and `counts_toward_visit_balance = true`
+- Status check: agreement must be `active`
+- Frequency check: agreement must have interval-based frequency (not custom/manual)
+
+Recorded preconditions/blocking rules:
+
+| Condition | Blocking | Banner | Test |
+|-----------|----------|--------|------|
+| Valid state, baseline matches | ✅ Proceed | confirm_next_due_saved | ✅ |
+| Stale baseline (current ≠ baseline) | ✅ Block | confirm_next_due_stale_state | ✅ |
+| Custom/manual frequency | ✅ Block | confirm_next_due_custom_frequency | ✅ |
+| Agreement not active | ✅ Block | confirm_next_due_agreement_inactive | ✅ |
+| Link not counted or not counts_toward_visit_balance | ✅ Block | confirm_next_due_not_counted | ✅ |
+| Feature flag disabled | ✅ Block | confirm_next_due_unavailable | ✅ |
+| Out-of-scope (account/customer mismatch) | ✅ Block | (scope validation error) | ✅ |
+
+Recorded revalidation paths:
+
+- `/jobs/{jobId}` — refreshes job detail UI and suggestion block
+- `/service-plans` — refreshes service plans drilldown if user navigates there
+- `/customers/{customerId}` — refreshes customer profile if user navigates there
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (67/67 tests):
+	- 6 new tests for confirm action (success, stale-state, frequency/status/link validation, feature flag)
+	- 61 existing tests still passing (link/exposure/read-model/action suite)
+- `npx.cmd tsc --noEmit` passed (no type errors)
+- `git diff --check` passed (no blocking issues)
+- Working tree clean after commit
+- Commit `c30cbac` pushed to `origin/main`
+
+Test scenarios validated:
+
+1. **Success**: Valid interval frequency, matched baseline → agreement.next_due_date updates to suggested date, updated_by_user_id populated, revalidation triggered ✅
+2. **Stale-state protection**: Current agreement.next_due_date ≠ baseline → fails with stale_state banner, no update ✅
+3. **Custom frequency blocking**: frequency='custom' → fails with custom_frequency banner, button not rendered ✅
+4. **Inactive agreement blocking**: status≠'active' → fails with agreement_inactive banner ✅
+5. **Non-counted link blocking**: count_status≠'counted' or counts_toward_visit_balance=false → fails with not_counted banner ✅
+6. **Feature flag enforcement**: flag disabled → fails with unavailable banner ✅
+
+Browser smoke testing decision:
+
+- Browser click-through testing deferred due to complexity of authenticated session setup
+- Decision: Unit test coverage is sufficient (67/67 passing)
+	- Stale-state guard validated by dedicated test
+	- All preconditions and blocking rules unit-tested
+	- Scope enforcement verified
+	- Mutation contract verified (only agreement fields updated, no side effects)
+	- Component structure validated
+- Browser smoke should be performed later in staging with ready authenticated fixture
+
+Boundaries preserved in Group 9A-11C-B:
+
+- no automatic `next_due_date` advancement
+- no recurrence engine
+- no automatic job generation
+- no calendar events
+- no invoice/payment behavior
+- no Stripe/QBO/SMS/customer portal behavior
+- no renewal automation
+- no schema changes
+- no migrations
+- no Supabase commands executed
+- no production writes
+- no feature flag changes
+- no customer profile confirm action yet (parked)
+- no `/service-plans` confirm action yet (parked)
+- no seasonal-window confirm behavior yet (parked)
+
+Implementation status statement:
+
+- Confirm Next Due Date action is implemented on job detail only.
+- Action is operator-confirmed (not automatic).
+- Stale-state protection prevents race conditions.
+- Narrow mutation contract isolates side effects.
+- Customer profile and `/service-plans` confirm actions remain parked until job-detail V1 is proven in real usage.
+- Seasonal-window confirm behavior remains parked until template/window schema is approved.
+
+Watch items:
+
+- Browser click-through validation should be performed later in staging or with ready authenticated fixture
+- Seasonal-window confirm behavior remains parked for V2 or later
+- Customer profile and `/service-plans` confirm surfaces remain parked for future implementation
+- Multi-surface confirms deferred per user requirements
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.

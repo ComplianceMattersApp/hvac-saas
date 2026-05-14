@@ -71,6 +71,17 @@ Maintenance agreements read-only projection closeout note (May 2026):
 - 9A-11C-A preconditions for future confirm write include: active internal user, active agreement, counted/counts-toward link row, interval suggestion availability, strict account/customer scope match, and stale-state guard requiring unchanged baseline `next_due_date`.
 - 9A-11C-A write contract is narrow: update agreement `next_due_date` + `updated_by_user_id` only (normal `updated_at`), with no link/job/service-case/calendar/invoice/payment mutation.
 - 9A-11C-A keeps seasonal-window confirm behavior parked until template/window schema approval and keeps custom/manual as no-confirm/manual-scheduling guidance.
+- Group 9A-11C-B Confirm Next Due Date action on job detail is now complete in commit `c30cbac` and implements job-detail-first explicit operator-confirmed confirm action for counted Service Plans with interval-based suggested due dates.
+- 9A-11C-B adds blue `Confirm Next Due Date` action button on job detail for: active agreements, counted links with `counts_toward_visit_balance=true`, interval frequencies, and feature-flag enabled.
+- 9A-11C-B action is blocked/hidden for: custom/manual frequencies (shows manual-scheduling guidance instead), inactive agreements, non-counted links, stale baseline (optimistic concurrency guard), disabled feature flag, out-of-scope records.
+- 9A-11C-B confirmation copy is explicit and non-prescriptive: "This will update the Service Plan next due date to [date]. It will not create a job, schedule an appointment, create an invoice, collect payment, or renew the plan. Continue?"
+- 9A-11C-B implements stale-state protection with optimistic concurrency guard: compares current `maintenance_agreements.next_due_date` to `baselineNextDueDate` from form; fails with `confirm_next_due_stale_state` banner if values diverge.
+- 9A-11C-B mutation contract is narrow: updates only `maintenance_agreements.next_due_date` (to suggested value) and `updated_by_user_id` (to current internal user); does not mutate links/jobs/service cases or create calendar/invoice/payment records.
+- 9A-11C-B revalidates affected surfaces on success: `/jobs/{jobId}`, `/service-plans`, `/customers/{customerId}`.
+- 9A-11C-B validation recorded: 67/67 unit tests passing (6 new confirm scenarios + 61 existing suite tests), tsc clean, git diff clean, working tree clean, commit pushed to origin/main.
+- 9A-11C-B browser smoke deferred with justification: unit test coverage sufficient (stale-state guard, precondition validation, mutation contract verification tested); browser click-through smoke should be performed later in staging with ready authenticated fixture.
+- 9A-11C-B keeps customer profile and `/service-plans` confirm actions parked until job-detail V1 is proven in real usage.
+- 9A-11C-B keeps seasonal-window confirm behavior parked until template/window schema approval.
 - Group 9A-11A Service Plan Due Window / Next Due Model is documented as planning-only (no implementation) with two future cadence tracks: interval cadence and seasonal service-window cadence.
 - 9A-11A preserves the locked rule that counting does not auto-advance `next_due_date`; future flow is suggestion-first, with any write path parked behind explicit operator confirmation.
 - Boundaries remain explicit: no automatic counting, no due-date advancement, and no visit-balance deduction.
