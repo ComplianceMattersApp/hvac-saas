@@ -23,7 +23,9 @@ import {
   MAINTENANCE_AGREEMENT_STATUSES,
   MAINTENANCE_AGREEMENT_TYPES,
   listMaintenanceAgreementsForCustomer,
+  summarizeMaintenanceAgreementVisitLinksForAgreement,
   classifyMaintenanceAgreementDueState,
+  type MaintenanceAgreementVisitLinkSummary,
   type MaintenanceAgreementRow,
 } from "@/lib/maintenance-agreements/read-model";
 import VisitScopeBuilder from "@/components/jobs/VisitScopeBuilder";
@@ -550,6 +552,28 @@ export default async function CustomerDetailPage(props: {
     } catch {
       // Fail safely — table may not exist in this environment
       customerAgreements = [];
+    }
+  }
+
+  const agreementVisitSummaryById = new Map<string, MaintenanceAgreementVisitLinkSummary>();
+  if (maintenanceAgreementsEnabled && customerAgreements.length > 0) {
+    try {
+      const summaryRows = await Promise.all(
+        customerAgreements.map(async (agreement) => {
+          const summary = await summarizeMaintenanceAgreementVisitLinksForAgreement({
+            supabase,
+            accountOwnerUserId: visibilityScope.accountOwnerUserId,
+            agreementId: agreement.id,
+          });
+          return [agreement.id, summary] as const;
+        }),
+      );
+
+      for (const [agreementId, summary] of summaryRows) {
+        agreementVisitSummaryById.set(agreementId, summary);
+      }
+    } catch {
+      // Fail safe for environments where visit-link projection is unavailable.
     }
   }
 
@@ -1345,6 +1369,12 @@ export default async function CustomerDetailPage(props: {
             ) : (
               <div className="space-y-2">
                 {customerAgreements.map((agr) => {
+                  const normalizedAgreementType = String(agr.agreement_type).replace(/_/g, " ");
+                  const normalizedFrequency = String(agr.frequency).replace(/_/g, " ");
+                  const visitLinkSummary = agreementVisitSummaryById.get(agr.id);
+                  const defaultPlanItems = sanitizeAgreementDefaultVisitScopeItems(
+                    agr.default_visit_scope_items,
+                  );
                   const primaryLocationMatch = locations.find((loc) => {
                     const locId = String(loc.id ?? loc.location_id ?? "").trim();
                     return locId && locId === String(agr.primary_location_id ?? "").trim();
@@ -1410,11 +1440,11 @@ export default async function CustomerDetailPage(props: {
                               {String(agr.status).charAt(0).toUpperCase() + String(agr.status).slice(1)}
                             </span>
                             <span className="text-xs text-slate-500">
-                              {String(agr.agreement_type).replace(/_/g, " ")}
+                              {normalizedAgreementType}
                             </span>
                             <span className="text-slate-300">&middot;</span>
                             <span className="text-xs text-slate-500">
-                              {String(agr.frequency).replace(/_/g, " ")}
+                              {normalizedFrequency}
                             </span>
                           </div>
                           {primaryLocationLabel ? (
@@ -1447,9 +1477,83 @@ export default async function CustomerDetailPage(props: {
                         </div>
                       </div>
 
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3.5 py-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                          Plan Snapshot
+                        </div>
+                        <dl className="mt-2 grid gap-x-3 gap-y-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
+                          <div>
+                            <dt className="font-medium text-slate-500">Plan</dt>
+                            <dd className="mt-0.5 text-slate-900">{agr.agreement_name}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-medium text-slate-500">Status</dt>
+                            <dd className="mt-0.5 text-slate-900">{String(agr.status).replace(/_/g, " ")}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-medium text-slate-500">Frequency</dt>
+                            <dd className="mt-0.5 text-slate-900">{normalizedFrequency}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-medium text-slate-500">Start date</dt>
+                            <dd className="mt-0.5 text-slate-900">{formatDate(agr.start_date)}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-medium text-slate-500">Next due date</dt>
+                            <dd className="mt-0.5 text-slate-900">{formatDate(agr.next_due_date)}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-medium text-slate-500">Renewal date</dt>
+                            <dd className="mt-0.5 text-slate-900">{agr.renewal_date ? formatDate(agr.renewal_date) : "-"}</dd>
+                          </div>
+                          <div className="sm:col-span-2 lg:col-span-1">
+                            <dt className="font-medium text-slate-500">Primary location</dt>
+                            <dd className="mt-0.5 text-slate-900">{primaryLocationLabel || "No primary location"}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-medium text-slate-500">Visit links</dt>
+                            <dd className="mt-0.5 text-slate-900">
+                              {visitLinkSummary ? visitLinkSummary.total_links : "-"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="font-medium text-slate-500">Used visits</dt>
+                            <dd className="mt-0.5 text-slate-900">
+                              {visitLinkSummary ? visitLinkSummary.used_visits : "-"}
+                            </dd>
+                          </div>
+                        </dl>
+
+                        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                            What's Included
+                          </div>
+                          {defaultPlanItems.length > 0 ? (
+                            <ul className="mt-2 space-y-1.5 text-xs text-slate-700">
+                              {defaultPlanItems.map((item) => (
+                                <li key={item.id}>
+                                  <div className="font-medium text-slate-900">{item.title}</div>
+                                  {item.details ? (
+                                    <div className="text-slate-600">
+                                      {item.details.length > 120
+                                        ? `${item.details.slice(0, 120).trimEnd()}...`
+                                        : item.details}
+                                    </div>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className="mt-2 text-xs text-slate-500">
+                              No default Work Items saved for this plan yet.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                       <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
                         <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-                          Edit
+                          Edit Details
                         </summary>
                         <form action={updateAgreementAction} className="mt-3 grid gap-3 md:grid-cols-2">
                           <input type="hidden" name="agreement_id" value={agr.id} />
