@@ -50,6 +50,9 @@ Maintenance agreements closeout note (May 2026):
 - Group 9A-10C Manual Mark Visit Counted on Job Detail is now implemented in commit `1b69336` with visibility closure fix in `2ae1a4b`.
 - `Mark Visit Counted` remains manual/operator-confirmed, updates only the targeted `maintenance_agreement_visits` row count fields, and does not mutate agreement or advance `next_due_date`.
 - Group 9A-11A Service Plan Due Window / Next Due Model planning is now documented as docs/model-only with two future cadence tracks: interval cadence and seasonal service-window cadence.
+- Group 9A-11B Read-Only Suggested Next Due projection is implemented in commit `d627b91` and browser-validated on counted maintenance-job detail.
+- 9A-11B suggestion block remains read-only and explicitly non-mutating: no `Confirm Next Due Date` action, no agreement `next_due_date` write, no automatic due-date advancement, and no invoice/payment behavior.
+- 9A-11B projection supports interval frequencies (`monthly`, `quarterly`, `semi_annual`, `annual`) with cadence-preserving roll-forward from current `next_due_date`; `custom`/missing next due falls back to `Manual scheduling required.`
 - 9A-11A keeps the core rule that counting does not auto-advance `next_due_date`; suggestion-first (read-only) is preferred before any future explicit confirm-write action.
 - Seasonal due language is planned as `Upcoming`, `In Service Window`, `Overdue`, and `Manual scheduling required` instead of date-only messaging.
 - Boundaries remain: no automatic counting, no due-date advancement, no visit-balance deduction automation, and no invoice/payment behavior.

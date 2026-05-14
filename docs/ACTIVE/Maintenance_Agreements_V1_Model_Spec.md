@@ -518,6 +518,74 @@ Explicit non-goals for Group 9A-11A:
 - no template implementation in this slice
 - no seasonal-window schema implementation in this slice
 
+## Group 9A-11B Closeout Snapshot (read-only suggested next due projection on job detail)
+
+Group 9A-11B (Read-Only Suggested Next Due / Due Window Projection) is implemented and pushed in commit `d627b91`.
+
+Recorded behavior:
+
+- Job detail now shows a read-only `Suggested next due date` block after a Service Plan visit is counted.
+- Projection is suggestion-only with explicit copy:
+	- `This is a suggestion only. Confirming next due date will be added later.`
+- No `Confirm Next Due Date` button/action is present in this slice.
+- Agreement `next_due_date` is not mutated.
+- No automatic due-date advancement is introduced.
+- No invoice/payment behavior is introduced.
+- No recurrence/job generation behavior is introduced.
+
+Projection behavior:
+
+- Supported interval frequencies:
+	- `monthly`
+	- `quarterly`
+	- `semi_annual`
+	- `annual`
+- Cadence-preserving roll-forward logic:
+	- start from current `agreement.next_due_date`
+	- add the configured frequency interval
+	- if result is on or before counted completion anchor, roll forward by same interval until after anchor
+- `custom` frequency or missing `next_due_date` falls back to `Manual scheduling required.`
+- Seasonal window support remains model/docs-only in this slice.
+
+Browser validation recorded:
+
+- Fixture IDs:
+	- `customer_id = ad18fa80-2817-476b-8fca-bdcf4ff3c3d6`
+	- `agreement_id = 454b3737-fa39-46be-8925-45131a571693`
+	- `job_id = f6600de6-63d9-4551-94c1-a0b3a8db9a5c`
+	- `link_row_id = 307cc7d6-5ef2-4d06-bf8c-25fa828b4d66`
+- Pre-count: `Service Plan Visit Count Review` and `Mark Visit Counted` were present.
+- Post-count:
+	- visit-counted banner appeared
+	- `Suggested next due date` block rendered
+	- suggestion-only copy rendered
+	- no `Confirm Next Due Date` action present
+	- `Mark Visit Counted` no longer present
+- DB verification after count:
+	- link row set to `count_status = counted`
+	- `counts_toward_visit_balance = true`
+	- `counted_at` populated
+	- `counted_by_user_id` populated
+	- agreement `next_due_date` remained `2026-06-15`
+	- `internal_invoices` count for job remained `0`
+	- `internal_invoice_payments` count for job remained `0`
+
+Validation recorded:
+
+- `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`61` tests).
+- `npx.cmd tsc --noEmit` passed.
+- `git diff --check` passed.
+- `git status --short` clean.
+
+Boundaries preserved in Group 9A-11B:
+
+- no automatic `next_due_date` advancement
+- no `Confirm Next Due Date` action
+- no invoice/payment behavior
+- no recurrence engine
+- no automatic job generation
+- no customer portal/SMS/QBO behavior
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.

@@ -62,6 +62,9 @@ Maintenance agreements read-only projection closeout note (May 2026):
 - Recorded projection labels include: `No linked visits`, `Linked`, `Eligible for count review`, `Counted`, `Excluded`, `Reversed`, `Not eligible`.
 - Group 9A-10C is complete in commit `1b69336` with visibility closure fix in commit `2ae1a4b`: `Mark Visit Counted` now appears on eligible linked job detail in always-visible scope (not inside collapsed Edit Job details).
 - `Mark Visit Counted` is manual/operator-confirmed, mutates only the target `maintenance_agreement_visits` row (`count_status=counted`, `counts_toward_visit_balance=true`, counted audit fields), does not mutate agreement, does not advance `next_due_date`, and introduces no invoice/payment behavior.
+- Group 9A-11B is complete in commit `d627b91`: counted-job detail now renders a read-only `Suggested next due date` projection block.
+- 9A-11B projection is suggestion-only (explicit copy), introduces no `Confirm Next Due Date` action, does not mutate agreement `next_due_date`, does not auto-advance cadence, and adds no invoice/payment behavior.
+- 9A-11B projection supports interval frequencies (`monthly`, `quarterly`, `semi_annual`, `annual`) with cadence-preserving roll-forward from existing `next_due_date`; `custom`/missing date falls back to `Manual scheduling required.`
 - Group 9A-11A Service Plan Due Window / Next Due Model is documented as planning-only (no implementation) with two future cadence tracks: interval cadence and seasonal service-window cadence.
 - 9A-11A preserves the locked rule that counting does not auto-advance `next_due_date`; future flow is suggestion-first, with any write path parked behind explicit operator confirmation.
 - Boundaries remain explicit: no automatic counting, no due-date advancement, and no visit-balance deduction.

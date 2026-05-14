@@ -26,6 +26,15 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Group 9A-11B Read-Only Suggested Next Due / Due Window Projection is complete and pushed in commit `d627b91`:
+  - counted maintenance-job detail now renders a read-only `Suggested next due date` block
+  - projection copy is explicit: `This is a suggestion only. Confirming next due date will be added later.`
+  - no `Confirm Next Due Date` action is present in this slice
+  - projection supports `monthly`, `quarterly`, `semi_annual`, and `annual` frequencies using cadence-preserving roll-forward from current agreement `next_due_date`; `custom` or missing date falls back to `Manual scheduling required.`
+  - browser + DB closeout recorded on fixture `job_id=f6600de6-63d9-4551-94c1-a0b3a8db9a5c` / `agreement_id=454b3737-fa39-46be-8925-45131a571693` / `link_row_id=307cc7d6-5ef2-4d06-bf8c-25fa828b4d66`: post-count link fields updated to counted state, agreement `next_due_date` remained `2026-06-15`, invoice/payment counts remained zero
+  - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`61` tests), `npx.cmd tsc --noEmit` passed, `git diff --check` passed, `git status --short` clean
+  - boundaries preserved: no automatic next-due advancement, no confirm-write action, no invoice/payment behavior, no recurrence engine, no automatic job generation, no portal/SMS/QBO behavior
+
 - Group 9A-11A Service Plan Due Window / Next Due Model is documented as planning-only (no implementation changes) with the following model decisions:
   - counting a service-plan visit does not auto-advance `maintenance_agreements.next_due_date`
   - future cadence supports both interval suggestions (monthly/quarterly/semi_annual/annual/custom-manual) and seasonal service windows (Spring/Fall/custom)
