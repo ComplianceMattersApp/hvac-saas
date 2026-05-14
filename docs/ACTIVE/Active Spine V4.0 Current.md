@@ -26,6 +26,31 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Group 9A-14B Service Plans Drilldown Navigation Polish is complete and pushed in commit `f05bc29`:
+  - `/service-plans` remains read-only
+  - Service Plan names now deep-link to focused customer agreement cards using `/customers/{customerId}?maFocus={agreementId}#maintenance-agreement-{agreementId}`
+  - row-level `Manage on Customer` links added
+  - customer agreement cards now expose stable anchor ids and focused-card highlight styling
+  - helper copy now clarifies customer-profile ownership of edit/create-work-order/default-Work-Items actions
+  - no mutation controls were added to `/service-plans`
+
+- Group 9A-14C Service Plan Detail Snapshot on Customer Profile is complete and pushed in commit `eefae0b`:
+  - customer profile agreement cards now surface summary-first read-only `Plan Snapshot` before edit controls
+  - snapshot includes plan name, status, frequency, start date, next due date, renewal date, primary location, and visit links/used visits where available
+  - cards now include read-only `What's Included` from default Work Items with empty-state copy `No default Work Items saved for this plan yet.`
+  - `Create Work Order` remains prominent and `Edit Details` remains secondary/collapsed
+  - no persistence/server-action/counting/next-due/invoice-payment/calendar-recurrence behavior changed
+
+- Validation recorded for 9A-14B / 9A-14C:
+  - `npx.cmd tsc --noEmit` passed
+  - `git diff --check` passed
+  - browser smoke passed for `/service-plans` load, deep-link navigation, focused-card anchor/highlight, snapshot and included-items visibility, `Create Work Order` availability, `Edit Details` collapsed state, and `/service-plans` read-only posture
+
+- Service Plans / Maintenance Agreements status:
+  - closed for now after 9A-14A, 9A-14B, and 9A-14C
+  - reopen only for real-world workflow bugs or strongly validated user feedback
+  - do not add more Service Plan capability in the next pass unless explicitly reopened
+
 - Group 9A-13B-C Safe Confirm Write (agreement + link metadata idempotency truth) is complete and pushed in commit `3e8c769` with 9A-13B-C1 browser smoke closeout:
   - confirm now writes both surfaces on success: `maintenance_agreements.next_due_date` and `maintenance_agreement_visits` confirmation metadata (`baseline_next_due_date`, `confirmed_next_due_date`, `next_due_confirmed_at`, `next_due_confirmed_by_user_id`)
   - link metadata is the idempotency truth: counted link can confirm once; repeat confirm from same counted link is blocked with `confirm_next_due_already_confirmed`

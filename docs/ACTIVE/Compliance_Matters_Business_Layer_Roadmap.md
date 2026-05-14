@@ -128,6 +128,15 @@ Maintenance agreements closeout note (May 2026):
 - 9A-11A keeps the core rule that counting does not auto-advance `next_due_date`; suggestion-first (read-only) is preferred before any future explicit confirm-write action.
 - Seasonal due language is planned as `Upcoming`, `In Service Window`, `Overdue`, and `Manual scheduling required` instead of date-only messaging.
 - Boundaries remain: no automatic counting, no due-date advancement, no visit-balance deduction automation, and no invoice/payment behavior.
+- Group 9A-14B Service Plans Drilldown Navigation Polish is complete in commit `f05bc29`.
+- 9A-14B keeps `/service-plans` read-only, adds focused customer-card deep-links (`/customers/{customerId}?maFocus={agreementId}#maintenance-agreement-{agreementId}`), and adds `Manage on Customer` row links without adding mutation controls.
+- 9A-14B also records stable customer-card anchors plus focused-card highlight and helper copy clarifying that edit/create-work-order/default-Work-Items actions live on customer profile.
+- Group 9A-14C Service Plan Detail Snapshot on Customer Profile is complete in commit `eefae0b`.
+- 9A-14C adds summary-first, read-only customer-card context (`Plan Snapshot` and `What's Included`) before edit controls, with empty-state copy: `No default Work Items saved for this plan yet.`
+- 9A-14C preserves interaction hierarchy: `Create Work Order` remains prominent; `Edit Details` remains secondary/collapsed.
+- 9A-14B/14C validations recorded: `npx.cmd tsc --noEmit` clean, `git diff --check` clean, and browser smoke passed for deep-link focus/highlight, snapshot visibility, included-items visibility, and `/service-plans` read-only behavior.
+- Service Plans / Maintenance Agreements status is now closed for this pass after 9A-14A, 9A-14B, and 9A-14C; reopen only for real workflow bugs or strongly validated user feedback.
+- Planning guardrail for next pass: do not add additional Service Plan capability unless explicitly reopened.
 
 ---
 

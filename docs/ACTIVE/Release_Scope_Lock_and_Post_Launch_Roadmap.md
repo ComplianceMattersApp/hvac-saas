@@ -155,6 +155,14 @@ Maintenance agreements read-only projection closeout note (May 2026):
 - Group 9A-11A Service Plan Due Window / Next Due Model is documented as planning-only (no implementation) with two future cadence tracks: interval cadence and seasonal service-window cadence.
 - 9A-11A preserves the locked rule that counting does not auto-advance `next_due_date`; future flow is suggestion-first, with any write path parked behind explicit operator confirmation.
 - Boundaries remain explicit: no automatic counting, no due-date advancement, and no visit-balance deduction.
+- Group 9A-14B Service Plans Drilldown Navigation Polish is complete in commit `f05bc29`.
+- 9A-14B keeps `/service-plans` read-only while adding focused customer-profile deep-links (`/customers/{customerId}?maFocus={agreementId}#maintenance-agreement-{agreementId}`), `Manage on Customer` row links, stable customer-card anchors, focused-card highlight styling, and helper copy clarifying customer-profile ownership of edit/create-work-order/default-Work-Items actions.
+- Group 9A-14C Service Plan Detail Snapshot on Customer Profile is complete in commit `eefae0b`.
+- 9A-14C adds summary-first read-only card context (`Plan Snapshot` plus `What's Included` with empty-state copy `No default Work Items saved for this plan yet.`) before edit controls.
+- 9A-14C preserves interaction hierarchy: `Create Work Order` remains prominent and `Edit Details` remains available but secondary/collapsed.
+- 9A-14B/14C validation recorded: `npx.cmd tsc --noEmit` clean, `git diff --check` clean, browser smoke passed for drilldown deep-link focus/highlight, snapshot/included-items visibility, action placement, and `/service-plans` read-only behavior.
+- Service Plans / Maintenance Agreements status: closed for now after 9A-14A, 9A-14B, and 9A-14C; reopen only for real-world workflow bugs or strongly validated user feedback.
+- Scope guardrail for next pass: do not add more Service Plan capability unless explicitly reopened.
 
 Execution companion note: for practical first-customer support posture and expansion-lane classification guardrails, see `docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md`.
 

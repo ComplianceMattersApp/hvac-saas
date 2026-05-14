@@ -1181,6 +1181,74 @@ Boundaries preserved in Group 9A-13B-D1 / 13B-D2:
 - no production writes
 - no feature-flag changes
 
+## Group 9A-14B / 9A-14C Closeout Snapshot (service-plans navigation polish + customer-profile snapshot-first clarity)
+
+Group 9A-14B (Service Plans Drilldown Navigation Polish) is complete and pushed in commit `f05bc29`.
+
+Recorded 14B behavior:
+
+- `/service-plans` remains read-only.
+- Each Service Plan name now links to the focused agreement card on customer profile:
+	- `/customers/{customerId}?maFocus={agreementId}#maintenance-agreement-{agreementId}`
+- Added read-only `Manage on Customer` deep-link on each drilldown row.
+- Customer profile agreement cards expose stable anchor ids (`maintenance-agreement-{agreementId}`).
+- Focused agreement card receives subtle highlight styling when `maFocus` is present.
+- `/service-plans` helper copy now explicitly directs edit/create-work-order/default-Work-Items actions to customer profile.
+- No mutation controls were added to `/service-plans`.
+
+Group 9A-14C (Service Plan Detail Snapshot on Customer Profile) is complete and pushed in commit `eefae0b`.
+
+Recorded 14C behavior:
+
+- Customer profile Maintenance Agreement / Service Plan cards now show a read-only `Plan Snapshot` before edit controls.
+- Snapshot fields include:
+	- plan name
+	- status
+	- frequency
+	- start date
+	- next due date
+	- renewal date
+	- primary location
+	- visit links and used visits (where available)
+- Added read-only `What's Included` section using default Work Items.
+- Empty-state copy is now: `No default Work Items saved for this plan yet.`
+- `Create Work Order` remains prominent.
+- `Edit Details` remains available as secondary/collapsed control.
+
+Validation recorded for 14B / 14C:
+
+- `npx.cmd tsc --noEmit` passed
+- `git diff --check` passed
+- Browser smoke passed:
+	- `/service-plans` opened
+	- Service Plan deep-link navigated to focused customer agreement card
+	- focused-card anchor/highlight worked
+	- `Plan Snapshot` visible
+	- `What's Included` visible
+	- `Create Work Order` remained available
+	- `Edit Details` remained collapsed/secondary
+	- `/service-plans` remained read-only
+
+Boundaries preserved in Group 9A-14B / 9A-14C:
+
+- no persistence logic changes
+- no server action changes
+- no visit-counting behavior changes
+- no next-due behavior changes
+- no invoice/payment behavior changes
+- no calendar/recurrence behavior changes
+- no schema changes
+- no migrations
+- no Supabase commands
+- no production writes
+- no feature-flag changes
+
+Service Plans / Maintenance Agreements status:
+
+- Closed for now after 9A-14A, 9A-14B, and 9A-14C.
+- Reopen only for real-world workflow bugs or strongly validated user feedback.
+- Do not add more Service Plan capability in the next pass.
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.
