@@ -11,6 +11,18 @@ type ConfirmNextDueDateActionButtonProps = {
   displayDate: string;
 };
 
+function formatDateOnlyForDialog(dateOnlyValue: string, fallbackDisplayDate: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOnlyValue);
+
+  if (!match) {
+    return fallbackDisplayDate;
+  }
+
+  const [, year, month, day] = match;
+
+  return `${month}/${day}/${year}`;
+}
+
 function SubmitInner() {
   const { pending } = useFormStatus();
 
@@ -32,12 +44,14 @@ export default function ConfirmNextDueDateActionButton({
   baselineNextDueDate,
   displayDate,
 }: ConfirmNextDueDateActionButtonProps) {
+  const confirmDialogDisplayDate = formatDateOnlyForDialog(suggestedNextDueDate, displayDate);
+
   return (
     <form
       action={confirmMaintenanceAgreementNextDueDateFromForm}
       onSubmit={(event) => {
         const confirmed = window.confirm(
-          `This will update the Service Plan next due date to ${displayDate}. It will not create a job, schedule an appointment, create an invoice, collect payment, or renew the plan. Continue?`,
+          `This will update the Service Plan next due date to ${confirmDialogDisplayDate}. It will not create a job, schedule an appointment, create an invoice, collect payment, or renew the plan. Continue?`,
         );
 
         if (!confirmed) {
