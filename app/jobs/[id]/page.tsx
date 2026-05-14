@@ -651,22 +651,28 @@ async function TimedJobLocationPreview({
   }
 }
 
-async function TimedServiceStatusActions({
+function TimedServiceStatusActions({
   jobId,
   billingMode,
+  jobType,
+  opsStatus,
   timingEnabled,
   onPhaseTiming,
 }: {
   jobId: string;
   billingMode: BillingMode;
+  jobType?: string | null;
+  opsStatus?: string | null;
   timingEnabled: boolean;
   onPhaseTiming: TimingPhaseRecorder;
 }) {
   const startedAt = timingEnabled ? Date.now() : 0;
   try {
-    return await ServiceStatusActions({
+    return ServiceStatusActions({
       jobId,
       billingMode,
+      jobType,
+      opsStatus,
     });
   } finally {
     if (timingEnabled) {
@@ -4734,6 +4740,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       <TimedServiceStatusActions
         jobId={job.id}
         billingMode={billingMode}
+        jobType={job.job_type}
+        opsStatus={job.ops_status}
         timingEnabled={timingEnabled}
         onPhaseTiming={recordBlockingPhase}
       />

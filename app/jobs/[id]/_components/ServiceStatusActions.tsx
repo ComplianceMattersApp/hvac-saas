@@ -2,7 +2,6 @@
 
 import type { BillingMode } from "@/lib/business/internal-business-profile";
 import { markServiceComplete, markInvoiceSent } from "@/lib/actions/service-actions";
-import { createClient } from "@/lib/supabase/server";
 import SubmitButton from "@/components/SubmitButton";
 
 function formatOpsStatusLabel(value?: string | null) {
@@ -22,32 +21,19 @@ function formatOpsStatusLabel(value?: string | null) {
   return labels[key] ?? "In Progress";
 }
 
-export default async function ServiceStatusActions({
+export default function ServiceStatusActions({
   jobId,
   billingMode,
+  jobType,
+  opsStatus,
 }: {
   jobId: string;
   billingMode: BillingMode;
+  jobType?: string | null;
+  opsStatus?: string | null;
 }) {
-  const supabase = await createClient();
-
-  // Read the job so we only show these controls for Service jobs
-  const { data: job, error } = await supabase
-    .from("jobs")
-    .select("id, job_type, ops_status, invoice_number")
-    .eq("id", jobId)
-    .single();
-
-  if (error) {
-    // Fail soft: don't break the job page
-    return (
-      <div className="rounded-xl border p-4 text-sm">
-        Could not load job for service actions.
-      </div>
-    );
-  }
-
-  if (job.job_type !== "service") return null;
+  // Only show these controls for Service jobs
+  if (jobType !== "service") return null;
 
   // Bind server actions to this jobId (so the form submit passes the id)
   const completeAction = markServiceComplete.bind(null, jobId);
@@ -63,7 +49,7 @@ export default async function ServiceStatusActions({
             These update <b>ops_status</b> and do not affect the Tests page.
           </p>
           <div className="mt-2 text-xs">
-            Current status: <b>{formatOpsStatusLabel(job.ops_status)}</b>
+            Current status: <b>{formatOpsStatusLabel(opsStatus)}</b>
           </div>
         </div>
       </div>
