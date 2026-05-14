@@ -866,6 +866,76 @@ Watch item:
 
 - A temporary sandbox auth user may remain due to sandbox cleanup delete error; this is sandbox cleanup scope only and not product behavior scope.
 
+## Group 9A-13B-A Model Snapshot (next due idempotency before persistent confirm UI)
+
+Group 9A-13B-A (Next Due Idempotency Model Docs) is a docs/model decision pass only. No implementation changes are included in this slice.
+
+Audit verdict context:
+
+- Group 9A-13B audit found Suggested Next Due and Confirm Next Due visibility is currently both banner-gated and counted-link-gated.
+- Current gating avoids noisy persistent UI but does not provide durable idempotency if confirm becomes persistent.
+- Recommended outcome is C: add durable idempotency marker before persistent confirm.
+
+Core problem statement:
+
+- Suggested Next Due currently depends on transient URL banner state.
+- Persistent next-due context is desirable for usability.
+- Persistent Confirm Next Due Date is unsafe without durable per-link confirmation tracking.
+- The same counted link could be reused to recompute from newly advanced agreement `next_due_date` and offer another advancement.
+
+Model decision:
+
+- Add durable next-due confirmation metadata to `maintenance_agreement_visits`.
+- The visit link is the correct idempotency surface because the counted visit is the business event causing the next-due write.
+
+Proposed future fields on `maintenance_agreement_visits`:
+
+- `next_due_confirmed_at` timestamp nullable
+- `next_due_confirmed_by_user_id` uuid nullable
+- `confirmed_next_due_date` date nullable
+- `baseline_next_due_date` date nullable
+
+Field meanings:
+
+- `baseline_next_due_date` = agreement `next_due_date` value used when suggestion was confirmed
+- `confirmed_next_due_date` = date written to `maintenance_agreements.next_due_date`
+- `next_due_confirmed_at` = timestamp when this link confirmed the update
+- `next_due_confirmed_by_user_id` = internal user who confirmed
+
+Future confirm action rule:
+
+- Confirm Next Due Date may update agreement `next_due_date` and visit-link confirmation metadata together.
+- Treat this as one logical operation.
+- If link already has `next_due_confirmed_at` or `confirmed_next_due_date`, action must not advance the date again.
+
+Persistent UI rule:
+
+- Counted visit may show persistent read-only next-due context after reload.
+- Confirm button should render only for counted links that have not already confirmed next due.
+- After confirmation, show read-only confirmation context instead of another confirm action.
+
+Stale-state rule remains:
+
+- Agreement `next_due_date` must still match `baseline_next_due_date` before confirm.
+- If mismatch, fail safely and ask user to refresh/review latest suggestion.
+
+V1 non-goals for this model pass:
+
+- no automatic due-date advancement
+- no recurring job generation
+- no seasonal window implementation yet
+- no invoice/payment behavior
+- no customer portal/SMS/QBO
+- no reversal/adjustment UI yet
+- no full event-log/audit timeline beyond minimal link confirmation metadata
+
+Recommended implementation sequence:
+
+- 9A-13B-B: schema foundation for metadata columns, read-model support, and tests
+- 9A-13B-C: update confirm action to write agreement plus link metadata safely
+- 9A-13B-D: make read-only next-due context persistent and hide confirm after link confirmation
+- Browser smoke only after full idempotency path is wired in sandbox
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.

@@ -74,6 +74,14 @@ Maintenance agreements closeout note (May 2026):
 - 9A-13A browser smoke recorded successful no-reselect submit from prefilled Service Plan fixture, persisted canonical `visit_scope_items`, no invoice/payment side effects, unchanged agreement `next_due_date`, and new link row remaining `linked` (not counted).
 - 9A-13A validation: targeted tests 35/35 passed, `npx.cmd tsc --noEmit` clean, `git diff --check` clean, working tree clean.
 - 9A-13A boundaries preserved: no visit-counting mutation, no next-due mutation, no invoice/payment behavior change, no schema/migration/flag changes, and no recurrence/job-generation changes.
+- Group 9A-13B-A Next Due Idempotency Model Docs is documented as docs/model-only (no implementation in this slice).
+- 9A-13B-A core problem: current Suggested Next Due/Confirm visibility is banner-gated plus counted-link-gated; persistent confirm without durable link-level confirmation metadata could allow repeated advancement from the same counted visit.
+- 9A-13B-A model decision: use `maintenance_agreement_visits` as idempotency surface and add durable next-due confirmation metadata fields (`next_due_confirmed_at`, `next_due_confirmed_by_user_id`, `confirmed_next_due_date`, `baseline_next_due_date`).
+- 9A-13B-A future confirm rule: update agreement next due and link confirmation metadata together as one logical operation; if link already has confirmation metadata, do not advance again.
+- 9A-13B-A persistent UI rule: allow persistent read-only next-due context for counted links, render confirm only when link is not yet next-due-confirmed, and show read-only confirmation context after confirm.
+- 9A-13B-A stale-state rule remains required: agreement `next_due_date` must match `baseline_next_due_date` at confirm time or fail safely with refresh/review guidance.
+- 9A-13B-A recommended sequence: 13B-B schema/read-model/test foundation, 13B-C safe confirm write of agreement plus link metadata, 13B-D persistent read-only context plus post-confirm hide of action, then browser smoke in sandbox.
+- 9A-13B-A boundaries preserved: no automatic advancement, no recurring generation, no seasonal-window implementation, no invoice/payment behavior, no portal/SMS/QBO behavior, no reversal/adjustment UI, and no broad event-log expansion in this slice.
 - 9A-11A keeps the core rule that counting does not auto-advance `next_due_date`; suggestion-first (read-only) is preferred before any future explicit confirm-write action.
 - Seasonal due language is planned as `Upcoming`, `In Service Window`, `Overdue`, and `Manual scheduling required` instead of date-only messaging.
 - Boundaries remain: no automatic counting, no due-date advancement, no visit-balance deduction automation, and no invoice/payment behavior.

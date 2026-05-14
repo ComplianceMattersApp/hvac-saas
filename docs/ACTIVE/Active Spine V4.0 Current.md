@@ -26,6 +26,17 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Group 9A-13B-A Next Due Idempotency Model Docs is complete as docs/model-only (no implementation changes):
+  - audit finding recorded: current Suggested Next Due/Confirm visibility is banner-gated plus counted-link-gated; persistent confirm without durable idempotency can allow repeated next-due advancement from the same counted link
+  - recommended outcome C adopted: add durable idempotency marker before persistent confirm
+  - model decision: use `maintenance_agreement_visits` as durable idempotency surface for next-due confirmation
+  - planned metadata fields: `next_due_confirmed_at`, `next_due_confirmed_by_user_id`, `confirmed_next_due_date`, `baseline_next_due_date`
+  - confirm rule (future implementation): agreement next due update and link confirmation metadata write occur together as one logical operation; link with existing next-due confirmation metadata must not advance again
+  - persistent UI rule (future implementation): counted visit may show persistent read-only context; confirm action should render only before link-level next-due confirmation; post-confirm should show read-only confirmation context
+  - stale-state rule retained: agreement `next_due_date` must match `baseline_next_due_date` before write or fail safely with refresh/review guidance
+  - recommended sequence recorded: 13B-B schema/read-model/tests, 13B-C safe confirm write of agreement plus link metadata, 13B-D persistent read-only context plus post-confirm action suppression, then sandbox browser smoke
+  - boundaries preserved in this model slice: no schema/migration/code changes, no automatic advancement, no recurrence generation, no invoice/payment behavior, no seasonal-window implementation, no portal/SMS/QBO behavior, no reversal/adjustment UI
+
 - Group 9A-13A Service Plan Work Items Prefill Structured Validation Fix is complete and pushed in commit `a116c1e`:
   - root cause addressed: legacy/default Service Plan Work Item shapes (`item_name`, `description`, `pricebook_item_id`, `default_unit_price`) could degrade `/jobs/new` prefill into blank/Untitled Work Item behavior and trigger structured Work Item submit blocking
   - fix implemented in Service Plan prefill read path: normalize legacy/default Work Item shapes before sanitization so valid data survives into canonical Work Item fields

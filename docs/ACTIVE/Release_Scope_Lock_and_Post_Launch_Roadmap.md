@@ -98,6 +98,19 @@ Maintenance agreements read-only projection closeout note (May 2026):
 - 9A-13A validation recorded: targeted tests 35/35 passing, tsc clean, git diff clean, and working tree clean.
 - 9A-13A boundaries preserved: no visit-counting changes, no next-due-date changes, no invoice/payment behavior changes, no schema/migration/flag changes, and no recurrence/job-generation changes.
 - 9A-13A watch item: temporary sandbox auth user cleanup may remain due to sandbox delete error; this is sandbox cleanup scope only and not product behavior scope.
+- Group 9A-13B-A Next Due Idempotency Model Docs is documented as docs/model-only and records recommended outcome C from the audit: add durable idempotency marker before persistent confirm.
+- 9A-13B-A core problem: current Suggested Next Due/Confirm visibility is transient-banner-gated plus counted-link-gated; persistent confirm without durable per-link next-due confirmation metadata can allow repeated due-date advancement from the same counted visit.
+- 9A-13B-A model decision: place durable idempotency metadata on `maintenance_agreement_visits`, since the counted visit link is the business event causing next-due mutation.
+- 9A-13B-A proposed future metadata fields:
+   - `next_due_confirmed_at` timestamp nullable
+   - `next_due_confirmed_by_user_id` uuid nullable
+   - `confirmed_next_due_date` date nullable
+   - `baseline_next_due_date` date nullable
+- 9A-13B-A future confirm rule: confirm may write agreement `next_due_date` plus link confirmation metadata together as one logical operation; if link already has confirmation metadata, action must not advance again.
+- 9A-13B-A persistent UI rule: counted links may show persistent read-only next-due context after reload; confirm action renders only for counted links without next-due confirmation metadata; post-confirm state is read-only confirmation context.
+- 9A-13B-A stale-state rule remains required: agreement `next_due_date` must match `baseline_next_due_date` before write or fail safely with refresh/review guidance.
+- 9A-13B-A recommended sequence: 13B-B schema/read-model/tests, 13B-C safe confirm write of agreement plus link metadata, 13B-D persistent read-only context and post-confirm action suppression, then browser smoke in sandbox.
+- 9A-13B-A non-goals preserved: no automatic due-date advancement, no recurring job generation, no seasonal-window implementation, no invoice/payment behavior, no portal/SMS/QBO behavior, no reversal/adjustment UI, and no broad event-log expansion in this slice.
 - Group 9A-11A Service Plan Due Window / Next Due Model is documented as planning-only (no implementation) with two future cadence tracks: interval cadence and seasonal service-window cadence.
 - 9A-11A preserves the locked rule that counting does not auto-advance `next_due_date`; future flow is suggestion-first, with any write path parked behind explicit operator confirmation.
 - Boundaries remain explicit: no automatic counting, no due-date advancement, and no visit-balance deduction.
