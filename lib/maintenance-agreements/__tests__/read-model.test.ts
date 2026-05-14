@@ -5,6 +5,7 @@ import {
   isMaintenanceAgreementFrequency,
   isMaintenanceAgreementStatus,
   isMaintenanceAgreementType,
+  hasMaintenanceAgreementVisitConfirmedNextDue,
   listMaintenanceAgreementLinksForJob,
   listMaintenanceAgreementDrilldownForAccount,
   listMaintenanceAgreementsForCustomer,
@@ -54,6 +55,10 @@ type MockAgreementVisitLink = {
   counts_toward_visit_balance: boolean;
   counted_at: string | null;
   counted_by_user_id: string | null;
+  next_due_confirmed_at: string | null;
+  next_due_confirmed_by_user_id: string | null;
+  confirmed_next_due_date: string | null;
+  baseline_next_due_date: string | null;
   reversed_at: string | null;
   reversed_by_user_id: string | null;
   reversal_reason: string | null;
@@ -109,6 +114,10 @@ function makeAgreementVisitLink(
     counts_toward_visit_balance: false,
     counted_at: null,
     counted_by_user_id: null,
+    next_due_confirmed_at: null,
+    next_due_confirmed_by_user_id: null,
+    confirmed_next_due_date: null,
+    baseline_next_due_date: null,
     reversed_at: null,
     reversed_by_user_id: null,
     reversal_reason: null,
@@ -954,8 +963,31 @@ describe("maintenance agreement read model", () => {
     });
 
     expect(rows.map((row) => row.id)).toEqual(["link-1"]);
+    expect(rows[0]).toMatchObject({
+      next_due_confirmed_at: null,
+      next_due_confirmed_by_user_id: null,
+      confirmed_next_due_date: null,
+      baseline_next_due_date: null,
+    });
     expect(calls).toContainEqual({ op: "eq", column: "account_owner_user_id", value: ACCOUNT_OWNER });
     expect(calls).toContainEqual({ op: "eq", column: "agreement_id", value: "agreement-1" });
+  });
+
+  it("treats link as unconfirmed when next-due confirmation metadata is missing", () => {
+    const link = makeAgreementVisitLink({ id: "unconfirmed" });
+    expect(hasMaintenanceAgreementVisitConfirmedNextDue(link)).toBe(false);
+  });
+
+  it("treats link as confirmed when next-due confirmation metadata is populated", () => {
+    const link = makeAgreementVisitLink({
+      id: "confirmed",
+      next_due_confirmed_at: "2026-07-15T09:30:00Z",
+      next_due_confirmed_by_user_id: "user-1",
+      confirmed_next_due_date: "2026-10-15",
+      baseline_next_due_date: "2026-07-15",
+    });
+
+    expect(hasMaintenanceAgreementVisitConfirmedNextDue(link)).toBe(true);
   });
 
   it("lists maintenance agreement links for a job with account scope", async () => {

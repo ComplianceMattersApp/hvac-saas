@@ -167,6 +167,10 @@ export type MaintenanceAgreementVisitLinkRow = {
   counts_toward_visit_balance: boolean;
   counted_at: string | null;
   counted_by_user_id: string | null;
+  next_due_confirmed_at: string | null;
+  next_due_confirmed_by_user_id: string | null;
+  confirmed_next_due_date: string | null;
+  baseline_next_due_date: string | null;
   reversed_at: string | null;
   reversed_by_user_id: string | null;
   reversal_reason: string | null;
@@ -551,7 +555,23 @@ function normalizeMaintenanceAgreementVisitLinkRow(
   return {
     ...row,
     counts_toward_visit_balance: Boolean(row.counts_toward_visit_balance),
+    next_due_confirmed_at: toCleanString(row.next_due_confirmed_at) || null,
+    next_due_confirmed_by_user_id: toCleanString(row.next_due_confirmed_by_user_id) || null,
+    confirmed_next_due_date: toCleanString(row.confirmed_next_due_date) || null,
+    baseline_next_due_date: toCleanString(row.baseline_next_due_date) || null,
   };
+}
+
+export function hasMaintenanceAgreementVisitConfirmedNextDue(
+  link: Pick<
+    MaintenanceAgreementVisitLinkRow,
+    "next_due_confirmed_at" | "confirmed_next_due_date"
+  > | null | undefined,
+) {
+  return Boolean(
+    toCleanString(link?.next_due_confirmed_at) ||
+      toCleanString(link?.confirmed_next_due_date),
+  );
 }
 
 type MaintenanceAgreementVisitProjectionJob = {
@@ -745,6 +765,10 @@ export async function listMaintenanceAgreementVisitsForAgreement(
           "counts_toward_visit_balance",
           "counted_at",
           "counted_by_user_id",
+          "next_due_confirmed_at",
+          "next_due_confirmed_by_user_id",
+          "confirmed_next_due_date",
+          "baseline_next_due_date",
           "reversed_at",
           "reversed_by_user_id",
           "reversal_reason",
@@ -782,6 +806,10 @@ export async function listMaintenanceAgreementLinksForJob(
           "counts_toward_visit_balance",
           "counted_at",
           "counted_by_user_id",
+          "next_due_confirmed_at",
+          "next_due_confirmed_by_user_id",
+          "confirmed_next_due_date",
+          "baseline_next_due_date",
           "reversed_at",
           "reversed_by_user_id",
           "reversal_reason",
@@ -1060,6 +1088,10 @@ export async function listMaintenanceAgreementDrilldownForAccount(
           "counts_toward_visit_balance",
           "counted_at",
           "counted_by_user_id",
+          "next_due_confirmed_at",
+          "next_due_confirmed_by_user_id",
+          "confirmed_next_due_date",
+          "baseline_next_due_date",
           "reversed_at",
           "reversed_by_user_id",
           "reversal_reason",
