@@ -3275,6 +3275,48 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         />
       )}
 
+      {banner === "confirm_next_due_saved" && (
+        <FlashBanner
+          type="success"
+          message="Service Plan next due date updated."
+        />
+      )}
+
+      {banner === "confirm_next_due_already_confirmed" && (
+        <FlashBanner
+          type="warning"
+          message="This visit has already confirmed the Service Plan next due date."
+        />
+      )}
+
+      {banner === "confirm_next_due_stale_state" && (
+        <FlashBanner
+          type="warning"
+          message="This suggestion is out of date. Refresh and review the latest next due date before confirming."
+        />
+      )}
+
+      {banner === "confirm_next_due_not_counted" && (
+        <FlashBanner
+          type="warning"
+          message="This visit must be counted before confirming the next due date."
+        />
+      )}
+
+      {banner === "confirm_next_due_unavailable" && (
+        <FlashBanner
+          type="warning"
+          message="Service Plan next due confirmation is currently unavailable."
+        />
+      )}
+
+      {banner === "confirm_next_due_update_failed" && (
+        <FlashBanner
+          type="warning"
+          message="Could not update the Service Plan next due date. Please try again."
+        />
+      )}
+
       {banner === "internal_invoicing_billing_pending" && (
         <FlashBanner
           type="warning"
@@ -4744,7 +4786,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               <div className="mt-2 text-sm font-semibold text-blue-900">
                 {suggestedNextDueProjection.manualSchedulingRequired
                   ? "Manual scheduling required."
-                  : formatYmdDisplay(suggestedNextDueProjection.suggestedNextDueDate) || "Manual scheduling required."}
+                  : formatDateOnlyUs(suggestedNextDueProjection.suggestedNextDueDate) || "Manual scheduling required."}
               </div>
               <p className="mt-1 text-xs leading-5 text-blue-900/90">
                 {suggestedNextDueProjection.seasonalWindowPlaceholder}
@@ -4756,7 +4798,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     agreementId={suggestedNextDueProjection.agreementId}
                     suggestedNextDueDate={suggestedNextDueProjection.suggestedNextDueDate}
                     baselineNextDueDate={suggestedNextDueProjection.baselineNextDueDate || ""}
-                    displayDate={formatYmdDisplay(suggestedNextDueProjection.suggestedNextDueDate) || suggestedNextDueProjection.suggestedNextDueDate}
+                    displayDate={formatDateOnlyUs(suggestedNextDueProjection.suggestedNextDueDate) || suggestedNextDueProjection.suggestedNextDueDate}
                   />
                 </div>
               ) : null}
