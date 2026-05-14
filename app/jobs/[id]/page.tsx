@@ -624,6 +624,81 @@ type SearchParams = Record<string, string | string[] | undefined>;
 
 type TimingPhaseRecorder = (phaseName: string, durationMs: number) => void;
 
+type JobLocationPreviewFallbackProps = {
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  showAddressFooter?: boolean;
+  className?: string;
+};
+
+function JobLocationPreviewFallback({
+  addressLine1,
+  addressLine2,
+  city,
+  state,
+  zip,
+  showAddressFooter,
+  className,
+}: JobLocationPreviewFallbackProps) {
+  const parts = [addressLine1, addressLine2, [city, state, zip].filter(Boolean).join(" ")]
+    .map((p) => String(p ?? "").trim())
+    .filter(Boolean);
+  const addressDisplay = parts.join(", ");
+  const mapsQuery = encodeURIComponent(addressDisplay);
+  const mapsSearchUrl = addressDisplay
+    ? `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`
+    : null;
+  const mapsDirectionsUrl = addressDisplay
+    ? `https://www.google.com/maps/dir/?api=1&destination=${mapsQuery}`
+    : null;
+
+  return (
+    <div className={className}>
+      {addressDisplay ? (
+        <div className="aspect-[16/9] w-full animate-pulse rounded-lg border border-slate-200 bg-slate-200/60" />
+      ) : (
+        <div className="flex aspect-[16/9] w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-4 text-center text-sm font-medium text-slate-600">
+          Location preview unavailable
+        </div>
+      )}
+      {addressDisplay ? (
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            {mapsDirectionsUrl ? (
+              <a
+                href={mapsDirectionsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+              >
+                Navigate
+              </a>
+            ) : null}
+            {mapsSearchUrl ? (
+              <a
+                href={mapsSearchUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50"
+              >
+                Open in Maps
+              </a>
+            ) : null}
+          </div>
+          {showAddressFooter ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-sm font-medium leading-6 text-slate-700 sm:max-w-[20rem] sm:text-right">
+              {addressDisplay}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 type TimedJobLocationPreviewProps = {
   addressLine1?: string | null;
   addressLine2?: string | null;
@@ -2955,17 +3030,31 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       </div>
       <div className="w-full flex-1 overflow-hidden bg-slate-100">
-        <TimedJobLocationPreview
-          addressLine1={serviceAddressLine1}
-          addressLine2={serviceAddressLine2}
-          city={serviceCity}
-          state={serviceState}
-          zip={serviceZip}
-          showAddressFooter
-          className="flex h-full flex-col [&>div:last-child]:!mt-auto [&>div:last-child]:pt-3"
-          timingEnabled={timingEnabled}
-          onPhaseTiming={recordBlockingPhase}
-        />
+        <Suspense
+          fallback={
+            <JobLocationPreviewFallback
+              addressLine1={serviceAddressLine1}
+              addressLine2={serviceAddressLine2}
+              city={serviceCity}
+              state={serviceState}
+              zip={serviceZip}
+              showAddressFooter
+              className="flex h-full flex-col [&>div:last-child]:!mt-auto [&>div:last-child]:pt-3"
+            />
+          }
+        >
+          <TimedJobLocationPreview
+            addressLine1={serviceAddressLine1}
+            addressLine2={serviceAddressLine2}
+            city={serviceCity}
+            state={serviceState}
+            zip={serviceZip}
+            showAddressFooter
+            className="flex h-full flex-col [&>div:last-child]:!mt-auto [&>div:last-child]:pt-3"
+            timingEnabled={timingEnabled}
+            onPhaseTiming={recordBlockingPhase}
+          />
+        </Suspense>
       </div>
     </div>
 
