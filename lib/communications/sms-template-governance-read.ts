@@ -1,3 +1,10 @@
+import {
+  ON_THE_WAY_ALLOWED_TEMPLATE_TOKENS,
+  ON_THE_WAY_PLANNING_DEFAULT_BODY,
+  ON_THE_WAY_SAMPLE_TOKEN_VALUES,
+  validateOnTheWayTemplateBody,
+} from "@/lib/communications/sms-template-governance-validation";
+
 type SupabaseLike = {
   from(table: string): any;
 };
@@ -37,18 +44,6 @@ export const SMS_TEMPLATE_GOVERNANCE_VERSION_SELECT = [
 ].join(", ");
 
 const ON_THE_WAY_TEMPLATE_KEY = "on_the_way";
-const STOP_FOOTER_TEXT = "Reply STOP to opt out.";
-const PLANNING_DEFAULT_BODY_TEMPLATE =
-  "Hi {{recipient_first_name}}, this is {{operator_or_tech_name}} with {{company_name}}. I am on the way to your service appointment. Reply STOP to opt out.";
-
-const SAMPLE_TOKEN_VALUES: Record<string, string> = {
-  recipient_first_name: "Taylor",
-  operator_or_tech_name: "Alex",
-  company_name: "Your company",
-  appointment_or_job_context: "your service appointment",
-};
-
-const ALLOWED_TOKENS = new Set(Object.keys(SAMPLE_TOKEN_VALUES));
 
 type ReviewStatus = "not_requested" | "pending" | "approved" | "rejected";
 type VersionStatus =
@@ -82,6 +77,7 @@ export type SmsTemplateGovernanceTemplateSummary = {
 
 export type SmsTemplateGovernanceVersionSummary = {
   exists: boolean;
+  versionId: string;
   versionNumber: number | null;
   versionLabel: string;
   versionStatus: string;
@@ -97,12 +93,20 @@ export type SmsTemplateGovernanceVersionSummary = {
   detectedTokens: string[];
   unknownTokens: string[];
   hasUnknownTokens: boolean;
+  stopLanguagePresent: boolean;
+  prohibitedContentHits: string[];
   bodyTemplate: string;
   samplePreview: string;
   characterCount: number;
   estimatedSegments: number;
   approvalReady: boolean;
   approvalReadyLabel: string;
+  blockingReasons: string[];
+  warnings: string[];
+  canSaveDraft: boolean;
+  canMarkReadyForSandbox: boolean;
+  markReadyBlockingReasons: string[];
+  markReadyWarnings: string[];
 };
 
 export type SmsTemplateGovernanceLatestVersionSummary = SmsTemplateGovernanceVersionSummary & {
@@ -111,7 +115,6 @@ export type SmsTemplateGovernanceLatestVersionSummary = SmsTemplateGovernanceVer
 };
 
 export type SmsTemplateGovernanceReadResult = {
-  accountOwnerUserId: string;
   status: SmsTemplateGovernanceStatus;
   template: SmsTemplateGovernanceTemplateSummary;
   currentVersion: SmsTemplateGovernanceVersionSummary;
@@ -158,19 +161,6 @@ function uniqueTokens(tokens: string[]) {
 function normalizeTokenArray(value: unknown) {
   if (!Array.isArray(value)) return [];
   return uniqueTokens(value.map((item) => asTrimmed(item)));
-}
-
-function parseTokensFromTemplate(bodyTemplate: string) {
-  const tokens: string[] = [];
-  const regex = /{{\s*([a-zA-Z0-9_]+)\s*}}/g;
-  let match = regex.exec(bodyTemplate);
-
-  while (match) {
-    tokens.push(asTrimmed(match[1]).toLowerCase());
-    match = regex.exec(bodyTemplate);
-  }
-
-  return uniqueTokens(tokens);
 }
 
 function mapLifecycleLabel(value: unknown) {
@@ -231,20 +221,11 @@ function mapReviewLabel(value: unknown) {
   }
 }
 
-function hasStopLanguage(bodyTemplate: string) {
-  return /reply\s+stop\s+to\s+opt\s+out\.?/i.test(bodyTemplate);
-}
-
 function renderSamplePreview(bodyTemplate: string) {
   return bodyTemplate.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_full, tokenName: string) => {
     const token = asTrimmed(tokenName).toLowerCase();
-    return SAMPLE_TOKEN_VALUES[token] ?? `{{${token}}}`;
+    return (ON_THE_WAY_SAMPLE_TOKEN_VALUES as Record<string, string>)[token] ?? `{{${token}}}`;
   });
-}
-
-function estimateSegments(characterCount: number) {
-  if (characterCount <= 160) return 1;
-  return Math.ceil(characterCount / 153);
 }
 
 function isApprovalStatus(status: string) {
@@ -254,6 +235,7 @@ function isApprovalStatus(status: string) {
 function emptyVersionSummary(): SmsTemplateGovernanceVersionSummary {
   return {
     exists: false,
+    versionId: "",
     versionNumber: null,
     versionLabel: "",
     versionStatus: "",
@@ -269,18 +251,27 @@ function emptyVersionSummary(): SmsTemplateGovernanceVersionSummary {
     detectedTokens: [],
     unknownTokens: [],
     hasUnknownTokens: false,
+    stopLanguagePresent: false,
+    prohibitedContentHits: [],
     bodyTemplate: "",
     samplePreview: "",
     characterCount: 0,
     estimatedSegments: 1,
     approvalReady: false,
     approvalReadyLabel: "Not configured",
+    blockingReasons: [],
+    warnings: [],
+    canSaveDraft: false,
+    canMarkReadyForSandbox: false,
+    markReadyBlockingReasons: [],
+    markReadyWarnings: [],
   };
 }
 
-function buildVersionSummary(row: any): SmsTemplateGovernanceVersionSummary {
+function buildVersionSummary(row: any, options?: { isLatestVersion?: boolean }): SmsTemplateGovernanceVersionSummary {
   if (!row) return emptyVersionSummary();
 
+  const versionId = asTrimmed(row?.id);
   const versionStatus = asTrimmed(row?.version_status).toLowerCase();
   const internalReviewStatus = asTrimmed(row?.internal_review_status).toLowerCase() || "not_requested";
   const legalReviewStatus = asTrimmed(row?.legal_review_status).toLowerCase() || "not_requested";
@@ -289,16 +280,29 @@ function buildVersionSummary(row: any): SmsTemplateGovernanceVersionSummary {
 
   if (!bodyTemplate) return emptyVersionSummary();
 
-  const parsedTokens = parseTokensFromTemplate(bodyTemplate);
-  const detectedTokens = uniqueTokens([...normalizeTokenArray(row?.detected_tokens), ...parsedTokens]);
+  const validation = validateOnTheWayTemplateBody(bodyTemplate);
+  const detectedTokens = uniqueTokens([...normalizeTokenArray(row?.detected_tokens), ...validation.detectedTokens]);
+  const allowedTokenSet = new Set<string>(ON_THE_WAY_ALLOWED_TEMPLATE_TOKENS);
   const unknownTokens = uniqueTokens([
     ...normalizeTokenArray(row?.unknown_tokens),
-    ...detectedTokens.filter((token) => !ALLOWED_TOKENS.has(token)),
+    ...validation.unknownTokens,
+    ...detectedTokens.filter((token) => !allowedTokenSet.has(token)),
   ]);
-  const stopLanguagePresent = hasStopLanguage(bodyTemplate);
-  const samplePreview = renderSamplePreview(bodyTemplate);
-  const characterCount = samplePreview.length;
-  const estimatedSegments = estimateSegments(characterCount);
+  const isLatestVersion = options?.isLatestVersion === true;
+  const canSaveDraft = isLatestVersion && versionStatus === "draft" && validation.canSaveDraft;
+  const canMarkReadyStatus = versionStatus === "draft" || versionStatus === "pending_review";
+  const markReadyBlockingReasons = uniqueTokens([
+    ...validation.blockingReasons,
+    ...(unknownTokens.length > 0 ? ["unknown_tokens"] : []),
+  ]);
+  const markReadyWarnings = uniqueTokens([
+    ...validation.warnings,
+    ...(unknownTokens.length > 0 ? ["unknown_tokens_present"] : []),
+  ]);
+  // V1 admin readiness can be computed for latest drafts, but current review actions still
+  // require pending_review before approve-for-sandbox; UI/actions may need a combined path later.
+  const canMarkReadyForSandbox =
+    isLatestVersion && canMarkReadyStatus && validation.canApproveForSandbox && markReadyBlockingReasons.length === 0;
 
   const approvalReady =
     isApprovalStatus(versionStatus) &&
@@ -306,14 +310,14 @@ function buildVersionSummary(row: any): SmsTemplateGovernanceVersionSummary {
     legalReviewStatus === "approved" &&
     providerReviewStatus === "approved" &&
     unknownTokens.length === 0 &&
-    stopLanguagePresent;
+    validation.stopLanguagePresent;
 
   let approvalReadyLabel = "Not approval-ready";
   if (approvalReady) {
     approvalReadyLabel = "Approval-ready for governance only (send remains disabled)";
   } else if (unknownTokens.length > 0) {
     approvalReadyLabel = "Blocked: unknown tokens present";
-  } else if (!stopLanguagePresent) {
+  } else if (!validation.stopLanguagePresent) {
     approvalReadyLabel = "Blocked: STOP language missing";
   } else if (!isApprovalStatus(versionStatus)) {
     approvalReadyLabel = "Blocked: version status is not approval state";
@@ -323,6 +327,8 @@ function buildVersionSummary(row: any): SmsTemplateGovernanceVersionSummary {
 
   return {
     exists: true,
+    // Safe for browser read-model use only; future server actions still re-check account scope.
+    versionId,
     versionNumber: Number.isFinite(Number(row?.version_number)) ? Number(row?.version_number) : null,
     versionLabel: asTrimmed(row?.version_label),
     versionStatus,
@@ -338,18 +344,25 @@ function buildVersionSummary(row: any): SmsTemplateGovernanceVersionSummary {
     detectedTokens,
     unknownTokens,
     hasUnknownTokens: unknownTokens.length > 0,
+    stopLanguagePresent: validation.stopLanguagePresent,
+    prohibitedContentHits: validation.prohibitedContentHits,
     bodyTemplate,
-    samplePreview,
-    characterCount,
-    estimatedSegments,
+    samplePreview: validation.samplePreview,
+    characterCount: validation.characterCount,
+    estimatedSegments: validation.estimatedSegments,
     approvalReady,
     approvalReadyLabel,
+    blockingReasons: markReadyBlockingReasons,
+    warnings: markReadyWarnings,
+    canSaveDraft,
+    canMarkReadyForSandbox,
+    markReadyBlockingReasons,
+    markReadyWarnings,
   };
 }
 
 function buildResult(accountOwnerUserId: string): SmsTemplateGovernanceReadResult {
   return {
-    accountOwnerUserId,
     status: {
       smsEnabled: false,
       liveSendsEnabled: false,
@@ -374,8 +387,8 @@ function buildResult(accountOwnerUserId: string): SmsTemplateGovernanceReadResul
       helperText: "No versions configured.",
     },
     planningDefault: {
-      bodyTemplate: PLANNING_DEFAULT_BODY_TEMPLATE,
-      samplePreview: renderSamplePreview(PLANNING_DEFAULT_BODY_TEMPLATE),
+      bodyTemplate: ON_THE_WAY_PLANNING_DEFAULT_BODY,
+      samplePreview: renderSamplePreview(ON_THE_WAY_PLANNING_DEFAULT_BODY),
       label: "Planning sample only",
     },
     compliance: {
@@ -386,7 +399,7 @@ function buildResult(accountOwnerUserId: string): SmsTemplateGovernanceReadResul
     },
     deferredItems: [
       "Template editor",
-      "Admin approval actions",
+      "Admin readiness actions",
       "Legal/provider review workflow",
       "Token renderer for live send",
       "Send endpoint",
@@ -459,11 +472,15 @@ export async function getSmsOnTheWayTemplateGovernanceForAccount(
     : null;
   const latestRow = versionRows[0] ?? null;
 
-  result.currentVersion = buildVersionSummary(currentRow);
-  result.sandboxVersion = buildVersionSummary(sandboxRow);
-
-  const latestSummary = buildVersionSummary(latestRow);
   const latestRowId = asTrimmed(latestRow?.id);
+  result.currentVersion = buildVersionSummary(currentRow, {
+    isLatestVersion: latestRowId.length > 0 && latestRowId === asTrimmed(currentRow?.id),
+  });
+  result.sandboxVersion = buildVersionSummary(sandboxRow, {
+    isLatestVersion: latestRowId.length > 0 && latestRowId === asTrimmed(sandboxRow?.id),
+  });
+
+  const latestSummary = buildVersionSummary(latestRow, { isLatestVersion: true });
   const latestIsCurrent = latestSummary.exists && latestRowId.length > 0 && latestRowId === currentVersionPointerId;
 
   result.latestVersion = {
@@ -478,7 +495,7 @@ export async function getSmsOnTheWayTemplateGovernanceForAccount(
 
   const complianceSource = result.currentVersion.exists ? result.currentVersion : result.latestVersion;
   result.compliance = {
-    stopLanguagePresent: complianceSource.exists ? hasStopLanguage(complianceSource.bodyTemplate) : true,
+    stopLanguagePresent: complianceSource.exists ? complianceSource.stopLanguagePresent : true,
     unknownTokensBlockApproval: true,
     marketingLanguageBlocked: "deferred",
     samplePreviewOnly: true,

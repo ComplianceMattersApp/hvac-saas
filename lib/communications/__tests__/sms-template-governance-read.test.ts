@@ -169,10 +169,10 @@ describe("sms template governance read helper", () => {
       accountOwnerUserId: "",
     });
 
-    expect(result.accountOwnerUserId).toBe("");
     expect(result.template.hasTemplate).toBe(false);
     expect(result.status.smsEnabled).toBe(false);
     expect(result.status.liveSendsEnabled).toBe(false);
+    expect(result).not.toHaveProperty("accountOwnerUserId");
     expect(calls.some((call) => call.op === "from")).toBe(false);
   });
 
@@ -224,6 +224,7 @@ describe("sms template governance read helper", () => {
 
     expect(result.template.hasCurrentVersion).toBe(true);
     expect(result.currentVersion.exists).toBe(true);
+    expect(result.currentVersion.versionId).toBe("version-2");
     expect(result.currentVersion.versionNumber).toBe(2);
     expect(result.currentVersion.versionLabel).toBe("v2");
   });
@@ -244,6 +245,7 @@ describe("sms template governance read helper", () => {
 
     expect(result.template.hasSandboxVersion).toBe(true);
     expect(result.sandboxVersion.exists).toBe(true);
+    expect(result.sandboxVersion.versionId).toBe("version-3");
     expect(result.sandboxVersion.versionNumber).toBe(3);
     expect(result.sandboxVersion.versionLabel).toBe("sandbox-v3");
   });
@@ -264,9 +266,33 @@ describe("sms template governance read helper", () => {
 
     expect(result.currentVersion.exists).toBe(false);
     expect(result.latestVersion.exists).toBe(true);
+    expect(result.latestVersion.versionId).toBe("version-4");
     expect(result.latestVersion.versionNumber).toBe(4);
     expect(result.latestVersion.isCurrentPointer).toBe(false);
     expect(result.latestVersion.helperText).toContain("is informational only");
+  });
+
+  it("exposes latest draft admin readiness without exposing account scope", async () => {
+    const { supabase } = makeSupabase({
+      templates: [makeTemplate({ id: "template-1" })],
+      versions: [makeVersion({ id: "version-1", version_status: "draft" })],
+    });
+
+    const result = await getSmsOnTheWayTemplateGovernanceForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result).not.toHaveProperty("accountOwnerUserId");
+    expect(result.latestVersion.versionId).toBe("version-1");
+    expect(result.latestVersion.canSaveDraft).toBe(true);
+    expect(result.latestVersion.canMarkReadyForSandbox).toBe(true);
+    expect(result.latestVersion.markReadyBlockingReasons).toEqual([]);
+    expect(result.latestVersion.stopLanguagePresent).toBe(true);
+
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain("account_owner_user_id");
+    expect(serialized).not.toContain("owner-1");
   });
 
   it("renders allowed tokens into sample preview using only sample data", async () => {
@@ -322,6 +348,31 @@ describe("sms template governance read helper", () => {
     expect(result.currentVersion.approvalReadyLabel).toContain("unknown tokens");
   });
 
+  it("blocks latest draft sandbox readiness when unknown tokens are present", async () => {
+    const { supabase } = makeSupabase({
+      templates: [makeTemplate({ id: "template-1" })],
+      versions: [
+        makeVersion({
+          id: "version-1",
+          body_template: "Hi {{recipient_first_name}}, use {{unsafe_customer_note}}. Reply STOP to opt out.",
+          detected_tokens: ["recipient_first_name"],
+          unknown_tokens: [],
+          version_status: "draft",
+        }),
+      ],
+    });
+
+    const result = await getSmsOnTheWayTemplateGovernanceForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result.latestVersion.canSaveDraft).toBe(true);
+    expect(result.latestVersion.canMarkReadyForSandbox).toBe(false);
+    expect(result.latestVersion.markReadyBlockingReasons).toContain("unknown_tokens");
+    expect(result.latestVersion.markReadyWarnings).toContain("unknown_tokens_present");
+  });
+
   it("blocks approval readiness when STOP language is missing", async () => {
     const { supabase } = makeSupabase({
       templates: [makeTemplate({ id: "template-1", current_version_id: "version-1" })],
@@ -346,6 +397,106 @@ describe("sms template governance read helper", () => {
     expect(result.currentVersion.approvalReady).toBe(false);
     expect(result.currentVersion.approvalReadyLabel).toContain("STOP language missing");
     expect(result.compliance.stopLanguagePresent).toBe(false);
+  });
+
+  it("blocks latest draft sandbox readiness when STOP language is missing", async () => {
+    const { supabase } = makeSupabase({
+      templates: [makeTemplate({ id: "template-1" })],
+      versions: [
+        makeVersion({
+          id: "version-1",
+          body_template:
+            "Hi {{recipient_first_name}}, this is {{operator_or_tech_name}} with {{company_name}}.",
+          version_status: "draft",
+        }),
+      ],
+    });
+
+    const result = await getSmsOnTheWayTemplateGovernanceForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result.latestVersion.canMarkReadyForSandbox).toBe(false);
+    expect(result.latestVersion.markReadyBlockingReasons).toContain("stop_language_missing");
+    expect(result.latestVersion.markReadyWarnings).toContain("stop_language_missing");
+  });
+
+  it("blocks latest draft sandbox readiness when prohibited wording is present", async () => {
+    const { supabase } = makeSupabase({
+      templates: [makeTemplate({ id: "template-1" })],
+      versions: [
+        makeVersion({
+          id: "version-1",
+          body_template:
+            "Hi {{recipient_first_name}}, this is {{operator_or_tech_name}} with {{company_name}}. Ask about our discount. Reply STOP to opt out.",
+          version_status: "draft",
+        }),
+      ],
+    });
+
+    const result = await getSmsOnTheWayTemplateGovernanceForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result.latestVersion.canMarkReadyForSandbox).toBe(false);
+    expect(result.latestVersion.prohibitedContentHits).toContain("discount");
+    expect(result.latestVersion.markReadyBlockingReasons).toContain("prohibited_content");
+  });
+
+  it("does not make approved sandbox versions draft-editable", async () => {
+    const { supabase } = makeSupabase({
+      templates: [makeTemplate({ id: "template-1", sandbox_version_id: "version-1" })],
+      versions: [
+        makeVersion({
+          id: "version-1",
+          version_status: "approved_for_sandbox",
+          internal_review_status: "approved",
+        }),
+      ],
+    });
+
+    const result = await getSmsOnTheWayTemplateGovernanceForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result.latestVersion.versionStatus).toBe("approved_for_sandbox");
+    expect(result.latestVersion.canSaveDraft).toBe(false);
+    expect(result.latestVersion.canMarkReadyForSandbox).toBe(false);
+  });
+
+  it("keeps historical current and sandbox versions action-ineligible when they are not latest", async () => {
+    const { supabase } = makeSupabase({
+      templates: [
+        makeTemplate({
+          id: "template-1",
+          current_version_id: "version-1",
+          sandbox_version_id: "version-2",
+        }),
+      ],
+      versions: [
+        makeVersion({ id: "version-1", version_number: 1, version_status: "draft" }),
+        makeVersion({ id: "version-2", version_number: 2, version_status: "pending_review" }),
+        makeVersion({ id: "version-3", version_number: 3, version_status: "draft" }),
+      ],
+    });
+
+    const result = await getSmsOnTheWayTemplateGovernanceForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result.latestVersion.versionId).toBe("version-3");
+    expect(result.latestVersion.canSaveDraft).toBe(true);
+    expect(result.latestVersion.canMarkReadyForSandbox).toBe(true);
+    expect(result.currentVersion.versionId).toBe("version-1");
+    expect(result.currentVersion.canSaveDraft).toBe(false);
+    expect(result.currentVersion.canMarkReadyForSandbox).toBe(false);
+    expect(result.sandboxVersion.versionId).toBe("version-2");
+    expect(result.sandboxVersion.canSaveDraft).toBe(false);
+    expect(result.sandboxVersion.canMarkReadyForSandbox).toBe(false);
   });
 
   it("keeps SMS disabled even when version status and reviews are approved", async () => {
@@ -499,11 +650,14 @@ describe("sms template governance read helper", () => {
     });
 
     const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain("canSend");
     expect(serialized).not.toContain("provider_account_ref");
     expect(serialized).not.toContain("provider_sender_ref");
     expect(serialized).not.toContain("phone_e164");
     expect(serialized).not.toContain("customer");
     expect(serialized).not.toContain("job_id");
+    expect(serialized).not.toContain("account_owner_user_id");
+    expect(serialized).not.toContain("owner-1");
     expect(serialized).not.toContain("auth_token");
     expect(serialized).not.toContain("api_key");
   });
