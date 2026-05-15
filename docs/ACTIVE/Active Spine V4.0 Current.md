@@ -156,6 +156,18 @@ Current Program Status Note (May 2026)
     - explicit non-implementation boundary preserved: no code/schema/migration/Supabase/provider/send/webhook/env/flag/payment/QBO/portal changes and no production writes
     - real provider-powered SMS remains deferred pending later gated implementation slices and explicit approval
 
+  - SMS Slice F3B Provider Readiness Read-Model Helper is complete in commit `d370e56`:
+    - helper added: `lib/communications/sms-provider-readiness-read.ts` with test `lib/communications/__tests__/sms-provider-readiness-read.test.ts`
+    - helper API: `getSmsProviderReadinessForAccount({ supabase, accountOwnerUserId })`
+    - helper scope: account-scoped by `account_owner_user_id`, reads only `sms_provider_configurations` and `sms_sender_identities` tables
+    - helper output: safe-empty on missing scope or rows; browser-safe readiness data for future Communications UI; masks sender phone with `phone_last4`; no secrets/full refs/full phone/canSend/send eligibility
+    - helper always returns: `smsEnabled: false`, `liveSendsEnabled: false`, `statusLabel: "SMS is not enabled"` to reflect read-only status helper purpose
+    - helper posture: does not imply live SMS is active even if DB readiness/activation rows are active
+    - validation recorded: new provider readiness helper tests 16/16 passed; SMS eligibility helper tests 16/16 passed; contact recipient helper tests 4/4 passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed
+    - explicit non-implementation boundary preserved: no route/page/UI, no provider setup, no send endpoint/webhook, no sandbox/live SMS, no env/secrets/flag changes, no production migration apply, and no production writes
+    - F3C read-only Admin Center route/page implementation remains deferred
+    - real provider-powered SMS remains deferred pending later gated implementation slices and explicit legal/provider approval
+
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
   - Job Detail Location Preview Deferral (`4ecf127`) moved Street View/static map lookup behind `Suspense` around `TimedJobLocationPreview`; immediate fallback preserves address context plus `Navigate` and `Open in Maps` while map imagery resolves after first paint.

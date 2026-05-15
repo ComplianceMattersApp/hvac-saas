@@ -7,6 +7,15 @@ Date: 2026-05-15
 
 ---
 
+## F3B Completion Cross-Reference (May 2026)
+
+Slice F3B Provider Readiness Read-Model Helper is complete in commit `d370e56`:
+- Implementation: `lib/communications/sms-provider-readiness-read.ts` and `lib/communications/__tests__/sms-provider-readiness-read.test.ts`
+- Helper API: `getSmsProviderReadinessForAccount({ supabase, accountOwnerUserId })`
+- This spec (F1) defines the provider/Twilio readiness planning; F3B delivers a safe read-model helper for browser display.
+
+---
+
 ## 1) Current Decision
 
 Slice F1 closes the Provider/Twilio readiness planning contract only.
@@ -281,11 +290,11 @@ Primary risks before implementation:
 
 ## 15) Recommended Next Sequence
 
-A. F1 Provider/Twilio readiness spec closeout (this document).
-B. F2A sender identity/provider configuration model lock closeout (`docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md`).
-C. F2B provider configuration + sender identity schema foundation closeout (`supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`, commit `f093bdd`).
-D. F3A Settings Communications readiness UI model lock closeout (`docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md`).
-E. F3B read-model helper implementation (`lib/communications/sms-provider-readiness-read.ts`).
+A. F1 Provider/Twilio readiness spec closeout (this document). ✓ Complete
+B. F2A sender identity/provider configuration model lock closeout (`docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md`). ✓ Complete
+C. F2B provider configuration + sender identity schema foundation closeout (`supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`, commit `f093bdd`). ✓ Complete
+D. F3A Settings Communications readiness UI model lock closeout (`docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md`). ✓ Complete
+E. F3B read-model helper implementation (`lib/communications/sms-provider-readiness-read.ts`). ✓ Complete (commit `d370e56`)
 F. F3C read-only Admin Center route/page implementation (`/ops/admin/communications`).
 G. F4 webhook/status callback contract planning.
 H. F5 provider/Twilio sandbox implementation planning.

@@ -179,6 +179,19 @@ SMS Slice F3A closeout note (May 2026):
 - F3A does not implement code/UI/schema/migrations, provider setup, send endpoint, webhook, sandbox/live SMS, env/secrets changes, feature flags, payment/QBO/portal behavior, marketplace behavior, production migration apply, or production writes.
 - Real SMS remains deferred pending later gated implementation slices and explicit legal/provider activation approval.
 
+SMS Slice F3B closeout note (May 2026):
+- Slice F3B Provider Readiness Read-Model Helper is complete in commit `d370e56`.
+- F3B added helper file: `lib/communications/sms-provider-readiness-read.ts` and test file: `lib/communications/__tests__/sms-provider-readiness-read.test.ts`.
+- F3B helper API: `getSmsProviderReadinessForAccount({ supabase, accountOwnerUserId })`.
+- F3B helper scope: account-scoped by `account_owner_user_id`, reads only `sms_provider_configurations` and `sms_sender_identities` tables.
+- F3B helper output: safe-empty on missing scope or rows, browser-safe readiness data for future Settings → Communications UI, masks sender phone using `phone_last4`, does not return secrets/full provider refs/full phone/canSend/send eligibility.
+- F3B helper always returns: `smsEnabled: false`, `liveSendsEnabled: false`, `statusLabel: "SMS is not enabled"`.
+- F3B helper posture: does not imply live SMS is active even if DB readiness/activation rows are active.
+- F3B validation recorded: new provider readiness helper tests 16/16 passed, SMS eligibility helper tests 16/16 passed, contact recipient helper tests 4/4 passed, `npx.cmd tsc --noEmit` passed, `git diff --check` passed.
+- F3B does not implement route/page, provider setup, send endpoint, webhook, sandbox/live SMS, env/secrets changes, feature flags, payment/QBO/portal behavior, marketplace behavior, production migration apply, or production writes.
+- UI implementation and routing remain deferred to F3C read-only Admin Center route/page implementation.
+- Real SMS remains deferred pending later gated activation slices and explicit legal/provider approval.
+
 ---
 
 ## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version

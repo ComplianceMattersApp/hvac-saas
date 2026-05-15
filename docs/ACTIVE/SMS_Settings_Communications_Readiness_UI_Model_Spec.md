@@ -7,6 +7,15 @@ Date: 2026-05-15
 
 ---
 
+## F3B Completion Cross-Reference (May 2026)
+
+Slice F3B Provider Readiness Read-Model Helper is complete in commit `d370e56`:
+- Implementation: `lib/communications/sms-provider-readiness-read.ts` and `lib/communications/__tests__/sms-provider-readiness-read.test.ts`
+- Helper API: `getSmsProviderReadinessForAccount({ supabase, accountOwnerUserId })`
+- This spec (F3A) defined the browser-safe output contract; F3B delivers the implementation.
+
+---
+
 ## 1) Current Decision
 
 Slice F3A closes Settings -> Communications readiness UI posture in documentation only.
@@ -344,8 +353,8 @@ F3 page must not include:
 
 ## 14) Future Implementation Sequence
 
-A. F3A docs/model lock closeout.
-B. F3B read-model helper returning safe account-scoped readiness.
+A. F3A docs/model lock closeout. ✓ Complete
+B. F3B read-model helper returning safe account-scoped readiness. ✓ Complete (commit `d370e56`)
 C. F3C read-only Admin Center route/page.
 D. Later slices: provider setup mutation planning, template governance, webhook/signature validation, sandbox send planning, activation planning.
 

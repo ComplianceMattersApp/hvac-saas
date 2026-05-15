@@ -48,6 +48,14 @@ Slice F3A model lock cross-reference:
 - F3A locks route/IA posture (`/ops/admin/communications`), admin-only access guard, read-only first implementation sections, no-secret browser posture, status mapping, and no-go controls.
 - F3A remains docs/model-only and does not add route implementation, read-model helper, send route, webhook, sandbox send, live SMS, or activation behavior.
 
+Slice F3B completion cross-reference (May 2026):
+
+- Provider Readiness Read-Model Helper is complete in commit `d370e56`.
+- F3B implementation: `lib/communications/sms-provider-readiness-read.ts` with test file `lib/communications/__tests__/sms-provider-readiness-read.test.ts`.
+- F3B helper API: `getSmsProviderReadinessForAccount({ supabase, accountOwnerUserId })`.
+- F3B helper delivers safe account-scoped readiness data for future Communications UI per F3A model contract.
+- F3B validates: new provider readiness tests 16/16 passed, SMS eligibility tests 16/16 passed, contact recipient tests 4/4 passed, TypeScript clean.
+
 ---
 
 ## 1) Settings Location Decision
@@ -260,9 +268,9 @@ This slice does not perform or authorize:
 
 ## 11) Future Recommended Sequence
 
-A. Settings / Communications IA spec closeout.
-B. F3A Settings Communications readiness UI model lock closeout.
-C. F3B read-model helper planning/implementation (`lib/communications/sms-provider-readiness-read.ts`).
+A. Settings / Communications IA spec closeout. ✓ Complete
+B. F3A Settings Communications readiness UI model lock closeout. ✓ Complete
+C. F3B read-model helper planning/implementation (`lib/communications/sms-provider-readiness-read.ts`). ✓ Complete (commit `d370e56`)
 D. F3C read-only Admin Center route/page planning/implementation (`/ops/admin/communications`).
 E. Quiet-hours/timezone gate planning.
 F. Admin template governance implementation.
