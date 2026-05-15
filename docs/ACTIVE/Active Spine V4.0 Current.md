@@ -34,6 +34,20 @@ Current Program Status Note (May 2026)
   - caveat: dedicated ECC-negative smoke should continue during normal ongoing testing; the location-preview deferral is job-type neutral.
   - guardrail framing: these are shared job-detail responsiveness improvements that preserve neutral actor boundaries and scalable operational truth for future marketplace-style evolution.
 
+- Field Status Return-Anchor Continuity is complete and pushed in commit `7ac454b`:
+  - job detail now has a stable `#field-status-actions` anchor positioning field status action cluster consistently.
+  - field status redirects now return users near the action cluster after:
+    - Mark On The Way
+    - Mark In Progress
+    - Mark Job Complete
+    - Undo/Revert On The Way
+  - existing `tab`, `banner`/`notice`, cache-bust query, mutation behavior, lifecycle event writes, and revalidation behavior were preserved.
+  - banner cleanup may remove the hash from the final visible URL, but the viewport remains positioned near the field-status action area; this caveat is accepted as-is.
+  - validation recorded: `npx.cmd tsc --noEmit` passed, `npx.cmd vitest run lib/actions/__tests__/job-lifecycle-scope-hardening.test.ts` passed (16/16 tests), `git diff --check` passed, browser smoke passed for covered status flow, Service Plan-linked job, `/ops` dashboard, and banner cleanup behavior.
+  - boundaries preserved: no source-of-truth ownership, mutation/lifecycle/revalidation behavior, `/ops` queue behavior, Service Plans behavior, invoice/payment behavior, portal/SMS/QBO behavior, schema/migration state, auth/RLS, entitlement, or feature-flag behavior changed.
+  - button/status-transition speed work is paused for the current pass. future button-speed/status-transition work should be reopened only if real usage identifies a specific slow/jittery action or repeated UX problem, not as preventative polish.
+  - guardrail framing: this is shared job-detail reliability/continuity hardening that preserves neutral actor boundaries and scalable operational truth for future marketplace-style evolution, not Eddie-specific polish.
+
 - Group 9A-14B Service Plans Drilldown Navigation Polish is complete and pushed in commit `f05bc29`:
   - `/service-plans` remains read-only
   - Service Plan names now deep-link to focused customer agreement cards using `/customers/{customerId}?maFocus={agreementId}#maintenance-agreement-{agreementId}`
