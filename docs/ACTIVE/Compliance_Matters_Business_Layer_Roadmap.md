@@ -171,6 +171,14 @@ SMS Slice F2B closeout note (May 2026):
 - Validation recorded: `npx.cmd tsc --noEmit`, helper tests (`16/16` and `4/4`), `git diff --check`, and `supabase db reset --local --no-seed --yes` all passed, including full local migration chain with F2B.
 - Provider readiness is structurally closer but remains deferred/not active pending Settings UI planning, sender registration/provider review, webhook/signature validation planning, sandbox planning, legal/provider review, and explicit activation decision.
 
+SMS Slice F3A closeout note (May 2026):
+- Slice F3A Settings Communications Readiness UI Model Lock is complete in docs/model-only mode at `docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md`.
+- F3A locks future route/IA (`/ops/admin/communications`, `Communications`), admin-only access posture, first read-only section layout, and no-go control list.
+- F3A locks browser-safe/no-secret rendering posture, provider-ref masking/safe-label strategy, sender phone masking, status mapping contract, and activation-effective-state wording.
+- F3A locks sequencing: docs/model lock first, then F3B read-model helper, then F3C read-only route/page.
+- F3A does not implement code/UI/schema/migrations, provider setup, send endpoint, webhook, sandbox/live SMS, env/secrets changes, feature flags, payment/QBO/portal behavior, marketplace behavior, production migration apply, or production writes.
+- Real SMS remains deferred pending later gated implementation slices and explicit legal/provider activation approval.
+
 ---
 
 ## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version

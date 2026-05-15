@@ -66,6 +66,12 @@ Slice F2B closeout cross-reference (schema foundation only):
 - F2B did not alter `sms_message_intents` or `sms_provider_deliveries` in this slice.
 - Real SMS remains deferred.
 
+Slice F3A model lock cross-reference (settings readiness UI posture):
+
+- Settings -> Communications readiness UI model lock is captured in `docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md`.
+- F3A locks read-only/admin-only readiness display posture and status mapping without introducing send eligibility semantics.
+- F3A does not add send endpoint, webhook, provider callbacks, sandbox send, live SMS, or E2 table changes.
+
 ---
 
 ## 1) Current Decision
@@ -379,6 +385,7 @@ H. Production activation only after legal/provider review and explicit approval.
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
 - docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
+- docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
 - docs/ACTIVE/source-of-truth-strategy.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md

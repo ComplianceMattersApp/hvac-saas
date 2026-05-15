@@ -477,11 +477,13 @@ Future F2B migration should:
 A. F2A model lock closeout (this document).
 B. F2B schema migration foundation for provider configurations + sender identities.
 C. Local migration validation and docs closeout.
-D. Admin Settings -> Communications provider readiness UI planning.
-E. Webhook/signature-validation contract planning.
-F. Template governance implementation planning.
-G. Provider/Twilio sandbox implementation only after all gates.
-H. Production activation only after provider/legal review and explicit approval.
+D. F3A Settings Communications readiness UI model lock closeout (`docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md`).
+E. F3B read-model helper implementation planning (`lib/communications/sms-provider-readiness-read.ts`).
+F. F3C read-only Admin Center route/page implementation planning (`/ops/admin/communications`).
+G. Webhook/signature-validation contract planning.
+H. Template governance implementation planning.
+I. Provider/Twilio sandbox implementation only after all gates.
+J. Production activation only after provider/legal review and explicit approval.
 
 ---
 
@@ -489,6 +491,7 @@ H. Production activation only after provider/legal review and explicit approval.
 
 - docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
 - docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md
+- docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
 - docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md
 - docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md

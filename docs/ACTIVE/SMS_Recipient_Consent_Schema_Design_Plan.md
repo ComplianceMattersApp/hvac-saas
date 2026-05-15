@@ -281,6 +281,7 @@ Locked E2 interpretation:
 - Slice F1 Provider/Twilio readiness planning closeout is documented in `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md` and remains docs/model-only with no provider setup, send route, webhook, sandbox send, or live SMS.
 - Slice F2A sender identity/provider configuration model lock is documented in `docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md` with two-table semantics, no-secret DB rule, sandbox/production data semantics, and account-scoped mutation boundaries.
 - Slice F2B provider configuration + sender identity schema foundation is complete in commit `f093bdd` with migration `supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`, creating `sms_provider_configurations` and `sms_sender_identities` with account-scoped SELECT RLS only in V1 and no E2 table changes.
+- Slice F3A Settings Communications readiness UI model lock is documented in `docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md` with route/IA decision, admin-only/read-only posture, status mapping, no-secret browser rendering posture, and no-go controls.
 
 Validation recorded:
 
@@ -857,6 +858,7 @@ This is documentation only. It defines what must be built; it does not build it.
 - docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md (Slice E1 docs/model lock for intent/delivery audit semantics, idempotency, callback path, and RLS expectations)
 - docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md (Slice F1 docs/model lock for provider readiness, sender strategy, registration/A2P checklist, and callback/webhook planning)
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md (Slice F2A docs/model lock for provider configuration + sender identity schema semantics before migration)
+- docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md (Slice F3A docs/model lock for admin-only read-only Settings -> Communications readiness UI posture)
 - docs/ACTIVE/source-of-truth-strategy.md (canonical source rules that SMS schema must respect)
 - docs/ACTIVE/Active Spine V4.0 Current.md (project spine and SMS 9B entry)
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md (Group 9B roadmap entry)

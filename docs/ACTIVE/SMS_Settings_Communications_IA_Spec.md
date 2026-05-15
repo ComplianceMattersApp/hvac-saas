@@ -42,6 +42,12 @@ Slice F2B closeout cross-reference:
 - F2B created `sms_provider_configurations` and `sms_sender_identities` with account-scoped SELECT RLS only in V1 and no authenticated write policies.
 - F2B did not add settings UI, send route, webhook, sandbox send, live SMS, env/secret changes, or activation behavior.
 
+Slice F3A model lock cross-reference:
+
+- Settings -> Communications readiness UI model lock is captured in `docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md`.
+- F3A locks route/IA posture (`/ops/admin/communications`), admin-only access guard, read-only first implementation sections, no-secret browser posture, status mapping, and no-go controls.
+- F3A remains docs/model-only and does not add route implementation, read-model helper, send route, webhook, sandbox send, live SMS, or activation behavior.
+
 ---
 
 ## 1) Settings Location Decision
@@ -255,11 +261,11 @@ This slice does not perform or authorize:
 ## 11) Future Recommended Sequence
 
 A. Settings / Communications IA spec closeout.
-B. Admin Communications settings placeholder or route planning.
-C. SMS message intent/provider delivery audit schema planning.
-D. Quiet-hours/timezone gate planning.
-E. Admin template governance implementation.
-F. Non-sending background evaluator.
+B. F3A Settings Communications readiness UI model lock closeout.
+C. F3B read-model helper planning/implementation (`lib/communications/sms-provider-readiness-read.ts`).
+D. F3C read-only Admin Center route/page planning/implementation (`/ops/admin/communications`).
+E. Quiet-hours/timezone gate planning.
+F. Admin template governance implementation.
 G. Provider/Twilio readiness and sandbox setup.
 H. Sandbox provider send after all gates.
 I. Production activation only after legal/provider review and explicit approval.
@@ -274,6 +280,7 @@ I. Production activation only after legal/provider review and explicit approval.
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
 - docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
+- docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
 - docs/ACTIVE/source-of-truth-strategy.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md

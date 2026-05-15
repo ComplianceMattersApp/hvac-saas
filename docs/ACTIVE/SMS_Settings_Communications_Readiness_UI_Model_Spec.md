@@ -1,0 +1,395 @@
+# Compliance Matters - SMS Settings Communications Readiness UI Model Spec
+
+Status: ACTIVE planning/model spec
+Authority: Subordinate to docs/ACTIVE/Active Spine V4.0 Current.md and docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md
+Mode: Documentation/model only (no implementation)
+Date: 2026-05-15
+
+---
+
+## 1) Current Decision
+
+Slice F3A closes Settings -> Communications readiness UI posture in documentation only.
+
+Locked boundary for this slice:
+
+- no code changes
+- no behavior changes
+- no schema changes
+- no migrations
+- no Supabase commands
+- no production writes
+- no provider setup
+- no Twilio account changes
+- no Twilio API calls
+- no sandbox SMS sends
+- no live SMS sends
+- no environment/secret changes
+- no feature flag changes
+- no send endpoint
+- no provider webhook
+- no activation toggle
+- no template editor
+
+Real SMS remains deferred.
+
+---
+
+## 2) Route and IA Decision
+
+Locked route and IA posture:
+
+- future route: `/ops/admin/communications`
+- future nav/admin label: `Communications`
+- do not use `/ops/admin/settings/communications` unless a broader nested settings IA is introduced later
+- do not call V1 route `SMS Settings` because it implies live/editable behavior
+- do not call V1 route `Notifications` because that scope is broader than SMS readiness
+- Company Profile remains separate and does not own SMS provider/sender/template controls
+
+---
+
+## 3) Admin Center Card Posture
+
+Future Admin Center card content:
+
+- title: `Communications`
+- description: `Review SMS/provider readiness. SMS is not enabled and live sends are disabled.`
+- CTA: `Review readiness`
+
+Card placement/meaning:
+
+- card belongs in Admin Center organization/admin area
+- card must not imply SMS can send
+- first read-only implementation must not expose provider setup controls
+
+---
+
+## 4) Access and Role Guard
+
+V1 access posture:
+
+- admin-only route
+- use existing admin guard pattern: `requireInternalRole("admin", { supabase, userId })`
+- contractors redirect to `/portal`
+- non-admin internal users redirect to `/ops`
+- do not render read-only unavailable state to non-admin users in V1
+
+Future mutation boundary:
+
+- edits remain admin/owner-only through server actions
+
+---
+
+## 5) First Page Sections (Read-Only V1)
+
+### A. Communications Status
+
+- `SMS is not enabled.`
+- `Live sends are disabled.`
+- `This page is readiness/status only.`
+
+### B. SMS Provider Readiness
+
+Read-only fields:
+
+- provider name
+- environment
+- readiness status
+- activation status
+- callback readiness
+
+Empty state:
+
+- `Provider setup has not been configured.`
+
+### C. Sender Identity
+
+Read-only fields:
+
+- sender label
+- sender type
+- masked phone/sender
+- verification status
+- activation status
+
+Empty state:
+
+- `No sender identity is configured.`
+
+### D. On-The-Way Notification
+
+- `Planned only. Mark On The Way does not send SMS.`
+
+### E. Compliance Readiness
+
+Status-only checklist posture:
+
+- recipient registry: structurally complete
+- consent/suppression: structurally complete
+- eligibility input helper: structurally complete
+- intent/delivery audit tables: structurally complete
+- provider config/sender identity schema: structurally complete
+- quiet-hours send gate: deferred
+- template governance: deferred
+- provider webhook/signature validation: deferred
+- sandbox validation: deferred
+- legal/provider review: deferred
+- explicit activation: disabled/deferred
+
+### F. Activation Status
+
+Always show effective send state:
+
+- `Live sends are disabled.`
+
+If DB activation state is active before send path exists, use wording such as:
+
+- `Configured active; send path unavailable in this build.`
+
+---
+
+## 6) Read-Only First Implementation Posture
+
+Locked implementation posture:
+
+- first implementation is read-only
+- no editable fields in F3
+- no activation toggle
+- no template editor
+- no provider credential form
+- no provider setup form
+- no test/SMS/sandbox send controls
+
+---
+
+## 7) Secrets and Provider Reference Safety
+
+No-secret browser posture:
+
+- no secrets in browser HTML
+- never display auth tokens, API secrets, webhook secrets, private keys, or env var values
+
+Provider-reference display safety:
+
+- do not expose full refs by default:
+  - `provider_account_ref`
+  - `default_messaging_service_ref`
+  - `provider_sender_ref`
+  - `messaging_service_ref`
+  - `provider_brand_ref`
+  - `provider_campaign_ref`
+  - `provider_registration_ref`
+- future read model should map these to safe labels/booleans such as `Configured`/`Not configured`
+- sender phone display should be masked using `phone_last4`
+
+---
+
+## 8) Future Read-Model Helper Decision
+
+Locked next implementation target:
+
+- `lib/communications/sms-provider-readiness-read.ts`
+
+Inputs:
+
+- `supabase`
+- `accountOwnerUserId`
+
+Reads:
+
+- `sms_provider_configurations`
+- `sms_sender_identities`
+
+Behavior:
+
+- account-scoped by `account_owner_user_id`
+- safe empty result when no rows exist
+- no provider calls
+- no secrets
+- no full raw provider refs in browser output
+- mask sender phone using `phone_last4`
+- convert provider refs to safe booleans/labels
+
+---
+
+## 9) Read Model Output Posture
+
+Likely read-model outputs:
+
+- communications status summary
+- provider readiness summary
+- sender identity summary
+- compliance checklist summary
+- activation effective state
+- safe-empty state
+- deferred-items list
+
+Locked exclusions:
+
+- should not return send eligibility
+- should not return `canSend`
+- should not return secrets or full provider refs
+
+---
+
+## 10) Status Mapping (UI Labels)
+
+Provider readiness mapping:
+
+- `draft` -> `Setup required`
+- `sandbox_only` -> `Sandbox only`
+- `registration_required` -> `Registration required`
+- `registration_pending` -> `Registration pending`
+- `provider_review_required` -> `Provider review required`
+- `ready_for_sandbox` -> `Ready for sandbox`
+- `ready_for_activation` -> `Ready for activation`
+- `active` -> `Provider ready`
+- `paused` -> `Paused`
+- `rejected` -> `Rejected`
+- no row -> `Not configured`
+
+Activation mapping:
+
+- `disabled` -> `Disabled`
+- `pending_activation` -> `Pending activation`
+- `active` -> `Configured active; live sends still unavailable`
+- `paused` -> `Paused`
+
+Callback readiness mapping:
+
+- `not_configured` -> `Not configured`
+- `pending` -> `Pending`
+- `ready` -> `Ready`
+- `failed` -> `Needs attention`
+- `not_applicable` -> `Not applicable`
+
+Sender verification mapping:
+
+- `draft` -> `Draft`
+- `pending_verification` -> `Pending verification`
+- `verified` -> `Verified`
+- `rejected` -> `Rejected`
+- `active` -> `Active sender configuration`
+- `paused` -> `Paused`
+
+---
+
+## 11) Provider Readiness Checklist Posture
+
+Future checklist categories:
+
+- Provider configuration
+- Sender identity
+- Registration/verification
+- Opt-out/help readiness
+- Status callback readiness
+- Inbound callback readiness
+- Template governance
+- Consent/suppression model
+- Audit tables
+- Sandbox validation
+- Legal/provider review
+- Explicit activation
+
+Structurally complete now:
+
+- recipient registry
+- consent/suppression foundation
+- non-sending eligibility helper
+- intent/delivery audit tables
+- provider config/sender identity schema
+
+Deferred now:
+
+- quiet-hours send gate
+- template governance
+- provider webhook/signature validation
+- sandbox validation
+- legal/provider review
+- activation
+
+---
+
+## 12) Marketplace and Tenant Guardrails
+
+Normal admin UI language stays account-scoped:
+
+- `Sender identity is configured for this account.`
+
+Guardrails:
+
+- do not introduce marketplace language in normal admin UI yet
+- shared sender identity warnings remain docs/internal planning until marketplace onboarding is real
+- provider/sender data must remain tenant/account scoped
+
+---
+
+## 13) No-Go UI Controls (F3)
+
+F3 page must not include:
+
+- send button
+- test SMS button
+- sandbox send button
+- activation toggle
+- template editor
+- provider credential form
+- Twilio API calls
+- webhook setup
+- environment/secret display
+- full provider refs in HTML
+- marketplace controls
+
+---
+
+## 14) Future Implementation Sequence
+
+A. F3A docs/model lock closeout.
+B. F3B read-model helper returning safe account-scoped readiness.
+C. F3C read-only Admin Center route/page.
+D. Later slices: provider setup mutation planning, template governance, webhook/signature validation, sandbox send planning, activation planning.
+
+---
+
+## 15) Future Implementation Acceptance Criteria (Read-Only First)
+
+First read-only implementation should satisfy:
+
+- `/ops/admin/communications` exists and is admin-only
+- Admin Center links to Communications
+- no-row state clearly says SMS is not enabled and provider setup is not configured
+- existing provider/sender rows render only account-scoped, browser-safe status
+- provider refs and phone numbers are hidden or masked
+- no send, sandbox, activation, template, credential, or provider setup controls appear
+- no Twilio/network/provider calls happen
+- non-admin users cannot view the page
+
+---
+
+## 16) Future Validation Plan
+
+Future F3 implementation validation should include:
+
+- read-model unit tests for empty state, status mapping, masking, and account scope
+- route smoke for admin access
+- non-admin redirect check
+- browser smoke confirming no send/activation controls
+- browser/source check confirming no secrets or full provider refs render
+- `npx.cmd tsc --noEmit`
+- `git diff --check`
+- rerun existing communications tests around recipient/eligibility helpers if touched
+
+---
+
+## Related ACTIVE References
+
+- docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md
+- docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
+- docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
+- docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md
+- docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md
+- docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
+- docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md
+- docs/ACTIVE/source-of-truth-strategy.md
+- docs/ACTIVE/Active Spine V4.0 Current.md
+- docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md

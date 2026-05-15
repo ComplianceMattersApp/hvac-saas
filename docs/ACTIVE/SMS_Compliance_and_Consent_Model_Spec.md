@@ -56,6 +56,7 @@ Reference closeouts:
 - Slice F2B migration closeout: commit `f093bdd`; migration `supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`; created `sms_provider_configurations` and `sms_sender_identities` as account-scoped provider-readiness/sender-identity metadata foundations with SELECT-only RLS in V1 and no authenticated write policies.
 - Slice F2B validation: `npx.cmd tsc --noEmit`, B2 helper tests (`16/16`), recipient helper tests (`4/4`), `git diff --check`, and `supabase db reset --local --no-seed --yes` passed with full local migration chain including F2B.
 - Slice F2B boundary confirmation: no app code/UI changes, no E2 table changes, no send endpoint/webhook/provider integration/sandbox-live SMS behavior, no env/secret/feature-flag changes, no production migration apply, and no production writes.
+- Slice F3A docs/model closeout: `docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md` locks admin-only/read-only Settings -> Communications readiness UI posture, route decision (`/ops/admin/communications`), browser-safe/no-secret rendering posture, status mapping contract, and no-go UI controls before any helper/route implementation.
 - Quiet-hours scope lock: quiet-hours/timezone remains future conservative fail-closed SMS pre-send gate planning only; it must not block Mark On The Way or job lifecycle/status transitions.
 
 ---
@@ -226,6 +227,7 @@ This planning slice does not perform:
 - docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md (Slice E1 docs/model lock for intent/delivery audit semantics, callback path, and provider-neutral status design)
 - docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md (Slice F1 docs/model lock for provider readiness, sender strategy, A2P/registration checklist, callback/webhook readiness planning, and activation boundaries)
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md (Slice F2A docs/model lock for sender identity/provider configuration semantics, no-secret DB rule, and migration acceptance boundaries)
+- docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md (Slice F3A docs/model lock for admin-only read-only Settings -> Communications readiness UI posture)
 - docs/ACTIVE/Compliance_Matters_Prelaunch_Confirmation_Checklist.md
 - docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md
 - docs/ACTIVE/Active Spine V4.0 Current.md

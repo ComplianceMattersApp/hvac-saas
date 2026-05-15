@@ -146,6 +146,15 @@ Current Program Status Note (May 2026)
     - validation recorded: `npx.cmd tsc --noEmit` passed, helper tests passed (`16/16` and `4/4`), `git diff --check` passed, and `supabase db reset --local --no-seed --yes` passed with full local migration chain including F2B
     - boundaries preserved: no app code/UI changes, no E2 table changes, no send endpoint/webhook/provider behavior, no sandbox/live SMS, no env/secret/flag changes, no production migration apply, and no production writes
     - provider readiness is structurally closer but remains deferred/not active pending later gates and explicit approval
+  - SMS Slice F3A Settings Communications Readiness UI Model Lock (docs/model-only) is complete:
+    - spec added: `docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md`
+    - locked route/IA posture recorded: future admin route is `/ops/admin/communications` with `Communications` label; Company Profile boundary remains separate
+    - locked access and first implementation posture recorded: admin-only route guard and read-only first implementation with no send/sandbox/activation/template/credential controls
+    - locked data-safety posture recorded: no secrets/full provider refs in browser output; masked sender phone display; provider refs mapped to safe configured/not-configured labels
+    - locked status-mapping and activation-effective-state wording recorded, including `Configured active; send path unavailable in this build` when send path is unavailable
+    - locked sequence recorded: F3A docs/model lock before F3B read-model helper and F3C read-only route/page implementation
+    - explicit non-implementation boundary preserved: no code/schema/migration/Supabase/provider/send/webhook/env/flag/payment/QBO/portal changes and no production writes
+    - real provider-powered SMS remains deferred pending later gated implementation slices and explicit approval
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

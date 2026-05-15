@@ -216,6 +216,7 @@ Current audit-first foundation supports provider readiness planning:
 Missing before any sandbox-send implementation:
 
 - sender identity / provider configuration implementation wiring and mutation contract
+- Settings -> Communications readiness route/read-model implementation
 - admin template governance/storage model
 - webhook route + signature-validation implementation
 - provider status normalization implementation layer
@@ -283,11 +284,13 @@ Primary risks before implementation:
 A. F1 Provider/Twilio readiness spec closeout (this document).
 B. F2A sender identity/provider configuration model lock closeout (`docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md`).
 C. F2B provider configuration + sender identity schema foundation closeout (`supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`, commit `f093bdd`).
-D. F3 admin template governance planning.
-E. F4 webhook/status callback contract planning.
-F. F5 provider/Twilio sandbox implementation planning.
-G. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
-H. Production activation only after provider/legal review and explicit approval.
+D. F3A Settings Communications readiness UI model lock closeout (`docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md`).
+E. F3B read-model helper implementation (`lib/communications/sms-provider-readiness-read.ts`).
+F. F3C read-only Admin Center route/page implementation (`/ops/admin/communications`).
+G. F4 webhook/status callback contract planning.
+H. F5 provider/Twilio sandbox implementation planning.
+I. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
+J. Production activation only after provider/legal review and explicit approval.
 
 ---
 
@@ -320,6 +323,7 @@ Primary official references used for this planning slice:
 - docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md
 - docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
+- docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md
