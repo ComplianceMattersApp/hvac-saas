@@ -82,6 +82,8 @@ Reference closeouts:
 - Slice F4D-E1 boundary: UI wires only create/save draft actions and remains non-sending; submit/review/approve/reject/activation/provider/send/webhook controls are not wired in this slice.
 - Slice F4D-E1 copy posture: UI continues to show `SMS is not enabled`, `Live sends are disabled`, `Template approval does not enable sending`, `Sample preview only`, `Mark On The Way does not send SMS`, and legal/provider review reminder.
 - Slice F4D-E1 smoke/validation posture: browser smoke passed with `draft_created` and `draft_saved` after local runtime target alignment; initial `template_create_failed` was runtime-target mismatch (not code defect); post-smoke validation matrix remained green.
+- SMS On-The-Way V1 simplification: Mark On The Way is the operational trigger; future SMS is a background operational/customer-care notification after that lifecycle event; admin owns the wording in V1; field users do not write custom SMS; visible V1 UI should not become a multi-person approval/rejection queue unless explicitly reopened.
+- V1 compliance posture: the sample On-The-Way wording remains operational only (`Reply STOP to opt out` required); review-request SMS is a separate future message class; template readiness and sandbox readiness do not enable sending.
 - Quiet-hours scope lock: quiet-hours/timezone remains future conservative fail-closed SMS pre-send gate planning only; it must not block Mark On The Way or job lifecycle/status transitions.
 
 ---

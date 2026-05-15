@@ -312,7 +312,7 @@ SMS Slice F4D-D closeout note (May 2026):
 - no activation behavior, no provider/Twilio/send/webhook behavior, and no SMS send readiness implied by template approval/readiness.
 - validation recorded: template action tests `40/40`; template validation helper tests `19/19`; template governance read tests `15/15`; provider readiness tests `16/16`; SMS eligibility tests `16/16`; contact recipient tests `4/4`; `npx.cmd tsc --noEmit`; `git diff --check`; total `110/110` passed.
 - state after F4D-D: schema/read-model/read-only UI/validation helper/create-save draft/review actions exist; editable UI remains deferred (F4D-E); approve-for-activation remains deferred; provider/legal approval actions remain deferred; provider setup remains deferred; sandbox/live SMS remains deferred; real SMS remains deferred.
-- safe forward sequence: F4D-D docs closeout, then F4D-E1 create/save draft UI, then F4D-E2 safe version-id/action-eligibility read-model support, then F4D-E3 review controls UI, then later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
+- safe forward sequence: F4D-D docs closeout, then F4D-E1 create/save draft UI, then F4D-E2 safe version-id/action-eligibility read-model support for admin readiness, then F4D-E3 mark wording ready for sandbox/readiness UI (not full review/reject UI unless reopened), then later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
 
 SMS Slice F4D-E1 closeout note (May 2026):
 - Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
@@ -324,7 +324,18 @@ SMS Slice F4D-E1 closeout note (May 2026):
 - browser smoke passed after local runtime target alignment with `draft_created` and `draft_saved`.
 - runtime mismatch finding recorded: initial `template_create_failed` came from local reset target vs remote app runtime target mismatch (missing template tables in remote PostgREST schema cache), not a code defect.
 - validation recorded post-smoke: template action tests `40/40`, template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipients tests `4/4`, `npx.cmd tsc --noEmit`, `git diff --check`, and clean working tree.
-- state after F4D-E1: schema/read-model/read-only UI/validation helper/create-save draft/review actions/create-save draft UI exist; review controls UI remains deferred to F4D-E2/F4D-E3; approve-for-activation/provider-legal actions/provider setup/sandbox-live SMS remain deferred; real SMS remains deferred.
+- state after F4D-E1: schema/read-model/read-only UI/validation helper/create-save draft/review actions/create-save draft UI exist; review/reject UI remains deferred unless team-review workflow is reopened; approve-for-activation/provider-legal actions/provider setup/sandbox-live SMS remain deferred; real SMS remains deferred.
+
+SMS On-The-Way V1 workflow simplification note (May 2026):
+- V1 product goal is simple: job users press Mark On The Way, and future provider SMS is a background operational/customer-care notification after that lifecycle event.
+- Mark On The Way remains lifecycle-first; provider failure must not roll back the lifecycle transition.
+- Admin controls the V1 On-The-Way wording and is the effective wording owner/approver.
+- Field users do not write, preview, or freely edit SMS wording; job/customer-level custom SMS text is not V1.
+- Existing submit/approve/reject server actions remain future-compatible infrastructure, but visible V1 UI should not become a multi-person approval/rejection queue.
+- `Reject version` UI remains deferred unless a larger-company/team-review workflow is intentionally reopened.
+- Future UI should prefer readiness language like `Mark wording ready for sandbox` or `Wording ready for future SMS testing`, not `Approve SMS`, `Activate SMS`, or `Enable SMS`.
+- Template readiness and sandbox readiness do not send SMS; real SMS remains deferred.
+- `job_events` and manual contact logs are not provider delivery truth; `sms_message_intents.message_body_snapshot` remains the future audit record of attempted SMS wording.
 
 ---
 

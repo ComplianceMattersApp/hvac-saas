@@ -244,6 +244,32 @@ SMS Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
 - initial `template_create_failed` was runtime-target mismatch, not a template-governance code defect
 - real SMS remains deferred
 
+## SMS On-The-Way V1 Workflow Simplification (May 2026)
+
+The V1 product direction is intentionally simple:
+
+- Job users press Mark On The Way.
+- Mark On The Way remains lifecycle-first and does not send SMS yet.
+- Future provider SMS, when approved later, should run as a background notification after the lifecycle event and must not roll back the lifecycle transition on provider failure.
+- Admin controls the On-The-Way wording; field users do not write or freely edit SMS wording.
+- Job/customer-level custom SMS text is not part of V1.
+- Admin is the V1 wording owner and effective approver.
+
+The governed V1 wording remains simple operational/customer-care text, for example:
+
+`Hi {{recipient_first_name}}, this is {{operator_or_tech_name}} with {{company_name}}. I am on the way to your service appointment. Reply STOP to opt out.`
+
+Visible V1 UI should stay admin-readiness oriented:
+
+- Create draft from default.
+- Edit/save draft wording.
+- Later, mark wording ready for sandbox/readiness.
+- Do not expose `Reject version` unless a larger-company/team-review workflow is intentionally reopened.
+- Do not make `Submit for review` feel required for owner-led/admin-owned V1 unless explicitly reopened.
+- Prefer `Mark wording ready for sandbox` or `Wording ready for future SMS testing` over approval-queue language.
+
+Template governance remains admin/settings governance, not job timeline truth. `job_events` and manual contact logs are not provider delivery truth, and `sms_message_intents.message_body_snapshot` remains the future audit record of attempted SMS wording.
+
 ---
 
 ## 2) Governance Location
@@ -617,8 +643,8 @@ F. F4D-B validation helper. ✓ Complete (`418172e`)
 G. F4D-C create/save draft server actions.
 H. F4D-D review actions.
 I. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
-J. F4D-E2 safe version-id/action-eligibility read-model support.
-K. F4D-E3 review controls UI.
+J. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness.
+K. F4D-E3 mark wording ready for sandbox/readiness UI, not full review/reject UI unless reopened.
 L. Later webhook/status callback contract planning.
 M. Later sandbox/provider planning.
 N. Later production activation only after legal/provider review and explicit approval.

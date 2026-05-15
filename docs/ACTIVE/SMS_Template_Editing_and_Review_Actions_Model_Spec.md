@@ -54,8 +54,8 @@ B. F4D-B validation helper. ✓ Complete (`418172e`)
 C. F4D-C create/save draft server actions. ✓ Complete (`f7cf8c0`)
 D. F4D-D review actions. ✓ Complete (`f5995d7`)
 E. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
-F. F4D-E2 safe version-id/action-eligibility read-model support.
-G. F4D-E3 review controls UI.
+F. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness.
+G. F4D-E3 mark wording ready for sandbox/readiness UI, not full review/reject UI unless reopened.
 H. Later provider/legal review operations.
 I. Later sandbox/provider work.
 J. Later production activation only after explicit approval.
@@ -306,8 +306,8 @@ State after F4D-D:
 Future sequence after this docs closeout:
 
 - F4D-E1 create/save draft UI
-- F4D-E2 safe version-id/action-eligibility read-model support
-- F4D-E3 review controls UI
+- F4D-E2 safe version-id/action-eligibility read-model support for admin readiness
+- F4D-E3 mark wording ready for sandbox/readiness UI, not full review/reject UI unless reopened
 - later provider/legal review workflow
 - later webhook/status callback contract planning
 - later provider/Twilio sandbox planning
@@ -352,12 +352,64 @@ State after F4D-E1:
 - create/save draft actions exist
 - submit/approve-for-sandbox/reject review actions exist
 - create/save draft UI exists
-- review controls UI remains deferred to F4D-E2/F4D-E3 sequence
+- review/reject UI remains deferred unless a larger-company/team-review workflow is reopened
 - approve-for-activation remains deferred
 - provider/legal approval actions remain deferred
 - provider setup remains deferred
 - sandbox/live SMS remains deferred
 - real SMS remains deferred
+
+---
+
+## SMS On-The-Way V1 Workflow Simplification (May 2026)
+
+V1 product goal:
+
+- Mark On The Way is the user-facing operational action.
+- The job lifecycle/status update remains primary and succeeds or fails on its own operational rules.
+- Future provider-powered SMS is a background notification triggered after the Mark On The Way lifecycle event.
+- Provider failure must not roll back the Mark On The Way lifecycle transition.
+- The V1 message remains simple operational/customer-care wording only.
+
+Planning example:
+
+`Hi {{recipient_first_name}}, this is {{operator_or_tech_name}} with {{company_name}}. I am on the way to your service appointment. Reply STOP to opt out.`
+
+V1 wording ownership:
+
+- Admin controls the On-The-Way message wording.
+- Admin is the V1 wording owner and effective approver.
+- Field users do not write, preview, or freely edit SMS wording.
+- Customer/job-level custom SMS text is not part of V1.
+- Job users should only press Mark On The Way.
+
+Visible V1 UI simplification:
+
+- Existing submit/approve/reject server actions remain future-compatible infrastructure.
+- Visible V1 UI should not behave like a multi-person approval queue.
+- Do not expose `Reject version` in V1 UI unless a larger-company/team-review workflow is intentionally reopened.
+- Do not present `Submit for review` as required for owner-led/admin-owned V1 unless explicitly reopened.
+- Prefer readiness wording such as `Mark wording ready for sandbox` or `Wording ready for future SMS testing`.
+- Avoid UI language such as `Approve SMS`, `Activate SMS`, or `Enable SMS`.
+- F4D-E2 should support safe action eligibility/read-model data around admin-controlled readiness.
+- F4D-E3 should be reconsidered as mark-wording-ready-for-sandbox/readiness UI rather than review-controls UI.
+
+Non-live boundaries:
+
+- Template readiness does not enable SMS.
+- Sandbox readiness does not send SMS.
+- Real SMS remains deferred.
+- No provider/Twilio/send/webhook behavior exists.
+- No activation toggle exists.
+- No sandbox/live SMS exists.
+- Mark On The Way does not send SMS yet.
+
+Source-of-truth boundaries:
+
+- `job_events` is not provider delivery truth.
+- Manual contact logs are not provider delivery truth.
+- `sms_message_intents.message_body_snapshot` remains the future audit record of attempted SMS wording.
+- Template governance remains admin/settings governance, not job timeline truth.
 
 ---
 

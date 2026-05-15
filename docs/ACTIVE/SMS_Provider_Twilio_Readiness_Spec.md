@@ -86,7 +86,7 @@ Slice F4D-B Template Governance Validation Helper is complete.
 - helper has no Supabase/database/provider dependencies and no UI/server-action behavior; it does not enable SMS or imply `canSend`
 - review-request SMS remains a future separate message class and is prohibited in On-The-Way operational template wording
 - validation recorded: template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed
-- create/save draft server actions and review actions are complete; create/save draft UI is complete; review controls UI remains deferred; real SMS remains deferred
+- create/save draft server actions and review actions are complete; create/save draft UI is complete; review/reject UI remains deferred unless team-review workflow is reopened; real SMS remains deferred
 
 ## F4D-E1 Completion Cross-Reference (May 2026)
 
@@ -99,6 +99,19 @@ Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
 - browser smoke passed after local runtime target alignment (`draft_created`, `draft_saved`)
 - initial `template_create_failed` was caused by runtime target mismatch (local reset target vs remote app runtime target), not a code defect
 - real SMS remains deferred
+
+## SMS On-The-Way V1 Workflow Simplification (May 2026)
+
+Provider planning remains subordinate to the simple V1 product goal:
+
+- User presses Mark On The Way.
+- Future SMS is a background operational/customer-care notification after that lifecycle event.
+- Provider failure must not roll back Mark On The Way.
+- Admin controls the wording before provider send behavior is connected.
+- Visible V1 UI should use admin readiness language, not activation or approval-queue language.
+- Sandbox readiness does not send SMS.
+- Template readiness does not enable provider/Twilio behavior.
+- Real SMS remains deferred until provider setup, webhook/signature validation, consent/suppression gates, legal/provider review, and explicit activation are approved later.
 
 ---
 
@@ -391,8 +404,8 @@ L. F4D-B validation helper only; no writes, no UI. ✓ Complete (`418172e`)
 M. F4D-C create/save draft server actions.
 N. F4D-D review actions.
 O. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
-P. F4D-E2 safe version-id/action-eligibility read-model support.
-Q. F4D-E3 review controls UI.
+P. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness.
+Q. F4D-E3 mark wording ready for sandbox/readiness UI, not full review/reject UI unless reopened.
 R. F5 webhook/status callback contract planning.
 S. F6 provider/Twilio sandbox implementation planning.
 T. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.

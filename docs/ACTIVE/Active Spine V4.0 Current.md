@@ -230,7 +230,7 @@ Current Program Status Note (May 2026)
   - SMS Slice F4D-A Template Editing + Review Actions Model Lock is complete (docs/model-only):
     - spec added: `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md`
     - cross-references updated across ACTIVE SMS docs, source-of-truth strategy, Active Spine, and Business Layer Roadmap
-    - locked implementation sequence (updated): F4D-A docs/model lock, F4D-B validation helper, F4D-C create/save draft server actions, F4D-D review actions, F4D-E1 create/save draft UI (complete), F4D-E2 safe version-id/action-eligibility read-model support, F4D-E3 review controls UI, later provider/legal review, later sandbox/provider work, and later production activation only after explicit approval
+    - locked implementation sequence (updated): F4D-A docs/model lock, F4D-B validation helper, F4D-C create/save draft server actions, F4D-D review actions, F4D-E1 create/save draft UI (complete), F4D-E2 safe version-id/action-eligibility read-model support for admin readiness, F4D-E3 mark wording ready for sandbox/readiness UI (not full review/reject UI unless reopened), later provider/legal review, later sandbox/provider work, and later production activation only after explicit approval
     - locked future validation helper: `lib/communications/sms-template-governance-validation.ts`
     - locked future action file: `lib/actions/sms-template-actions.ts`
     - locked first future actions: `createOnTheWayTemplateDraftFromDefaultFromForm` and `saveOnTheWayTemplateDraftFromForm`
@@ -281,7 +281,7 @@ Current Program Status Note (May 2026)
     - approve-for-sandbox includes best-effort rollback when version approval succeeds but parent sandbox pointer update fails
     - validation recorded: template action tests `40/40` passed; template validation helper tests `19/19` passed; template governance read tests `15/15` passed; provider readiness tests `16/16` passed; SMS eligibility tests `16/16` passed; contact recipient tests `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed; total `110/110`
     - boundaries preserved: no UI/route/schema/migration changes, no Supabase production commands, no provider/Twilio/send/webhook/sandbox/live SMS behavior, no env/secret/flag changes, and no payment/QBO/portal/marketplace behavior changes
-    - create/save draft UI is completed in F4D-E1; review controls UI remains deferred to F4D-E2/F4D-E3; approve-for-activation remains deferred; provider/legal approval actions remain deferred; and real provider-powered SMS remains deferred
+    - create/save draft UI is completed in F4D-E1; review/reject UI remains deferred unless team-review workflow is reopened; approve-for-activation remains deferred; provider/legal approval actions remain deferred; and real provider-powered SMS remains deferred
 
   - SMS Slice F4D-E1 Create/Save Draft UI is complete:
     - implementation commit: `1b8b671`
@@ -293,7 +293,18 @@ Current Program Status Note (May 2026)
     - browser smoke passed after local runtime target alignment: create -> `draft_created`, save -> `draft_saved`
     - runtime finding recorded: initial `template_create_failed` was caused by local reset target vs app runtime target mismatch, not a code defect
     - validation recorded: template action tests `40/40`, template validation `19/19`, template governance read `15/15`, provider readiness `16/16`, eligibility `16/16`, recipients `4/4`, `npx.cmd tsc --noEmit`, `git diff --check`, clean status
-    - review controls UI remains deferred to F4D-E2/F4D-E3; real provider-powered SMS remains deferred
+    - review/reject UI remains deferred unless team-review workflow is reopened; real provider-powered SMS remains deferred
+
+  - SMS On-The-Way V1 Workflow Simplification is locked:
+    - Mark On The Way is the user-facing operational trigger.
+    - future SMS is a simple background operational/customer-care notification after the lifecycle event, not inline send behavior.
+    - provider failure must not roll back the Mark On The Way lifecycle transition.
+    - admin controls the V1 On-The-Way wording and is the effective wording owner/approver.
+    - field users do not write, preview, or freely edit SMS wording; customer/job-level custom SMS text is not V1.
+    - visible V1 UI should not become a multi-person approval/rejection queue; `Reject version` remains deferred unless team-review workflow is reopened.
+    - future UI should prefer readiness language such as `Mark wording ready for sandbox` or `Wording ready for future SMS testing`.
+    - template readiness and sandbox readiness do not send SMS; real provider-powered SMS remains deferred.
+    - `job_events` and manual contact logs are not provider delivery truth; `sms_message_intents.message_body_snapshot` remains the future audit record of attempted SMS wording.
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

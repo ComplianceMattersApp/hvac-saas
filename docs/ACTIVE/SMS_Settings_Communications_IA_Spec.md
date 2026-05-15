@@ -134,7 +134,7 @@ Slice F4D-B completion cross-reference (May 2026):
 - helper does not enable SMS, does not imply `canSend`, has no Supabase/database/provider dependencies, and has no UI/server-action behavior.
 - review-request SMS remains a future separate message class and is prohibited in On-The-Way operational template wording.
 - F4D-B validation recorded: template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed.
-- create/save draft server actions and review actions are complete; create/save draft UI is complete; review controls UI remains deferred; real SMS remains deferred.
+- create/save draft server actions and review actions are complete; create/save draft UI is complete; review/reject UI remains deferred unless team-review workflow is reopened; real SMS remains deferred.
 
 Slice F4D-E1 completion cross-reference (May 2026):
 
@@ -144,6 +144,15 @@ Slice F4D-E1 completion cross-reference (May 2026):
 - F4D-E1 wires only create/save draft actions and intentionally does not render review/activation controls.
 - F4D-E1 preserves required non-sending copy and browser-safe posture.
 - Browser smoke passed after local runtime target alignment (`draft_created`, `draft_saved`); initial `template_create_failed` was runtime-target mismatch, not a code defect.
+
+SMS On-The-Way V1 workflow simplification cross-reference (May 2026):
+
+- Settings -> Communications remains the admin home for On-The-Way wording control.
+- V1 does not require a visible multi-person approval queue; admin is the wording owner and effective approver.
+- Field users only press Mark On The Way and do not write, preview, or freely edit SMS wording.
+- Review/reject UI remains deferred unless a larger-company/team-review workflow is intentionally reopened.
+- Future visible readiness language should prefer `Mark wording ready for sandbox` or `Wording ready for future SMS testing`.
+- Template readiness and sandbox readiness do not send SMS or activate provider behavior.
 
 ---
 
@@ -370,8 +379,8 @@ J. F4D-B validation helper only; no writes, no UI. ✓ Complete (`418172e`)
 K. F4D-C create/save draft server actions.
 L. F4D-D review actions.
 M. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
-N. F4D-E2 safe version-id/action-eligibility read-model support.
-O. F4D-E3 review controls UI.
+N. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness.
+O. F4D-E3 mark wording ready for sandbox/readiness UI, not full review/reject UI unless reopened.
 P. Quiet-hours/timezone gate planning.
 Q. Provider/Twilio readiness and sandbox setup.
 R. Sandbox provider send after all gates.

@@ -133,7 +133,7 @@ Slice F4D-B completion cross-reference (Template governance validation helper):
 - helper has no Supabase/database/provider dependencies, no UI/server-action behavior, does not enable SMS, and does not imply `canSend`.
 - review-request SMS remains parked as a future separate message class and is prohibited in On-The-Way operational template wording.
 - validation recorded: template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed.
-- create/save draft server actions and review actions are complete; create/save draft UI is complete; review controls UI remains deferred; real SMS remains deferred.
+- create/save draft server actions and review actions are complete; create/save draft UI is complete; review/reject UI remains deferred unless team-review workflow is reopened; real SMS remains deferred.
 
 Slice F4D-E1 completion cross-reference (Create/Save Draft UI):
 
@@ -142,6 +142,16 @@ Slice F4D-E1 completion cross-reference (Create/Save Draft UI):
 - F4D-E1 wires only create/save draft actions and does not wire review/activation/provider/send/webhook behavior.
 - E2 boundary remains preserved: no `sms_message_intents` or `sms_provider_deliveries` writes are added by F4D-E1.
 - browser smoke passed after local runtime target alignment (`draft_created`, `draft_saved`); initial `template_create_failed` was runtime-target mismatch, not a code defect.
+
+Slice SMS On-The-Way V1 workflow simplification cross-reference:
+
+- Mark On The Way is the user-facing operational trigger.
+- Future provider-powered SMS is a background notification after that lifecycle event, not inline send behavior.
+- Template governance is admin/settings wording control only.
+- Admin is the V1 wording owner and effective approver; visible V1 UI should avoid a multi-person review/rejection queue unless that product workflow is reopened.
+- `job_events` remains non-authoritative for provider delivery truth.
+- Manual contact logs remain non-authoritative for provider delivery truth.
+- `sms_message_intents.message_body_snapshot` remains the future audit record of attempted SMS wording.
 
 ---
 
@@ -449,8 +459,8 @@ J. F4D-B validation helper only; no writes, no UI. ✓ Complete (`418172e`)
 K. F4D-C create/save draft server actions.
 L. F4D-D review actions.
 M. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
-N. F4D-E2 safe version-id/action-eligibility read-model support.
-O. F4D-E3 review controls UI.
+N. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness.
+O. F4D-E3 mark wording ready for sandbox/readiness UI, not full review/reject UI unless reopened.
 P. Provider/Twilio sandbox readiness.
 Q. Provider webhook/send implementation only after all gates.
 R. Production activation only after legal/provider review and explicit approval.
