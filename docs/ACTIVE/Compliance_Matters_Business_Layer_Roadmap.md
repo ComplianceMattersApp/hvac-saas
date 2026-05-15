@@ -271,8 +271,21 @@ SMS Slice F4D-A closeout note (May 2026):
 - F4D-A locks versioning: drafts may be mutable, approved/active/superseded/retired body text is immutable, edits to approved/current wording create new draft versions, and activation/current pointer behavior remains deferred.
 - F4D-A keeps F4B SELECT-only RLS intentional, normal authenticated template write policies absent, delete actions absent, and `job_events` excluded from template governance logging.
 - F4D-A does not implement server actions, editable UI, code behavior, schema/migration changes, Supabase commands, provider/Twilio calls, send endpoint, webhook, sandbox/live SMS, activation, env/secret/feature-flag changes, payment/QBO/portal behavior, marketplace behavior, or production writes.
-- state after F4D-A: mutation semantics are locked; validation helper remains next; create/save draft actions, review actions, editable UI, provider/legal review, sandbox sends, and production activation remain deferred.
+- state after F4D-A at that time: mutation semantics were locked; validation helper was the next implementation slice; create/save draft actions, review actions, editable UI, provider/legal review, sandbox sends, and production activation remained deferred.
 - real SMS remains deferred.
+
+SMS Slice F4D-B closeout note (May 2026):
+- Slice F4D-B Template Governance Validation Helper is complete in commit `418172e`.
+- F4D-B added helper `lib/communications/sms-template-governance-validation.ts` and test file `lib/communications/__tests__/sms-template-governance-validation.test.ts`.
+- F4D-B helper API is `validateOnTheWayTemplateBody(bodyTemplate: string)`.
+- helper owns allowed token constants, planning default body, sample token values, STOP-language validation, prohibited wording patterns, body normalization, SHA-256 body hashing, sample preview generation, segment estimation, and draft/review/sandbox readiness flags.
+- helper blocks submit/sandbox approval for blank body, unknown tokens, missing STOP language, prohibited promotional wording, and message length above 2 estimated segments.
+- helper warns for multi-segment messages above 1 segment, unknown tokens, missing STOP language, and prohibited content.
+- helper does not enable SMS, does not imply `canSend`, has no Supabase/database/provider dependencies, and has no UI/server-action behavior.
+- review-request SMS remains parked as a future separate message class and remains prohibited inside On-The-Way operational template wording.
+- validation recorded: template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, `npx.cmd tsc --noEmit`, and `git diff --check` all passed.
+- state after F4D-B: validation helper exists; create/save draft server actions remain deferred to F4D-C; review actions remain deferred; editable UI remains deferred; later provider/legal/sandbox/activation work remains deferred; real SMS remains deferred.
+- conservative next-lane recommendation: proceed with F4D-C create/save draft server actions before review actions or editable UI.
 
 ---
 

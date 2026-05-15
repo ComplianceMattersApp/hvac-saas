@@ -50,7 +50,7 @@ Real SMS remains deferred.
 Future sequence:
 
 A. F4D-A docs/model lock.
-B. F4D-B validation helper.
+B. F4D-B validation helper. ✓ Complete (`418172e`)
 C. F4D-C create/save draft server actions.
 D. F4D-D review actions.
 E. F4D-E editable UI.
@@ -169,6 +169,39 @@ Initial allowed tokens:
 - `appointment_or_job_context`
 
 Tokens remain server-rendered only. Browser preview may display server-generated sample output, but browser interpolation is not authoritative.
+
+## F4D-B Completion Cross-Reference (May 2026)
+
+SMS Slice F4D-B Template Governance Validation Helper is complete.
+
+- implementation commit: `418172e`
+- helper file: `lib/communications/sms-template-governance-validation.ts`
+- test file: `lib/communications/__tests__/sms-template-governance-validation.test.ts`
+- helper API: `validateOnTheWayTemplateBody(bodyTemplate: string)`
+- helper owns allowed token constants, planning default body, sample token values, STOP-language validation, prohibited wording patterns, body normalization, deterministic SHA-256 body hashing, sample preview generation, segment estimation, and draft/review/sandbox readiness flags
+- helper returns blocking reason codes and warning codes for validation-only governance posture
+- helper blocks submit/sandbox approval for blank body, unknown tokens, missing STOP language, prohibited promotional wording, and message length above 2 estimated segments
+- helper warns for multi-segment messages above 1 segment, unknown tokens, missing STOP language, and prohibited content
+- helper does not enable SMS, does not imply `canSend`, has no Supabase/database/provider dependencies, and has no UI or server-action behavior
+- review-request SMS is parked as a future separate message class and remains prohibited inside On-The-Way operational template wording
+
+Validation recorded:
+
+- template validation helper tests passed (`19/19`)
+- template governance read tests passed (`15/15`)
+- provider readiness tests passed (`16/16`)
+- SMS eligibility tests passed (`16/16`)
+- contact recipient tests passed (`4/4`)
+- TypeScript passed
+- `git diff --check` passed
+
+State after F4D-B:
+
+- validation helper exists and is locked non-sending
+- create/save draft server actions remain deferred to F4D-C
+- review actions remain deferred
+- editable UI remains deferred
+- real SMS remains deferred
 
 ---
 
@@ -371,11 +404,11 @@ Operational UX risk:
 
 ---
 
-## 15) Future F4D-B Acceptance Criteria
+## 15) F4D-B Boundary Confirmation
 
-F4D-B should add validation helper only.
+F4D-B added validation helper only.
 
-F4D-B must not add:
+F4D-B did not add:
 
 - writes
 - server actions
@@ -384,7 +417,7 @@ F4D-B must not add:
 - provider behavior
 - send behavior
 
-F4D-B should include:
+F4D-B includes:
 
 - shared constants for allowed tokens/default body/sample values/STOP/prohibited wording
 - tests for blank body
@@ -396,6 +429,8 @@ F4D-B should include:
 - tests for sample preview
 - tests for segment estimates
 - tests for approval readiness flags
+- warnings for unknown tokens, missing STOP language, prohibited content, and multi-segment messages
+- parked future note that review-request SMS is a separate future message class and remains prohibited in On-The-Way wording
 
 Real SMS remains deferred.
 

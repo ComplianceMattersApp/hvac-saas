@@ -72,6 +72,12 @@ Reference closeouts:
 - Slice F4D-A docs/model closeout: `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md` locks future admin template editing/review action semantics before any mutation path exists.
 - Slice F4D-A compliance boundary: template approval/readiness does not enable sending; future validation must block unknown tokens, missing STOP language, and prohibited promotional wording before submit/review/sandbox approval; provider/legal approval and activation remain deferred.
 - Slice F4D-A write boundary: future writes stay admin-only, account-scoped, and server-side after role validation; normal authenticated template INSERT/UPDATE/DELETE policies remain absent, and `job_events` is not used for template governance.
+- Slice F4D-B implementation closeout: commit `418172e`; helper `lib/communications/sms-template-governance-validation.ts`; tests `lib/communications/__tests__/sms-template-governance-validation.test.ts`; API `validateOnTheWayTemplateBody(bodyTemplate: string)`.
+- Slice F4D-B compliance boundary: helper owns allowed token constants, planning default body, sample token values, STOP-language validation, prohibited wording patterns, body normalization, SHA-256 body hashing, sample preview generation, segment estimation, and draft/review/sandbox readiness flags; it blocks blank body, unknown tokens, missing STOP language, prohibited promotional wording, and message length above 2 estimated segments before submit/sandbox approval.
+- Slice F4D-B warning posture: multi-segment messages above 1 segment, unknown tokens, missing STOP language, and prohibited content warn while non-blank drafts may still be saved.
+- Slice F4D-B marketing boundary: review-request SMS remains a future separate message class and is prohibited inside On-The-Way operational template wording.
+- Slice F4D-B validation: template validation helper tests (`19/19`), template governance read tests (`15/15`), provider readiness helper tests (`16/16`), SMS eligibility helper tests (`16/16`), recipient helper tests (`4/4`), `npx.cmd tsc --noEmit`, and `git diff --check` all passed.
+- Slice F4D-B boundary confirmation: no send endpoint, webhook, provider/Twilio integration, sandbox/live SMS enablement, UI/server-action behavior, or compliance gate bypass behavior changed; real SMS remains deferred.
 - Quiet-hours scope lock: quiet-hours/timezone remains future conservative fail-closed SMS pre-send gate planning only; it must not block Mark On The Way or job lifecycle/status transitions.
 
 ---

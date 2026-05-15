@@ -122,6 +122,19 @@ Slice F4D-A model lock cross-reference (Template editing/review actions):
 - Future draft and review actions must not write provider-delivery truth; `sms_message_intents.message_body_snapshot` remains the future attempted-message body snapshot only when an actual approved send path exists later.
 - Template approval/readiness must not be recorded as provider delivery truth and must not summarize into `job_events`.
 
+Slice F4D-B completion cross-reference (Template governance validation helper):
+
+- F4D-B is complete in commit `418172e`.
+- F4D-B added helper `lib/communications/sms-template-governance-validation.ts` and tests `lib/communications/__tests__/sms-template-governance-validation.test.ts`.
+- helper API is `validateOnTheWayTemplateBody(bodyTemplate: string)`.
+- helper owns allowed token constants, planning default body, sample token values, STOP-language validation, prohibited wording patterns, body normalization, SHA-256 body hashing, sample preview generation, segment estimation, and draft/review/sandbox readiness flags.
+- helper blocks submit/sandbox approval for blank body, unknown tokens, missing STOP language, prohibited promotional wording, and message length above 2 estimated segments.
+- helper warns for multi-segment messages above 1 segment, unknown tokens, missing STOP language, and prohibited content.
+- helper has no Supabase/database/provider dependencies, no UI/server-action behavior, does not enable SMS, and does not imply `canSend`.
+- review-request SMS remains parked as a future separate message class and is prohibited in On-The-Way operational template wording.
+- validation recorded: template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed.
+- create/save draft server actions remain deferred to F4D-C; review actions, editable UI, and real SMS remain deferred.
+
 ---
 
 ## 1) Current Decision
@@ -424,7 +437,7 @@ F. F4B template-governance schema foundation. ✓ Complete (`b676736`)
 G. F4C-A template governance read-model helper (`lib/communications/sms-template-governance-read.ts`). ✓ Complete (`0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`)
 H. F4C-B read-only template status/sample preview in Admin Communications. ✓ Complete (`05475929cc69704b1fb22f3dabbde10ff83aed90`, stabilized by `1ffa475e2167eeb60a206358a4e7032a407bdd0f`)
 I. F4D-A template editing/review actions model lock. Complete.
-J. F4D-B validation helper only; no writes, no UI.
+J. F4D-B validation helper only; no writes, no UI. ✓ Complete (`418172e`)
 K. F4D-C create/save draft server actions.
 L. F4D-D review actions.
 M. F4D-E editable UI.

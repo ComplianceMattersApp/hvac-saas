@@ -97,6 +97,22 @@ Slice F4D-A Template Editing + Review Actions Model Lock is complete in `docs/AC
 - Template approval/readiness does not enable SMS sending, sandbox sends, provider setup, webhook behavior, activation, or Mark On The Way automation.
 - Communications UI copy must continue to state that SMS is not enabled, live sends are disabled, template approval does not enable sending, and previews are sample-only.
 
+## F4D-B Completion Cross-Reference (May 2026)
+
+Slice F4D-B Template Governance Validation Helper is complete.
+
+- implementation commit: `418172e`
+- helper file: `lib/communications/sms-template-governance-validation.ts`
+- test file: `lib/communications/__tests__/sms-template-governance-validation.test.ts`
+- helper API: `validateOnTheWayTemplateBody(bodyTemplate: string)`
+- helper owns allowed token constants, planning default body, sample token values, STOP-language validation, prohibited wording patterns, body normalization, SHA-256 body hashing, sample preview generation, segment estimation, and draft/review/sandbox readiness flags
+- helper blocks submit/sandbox approval for blank body, unknown tokens, missing STOP language, prohibited promotional wording, and message length above 2 estimated segments
+- helper warns for multi-segment messages above 1 segment, unknown tokens, missing STOP language, and prohibited content
+- helper has no Supabase/database/provider dependencies and no UI/server-action behavior; it does not enable SMS or imply `canSend`
+- review-request SMS remains parked as a future separate message class and is prohibited in On-The-Way operational template wording
+- validation recorded: template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed
+- real SMS remains deferred; create/save draft server actions, review actions, and editable UI remain deferred
+
 ---
 
 ## 1) Current Decision
@@ -441,7 +457,7 @@ B. F3B read-model helper returning safe account-scoped readiness. ✓ Complete (
 C. F3C read-only Admin Center route/page. ✓ Complete (commit `994e79c`)
 D. F4A/F4B/F4C template governance model/schema/read-only UI. Complete.
 E. F4D-A template editing/review actions model lock. Complete.
-F. F4D-B validation helper only; no writes, no UI.
+F. F4D-B validation helper only; no writes, no UI. ✓ Complete (`418172e`)
 G. F4D-C create/save draft server actions.
 H. F4D-D review actions.
 I. F4D-E editable UI.

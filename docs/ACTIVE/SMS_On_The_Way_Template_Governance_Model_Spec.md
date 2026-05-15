@@ -195,6 +195,39 @@ F4D-A locks future admin edit/review mutation semantics before any write path ex
 - `sandbox_version_id` is set only by approve-for-sandbox
 - `current_version_id` is not set by draft save or sandbox approval
 - approving a template does not enable SMS send
+- review-request SMS remains parked as a separate future message class and is not part of On-The-Way operational template wording
+- real SMS remains deferred
+
+## F4D-B Completion Cross-Reference (May 2026)
+
+SMS Slice F4D-B Template Governance Validation Helper is complete.
+
+- implementation commit: `418172e`
+- helper file: `lib/communications/sms-template-governance-validation.ts`
+- test file: `lib/communications/__tests__/sms-template-governance-validation.test.ts`
+- helper API: `validateOnTheWayTemplateBody(bodyTemplate: string)`
+- helper owns allowed token constants, planning default body, sample token values, STOP-language validation, prohibited wording patterns, body normalization, SHA-256 body hashing, sample preview generation, segment estimation, and draft/review/sandbox readiness flags
+- helper blocks submit/sandbox approval for blank body, unknown tokens, missing STOP language, prohibited promotional wording, and message length above 2 estimated segments
+- helper warns for multi-segment messages above 1 segment, unknown tokens, missing STOP language, and prohibited content
+- helper does not enable SMS, does not imply `canSend`, has no Supabase/database/provider dependencies, and has no UI/server-action behavior
+- review-request SMS remains prohibited inside On-The-Way operational wording and is parked as a future separate message class
+
+Validation recorded:
+
+- template validation helper tests passed (`19/19`)
+- template governance read tests passed (`15/15`)
+- provider readiness tests passed (`16/16`)
+- SMS eligibility tests passed (`16/16`)
+- contact recipient tests passed (`4/4`)
+- TypeScript passed
+- `git diff --check` passed
+
+State after F4D-B:
+
+- template governance validation helper exists
+- template create/save draft server actions remain deferred to F4D-C
+- review actions remain deferred
+- editable UI remains deferred
 - real SMS remains deferred
 
 ---
@@ -566,7 +599,7 @@ B. F4B template schema foundation with `sms_message_templates` and `sms_message_
 C. F4C-A template governance read-model helper (`lib/communications/sms-template-governance-read.ts`). ✓ Complete (`0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`)
 D. F4C-B read-only template status/sample preview in `/ops/admin/communications`. ✓ Complete (`05475929cc69704b1fb22f3dabbde10ff83aed90`, stabilized by `1ffa475e2167eeb60a206358a4e7032a407bdd0f`)
 E. F4D-A template editing/review actions model lock. Complete.
-F. F4D-B validation helper.
+F. F4D-B validation helper. ✓ Complete (`418172e`)
 G. F4D-C create/save draft server actions.
 H. F4D-D review actions.
 I. F4D-E editable UI.

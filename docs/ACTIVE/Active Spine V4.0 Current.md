@@ -241,6 +241,19 @@ Current Program Status Note (May 2026)
     - boundaries preserved: no code/server-action/UI/schema/migration/Supabase/provider/Twilio/send/webhook/activation/env/flag/payment/QBO/portal behavior changes and no production writes
     - template approval/readiness does not enable SMS sending; real provider-powered SMS remains deferred
 
+  - SMS Slice F4D-B Template Governance Validation Helper is complete:
+    - implementation commit: `418172e`
+    - helper added: `lib/communications/sms-template-governance-validation.ts`
+    - tests added: `lib/communications/__tests__/sms-template-governance-validation.test.ts`
+    - helper API: `validateOnTheWayTemplateBody(bodyTemplate: string)`
+    - helper owns allowed token constants, planning default body, sample token values, STOP-language validation, prohibited wording patterns, body normalization, SHA-256 body hashing, sample preview generation, segment estimation, and draft/review/sandbox readiness flags
+    - helper blocks submit/sandbox approval for blank body, unknown tokens, missing STOP language, prohibited promotional wording, and message length above 2 estimated segments
+    - helper warnings cover multi-segment messages above 1 segment, unknown tokens, missing STOP language, and prohibited content
+    - helper has no Supabase/database/provider dependencies, no UI/server-action behavior, does not enable SMS, and does not imply `canSend`
+    - review-request SMS remains parked as a separate future message class and is prohibited inside On-The-Way operational template wording
+    - validation recorded: template validation helper tests `19/19` passed; template governance read tests `15/15` passed; provider readiness tests `16/16` passed; SMS eligibility tests `16/16` passed; contact recipient tests `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed
+    - boundaries preserved: no code outside helper/tests, no server-action/UI/schema/migration/Supabase/provider/send/env/payment/QBO/portal behavior changes, and real provider-powered SMS remains deferred
+
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
   - Job Detail Location Preview Deferral (`4ecf127`) moved Street View/static map lookup behind `Suspense` around `TimedJobLocationPreview`; immediate fallback preserves address context plus `Navigate` and `Open in Maps` while map imagery resolves after first paint.
