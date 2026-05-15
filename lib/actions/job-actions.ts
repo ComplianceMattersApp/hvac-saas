@@ -8170,6 +8170,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     String(formData.get("id") || "").trim() ||
     String(formData.get("job_id") || "").trim();
   const tab = normalizeJobTab(String(formData.get("tab") || ""));
+  const fieldStatusAnchor = "field-status-actions";
 
   if (!id) throw new Error("Job ID is required");
 
@@ -8179,7 +8180,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     for (const [key, value] of Object.entries(params)) {
       query.set(key, value);
     }
-    return `/jobs/${id}?${query.toString()}`;
+    return `/jobs/${id}?${query.toString()}#${fieldStatusAnchor}`;
   };
 
   // Slice-4A: measurement-only timing (FIELD_ACTION_TIMING_DEBUG=true to enable; no behavior change)
@@ -8855,6 +8856,7 @@ export async function revertOnTheWayFromForm(formData: FormData) {
     String(formData.get("id") || "").trim() ||
     String(formData.get("job_id") || "").trim();
   const tab = String(formData.get("tab") || "info").trim() || "info";
+  const fieldStatusAnchor = "field-status-actions";
 
   if (!id) throw new Error("Job ID is required");
 
@@ -8864,13 +8866,13 @@ export async function revertOnTheWayFromForm(formData: FormData) {
     const params = new URLSearchParams();
     params.set("tab", tab);
     params.set("banner", banner);
-    redirect(`/jobs/${id}?${params.toString()}`);
+    redirect(`/jobs/${id}?${params.toString()}#${fieldStatusAnchor}`);
   };
 
   const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
-    onUnauthorized: () => redirect(`/jobs/${id}?notice=not_authorized`),
+    onUnauthorized: () => redirect(`/jobs/${id}?notice=not_authorized#${fieldStatusAnchor}`),
   });
   await requireOperationalScopedJobMutationAccessOrRedirect({
     supabase,

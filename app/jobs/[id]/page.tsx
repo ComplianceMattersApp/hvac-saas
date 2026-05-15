@@ -2746,7 +2746,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </div>
         ) : null}
       </div>
-      <div className="flex w-full flex-col gap-2.5 xl:w-auto xl:min-w-[24rem] xl:items-end">
+      <div id="field-status-actions" className="flex w-full flex-col gap-2.5 xl:w-auto xl:min-w-[24rem] xl:items-end">
         {!isFieldComplete ? (
           <div className="flex w-full flex-col items-start gap-2 xl:items-end">
             <div className="flex w-full flex-wrap justify-start gap-2 xl:justify-end">
