@@ -141,6 +141,15 @@ export default async function OpsAdminPage() {
       ctaLabel: "Open pricebook",
       enabled: true,
     },
+    {
+      section: "organization",
+      eyebrow: "Organization",
+      title: "Communications",
+      description: "Review SMS/provider readiness. SMS is not enabled and live sends are disabled.",
+      href: "/ops/admin/communications",
+      ctaLabel: "Review readiness",
+      enabled: true,
+    },
   ];
 
   const platformOwnerAllowed = isPlatformOwnerActor({
