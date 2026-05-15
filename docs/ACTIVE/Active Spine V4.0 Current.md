@@ -43,6 +43,7 @@ Current Program Status Note (May 2026)
   - boundaries preserved: no live SMS send, no provider integration, no consent/opt-out implementation, no delivery-tracking implementation, no schema/migration/env/secret/feature-flag changes, no payment/Stripe/QBO behavior changes, no portal expansion, no auth/RLS/entitlement behavior changes
   - this is compliance-risk-reduction wording alignment only; future real SMS remains deferred pending consent/opt-out/quiet-hours/provider/audit/legal-provider review gates and explicit activation decision
   - guardrail framing: this is neutral communication-readiness hardening designed to preserve clean actor/recipient boundaries for future marketplace-style evolution, not Eddie-specific behavior
+  - model-spec pointer: `docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md` now defines the future provider-powered SMS control contract and activation gates
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

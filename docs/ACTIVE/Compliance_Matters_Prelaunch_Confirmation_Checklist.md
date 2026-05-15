@@ -26,6 +26,7 @@ If any item here conflicts with the active spine, the spine wins.
 - Do not fully configure/send live messages until right before launch.
 - Final provider/payment-backed setup belongs to the pre-launch window.
 - Verify wording does not imply live texting is active until setup is complete.
+- SMS activation control contract reference: `docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md`.
 
 ### 2.2.1 Manual Text Logging Wording Clarification closeout (completed)
 - Completed in commit `36460b8` (`Clarify manual text logging wording`).
@@ -57,6 +58,7 @@ If any item here conflicts with the active spine, the spine wins.
   - delivery/failure audit trail
   - legal/provider review
   - explicit activation decision
+- Canonical model details for those gates are captured in `docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md`.
 - Marketplace-readiness framing: this wording hardening is actor-neutral and preserves clean communication boundaries across customers, responsible parties, contractors, internal users, account owners, and future marketplace participants.
 
 ### 2.3 Payment/live enablement readiness

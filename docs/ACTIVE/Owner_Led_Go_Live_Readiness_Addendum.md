@@ -188,6 +188,9 @@ Future SMS capability requirements (before activation):
 - failure handling
 - communication audit trail
 
+Control-model reference:
+- See `docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md` for the SMS classification, consent, suppression, quiet-hours, audit-trail, and activation-gate contract.
+
 No SMS provider setup or activation is performed in this addendum.
 
 ---
