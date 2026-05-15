@@ -7,12 +7,54 @@ Date: 2026-05-14
 
 ---
 
+## Slice A Closeout Status (2026-05-15)
+
+SMS Slice A Recipient Registry Foundation is complete.
+
+- Implementation commit: `afddb9c`
+- Migration timestamp hygiene fix commit: `02aee5a`
+- Final migration filename: `supabase/migrations/20260515120000_contact_recipients_slice_a_foundation.sql`
+
+Timestamp correction note:
+- The original filename `supabase/migrations/20260514120000_contact_recipients_slice_a_foundation.sql` was renamed because timestamp prefix `20260514120000` was already used by `supabase/migrations/20260514120000_maintenance_agreement_visits_next_due_confirmation_metadata.sql`.
+- Rename was a 100% file rename with no SQL body behavior change.
+
+What Slice A includes:
+- `contact_recipients` foundation only
+- account-scoped RLS policies
+- read-only helper: `lib/communications/contact-recipients-read.ts`
+- targeted tests: `lib/communications/__tests__/contact-recipients-read.test.ts`
+
+What Slice A explicitly does not include:
+- no consent table
+- no suppression table
+- no SMS intent table
+- no provider delivery table
+- no backfill
+- no provider/Twilio behavior
+- no live SMS activation
+- no env/secret/feature-flag/payment/QBO/portal behavior change
+
+Validation recorded:
+- `npx.cmd tsc --noEmit` passed
+- `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed
+- `git diff --check` passed
+- no migration apply, no Supabase production command, no production writes
+
+Marketplace guardrail framing:
+- Slice A is neutral communication-recipient infrastructure preserving tenant/account/recipient-role boundaries for future marketplace-style evolution.
+
+Live-SMS status:
+- Real SMS remains deferred pending future consent/suppression/provider delivery model completion plus legal/provider activation gates.
+
+---
+
 ## 1) Current Non-Implementation Boundary
 
 This document is a **design contract**, not an implementation or migration.
 
 ### Explicit constraints:
-- **No schema exists yet** for provider-powered SMS recipients, consent, suppression, or delivery audit in this slice.
+- **Only recipient registry schema exists** (`contact_recipients`, Slice A). Consent, suppression, SMS intent, and provider delivery schema are still deferred.
 - **This pass does not create schema files, migrations, or Supabase changes.**
 - **This pass does not enable SMS, change any behavior, or activate any feature flag.**
 - **This pass exists solely to define a future additive schema proposal** that will be reviewed, refined, and eventually implemented in a separate schema design review + migration slice.
@@ -22,7 +64,7 @@ This document is a **design contract**, not an implementation or migration.
 - Device-intent SMS links work via `sms:` scheme on canonical customer phone.
 - Job snapshot phone/email fields (`jobs.customer_phone`, `jobs.customer_email`, etc.) are operational convenience only.
 - No provider delivery truth exists.
-- No recipient roles, consent provenance, opt-out/suppression state, or audit trail exist.
+- Recipient registry foundation now exists (`contact_recipients`), but consent provenance, opt-out/suppression state, and provider delivery audit truth remain deferred.
 - Real SMS remains deferred pending schema, provider setup, and legal approval gates.
 
 ---
