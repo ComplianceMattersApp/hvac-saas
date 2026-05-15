@@ -184,10 +184,16 @@ async function requireAdminOrRedirect() {
 
 export default async function AdminCommunicationsPage() {
   const { supabase, internalUser } = await requireAdminOrRedirect();
+  // Fail closed to safe-empty readiness if local schemas do not yet include SMS readiness tables.
   const readiness = await getSmsProviderReadinessForAccount({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
-  });
+  }).catch(() =>
+    getSmsProviderReadinessForAccount({
+      supabase,
+      accountOwnerUserId: "",
+    }),
+  );
 
   // Fail closed to a safe-empty governance view if template tables are unavailable in local environments.
   const templateGovernance = await getSmsOnTheWayTemplateGovernanceForAccount({
