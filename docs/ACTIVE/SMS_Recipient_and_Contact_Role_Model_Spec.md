@@ -36,6 +36,7 @@ Implementation status note (2026-05-15):
 - Slice C docs/model closeout is recorded in `docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md` with locked posture: no job-detail preview card for V1, no field free-text editor, no field template editing, no live SMS, future background/event-driven evaluation after lifecycle transition, admin-only future template governance, and gate/failure control contracts.
 - Slice D docs/model closeout is recorded in `docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md` with locked IA posture: Settings -> Communications is the future home for messaging governance; Company Profile remains identity/support-contact scope; no runtime settings activation or provider controls are enabled in this slice.
 - Slice E1 docs/model closeout is recorded in `docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md` with locked audit posture: one intent to zero-or-one current delivery row in V1, account-scoped idempotency, provider-neutral status normalization, and server-side callback-write expectations.
+- Slice F1 docs/model closeout is recorded in `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md` with locked readiness posture: Twilio-likely provider direction, provider-neutral internal model lock, and no provider setup/send/webhook/sandbox activation in this slice.
 
 ---
 
@@ -275,6 +276,7 @@ This planning/model doc does not perform or authorize:
 - docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md (Slice C docs/model contract for future On-The-Way background evaluation, admin-only template governance, and badge-only UI posture)
 - docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md (Slice D docs/model IA contract for Settings -> Communications ownership and section design)
 - docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md (Slice E1 docs/model lock for intent/delivery audit semantics and callback/write/RLS expectations)
+- docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md (Slice F1 docs/model lock for provider readiness and sender/A2P/callback planning boundaries)
 - docs/ACTIVE/source-of-truth-strategy.md (canonical field authority)
 - docs/ACTIVE/Active Spine V4.0 Current.md (project spine and SMS 9B entry)
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md (Group 9B roadmap entry)

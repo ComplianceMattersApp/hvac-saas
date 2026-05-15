@@ -51,6 +51,7 @@ Reference closeouts:
 - Slice E2 locked posture: `sms_message_intents` is send-request/decision audit context (not provider delivery truth); `sms_provider_deliveries` is provider submission/callback truth (not manual contact log); one current delivery row per intent; account-scoped intent idempotency foundation exists.
 - Slice E2 validation: `npx.cmd tsc --noEmit`, B2 helper tests (`16/16`), recipient helper tests (`4/4`), `git diff --check`, and `supabase db reset --local --no-seed --yes` all passed with full local migration chain including E2.
 - Slice E2 boundary confirmation: no provider delivery write path, no send endpoint/webhook/provider integration/live SMS behavior, no `job_events` provider summary behavior, no backfill, no production migration apply, and no production writes.
+- Slice F1 docs/model closeout: `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md` captures Twilio-likely provider readiness requirements while preserving provider-neutral internal model lock and no-implementation boundaries.
 - Quiet-hours scope lock: quiet-hours/timezone remains future conservative fail-closed SMS pre-send gate planning only; it must not block Mark On The Way or job lifecycle/status transitions.
 
 ---
@@ -219,6 +220,7 @@ This planning slice does not perform:
 - docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md (Slice C docs/model workflow contract for future background On-The-Way evaluation, admin-only template governance, required pre-send gates, and fail-closed blocked-send behavior)
 - docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md (Slice D docs/model IA contract for Settings -> Communications ownership, section design, and activation-control posture)
 - docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md (Slice E1 docs/model lock for intent/delivery audit semantics, callback path, and provider-neutral status design)
+- docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md (Slice F1 docs/model lock for provider readiness, sender strategy, A2P/registration checklist, callback/webhook readiness planning, and activation boundaries)
 - docs/ACTIVE/Compliance_Matters_Prelaunch_Confirmation_Checklist.md
 - docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md
 - docs/ACTIVE/Active Spine V4.0 Current.md

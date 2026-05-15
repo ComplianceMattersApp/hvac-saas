@@ -147,6 +147,13 @@ SMS Slice E2 closeout note (May 2026):
 - Quiet-hours/timezone is scoped to future conservative fail-closed SMS pre-send eligibility only; Mark On The Way and job lifecycle/status transitions remain direct workflow and are not blocked.
 - No quiet-hours settings UI is approved for V1 direct job workflows.
 
+SMS Slice F1 closeout note (May 2026):
+- Slice F1 Provider/Twilio Readiness Spec is complete in docs/model-only mode at `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md`.
+- F1 records Twilio as likely provider direction while locking provider-neutral internal model and status semantics.
+- F1 records sender strategy, A2P/registration checklist, On-The-Way classification/template constraints, opt-in/opt-out/help expectations, callback/webhook signature-validation readiness, status mapping, env/secrets planning posture, settings implications, and marketplace guardrails.
+- F1 does not implement provider setup, Twilio API calls, send endpoint, webhook route, sandbox send, live SMS, env/secrets changes, schema/migration/Supabase changes, feature flags, or production writes.
+- Real SMS remains deferred pending later implementation slices and explicit activation approval.
+
 ---
 
 ## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version

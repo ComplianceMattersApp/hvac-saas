@@ -278,6 +278,7 @@ Locked E2 interpretation:
 - provider status foundation is provider-neutral and Twilio-aware, not Twilio-specific.
 - no provider delivery write path was added in this slice.
 - quiet-hours/timezone remains future conservative fail-closed pre-send gate policy only and is not a direct lifecycle/workflow blocker.
+- Slice F1 Provider/Twilio readiness planning closeout is documented in `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md` and remains docs/model-only with no provider setup, send route, webhook, sandbox send, or live SMS.
 
 Validation recorded:
 
@@ -852,6 +853,7 @@ This is documentation only. It defines what must be built; it does not build it.
 - docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md (Slice C docs/model workflow contract for future background On-The-Way evaluation and template governance boundaries)
 - docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md (Slice D docs/model IA contract for future Settings -> Communications ownership and section design)
 - docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md (Slice E1 docs/model lock for intent/delivery audit semantics, idempotency, callback path, and RLS expectations)
+- docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md (Slice F1 docs/model lock for provider readiness, sender strategy, registration/A2P checklist, and callback/webhook planning)
 - docs/ACTIVE/source-of-truth-strategy.md (canonical source rules that SMS schema must respect)
 - docs/ACTIVE/Active Spine V4.0 Current.md (project spine and SMS 9B entry)
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md (Group 9B roadmap entry)

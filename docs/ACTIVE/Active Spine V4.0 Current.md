@@ -119,6 +119,12 @@ Current Program Status Note (May 2026)
     - no quiet-hours settings UI is approved for V1 direct job workflows
     - marketplace guardrail preserved: this is neutral tenant/account-scoped communication audit infrastructure, not Eddie-specific activation behavior
     - real provider-powered SMS remains deferred pending quiet-hours/timezone gate implementation, admin template governance implementation, sender identity/provider readiness, provider/Twilio sandbox readiness, webhook/send implementation after all gates, legal/provider review, and explicit activation approval
+  - SMS Slice F1 Provider/Twilio Readiness Spec (docs/model-only) is complete:
+    - spec added: `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md`
+    - locked readiness posture recorded: Twilio is likely provider direction for V1 planning, while internal model and status semantics remain provider-neutral
+    - planning contract recorded across sender strategy, A2P/registration checklist, On-The-Way classification/template guardrails, opt-in/opt-out/help expectations, callback/webhook signature-validation readiness, status mapping, env/secrets planning posture, and settings/marketplace guardrails
+    - explicit non-implementation boundary preserved: no provider setup, no Twilio API calls, no send endpoint, no webhook route, no sandbox send, no live SMS, no env/secret/flag changes, no schema/migration/Supabase changes, and no production writes
+    - real provider-powered SMS remains deferred pending later implementation slices and explicit activation approval
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

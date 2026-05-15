@@ -24,6 +24,12 @@ Marketplace guardrail preserved:
 
 - this closeout is neutral tenant/account-scoped audit infrastructure, not Eddie-specific behavior and not a live marketplace messaging implementation
 
+Slice F1 planning cross-reference:
+
+- Provider/Twilio readiness planning is captured in `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md`.
+- F1 defines provider readiness, A2P/registration checklist, callback/signature-validation expectations, env/secrets planning posture, and tenant sender guardrails.
+- F1 is docs/model-only and does not add settings UI, provider setup, send route, webhook, sandbox send, or live SMS.
+
 ---
 
 ## 1) Settings Location Decision
@@ -254,6 +260,7 @@ I. Production activation only after legal/provider review and explicit approval.
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
+- docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
 - docs/ACTIVE/source-of-truth-strategy.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md

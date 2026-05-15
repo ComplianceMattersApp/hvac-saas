@@ -47,6 +47,12 @@ Boundary confirmation:
 - real SMS remains deferred pending remaining activation gates
 - marketplace guardrail preserved: this is neutral tenant/account-scoped communication audit infrastructure
 
+Slice F1 planning cross-reference (docs/model-only):
+
+- Provider/Twilio readiness planning is now captured in `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md`.
+- F1 confirms Twilio likely direction with provider-neutral internal model lock.
+- F1 does not approve provider setup, credentials, send endpoint, webhook, sandbox send, or live SMS.
+
 ---
 
 ## 1) Current Decision
@@ -358,6 +364,7 @@ H. Production activation only after legal/provider review and explicit approval.
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
+- docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
 - docs/ACTIVE/source-of-truth-strategy.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md
