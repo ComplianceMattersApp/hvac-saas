@@ -78,6 +78,15 @@ Current Program Status Note (May 2026)
     - validation recorded: `npx.cmd vitest run lib/communications/__tests__/sms-eligibility-inputs-read.test.ts` passed (`16/16`), `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed (`4/4`), `npx.cmd tsc --noEmit` passed, `git diff --check` passed
     - boundaries preserved: no UI/schema/migration changes, no Supabase commands, no provider/Twilio/send pipeline changes, no env/flag/payment/QBO/portal changes, no production writes
     - real provider-powered SMS remains deferred pending non-sending recipient picker/template preview, quiet-hours/timezone decision gate, sender identity/provider registration, intent/provider-delivery audit tables, Twilio/provider sandbox send, legal/provider review, and explicit activation decision
+  - SMS Slice C Background On-The-Way Workflow Spec (docs/model-only) is complete:
+    - spec added: `docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md`
+    - locked product posture recorded: no job-detail SMS preview card for V1, no field-tech free-text SMS editor, no field template editing, and no live SMS/provider behavior in this slice
+    - future workflow contract recorded: lifecycle transition remains primary; future SMS evaluation occurs after Mark On The Way via background/event-driven workflow; provider failure must not roll back job status
+    - required pre-send gates and blocked-send failure behavior are explicitly documented (recipient/role/consent/suppression/quiet-hours/template/provider-readiness/audit/legal-approval)
+    - admin-governance posture recorded: future template control belongs in dedicated admin communications settings (not job detail; not Company Profile)
+    - badge-only UI posture recorded for future surfaces (`Do Not Text`, `Notifications Off`, `Consent Needed`, `Texting Not Enabled`) sourced from first-class recipient/consent/suppression truth and B2 helper outputs
+    - boundaries preserved: no code/schema/migration/Supabase/provider/send/env/flag/payment/QBO/portal changes and no production writes
+    - real provider-powered SMS remains deferred pending future activation slices and explicit approval gates
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

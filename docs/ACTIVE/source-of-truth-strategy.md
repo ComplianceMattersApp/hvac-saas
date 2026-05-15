@@ -154,3 +154,4 @@ Job snapshot fields (`jobs.customer_phone`, `jobs.customer_email`, `jobs.job_add
 - Snapshots are Ops display convenience fields only.
 - Canonical customer phone (`customers.phone`) is the identity reference for Ops context, but it is not role-tagged, not consent-scoped, and not suppression-aware.
 - A first-class recipient/contact role model is required before live SMS. See: `docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md`.
+- Future On-The-Way workflow and control-gate contract is documented in `docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md` (background/event-driven evaluation, no job-detail preview card, admin-only future template governance, fail-closed blocked-send posture).

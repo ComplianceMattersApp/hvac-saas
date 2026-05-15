@@ -156,6 +156,40 @@ Marketplace guardrail framing:
 
 ---
 
+## Slice C Docs Closeout Status (2026-05-15)
+
+SMS Slice C Background On-The-Way Workflow Spec (docs/model-only) is complete.
+
+- Spec added: `docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md`
+- Locked decisions captured:
+   - no job-detail SMS preview card for V1
+   - no field-tech free-text SMS editor
+   - no field UI template editing
+   - no live SMS/provider behavior in this slice
+   - future On-The-Way evaluation is background/event-driven after lifecycle transition
+   - template governance is future admin-only communications settings
+- Gate contract captured for future activation:
+   - first-class recipient role/active/phone checks
+   - consent opted-in for `on_the_way`
+   - suppression checks (recipient + phone)
+   - quiet-hours/timezone policy gate
+   - admin-approved template/version
+   - sender identity/provider readiness
+   - intent/provider-delivery audit model existence
+   - sandbox validation + legal/provider review + explicit activation decision
+- Failure posture captured: no send, no fake delivery claim/status, no automatic manual contact-log write, lifecycle transition remains primary.
+
+Deployment/write boundary confirmation:
+- no code changes
+- no schema/migration changes
+- no Supabase commands
+- no production writes
+
+Live-SMS status:
+- Real SMS remains deferred.
+
+---
+
 ## 1) Current Non-Implementation Boundary
 
 This document is a **design contract**, not an implementation or migration.
@@ -685,6 +719,7 @@ This is documentation only. It defines what must be built; it does not build it.
 
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md (model and role taxonomy that informs schema)
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md (compliance gates that schema must satisfy)
+- docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md (Slice C docs/model workflow contract for future background On-The-Way evaluation and template governance boundaries)
 - docs/ACTIVE/source-of-truth-strategy.md (canonical source rules that SMS schema must respect)
 - docs/ACTIVE/Active Spine V4.0 Current.md (project spine and SMS 9B entry)
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md (Group 9B roadmap entry)
