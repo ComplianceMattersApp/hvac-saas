@@ -49,12 +49,62 @@ Live-SMS status:
 
 ---
 
+## Slice B1 Closeout Status (2026-05-15)
+
+SMS Slice B1 Consent + Suppression Foundation is complete.
+
+- Implementation commit: `39a2963`
+- Migration filename: `supabase/migrations/20260515123000_contact_recipient_consent_suppression_foundation.sql`
+
+What Slice B1 creates:
+- `contact_recipient_consents`
+- `contact_recipient_suppressions`
+
+Locked behavior posture from this foundation:
+- consent defaults to `unknown`
+- missing/unknown consent remains fail-closed by design
+- active suppression is the future hard-stop override and must win over consent at send decision time
+
+What Slice B1 explicitly does not add:
+- no SMS message intent table
+- no provider delivery table
+- no send endpoint
+- no provider webhook
+- no Twilio/provider code
+- no live SMS sends
+- no backfill
+- no env/secret/feature-flag/payment/QBO/portal behavior changes
+
+Local validation recorded:
+- local Studio port `54323` was held by VS Code (`Code.exe`); plain `supabase start` failed on that local bind
+- local workaround only: `supabase start -x studio` succeeded (no process kill)
+- `supabase db reset --local` passed
+- local reset applied Slice A and Slice B1 migrations:
+   - `20260515120000_contact_recipients_slice_a_foundation.sql`
+   - `20260515123000_contact_recipient_consent_suppression_foundation.sql`
+- no blocking migration SQL issues found (non-fatal NOTICE messages only)
+- `npx.cmd tsc --noEmit` passed
+- `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed
+- `git diff --check` passed
+
+Deployment/write boundary confirmation:
+- no remote/sandbox/production migration apply
+- no production writes
+
+Live-SMS status:
+- Real SMS remains deferred pending future read/decision helpers, non-sending recipient picker/template preview, message intent/provider delivery audit tables, provider/Twilio registration + sandbox send, legal/provider review, and explicit activation decision.
+
+Marketplace guardrail framing:
+- Slice B1 is neutral tenant/account-scoped consent and suppression infrastructure for future communication readiness. It does not imply live SMS, marketplace behavior, or provider integration activation.
+
+---
+
 ## 1) Current Non-Implementation Boundary
 
 This document is a **design contract**, not an implementation or migration.
 
 ### Explicit constraints:
-- **Only recipient registry schema exists** (`contact_recipients`, Slice A). Consent, suppression, SMS intent, and provider delivery schema are still deferred.
+- **Recipient + consent/suppression foundations now exist** (`contact_recipients`, `contact_recipient_consents`, `contact_recipient_suppressions`; Slice A + Slice B1). SMS intent and provider delivery schema remain deferred.
 - **This pass does not create schema files, migrations, or Supabase changes.**
 - **This pass does not enable SMS, change any behavior, or activate any feature flag.**
 - **This pass exists solely to define a future additive schema proposal** that will be reviewed, refined, and eventually implemented in a separate schema design review + migration slice.
@@ -64,7 +114,7 @@ This document is a **design contract**, not an implementation or migration.
 - Device-intent SMS links work via `sms:` scheme on canonical customer phone.
 - Job snapshot phone/email fields (`jobs.customer_phone`, `jobs.customer_email`, etc.) are operational convenience only.
 - No provider delivery truth exists.
-- Recipient registry foundation now exists (`contact_recipients`), but consent provenance, opt-out/suppression state, and provider delivery audit truth remain deferred.
+- Recipient/consent/suppression foundations now exist (`contact_recipients`, `contact_recipient_consents`, `contact_recipient_suppressions`), but provider delivery audit truth remains deferred.
 - Real SMS remains deferred pending schema, provider setup, and legal approval gates.
 
 ---

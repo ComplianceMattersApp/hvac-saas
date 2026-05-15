@@ -59,6 +59,14 @@ Current Program Status Note (May 2026)
     - validation recorded: `npx.cmd tsc --noEmit` passed, `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed, `git diff --check` passed
     - no migration was applied and no Supabase production command or production write occurred
     - real provider-powered SMS remains deferred pending future consent/suppression/provider delivery implementation and activation-gate completion
+  - SMS Slice B1 Consent + Suppression Foundation is complete and pushed in commit `39a2963`:
+    - migration created: `supabase/migrations/20260515123000_contact_recipient_consent_suppression_foundation.sql`
+    - scope added: `contact_recipient_consents` and `contact_recipient_suppressions` foundation tables only
+    - locked defaults and guardrails: consent defaults to `unknown`, missing/unknown consent remains fail-closed, and active suppression is the future hard-stop override over consent
+    - scope preserved: no SMS intent/provider delivery tables, no send endpoint, no provider webhook, no Twilio/provider code, no live SMS, and no backfill
+    - local validation recorded: plain `supabase start` failed because VS Code held Studio port `54323`; safe local workaround `supabase start -x studio` succeeded; `supabase db reset --local` passed and applied Slice A + Slice B1 migrations; `npx.cmd tsc --noEmit` passed; `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed; `git diff --check` passed
+    - deployment/write boundary preserved: no remote/sandbox/production migration apply and no production writes
+    - real provider-powered SMS remains deferred pending read/decision helpers, non-sending recipient picker/template preview, intent/provider-delivery audit tables, provider/Twilio registration + sandbox send, legal/provider review, and explicit activation decision
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

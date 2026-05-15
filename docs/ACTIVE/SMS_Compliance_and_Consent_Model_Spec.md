@@ -30,6 +30,14 @@ Current truth constraints:
 Reference closeouts:
 - manual wording implementation: commit 36460b8
 - docs closeout: commit 4c03c0c
+- Slice A foundation implementation: commits `afddb9c`, `02aee5a`; migration `supabase/migrations/20260515120000_contact_recipients_slice_a_foundation.sql`
+- Slice B1 consent + suppression foundation implementation: commit `39a2963`; migration `supabase/migrations/20260515123000_contact_recipient_consent_suppression_foundation.sql`
+- Slice B1 added tables: `contact_recipient_consents`, `contact_recipient_suppressions`
+- Slice B1 locked posture: consent defaults to `unknown`; missing/unknown consent remains fail-closed; active suppression is the future hard-stop override over consent
+- Slice B1 local validation: `supabase start -x studio`, `supabase db reset --local`, local reset applied Slice A and Slice B1 migrations, `npx.cmd tsc --noEmit`, `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts`, `git diff --check`
+- local caveat: Studio port `54323` was held by VS Code, so Studio was excluded via `-x studio` for local validation only
+- no remote/sandbox/production migration apply and no production writes
+- no SMS intent/provider delivery tables, no send endpoint/webhook, no Twilio/provider code, no live SMS, no backfill
 
 ---
 
@@ -186,7 +194,7 @@ This planning slice does not perform:
 ## 12) Related ACTIVE References
 
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md (recipient/contact role model — required before live SMS; see Section 10 activation gates)
-- docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md (schema design contract; Slice A closeout recorded with final migration `supabase/migrations/20260515120000_contact_recipients_slice_a_foundation.sql`, commits `afddb9c` and `02aee5a`)
+- docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md (schema design contract; Slice A and Slice B1 closeout recorded with migrations `supabase/migrations/20260515120000_contact_recipients_slice_a_foundation.sql` and `supabase/migrations/20260515123000_contact_recipient_consent_suppression_foundation.sql`, commits `afddb9c`, `02aee5a`, `39a2963`)
 - docs/ACTIVE/Compliance_Matters_Prelaunch_Confirmation_Checklist.md
 - docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
