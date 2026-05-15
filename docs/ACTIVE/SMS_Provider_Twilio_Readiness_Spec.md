@@ -17,6 +17,7 @@ Locked decision for this slice:
 - Internal data model and product logic remain provider-neutral.
 - No Twilio/provider implementation is approved in this slice.
 - No provider setup, credentials, environment variables, sandbox sends, or live sends are approved in this slice.
+- Sender identity/provider configuration model lock is now documented in `docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md` (F2A docs/model-only).
 - Real SMS remains deferred.
 
 Explicit non-implementation boundary for this slice:
@@ -274,7 +275,7 @@ Primary risks before implementation:
 ## 15) Recommended Next Sequence
 
 A. F1 Provider/Twilio readiness spec closeout (this document).
-B. F2 sender identity/provider configuration schema planning.
+B. F2A sender identity/provider configuration model lock closeout (`docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md`).
 C. F3 admin template governance planning.
 D. F4 webhook/status callback contract planning.
 E. F5 provider/Twilio sandbox implementation planning.
@@ -311,6 +312,7 @@ Primary official references used for this planning slice:
 - docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md
 - docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md
 - docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md
+- docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md

@@ -125,6 +125,16 @@ Current Program Status Note (May 2026)
     - planning contract recorded across sender strategy, A2P/registration checklist, On-The-Way classification/template guardrails, opt-in/opt-out/help expectations, callback/webhook signature-validation readiness, status mapping, env/secrets planning posture, and settings/marketplace guardrails
     - explicit non-implementation boundary preserved: no provider setup, no Twilio API calls, no send endpoint, no webhook route, no sandbox send, no live SMS, no env/secret/flag changes, no schema/migration/Supabase changes, and no production writes
     - real provider-powered SMS remains deferred pending later implementation slices and explicit activation approval
+  - SMS Slice F2A Sender Identity + Provider Configuration Model Lock (docs/model-only) is complete:
+    - spec added: `docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md`
+    - locked two-table model recorded: `sms_provider_configurations` + `sms_sender_identities`; registration-evidence table remains parked
+    - locked field semantics recorded: provider-neutral naming with Twilio-aware external refs (`provider_account_ref`, `default_messaging_service_ref`, `provider_sender_ref`, `messaging_service_ref`, provider registration refs)
+    - locked no-secret DB rule recorded: credentials remain server-only env/secret-manager material and never browser-exposed
+    - locked status model recorded: provider readiness + sender verification + activation separation, including sandbox/production data semantics
+    - locked RLS/mutation posture recorded: account-scoped reads, admin/owner mutation contract, no customer/portal/public access, no delete policy initially
+    - locked E2 relationship posture recorded: E2 remains unchanged in F2A; optional FK links are parked for later explicit approval
+    - explicit non-implementation boundary preserved: no code/schema/migration/Supabase/provider/send/webhook/env/flag/payment/QBO/portal changes and no production writes
+    - real provider-powered SMS remains deferred pending F2B migration foundation and later gated implementation slices
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

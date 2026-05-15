@@ -20,6 +20,7 @@ Recorded boundary for this workflow spec:
 - real SMS remains deferred until quiet-hours/timezone, template governance, sender identity/provider readiness, sandbox validation, legal/provider review, and explicit activation approval are complete
 - quiet-hours/timezone remains future SMS pre-send gate planning only and is not a direct field workflow blocker
 - Slice F1 Provider/Twilio readiness planning closeout is documented in `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md` and does not approve provider setup, send route, webhook, sandbox send, or live SMS
+- Slice F2A sender identity/provider configuration model lock is documented in `docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md` and does not approve provider setup, send route, webhook, sandbox send, live SMS, or activation behavior
 
 ---
 
@@ -259,6 +260,7 @@ I. Production activation only after legal/provider review and explicit approval.
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
 - docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
+- docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
 - docs/ACTIVE/source-of-truth-strategy.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md

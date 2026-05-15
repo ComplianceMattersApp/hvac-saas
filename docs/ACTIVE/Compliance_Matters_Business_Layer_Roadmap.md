@@ -154,6 +154,14 @@ SMS Slice F1 closeout note (May 2026):
 - F1 does not implement provider setup, Twilio API calls, send endpoint, webhook route, sandbox send, live SMS, env/secrets changes, schema/migration/Supabase changes, feature flags, or production writes.
 - Real SMS remains deferred pending later implementation slices and explicit activation approval.
 
+SMS Slice F2A closeout note (May 2026):
+- Slice F2A Sender Identity + Provider Configuration Model Lock is complete in docs/model-only mode at `docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md`.
+- F2A locks a two-table model (`sms_provider_configurations`, `sms_sender_identities`) and parks separate registration-evidence table design unless explicitly required later.
+- F2A locks provider-neutral/Twilio-aware field semantics, no-secret DB rule, readiness/verification/activation status values, sandbox-vs-production data semantics, and account-scoped RLS/mutation boundaries.
+- F2A keeps E2 tables unchanged in this slice and parks optional sender/provider FK linkage for later explicit approval.
+- F2A does not implement schema/migrations, provider setup, Twilio API calls, send endpoint, webhook route, sandbox send, live SMS, env/secrets changes, feature flags, or production writes.
+- Real SMS remains deferred pending F2B migration foundation and later gated implementation slices with legal/provider approval.
+
 ---
 
 ## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version
