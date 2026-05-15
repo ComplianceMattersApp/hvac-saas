@@ -209,6 +209,21 @@ Current Program Status Note (May 2026)
     - template read-model/helper and F4C read-only template status/sample preview remain deferred
     - real provider-powered SMS remains deferred
 
+  - SMS Slice F4C-A Template Governance Read Model Helper is complete:
+    - implementation commit: `0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`
+    - helper added: `lib/communications/sms-template-governance-read.ts`
+    - tests added: `lib/communications/__tests__/sms-template-governance-read.test.ts`
+    - helper API: `getSmsOnTheWayTemplateGovernanceForAccount({ supabase, accountOwnerUserId })`
+    - helper reads only `sms_message_templates` and `sms_message_template_versions`
+    - helper is account-scoped by `account_owner_user_id`
+    - helper safe-empty behavior: missing scope or no configured template rows
+    - helper output posture: browser-safe readiness/status only, `smsEnabled=false`, `liveSendsEnabled=false`, and no `canSend`
+    - helper behavior: sample-data preview only; token detection; unknown-token approval blocking; STOP-language approval blocking; approval-readiness does not imply send-readiness
+    - helper isolation: no provider/Twilio calls, no customer/job/contact reads, no `sms_message_intents`/`sms_provider_deliveries` reads
+    - validation recorded: template governance tests `15/15` passed; provider readiness tests `16/16` passed; SMS eligibility tests `16/16` passed; contact recipient tests `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed
+    - boundaries preserved: no UI/route/schema/migration/Supabase/provider/send/env/payment/QBO/portal behavior changes
+    - F4C-B read-only template status/sample preview remains deferred; real provider-powered SMS remains deferred
+
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
   - Job Detail Location Preview Deferral (`4ecf127`) moved Street View/static map lookup behind `Suspense` around `TimedJobLocationPreview`; immediate fallback preserves address context plus `Navigate` and `Open in Maps` while map imagery resolves after first paint.

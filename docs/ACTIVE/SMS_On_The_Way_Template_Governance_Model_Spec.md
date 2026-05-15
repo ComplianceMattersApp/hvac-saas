@@ -87,6 +87,51 @@ State after F4B:
 - provider setup remains deferred
 - sandbox/live SMS remains deferred
 
+## F4C-A Completion Cross-Reference (May 2026)
+
+SMS Slice F4C-A Template Governance Read Model Helper is complete.
+
+- implementation commit: `0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`
+- helper file: `lib/communications/sms-template-governance-read.ts`
+- test file: `lib/communications/__tests__/sms-template-governance-read.test.ts`
+- helper API: `getSmsOnTheWayTemplateGovernanceForAccount({ supabase, accountOwnerUserId })`
+
+F4C-A read-model posture:
+
+- reads only `sms_message_templates` and `sms_message_template_versions`
+- account-scoped by `account_owner_user_id`
+- safe-empty output for missing scope or no configured template rows
+- browser-safe readiness/status output only
+- always keeps SMS disabled and live sends disabled
+- does not return `canSend`
+- does not call provider/Twilio APIs
+- does not read customer/job/contact data
+- does not read `sms_message_intents` or `sms_provider_deliveries`
+- supports sample-data preview only
+- detects allowed and unknown `{{token_name}}` tokens
+- unknown tokens block approval readiness
+- missing STOP opt-out language blocks approval readiness
+- approval readiness does not equal send readiness
+- real SMS remains deferred
+
+Validation recorded:
+
+- template governance helper tests passed (`15/15`)
+- provider readiness helper tests passed (`16/16`)
+- SMS eligibility helper tests passed (`16/16`)
+- contact recipient helper tests passed (`4/4`)
+- TypeScript passed
+- `git diff --check` passed
+
+State after F4C-A:
+
+- template governance schema foundation exists
+- template governance read model exists
+- template status/sample preview UI remains deferred to F4C-B
+- template editing/review actions remain deferred
+- provider setup remains deferred
+- sandbox/live SMS remains deferred
+
 ---
 
 ## 2) Governance Location
@@ -453,10 +498,11 @@ Operational UX risk:
 
 A. F4A docs/model lock closeout. ✓ Complete
 B. F4B template schema foundation with `sms_message_templates` and `sms_message_template_versions`. ✓ Complete (`b676736`)
-C. F4C read-only template status/sample preview in `/ops/admin/communications`.
-D. Later admin edit/review server actions.
-E. Later sandbox/provider planning.
-F. Later production activation only after legal/provider review and explicit approval.
+C. F4C-A template governance read-model helper (`lib/communications/sms-template-governance-read.ts`). ✓ Complete (`0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`)
+D. F4C-B read-only template status/sample preview in `/ops/admin/communications`.
+E. Later admin edit/review server actions.
+F. Later sandbox/provider planning.
+G. Later production activation only after legal/provider review and explicit approval.
 
 ---
 

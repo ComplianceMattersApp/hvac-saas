@@ -50,6 +50,22 @@ Slice F4B Template Governance Schema Foundation is complete in commit `b676736` 
 - no production migration apply and no production writes.
 - F4C read-only template status/sample preview remains deferred; real SMS remains deferred.
 
+## F4C-A Completion Cross-Reference (May 2026)
+
+Slice F4C-A Template Governance Read Model Helper is complete in commit `0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`.
+
+- helper file: `lib/communications/sms-template-governance-read.ts`
+- test file: `lib/communications/__tests__/sms-template-governance-read.test.ts`
+- helper API: `getSmsOnTheWayTemplateGovernanceForAccount({ supabase, accountOwnerUserId })`
+- helper reads only `sms_message_templates` and `sms_message_template_versions`, scoped by `account_owner_user_id`
+- helper returns safe-empty output for missing scope or no configured template rows
+- helper returns browser-safe readiness/status output only and always keeps SMS disabled/live sends disabled
+- helper does not return `canSend`, does not call provider/Twilio APIs, does not read customer/job/contact data, and does not read `sms_message_intents` or `sms_provider_deliveries`
+- helper supports sample-data preview only, token detection, unknown-token approval blocking, STOP-language approval blocking, and approval-readiness-only semantics
+- validation recorded: template governance tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed
+- no UI/route/schema/migration/Supabase/provider/send behavior changes in this slice
+- F4C-B read-only template status/sample preview UI remains deferred; real SMS remains deferred
+
 ---
 
 ## 1) Current Decision

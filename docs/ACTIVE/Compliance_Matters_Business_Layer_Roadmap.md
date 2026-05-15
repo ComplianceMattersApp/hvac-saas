@@ -238,6 +238,20 @@ SMS Slice F4B closeout note (May 2026):
 - safe forward sequence: F4B docs closeout, then F4C read-only template status/sample preview planning/implementation, then later admin edit/review server actions, later webhook/status callback planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
 - real SMS remains deferred.
 
+SMS Slice F4C-A closeout note (May 2026):
+- Slice F4C-A Template Governance Read Model Helper is complete in commit `0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`.
+- F4C-A added helper file `lib/communications/sms-template-governance-read.ts` and test file `lib/communications/__tests__/sms-template-governance-read.test.ts`.
+- F4C-A helper API is `getSmsOnTheWayTemplateGovernanceForAccount({ supabase, accountOwnerUserId })`.
+- helper reads only `sms_message_templates` and `sms_message_template_versions`, account-scoped by `account_owner_user_id`.
+- helper returns safe-empty output for missing scope or no configured template rows.
+- helper returns browser-safe readiness/status output only, always keeps SMS disabled/live sends disabled, and does not return `canSend`.
+- helper does not call provider/Twilio APIs, does not read customer/job/contact data, and does not read `sms_message_intents` or `sms_provider_deliveries`.
+- helper supports sample-data preview only, token detection, unknown-token approval blocking, STOP-language approval blocking, and approval-readiness-not-send-readiness posture.
+- validation recorded: template governance helper tests `15/15`, provider readiness helper tests `16/16`, SMS eligibility helper tests `16/16`, contact recipient helper tests `4/4`, TypeScript passed, and `git diff --check` passed.
+- state after F4C-A: template governance schema foundation exists; template governance read model exists; F4C-B read-only template status/sample preview UI remains deferred; template editing/review actions remain deferred; provider setup remains deferred; sandbox/live SMS remains deferred.
+- safe forward sequence: F4C-A docs closeout, then F4C-B read-only On-The-Way Template Governance section on `/ops/admin/communications`, then later admin edit/review server actions, later webhook/status callback planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
+- real SMS remains deferred.
+
 ---
 
 ## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version

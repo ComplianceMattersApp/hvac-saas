@@ -89,6 +89,19 @@ Slice F4B completion cross-reference (On-The-Way template governance schema foun
 - validation recorded: TypeScript passed, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, `git diff --check` passed, and `supabase db reset --local --no-seed --yes` passed with full local migration chain including F4B.
 - no production migration apply and no production writes; real SMS remains deferred.
 
+Slice F4C-A completion cross-reference (On-The-Way template governance read model):
+
+- F4C-A is complete in commit `0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`.
+- F4C-A added helper `lib/communications/sms-template-governance-read.ts` and tests `lib/communications/__tests__/sms-template-governance-read.test.ts`.
+- helper API is `getSmsOnTheWayTemplateGovernanceForAccount({ supabase, accountOwnerUserId })`.
+- helper reads only `sms_message_templates` and `sms_message_template_versions`, scoped by `account_owner_user_id`.
+- helper returns safe-empty output on missing scope/no template rows and browser-safe readiness/status output only.
+- helper always keeps SMS disabled/live sends disabled, does not return `canSend`, does not call provider/Twilio APIs, and does not read customer/job/contact data.
+- E2 boundary preserved: helper does not read `sms_message_intents` or `sms_provider_deliveries`; `sms_message_intents.message_body_snapshot` remains the future attempted-message audit record.
+- helper supports sample-data preview only, token detection, unknown-token blocking for approval readiness, STOP-language blocking for approval readiness, and approval-readiness-not-send-readiness posture.
+- validation recorded: template governance tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed.
+- no UI/route/schema/migration/Supabase/provider/send behavior changes; real SMS remains deferred.
+
 ---
 
 ## 1) Current Decision
@@ -388,9 +401,11 @@ C. Slice E3 local migration validation and docs closeout.
 D. Quiet-hours/timezone gate planning.
 E. F4A On-The-Way template governance model lock closeout. ✓ Complete
 F. F4B template-governance schema foundation. ✓ Complete (`b676736`)
-G. Provider/Twilio sandbox readiness.
-H. Provider webhook/send implementation only after all gates.
-I. Production activation only after legal/provider review and explicit approval.
+G. F4C-A template governance read-model helper (`lib/communications/sms-template-governance-read.ts`). ✓ Complete (`0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`)
+H. F4C-B read-only template status/sample preview in Admin Communications.
+I. Provider/Twilio sandbox readiness.
+J. Provider webhook/send implementation only after all gates.
+K. Production activation only after legal/provider review and explicit approval.
 
 ---
 
