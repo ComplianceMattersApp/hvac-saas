@@ -28,6 +28,7 @@ Closeout semantics recorded:
 - No send endpoint, webhook, provider integration, or live SMS behavior was added.
 - No `job_events` provider summary behavior was added; `job_events` remains non-authoritative for provider truth.
 - Manual contact logs remain separate from provider audit truth.
+- Quiet-hours/timezone is future conservative fail-closed send-eligibility policy only; it must not block Mark On The Way or lifecycle/status transitions.
 
 Validation recorded:
 
@@ -158,6 +159,7 @@ Constraints and source-of-truth behavior:
 - account-scoped internal reads
 - no delete policy in V1 unless explicitly added later
 - blocked intents are decision truth only; they do not create provider delivery truth
+- `quiet_hours_decision` captures SMS send-eligibility evaluation state only and is not lifecycle control truth
 
 ---
 

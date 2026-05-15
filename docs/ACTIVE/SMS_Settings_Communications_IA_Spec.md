@@ -18,6 +18,7 @@ Settings IA implications remain unchanged:
 - no provider delivery write path was added in this slice
 - no activation toggle behavior was added
 - real SMS remains deferred until remaining activation gates are complete
+- quiet-hours/timezone remains future pre-send gate planning only and is not a direct workflow blocker
 
 Marketplace guardrail preserved:
 
@@ -78,6 +79,13 @@ Possible future states:
 - quiet-hours/timezone status
 - provider registration status
 - legal/provider review status
+
+Quiet-hours/timezone scope clarification:
+
+- quiet-hours/timezone is a future conservative fail-closed pre-send gate only
+- quiet-hours/timezone must not block Mark On The Way or other lifecycle/status transitions
+- no quiet-hours settings UI is approved for V1 direct job workflows
+- quiet-hours/timezone remains parked inside broader pre-send gate policy planning
 
 ### E. Activation
 
@@ -147,6 +155,7 @@ Field workflow remains lifecycle-first:
 - no job-detail preview panel
 - no field SMS editor
 - no send-status claim without provider delivery truth
+- quiet-hours/timezone must not appear as a required V1 field workflow control
 
 ---
 
@@ -210,6 +219,7 @@ This slice does not perform or authorize:
 - activation toggle implementation
 - job-detail preview card
 - field SMS editor
+- quiet-hours settings UI in direct job workflows
 - fake consent/suppression toggles
 - fake delivery status
 - payment/QBO/portal behavior

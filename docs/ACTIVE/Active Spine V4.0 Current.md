@@ -113,6 +113,10 @@ Current Program Status Note (May 2026)
     - provider posture preserved: provider status foundation is provider-neutral and Twilio-aware, not Twilio-specific
     - validation recorded: `npx.cmd tsc --noEmit` passed, `npx.cmd vitest run lib/communications/__tests__/sms-eligibility-inputs-read.test.ts` passed (`16/16`), `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed (`4/4`), `git diff --check` passed, `supabase db reset --local --no-seed --yes` passed with full local migration chain including E2
     - boundaries preserved: no provider delivery write path, no send endpoint/webhook/provider integration/live SMS behavior, no `job_events` provider summary behavior, no backfill, no production migration apply, and no production writes
+    - quiet-hours/timezone scope clarified: future conservative fail-closed pre-send gate only; not a direct workflow/lifecycle blocker
+    - Mark On The Way remains lifecycle-first and cannot be blocked by quiet-hours/timezone policy
+    - quiet-hours/timezone blocked-send outcomes remain SMS-only and do not change lifecycle/status transition success
+    - no quiet-hours settings UI is approved for V1 direct job workflows
     - marketplace guardrail preserved: this is neutral tenant/account-scoped communication audit infrastructure, not Eddie-specific activation behavior
     - real provider-powered SMS remains deferred pending quiet-hours/timezone gate implementation, admin template governance implementation, sender identity/provider readiness, provider/Twilio sandbox readiness, webhook/send implementation after all gates, legal/provider review, and explicit activation approval
 

@@ -51,6 +51,7 @@ Reference closeouts:
 - Slice E2 locked posture: `sms_message_intents` is send-request/decision audit context (not provider delivery truth); `sms_provider_deliveries` is provider submission/callback truth (not manual contact log); one current delivery row per intent; account-scoped intent idempotency foundation exists.
 - Slice E2 validation: `npx.cmd tsc --noEmit`, B2 helper tests (`16/16`), recipient helper tests (`4/4`), `git diff --check`, and `supabase db reset --local --no-seed --yes` all passed with full local migration chain including E2.
 - Slice E2 boundary confirmation: no provider delivery write path, no send endpoint/webhook/provider integration/live SMS behavior, no `job_events` provider summary behavior, no backfill, no production migration apply, and no production writes.
+- Quiet-hours scope lock: quiet-hours/timezone remains future conservative fail-closed SMS pre-send gate planning only; it must not block Mark On The Way or job lifecycle/status transitions.
 
 ---
 
@@ -120,6 +121,13 @@ Before activation, future SMS must support:
 - recipient-local timezone resolution policy
 - quiet-hours guardrails by message class
 - deterministic behavior when timezone confidence is low
+
+Workflow-scope lock:
+
+- quiet-hours/timezone applies only to future SMS send eligibility
+- quiet-hours/timezone is not a direct field workflow control in V1
+- quiet-hours/timezone blocked-send outcomes must not block lifecycle/status transitions
+- no quiet-hours settings UI is approved for V1 direct job workflows
 
 No-go rule:
 - no live SMS if quiet-hours controls are undefined or unenforced.

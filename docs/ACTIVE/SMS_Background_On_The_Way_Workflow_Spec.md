@@ -18,6 +18,7 @@ Recorded boundary for this workflow spec:
 - this does not add send endpoint, webhook, provider integration, or live SMS behavior
 - no `job_events` provider summary behavior was added
 - real SMS remains deferred until quiet-hours/timezone, template governance, sender identity/provider readiness, sandbox validation, legal/provider review, and explicit activation approval are complete
+- quiet-hours/timezone remains future SMS pre-send gate planning only and is not a direct field workflow blocker
 
 ---
 
@@ -45,6 +46,12 @@ Future intended flow (planning only):
 3. Future SMS send evaluation runs after lifecycle transition as background/event-driven workflow.
 4. If all gates pass, future provider SMS may be sent.
 5. If any gate fails, no SMS is sent and lifecycle transition remains successful.
+
+Quiet-hours/timezone clarification:
+
+- quiet-hours/timezone must not block Mark On The Way
+- quiet-hours/timezone must not block job lifecycle/status transitions
+- quiet-hours/timezone applies only to future background SMS send eligibility
 
 ---
 
@@ -83,6 +90,11 @@ All gates below must pass before any future background send is allowed:
 
 If any gate is missing or ambiguous, send remains blocked.
 
+Scope clarification:
+
+- this gate is conservative and fail-closed for SMS send eligibility only
+- this gate is not a required V1 field workflow control
+
 ---
 
 ## 5) Failure Behavior When Gates Block Sending
@@ -95,6 +107,7 @@ If a future background send is blocked:
 - no automatic manual contact log creation
 - optional internal-only note/event may be added later only after that event model is designed
 - Mark On The Way remains successful when lifecycle action itself succeeded
+- quiet-hours/timezone blocked-send outcomes are SMS-only and do not change lifecycle success
 
 ---
 
@@ -207,6 +220,7 @@ This slice does not perform or authorize:
 - On-The-Way automation
 - job-detail preview card
 - field SMS editor
+- quiet-hours settings UI in direct job workflows
 - consent/suppression fake toggles
 - customer portal work
 - payment/QBO behavior

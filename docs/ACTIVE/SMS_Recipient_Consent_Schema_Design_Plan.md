@@ -277,6 +277,7 @@ Locked E2 interpretation:
 - account-scoped idempotency foundation exists for intents.
 - provider status foundation is provider-neutral and Twilio-aware, not Twilio-specific.
 - no provider delivery write path was added in this slice.
+- quiet-hours/timezone remains future conservative fail-closed pre-send gate policy only and is not a direct lifecycle/workflow blocker.
 
 Validation recorded:
 
@@ -303,6 +304,13 @@ Future gates still required:
 - webhook/send implementation only after all gates
 - legal/provider review
 - explicit activation decision
+
+Quiet-hours scope clarification:
+
+- quiet-hours/timezone must not block Mark On The Way
+- quiet-hours/timezone must not block job lifecycle/status transitions
+- if future SMS is blocked by quiet-hours/timezone, lifecycle action still succeeds
+- no quiet-hours settings UI is approved for V1 direct workflows
 
 Live-SMS status:
 - Real SMS remains deferred.
