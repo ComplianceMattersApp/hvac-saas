@@ -86,6 +86,17 @@ Slice F4C-B Read-Only On-The-Way Template Governance Section is complete.
 - validation recorded: TypeScript passed, template governance tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, and `git diff --check` passed
 - real SMS remains deferred
 
+## F4D-A Model Lock Cross-Reference (May 2026)
+
+Slice F4D-A Template Editing + Review Actions Model Lock is complete in `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md`.
+
+- F4D-A is docs/model-only and does not implement mutation paths, server actions, editable UI, schema changes, provider calls, or SMS sends.
+- Future validation helper location is locked as `lib/communications/sms-template-governance-validation.ts`.
+- Future mutation file is locked as `lib/actions/sms-template-actions.ts`, with `requireInternalRole("admin")`, account scope derived from authenticated internal-user context, explicit scoped lookups, and admin-client writes only after validation.
+- First future action posture is create/save draft only; review actions and editable UI remain later slices.
+- Template approval/readiness does not enable SMS sending, sandbox sends, provider setup, webhook behavior, activation, or Mark On The Way automation.
+- Communications UI copy must continue to state that SMS is not enabled, live sends are disabled, template approval does not enable sending, and previews are sample-only.
+
 ---
 
 ## 1) Current Decision
@@ -428,7 +439,13 @@ F3 page must not include:
 A. F3A docs/model lock closeout. ✓ Complete
 B. F3B read-model helper returning safe account-scoped readiness. ✓ Complete (commit `d370e56`)
 C. F3C read-only Admin Center route/page. ✓ Complete (commit `994e79c`)
-D. Later slices: provider setup mutation planning, template governance, webhook/signature validation, sandbox send planning, activation planning.
+D. F4A/F4B/F4C template governance model/schema/read-only UI. Complete.
+E. F4D-A template editing/review actions model lock. Complete.
+F. F4D-B validation helper only; no writes, no UI.
+G. F4D-C create/save draft server actions.
+H. F4D-D review actions.
+I. F4D-E editable UI.
+J. Later slices: provider setup mutation planning, webhook/signature validation, sandbox send planning, activation planning.
 
 ---
 
@@ -469,6 +486,7 @@ Future F3 implementation validation should include:
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
 - docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md
 - docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md
+- docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md
 - docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md

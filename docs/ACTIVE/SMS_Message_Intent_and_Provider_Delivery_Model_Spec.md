@@ -115,6 +115,13 @@ Slice F4C-B completion cross-reference (On-The-Way template governance read-only
 - validation recorded: TypeScript passed, template governance tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, and `git diff --check` passed.
 - browser smoke passed after stabilization; real SMS remains deferred.
 
+Slice F4D-A model lock cross-reference (Template editing/review actions):
+
+- F4D-A is documented in `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md`.
+- F4D-A locks that draft/save/review semantics are template governance only and do not create `sms_message_intents`, `sms_provider_deliveries`, provider calls, provider callbacks, or send attempts.
+- Future draft and review actions must not write provider-delivery truth; `sms_message_intents.message_body_snapshot` remains the future attempted-message body snapshot only when an actual approved send path exists later.
+- Template approval/readiness must not be recorded as provider delivery truth and must not summarize into `job_events`.
+
 ---
 
 ## 1) Current Decision
@@ -416,9 +423,14 @@ E. F4A On-The-Way template governance model lock closeout. ✓ Complete
 F. F4B template-governance schema foundation. ✓ Complete (`b676736`)
 G. F4C-A template governance read-model helper (`lib/communications/sms-template-governance-read.ts`). ✓ Complete (`0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`)
 H. F4C-B read-only template status/sample preview in Admin Communications. ✓ Complete (`05475929cc69704b1fb22f3dabbde10ff83aed90`, stabilized by `1ffa475e2167eeb60a206358a4e7032a407bdd0f`)
-I. Provider/Twilio sandbox readiness.
-J. Provider webhook/send implementation only after all gates.
-K. Production activation only after legal/provider review and explicit approval.
+I. F4D-A template editing/review actions model lock. Complete.
+J. F4D-B validation helper only; no writes, no UI.
+K. F4D-C create/save draft server actions.
+L. F4D-D review actions.
+M. F4D-E editable UI.
+N. Provider/Twilio sandbox readiness.
+O. Provider webhook/send implementation only after all gates.
+P. Production activation only after legal/provider review and explicit approval.
 
 ---
 
@@ -433,6 +445,7 @@ K. Production activation only after legal/provider review and explicit approval.
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
 - docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
 - docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md
+- docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md
 - docs/ACTIVE/source-of-truth-strategy.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md

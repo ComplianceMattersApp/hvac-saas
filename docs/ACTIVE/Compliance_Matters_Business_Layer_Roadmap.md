@@ -262,6 +262,18 @@ SMS Slice F4C-B closeout note (May 2026):
 - state after F4C-B: template governance schema foundation exists, template governance read model exists, template governance read-only UI section exists, admin edit/review actions remain deferred, webhook/status callback planning remains deferred, provider/Twilio sandbox planning remains deferred, and real SMS remains deferred.
 - conservative next-lane recommendation: proceed with admin edit/review server-action planning before any provider/webhook/send activation implementation.
 
+SMS Slice F4D-A closeout note (May 2026):
+- Slice F4D-A Template Editing + Review Actions Model Lock is complete in docs/model-only mode at `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md`.
+- F4D-A locks future action sequence: validation helper, create/save draft server actions, review actions, editable UI, later provider/legal review operations, later sandbox/provider work, and later production activation only after explicit approval.
+- F4D-A locks future server-action architecture: `lib/actions/sms-template-actions.ts`, authenticated internal context, `requireInternalRole("admin")`, account owner derived from internal-user context, scoped lookups, `createAdminClient()` writes after validation, and `/ops/admin/communications` revalidation.
+- F4D-A locks first future actions as `createOnTheWayTemplateDraftFromDefaultFromForm` and `saveOnTheWayTemplateDraftFromForm`; submit/approve/reject/pause/retire actions remain later.
+- F4D-A locks future validation helper `lib/communications/sms-template-governance-validation.ts`, token allowlist, STOP-language requirement, prohibited promotional wording block, SHA-256 body hash, sample-only preview, and segment estimate posture.
+- F4D-A locks versioning: drafts may be mutable, approved/active/superseded/retired body text is immutable, edits to approved/current wording create new draft versions, and activation/current pointer behavior remains deferred.
+- F4D-A keeps F4B SELECT-only RLS intentional, normal authenticated template write policies absent, delete actions absent, and `job_events` excluded from template governance logging.
+- F4D-A does not implement server actions, editable UI, code behavior, schema/migration changes, Supabase commands, provider/Twilio calls, send endpoint, webhook, sandbox/live SMS, activation, env/secret/feature-flag changes, payment/QBO/portal behavior, marketplace behavior, or production writes.
+- state after F4D-A: mutation semantics are locked; validation helper remains next; create/save draft actions, review actions, editable UI, provider/legal review, sandbox sends, and production activation remain deferred.
+- real SMS remains deferred.
+
 ---
 
 ## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version

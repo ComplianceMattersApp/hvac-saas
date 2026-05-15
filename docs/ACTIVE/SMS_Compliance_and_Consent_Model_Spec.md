@@ -69,6 +69,9 @@ Reference closeouts:
 - Slice F4C-B stabilization closeout: commit `1ffa475e2167eeb60a206358a4e7032a407bdd0f` added fail-closed provider-readiness handling for local schema-cache/missing-table (`PGRST205`) conditions so missing local SMS tables degrade to safe-empty readiness state instead of page crash.
 - Slice F4C-B validation: template governance tests (`15/15`), provider readiness helper tests (`16/16`), SMS eligibility helper tests (`16/16`), recipient helper tests (`4/4`), `npx.cmd tsc --noEmit`, `git diff --check`, and browser smoke after stabilization all passed.
 - Slice F4C-B boundary confirmation: no send endpoint, webhook, provider/Twilio integration, sandbox/live SMS activation, or compliance gate bypass behavior changed; real SMS remains deferred.
+- Slice F4D-A docs/model closeout: `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md` locks future admin template editing/review action semantics before any mutation path exists.
+- Slice F4D-A compliance boundary: template approval/readiness does not enable sending; future validation must block unknown tokens, missing STOP language, and prohibited promotional wording before submit/review/sandbox approval; provider/legal approval and activation remain deferred.
+- Slice F4D-A write boundary: future writes stay admin-only, account-scoped, and server-side after role validation; normal authenticated template INSERT/UPDATE/DELETE policies remain absent, and `job_events` is not used for template governance.
 - Quiet-hours scope lock: quiet-hours/timezone remains future conservative fail-closed SMS pre-send gate planning only; it must not block Mark On The Way or job lifecycle/status transitions.
 
 ---
@@ -241,6 +244,7 @@ This planning slice does not perform:
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md (Slice F2A docs/model lock for sender identity/provider configuration semantics, no-secret DB rule, and migration acceptance boundaries)
 - docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md (Slice F3A docs/model lock for admin-only read-only Settings -> Communications readiness UI posture)
 - docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md (Slice F4A docs/model lock for admin-only On-The-Way template governance, two-table template model, token allowlist, immutable approved wording versions, preview posture, and review-state separation)
+- docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md (Slice F4D-A docs/model lock for admin template editing/review action semantics, validation helper contract, draft/review sequencing, and non-sending approval posture)
 - docs/ACTIVE/Compliance_Matters_Prelaunch_Confirmation_Checklist.md
 - docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md
 - docs/ACTIVE/Active Spine V4.0 Current.md

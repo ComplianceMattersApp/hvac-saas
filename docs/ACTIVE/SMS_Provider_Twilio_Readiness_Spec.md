@@ -63,6 +63,15 @@ Slice F4C-B Read-Only On-The-Way Template Governance Section is complete.
 - no Twilio/provider integration, credentials, webhook, sandbox send, or live SMS behavior was enabled
 - real SMS remains deferred
 
+## F4D-A Model Lock Cross-Reference (May 2026)
+
+Slice F4D-A Template Editing + Review Actions Model Lock is complete in `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md`.
+
+- F4D-A does not approve Twilio/provider setup, sandbox sends, status callbacks, webhook behavior, activation, or live SMS.
+- Template approval/readiness is product governance only and must not be interpreted as provider readiness or send enablement.
+- Future provider/legal review actions remain postponed until provider/Twilio and production activation planning starts.
+- Future `approved_for_activation` semantics must require legal and provider approval; sandbox approval remains separate and non-sending.
+
 ---
 
 ## 1) Current Decision
@@ -349,10 +358,15 @@ G. F4A On-The-Way Template Governance model lock closeout (`docs/ACTIVE/SMS_On_T
 H. F4B template schema foundation (`sms_message_templates`, `sms_message_template_versions`) with no send/provider behavior. ✓ Complete (`b676736`)
 I. F4C-A template governance read-model helper (`lib/communications/sms-template-governance-read.ts`). ✓ Complete (`0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`)
 J. F4C-B read-only template status/sample preview in `/ops/admin/communications`. ✓ Complete (`05475929cc69704b1fb22f3dabbde10ff83aed90`, stabilized by `1ffa475e2167eeb60a206358a4e7032a407bdd0f`)
-K. F5 webhook/status callback contract planning.
-L. F6 provider/Twilio sandbox implementation planning.
-M. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
-N. Production activation only after provider/legal review and explicit approval.
+K. F4D-A template editing/review actions model lock. Complete.
+L. F4D-B validation helper only; no writes, no UI.
+M. F4D-C create/save draft server actions.
+N. F4D-D review actions.
+O. F4D-E editable UI.
+P. F5 webhook/status callback contract planning.
+Q. F6 provider/Twilio sandbox implementation planning.
+R. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
+S. Production activation only after provider/legal review and explicit approval.
 
 ---
 
@@ -387,6 +401,7 @@ Primary official references used for this planning slice:
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
 - docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
 - docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md
+- docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md

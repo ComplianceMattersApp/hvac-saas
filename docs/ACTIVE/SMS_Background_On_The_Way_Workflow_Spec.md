@@ -41,6 +41,9 @@ Recorded boundary for this workflow spec:
 - stabilization added fail-closed provider-readiness handling for local schema-cache/missing-table (`PGRST205`) conditions so local errors degrade to safe-empty readiness instead of crashing page.
 - browser smoke passed after stabilization; real SMS remains deferred.
 - F4C-B validation recorded: TypeScript passed, template governance tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, and `git diff --check` passed.
+- Slice F4D-A Template Editing + Review Actions Model Lock is complete in `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md`.
+- F4D-A keeps this workflow boundary intact: template create/save/review semantics are admin settings governance only, do not send SMS, do not create provider delivery truth, do not add webhook behavior, and do not change Mark On The Way lifecycle behavior.
+- Future template validation and admin draft/review actions must preserve background/event-driven send planning and must not run inline inside Mark On The Way.
 
 ---
 
@@ -269,11 +272,16 @@ E. F4A On-The-Way template governance model lock closeout. ✓ Complete
 F. F4B template schema foundation (`sms_message_templates`, `sms_message_template_versions`). ✓ Complete (`b676736`)
 G. F4C-A template governance read-model helper (`lib/communications/sms-template-governance-read.ts`). ✓ Complete (`0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`)
 H. F4C-B read-only template status/sample preview in Admin Communications. ✓ Complete (`05475929cc69704b1fb22f3dabbde10ff83aed90`, stabilized by `1ffa475e2167eeb60a206358a4e7032a407bdd0f`)
-I. Quiet-hours/timezone gate planning.
-J. Provider/Twilio readiness and A2P sandbox planning.
-K. Non-sending background evaluator.
-L. Sandbox provider send only after all gates.
-M. Production activation only after legal/provider review and explicit approval.
+I. F4D-A template editing/review actions model lock. Complete.
+J. F4D-B validation helper only; no writes, no UI.
+K. F4D-C create/save draft server actions.
+L. F4D-D review actions.
+M. F4D-E editable UI.
+N. Quiet-hours/timezone gate planning.
+O. Provider/Twilio readiness and A2P sandbox planning.
+P. Non-sending background evaluator.
+Q. Sandbox provider send only after all gates.
+R. Production activation only after legal/provider review and explicit approval.
 
 ---
 
@@ -287,6 +295,7 @@ M. Production activation only after legal/provider review and explicit approval.
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
 - docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
 - docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md
+- docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md
 - docs/ACTIVE/source-of-truth-strategy.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md

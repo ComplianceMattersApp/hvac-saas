@@ -227,6 +227,20 @@ Current Program Status Note (May 2026)
     - F4C-B validation recorded: template governance tests `15/15` passed; provider readiness tests `16/16` passed; SMS eligibility tests `16/16` passed; contact recipient tests `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed; browser smoke passed after stabilization
     - real provider-powered SMS remains deferred
 
+  - SMS Slice F4D-A Template Editing + Review Actions Model Lock is complete (docs/model-only):
+    - spec added: `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md`
+    - cross-references updated across ACTIVE SMS docs, source-of-truth strategy, Active Spine, and Business Layer Roadmap
+    - locked implementation sequence: F4D-A docs/model lock, F4D-B validation helper, F4D-C create/save draft server actions, F4D-D review actions, F4D-E editable UI, later provider/legal review, later sandbox/provider work, and later production activation only after explicit approval
+    - locked future validation helper: `lib/communications/sms-template-governance-validation.ts`
+    - locked future action file: `lib/actions/sms-template-actions.ts`
+    - locked first future actions: `createOnTheWayTemplateDraftFromDefaultFromForm` and `saveOnTheWayTemplateDraftFromForm`
+    - locked action posture: authenticated internal context, `requireInternalRole("admin")`, account owner derived from internal-user context, explicit scoped lookups, `createAdminClient()` for writes because F4B RLS remains SELECT-only, and revalidation of `/ops/admin/communications`
+    - locked validation posture: strict token allowlist, server-side SHA-256 body hash, STOP-language requirement, prohibited promotional wording block, sample-only preview, segment warnings above one segment, and approval block above two estimated segments until provider/legal review says otherwise
+    - locked versioning posture: draft versions may be mutable; approved/active/superseded/retired body text is immutable; edits to approved/current wording create a new draft version; `sandbox_version_id` is set only by approve-for-sandbox; `current_version_id` waits for legal/provider review and activation planning
+    - locked audit/RLS posture: use existing row actor/timestamp fields first, keep `sms_message_template_events` parked, do not use `job_events`, keep normal authenticated INSERT/UPDATE/DELETE policies absent, and no DELETE actions
+    - boundaries preserved: no code/server-action/UI/schema/migration/Supabase/provider/Twilio/send/webhook/activation/env/flag/payment/QBO/portal behavior changes and no production writes
+    - template approval/readiness does not enable SMS sending; real provider-powered SMS remains deferred
+
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
   - Job Detail Location Preview Deferral (`4ecf127`) moved Street View/static map lookup behind `Suspense` around `TimedJobLocationPreview`; immediate fallback preserves address context plus `Navigate` and `Open in Maps` while map imagery resolves after first paint.

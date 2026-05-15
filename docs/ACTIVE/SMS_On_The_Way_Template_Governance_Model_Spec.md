@@ -179,6 +179,24 @@ State after F4C-B:
 - sandbox/live SMS remains deferred
 - webhook/status callback planning remains deferred
 
+## F4D-A Model Lock Cross-Reference (May 2026)
+
+SMS Slice F4D-A Template Editing + Review Actions Model Lock is complete in `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md`.
+
+F4D-A locks future admin edit/review mutation semantics before any write path exists:
+
+- future action file: `lib/actions/sms-template-actions.ts`
+- future validation helper file: `lib/communications/sms-template-governance-validation.ts`
+- first implementation after docs should be validation helper only
+- future create/save draft actions precede review actions and editable UI
+- `createAdminClient()` writes are allowed only after `requireInternalRole("admin")` and explicit account-scope validation because F4B SELECT-only RLS remains intentional
+- normal authenticated INSERT/UPDATE/DELETE policies remain absent
+- approved/current template text is immutable; meaningful edits create a new draft version
+- `sandbox_version_id` is set only by approve-for-sandbox
+- `current_version_id` is not set by draft save or sandbox approval
+- approving a template does not enable SMS send
+- real SMS remains deferred
+
 ---
 
 ## 2) Governance Location
@@ -547,10 +565,14 @@ A. F4A docs/model lock closeout. ✓ Complete
 B. F4B template schema foundation with `sms_message_templates` and `sms_message_template_versions`. ✓ Complete (`b676736`)
 C. F4C-A template governance read-model helper (`lib/communications/sms-template-governance-read.ts`). ✓ Complete (`0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`)
 D. F4C-B read-only template status/sample preview in `/ops/admin/communications`. ✓ Complete (`05475929cc69704b1fb22f3dabbde10ff83aed90`, stabilized by `1ffa475e2167eeb60a206358a4e7032a407bdd0f`)
-E. Later admin edit/review server actions.
-F. Later webhook/status callback contract planning.
-G. Later sandbox/provider planning.
-H. Later production activation only after legal/provider review and explicit approval.
+E. F4D-A template editing/review actions model lock. Complete.
+F. F4D-B validation helper.
+G. F4D-C create/save draft server actions.
+H. F4D-D review actions.
+I. F4D-E editable UI.
+J. Later webhook/status callback contract planning.
+K. Later sandbox/provider planning.
+L. Later production activation only after legal/provider review and explicit approval.
 
 ---
 
@@ -608,6 +630,7 @@ Documentation acceptance criteria:
 - docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
 - docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
 - docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md
+- docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md
