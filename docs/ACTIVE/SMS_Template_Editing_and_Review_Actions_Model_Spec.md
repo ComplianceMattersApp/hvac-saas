@@ -52,7 +52,7 @@ Future sequence:
 A. F4D-A docs/model lock.
 B. F4D-B validation helper. ✓ Complete (`418172e`)
 C. F4D-C create/save draft server actions. ✓ Complete (`f7cf8c0`)
-D. F4D-D review actions.
+D. F4D-D review actions. ✓ Complete (`f5995d7`)
 E. F4D-E editable UI.
 F. Later provider/legal review operations.
 G. Later sandbox/provider work.
@@ -250,6 +250,65 @@ State after F4D-C:
 - provider setup remains deferred
 - sandbox/live SMS remains deferred
 - real SMS remains deferred
+
+---
+
+## F4D-D Completion Cross-Reference (May 2026)
+
+SMS Slice F4D-D Template Review Actions is complete.
+
+- implementation commit: `f5995d7`
+- action file: `lib/actions/sms-template-actions.ts`
+- test file: `lib/actions/__tests__/sms-template-actions.test.ts`
+- actions added: `submitOnTheWayTemplateVersionForReviewFromForm`, `approveOnTheWayTemplateVersionForSandboxFromForm`, `rejectOnTheWayTemplateVersionFromForm`
+- actions are admin-only via `requireInternalRole("admin")`
+- actions are account-scoped from authenticated internal-user context and never trust `account_owner_user_id` from form input
+- actions use `createAdminClient()` for writes because template governance tables remain SELECT-only for authenticated users
+- submit action requires scoped/latest draft + `validateOnTheWayTemplateBody(...).canSubmitForReview`, then moves version to `pending_review` with internal review `pending` only
+- approve-for-sandbox action requires scoped/latest pending-review + internal review `pending` + `validateOnTheWayTemplateBody(...).canApproveForSandbox`, then moves version to `approved_for_sandbox` and sets parent `sandbox_version_id` only
+- reject action requires scoped pending-review version and non-blank reason, normalizes reason and bounds to 500 chars, then moves version to `rejected`
+- approve-for-sandbox includes best-effort rollback when parent sandbox pointer update fails
+- `current_version_id` remains untouched
+- no activation behavior exists
+- no provider/Twilio/send/webhook behavior exists
+- template approval/readiness still does not enable SMS sending
+- real SMS remains deferred
+
+Validation recorded:
+
+- template action tests passed (`40/40`)
+- template validation helper tests passed (`19/19`)
+- template governance read tests passed (`15/15`)
+- provider readiness tests passed (`16/16`)
+- SMS eligibility tests passed (`16/16`)
+- contact recipient tests passed (`4/4`)
+- TypeScript passed
+- `git diff --check` passed
+- total: `110/110`
+
+State after F4D-D:
+
+- template governance schema exists
+- template governance read model exists
+- template governance read-only UI exists
+- template validation helper exists
+- create/save draft actions exist
+- submit/approve-for-sandbox/reject review actions exist
+- editable UI remains deferred (F4D-E)
+- approve-for-activation remains deferred
+- provider/legal approval actions remain deferred
+- provider setup remains deferred
+- sandbox/live SMS remains deferred
+- real SMS remains deferred
+
+Future sequence after this docs closeout:
+
+- F4D-E editable UI planning audit
+- later editable UI controls inside `/ops/admin/communications`
+- later provider/legal review workflow
+- later webhook/status callback contract planning
+- later provider/Twilio sandbox planning
+- later production activation only after legal/provider review and explicit approval
 
 ---
 
@@ -512,6 +571,40 @@ F4D-C includes:
 - `saveOnTheWayTemplateDraftFromForm`: validates body, blocks blank, updates mutable draft in place, creates new draft after immutable latest
 - exported pure helpers `resolveNextVersionNumber` and `isVersionMutable`
 - 20 focused tests covering non-admin block, create/reuse/next-version logic, blank-body block, in-place update, immutable-version protection, validation-metadata persistence, warning notice, scope/ownership enforcement, `current_version_id`/`sandbox_version_id` absence, and revalidation
+
+Real SMS remains deferred.
+
+---
+
+## 17) F4D-D Boundary Confirmation
+
+F4D-D added admin-only review actions only.
+
+F4D-D did not add:
+
+- editable UI
+- route changes
+- schema/migration changes
+- Supabase production commands
+- provider/Twilio behavior
+- send behavior
+- webhook behavior
+- approve-for-activation action
+- provider/legal approval actions
+- pause/retire actions
+- sandbox SMS
+- live SMS
+- env/secret/feature-flag changes
+- invoice/payment/Stripe/QBO behavior
+- portal/marketplace behavior
+
+F4D-D includes:
+
+- `submitOnTheWayTemplateVersionForReviewFromForm`: scoped/latest draft submit only, validation-gated
+- `approveOnTheWayTemplateVersionForSandboxFromForm`: scoped/latest pending-review approve only, sandbox pointer update only
+- `rejectOnTheWayTemplateVersionFromForm`: pending-review reject only, required normalized/bounded reason
+- continued account-scope enforcement and revalidation of `/ops/admin/communications` + `/ops/admin`
+- explicit non-sending posture with no provider/send/webhook write path
 
 Real SMS remains deferred.
 

@@ -270,6 +270,19 @@ Current Program Status Note (May 2026)
     - boundaries preserved: no UI/schema/migration/Supabase production/provider/Twilio/send/webhook/activation/env/flag/payment/QBO/portal behavior changes and no production writes
     - template approval/readiness does not enable SMS sending; real provider-powered SMS remains deferred
 
+  - SMS Slice F4D-D Template Review Actions is complete:
+    - implementation commit: `f5995d7`
+    - action file: `lib/actions/sms-template-actions.ts`
+    - test file: `lib/actions/__tests__/sms-template-actions.test.ts`
+    - actions added: `submitOnTheWayTemplateVersionForReviewFromForm`, `approveOnTheWayTemplateVersionForSandboxFromForm`, `rejectOnTheWayTemplateVersionFromForm`
+    - actions are admin-only, account-scoped from authenticated internal-user context, and validation-gated with `validateOnTheWayTemplateBody`
+    - submit moves scoped latest `draft` version to `pending_review` only; approval for sandbox moves scoped latest `pending_review` version to `approved_for_sandbox` only; reject moves scoped `pending_review` version to `rejected` only with required normalized/bounded `rejected_reason`
+    - pointer posture: `sandbox_version_id` is set only by approve-for-sandbox; `current_version_id` remains untouched; submit/reject do not modify template pointers
+    - approve-for-sandbox includes best-effort rollback when version approval succeeds but parent sandbox pointer update fails
+    - validation recorded: template action tests `40/40` passed; template validation helper tests `19/19` passed; template governance read tests `15/15` passed; provider readiness tests `16/16` passed; SMS eligibility tests `16/16` passed; contact recipient tests `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed; total `110/110`
+    - boundaries preserved: no UI/route/schema/migration changes, no Supabase production commands, no provider/Twilio/send/webhook/sandbox/live SMS behavior, no env/secret/flag changes, and no payment/QBO/portal/marketplace behavior changes
+    - editable UI remains deferred (F4D-E), approve-for-activation remains deferred, provider/legal approval actions remain deferred, and real provider-powered SMS remains deferred
+
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
   - Job Detail Location Preview Deferral (`4ecf127`) moved Street View/static map lookup behind `Suspense` around `TimedJobLocationPreview`; immediate fallback preserves address context plus `Navigate` and `Open in Maps` while map imagery resolves after first paint.

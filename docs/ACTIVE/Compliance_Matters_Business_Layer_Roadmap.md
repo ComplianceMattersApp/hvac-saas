@@ -300,6 +300,20 @@ SMS Slice F4D-C closeout note (May 2026):
 - validation recorded: template action tests `20/20`, template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, `npx.cmd tsc --noEmit`, and `git diff --check` all passed; total `90/90`.
 - state after F4D-C: template governance schema exists; read model exists; read-only UI exists; validation helper exists; create/save draft actions exist; review actions remain deferred (F4D-D); editable UI remains deferred (F4D-E); provider setup, sandbox sends, and live SMS remain deferred; real SMS remains deferred.
 
+SMS Slice F4D-D closeout note (May 2026):
+- Slice F4D-D Template Review Actions is complete in commit `f5995d7`.
+- F4D-D changed action file `lib/actions/sms-template-actions.ts` and test file `lib/actions/__tests__/sms-template-actions.test.ts`.
+- actions added: `submitOnTheWayTemplateVersionForReviewFromForm`, `approveOnTheWayTemplateVersionForSandboxFromForm`, and `rejectOnTheWayTemplateVersionFromForm`.
+- actions are admin-only, scoped by authenticated internal-user account context, and use `validateOnTheWayTemplateBody` as review gate.
+- submit transitions only `draft -> pending_review` for scoped latest version.
+- approve-for-sandbox transitions only `pending_review -> approved_for_sandbox` for scoped latest version and sets parent `sandbox_version_id` only.
+- reject transitions only `pending_review -> rejected` and requires non-blank normalized/bounded `rejected_reason` (max 500).
+- pointer behavior remains safe: `current_version_id` untouched; submit/reject do not modify template pointers.
+- no activation behavior, no provider/Twilio/send/webhook behavior, and no SMS send readiness implied by template approval/readiness.
+- validation recorded: template action tests `40/40`; template validation helper tests `19/19`; template governance read tests `15/15`; provider readiness tests `16/16`; SMS eligibility tests `16/16`; contact recipient tests `4/4`; `npx.cmd tsc --noEmit`; `git diff --check`; total `110/110` passed.
+- state after F4D-D: schema/read-model/read-only UI/validation helper/create-save draft/review actions exist; editable UI remains deferred (F4D-E); approve-for-activation remains deferred; provider/legal approval actions remain deferred; provider setup remains deferred; sandbox/live SMS remains deferred; real SMS remains deferred.
+- safe forward sequence: F4D-D docs closeout, then F4D-E editable UI planning audit, then later editable UI controls in `/ops/admin/communications`, later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
+
 ---
 
 ## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version
