@@ -75,6 +75,19 @@ Slice F4A completion cross-reference (May 2026):
 - F4A locks admin-only governance posture, token allowlist, mandatory STOP language, prohibited wording, sample-preview-only posture, and separate internal/legal/provider review states.
 - F4A remains docs/model-only and does not add schema/migrations, read-model/UI editing, provider setup, send route, webhook, sandbox send, live SMS, or activation behavior.
 
+Slice F4B completion cross-reference (May 2026):
+
+- Template Governance Schema Foundation is complete in commit `b676736` via `supabase/migrations/20260515140000_sms_message_template_governance_foundation.sql`.
+- F4B implemented the safer two-table model by creating `sms_message_templates` (account-scoped template container/current pointer) and `sms_message_template_versions` (durable governed wording/version record).
+- single-table `sms_templates` remains rejected for this lane.
+- template rows are account-scoped with RLS enabled and SELECT-only policy posture for authenticated active internal users in the same account.
+- no INSERT/UPDATE/DELETE policies were added in V1; future writes remain deferred to admin-only server actions.
+- F4B does not enable template editing, preview, rendering, sending, or On-The-Way automation.
+- F4B does not alter `sms_message_intents`; `sms_message_intents.message_body_snapshot` remains the future attempted-message audit record.
+- F4B validation recorded: TypeScript passed, provider readiness helper tests `16/16`, SMS eligibility helper tests `16/16`, contact recipient helper tests `4/4`, `git diff --check` passed, and `supabase db reset --local --no-seed --yes` passed with full local migration chain including F4B.
+- no production migration apply and no production writes.
+- F4C read-only template status/sample preview remains deferred; real SMS remains deferred.
+
 ---
 
 ## 1) Settings Location Decision
@@ -292,7 +305,7 @@ B. F3A Settings Communications readiness UI model lock closeout. ✓ Complete
 C. F3B read-model helper planning/implementation (`lib/communications/sms-provider-readiness-read.ts`). ✓ Complete (commit `d370e56`)
 D. F3C read-only Admin Center route/page planning/implementation (`/ops/admin/communications`). ✓ Complete (commit `994e79c`)
 E. F4A On-The-Way Template Governance model lock closeout (`docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md`). ✓ Complete
-F. F4B template schema foundation (`sms_message_templates`, `sms_message_template_versions`) with account-scoped RLS and no mutation/send behavior.
+F. F4B template schema foundation (`sms_message_templates`, `sms_message_template_versions`) with account-scoped RLS and no mutation/send behavior. ✓ Complete (`b676736`)
 G. F4C read-only template status/sample preview in `/ops/admin/communications`.
 H. Quiet-hours/timezone gate planning.
 I. Provider/Twilio readiness and sandbox setup.

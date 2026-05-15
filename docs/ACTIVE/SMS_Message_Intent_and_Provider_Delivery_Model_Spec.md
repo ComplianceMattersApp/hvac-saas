@@ -78,6 +78,17 @@ Slice F4A model lock cross-reference (On-The-Way template governance posture):
 - F4A locks a two-table future template-governance model (`sms_message_templates`, `sms_message_template_versions`) and immutable approved historical body text.
 - F4A keeps E2 unchanged in this slice and confirms `template_key` + `template_version` + `message_body_snapshot` posture remains valid until explicit E2 linkage is later approved.
 
+Slice F4B completion cross-reference (On-The-Way template governance schema foundation):
+
+- F4B is complete in commit `b676736` via migration `supabase/migrations/20260515140000_sms_message_template_governance_foundation.sql`.
+- F4B implemented the safer two-table governance foundation by creating `sms_message_templates` (account-scoped template container/current pointer) and `sms_message_template_versions` (durable governed wording/version record).
+- single-table `sms_templates` remains rejected for this lane.
+- template rows are account-scoped with RLS enabled and SELECT-only policy posture for authenticated active internal users in the same account; no INSERT/UPDATE/DELETE policies were added in V1.
+- E2 relationship boundary is preserved: F4B does not alter `sms_message_intents` and `sms_message_intents.message_body_snapshot` remains the future attempted-message audit record.
+- F4B does not enable template editing, preview, rendering, provider behavior, or sending.
+- validation recorded: TypeScript passed, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, `git diff --check` passed, and `supabase db reset --local --no-seed --yes` passed with full local migration chain including F4B.
+- no production migration apply and no production writes; real SMS remains deferred.
+
 ---
 
 ## 1) Current Decision
@@ -376,7 +387,7 @@ B. Slice E2 combined migration foundation for intent + delivery audit tables.
 C. Slice E3 local migration validation and docs closeout.
 D. Quiet-hours/timezone gate planning.
 E. F4A On-The-Way template governance model lock closeout. ✓ Complete
-F. F4B template-governance schema foundation planning.
+F. F4B template-governance schema foundation. ✓ Complete (`b676736`)
 G. Provider/Twilio sandbox readiness.
 H. Provider webhook/send implementation only after all gates.
 I. Production activation only after legal/provider review and explicit approval.

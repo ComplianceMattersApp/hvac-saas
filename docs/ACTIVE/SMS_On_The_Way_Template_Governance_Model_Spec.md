@@ -41,6 +41,54 @@ Real SMS remains deferred.
 
 ---
 
+## F4B Completion Cross-Reference (May 2026)
+
+SMS Slice F4B Template Governance Schema Foundation is complete.
+
+- Implementation commit: `b676736`
+- Migration: `supabase/migrations/20260515140000_sms_message_template_governance_foundation.sql`
+- Created tables:
+  - `sms_message_templates`
+  - `sms_message_template_versions`
+
+Closeout semantics recorded:
+
+- the safer two-table template governance model is now implemented
+- `sms_message_templates` is the account-scoped template container/current pointer
+- `sms_message_template_versions` is the durable governed wording/version record
+- single-table `sms_templates` remains rejected for this lane
+- template rows are account-scoped with RLS enabled
+- SELECT-only RLS is available for authenticated active internal users in the same account
+- no INSERT/UPDATE/DELETE policies were added in V1
+- future writes remain deferred to admin-only server actions
+- F4B does not enable template editing, preview, rendering, or sending
+- F4B does not alter `sms_message_intents`
+- `sms_message_intents.message_body_snapshot` remains the future audit record of what was attempted
+- real SMS remains deferred
+
+Validation recorded:
+
+- `npx.cmd tsc --noEmit` passed
+- `npx.cmd vitest run lib/communications/__tests__/sms-provider-readiness-read.test.ts` passed (`16/16`)
+- `npx.cmd vitest run lib/communications/__tests__/sms-eligibility-inputs-read.test.ts` passed (`16/16`)
+- `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed (`4/4`)
+- `git diff --check` passed
+- `supabase db reset --local --no-seed --yes` passed
+- full local migration chain applied successfully, including F4B
+- no production migration apply
+- no production writes
+
+State after F4B:
+
+- template governance schema foundation exists
+- template read-model/helper remains deferred
+- template status/sample preview remains deferred to F4C
+- template editing/review actions remain deferred
+- provider setup remains deferred
+- sandbox/live SMS remains deferred
+
+---
+
 ## 2) Governance Location
 
 Locked location posture:
@@ -404,7 +452,7 @@ Operational UX risk:
 ## 19) Future Sequence
 
 A. F4A docs/model lock closeout. ✓ Complete
-B. F4B template schema foundation with `sms_message_templates` and `sms_message_template_versions`.
+B. F4B template schema foundation with `sms_message_templates` and `sms_message_template_versions`. ✓ Complete (`b676736`)
 C. F4C read-only template status/sample preview in `/ops/admin/communications`.
 D. Later admin edit/review server actions.
 E. Later sandbox/provider planning.
@@ -412,9 +460,9 @@ F. Later production activation only after legal/provider review and explicit app
 
 ---
 
-## 20) Future F4B Acceptance Criteria
+## 20) F4B Closeout Validation
 
-F4B scope lock:
+F4B scope and boundary confirmation:
 
 - create only template-governance schema foundation
 - no send behavior
@@ -427,6 +475,20 @@ F4B scope lock:
 - account-scoped RLS
 - no customer/portal access
 - no direct delete policy
+
+F4B implementation and validation confirmation:
+
+- implementation commit: `b676736`
+- migration: `supabase/migrations/20260515140000_sms_message_template_governance_foundation.sql`
+- created `sms_message_templates` and `sms_message_template_versions`
+- TypeScript passed
+- provider readiness helper tests passed (`16/16`)
+- SMS eligibility helper tests passed (`16/16`)
+- contact recipient helper tests passed (`4/4`)
+- `git diff --check` passed
+- `supabase db reset --local --no-seed --yes` passed
+- full local migration chain applied successfully, including F4B
+- no production migration apply and no production writes
 
 Documentation acceptance criteria:
 

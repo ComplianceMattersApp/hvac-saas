@@ -35,6 +35,21 @@ F4A planning lock impact for this readiness model:
 - no editable template controls are approved in this slice
 - real SMS remains deferred
 
+## F4B Completion Cross-Reference (May 2026)
+
+Slice F4B Template Governance Schema Foundation is complete in commit `b676736` with migration `supabase/migrations/20260515140000_sms_message_template_governance_foundation.sql`.
+
+- F4B implemented the safer two-table governance model (`sms_message_templates`, `sms_message_template_versions`) as account-scoped foundation with RLS enabled and SELECT-only policy posture for authenticated active internal users in the same account.
+- `sms_message_templates` is the account-scoped template container/current pointer.
+- `sms_message_template_versions` is the durable governed wording/version record.
+- single-table `sms_templates` remains rejected for this lane.
+- no INSERT/UPDATE/DELETE policies were added in V1; future writes remain deferred to admin-only server actions.
+- this slice does not enable template editing, preview, rendering, or sending.
+- this slice does not alter `sms_message_intents`; `sms_message_intents.message_body_snapshot` remains the future attempted-message audit record.
+- validation recorded: TypeScript passed, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, `git diff --check` passed, and `supabase db reset --local --no-seed --yes` passed with full local migration chain including F4B.
+- no production migration apply and no production writes.
+- F4C read-only template status/sample preview remains deferred; real SMS remains deferred.
+
 ---
 
 ## 1) Current Decision
