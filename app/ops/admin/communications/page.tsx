@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   createOnTheWayTemplateDraftFromDefaultFromForm,
+  markOnTheWayTemplateReadyForSandboxFromForm,
   saveOnTheWayTemplateDraftFromForm,
 } from "@/lib/actions/sms-template-actions";
 import { getSmsProviderReadinessForAccount } from "@/lib/communications/sms-provider-readiness-read";
@@ -52,10 +53,30 @@ const TEMPLATE_NOTICE_TEXT: Record<string, TemplateNotice> = {
   },
   template_sandbox_pointer_failed: {
     tone: "error",
-    message: "Template was not marked as sandbox-ready. Please try again.",
+    message: "Could not update sandbox readiness pointer. Please try again.",
   },
   template_reject_failed: { tone: "error", message: "Could not reject template version. Please try again." },
   admin_required: { tone: "error", message: "Admin access is required." },
+  template_marked_ready_for_sandbox: {
+    tone: "success",
+    message: "Wording marked ready for future SMS testing. SMS is still disabled.",
+  },
+  template_ready_validation_failed: {
+    tone: "error",
+    message: "Resolve wording blockers before marking ready.",
+  },
+  template_ready_invalid_status: {
+    tone: "error",
+    message: "Only the latest draft or pending wording can be marked ready.",
+  },
+  template_ready_stale_version: {
+    tone: "error",
+    message: "A newer version exists. Refresh and review latest wording.",
+  },
+  template_ready_failed: {
+    tone: "error",
+    message: "Could not mark wording ready. Please try again.",
+  },
 };
 
 const TEMPLATE_NOTICE_FALLBACK: TemplateNotice = {
@@ -282,6 +303,11 @@ export default async function AdminCommunicationsPage({
 
   const latestVersionIsMutableDraft =
     templateGovernance.latestVersion.exists && templateGovernance.latestVersion.versionStatus === "draft";
+
+  const latestVersionCanMarkReady =
+    templateGovernance.latestVersion.exists &&
+    !!templateGovernance.latestVersion.versionId &&
+    templateGovernance.latestVersion.canMarkReadyForSandbox === true;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 text-gray-900 sm:p-6">
@@ -678,6 +704,74 @@ export default async function AdminCommunicationsPage({
                   : templateGovernance.planningDefault.samplePreview}
               </p>
             </div>
+          </div>
+
+          {/* Mark Wording Ready for Sandbox */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Mark Wording Ready for Sandbox</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Mark the current wording ready for future SMS testing. This does not enable SMS.
+                </p>
+              </div>
+              {latestVersionCanMarkReady ? (
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">
+                  Eligible
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
+                  Not eligible
+                </span>
+              )}
+            </div>
+
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-sm text-slate-700">
+              <p>This only marks the wording ready for future SMS testing. SMS is still disabled.</p>
+              <p className="mt-1">Template readiness does not send SMS.</p>
+              <p className="mt-1">Mark On The Way does not send SMS yet.</p>
+            </div>
+
+            {latestVersionCanMarkReady ? (
+              <form action={markOnTheWayTemplateReadyForSandboxFromForm} className="mt-4">
+                <input type="hidden" name="version_id" value={templateGovernance.latestVersion.versionId} />
+                {templateGovernance.latestVersion.markReadyWarnings.length > 0 ? (
+                  <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    <p className="font-semibold">Warnings (wording will still be marked ready):</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {templateGovernance.latestVersion.markReadyWarnings.map((w) => (
+                        <li key={w}>{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <button
+                  type="submit"
+                  className="inline-flex items-center rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-emerald-100 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px] focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                >
+                  Mark wording ready for sandbox
+                </button>
+              </form>
+            ) : (
+              <div className="mt-4 space-y-2">
+                {templateGovernance.latestVersion.markReadyBlockingReasons.length > 0 ? (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+                    <p className="font-semibold">Blockers preventing readiness:</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {templateGovernance.latestVersion.markReadyBlockingReasons.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-600">
+                    {!templateGovernance.latestVersion.exists
+                      ? "No template version exists. Create a draft first."
+                      : "Latest version is not eligible to be marked ready. Review blocking conditions above."}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-700">
