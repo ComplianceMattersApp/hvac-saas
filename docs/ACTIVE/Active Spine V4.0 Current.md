@@ -26,6 +26,24 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 Current Program Status Note (May 2026)
 
+- Manual Text Logging Wording Clarification is complete and pushed in commit `36460b8`:
+  - this pass clarified that current text-related actions are manual/device-intent/contact-attempt logging only, not provider-powered SMS delivery
+  - user-facing labels were aligned to avoid delivery implication:
+    - `Log Text Attempt`
+    - `Text Attempt Logged`
+    - `Contact attempt logged`
+    - `Open SMS App`
+  - helper copy now states: `Logs communication attempts only; does not confirm carrier delivery.`
+  - existing behavior was preserved:
+    - `job_events.customer_attempt` write truth
+    - attempt counts
+    - follow-up logic
+    - timeline/history rendering
+    - redirects and manual logging flow
+  - boundaries preserved: no live SMS send, no provider integration, no consent/opt-out implementation, no delivery-tracking implementation, no schema/migration/env/secret/feature-flag changes, no payment/Stripe/QBO behavior changes, no portal expansion, no auth/RLS/entitlement behavior changes
+  - this is compliance-risk-reduction wording alignment only; future real SMS remains deferred pending consent/opt-out/quiet-hours/provider/audit/legal-provider review gates and explicit activation decision
+  - guardrail framing: this is neutral communication-readiness hardening designed to preserve clean actor/recipient boundaries for future marketplace-style evolution, not Eddie-specific behavior
+
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
   - Job Detail Location Preview Deferral (`4ecf127`) moved Street View/static map lookup behind `Suspense` around `TimedJobLocationPreview`; immediate fallback preserves address context plus `Navigate` and `Open in Maps` while map imagery resolves after first paint.

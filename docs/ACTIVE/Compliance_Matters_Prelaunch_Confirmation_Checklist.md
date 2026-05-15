@@ -27,6 +27,38 @@ If any item here conflicts with the active spine, the spine wins.
 - Final provider/payment-backed setup belongs to the pre-launch window.
 - Verify wording does not imply live texting is active until setup is complete.
 
+### 2.2.1 Manual Text Logging Wording Clarification closeout (completed)
+- Completed in commit `36460b8` (`Clarify manual text logging wording`).
+- This pass is compliance-risk-reduction wording alignment only; no live SMS behavior was added.
+- Current text-related actions are clarified as manual/device-intent/contact-attempt logging only, not provider-powered SMS delivery.
+- User-facing labels now avoid delivery implication:
+  - `Log Text Attempt`
+  - `Text Attempt Logged`
+  - `Contact attempt logged`
+  - `Open SMS App`
+- Helper copy now clarifies: `Logs communication attempts only; does not confirm carrier delivery.`
+- Preserved behavior boundaries:
+  - existing `job_events.customer_attempt` writes
+  - attempt counts, follow-up logic, timelines/history, redirects, and manual logging behavior
+- Explicit non-implementation confirmation:
+  - no live SMS send
+  - no provider integration or credentials
+  - no consent/opt-out implementation
+  - no delivery-tracking implementation
+  - no schema/migration/env/secret/feature-flag changes
+  - no auth/RLS/entitlement changes
+  - no payment/Stripe/QBO behavior changes
+  - no portal expansion
+- Future real SMS remains deferred pending explicit design/review gates:
+  - consent/opt-in model
+  - opt-out/do-not-text handling
+  - quiet-hours/timezone controls
+  - provider registration/configuration
+  - delivery/failure audit trail
+  - legal/provider review
+  - explicit activation decision
+- Marketplace-readiness framing: this wording hardening is actor-neutral and preserves clean communication boundaries across customers, responsible parties, contractors, internal users, account owners, and future marketplace participants.
+
 ### 2.3 Payment/live enablement readiness
 - Confirm launch posture remains `payment-ready by design, payment-active later` unless explicitly changed.
 - Confirm Phase P1 payment-ready foundation is complete, while live processor-backed payment execution remains later/pre-launch enablement work.

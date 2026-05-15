@@ -156,7 +156,29 @@ Planning rule:
 
 Boundary clarifications:
 - In-app notifications are not SMS.
-- Manual `Sent Text` contact logs are not provider-powered message delivery.
+- Manual contact logs and `sms:` links are not provider-powered message delivery.
+
+Manual Text Logging Wording Clarification closeout:
+- Completed in commit `36460b8` (`Clarify manual text logging wording`).
+- Wording now explicitly reflects manual/device-intent/contact-attempt behavior, not platform SMS delivery confirmation.
+- Clarified labels include:
+   - `Log Text Attempt`
+   - `Text Attempt Logged`
+   - `Contact attempt logged`
+   - `Open SMS App`
+- Added helper copy: `Logs communication attempts only; does not confirm carrier delivery.`
+- Existing manual logging behavior was preserved, including `customer_attempt` event writes, attempt counts, follow-up logic, timelines/history, and redirects.
+- This is wording/readiness hardening only and not legal advice.
+
+Non-goal confirmation for this pass:
+- no live SMS send
+- no provider setup or credentials
+- no consent/opt-out implementation
+- no delivery tracking implementation
+- no schema/migration/env/secret/feature-flag changes
+- no payment/Stripe/QBO behavior changes
+- no portal expansion
+- no auth/RLS/entitlement behavior changes
 
 Future SMS capability requirements (before activation):
 - consent/opt-in boundaries
