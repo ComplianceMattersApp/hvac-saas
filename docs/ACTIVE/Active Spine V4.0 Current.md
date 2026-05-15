@@ -168,6 +168,21 @@ Current Program Status Note (May 2026)
     - F3C read-only Admin Center route/page implementation remains deferred
     - real provider-powered SMS remains deferred pending later gated implementation slices and explicit legal/provider approval
 
+  - SMS Slice F3C Read-Only Admin Communications Page is complete in commit `994e79c`:
+    - route added: `/ops/admin/communications` (admin-only, read-only, readiness/status only)
+    - Admin Center card added: `Communications` with description "Review SMS/provider readiness. SMS is not enabled and live sends are disabled."
+    - page displays: Communications Status, SMS Provider Readiness, Sender Identity, On-The-Way Notification, Compliance Readiness, Activation Status
+    - page uses F3B helper: `getSmsProviderReadinessForAccount({ supabase, accountOwnerUserId })`
+    - page scope: admin-only via `requireInternalRole("admin")`; contractors redirect to `/portal`; non-admin internal users redirect to `/ops`
+    - page safety: renders only safe helper output (senderDisplayLabel, maskedSender, status labels); does not render provider_account_ref, provider_sender_ref, phone_e164, secrets, API keys, or credentials
+    - page behavior: read-only, no forms/mutations, no send/test/sandbox/activation/template/provider setup controls
+    - page empty states: "Provider setup has not been configured" / "No sender identity is configured"
+    - page always shows: `SMS is not enabled` and `Live sends are disabled`
+    - validation recorded: TypeScript clean, provider readiness helper 16/16 passed, SMS eligibility helper 16/16 passed, contact recipient helper 4/4 passed, `git diff --check` clean
+    - explicit non-implementation boundary preserved: no provider setup, no send endpoint/webhook, no sandbox/live SMS, no env/secrets/flag changes, no production migration apply, and no production writes
+    - communications readiness is now visible in Admin Center as read-only status/readiness
+    - real provider-powered SMS remains deferred pending template governance planning, webhook/status callback planning, provider/Twilio sandbox planning, legal/provider review, and explicit activation decision
+
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
   - Job Detail Location Preview Deferral (`4ecf127`) moved Street View/static map lookup behind `Suspense` around `TimedJobLocationPreview`; immediate fallback preserves address context plus `Navigate` and `Open in Maps` while map imagery resolves after first paint.

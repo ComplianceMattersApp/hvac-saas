@@ -192,6 +192,26 @@ SMS Slice F3B closeout note (May 2026):
 - UI implementation and routing remain deferred to F3C read-only Admin Center route/page implementation.
 - Real SMS remains deferred pending later gated activation slices and explicit legal/provider approval.
 
+SMS Slice F3C closeout note (May 2026):
+- Slice F3C Read-Only Admin Communications Page is complete in commit `994e79c`.
+- F3C added route: `/ops/admin/communications` (admin-only, read-only).
+- F3C added Admin Center card: `Communications` with description "Review SMS/provider readiness. SMS is not enabled and live sends are disabled."
+- F3C page displays:
+  - Communications Status: always shows SMS not enabled and live sends disabled
+  - SMS Provider Readiness: provider configurations with account/messaging-service/callback/opt-out status
+  - Sender Identity: sender identities with type/verification/activation/registration status, masked phone (last 4 only)
+  - On-The-Way Notification: "Planned only. Mark On The Way does not send SMS."
+  - Compliance Readiness: checklist of readiness items (recipient registry, consent/suppression, eligibility helper, audit tables, provider config/sender schema complete; quiet-hours, template governance, webhook, sandbox, legal/provider, explicit activation deferred or disabled)
+  - Activation Status: always shows SMS not enabled and live sends disabled
+- F3C page uses F3B helper: `getSmsProviderReadinessForAccount({ supabase, accountOwnerUserId })`
+- F3C page scope: admin-only, no forms/mutations, no send/test/sandbox/activation/template/provider controls
+- F3C page safety: does not render provider refs, secrets, full phone numbers; only renders safe helper output with masked sender display
+- F3C page empty states: "Provider setup has not been configured" / "No sender identity is configured"
+- F3C validation recorded: `npx.cmd tsc --noEmit` passed, provider readiness helper 16/16 passed, SMS eligibility helper 16/16 passed, contact recipient helper 4/4 passed, `git diff --check` passed.
+- F3C does not implement provider setup, send endpoint, webhook, sandbox/live SMS, env/secrets changes, feature flags, payment/QBO/portal behavior, marketplace behavior, production migration apply, or production writes.
+- Communications readiness is now visible in Admin Center as read-only status/readiness.
+- Real SMS remains deferred pending template governance planning, webhook/status callback planning, provider/Twilio sandbox planning, legal/provider review, and explicit activation decision.
+
 ---
 
 ## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version

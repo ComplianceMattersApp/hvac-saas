@@ -56,6 +56,17 @@ Slice F3B completion cross-reference (May 2026):
 - F3B helper delivers safe account-scoped readiness data for future Communications UI per F3A model contract.
 - F3B validates: new provider readiness tests 16/16 passed, SMS eligibility tests 16/16 passed, contact recipient tests 4/4 passed, TypeScript clean.
 
+Slice F3C completion cross-reference (May 2026):
+
+- Read-Only Admin Communications Page is complete in commit `994e79c`.
+- F3C route: `/ops/admin/communications` (admin-only, read-only, readiness/status only).
+- F3C Admin Center card: `Communications` with description "Review SMS/provider readiness. SMS is not enabled and live sends are disabled."
+- F3C page sections: Communications Status, SMS Provider Readiness, Sender Identity, On-The-Way Notification, Compliance Readiness, Activation Status.
+- F3C page uses F3B helper and implements F3A output contract: no send/activation/template/provider controls, no secrets/refs/full phone rendered, masked sender display.
+- F3C validation: TypeScript clean, provider readiness tests 16/16 passed, SMS eligibility tests 16/16 passed, contact recipient tests 4/4 passed.
+- Communications readiness is now visible in Admin Center as read-only status/readiness.
+- Real SMS remains deferred.
+
 ---
 
 ## 1) Settings Location Decision
@@ -271,9 +282,9 @@ This slice does not perform or authorize:
 A. Settings / Communications IA spec closeout. ✓ Complete
 B. F3A Settings Communications readiness UI model lock closeout. ✓ Complete
 C. F3B read-model helper planning/implementation (`lib/communications/sms-provider-readiness-read.ts`). ✓ Complete (commit `d370e56`)
-D. F3C read-only Admin Center route/page planning/implementation (`/ops/admin/communications`).
-E. Quiet-hours/timezone gate planning.
-F. Admin template governance implementation.
+D. F3C read-only Admin Center route/page planning/implementation (`/ops/admin/communications`). ✓ Complete (commit `994e79c`)
+E. F4 On-The-Way Template Governance Planning Audit.
+F. Quiet-hours/timezone gate planning.
 G. Provider/Twilio readiness and sandbox setup.
 H. Sandbox provider send after all gates.
 I. Production activation only after legal/provider review and explicit approval.

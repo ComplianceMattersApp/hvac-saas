@@ -14,6 +14,15 @@ Slice F3B Provider Readiness Read-Model Helper is complete in commit `d370e56`:
 - Helper API: `getSmsProviderReadinessForAccount({ supabase, accountOwnerUserId })`
 - This spec (F3A) defined the browser-safe output contract; F3B delivers the implementation.
 
+## F3C Completion Cross-Reference (May 2026)
+
+Slice F3C Read-Only Admin Communications Page is complete in commit `994e79c`:
+- Route: `/ops/admin/communications` (admin-only, read-only)
+- Admin Center card: `Communications` with description "Review SMS/provider readiness. SMS is not enabled and live sends are disabled."
+- Page displays 6 sections: Communications Status, SMS Provider Readiness, Sender Identity, On-The-Way Notification, Compliance Readiness, Activation Status
+- Page uses F3B helper and implements this spec's browser-safe/no-secret/no-send output contract
+- Real SMS remains deferred
+
 ---
 
 ## 1) Current Decision
@@ -355,7 +364,7 @@ F3 page must not include:
 
 A. F3A docs/model lock closeout. ✓ Complete
 B. F3B read-model helper returning safe account-scoped readiness. ✓ Complete (commit `d370e56`)
-C. F3C read-only Admin Center route/page.
+C. F3C read-only Admin Center route/page. ✓ Complete (commit `994e79c`)
 D. Later slices: provider setup mutation planning, template governance, webhook/signature validation, sandbox send planning, activation planning.
 
 ---
