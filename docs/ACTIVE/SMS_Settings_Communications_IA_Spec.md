@@ -7,6 +7,24 @@ Date: 2026-05-15
 
 ---
 
+## Slice E2 Cross-Reference Closeout (2026-05-15)
+
+SMS Slice E2 Message Intent + Provider Delivery Audit Foundation is complete in commit `b90c9ea` with migration `supabase/migrations/20260515130000_sms_message_intent_provider_delivery_foundation.sql`.
+
+Settings IA implications remain unchanged:
+
+- audit tables now exist as tenant/account-scoped communication infrastructure (`sms_message_intents`, `sms_provider_deliveries`)
+- no send endpoint, webhook, provider integration, or live SMS behavior was added
+- no provider delivery write path was added in this slice
+- no activation toggle behavior was added
+- real SMS remains deferred until remaining activation gates are complete
+
+Marketplace guardrail preserved:
+
+- this closeout is neutral tenant/account-scoped audit infrastructure, not Eddie-specific behavior and not a live marketplace messaging implementation
+
+---
+
 ## 1) Settings Location Decision
 
 Future SMS/message controls belong under:

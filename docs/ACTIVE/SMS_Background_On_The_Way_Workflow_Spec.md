@@ -7,6 +7,20 @@ Date: 2026-05-15
 
 ---
 
+## Slice E2 Cross-Reference Closeout (2026-05-15)
+
+SMS Slice E2 Message Intent + Provider Delivery Audit Foundation is complete in commit `b90c9ea` with migration `supabase/migrations/20260515130000_sms_message_intent_provider_delivery_foundation.sql`.
+
+Recorded boundary for this workflow spec:
+
+- intent and provider-delivery audit schema foundation now exists (`sms_message_intents`, `sms_provider_deliveries`)
+- this does not add On-The-Way automation
+- this does not add send endpoint, webhook, provider integration, or live SMS behavior
+- no `job_events` provider summary behavior was added
+- real SMS remains deferred until quiet-hours/timezone, template governance, sender identity/provider readiness, sandbox validation, legal/provider review, and explicit activation approval are complete
+
+---
+
 ## 1) Current Decision
 
 Locked product decision for this lane:

@@ -47,6 +47,10 @@ Reference closeouts:
 - Slice C docs/model closeout: `docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md` records no job-detail preview card for V1, no field free-text editor, admin-only future template governance, background/event-driven future On-The-Way evaluation after lifecycle transition, and gate/failure control contracts. No code/schema/migration/Supabase/provider behavior changed.
 - Slice D docs/model closeout: `docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md` records Settings -> Communications as the future home for messaging governance, with Company Profile boundary separation, future section IA, visibility constraints, and activation-gate ownership posture. No code/schema/migration/Supabase/provider behavior changed.
 - Slice E1 docs/model closeout: `docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md` records the frozen intent/delivery model semantics, including V1 cardinality, retry posture, idempotency shape, callback write path, and RLS expectations. No code/schema/migration/Supabase/provider behavior changed.
+- Slice E2 migration closeout: commit `b90c9ea`; migration `supabase/migrations/20260515130000_sms_message_intent_provider_delivery_foundation.sql`; created `sms_message_intents` and `sms_provider_deliveries` as account-scoped audit foundations.
+- Slice E2 locked posture: `sms_message_intents` is send-request/decision audit context (not provider delivery truth); `sms_provider_deliveries` is provider submission/callback truth (not manual contact log); one current delivery row per intent; account-scoped intent idempotency foundation exists.
+- Slice E2 validation: `npx.cmd tsc --noEmit`, B2 helper tests (`16/16`), recipient helper tests (`4/4`), `git diff --check`, and `supabase db reset --local --no-seed --yes` all passed with full local migration chain including E2.
+- Slice E2 boundary confirmation: no provider delivery write path, no send endpoint/webhook/provider integration/live SMS behavior, no `job_events` provider summary behavior, no backfill, no production migration apply, and no production writes.
 
 ---
 

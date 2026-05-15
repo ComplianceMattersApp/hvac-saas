@@ -7,6 +7,47 @@ Date: 2026-05-15
 
 ---
 
+## Slice E2 Closeout Status (2026-05-15)
+
+SMS Slice E2 Message Intent + Provider Delivery Audit Foundation is complete.
+
+- Implementation commit: `b90c9ea`
+- Migration: `supabase/migrations/20260515130000_sms_message_intent_provider_delivery_foundation.sql`
+- Created tables:
+  - `sms_message_intents`
+  - `sms_provider_deliveries`
+
+Closeout semantics recorded:
+
+- `sms_message_intents` stores future send-request and pre-provider decision audit context; it is not provider delivery truth.
+- `sms_provider_deliveries` stores future provider submission/callback truth; it is not a manual contact log.
+- V1 cardinality is enforced as one current delivery row per intent.
+- Account-scoped idempotency foundation exists for intents.
+- Provider status foundation is provider-neutral and Twilio-aware, not Twilio-specific.
+- No provider delivery write path was added in this slice.
+- No send endpoint, webhook, provider integration, or live SMS behavior was added.
+- No `job_events` provider summary behavior was added; `job_events` remains non-authoritative for provider truth.
+- Manual contact logs remain separate from provider audit truth.
+
+Validation recorded:
+
+- `npx.cmd tsc --noEmit` passed.
+- `npx.cmd vitest run lib/communications/__tests__/sms-eligibility-inputs-read.test.ts` passed (`16/16`).
+- `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed (`4/4`).
+- `git diff --check` passed.
+- `supabase db reset --local --no-seed --yes` passed.
+- Full local migration chain applied successfully, including E2.
+
+Boundary confirmation:
+
+- no data backfill
+- no production migration apply
+- no production writes
+- real SMS remains deferred pending remaining activation gates
+- marketplace guardrail preserved: this is neutral tenant/account-scoped communication audit infrastructure
+
+---
+
 ## 1) Current Decision
 
 Slice E is not ready for migration until this model lock is recorded.

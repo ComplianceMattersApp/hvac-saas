@@ -105,6 +105,16 @@ Current Program Status Note (May 2026)
     - locked source-of-truth posture recorded: `job_events` remains non-authoritative for provider truth; timeline summaries may only be added later if explicitly designed and backed by delivery truth
     - boundaries preserved: no code/schema/migration/Supabase/provider/send/env/flag/payment/QBO/portal changes and no production writes
     - real provider-powered SMS remains deferred pending the combined migration foundation and later provider readiness slices
+  - SMS Slice E2 Message Intent + Provider Delivery Audit Foundation is complete and pushed in commit `b90c9ea`:
+    - migration created: `supabase/migrations/20260515130000_sms_message_intent_provider_delivery_foundation.sql`
+    - tables created: `sms_message_intents` and `sms_provider_deliveries`
+    - locked semantics preserved: `sms_message_intents` is send-request/decision audit context (not provider delivery truth); `sms_provider_deliveries` is provider submission/callback truth (not manual contact log)
+    - locked model constraints preserved: one current delivery row per intent and account-scoped intent idempotency foundation
+    - provider posture preserved: provider status foundation is provider-neutral and Twilio-aware, not Twilio-specific
+    - validation recorded: `npx.cmd tsc --noEmit` passed, `npx.cmd vitest run lib/communications/__tests__/sms-eligibility-inputs-read.test.ts` passed (`16/16`), `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed (`4/4`), `git diff --check` passed, `supabase db reset --local --no-seed --yes` passed with full local migration chain including E2
+    - boundaries preserved: no provider delivery write path, no send endpoint/webhook/provider integration/live SMS behavior, no `job_events` provider summary behavior, no backfill, no production migration apply, and no production writes
+    - marketplace guardrail preserved: this is neutral tenant/account-scoped communication audit infrastructure, not Eddie-specific activation behavior
+    - real provider-powered SMS remains deferred pending quiet-hours/timezone gate implementation, admin template governance implementation, sender identity/provider readiness, provider/Twilio sandbox readiness, webhook/send implementation after all gates, legal/provider review, and explicit activation approval
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

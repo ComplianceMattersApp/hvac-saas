@@ -257,6 +257,61 @@ Live-SMS status:
 
 ---
 
+## Slice E2 Closeout Status (2026-05-15)
+
+SMS Slice E2 Message Intent + Provider Delivery Audit Foundation is complete.
+
+- Implementation commit: `b90c9ea`
+- Migration filename: `supabase/migrations/20260515130000_sms_message_intent_provider_delivery_foundation.sql`
+
+What Slice E2 creates:
+
+- `sms_message_intents`
+- `sms_provider_deliveries`
+
+Locked E2 interpretation:
+
+- `sms_message_intents` records future send-request/decision audit context and is not provider delivery truth.
+- `sms_provider_deliveries` records future provider submission/callback truth and is not a manual contact log.
+- V1 cardinality is one current delivery row per intent.
+- account-scoped idempotency foundation exists for intents.
+- provider status foundation is provider-neutral and Twilio-aware, not Twilio-specific.
+- no provider delivery write path was added in this slice.
+
+Validation recorded:
+
+- `npx.cmd tsc --noEmit` passed.
+- `npx.cmd vitest run lib/communications/__tests__/sms-eligibility-inputs-read.test.ts` passed (`16/16`).
+- `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed (`4/4`).
+- `git diff --check` passed.
+- `supabase db reset --local --no-seed --yes` passed.
+- full local migration chain applied successfully, including E2.
+
+Deployment/write boundary confirmation:
+
+- no production migration apply
+- no production writes
+- no data backfill
+- no send endpoint/webhook/provider integration/live SMS behavior
+
+Future gates still required:
+
+- quiet-hours/timezone gate planning and implementation
+- admin template governance implementation
+- sender identity/provider readiness
+- provider/Twilio sandbox readiness
+- webhook/send implementation only after all gates
+- legal/provider review
+- explicit activation decision
+
+Live-SMS status:
+- Real SMS remains deferred.
+
+Marketplace guardrail framing:
+- Slice E2 is neutral tenant/account-scoped communication audit infrastructure and does not imply marketplace activation or live provider behavior.
+
+---
+
 ## 1) Current Non-Implementation Boundary
 
 This document is a **design contract**, not an implementation or migration.
