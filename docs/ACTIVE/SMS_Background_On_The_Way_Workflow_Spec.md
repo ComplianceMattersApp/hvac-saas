@@ -34,6 +34,13 @@ Recorded boundary for this workflow spec:
 - F4C-A helper supports sample-data preview only, detects `{{token_name}}` tokens, blocks approval readiness for unknown tokens or missing STOP language, and keeps approval readiness separate from send readiness
 - F4C-A validation recorded: template governance tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed
 - no UI/route/schema/migration/Supabase/provider/send behavior changes in F4C-A; F4C-B read-only template status/sample preview remains deferred and real SMS remains deferred
+- Slice F4C-B Read-Only On-The-Way Template Governance Section is complete in implementation commit `05475929cc69704b1fb22f3dabbde10ff83aed90` and stabilization commit `1ffa475e2167eeb60a206358a4e7032a407bdd0f`.
+- F4C-B changed `app/ops/admin/communications/page.tsx` and added `On-The-Way Template Governance` on `/ops/admin/communications` as admin-only read-only status/sample-preview-only surface using `getSmsOnTheWayTemplateGovernanceForAccount`.
+- F4C-B section includes required non-sending copy (`Sample preview only.`, `SMS is not enabled and live sends are disabled.`, `Mark On The Way does not send SMS.`, `Template readiness does not enable sending.`), shows governance/version/token/preview summaries, and avoids send/test/sandbox/activation/edit/provider controls.
+- F4C-B section exposes no raw provider refs/secrets/full phone/customer/job data or raw JSON dump.
+- stabilization added fail-closed provider-readiness handling for local schema-cache/missing-table (`PGRST205`) conditions so local errors degrade to safe-empty readiness instead of crashing page.
+- browser smoke passed after stabilization; real SMS remains deferred.
+- F4C-B validation recorded: TypeScript passed, template governance tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, and `git diff --check` passed.
 
 ---
 
@@ -261,7 +268,7 @@ D. SMS message intent/provider delivery audit schema planning. ✓ Complete
 E. F4A On-The-Way template governance model lock closeout. ✓ Complete
 F. F4B template schema foundation (`sms_message_templates`, `sms_message_template_versions`). ✓ Complete (`b676736`)
 G. F4C-A template governance read-model helper (`lib/communications/sms-template-governance-read.ts`). ✓ Complete (`0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`)
-H. F4C-B read-only template status/sample preview in Admin Communications.
+H. F4C-B read-only template status/sample preview in Admin Communications. ✓ Complete (`05475929cc69704b1fb22f3dabbde10ff83aed90`, stabilized by `1ffa475e2167eeb60a206358a4e7032a407bdd0f`)
 I. Quiet-hours/timezone gate planning.
 J. Provider/Twilio readiness and A2P sandbox planning.
 K. Non-sending background evaluator.

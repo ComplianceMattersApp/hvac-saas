@@ -132,6 +132,53 @@ State after F4C-A:
 - provider setup remains deferred
 - sandbox/live SMS remains deferred
 
+## F4C-B Completion Cross-Reference (May 2026)
+
+SMS Slice F4C-B Read-Only On-The-Way Template Governance Section is complete.
+
+- implementation commit: `05475929cc69704b1fb22f3dabbde10ff83aed90`
+- stabilization commit: `1ffa475e2167eeb60a206358a4e7032a407bdd0f`
+- page changed: `app/ops/admin/communications/page.tsx`
+- route: `/ops/admin/communications`
+- section added: `On-The-Way Template Governance`
+- section remains admin-only through existing Communications page access posture
+- section is read-only and status/sample-preview only
+- section uses `getSmsOnTheWayTemplateGovernanceForAccount`
+
+Section summary:
+
+- shows template governance status, template display name/lifecycle, current/sandbox/latest version summaries when present
+- shows detected/unknown tokens, sample preview only, character count, estimated SMS segments, and STOP/unknown-token warnings
+- includes required non-sending copy: `Sample preview only.`, `SMS is not enabled and live sends are disabled.`, `Mark On The Way does not send SMS.`, `Template readiness does not enable sending.`
+- includes no send/test/sandbox/activation/edit/approval/provider setup controls
+- exposes no raw provider refs, secrets, full phone numbers, customer data, job data, or raw JSON dump
+
+Stabilization and smoke:
+
+- stabilization added fail-closed provider-readiness handling for local schema-cache/missing-table (`PGRST205`) conditions
+- local missing-table behavior now degrades to safe-empty readiness state instead of page crash
+- browser smoke passed after stabilization
+
+Validation recorded:
+
+- TypeScript passed
+- template governance helper tests passed (`15/15`)
+- provider readiness helper tests passed (`16/16`)
+- SMS eligibility helper tests passed (`16/16`)
+- contact recipient helper tests passed (`4/4`)
+- `git diff --check` passed
+- browser smoke passed after stabilization
+
+State after F4C-B:
+
+- template governance schema exists
+- template governance read model exists
+- template governance read-only UI section exists
+- template editing/review actions remain deferred
+- provider setup remains deferred
+- sandbox/live SMS remains deferred
+- webhook/status callback planning remains deferred
+
 ---
 
 ## 2) Governance Location
@@ -499,10 +546,11 @@ Operational UX risk:
 A. F4A docs/model lock closeout. ✓ Complete
 B. F4B template schema foundation with `sms_message_templates` and `sms_message_template_versions`. ✓ Complete (`b676736`)
 C. F4C-A template governance read-model helper (`lib/communications/sms-template-governance-read.ts`). ✓ Complete (`0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`)
-D. F4C-B read-only template status/sample preview in `/ops/admin/communications`.
+D. F4C-B read-only template status/sample preview in `/ops/admin/communications`. ✓ Complete (`05475929cc69704b1fb22f3dabbde10ff83aed90`, stabilized by `1ffa475e2167eeb60a206358a4e7032a407bdd0f`)
 E. Later admin edit/review server actions.
-F. Later sandbox/provider planning.
-G. Later production activation only after legal/provider review and explicit approval.
+F. Later webhook/status callback contract planning.
+G. Later sandbox/provider planning.
+H. Later production activation only after legal/provider review and explicit approval.
 
 ---
 

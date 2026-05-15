@@ -66,6 +66,26 @@ Slice F4C-A Template Governance Read Model Helper is complete in commit `0662e73
 - no UI/route/schema/migration/Supabase/provider/send behavior changes in this slice
 - F4C-B read-only template status/sample preview UI remains deferred; real SMS remains deferred
 
+## F4C-B Completion Cross-Reference (May 2026)
+
+Slice F4C-B Read-Only On-The-Way Template Governance Section is complete.
+
+- implementation commit: `05475929cc69704b1fb22f3dabbde10ff83aed90`
+- stabilization commit: `1ffa475e2167eeb60a206358a4e7032a407bdd0f`
+- page changed: `app/ops/admin/communications/page.tsx`
+- route: `/ops/admin/communications`
+- section added: `On-The-Way Template Governance`
+- section is admin-only via existing Communications page access posture
+- section is read-only and status/sample-preview only
+- section uses `getSmsOnTheWayTemplateGovernanceForAccount`
+- section shows governance status, display name/lifecycle, current/sandbox/latest summaries when present, token summaries, sample preview only, character count/segment estimate, and STOP/unknown-token warnings
+- section includes required non-sending copy and no send/test/sandbox/activation/edit/provider controls
+- section does not expose raw provider refs, secrets, full phone numbers, customer/job data, or raw JSON dump
+- stabilization added fail-closed provider-readiness handling for local schema-cache/missing-table (`PGRST205`) conditions
+- browser smoke passed after stabilization
+- validation recorded: TypeScript passed, template governance tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, and `git diff --check` passed
+- real SMS remains deferred
+
 ---
 
 ## 1) Current Decision

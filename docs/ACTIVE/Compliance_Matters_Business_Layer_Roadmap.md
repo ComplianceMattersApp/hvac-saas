@@ -249,8 +249,18 @@ SMS Slice F4C-A closeout note (May 2026):
 - helper supports sample-data preview only, token detection, unknown-token approval blocking, STOP-language approval blocking, and approval-readiness-not-send-readiness posture.
 - validation recorded: template governance helper tests `15/15`, provider readiness helper tests `16/16`, SMS eligibility helper tests `16/16`, contact recipient helper tests `4/4`, TypeScript passed, and `git diff --check` passed.
 - state after F4C-A: template governance schema foundation exists; template governance read model exists; F4C-B read-only template status/sample preview UI remains deferred; template editing/review actions remain deferred; provider setup remains deferred; sandbox/live SMS remains deferred.
-- safe forward sequence: F4C-A docs closeout, then F4C-B read-only On-The-Way Template Governance section on `/ops/admin/communications`, then later admin edit/review server actions, later webhook/status callback planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
+- safe forward sequence after F4C-A: F4C-B read-only On-The-Way Template Governance section on `/ops/admin/communications`, then later admin edit/review server actions, later webhook/status callback planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
 - real SMS remains deferred.
+
+SMS Slice F4C-B closeout note (May 2026):
+- Slice F4C-B Read-Only On-The-Way Template Governance Section is complete in implementation commit `05475929cc69704b1fb22f3dabbde10ff83aed90` and stabilization commit `1ffa475e2167eeb60a206358a4e7032a407bdd0f`.
+- F4C-B changed `app/ops/admin/communications/page.tsx` and added `On-The-Way Template Governance` section on `/ops/admin/communications`.
+- section posture is admin-only/read-only/status-sample-preview only and includes required non-sending copy: `Sample preview only.`, `SMS is not enabled and live sends are disabled.`, `Mark On The Way does not send SMS.`, `Template readiness does not enable sending.`.
+- section includes no send/test/sandbox/activation/edit/approval/provider controls and exposes no raw provider refs/secrets/full phone/customer/job data or raw JSON dump.
+- stabilization addressed local schema-cache missing-table errors (`PGRST205`) with fail-closed provider-readiness handling so local missing tables degrade to safe-empty readiness state instead of page crash.
+- validation recorded: template governance tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, `npx.cmd tsc --noEmit`, `git diff --check`, and browser smoke after stabilization all passed.
+- state after F4C-B: template governance schema foundation exists, template governance read model exists, template governance read-only UI section exists, admin edit/review actions remain deferred, webhook/status callback planning remains deferred, provider/Twilio sandbox planning remains deferred, and real SMS remains deferred.
+- conservative next-lane recommendation: proceed with admin edit/review server-action planning before any provider/webhook/send activation implementation.
 
 ---
 

@@ -222,7 +222,10 @@ Current Program Status Note (May 2026)
     - helper isolation: no provider/Twilio calls, no customer/job/contact reads, no `sms_message_intents`/`sms_provider_deliveries` reads
     - validation recorded: template governance tests `15/15` passed; provider readiness tests `16/16` passed; SMS eligibility tests `16/16` passed; contact recipient tests `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed
     - boundaries preserved: no UI/route/schema/migration/Supabase/provider/send/env/payment/QBO/portal behavior changes
-    - F4C-B read-only template status/sample preview remains deferred; real provider-powered SMS remains deferred
+    - F4C-B read-only template status/sample preview is complete in implementation commit `05475929cc69704b1fb22f3dabbde10ff83aed90`; stabilization commit `1ffa475e2167eeb60a206358a4e7032a407bdd0f` added fail-closed provider-readiness handling for local schema-cache/missing-table (`PGRST205`) conditions
+    - F4C-B section details: `On-The-Way Template Governance` added to `/ops/admin/communications` (`app/ops/admin/communications/page.tsx`), admin-only/read-only/status-sample-preview-only, required non-sending copy present, no send/test/sandbox/activation/edit/provider controls, no raw provider refs/secrets/full phone/customer/job data exposure
+    - F4C-B validation recorded: template governance tests `15/15` passed; provider readiness tests `16/16` passed; SMS eligibility tests `16/16` passed; contact recipient tests `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed; browser smoke passed after stabilization
+    - real provider-powered SMS remains deferred
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

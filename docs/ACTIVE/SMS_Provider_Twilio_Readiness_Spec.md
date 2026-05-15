@@ -44,6 +44,25 @@ Slice F4C-A Template Governance Read Model Helper is complete in commit `0662e73
 - no UI/route/schema/migration/Supabase/provider/send behavior changes in F4C-A
 - F4C-B read-only template status/sample preview remains deferred; real SMS remains deferred
 
+## F4C-B Completion Cross-Reference (May 2026)
+
+Slice F4C-B Read-Only On-The-Way Template Governance Section is complete.
+
+- implementation commit: `05475929cc69704b1fb22f3dabbde10ff83aed90`
+- stabilization commit: `1ffa475e2167eeb60a206358a4e7032a407bdd0f`
+- page changed: `app/ops/admin/communications/page.tsx`
+- route: `/ops/admin/communications`
+- section added: `On-The-Way Template Governance`
+- section posture: admin-only, read-only, sample-preview/status only; no send/test/sandbox/activation/edit/provider controls
+- section uses `getSmsOnTheWayTemplateGovernanceForAccount` and includes required non-sending copy
+- section shows governance/version/token/preview summaries and STOP/unknown-token warnings
+- section does not expose raw provider refs/secrets/full phone/customer/job data or raw JSON dump
+- stabilization added fail-closed provider-readiness handling for local schema-cache/missing-table (`PGRST205`) conditions
+- browser smoke passed after stabilization
+- validation recorded: TypeScript passed, template governance tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, and `git diff --check` passed
+- no Twilio/provider integration, credentials, webhook, sandbox send, or live SMS behavior was enabled
+- real SMS remains deferred
+
 ---
 
 ## 1) Current Decision
@@ -329,7 +348,7 @@ F. F3C read-only Admin Center route/page implementation (`/ops/admin/communicati
 G. F4A On-The-Way Template Governance model lock closeout (`docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md`). ✓ Complete
 H. F4B template schema foundation (`sms_message_templates`, `sms_message_template_versions`) with no send/provider behavior. ✓ Complete (`b676736`)
 I. F4C-A template governance read-model helper (`lib/communications/sms-template-governance-read.ts`). ✓ Complete (`0662e73c1c95f2d590048f24ebb8f9f8b23ce40a`)
-J. F4C-B read-only template status/sample preview in `/ops/admin/communications`.
+J. F4C-B read-only template status/sample preview in `/ops/admin/communications`. ✓ Complete (`05475929cc69704b1fb22f3dabbde10ff83aed90`, stabilized by `1ffa475e2167eeb60a206358a4e7032a407bdd0f`)
 K. F5 webhook/status callback contract planning.
 L. F6 provider/Twilio sandbox implementation planning.
 M. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
