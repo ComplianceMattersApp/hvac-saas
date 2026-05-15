@@ -190,6 +190,38 @@ Live-SMS status:
 
 ---
 
+## Slice D Docs Closeout Status (2026-05-15)
+
+SMS Slice D Settings / Communications IA Spec (docs/model-only) is complete.
+
+- Spec added: `docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md`
+- Locked IA decision captured:
+   - future SMS/message controls belong under Settings -> Communications
+   - full SMS controls are not placed in Company Profile
+   - Company Profile remains business identity/support contact scope
+   - Communications Settings owns template governance, provider readiness, sender identity, compliance gates, and activation controls
+- Future sections documented:
+   - Communications Status
+   - SMS / On-The-Way Messaging
+   - Sender Identity
+   - Compliance Readiness
+   - Activation
+- Visibility and safety posture documented:
+   - no live SMS settings activation in this slice
+   - placeholder copy requirements if UI is introduced later
+   - no editable templates or provider credential fields until explicit future slices
+
+Deployment/write boundary confirmation:
+- no code changes
+- no schema/migration changes
+- no Supabase commands
+- no production writes
+
+Live-SMS status:
+- Real SMS remains deferred.
+
+---
+
 ## 1) Current Non-Implementation Boundary
 
 This document is a **design contract**, not an implementation or migration.
@@ -720,6 +752,7 @@ This is documentation only. It defines what must be built; it does not build it.
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md (model and role taxonomy that informs schema)
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md (compliance gates that schema must satisfy)
 - docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md (Slice C docs/model workflow contract for future background On-The-Way evaluation and template governance boundaries)
+- docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md (Slice D docs/model IA contract for future Settings -> Communications ownership and section design)
 - docs/ACTIVE/source-of-truth-strategy.md (canonical source rules that SMS schema must respect)
 - docs/ACTIVE/Active Spine V4.0 Current.md (project spine and SMS 9B entry)
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md (Group 9B roadmap entry)

@@ -152,10 +152,15 @@ Future policy may either:
 
 Future SMS template/settings location recommendation:
 
+- canonical home: Settings -> Communications
 - dedicated Admin Communications route (example: /ops/admin/communications)
 - do not place full SMS template management inside Company Profile
 - Company Profile continues to own business identity/support contact details
 - Communications settings should eventually own template governance, provider readiness state, sender identity, and activation gates
+
+Information architecture details for this decision are documented in:
+
+- docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md
 
 ---
 
@@ -220,6 +225,7 @@ I. Production activation only after legal/provider review and explicit approval.
 
 ## Related ACTIVE References
 
+- docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md

@@ -45,6 +45,7 @@ Reference closeouts:
 - Slice B2 locked posture: `eligible_inputs_present` does not imply live-send approval; missing/unknown consent remains fail-closed; active suppression blocks regardless of consent and is surfaced before consent blocks
 - Slice B2 validation: `npx.cmd vitest run lib/communications/__tests__/sms-eligibility-inputs-read.test.ts` passed (`16/16`), `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed (`4/4`), `npx.cmd tsc --noEmit` passed, `git diff --check` passed
 - Slice C docs/model closeout: `docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md` records no job-detail preview card for V1, no field free-text editor, admin-only future template governance, background/event-driven future On-The-Way evaluation after lifecycle transition, and gate/failure control contracts. No code/schema/migration/Supabase/provider behavior changed.
+- Slice D docs/model closeout: `docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md` records Settings -> Communications as the future home for messaging governance, with Company Profile boundary separation, future section IA, visibility constraints, and activation-gate ownership posture. No code/schema/migration/Supabase/provider behavior changed.
 
 ---
 
@@ -203,6 +204,7 @@ This planning slice does not perform:
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md (recipient/contact role model — required before live SMS; see Section 10 activation gates)
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md (schema design contract; Slice A, Slice B1, and Slice B2 closeout recorded with migrations `supabase/migrations/20260515120000_contact_recipients_slice_a_foundation.sql` and `supabase/migrations/20260515123000_contact_recipient_consent_suppression_foundation.sql`, commits `afddb9c`, `02aee5a`, `39a2963`, `c0247af`)
 - docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md (Slice C docs/model workflow contract for future background On-The-Way evaluation, admin-only template governance, required pre-send gates, and fail-closed blocked-send behavior)
+- docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md (Slice D docs/model IA contract for Settings -> Communications ownership, section design, and activation-control posture)
 - docs/ACTIVE/Compliance_Matters_Prelaunch_Confirmation_Checklist.md
 - docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md
 - docs/ACTIVE/Active Spine V4.0 Current.md

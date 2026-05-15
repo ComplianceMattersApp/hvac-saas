@@ -87,6 +87,15 @@ Current Program Status Note (May 2026)
     - badge-only UI posture recorded for future surfaces (`Do Not Text`, `Notifications Off`, `Consent Needed`, `Texting Not Enabled`) sourced from first-class recipient/consent/suppression truth and B2 helper outputs
     - boundaries preserved: no code/schema/migration/Supabase/provider/send/env/flag/payment/QBO/portal changes and no production writes
     - real provider-powered SMS remains deferred pending future activation slices and explicit approval gates
+  - SMS Slice D Settings / Communications IA Spec (docs/model-only) is complete:
+    - spec added: `docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md`
+    - locked settings-home decision recorded: future SMS/message governance belongs in Settings -> Communications
+    - Company Profile boundary preserved: business identity/support contact scope remains in Company Profile; full messaging governance is not placed there
+    - future Communications IA sections recorded: Communications Status, SMS/On-The-Way Messaging, Sender Identity, Compliance Readiness, Activation
+    - visibility controls recorded: no live SMS activation in this slice, no editable templates yet, no provider credential fields yet, and placeholder copy requirements if a future settings shell is added
+    - no-preview/no-field-editor posture preserved by cross-reference to Slice C workflow spec
+    - boundaries preserved: no code/schema/migration/Supabase/provider/send/env/flag/payment/QBO/portal changes and no production writes
+    - real provider-powered SMS remains deferred pending future activation slices and explicit approval gates
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
