@@ -51,7 +51,7 @@ Future sequence:
 
 A. F4D-A docs/model lock.
 B. F4D-B validation helper. ✓ Complete (`418172e`)
-C. F4D-C create/save draft server actions.
+C. F4D-C create/save draft server actions. ✓ Complete (`f7cf8c0`)
 D. F4D-D review actions.
 E. F4D-E editable UI.
 F. Later provider/legal review operations.
@@ -201,6 +201,54 @@ State after F4D-B:
 - create/save draft server actions remain deferred to F4D-C
 - review actions remain deferred
 - editable UI remains deferred
+- real SMS remains deferred
+
+---
+
+## F4D-C Completion Cross-Reference (May 2026)
+
+SMS Slice F4D-C Create/Save On-The-Way Template Draft Actions is complete.
+
+- implementation commit: `f7cf8c0`
+- action file: `lib/actions/sms-template-actions.ts`
+- test file: `lib/actions/__tests__/sms-template-actions.test.ts`
+- actions added: `createOnTheWayTemplateDraftFromDefaultFromForm`, `saveOnTheWayTemplateDraftFromForm`
+- pure helpers exported for testability: `resolveNextVersionNumber`, `isVersionMutable`
+- actions are admin-only via `requireInternalRole("admin")`
+- actions use `createAdminClient()` for all writes because F4B intentionally has SELECT-only RLS
+- actions derive `account_owner_user_id` from authenticated internal-user context; form input for owner is ignored
+- `createOnTheWayTemplateDraftFromDefaultFromForm` ensures/reuses the parent template container; reuses an existing mutable draft if one exists; creates a new draft version at `max(version_number) + 1` when the latest is immutable
+- `saveOnTheWayTemplateDraftFromForm` validates the submitted body with `validateOnTheWayTemplateBody`; blocks blank body; updates a mutable draft in place; creates a new draft version when the latest is immutable
+- both actions persist all validation metadata: `body_template` (normalized), `body_hash`, `detected_tokens`, `unknown_tokens`, `token_policy_version = "v1"`, `content_classification = "operational"`
+- both actions revalidate `/ops/admin/communications` and `/ops/admin` on success
+- notice/redirect outcomes: `admin_required`, `body_blank`, `draft_created`, `draft_available`, `draft_saved`, `draft_validation_warning`
+- `current_version_id` is never set by these actions
+- `sandbox_version_id` is never set by these actions
+- no UI is wired yet
+
+Validation recorded:
+
+- template action tests passed (`20/20`)
+- template validation helper tests passed (`19/19`)
+- template governance read tests passed (`15/15`)
+- provider readiness tests passed (`16/16`)
+- SMS eligibility tests passed (`16/16`)
+- contact recipient tests passed (`4/4`)
+- TypeScript passed
+- `git diff --check` passed
+- total: `90/90`
+
+State after F4D-C:
+
+- template governance schema exists
+- template governance read model exists
+- template governance read-only UI exists
+- template validation helper exists
+- create/save draft server actions exist
+- review actions remain deferred (F4D-D)
+- editable UI remains deferred (F4D-E)
+- provider setup remains deferred
+- sandbox/live SMS remains deferred
 - real SMS remains deferred
 
 ---
@@ -431,6 +479,39 @@ F4D-B includes:
 - tests for approval readiness flags
 - warnings for unknown tokens, missing STOP language, prohibited content, and multi-segment messages
 - parked future note that review-request SMS is a separate future message class and remains prohibited in On-The-Way wording
+
+Real SMS remains deferred.
+
+---
+
+## 16) F4D-C Boundary Confirmation
+
+F4D-C added admin-only create/save draft server actions only.
+
+F4D-C did not add:
+
+- UI
+- schema/migration changes
+- provider behavior
+- send behavior
+- submit/review/approve/reject actions
+- `current_version_id` writes
+- `sandbox_version_id` writes
+- Twilio/provider API calls
+- send endpoint
+- webhook
+- sandbox SMS
+- live SMS
+- `job_events` logging
+- delete actions
+- normal authenticated write policies
+
+F4D-C includes:
+
+- `createOnTheWayTemplateDraftFromDefaultFromForm`: creates parent template container + draft version from default body, reuses mutable draft, creates next version after immutable latest
+- `saveOnTheWayTemplateDraftFromForm`: validates body, blocks blank, updates mutable draft in place, creates new draft after immutable latest
+- exported pure helpers `resolveNextVersionNumber` and `isVersionMutable`
+- 20 focused tests covering non-admin block, create/reuse/next-version logic, blank-body block, in-place update, immutable-version protection, validation-metadata persistence, warning notice, scope/ownership enforcement, `current_version_id`/`sandbox_version_id` absence, and revalidation
 
 Real SMS remains deferred.
 

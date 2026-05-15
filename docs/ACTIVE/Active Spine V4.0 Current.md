@@ -254,6 +254,22 @@ Current Program Status Note (May 2026)
     - validation recorded: template validation helper tests `19/19` passed; template governance read tests `15/15` passed; provider readiness tests `16/16` passed; SMS eligibility tests `16/16` passed; contact recipient tests `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed
     - boundaries preserved: no code outside helper/tests, no server-action/UI/schema/migration/Supabase/provider/send/env/payment/QBO/portal behavior changes, and real provider-powered SMS remains deferred
 
+  - SMS Slice F4D-C Create/Save On-The-Way Template Draft Actions is complete:
+    - implementation commit: `f7cf8c0`
+    - action file added: `lib/actions/sms-template-actions.ts`
+    - test file added: `lib/actions/__tests__/sms-template-actions.test.ts`
+    - actions added: `createOnTheWayTemplateDraftFromDefaultFromForm` and `saveOnTheWayTemplateDraftFromForm`
+    - pure helpers exported: `resolveNextVersionNumber` and `isVersionMutable`
+    - actions are admin-only, use `createAdminClient()` for writes, derive `account_owner_user_id` from auth context, and revalidate `/ops/admin/communications` + `/ops/admin`
+    - create action ensures/reuses the parent template container, reuses an existing mutable draft, and creates a new draft version at `max(version_number) + 1` when the latest is immutable
+    - save action validates with `validateOnTheWayTemplateBody`, blocks blank body, updates a mutable draft in place, and creates a new draft version when the latest is immutable
+    - both actions persist all validation metadata fields (`body_template`, `body_hash`, `detected_tokens`, `unknown_tokens`, `token_policy_version`, `content_classification`) and never set `current_version_id` or `sandbox_version_id`
+    - notice/redirect outcomes: `admin_required`, `body_blank`, `draft_created`, `draft_available`, `draft_saved`, `draft_validation_warning`
+    - no UI wired yet; review actions remain deferred to F4D-D; editable UI remains deferred to F4D-E; provider setup, sandbox sends, and live SMS remain deferred
+    - validation recorded: template action tests `20/20` passed; template validation helper tests `19/19` passed; template governance read tests `15/15` passed; provider readiness tests `16/16` passed; SMS eligibility tests `16/16` passed; contact recipient tests `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed; total `90/90`
+    - boundaries preserved: no UI/schema/migration/Supabase production/provider/Twilio/send/webhook/activation/env/flag/payment/QBO/portal behavior changes and no production writes
+    - template approval/readiness does not enable SMS sending; real provider-powered SMS remains deferred
+
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
   - Job Detail Location Preview Deferral (`4ecf127`) moved Street View/static map lookup behind `Suspense` around `TimedJobLocationPreview`; immediate fallback preserves address context plus `Navigate` and `Open in Maps` while map imagery resolves after first paint.

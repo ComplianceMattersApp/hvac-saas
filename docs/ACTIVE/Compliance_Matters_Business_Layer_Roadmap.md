@@ -287,6 +287,19 @@ SMS Slice F4D-B closeout note (May 2026):
 - state after F4D-B: validation helper exists; create/save draft server actions remain deferred to F4D-C; review actions remain deferred; editable UI remains deferred; later provider/legal/sandbox/activation work remains deferred; real SMS remains deferred.
 - conservative next-lane recommendation: proceed with F4D-C create/save draft server actions before review actions or editable UI.
 
+SMS Slice F4D-C closeout note (May 2026):
+- Slice F4D-C Create/Save On-The-Way Template Draft Actions is complete in commit `f7cf8c0`.
+- F4D-C added action file `lib/actions/sms-template-actions.ts` and test file `lib/actions/__tests__/sms-template-actions.test.ts`.
+- actions added: `createOnTheWayTemplateDraftFromDefaultFromForm` and `saveOnTheWayTemplateDraftFromForm`.
+- pure helpers exported for testability: `resolveNextVersionNumber` and `isVersionMutable`.
+- actions are admin-only; use `createAdminClient()` for writes; derive `account_owner_user_id` from auth context; never trust owner/template/version ids from form input without scoped lookup; revalidate `/ops/admin/communications` and `/ops/admin`.
+- create action ensures/reuses parent template container, reuses mutable draft, creates new draft at `max(version_number) + 1` when latest is immutable.
+- save action validates with `validateOnTheWayTemplateBody`, blocks blank body, updates mutable draft in place, creates new draft when latest is immutable.
+- both actions persist all validation metadata fields and never set `current_version_id` or `sandbox_version_id`.
+- no UI wired; no review/approve/reject actions; no send endpoint; no provider/Twilio calls; no webhook; no schema/migration/env/flag/payment/QBO/portal changes; no production writes.
+- validation recorded: template action tests `20/20`, template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, `npx.cmd tsc --noEmit`, and `git diff --check` all passed; total `90/90`.
+- state after F4D-C: template governance schema exists; read model exists; read-only UI exists; validation helper exists; create/save draft actions exist; review actions remain deferred (F4D-D); editable UI remains deferred (F4D-E); provider setup, sandbox sends, and live SMS remain deferred; real SMS remains deferred.
+
 ---
 
 ## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version
