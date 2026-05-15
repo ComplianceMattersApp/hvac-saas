@@ -23,6 +23,7 @@ Recorded boundary for this workflow spec:
 - Slice F2B provider configuration + sender identity schema foundation is complete in commit `f093bdd` via `supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql` and does not approve send endpoint, webhook, sandbox/live SMS, or activation behavior
 - Slice F2A sender identity/provider configuration model lock is documented in `docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md` and does not approve provider setup, send route, webhook, sandbox send, live SMS, or activation behavior
 - Slice F3A Settings Communications readiness UI model lock is documented in `docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md` and does not approve send controls, activation toggle, sandbox/live sends, provider setup, or template editing
+- Slice F4A On-The-Way Template Governance model lock is documented in `docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md` and locks the two-table future template model (`sms_message_templates`, `sms_message_template_versions`) with immutable approved wording versions and no implementation changes in this slice
 
 ---
 
@@ -246,12 +247,15 @@ Future sequence (planning order):
 A. Background On-The-Way workflow spec closeout.
 B. Admin communications settings IA/spec.
 C. Badge-only readiness UI planning.
-D. SMS message intent/provider delivery audit schema planning.
-E. Quiet-hours/timezone gate planning.
-F. Provider/Twilio readiness and A2P sandbox planning.
-G. Non-sending background evaluator.
-H. Sandbox provider send only after all gates.
-I. Production activation only after legal/provider review and explicit approval.
+D. SMS message intent/provider delivery audit schema planning. ✓ Complete
+E. F4A On-The-Way template governance model lock closeout. ✓ Complete
+F. F4B template schema foundation (`sms_message_templates`, `sms_message_template_versions`).
+G. F4C read-only template status/sample preview in Admin Communications.
+H. Quiet-hours/timezone gate planning.
+I. Provider/Twilio readiness and A2P sandbox planning.
+J. Non-sending background evaluator.
+K. Sandbox provider send only after all gates.
+L. Production activation only after legal/provider review and explicit approval.
 
 ---
 
@@ -264,6 +268,7 @@ I. Production activation only after legal/provider review and explicit approval.
 - docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
 - docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
+- docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md
 - docs/ACTIVE/source-of-truth-strategy.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md

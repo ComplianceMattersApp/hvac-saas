@@ -72,6 +72,12 @@ Slice F3A model lock cross-reference (settings readiness UI posture):
 - F3A locks read-only/admin-only readiness display posture and status mapping without introducing send eligibility semantics.
 - F3A does not add send endpoint, webhook, provider callbacks, sandbox send, live SMS, or E2 table changes.
 
+Slice F4A model lock cross-reference (On-The-Way template governance posture):
+
+- F4A model lock is documented in `docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md`.
+- F4A locks a two-table future template-governance model (`sms_message_templates`, `sms_message_template_versions`) and immutable approved historical body text.
+- F4A keeps E2 unchanged in this slice and confirms `template_key` + `template_version` + `message_body_snapshot` posture remains valid until explicit E2 linkage is later approved.
+
 ---
 
 ## 1) Current Decision
@@ -369,10 +375,11 @@ A. Slice E1 model lock closeout.
 B. Slice E2 combined migration foundation for intent + delivery audit tables.
 C. Slice E3 local migration validation and docs closeout.
 D. Quiet-hours/timezone gate planning.
-E. Admin template governance implementation planning.
-F. Provider/Twilio sandbox readiness.
-G. Provider webhook/send implementation only after all gates.
-H. Production activation only after legal/provider review and explicit approval.
+E. F4A On-The-Way template governance model lock closeout. ✓ Complete
+F. F4B template-governance schema foundation planning.
+G. Provider/Twilio sandbox readiness.
+H. Provider webhook/send implementation only after all gates.
+I. Production activation only after legal/provider review and explicit approval.
 
 ---
 
@@ -386,6 +393,7 @@ H. Production activation only after legal/provider review and explicit approval.
 - docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
 - docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
+- docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md
 - docs/ACTIVE/source-of-truth-strategy.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md

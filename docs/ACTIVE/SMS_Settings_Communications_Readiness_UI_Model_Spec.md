@@ -23,6 +23,18 @@ Slice F3C Read-Only Admin Communications Page is complete in commit `994e79c`:
 - Page uses F3B helper and implements this spec's browser-safe/no-secret/no-send output contract
 - Real SMS remains deferred
 
+## F4A Cross-Reference (May 2026)
+
+On-The-Way Template Governance model lock is complete in `docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md`.
+
+F4A planning lock impact for this readiness model:
+
+- future template governance section label is `On-The-Way Template Governance`
+- future template model is locked as two-table (`sms_message_templates`, `sms_message_template_versions`)
+- future template sample preview remains admin-only and read-only in Communications
+- no editable template controls are approved in this slice
+- real SMS remains deferred
+
 ---
 
 ## 1) Current Decision
@@ -405,6 +417,7 @@ Future F3 implementation validation should include:
 - docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
 - docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md
+- docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md
 - docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md

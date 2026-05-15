@@ -212,6 +212,16 @@ SMS Slice F3C closeout note (May 2026):
 - Communications readiness is now visible in Admin Center as read-only status/readiness.
 - Real SMS remains deferred pending template governance planning, webhook/status callback planning, provider/Twilio sandbox planning, legal/provider review, and explicit activation decision.
 
+SMS Slice F4A closeout note (May 2026):
+- Slice F4A On-The-Way Template Governance Model Lock is complete in docs/model-only mode at `docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md`.
+- F4A locks governance location in `/ops/admin/communications` as `On-The-Way Template Governance` section, with no template sub-page in first posture.
+- F4A locks admin-only posture and no field-user free-text editing or job-detail template preview/editor posture.
+- F4A locks two-table future model (`sms_message_templates` as account-scoped container/current pointer and `sms_message_template_versions` as durable immutable wording/version record).
+- F4A explicitly rejects single-table `sms_templates` for this lane.
+- F4A locks statuses/review states, token allowlist and unknown-token block behavior, mandatory STOP language, prohibited wording, sample-preview-only posture, and future mutation/RLS boundaries.
+- F4A does not implement schema/migrations/read-model/UI editing/provider setup/send behavior/webhook/sandbox/live SMS/env-secret-flag/payment/QBO/portal behavior.
+- Real SMS remains deferred; safe next sequence is F4B schema foundation, then F4C read-only template status/sample preview, then later edit/review actions.
+
 ---
 
 ## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version

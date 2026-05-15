@@ -1,0 +1,460 @@
+# Compliance Matters - SMS On-The-Way Template Governance Model Spec
+
+Status: ACTIVE planning/model spec
+Authority: Subordinate to docs/ACTIVE/Active Spine V4.0 Current.md and docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md
+Mode: Documentation/model only (no implementation)
+Date: 2026-05-15
+
+---
+
+## 1) Current Decision
+
+Slice F4A closes On-The-Way template governance model lock in documentation only.
+
+Locked boundary for this slice:
+
+- no code changes
+- no behavior changes
+- no schema changes
+- no migrations
+- no Supabase commands
+- no production writes
+- no provider setup
+- no Twilio account changes
+- no Twilio API calls
+- no sandbox SMS sends
+- no live SMS sends
+- no environment/secret changes
+- no feature flag changes
+- no send endpoint
+- no provider webhook
+- no On-The-Way automation
+- no invoice/payment behavior changes
+- no tenant Stripe payment execution
+- no QBO behavior changes
+- no portal expansion
+- no marketplace feature implementation
+
+F4A locks template governance semantics before schema, read model, preview UI, editing/review actions, sandbox, webhook, provider setup, or send behavior.
+
+Real SMS remains deferred.
+
+---
+
+## 2) Governance Location
+
+Locked location posture:
+
+- template governance belongs inside `/ops/admin/communications`
+- start as a section on the existing Communications page
+- do not create a template sub-page until multiple templates, review artifacts, and version-history browsing justify expansion
+- recommended section label: `On-The-Way Template Governance`
+- Company Profile remains separate
+
+Product language lock:
+
+- use `On-The-Way Notification` or `On-The-Way SMS` for product UI
+- use `campaign` only for provider/A2P terminology
+
+---
+
+## 3) Access Posture
+
+Locked access posture:
+
+- admin-only
+- reuse existing Communications guard pattern: `requireInternalRole("admin", { supabase, userId })`
+- no field-user editing
+- no job-detail template preview
+- no job-detail SMS editor
+- no operator/tech free-text SMS wording
+- field users remain lifecycle-only
+- future SMS evaluation remains background/event-driven
+
+---
+
+## 4) Template Data Model Decision
+
+Locked future model is a two-table model:
+
+- `sms_message_templates`
+- `sms_message_template_versions`
+
+Decision semantics:
+
+- `sms_message_templates` is the account-scoped template container/current pointer
+- `sms_message_template_versions` is the durable immutable wording/version record
+- approved historical body text must not be mutated
+- do not use a single `sms_templates` table for this lane
+
+F4B schema scope lock:
+
+- add only these two core tables in first schema slice
+- park a separate template event/ledger table unless review workflow later requires full state-transition history
+
+---
+
+## 5) `sms_message_templates` Recommended Fields
+
+Recommended future fields:
+
+- `id`
+- `account_owner_user_id`
+- `template_key`
+- `message_class`
+- `display_name`
+- `lifecycle_status`
+- `current_version_id`
+- `sandbox_version_id`
+- `created_by_user_id`
+- `updated_by_user_id`
+- `created_at`
+- `updated_at`
+
+Default/first values:
+
+- `template_key`: `on_the_way`
+- `message_class`: `on_the_way`
+
+Unique recommendation:
+
+- unique `(account_owner_user_id, template_key)`
+
+---
+
+## 6) `sms_message_template_versions` Recommended Fields
+
+Recommended future fields:
+
+- `id`
+- `account_owner_user_id`
+- `sms_message_template_id`
+- `template_key`
+- `message_class`
+- `version_number`
+- `version_label`
+- `body_template`
+- `body_hash`
+- `detected_tokens`
+- `unknown_tokens`
+- `token_policy_version`
+- `content_classification`
+- `version_status`
+- `internal_review_status`
+- `legal_review_status`
+- `provider_review_status`
+- `approved_by_user_id`
+- `approved_at`
+- `rejected_by_user_id`
+- `rejected_at`
+- `rejected_reason`
+- `created_by_user_id`
+- `updated_by_user_id`
+- `created_at`
+- `updated_at`
+
+Version record immutability lock:
+
+- meaningful body changes create a new version row
+- approved version body text is immutable
+- superseded/retired versions remain durable for audit
+
+---
+
+## 7) Parked Fields and Features
+
+Parked until explicit later approval:
+
+- separate `sms_message_template_events`
+- locale support
+- multi-language templates
+- per-location overrides
+- per-business-unit overrides
+- rich template-variable snapshot table
+- provider registration evidence links
+- public/customer-facing template preview
+- job-detail template preview
+- editable UI in F4C
+- activation controls in F4C
+
+---
+
+## 8) Template Lifecycle Statuses
+
+Locked planning values for `sms_message_templates.lifecycle_status`:
+
+- `draft`
+- `active`
+- `paused`
+- `archived`
+
+---
+
+## 9) Template Version Statuses
+
+Locked planning values for `sms_message_template_versions.version_status`:
+
+- `draft`
+- `pending_review`
+- `approved_for_sandbox`
+- `approved_for_activation`
+- `active`
+- `rejected`
+- `superseded`
+- `retired`
+
+---
+
+## 10) Review States
+
+Locked review-state values:
+
+- `not_requested`
+- `pending`
+- `approved`
+- `rejected`
+
+Review-separation lock:
+
+- internal approval, legal review, and provider review are separate controls
+- internal admin approval does not imply legal/provider approval
+- activation requires approved/active version state plus future legal/provider and activation gates
+
+---
+
+## 11) Token Model
+
+Initial allowed tokens:
+
+- `recipient_first_name`
+- `operator_or_tech_name`
+- `company_name`
+- `appointment_or_job_context`
+
+Parked tokens:
+
+- `window_start_local`
+- `window_end_local`
+- `service_city`
+- `assigned_tech_phone`
+- `job_address`
+- `arrival_eta`
+
+Token rules:
+
+- unknown tokens block approval
+- unknown tokens block activation
+- unknown tokens block future send rendering
+- tokens are rendered server-side only
+- browser preview may show safe server-generated sample output; browser interpolation is not authoritative
+- avoid tokens that expose uncontrolled notes, full addresses, payment links, invoice amounts, raw phone numbers, or job snapshot fields
+
+---
+
+## 12) Default Planning Wording
+
+Planning-only default body:
+
+Hi {{recipient_first_name}}, this is {{operator_or_tech_name}} with {{company_name}}. I am on the way to your service appointment. Reply STOP to opt out.
+
+Wording lock:
+
+- this is not final legal/provider-approved production copy
+- `Reply STOP to opt out` is mandatory for the first governed On-The-Way template
+- HELP behavior remains part of provider/opt-out readiness planning
+
+---
+
+## 13) Prohibited Wording and Content
+
+Prohibited content for On-The-Way operational SMS:
+
+- discounts
+- upsells
+- review requests
+- referral requests
+- promotional offers
+- payment execution claims
+- pressure/urgency language
+- mixed operational and marketing wording
+- uncontrolled free-text notes
+
+---
+
+## 14) Preview Posture
+
+Locked preview posture:
+
+- preview belongs only in Admin Communications
+- no job-detail preview
+- no field-user preview
+- V1 preview uses sample data only until live send exists
+
+Suggested sample data:
+
+- recipient: `Taylor`
+- operator: `Alex`
+- company: current company display name or `Your company`
+- context: `your service appointment`
+
+Preview safety copy:
+
+- `Sample preview only. SMS is not enabled and live sends are disabled.`
+
+Locked exclusions:
+
+- no send button
+- no sandbox send button
+
+---
+
+## 15) Mutation and RLS Boundaries
+
+Future F4B/F4 editing posture:
+
+- account-scoped SELECT for active internal users
+- no customer/portal access
+- no public access
+- no direct authenticated delete
+- prefer no direct authenticated INSERT/UPDATE in first schema slice
+- future edits require admin-only server actions
+- future edit scope must be bound by `account_owner_user_id`
+- meaningful body changes create a new version
+- approved historical body text is immutable
+- future edit/review actions should be audit logged
+- future mutation actions should revalidate `/ops/admin/communications`
+
+Locked exclusions:
+
+- no provider calls
+- no send behavior
+
+---
+
+## 16) Relationship to `sms_message_intents`
+
+Locked F4 relationship posture:
+
+- keep current E2 tables unchanged for F4
+- future send decision should copy:
+  - `template_key`
+  - `template_version`
+  - rendered `message_body_snapshot`
+- `sms_message_intents.message_body_snapshot` remains the audit record of what was attempted
+
+Parked E2 linkage note:
+
+- nullable `sms_message_template_version_id` may be considered later
+- do not alter E2 in F4 unless explicitly approved
+- text `template_version` remains acceptable while no send path exists
+
+---
+
+## 17) Settings -> Communications Implications
+
+Future Communications page should eventually show:
+
+- template governance status (`Deferred`, `Draft`, `Pending review`, `Approved for sandbox`, `Approved for activation`, `Active`)
+- active/current template version if present
+- sample preview
+- review status
+- clear copy that SMS is not enabled
+
+Still hidden/absent in F4C:
+
+- activation toggle
+- send controls
+- template editor
+- provider setup
+- provider refs
+- credentials/secrets
+
+---
+
+## 18) Risk Assessment
+
+Compliance risk:
+
+- wording can drift into marketing unless classification and prohibited-content checks are explicit
+
+Wording drift risk:
+
+- risk remains high without versioning
+- approved text must be immutable after approval
+
+Provider review risk:
+
+- Twilio/A2P sample wording may require review
+- internal approval is not enough
+
+Token/privacy risk:
+
+- tokens may leak notes, addresses, phone numbers, or uncontrolled context if not allowlisted
+
+Tenant leakage risk:
+
+- all template rows must be account-scoped and never shared implicitly
+
+Operational UX risk:
+
+- editable-looking UI can imply SMS is live; keep F4C read-only
+
+---
+
+## 19) Future Sequence
+
+A. F4A docs/model lock closeout. ✓ Complete
+B. F4B template schema foundation with `sms_message_templates` and `sms_message_template_versions`.
+C. F4C read-only template status/sample preview in `/ops/admin/communications`.
+D. Later admin edit/review server actions.
+E. Later sandbox/provider planning.
+F. Later production activation only after legal/provider review and explicit approval.
+
+---
+
+## 20) Future F4B Acceptance Criteria
+
+F4B scope lock:
+
+- create only template-governance schema foundation
+- no send behavior
+- no provider behavior
+- no webhook
+- no sandbox send
+- no activation
+- no UI edit controls
+- no E2 alteration unless separately approved
+- account-scoped RLS
+- no customer/portal access
+- no direct delete policy
+
+Documentation acceptance criteria:
+
+- ACTIVE docs lock template governance location
+- ACTIVE docs lock admin-only/no field-edit posture
+- ACTIVE docs lock two-table future model
+- ACTIVE docs lock statuses/review states
+- ACTIVE docs lock allowed tokens and parked tokens
+- ACTIVE docs lock default planning wording and mandatory STOP language
+- ACTIVE docs lock prohibited wording
+- ACTIVE docs lock preview posture
+- ACTIVE docs lock mutation/RLS boundaries
+- ACTIVE docs lock relationship to `sms_message_intents`
+- real SMS remains deferred
+- no code/schema/migration files changed for F4A
+
+---
+
+## Related ACTIVE References
+
+- docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md
+- docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md
+- docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
+- docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
+- docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md
+- docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
+- docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
+- docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md
+- docs/ACTIVE/source-of-truth-strategy.md
+- docs/ACTIVE/Active Spine V4.0 Current.md
+- docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md

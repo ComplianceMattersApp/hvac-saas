@@ -296,11 +296,12 @@ C. F2B provider configuration + sender identity schema foundation closeout (`sup
 D. F3A Settings Communications readiness UI model lock closeout (`docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md`). ✓ Complete
 E. F3B read-model helper implementation (`lib/communications/sms-provider-readiness-read.ts`). ✓ Complete (commit `d370e56`)
 F. F3C read-only Admin Center route/page implementation (`/ops/admin/communications`). ✓ Complete (commit `994e79c`)
-G. F4 On-The-Way Template Governance Planning Audit.
-H. F5 webhook/status callback contract planning.
-I. F6 provider/Twilio sandbox implementation planning.
-J. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
-K. Production activation only after provider/legal review and explicit approval.
+G. F4A On-The-Way Template Governance model lock closeout (`docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md`). ✓ Complete
+H. F4B template schema foundation (`sms_message_templates`, `sms_message_template_versions`) with no send/provider behavior.
+I. F5 webhook/status callback contract planning.
+J. F6 provider/Twilio sandbox implementation planning.
+K. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
+L. Production activation only after provider/legal review and explicit approval.
 
 ---
 
@@ -334,6 +335,7 @@ Primary official references used for this planning slice:
 - docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
 - docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
+- docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md

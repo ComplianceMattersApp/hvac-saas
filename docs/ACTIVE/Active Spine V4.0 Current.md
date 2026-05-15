@@ -183,6 +183,16 @@ Current Program Status Note (May 2026)
     - communications readiness is now visible in Admin Center as read-only status/readiness
     - real provider-powered SMS remains deferred pending template governance planning, webhook/status callback planning, provider/Twilio sandbox planning, legal/provider review, and explicit activation decision
 
+  - SMS Slice F4A On-The-Way Template Governance Model Lock is complete (docs/model-only):
+    - spec added: `docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md`
+    - locked governance location: `/ops/admin/communications` as `On-The-Way Template Governance` section (no sub-page in first posture)
+    - locked access posture: admin-only governance; no field free-text editing; no job-detail preview/editor; field actions remain lifecycle-only
+    - locked model posture: two-table future schema (`sms_message_templates` + `sms_message_template_versions`); single-table `sms_templates` is explicitly rejected for this lane
+    - locked safety posture: immutable approved historical wording versions, token allowlist and unknown-token block behavior, mandatory STOP language, prohibited operational-marketing mixed wording, sample-preview-only posture, and separate internal/legal/provider review states
+    - locked sequencing posture: F4A docs/model lock first, then F4B schema foundation, then F4C read-only template status/sample preview, with editing/review actions later
+    - boundaries preserved: no code/schema/migration changes, no provider/send/webhook/sandbox/live behavior, no env/secret/flag/payment/QBO/portal changes, and no production writes
+    - real provider-powered SMS remains deferred
+
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
   - Job Detail Location Preview Deferral (`4ecf127`) moved Street View/static map lookup behind `Suspense` around `TimedJobLocationPreview`; immediate fallback preserves address context plus `Navigate` and `Open in Maps` while map imagery resolves after first paint.

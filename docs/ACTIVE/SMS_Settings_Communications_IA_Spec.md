@@ -67,6 +67,14 @@ Slice F3C completion cross-reference (May 2026):
 - Communications readiness is now visible in Admin Center as read-only status/readiness.
 - Real SMS remains deferred.
 
+Slice F4A completion cross-reference (May 2026):
+
+- On-The-Way Template Governance Model Lock is complete in `docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md`.
+- F4A locks a two-table future model: `sms_message_templates` (account-scoped container/current pointer) and `sms_message_template_versions` (durable immutable wording/version record).
+- F4A explicitly rejects single-table `sms_templates` for this lane.
+- F4A locks admin-only governance posture, token allowlist, mandatory STOP language, prohibited wording, sample-preview-only posture, and separate internal/legal/provider review states.
+- F4A remains docs/model-only and does not add schema/migrations, read-model/UI editing, provider setup, send route, webhook, sandbox send, live SMS, or activation behavior.
+
 ---
 
 ## 1) Settings Location Decision
@@ -283,11 +291,13 @@ A. Settings / Communications IA spec closeout. ✓ Complete
 B. F3A Settings Communications readiness UI model lock closeout. ✓ Complete
 C. F3B read-model helper planning/implementation (`lib/communications/sms-provider-readiness-read.ts`). ✓ Complete (commit `d370e56`)
 D. F3C read-only Admin Center route/page planning/implementation (`/ops/admin/communications`). ✓ Complete (commit `994e79c`)
-E. F4 On-The-Way Template Governance Planning Audit.
-F. Quiet-hours/timezone gate planning.
-G. Provider/Twilio readiness and sandbox setup.
-H. Sandbox provider send after all gates.
-I. Production activation only after legal/provider review and explicit approval.
+E. F4A On-The-Way Template Governance model lock closeout (`docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md`). ✓ Complete
+F. F4B template schema foundation (`sms_message_templates`, `sms_message_template_versions`) with account-scoped RLS and no mutation/send behavior.
+G. F4C read-only template status/sample preview in `/ops/admin/communications`.
+H. Quiet-hours/timezone gate planning.
+I. Provider/Twilio readiness and sandbox setup.
+J. Sandbox provider send after all gates.
+K. Production activation only after legal/provider review and explicit approval.
 
 ---
 
@@ -300,6 +310,7 @@ I. Production activation only after legal/provider review and explicit approval.
 - docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md
 - docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md
+- docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md
 - docs/ACTIVE/source-of-truth-strategy.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md

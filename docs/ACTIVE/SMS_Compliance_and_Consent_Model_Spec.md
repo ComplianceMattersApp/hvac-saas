@@ -228,6 +228,7 @@ This planning slice does not perform:
 - docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md (Slice F1 docs/model lock for provider readiness, sender strategy, A2P/registration checklist, callback/webhook readiness planning, and activation boundaries)
 - docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md (Slice F2A docs/model lock for sender identity/provider configuration semantics, no-secret DB rule, and migration acceptance boundaries)
 - docs/ACTIVE/SMS_Settings_Communications_Readiness_UI_Model_Spec.md (Slice F3A docs/model lock for admin-only read-only Settings -> Communications readiness UI posture)
+- docs/ACTIVE/SMS_On_The_Way_Template_Governance_Model_Spec.md (Slice F4A docs/model lock for admin-only On-The-Way template governance, two-table template model, token allowlist, immutable approved wording versions, preview posture, and review-state separation)
 - docs/ACTIVE/Compliance_Matters_Prelaunch_Confirmation_Checklist.md
 - docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
