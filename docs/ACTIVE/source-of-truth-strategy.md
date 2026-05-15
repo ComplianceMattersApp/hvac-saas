@@ -144,3 +144,13 @@ If/when we move from Strategy B → Strategy A (fully normalized reads):
 - Remove snapshots only after:
   - all reads are normalized
   - test coverage or field validation confirms no regressions
+
+---
+
+## SMS Communication Authority Guardrail
+
+Job snapshot fields (`jobs.customer_phone`, `jobs.customer_email`, `jobs.job_address`, etc.) must **never** be used as the authoritative source for provider-powered SMS recipient selection.
+
+- Snapshots are Ops display convenience fields only.
+- Canonical customer phone (`customers.phone`) is the identity reference for Ops context, but it is not role-tagged, not consent-scoped, and not suppression-aware.
+- A first-class recipient/contact role model is required before live SMS. See: `docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md`.

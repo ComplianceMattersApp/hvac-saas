@@ -185,6 +185,7 @@ This planning slice does not perform:
 
 ## 12) Related ACTIVE References
 
+- docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md (recipient/contact role model — required before live SMS; see Section 10 activation gates)
 - docs/ACTIVE/Compliance_Matters_Prelaunch_Confirmation_Checklist.md
 - docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md
 - docs/ACTIVE/Active Spine V4.0 Current.md

@@ -44,6 +44,7 @@ Current Program Status Note (May 2026)
   - this is compliance-risk-reduction wording alignment only; future real SMS remains deferred pending consent/opt-out/quiet-hours/provider/audit/legal-provider review gates and explicit activation decision
   - guardrail framing: this is neutral communication-readiness hardening designed to preserve clean actor/recipient boundaries for future marketplace-style evolution, not Eddie-specific behavior
   - model-spec pointer: `docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md` now defines the future provider-powered SMS control contract and activation gates
+  - recipient/contact role model pointer: `docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md` defines the required first-class recipient/contact role model (audit decision C — 2026-05-14); this model must exist before any live SMS recipient selection; job snapshot phone fields are explicitly blocked from becoming SMS recipient truth
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
