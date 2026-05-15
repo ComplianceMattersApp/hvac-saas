@@ -86,7 +86,19 @@ Slice F4D-B Template Governance Validation Helper is complete.
 - helper has no Supabase/database/provider dependencies and no UI/server-action behavior; it does not enable SMS or imply `canSend`
 - review-request SMS remains a future separate message class and is prohibited in On-The-Way operational template wording
 - validation recorded: template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed
-- create/save draft server actions remain deferred to F4D-C; review actions, editable UI, and real SMS remain deferred
+- create/save draft server actions and review actions are complete; create/save draft UI is complete; review controls UI remains deferred; real SMS remains deferred
+
+## F4D-E1 Completion Cross-Reference (May 2026)
+
+Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
+
+- page changed: `app/ops/admin/communications/page.tsx`
+- server-action compatibility touched: `lib/actions/sms-template-actions.ts`
+- UI adds local notice rendering, `Draft Wording` card, create-draft button/form, and latest-draft-only textarea/save form
+- UI wires only create/save draft actions and intentionally does not add review/activation/provider/send/webhook controls
+- browser smoke passed after local runtime target alignment (`draft_created`, `draft_saved`)
+- initial `template_create_failed` was caused by runtime target mismatch (local reset target vs remote app runtime target), not a code defect
+- real SMS remains deferred
 
 ---
 
@@ -378,11 +390,13 @@ K. F4D-A template editing/review actions model lock. Complete.
 L. F4D-B validation helper only; no writes, no UI. ✓ Complete (`418172e`)
 M. F4D-C create/save draft server actions.
 N. F4D-D review actions.
-O. F4D-E editable UI.
-P. F5 webhook/status callback contract planning.
-Q. F6 provider/Twilio sandbox implementation planning.
-R. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
-S. Production activation only after provider/legal review and explicit approval.
+O. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
+P. F4D-E2 safe version-id/action-eligibility read-model support.
+Q. F4D-E3 review controls UI.
+R. F5 webhook/status callback contract planning.
+S. F6 provider/Twilio sandbox implementation planning.
+T. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
+U. Production activation only after provider/legal review and explicit approval.
 
 ---
 

@@ -230,6 +230,20 @@ State after F4D-B:
 - editable UI remains deferred
 - real SMS remains deferred
 
+## F4D-E1 Completion Cross-Reference (May 2026)
+
+SMS Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
+
+- page changed: `app/ops/admin/communications/page.tsx`
+- server-action compatibility touched: `lib/actions/sms-template-actions.ts`
+- UI adds local notice rendering, `Draft Wording` card, create-draft form, and latest-draft-only save form
+- UI wires only `createOnTheWayTemplateDraftFromDefaultFromForm` and `saveOnTheWayTemplateDraftFromForm`
+- review controls remain intentionally hidden in this slice
+- required non-sending copy remains visible (`SMS is not enabled`, `Live sends are disabled`, `Template approval does not enable sending`, `Sample preview only`, `Mark On The Way does not send SMS`, legal/provider reminder)
+- browser smoke passed after local runtime target alignment (`draft_created`, `draft_saved`)
+- initial `template_create_failed` was runtime-target mismatch, not a template-governance code defect
+- real SMS remains deferred
+
 ---
 
 ## 2) Governance Location
@@ -602,10 +616,12 @@ E. F4D-A template editing/review actions model lock. Complete.
 F. F4D-B validation helper. ✓ Complete (`418172e`)
 G. F4D-C create/save draft server actions.
 H. F4D-D review actions.
-I. F4D-E editable UI.
-J. Later webhook/status callback contract planning.
-K. Later sandbox/provider planning.
-L. Later production activation only after legal/provider review and explicit approval.
+I. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
+J. F4D-E2 safe version-id/action-eligibility read-model support.
+K. F4D-E3 review controls UI.
+L. Later webhook/status callback contract planning.
+M. Later sandbox/provider planning.
+N. Later production activation only after legal/provider review and explicit approval.
 
 ---
 

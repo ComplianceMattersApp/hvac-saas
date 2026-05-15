@@ -111,7 +111,21 @@ Slice F4D-B Template Governance Validation Helper is complete.
 - helper has no Supabase/database/provider dependencies and no UI/server-action behavior; it does not enable SMS or imply `canSend`
 - review-request SMS remains parked as a future separate message class and is prohibited in On-The-Way operational template wording
 - validation recorded: template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed
-- real SMS remains deferred; create/save draft server actions, review actions, and editable UI remain deferred
+- real SMS remains deferred; create/save draft server actions and review actions are complete, create/save draft UI is complete, and review controls UI remains deferred
+
+## F4D-E1 Completion Cross-Reference (May 2026)
+
+Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
+
+- page updated: `app/ops/admin/communications/page.tsx`
+- server-action compatibility touched: `lib/actions/sms-template-actions.ts`
+- UI adds local notice rendering, `Draft Wording` card, create-draft form, and latest-draft-only textarea/save form
+- UI wires only `createOnTheWayTemplateDraftFromDefaultFromForm` and `saveOnTheWayTemplateDraftFromForm`
+- UI does not wire submit/review/approve/reject/activation controls
+- non-live copy remains explicit (`SMS is not enabled`, `Live sends are disabled`, `Template approval does not enable sending`, `Sample preview only`, `Mark On The Way does not send SMS`, legal/provider review reminder)
+- browser smoke passed after local runtime target alignment with `draft_created` and `draft_saved`
+- runtime mismatch finding recorded: initial `template_create_failed` came from local-reset vs runtime-target mismatch, not a code defect
+- real SMS remains deferred
 
 ---
 
@@ -460,8 +474,10 @@ E. F4D-A template editing/review actions model lock. Complete.
 F. F4D-B validation helper only; no writes, no UI. ✓ Complete (`418172e`)
 G. F4D-C create/save draft server actions.
 H. F4D-D review actions.
-I. F4D-E editable UI.
-J. Later slices: provider setup mutation planning, webhook/signature validation, sandbox send planning, activation planning.
+I. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
+J. F4D-E2 safe version-id/action-eligibility read-model support.
+K. F4D-E3 review controls UI.
+L. Later slices: provider setup mutation planning, webhook/signature validation, sandbox send planning, activation planning.
 
 ---
 

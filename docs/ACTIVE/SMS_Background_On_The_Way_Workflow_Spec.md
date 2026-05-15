@@ -50,7 +50,13 @@ Recorded boundary for this workflow spec:
 - F4D-B does not enable SMS, does not imply `canSend`, has no Supabase/database/provider dependencies, and has no UI/server-action behavior.
 - review-request SMS remains a future separate message class and is prohibited in On-The-Way operational template wording.
 - F4D-B validation recorded: template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed.
-- create/save draft server actions remain deferred to F4D-C; review actions, editable UI, and real SMS remain deferred.
+- create/save draft server actions and review actions are complete; create/save draft UI is complete; review controls UI remains deferred; real SMS remains deferred.
+
+- Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
+- F4D-E1 changed `app/ops/admin/communications/page.tsx` and touched server-action compatibility in `lib/actions/sms-template-actions.ts`.
+- F4D-E1 adds local notice rendering, `Draft Wording` card, create-draft form, and latest-draft-only save form while preserving required non-sending copy.
+- F4D-E1 wires only create/save draft actions and intentionally does not add review controls, activation controls, provider setup, send endpoint, webhook, or automation behavior.
+- Browser smoke passed after local runtime target alignment (`draft_created`, `draft_saved`); initial `template_create_failed` was runtime-target mismatch and not a code defect.
 
 ---
 
@@ -283,12 +289,14 @@ I. F4D-A template editing/review actions model lock. Complete.
 J. F4D-B validation helper only; no writes, no UI. ✓ Complete (`418172e`)
 K. F4D-C create/save draft server actions.
 L. F4D-D review actions.
-M. F4D-E editable UI.
-N. Quiet-hours/timezone gate planning.
-O. Provider/Twilio readiness and A2P sandbox planning.
-P. Non-sending background evaluator.
-Q. Sandbox provider send only after all gates.
-R. Production activation only after legal/provider review and explicit approval.
+M. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
+N. F4D-E2 safe version-id/action-eligibility read-model support.
+O. F4D-E3 review controls UI.
+P. Quiet-hours/timezone gate planning.
+Q. Provider/Twilio readiness and A2P sandbox planning.
+R. Non-sending background evaluator.
+S. Sandbox provider send only after all gates.
+T. Production activation only after legal/provider review and explicit approval.
 
 ---
 

@@ -53,10 +53,12 @@ A. F4D-A docs/model lock.
 B. F4D-B validation helper. ✓ Complete (`418172e`)
 C. F4D-C create/save draft server actions. ✓ Complete (`f7cf8c0`)
 D. F4D-D review actions. ✓ Complete (`f5995d7`)
-E. F4D-E editable UI.
-F. Later provider/legal review operations.
-G. Later sandbox/provider work.
-H. Later production activation only after explicit approval.
+E. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
+F. F4D-E2 safe version-id/action-eligibility read-model support.
+G. F4D-E3 review controls UI.
+H. Later provider/legal review operations.
+I. Later sandbox/provider work.
+J. Later production activation only after explicit approval.
 
 Do not skip from this docs lock directly to full editable UI or review/approval controls.
 
@@ -294,7 +296,7 @@ State after F4D-D:
 - template validation helper exists
 - create/save draft actions exist
 - submit/approve-for-sandbox/reject review actions exist
-- editable UI remains deferred (F4D-E)
+- create/save draft UI exists (F4D-E1 complete)
 - approve-for-activation remains deferred
 - provider/legal approval actions remain deferred
 - provider setup remains deferred
@@ -303,12 +305,59 @@ State after F4D-D:
 
 Future sequence after this docs closeout:
 
-- F4D-E editable UI planning audit
-- later editable UI controls inside `/ops/admin/communications`
+- F4D-E1 create/save draft UI
+- F4D-E2 safe version-id/action-eligibility read-model support
+- F4D-E3 review controls UI
 - later provider/legal review workflow
 - later webhook/status callback contract planning
 - later provider/Twilio sandbox planning
 - later production activation only after legal/provider review and explicit approval
+
+---
+
+## F4D-E1 Completion Cross-Reference (May 2026)
+
+SMS Slice F4D-E1 Create/Save Draft UI is complete.
+
+- implementation commit: `1b8b671`
+- UI file: `app/ops/admin/communications/page.tsx`
+- server-action compatibility touched: `lib/actions/sms-template-actions.ts`
+- UI added local notice rendering and a `Draft Wording` card
+- UI added `Create draft from default` button/form
+- UI added draft textarea/save form for latest draft only
+- UI uses only: `createOnTheWayTemplateDraftFromDefaultFromForm`, `saveOnTheWayTemplateDraftFromForm`
+- UI does not wire: submit for review, approve for sandbox, reject, approve for activation
+- UI preserves non-live posture copy: `SMS is not enabled`, `Live sends are disabled`, `Template approval does not enable sending`, `Sample preview only`, `Mark On The Way does not send SMS`, and `Final wording may still require legal/provider review`
+- browser smoke passed after local runtime target alignment: create produced `draft_created`; save produced `draft_saved`
+- runtime mismatch finding: initial `template_create_failed` was caused by local reset target vs remote app runtime target mismatch (missing template tables in remote PostgREST schema cache), not a code defect; local retarget smoke passed
+
+Validation after smoke:
+
+- template action tests passed (`40/40`)
+- template validation helper tests passed (`19/19`)
+- template governance read tests passed (`15/15`)
+- provider readiness tests passed (`16/16`)
+- SMS eligibility tests passed (`16/16`)
+- contact recipient tests passed (`4/4`)
+- TypeScript passed
+- `git diff --check` passed
+- `git status --short` clean
+
+State after F4D-E1:
+
+- template governance schema exists
+- template governance read model exists
+- template governance read-only UI exists
+- template validation helper exists
+- create/save draft actions exist
+- submit/approve-for-sandbox/reject review actions exist
+- create/save draft UI exists
+- review controls UI remains deferred to F4D-E2/F4D-E3 sequence
+- approve-for-activation remains deferred
+- provider/legal approval actions remain deferred
+- provider setup remains deferred
+- sandbox/live SMS remains deferred
+- real SMS remains deferred
 
 ---
 

@@ -78,6 +78,10 @@ Reference closeouts:
 - Slice F4D-B marketing boundary: review-request SMS remains a future separate message class and is prohibited inside On-The-Way operational template wording.
 - Slice F4D-B validation: template validation helper tests (`19/19`), template governance read tests (`15/15`), provider readiness helper tests (`16/16`), SMS eligibility helper tests (`16/16`), recipient helper tests (`4/4`), `npx.cmd tsc --noEmit`, and `git diff --check` all passed.
 - Slice F4D-B boundary confirmation: no send endpoint, webhook, provider/Twilio integration, sandbox/live SMS enablement, UI/server-action behavior, or compliance gate bypass behavior changed; real SMS remains deferred.
+- Slice F4D-E1 implementation closeout: commit `1b8b671`; page `app/ops/admin/communications/page.tsx`; server-action compatibility touched in `lib/actions/sms-template-actions.ts`.
+- Slice F4D-E1 boundary: UI wires only create/save draft actions and remains non-sending; submit/review/approve/reject/activation/provider/send/webhook controls are not wired in this slice.
+- Slice F4D-E1 copy posture: UI continues to show `SMS is not enabled`, `Live sends are disabled`, `Template approval does not enable sending`, `Sample preview only`, `Mark On The Way does not send SMS`, and legal/provider review reminder.
+- Slice F4D-E1 smoke/validation posture: browser smoke passed with `draft_created` and `draft_saved` after local runtime target alignment; initial `template_create_failed` was runtime-target mismatch (not code defect); post-smoke validation matrix remained green.
 - Quiet-hours scope lock: quiet-hours/timezone remains future conservative fail-closed SMS pre-send gate planning only; it must not block Mark On The Way or job lifecycle/status transitions.
 
 ---

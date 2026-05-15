@@ -312,7 +312,19 @@ SMS Slice F4D-D closeout note (May 2026):
 - no activation behavior, no provider/Twilio/send/webhook behavior, and no SMS send readiness implied by template approval/readiness.
 - validation recorded: template action tests `40/40`; template validation helper tests `19/19`; template governance read tests `15/15`; provider readiness tests `16/16`; SMS eligibility tests `16/16`; contact recipient tests `4/4`; `npx.cmd tsc --noEmit`; `git diff --check`; total `110/110` passed.
 - state after F4D-D: schema/read-model/read-only UI/validation helper/create-save draft/review actions exist; editable UI remains deferred (F4D-E); approve-for-activation remains deferred; provider/legal approval actions remain deferred; provider setup remains deferred; sandbox/live SMS remains deferred; real SMS remains deferred.
-- safe forward sequence: F4D-D docs closeout, then F4D-E editable UI planning audit, then later editable UI controls in `/ops/admin/communications`, later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
+- safe forward sequence: F4D-D docs closeout, then F4D-E1 create/save draft UI, then F4D-E2 safe version-id/action-eligibility read-model support, then F4D-E3 review controls UI, then later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
+
+SMS Slice F4D-E1 closeout note (May 2026):
+- Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
+- F4D-E1 changed `app/ops/admin/communications/page.tsx` and touched server-action compatibility in `lib/actions/sms-template-actions.ts`.
+- UI added local notice rendering, `Draft Wording` card, `Create draft from default` form, and latest-draft-only draft textarea/save form.
+- UI wires only `createOnTheWayTemplateDraftFromDefaultFromForm` and `saveOnTheWayTemplateDraftFromForm`.
+- UI does not wire submit/review/approve/reject/activation controls and does not add provider setup/send/webhook controls.
+- UI preserves explicit non-live copy: `SMS is not enabled`, `Live sends are disabled`, `Template approval does not enable sending`, `Sample preview only`, `Mark On The Way does not send SMS`, and legal/provider review reminder.
+- browser smoke passed after local runtime target alignment with `draft_created` and `draft_saved`.
+- runtime mismatch finding recorded: initial `template_create_failed` came from local reset target vs remote app runtime target mismatch (missing template tables in remote PostgREST schema cache), not a code defect.
+- validation recorded post-smoke: template action tests `40/40`, template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipients tests `4/4`, `npx.cmd tsc --noEmit`, `git diff --check`, and clean working tree.
+- state after F4D-E1: schema/read-model/read-only UI/validation helper/create-save draft/review actions/create-save draft UI exist; review controls UI remains deferred to F4D-E2/F4D-E3; approve-for-activation/provider-legal actions/provider setup/sandbox-live SMS remain deferred; real SMS remains deferred.
 
 ---
 

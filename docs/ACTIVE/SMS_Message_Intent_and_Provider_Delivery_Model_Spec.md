@@ -133,7 +133,15 @@ Slice F4D-B completion cross-reference (Template governance validation helper):
 - helper has no Supabase/database/provider dependencies, no UI/server-action behavior, does not enable SMS, and does not imply `canSend`.
 - review-request SMS remains parked as a future separate message class and is prohibited in On-The-Way operational template wording.
 - validation recorded: template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed.
-- create/save draft server actions remain deferred to F4D-C; review actions, editable UI, and real SMS remain deferred.
+- create/save draft server actions and review actions are complete; create/save draft UI is complete; review controls UI remains deferred; real SMS remains deferred.
+
+Slice F4D-E1 completion cross-reference (Create/Save Draft UI):
+
+- F4D-E1 is complete in commit `1b8b671`.
+- F4D-E1 changed `app/ops/admin/communications/page.tsx` and touched server-action compatibility in `lib/actions/sms-template-actions.ts`.
+- F4D-E1 wires only create/save draft actions and does not wire review/activation/provider/send/webhook behavior.
+- E2 boundary remains preserved: no `sms_message_intents` or `sms_provider_deliveries` writes are added by F4D-E1.
+- browser smoke passed after local runtime target alignment (`draft_created`, `draft_saved`); initial `template_create_failed` was runtime-target mismatch, not a code defect.
 
 ---
 
@@ -440,10 +448,12 @@ I. F4D-A template editing/review actions model lock. Complete.
 J. F4D-B validation helper only; no writes, no UI. ✓ Complete (`418172e`)
 K. F4D-C create/save draft server actions.
 L. F4D-D review actions.
-M. F4D-E editable UI.
-N. Provider/Twilio sandbox readiness.
-O. Provider webhook/send implementation only after all gates.
-P. Production activation only after legal/provider review and explicit approval.
+M. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
+N. F4D-E2 safe version-id/action-eligibility read-model support.
+O. F4D-E3 review controls UI.
+P. Provider/Twilio sandbox readiness.
+Q. Provider webhook/send implementation only after all gates.
+R. Production activation only after legal/provider review and explicit approval.
 
 ---
 
