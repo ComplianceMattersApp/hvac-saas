@@ -222,6 +222,41 @@ Live-SMS status:
 
 ---
 
+## Slice E1 Docs Closeout Status (2026-05-15)
+
+SMS Slice E1 Message Intent + Provider Delivery Model Lock (docs/model-only) is complete.
+
+- Spec added: `docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md`
+- Locked model decisions captured:
+   - Slice E is not ready for migration until this lock exists
+   - likely next migration is a combined foundation for `sms_message_intents` and `sms_provider_deliveries`
+   - V1 is one intent to zero-or-one current delivery row
+   - blocked intents have no delivery row
+   - provider-submitted intents have one current delivery row
+   - retries are not fully modeled yet; multi-attempt history is parked
+   - lifecycle-driven idempotency should use account + job event + message class + recipient
+   - `job_events` remains non-authoritative for provider truth
+   - provider callback path must be trusted/server-side and account-scoped
+- Future migration acceptance criteria captured:
+   - only the two audit tables
+   - account-scoped RLS
+   - unique intent idempotency key
+   - unique current delivery row per intent
+   - unique provider message id per account/provider when present
+   - normalized status constraints
+   - no send logic, no webhook, no provider env vars, no feature flags
+
+Deployment/write boundary confirmation:
+- no code changes
+- no schema/migration changes
+- no Supabase commands
+- no production writes
+
+Live-SMS status:
+- Real SMS remains deferred.
+
+---
+
 ## 1) Current Non-Implementation Boundary
 
 This document is a **design contract**, not an implementation or migration.
@@ -753,6 +788,7 @@ This is documentation only. It defines what must be built; it does not build it.
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md (compliance gates that schema must satisfy)
 - docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md (Slice C docs/model workflow contract for future background On-The-Way evaluation and template governance boundaries)
 - docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md (Slice D docs/model IA contract for future Settings -> Communications ownership and section design)
+- docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md (Slice E1 docs/model lock for intent/delivery audit semantics, idempotency, callback path, and RLS expectations)
 - docs/ACTIVE/source-of-truth-strategy.md (canonical source rules that SMS schema must respect)
 - docs/ACTIVE/Active Spine V4.0 Current.md (project spine and SMS 9B entry)
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md (Group 9B roadmap entry)

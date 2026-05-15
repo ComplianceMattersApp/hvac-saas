@@ -35,6 +35,7 @@ Implementation status note (2026-05-15):
 - Real SMS remains deferred pending read/decision helpers, non-sending recipient picker/template preview, message intent/provider delivery audit tables, provider/Twilio registration + sandbox send, legal/provider review, and explicit activation decision.
 - Slice C docs/model closeout is recorded in `docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md` with locked posture: no job-detail preview card for V1, no field free-text editor, no field template editing, no live SMS, future background/event-driven evaluation after lifecycle transition, admin-only future template governance, and gate/failure control contracts.
 - Slice D docs/model closeout is recorded in `docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md` with locked IA posture: Settings -> Communications is the future home for messaging governance; Company Profile remains identity/support-contact scope; no runtime settings activation or provider controls are enabled in this slice.
+- Slice E1 docs/model closeout is recorded in `docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md` with locked audit posture: one intent to zero-or-one current delivery row in V1, account-scoped idempotency, provider-neutral status normalization, and server-side callback-write expectations.
 
 ---
 
@@ -273,6 +274,7 @@ This planning/model doc does not perform or authorize:
 - docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md (future schema design; builds on this model; Slice A, Slice B1, and Slice B2 closeout recorded with migrations `supabase/migrations/20260515120000_contact_recipients_slice_a_foundation.sql` and `supabase/migrations/20260515123000_contact_recipient_consent_suppression_foundation.sql`, commits `afddb9c`, `02aee5a`, `39a2963`, `c0247af`)
 - docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md (Slice C docs/model contract for future On-The-Way background evaluation, admin-only template governance, and badge-only UI posture)
 - docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md (Slice D docs/model IA contract for Settings -> Communications ownership and section design)
+- docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md (Slice E1 docs/model lock for intent/delivery audit semantics and callback/write/RLS expectations)
 - docs/ACTIVE/source-of-truth-strategy.md (canonical field authority)
 - docs/ACTIVE/Active Spine V4.0 Current.md (project spine and SMS 9B entry)
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md (Group 9B roadmap entry)

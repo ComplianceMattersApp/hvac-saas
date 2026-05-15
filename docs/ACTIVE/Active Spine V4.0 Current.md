@@ -96,6 +96,15 @@ Current Program Status Note (May 2026)
     - no-preview/no-field-editor posture preserved by cross-reference to Slice C workflow spec
     - boundaries preserved: no code/schema/migration/Supabase/provider/send/env/flag/payment/QBO/portal changes and no production writes
     - real provider-powered SMS remains deferred pending future activation slices and explicit approval gates
+  - SMS Slice E1 Message Intent + Provider Delivery Model Lock (docs/model-only) is complete:
+    - spec added: `docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md`
+    - locked audit model recorded: one intent to zero-or-one current delivery row in V1, blocked intents have no delivery row, provider-submitted intents have one current delivery row, and append-only provider event history is parked
+    - locked idempotency and retry posture recorded: account + job event + message class + recipient idempotency for lifecycle-driven sends; new send decision creates a new intent; same-submission provider updates revise the current delivery row; multi-attempt retry history is parked
+    - locked provider-neutral semantics recorded: generic provider fields/status normalization only; Twilio remains likely future provider direction but not a schema dependency
+    - locked callback/RLS posture recorded: provider callbacks must use trusted server-side updates with account revalidation; internal account-scoped reads are allowed; no client/public delivery-state writes
+    - locked source-of-truth posture recorded: `job_events` remains non-authoritative for provider truth; timeline summaries may only be added later if explicitly designed and backed by delivery truth
+    - boundaries preserved: no code/schema/migration/Supabase/provider/send/env/flag/payment/QBO/portal changes and no production writes
+    - real provider-powered SMS remains deferred pending the combined migration foundation and later provider readiness slices
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
