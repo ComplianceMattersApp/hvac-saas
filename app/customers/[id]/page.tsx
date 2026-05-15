@@ -782,7 +782,7 @@ export default async function CustomerDetailPage(props: {
                   href={smsHref}
                   className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
                 >
-                  Text Customer
+                  Open SMS App
                 </a>
               ) : null}
 

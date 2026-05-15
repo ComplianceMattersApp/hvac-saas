@@ -2923,7 +2923,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             href={`sms:${digitsOnly(customerPhone)}`}
             className={compactSecondaryButtonClass}
           >
-            Text
+            Open SMS App
           </a>
         ) : null}
 
@@ -3866,7 +3866,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       {banner === "contact_attempt_logged" && (
         <FlashBanner
           type="success"
-          message="Saved."
+          message="Contact attempt logged."
         />
       )}
 

@@ -110,7 +110,7 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
           <input type="hidden" name="return_to" value={returnTo} />
           <input type="hidden" name="success_banner" value="contact_attempt_logged" />
           <ContactLoggingSubmitButton
-            label="Sent Text"
+            label="Log Text Attempt"
             buttonClassName={buttonClassName}
             onPressed={markForRestore}
           />
@@ -118,6 +118,9 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
       </div>
       <div className="mt-2 text-[11px] text-slate-500">
         {summaryText}
+      </div>
+      <div className="mt-1 text-[11px] text-slate-500">
+        Logs communication attempts only; does not confirm carrier delivery.
       </div>
     </div>
   );

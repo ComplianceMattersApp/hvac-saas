@@ -71,18 +71,18 @@ describe("/ops/call-list page", () => {
     expect(callListPageSource).not.toMatch(/>\s*Open Job\s*</);
   });
 
-  it("renders Call and Text contact action links via tel/sms hrefs", () => {
+  it("renders Call and Open SMS App contact action links via tel/sms hrefs", () => {
     expect(callListPageSource).toContain("telHref(phone)");
     expect(callListPageSource).toContain("smsHref(phone)");
     // Label text exists somewhere in the JSX
     expect(callListPageSource).toMatch(/>\s*Call\s*</);
-    expect(callListPageSource).toMatch(/>\s*Text\s*</);
+    expect(callListPageSource).toMatch(/>\s*Open SMS App\s*</);
   });
 
-  it("renders Log Call and Log Text buttons that use existing contact-attempt action", () => {
+  it("renders Log Call and Log Text Attempt buttons that use existing contact-attempt action", () => {
     expect(callListPageSource).toContain("logCustomerContactAttemptFromForm");
     expect(callListPageSource).toMatch(/>\s*Log Call\s*</);
-    expect(callListPageSource).toMatch(/>\s*Log Text\s*</);
+    expect(callListPageSource).toMatch(/>\s*Log Text Attempt\s*</);
     expect(callListPageSource).toContain('name="method" value="call"');
     expect(callListPageSource).toContain('name="method" value="text"');
   });

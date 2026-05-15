@@ -232,7 +232,7 @@ export default async function CallListPage({
                             ) : null}
                             {smsHref(phone) ? (
                               <a href={smsHref(phone)} className={compactActionClass}>
-                                Text
+                                Open SMS App
                               </a>
                             ) : null}
                           </div>
@@ -333,10 +333,13 @@ export default async function CallListPage({
                         <input type="hidden" name="return_to" value={returnTo} />
                         <input type="hidden" name="success_banner" value="contact_attempt_logged_text" />
                         <button type="submit" className={outlineActionClass}>
-                          Log Text
+                          Log Text Attempt
                         </button>
                       </form>
                     </div>
+                    <p className="text-[11px] text-slate-500">
+                      Logs communication attempts only; does not confirm carrier delivery.
+                    </p>
                   </div>
                 </div>
               </div>

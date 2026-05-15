@@ -37,7 +37,9 @@ function renderAttemptItem(a: any, key: string, infoChipClassName: string) {
     result === "no_answer"
       ? "No Answer"
       : result === "sent"
-        ? "Sent"
+        ? method === "text"
+          ? "Text Attempt Logged"
+          : "Attempt Logged"
         : result === "spoke"
           ? "Spoke"
           : result || "—";
