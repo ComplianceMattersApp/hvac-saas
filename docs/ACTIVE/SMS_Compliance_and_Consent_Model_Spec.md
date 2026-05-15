@@ -53,6 +53,9 @@ Reference closeouts:
 - Slice E2 boundary confirmation: no provider delivery write path, no send endpoint/webhook/provider integration/live SMS behavior, no `job_events` provider summary behavior, no backfill, no production migration apply, and no production writes.
 - Slice F1 docs/model closeout: `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md` captures Twilio-likely provider readiness requirements while preserving provider-neutral internal model lock and no-implementation boundaries.
 - Slice F2A docs/model closeout: `docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md` locks sender identity + provider configuration semantics (two-table model, no-secret DB rule, status model, sandbox/production semantics, and account-scope mutation boundaries) before migration.
+- Slice F2B migration closeout: commit `f093bdd`; migration `supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`; created `sms_provider_configurations` and `sms_sender_identities` as account-scoped provider-readiness/sender-identity metadata foundations with SELECT-only RLS in V1 and no authenticated write policies.
+- Slice F2B validation: `npx.cmd tsc --noEmit`, B2 helper tests (`16/16`), recipient helper tests (`4/4`), `git diff --check`, and `supabase db reset --local --no-seed --yes` passed with full local migration chain including F2B.
+- Slice F2B boundary confirmation: no app code/UI changes, no E2 table changes, no send endpoint/webhook/provider integration/sandbox-live SMS behavior, no env/secret/feature-flag changes, no production migration apply, and no production writes.
 - Quiet-hours scope lock: quiet-hours/timezone remains future conservative fail-closed SMS pre-send gate planning only; it must not block Mark On The Way or job lifecycle/status transitions.
 
 ---

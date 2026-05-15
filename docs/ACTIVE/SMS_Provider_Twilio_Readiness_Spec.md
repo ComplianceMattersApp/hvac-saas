@@ -215,11 +215,17 @@ Current audit-first foundation supports provider readiness planning:
 
 Missing before any sandbox-send implementation:
 
-- sender identity / provider configuration model
+- sender identity / provider configuration implementation wiring and mutation contract
 - admin template governance/storage model
 - webhook route + signature-validation implementation
 - provider status normalization implementation layer
 - activation/readiness settings implementation
+
+F2B closeout cross-reference:
+
+- Sender identity/provider configuration schema foundation is now complete in commit `f093bdd` via `supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`.
+- F2B created `sms_provider_configurations` and `sms_sender_identities` as account-scoped metadata foundations with select-only RLS in V1.
+- F2B did not add provider setup, webhook/send behavior, sandbox/live SMS behavior, env/secret changes, or activation behavior.
 
 No sandbox send should occur until these gaps are resolved.
 
@@ -276,11 +282,12 @@ Primary risks before implementation:
 
 A. F1 Provider/Twilio readiness spec closeout (this document).
 B. F2A sender identity/provider configuration model lock closeout (`docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md`).
-C. F3 admin template governance planning.
-D. F4 webhook/status callback contract planning.
-E. F5 provider/Twilio sandbox implementation planning.
-F. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
-G. Production activation only after provider/legal review and explicit approval.
+C. F2B provider configuration + sender identity schema foundation closeout (`supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`, commit `f093bdd`).
+D. F3 admin template governance planning.
+E. F4 webhook/status callback contract planning.
+F. F5 provider/Twilio sandbox implementation planning.
+G. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
+H. Production activation only after provider/legal review and explicit approval.
 
 ---
 

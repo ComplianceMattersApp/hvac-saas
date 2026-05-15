@@ -162,6 +162,15 @@ SMS Slice F2A closeout note (May 2026):
 - F2A does not implement schema/migrations, provider setup, Twilio API calls, send endpoint, webhook route, sandbox send, live SMS, env/secrets changes, feature flags, or production writes.
 - Real SMS remains deferred pending F2B migration foundation and later gated implementation slices with legal/provider approval.
 
+SMS Slice F2B closeout note (May 2026):
+- Slice F2B Provider Configuration + Sender Identity Schema Foundation is complete in commit `f093bdd` with migration `supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`.
+- F2B created `sms_provider_configurations` and `sms_sender_identities` as neutral tenant/account-scoped provider-readiness and sender-identity metadata foundations.
+- F2B preserves provider-neutral/Twilio-aware reference semantics, no-secret DB posture, readiness/activation separation, and sandbox-vs-production data modeling.
+- F2B enables account-scoped SELECT RLS in V1 and intentionally omits INSERT/UPDATE/DELETE policies pending admin/owner-gated mutation contract.
+- F2B does not alter E2 tables and does not implement send endpoint, webhook route, provider/Twilio API behavior, sandbox/live SMS, env/secrets changes, feature flags, payment/QBO/portal behavior, marketplace behavior, production migration apply, or production writes.
+- Validation recorded: `npx.cmd tsc --noEmit`, helper tests (`16/16` and `4/4`), `git diff --check`, and `supabase db reset --local --no-seed --yes` all passed, including full local migration chain with F2B.
+- Provider readiness is structurally closer but remains deferred/not active pending Settings UI planning, sender registration/provider review, webhook/signature validation planning, sandbox planning, legal/provider review, and explicit activation decision.
+
 ---
 
 ## 3. Product Mode Matrix — ECC/HERS Version vs HVAC Service Version

@@ -135,6 +135,17 @@ Current Program Status Note (May 2026)
     - locked E2 relationship posture recorded: E2 remains unchanged in F2A; optional FK links are parked for later explicit approval
     - explicit non-implementation boundary preserved: no code/schema/migration/Supabase/provider/send/webhook/env/flag/payment/QBO/portal changes and no production writes
     - real provider-powered SMS remains deferred pending F2B migration foundation and later gated implementation slices
+  - SMS Slice F2B Provider Configuration + Sender Identity Schema Foundation is complete and pushed in commit `f093bdd`:
+    - migration created: `supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`
+    - tables created: `sms_provider_configurations` and `sms_sender_identities`
+    - locked semantics preserved: `sms_provider_configurations` is provider readiness/configuration metadata only; `sms_sender_identities` is sender identity metadata only
+    - no-secret posture preserved: provider refs are external references only and credentials remain server-side only
+    - sandbox/production data semantics preserved: provider environment is represented as data and readiness/activation remain separate
+    - RLS posture preserved: account-scoped SELECT policies only in V1; no INSERT/UPDATE/DELETE policies
+    - one-active-production sender enforcement intentionally parked for future helper/server-action or follow-up migration decision
+    - validation recorded: `npx.cmd tsc --noEmit` passed, helper tests passed (`16/16` and `4/4`), `git diff --check` passed, and `supabase db reset --local --no-seed --yes` passed with full local migration chain including F2B
+    - boundaries preserved: no app code/UI changes, no E2 table changes, no send endpoint/webhook/provider behavior, no sandbox/live SMS, no env/secret/flag changes, no production migration apply, and no production writes
+    - provider readiness is structurally closer but remains deferred/not active pending later gates and explicit approval
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

@@ -7,6 +7,77 @@ Date: 2026-05-15
 
 ---
 
+## Slice F2B Closeout Status (2026-05-15)
+
+SMS Slice F2B Provider Configuration + Sender Identity Schema Foundation is complete.
+
+- Implementation commit: `f093bdd`
+- Migration filename: `supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`
+- Created tables:
+  - `sms_provider_configurations`
+  - `sms_sender_identities`
+
+Locked F2B interpretation:
+
+- `sms_provider_configurations` stores account-scoped provider readiness/configuration metadata only.
+- `sms_sender_identities` stores account-scoped sender identity metadata only.
+- neither table stores provider secrets.
+- neither table enables live SMS.
+- neither table sends messages.
+- provider references are Twilio-aware but provider-neutral.
+- sandbox vs production is represented as data.
+- readiness and activation remain separate.
+- account-scoped RLS is enabled with SELECT policy only.
+- no INSERT/UPDATE/DELETE policies were added in V1.
+- future writes remain deferred to admin/owner-gated server actions or approved service-role/server-side paths.
+- one-active-production sender-identity enforcement is intentionally parked for a future helper/server-action or follow-up migration decision.
+- no E2 table was altered in this slice.
+- real SMS remains deferred.
+
+Validation recorded:
+
+- `npx.cmd tsc --noEmit` passed.
+- `npx.cmd vitest run lib/communications/__tests__/sms-eligibility-inputs-read.test.ts` passed (`16/16`).
+- `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed (`4/4`).
+- `git diff --check` passed.
+- `supabase db reset --local --no-seed --yes` passed.
+- full local migration chain applied successfully, including F2B.
+
+Deployment/write boundary confirmation:
+
+- no production migration apply.
+- no production writes.
+
+Provider-readiness posture after F2B:
+
+- provider readiness is structurally closer but not active.
+- Settings -> Communications remains the future home for provider readiness display/control.
+- Twilio/provider setup remains deferred.
+- provider credentials/environment variables remain deferred.
+- webhook/status callback implementation remains deferred.
+- sender registration/A2P/provider review remains deferred.
+- sandbox send remains deferred.
+- production activation remains deferred.
+
+Future gates still required:
+
+- admin Settings -> Communications provider readiness UI planning
+- admin template governance implementation planning
+- webhook/signature-validation contract planning
+- provider/Twilio sandbox implementation planning
+- opt-out/help inbound mapping implementation planning
+- explicit sender registration/provider review
+- legal/provider review
+- explicit activation decision
+
+Marketplace guardrail framing:
+
+- F2B is neutral tenant/account-scoped provider-readiness infrastructure.
+- this does not imply marketplace behavior exists.
+- this does not approve shared production sender identity.
+
+---
+
 ## 1) Current Decision
 
 Slice F2A closes the sender identity/provider configuration model lock in documentation only.

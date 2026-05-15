@@ -280,6 +280,7 @@ Locked E2 interpretation:
 - quiet-hours/timezone remains future conservative fail-closed pre-send gate policy only and is not a direct lifecycle/workflow blocker.
 - Slice F1 Provider/Twilio readiness planning closeout is documented in `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md` and remains docs/model-only with no provider setup, send route, webhook, sandbox send, or live SMS.
 - Slice F2A sender identity/provider configuration model lock is documented in `docs/ACTIVE/SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md` with two-table semantics, no-secret DB rule, sandbox/production data semantics, and account-scoped mutation boundaries.
+- Slice F2B provider configuration + sender identity schema foundation is complete in commit `f093bdd` with migration `supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`, creating `sms_provider_configurations` and `sms_sender_identities` with account-scoped SELECT RLS only in V1 and no E2 table changes.
 
 Validation recorded:
 

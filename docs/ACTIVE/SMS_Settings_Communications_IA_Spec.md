@@ -36,6 +36,12 @@ Slice F2A planning cross-reference:
 - F2A locks the two-table model (`sms_provider_configurations`, `sms_sender_identities`), no-secret DB rule, readiness/activation statuses, sandbox-vs-production semantics, and account-scope RLS/mutation boundaries.
 - F2A remains docs/model-only and does not add settings UI, provider setup, send route, webhook, sandbox send, or live SMS.
 
+Slice F2B closeout cross-reference:
+
+- Provider configuration + sender identity schema foundation is complete in commit `f093bdd` via `supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`.
+- F2B created `sms_provider_configurations` and `sms_sender_identities` with account-scoped SELECT RLS only in V1 and no authenticated write policies.
+- F2B did not add settings UI, send route, webhook, sandbox send, live SMS, env/secret changes, or activation behavior.
+
 ---
 
 ## 1) Settings Location Decision

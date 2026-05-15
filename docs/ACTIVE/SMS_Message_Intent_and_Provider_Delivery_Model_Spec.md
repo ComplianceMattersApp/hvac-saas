@@ -59,6 +59,13 @@ Slice F2A planning cross-reference (docs/model-only):
 - F2A keeps E2 tables unchanged in this slice, allows parked `sender_identity_ref` text posture while no send path exists, and parks FK additions (`sender_identity_id` / `provider_configuration_id`) for later explicit approval.
 - F2A does not approve send endpoint, webhook, provider callbacks, sandbox send, or live SMS.
 
+Slice F2B closeout cross-reference (schema foundation only):
+
+- Provider configuration + sender identity schema foundation is complete in commit `f093bdd` via `supabase/migrations/20260515133000_sms_provider_config_sender_identity_foundation.sql`.
+- F2B created `sms_provider_configurations` and `sms_sender_identities` with no-secret metadata posture and account-scoped SELECT RLS only in V1.
+- F2B did not alter `sms_message_intents` or `sms_provider_deliveries` in this slice.
+- Real SMS remains deferred.
+
 ---
 
 ## 1) Current Decision
