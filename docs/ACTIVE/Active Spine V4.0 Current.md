@@ -67,6 +67,17 @@ Current Program Status Note (May 2026)
     - local validation recorded: plain `supabase start` failed because VS Code held Studio port `54323`; safe local workaround `supabase start -x studio` succeeded; `supabase db reset --local` passed and applied Slice A + Slice B1 migrations; `npx.cmd tsc --noEmit` passed; `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed; `git diff --check` passed
     - deployment/write boundary preserved: no remote/sandbox/production migration apply and no production writes
     - real provider-powered SMS remains deferred pending read/decision helpers, non-sending recipient picker/template preview, intent/provider-delivery audit tables, provider/Twilio registration + sandbox send, legal/provider review, and explicit activation decision
+  - SMS Slice B2 Non-Sending Eligibility Inputs Helper is complete and pushed in commit `c0247af`:
+    - files added:
+      - `lib/communications/sms-eligibility-inputs-read.ts`
+      - `lib/communications/__tests__/sms-eligibility-inputs-read.test.ts`
+    - helper scope: read-only non-sending eligibility-input evaluation for recipient/consent/suppression state by message class
+    - helper read boundary: reads only `contact_recipients`, `contact_recipient_consents`, `contact_recipient_suppressions`; does not read `jobs`, `customers`, `locations`, or `job_events`
+    - helper output boundary: non-sending language only (`nonSendingStatus`, `blockedReasons`); no `canSend` output
+    - locked posture preserved: `eligible_inputs_present` means B2 inputs are present only, missing/unknown consent remains fail-closed, active suppression blocks regardless of consent, and suppression appears before consent in blocked-reason ordering
+    - validation recorded: `npx.cmd vitest run lib/communications/__tests__/sms-eligibility-inputs-read.test.ts` passed (`16/16`), `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed (`4/4`), `npx.cmd tsc --noEmit` passed, `git diff --check` passed
+    - boundaries preserved: no UI/schema/migration changes, no Supabase commands, no provider/Twilio/send pipeline changes, no env/flag/payment/QBO/portal changes, no production writes
+    - real provider-powered SMS remains deferred pending non-sending recipient picker/template preview, quiet-hours/timezone decision gate, sender identity/provider registration, intent/provider-delivery audit tables, Twilio/provider sandbox send, legal/provider review, and explicit activation decision
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

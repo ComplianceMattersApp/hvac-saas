@@ -26,6 +26,12 @@ Implementation status note (2026-05-15):
 - Local validation recorded: `supabase start -x studio`, `supabase db reset --local` (applying Slice A + Slice B1), `npx.cmd tsc --noEmit`, `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts`, `git diff --check`.
 - Local caveat: Studio port `54323` was held by VS Code; Studio was excluded with `-x studio` for local validation only.
 - No remote/sandbox/production migration apply and no production writes occurred.
+- Slice B2 Non-Sending Eligibility Inputs Helper is complete in commit `c0247af`.
+- Slice B2 files added: `lib/communications/sms-eligibility-inputs-read.ts` and `lib/communications/__tests__/sms-eligibility-inputs-read.test.ts`.
+- Slice B2 helper reads only `contact_recipients`, `contact_recipient_consents`, and `contact_recipient_suppressions`; it does not read `jobs`, `customers`, `locations`, or `job_events`.
+- Slice B2 helper output is non-sending only (`nonSendingStatus`, `blockedReasons`) and does not return `canSend`.
+- Slice B2 locks suppression-first blocked-reason ordering and preserves fail-closed consent posture (missing/unknown/opted_out/revoked blocked).
+- Slice B2 validation recorded: non-sending helper tests `16/16` passed, recipient read tests `4/4` passed, `npx.cmd tsc --noEmit` passed, `git diff --check` passed.
 - Real SMS remains deferred pending read/decision helpers, non-sending recipient picker/template preview, message intent/provider delivery audit tables, provider/Twilio registration + sandbox send, legal/provider review, and explicit activation decision.
 
 ---
@@ -262,7 +268,7 @@ This planning/model doc does not perform or authorize:
 ## 13) Related ACTIVE References
 
 - docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md (prerequisite gates)
-- docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md (future schema design; builds on this model; Slice A and Slice B1 closeout recorded with migrations `supabase/migrations/20260515120000_contact_recipients_slice_a_foundation.sql` and `supabase/migrations/20260515123000_contact_recipient_consent_suppression_foundation.sql`, commits `afddb9c`, `02aee5a`, `39a2963`)
+- docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md (future schema design; builds on this model; Slice A, Slice B1, and Slice B2 closeout recorded with migrations `supabase/migrations/20260515120000_contact_recipients_slice_a_foundation.sql` and `supabase/migrations/20260515123000_contact_recipient_consent_suppression_foundation.sql`, commits `afddb9c`, `02aee5a`, `39a2963`, `c0247af`)
 - docs/ACTIVE/source-of-truth-strategy.md (canonical field authority)
 - docs/ACTIVE/Active Spine V4.0 Current.md (project spine and SMS 9B entry)
 - docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md (Group 9B roadmap entry)

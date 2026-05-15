@@ -99,12 +99,70 @@ Marketplace guardrail framing:
 
 ---
 
+## Slice B2 Closeout Status (2026-05-15)
+
+SMS Slice B2 Non-Sending Eligibility Inputs Helper is complete.
+
+- Implementation commit: `c0247af`
+- Files added:
+   - `lib/communications/sms-eligibility-inputs-read.ts`
+   - `lib/communications/__tests__/sms-eligibility-inputs-read.test.ts`
+
+What Slice B2 adds:
+- read-only non-sending eligibility-input evaluation for recipient + message class
+- recipient existence/status checks
+- recipient phone presence checks
+- consent existence/status checks
+- active recipient-level suppression checks
+- active phone-level suppression checks
+- deterministic non-sending blocked-reason output ordering (suppression before consent)
+
+Read/write and source boundaries:
+- helper reads only:
+   - `contact_recipients`
+   - `contact_recipient_consents`
+   - `contact_recipient_suppressions`
+- helper does not read:
+   - `jobs`
+   - `customers`
+   - `locations`
+   - `job_events`
+- helper returns non-sending eligibility input state only
+- helper does not return `canSend`
+- `eligible_inputs_present` means B2 recipient/consent/suppression inputs are present; it does not imply live SMS can send
+
+Locked behavior posture from B2:
+- missing/unknown consent remains fail-closed
+- active suppression blocks regardless of consent
+- suppression is prioritized before consent in blocked reason ordering
+- job snapshot phone/email remains blocked from SMS recipient truth
+
+Validation recorded:
+- `npx.cmd vitest run lib/communications/__tests__/sms-eligibility-inputs-read.test.ts` passed (`16/16`)
+- `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed (`4/4`)
+- `npx.cmd tsc --noEmit` passed
+- `git diff --check` passed
+
+Deployment/write boundary confirmation:
+- no schema/migration change
+- no Supabase commands
+- no production writes
+
+Live-SMS status:
+- Real SMS remains deferred pending future non-sending recipient picker/template preview, quiet-hours/timezone decision gate, sender identity/provider registration, SMS intent/provider delivery audit tables, Twilio/provider sandbox send, legal/provider review, and explicit activation decision.
+
+Marketplace guardrail framing:
+- Slice B2 is neutral tenant/account-scoped communication-readiness infrastructure. It does not imply marketplace behavior, Twilio/provider behavior, or live SMS activation.
+
+---
+
 ## 1) Current Non-Implementation Boundary
 
 This document is a **design contract**, not an implementation or migration.
 
 ### Explicit constraints:
 - **Recipient + consent/suppression foundations now exist** (`contact_recipients`, `contact_recipient_consents`, `contact_recipient_suppressions`; Slice A + Slice B1). SMS intent and provider delivery schema remain deferred.
+- **Non-sending eligibility input helper now exists** (Slice B2) and remains read-only.
 - **This pass does not create schema files, migrations, or Supabase changes.**
 - **This pass does not enable SMS, change any behavior, or activate any feature flag.**
 - **This pass exists solely to define a future additive schema proposal** that will be reviewed, refined, and eventually implemented in a separate schema design review + migration slice.
@@ -114,7 +172,9 @@ This document is a **design contract**, not an implementation or migration.
 - Device-intent SMS links work via `sms:` scheme on canonical customer phone.
 - Job snapshot phone/email fields (`jobs.customer_phone`, `jobs.customer_email`, etc.) are operational convenience only.
 - No provider delivery truth exists.
-- Recipient/consent/suppression foundations now exist (`contact_recipients`, `contact_recipient_consents`, `contact_recipient_suppressions`), but provider delivery audit truth remains deferred.
+- Recipient/consent/suppression foundations now exist (`contact_recipients`, `contact_recipient_consents`, `contact_recipient_suppressions`).
+- Non-sending eligibility-input helper now exists and reads only recipient/consent/suppression sources with fail-closed posture.
+- Provider delivery audit truth remains deferred.
 - Real SMS remains deferred pending schema, provider setup, and legal approval gates.
 
 ---

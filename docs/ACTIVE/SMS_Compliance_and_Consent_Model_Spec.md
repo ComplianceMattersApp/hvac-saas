@@ -38,6 +38,12 @@ Reference closeouts:
 - local caveat: Studio port `54323` was held by VS Code, so Studio was excluded via `-x studio` for local validation only
 - no remote/sandbox/production migration apply and no production writes
 - no SMS intent/provider delivery tables, no send endpoint/webhook, no Twilio/provider code, no live SMS, no backfill
+- Slice B2 non-sending eligibility inputs helper implementation: commit `c0247af`
+- Slice B2 files added: `lib/communications/sms-eligibility-inputs-read.ts`, `lib/communications/__tests__/sms-eligibility-inputs-read.test.ts`
+- Slice B2 read boundary: helper reads only `contact_recipients`, `contact_recipient_consents`, `contact_recipient_suppressions`; it does not read `jobs`, `customers`, `locations`, or `job_events`
+- Slice B2 output boundary: non-sending input state only (`nonSendingStatus`, `blockedReasons`), no `canSend` output
+- Slice B2 locked posture: `eligible_inputs_present` does not imply live-send approval; missing/unknown consent remains fail-closed; active suppression blocks regardless of consent and is surfaced before consent blocks
+- Slice B2 validation: `npx.cmd vitest run lib/communications/__tests__/sms-eligibility-inputs-read.test.ts` passed (`16/16`), `npx.cmd vitest run lib/communications/__tests__/contact-recipients-read.test.ts` passed (`4/4`), `npx.cmd tsc --noEmit` passed, `git diff --check` passed
 
 ---
 
@@ -194,7 +200,7 @@ This planning slice does not perform:
 ## 12) Related ACTIVE References
 
 - docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md (recipient/contact role model — required before live SMS; see Section 10 activation gates)
-- docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md (schema design contract; Slice A and Slice B1 closeout recorded with migrations `supabase/migrations/20260515120000_contact_recipients_slice_a_foundation.sql` and `supabase/migrations/20260515123000_contact_recipient_consent_suppression_foundation.sql`, commits `afddb9c`, `02aee5a`, `39a2963`)
+- docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md (schema design contract; Slice A, Slice B1, and Slice B2 closeout recorded with migrations `supabase/migrations/20260515120000_contact_recipients_slice_a_foundation.sql` and `supabase/migrations/20260515123000_contact_recipient_consent_suppression_foundation.sql`, commits `afddb9c`, `02aee5a`, `39a2963`, `c0247af`)
 - docs/ACTIVE/Compliance_Matters_Prelaunch_Confirmation_Checklist.md
 - docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md
 - docs/ACTIVE/Active Spine V4.0 Current.md
