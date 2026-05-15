@@ -733,3 +733,145 @@ export async function rejectOnTheWayTemplateVersionFromForm(
   revalidateCommunications();
   redirect(withNotice("/ops/admin/communications", "template_rejected"));
 }
+
+/**
+ * Mark an On-The-Way template version ready for sandbox use.
+ *
+ * Combined admin readiness action (F4D-E3A):
+ * - Simplified V1 workflow: no visible submit/approve/reject queue.
+ * - Accepts draft or pending_review status (latest only).
+ * - Validates body to sandbox-approval standard.
+ * - Sets version_status = approved_for_sandbox + pointer on parent.
+ * - Does NOT enable SMS, does NOT call provider APIs.
+ * - Does NOT set current_version_id or activate.
+ * - Revalidates /ops/admin/communications on success.
+ */
+export async function markOnTheWayTemplateReadyForSandboxFromForm(
+  formData: FormData,
+): Promise<void> {
+  "use server";
+
+  const supabase = await createClient();
+  let userId: string;
+  let accountOwnerUserId: string;
+
+  try {
+    const ctx = await requireInternalRole("admin", { supabase });
+    userId = ctx.userId;
+    accountOwnerUserId = ctx.internalUser.account_owner_user_id;
+  } catch {
+    redirect(withNotice("/ops/admin/communications", "admin_required"));
+  }
+
+  const versionId = resolveFormVersionId(formData);
+  if (!versionId) {
+    redirect(withNotice("/ops/admin/communications", "template_version_missing"));
+  }
+
+  const admin = createAdminClient();
+
+  let targetVersion: Awaited<ReturnType<typeof fetchScopedOnTheWayVersionRow>>;
+  try {
+    targetVersion = await fetchScopedOnTheWayVersionRow({
+      admin,
+      accountOwnerUserId,
+      versionId,
+    });
+  } catch {
+    redirect(withNotice("/ops/admin/communications", "template_ready_failed"));
+  }
+
+  if (!targetVersion) {
+    redirect(withNotice("/ops/admin/communications", "template_version_not_found"));
+  }
+
+  // Allow draft or pending_review (combined readiness logic).
+  if (targetVersion.version_status !== "draft" && targetVersion.version_status !== "pending_review") {
+    redirect(withNotice("/ops/admin/communications", "template_ready_invalid_status"));
+  }
+
+  // Verify this version is the latest for the template.
+  let latestRow: Awaited<ReturnType<typeof fetchLatestVersionRow>>;
+  try {
+    latestRow = await fetchLatestVersionRow({
+      admin,
+      accountOwnerUserId,
+      templateId: targetVersion.sms_message_template_id,
+    });
+  } catch {
+    redirect(withNotice("/ops/admin/communications", "template_ready_failed"));
+  }
+
+  if (!latestRow || latestRow.id !== targetVersion.id) {
+    redirect(withNotice("/ops/admin/communications", "template_ready_stale_version"));
+  }
+
+  // Validate body to sandbox-approval standard.
+  const validation = validateOnTheWayTemplateBody(targetVersion.body_template);
+  if (!validation.canApproveForSandbox) {
+    redirect(withNotice("/ops/admin/communications", "template_ready_validation_failed"));
+  }
+
+  const approvedAt = new Date().toISOString();
+
+  // Update version to approved_for_sandbox with approval metadata.
+  try {
+    const { error: updateVersionErr } = await admin
+      .from("sms_message_template_versions")
+      .update({
+        version_status: "approved_for_sandbox",
+        internal_review_status: "approved",
+        legal_review_status: "not_requested",
+        provider_review_status: "not_requested",
+        approved_by_user_id: userId,
+        approved_at: approvedAt,
+        updated_by_user_id: userId,
+      })
+      .eq("id", targetVersion.id)
+      .eq("account_owner_user_id", accountOwnerUserId);
+
+    if (updateVersionErr) throw updateVersionErr;
+  } catch {
+    redirect(withNotice("/ops/admin/communications", "template_ready_failed"));
+  }
+
+  // Update parent template sandbox_version_id pointer.
+  try {
+    const { error: updateTemplateErr } = await admin
+      .from("sms_message_templates")
+      .update({
+        sandbox_version_id: targetVersion.id,
+        updated_by_user_id: userId,
+      })
+      .eq("id", targetVersion.sms_message_template_id)
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("template_key", ON_THE_WAY_TEMPLATE_KEY)
+      .eq("message_class", ON_THE_WAY_TEMPLATE_KEY);
+
+    if (updateTemplateErr) throw updateTemplateErr;
+  } catch {
+    // Best-effort rollback to reduce inconsistent state if pointer update fails.
+    try {
+      await admin
+        .from("sms_message_template_versions")
+        .update({
+          version_status: targetVersion.version_status,
+          internal_review_status: targetVersion.internal_review_status,
+          legal_review_status: "not_requested",
+          provider_review_status: "not_requested",
+          approved_by_user_id: null,
+          approved_at: null,
+          updated_by_user_id: userId,
+        })
+        .eq("id", targetVersion.id)
+        .eq("account_owner_user_id", accountOwnerUserId);
+    } catch {
+      // Intentionally swallow rollback errors so caller still receives pointer failure notice.
+    }
+
+    redirect(withNotice("/ops/admin/communications", "template_sandbox_pointer_failed"));
+  }
+
+  revalidateCommunications();
+  redirect(withNotice("/ops/admin/communications", "template_marked_ready_for_sandbox"));
+}

@@ -40,6 +40,7 @@ import {
   submitOnTheWayTemplateVersionForReviewFromForm,
   approveOnTheWayTemplateVersionForSandboxFromForm,
   rejectOnTheWayTemplateVersionFromForm,
+  markOnTheWayTemplateReadyForSandboxFromForm,
 } from "@/lib/actions/sms-template-actions";
 
 // ---------------------------------------------------------------------------
@@ -1436,5 +1437,479 @@ describe("F4D-D review actions", () => {
     expect(submitMock.tableCalls.every((name) => name.startsWith("sms_message_template"))).toBe(true);
     expect(approveMock.tableCalls.every((name) => name.startsWith("sms_message_template"))).toBe(true);
     expect(rejectMock.tableCalls.every((name) => name.startsWith("sms_message_template"))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// markOnTheWayTemplateReadyForSandboxFromForm (F4D-E3A)
+// ---------------------------------------------------------------------------
+
+describe("markOnTheWayTemplateReadyForSandboxFromForm", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createClientMock.mockResolvedValue({});
+  });
+
+  function formWithVersionId(versionId: string) {
+    const fd = new FormData();
+    fd.set("version_id", versionId);
+    return fd;
+  }
+
+  const VALID_READY_BODY =
+    "Hi {{recipient_first_name}}, this is {{operator_or_tech_name}} with {{company_name}}. I am on the way to your service appointment. Reply STOP to opt out.";
+
+  /**
+   * Mock admin client for mark-ready action tests.
+   * Tracks version reads, version updates, and template updates.
+   */
+  function buildReadyAdminMock(options: {
+    targetVersion?: {
+      id: string;
+      sms_message_template_id: string;
+      body_template: string;
+      version_number: number;
+      version_status: string;
+      internal_review_status: string;
+    };
+    latestVersion?: { id: string; version_number: number; version_status: string };
+    versionUpdateError?: boolean;
+    templateUpdateError?: boolean;
+  }) {
+    const versionReads: Array<Array<[string, unknown]>> = [];
+    const versionUpdates: Array<{ payload: unknown; filters: Array<[string, unknown]> }> = [];
+    const templateUpdates: Array<{ payload: unknown; filters: Array<[string, unknown]> }> = [];
+    let maybeSingleCallCount = 0;
+
+    const admin = {
+      from(table: string) {
+        if (table === "sms_message_templates") {
+          let updatePayload: unknown = null;
+          let updateFilters: Array<[string, unknown]> = [];
+
+          const q: any = {
+            update: vi.fn((p: unknown) => { updatePayload = p; return q; }),
+            eq: vi.fn((col: string, val: unknown) => {
+              updateFilters.push([col, val]);
+              return q;
+            }),
+            then: (resolve: (v: { error: unknown }) => void) => {
+              if (options.templateUpdateError) {
+                resolve({ error: new Error("template_update_error") });
+              } else {
+                templateUpdates.push({ payload: updatePayload, filters: updateFilters });
+                resolve({ error: null });
+              }
+            },
+          };
+          return q;
+        }
+
+        if (table === "sms_message_template_versions") {
+          let readFilters: Array<[string, unknown]> = [];
+          let updatePayload: unknown = null;
+          let updateFilters: Array<[string, unknown]> = [];
+          let hasOrder = false;
+
+          const q: any = {
+            select: vi.fn(() => q),
+            eq: vi.fn((col: string, val: unknown) => {
+              if (q.isUpdate) {
+                updateFilters.push([col, val]);
+              } else {
+                readFilters.push([col, val]);
+              }
+              return q;
+            }),
+            order: vi.fn((...args: unknown[]) => { hasOrder = true; return q; }),
+            limit: vi.fn(() => q),
+            maybeSingle: vi.fn(async () => {
+              versionReads.push(readFilters);
+              // First call (no order) = target version lookup
+              // Second call (with order) = latest version lookup
+              if (hasOrder && options.latestVersion !== undefined) {
+                return { data: options.latestVersion, error: null };
+              }
+              if (!hasOrder && options.targetVersion !== undefined) {
+                return { data: options.targetVersion, error: null };
+              }
+              return { data: null, error: null };
+            }),
+            update: vi.fn((p: unknown) => { updatePayload = p; q.isUpdate = true; return q; }),
+            then: (resolve: (v: { error: unknown }) => void) => {
+              if (q.isUpdate) {
+                if (options.versionUpdateError) {
+                  resolve({ error: new Error("version_update_error") });
+                } else {
+                  versionUpdates.push({ payload: updatePayload, filters: updateFilters });
+                  resolve({ error: null });
+                }
+              }
+            },
+          };
+          return q;
+        }
+
+        throw new Error(`Unexpected table in test mock: ${table}`);
+      },
+    };
+
+    return { admin, versionReads, versionUpdates, templateUpdates };
+  }
+
+  it("redirects to admin_required when caller is not admin", async () => {
+    requireInternalRoleMock.mockRejectedValue(new Error("INTERNAL_ROLE_REQUIRED"));
+
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("v1")),
+    ).rejects.toThrow(/REDIRECT:.*admin_required/);
+  });
+
+  it("redirects to template_version_missing when version_id is not provided", async () => {
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-1",
+      internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+    });
+
+    const emptyForm = new FormData();
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(emptyForm),
+    ).rejects.toThrow(/REDIRECT:.*template_version_missing/);
+  });
+
+  it("redirects to template_version_not_found when version not in scope", async () => {
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-1",
+      internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+    });
+
+    const { admin } = buildReadyAdminMock({
+      targetVersion: undefined,
+      latestVersion: undefined,
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("missing-v")),
+    ).rejects.toThrow(/REDIRECT:.*template_version_not_found/);
+  });
+
+  it("enforces account scope on version lookup", async () => {
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-1",
+      internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+    });
+
+    const { admin, versionReads } = buildReadyAdminMock({
+      targetVersion: {
+        id: "v1",
+        sms_message_template_id: "t1",
+        body_template: VALID_READY_BODY,
+        version_number: 1,
+        version_status: "draft",
+        internal_review_status: "not_requested",
+      },
+      latestVersion: { id: "v1", version_number: 1, version_status: "draft" },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("v1")),
+    ).rejects.toThrow(/REDIRECT:.*template_marked_ready_for_sandbox/);
+
+    // Verify account_owner_user_id filter is present
+    expect(versionReads[0]).toContainEqual(["account_owner_user_id", "owner-1"]);
+  });
+
+  it("redirects to template_ready_invalid_status for approved/active/rejected statuses", async () => {
+    const blockedStatuses = [
+      "approved_for_sandbox",
+      "approved_for_activation",
+      "active",
+      "rejected",
+      "superseded",
+      "retired",
+    ];
+
+    for (const status of blockedStatuses) {
+      vi.clearAllMocks();
+      requireInternalRoleMock.mockResolvedValue({
+        userId: "admin-1",
+        internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+      });
+
+      const { admin } = buildReadyAdminMock({
+        targetVersion: {
+          id: "v-blocked",
+          sms_message_template_id: "t1",
+          body_template: VALID_READY_BODY,
+          version_number: 1,
+          version_status: status,
+          internal_review_status: "approved",
+        },
+      });
+      createAdminClientMock.mockReturnValue(admin);
+
+      await expect(
+        markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("v-blocked")),
+      ).rejects.toThrow(/REDIRECT:.*template_ready_invalid_status/);
+    }
+  });
+
+  it("marks latest draft ready for sandbox", async () => {
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-1",
+      internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+    });
+
+    const { admin, versionUpdates, templateUpdates } = buildReadyAdminMock({
+      targetVersion: {
+        id: "v-draft",
+        sms_message_template_id: "t1",
+        body_template: VALID_READY_BODY,
+        version_number: 1,
+        version_status: "draft",
+        internal_review_status: "not_requested",
+      },
+      latestVersion: { id: "v-draft", version_number: 1, version_status: "draft" },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("v-draft")),
+    ).rejects.toThrow(/REDIRECT:.*template_marked_ready_for_sandbox/);
+
+    expect(versionUpdates).toHaveLength(1);
+    const versionUpdate = versionUpdates[0].payload as any;
+    expect(versionUpdate.version_status).toBe("approved_for_sandbox");
+    expect(versionUpdate.internal_review_status).toBe("approved");
+    expect(versionUpdate.legal_review_status).toBe("not_requested");
+    expect(versionUpdate.provider_review_status).toBe("not_requested");
+    expect(versionUpdate.approved_by_user_id).toBe("admin-1");
+    expect(versionUpdate.approved_at).toBeTruthy();
+  });
+
+  it("marks latest pending_review ready for sandbox", async () => {
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-2",
+      internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+    });
+
+    const { admin, versionUpdates } = buildReadyAdminMock({
+      targetVersion: {
+        id: "v-review",
+        sms_message_template_id: "t1",
+        body_template: VALID_READY_BODY,
+        version_number: 2,
+        version_status: "pending_review",
+        internal_review_status: "pending",
+      },
+      latestVersion: { id: "v-review", version_number: 2, version_status: "pending_review" },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("v-review")),
+    ).rejects.toThrow(/REDIRECT:.*template_marked_ready_for_sandbox/);
+
+    expect(versionUpdates).toHaveLength(1);
+    const versionUpdate = versionUpdates[0].payload as any;
+    expect(versionUpdate.version_status).toBe("approved_for_sandbox");
+    expect(versionUpdate.internal_review_status).toBe("approved");
+    expect(versionUpdate.approved_by_user_id).toBe("admin-2");
+  });
+
+  it("redirects to template_ready_stale_version when not latest", async () => {
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-1",
+      internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+    });
+
+    const { admin } = buildReadyAdminMock({
+      targetVersion: {
+        id: "v1",
+        sms_message_template_id: "t1",
+        body_template: VALID_READY_BODY,
+        version_number: 1,
+        version_status: "draft",
+        internal_review_status: "not_requested",
+      },
+      latestVersion: { id: "v2", version_number: 2, version_status: "draft" },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("v1")),
+    ).rejects.toThrow(/REDIRECT:.*template_ready_stale_version/);
+  });
+
+  it("redirects to template_ready_validation_failed when body invalid", async () => {
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-1",
+      internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+    });
+
+    const invalidBody = "Hi {{unknown_token}}, this is {{operator_or_tech_name}}.";
+
+    const { admin } = buildReadyAdminMock({
+      targetVersion: {
+        id: "v-invalid",
+        sms_message_template_id: "t1",
+        body_template: invalidBody,
+        version_number: 1,
+        version_status: "draft",
+        internal_review_status: "not_requested",
+      },
+      latestVersion: { id: "v-invalid", version_number: 1, version_status: "draft" },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("v-invalid")),
+    ).rejects.toThrow(/REDIRECT:.*template_ready_validation_failed/);
+  });
+
+  it("updates parent template sandbox_version_id pointer", async () => {
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-1",
+      internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+    });
+
+    const { admin, templateUpdates } = buildReadyAdminMock({
+      targetVersion: {
+        id: "v-ptr",
+        sms_message_template_id: "template-ptr",
+        body_template: VALID_READY_BODY,
+        version_number: 1,
+        version_status: "draft",
+        internal_review_status: "not_requested",
+      },
+      latestVersion: { id: "v-ptr", version_number: 1, version_status: "draft" },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("v-ptr")),
+    ).rejects.toThrow(/REDIRECT:.*template_marked_ready_for_sandbox/);
+
+    expect(templateUpdates).toHaveLength(1);
+    const templateUpdate = templateUpdates[0].payload as any;
+    expect(templateUpdate.sandbox_version_id).toBe("v-ptr");
+    expect(templateUpdate.lifecycle_status).toBeUndefined();
+    expect(templateUpdate.current_version_id).toBeUndefined();
+  });
+
+  it("does not set current_version_id or lifecycle_status on parent", async () => {
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-1",
+      internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+    });
+
+    const { admin, versionUpdates, templateUpdates } = buildReadyAdminMock({
+      targetVersion: {
+        id: "v-no-activate",
+        sms_message_template_id: "t1",
+        body_template: VALID_READY_BODY,
+        version_number: 1,
+        version_status: "draft",
+        internal_review_status: "not_requested",
+      },
+      latestVersion: { id: "v-no-activate", version_number: 1, version_status: "draft" },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("v-no-activate")),
+    ).rejects.toThrow(/REDIRECT:.*template_marked_ready_for_sandbox/);
+
+    const versionUpdate = versionUpdates[0].payload as any;
+    expect(versionUpdate.current_version_id).toBeUndefined();
+    expect(versionUpdate.lifecycle_status).toBeUndefined();
+
+    const templateUpdate = templateUpdates[0].payload as any;
+    expect(templateUpdate.current_version_id).toBeUndefined();
+    expect(templateUpdate.lifecycle_status).toBeUndefined();
+  });
+
+  it("rolls back version on template pointer failure", async () => {
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-1",
+      internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+    });
+
+    const { admin, versionUpdates } = buildReadyAdminMock({
+      targetVersion: {
+        id: "v-rollback",
+        sms_message_template_id: "t1",
+        body_template: VALID_READY_BODY,
+        version_number: 1,
+        version_status: "pending_review",
+        internal_review_status: "pending",
+      },
+      latestVersion: { id: "v-rollback", version_number: 1, version_status: "pending_review" },
+      templateUpdateError: true,
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("v-rollback")),
+    ).rejects.toThrow(/REDIRECT:.*template_sandbox_pointer_failed/);
+
+    // Should have attempted rollback: original status + cleared approval fields
+    expect(versionUpdates.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("revalidates /ops/admin/communications on success", async () => {
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-1",
+      internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+    });
+
+    const { admin } = buildReadyAdminMock({
+      targetVersion: {
+        id: "v-revalidate",
+        sms_message_template_id: "t1",
+        body_template: VALID_READY_BODY,
+        version_number: 1,
+        version_status: "draft",
+        internal_review_status: "not_requested",
+      },
+      latestVersion: { id: "v-revalidate", version_number: 1, version_status: "draft" },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("v-revalidate")),
+    ).rejects.toThrow(/REDIRECT:/);
+
+    expect(revalidatePathMock).toHaveBeenCalledWith("/ops/admin/communications");
+  });
+
+  it("no provider/send/webhook calls", async () => {
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-1",
+      internalUser: { account_owner_user_id: "owner-1", role: "admin" },
+    });
+
+    const { admin } = buildReadyAdminMock({
+      targetVersion: {
+        id: "v-no-provider",
+        sms_message_template_id: "t1",
+        body_template: VALID_READY_BODY,
+        version_number: 1,
+        version_status: "draft",
+        internal_review_status: "not_requested",
+      },
+      latestVersion: { id: "v-no-provider", version_number: 1, version_status: "draft" },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    await expect(
+      markOnTheWayTemplateReadyForSandboxFromForm(formWithVersionId("v-no-provider")),
+    ).rejects.toThrow(/REDIRECT:.*template_marked_ready_for_sandbox/);
+
+    // Verify only template tables accessed, no provider tables
+    expect(vi.fn()).not.toHaveBeenCalledWith(expect.stringContaining("twilio"));
+    expect(vi.fn()).not.toHaveBeenCalledWith(expect.stringContaining("provider"));
   });
 });
