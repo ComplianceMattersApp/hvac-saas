@@ -54,7 +54,7 @@ B. F4D-B validation helper. ✓ Complete (`418172e`)
 C. F4D-C create/save draft server actions. ✓ Complete (`f7cf8c0`)
 D. F4D-D review actions. ✓ Complete (`f5995d7`)
 E. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
-F. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness.
+F. F4D-E2 safe version-id/action-eligibility read-model support. ✓ Complete (`fededec`)
 G. F4D-E3 mark wording ready for sandbox/readiness UI, not full review/reject UI unless reopened.
 H. Later provider/legal review operations.
 I. Later sandbox/provider work.
@@ -297,6 +297,56 @@ State after F4D-D:
 - create/save draft actions exist
 - submit/approve-for-sandbox/reject review actions exist
 - create/save draft UI exists (F4D-E1 complete)
+- admin-readiness read-model support exists (F4D-E2 complete)
+- review/reject UI remains deferred unless team-review workflow is reopened
+- approve-for-activation remains deferred
+- provider/legal approval actions remain deferred
+- provider setup remains deferred
+- sandbox/live SMS remains deferred
+- real SMS remains deferred
+
+---
+
+## F4D-E2 Completion Cross-Reference (May 2026)
+
+SMS Slice F4D-E2 Admin Readiness Read-Model Support is complete.
+
+- implementation commit: `fededec`
+- read-model file: `lib/communications/sms-template-governance-read.ts`
+- test file: `lib/communications/__tests__/sms-template-governance-read.test.ts`
+- safe versionId is now exposed on latest/current/sandbox version summaries
+- accountOwnerUserId is no longer returned by the read model
+- latest-version admin readiness fields added: `canSaveDraft`, `canMarkReadyForSandbox`, `markReadyBlockingReasons`, `markReadyWarnings`
+- readiness reuses `validateOnTheWayTemplateBody` for token, STOP, prohibited-content, segment, preview, and readiness calculations
+- readiness is latest-version-only; historical current/sandbox versions do not become action-eligible unless they are also latest
+- read model does not return `canSend`
+- read model does not expose account owner ids, raw user ids, provider refs, customer/job data, or raw JSON dumps
+- no UI/route/schema/migration/docs/Supabase production/provider/send/env/payment/QBO/portal/automation changes
+- no UI controls were added in F4D-E2
+- review/reject UI remains deferred unless team-review workflow is reopened
+
+Validation recorded:
+
+- sms-template-governance-read.test.ts passed
+- sms-template-governance-validation.test.ts passed
+- sms-template-actions.test.ts passed (`40/40`)
+- sms-provider-readiness-read.test.ts passed (`16/16`)
+- sms-eligibility-inputs-read.test.ts passed (`16/16`)
+- contact-recipients-read.test.ts passed (`4/4`)
+- TypeScript passed
+- `git diff --check` passed
+
+State after F4D-E2:
+
+- template governance schema exists
+- template governance read model exists with safe version IDs and admin readiness fields
+- template governance read-only UI exists
+- template validation helper exists
+- create/save draft actions exist
+- submit/approve-for-sandbox/reject review actions exist
+- create/save draft UI exists
+- admin readiness support is available for future F4D-E3 review/readiness UI
+- review/reject UI remains deferred unless team-review workflow is reopened
 - approve-for-activation remains deferred
 - provider/legal approval actions remain deferred
 - provider setup remains deferred

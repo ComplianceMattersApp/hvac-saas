@@ -404,7 +404,7 @@ L. F4D-B validation helper only; no writes, no UI. ✓ Complete (`418172e`)
 M. F4D-C create/save draft server actions.
 N. F4D-D review actions.
 O. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
-P. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness.
+P. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
 Q. F4D-E3 mark wording ready for sandbox/readiness UI, not full review/reject UI unless reopened.
 R. F5 webhook/status callback contract planning.
 S. F6 provider/Twilio sandbox implementation planning.

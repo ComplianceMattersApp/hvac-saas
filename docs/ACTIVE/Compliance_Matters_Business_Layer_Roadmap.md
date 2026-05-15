@@ -326,6 +326,17 @@ SMS Slice F4D-E1 closeout note (May 2026):
 - validation recorded post-smoke: template action tests `40/40`, template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipients tests `4/4`, `npx.cmd tsc --noEmit`, `git diff --check`, and clean working tree.
 - state after F4D-E1: schema/read-model/read-only UI/validation helper/create-save draft/review actions/create-save draft UI exist; review/reject UI remains deferred unless team-review workflow is reopened; approve-for-activation/provider-legal actions/provider setup/sandbox-live SMS remain deferred; real SMS remains deferred.
 
+SMS Slice F4D-E2 closeout note (May 2026):
+- Slice F4D-E2 Admin Readiness Read-Model Support is complete in commit `fededec`.
+- F4D-E2 touched `lib/communications/sms-template-governance-read.ts` and tests in `lib/communications/__tests__/sms-template-governance-read.test.ts`.
+- F4D-E2 read-model enhancements: safe versionId exposure on latest/current/sandbox version summaries, accountOwnerUserId removed, latest-version admin readiness fields added (`canSaveDraft`, `canMarkReadyForSandbox`, `markReadyBlockingReasons`, `markReadyWarnings`).
+- F4D-E2 reuses `validateOnTheWayTemplateBody` for token, STOP, prohibited-content, segment, preview, and readiness calculations.
+- F4D-E2 readiness semantics: latest-version-only; historical current/sandbox versions do not become action-eligible unless they are also latest.
+- F4D-E2 safety posture: no `canSend` returned; no account owner ids, raw user ids, provider refs, customer/job data, or raw JSON dumps exposed.
+- F4D-E2 validation recorded: sms-template-governance-read tests passed; sms-template-governance-validation `19/19` passed; sms-template-actions `40/40` passed; sms-provider-readiness-read `16/16` passed; sms-eligibility-inputs-read `16/16` passed; contact-recipients-read `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed.
+- F4D-E2 boundaries preserved: no UI/route/schema/migration changes, no Supabase production commands, no provider/Twilio/send/webhook behavior, no env/flag/payment/QBO/portal changes, no production writes.
+- F4D-E2 forward state: admin readiness support is ready for future F4D-E3 UI planning; review/reject UI remains deferred unless team-review workflow is reopened; real provider-powered SMS remains deferred.
+
 SMS On-The-Way V1 workflow simplification note (May 2026):
 - V1 product goal is simple: job users press Mark On The Way, and future provider SMS is a background operational/customer-care notification after that lifecycle event.
 - Mark On The Way remains lifecycle-first; provider failure must not roll back the lifecycle transition.

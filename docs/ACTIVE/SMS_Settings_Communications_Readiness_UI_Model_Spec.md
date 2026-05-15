@@ -111,7 +111,7 @@ Slice F4D-B Template Governance Validation Helper is complete.
 - helper has no Supabase/database/provider dependencies and no UI/server-action behavior; it does not enable SMS or imply `canSend`
 - review-request SMS remains parked as a future separate message class and is prohibited in On-The-Way operational template wording
 - validation recorded: template validation helper tests `19/19`, template governance read tests `15/15`, provider readiness tests `16/16`, SMS eligibility tests `16/16`, contact recipient tests `4/4`, TypeScript passed, and `git diff --check` passed
-- real SMS remains deferred; create/save draft server actions and review actions are complete, create/save draft UI is complete, and review/reject UI remains deferred unless team-review workflow is reopened
+- real SMS remains deferred; create/save draft server actions and review actions are complete, create/save draft UI is complete, admin-readiness read-model support is complete, and review controls UI remains deferred unless team-review workflow is reopened
 
 ## F4D-E1 Completion Cross-Reference (May 2026)
 

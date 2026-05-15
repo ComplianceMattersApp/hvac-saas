@@ -295,6 +295,17 @@ Current Program Status Note (May 2026)
     - validation recorded: template action tests `40/40`, template validation `19/19`, template governance read `15/15`, provider readiness `16/16`, eligibility `16/16`, recipients `4/4`, `npx.cmd tsc --noEmit`, `git diff --check`, clean status
     - review/reject UI remains deferred unless team-review workflow is reopened; real provider-powered SMS remains deferred
 
+  - SMS Slice F4D-E2 Admin Readiness Read-Model Support is complete:
+    - implementation commit: `fededec`
+    - files touched: `lib/communications/sms-template-governance-read.ts` and tests in `lib/communications/__tests__/sms-template-governance-read.test.ts`
+    - read-model enhancements: safe versionId exposure on latest/current/sandbox version summaries; accountOwnerUserId removal; latest-version admin readiness fields (`canSaveDraft`, `canMarkReadyForSandbox`, `markReadyBlockingReasons`, `markReadyWarnings`)
+    - validation reuse: read model reuses `validateOnTheWayTemplateBody` for token, STOP, prohibited-content, segment, preview, and readiness calculations
+    - readiness semantics: latest-version-only; historical current/sandbox versions do not become action-eligible unless they are also latest
+    - safety posture: no `canSend` returned; no account owner ids, raw user ids, provider refs, customer/job data, or raw JSON dumps exposed
+    - validation recorded: sms-template-governance-read tests passed; sms-template-governance-validation `19/19` passed; sms-template-actions `40/40` passed; sms-provider-readiness-read `16/16` passed; sms-eligibility-inputs-read `16/16` passed; contact-recipients-read `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed
+    - boundaries preserved: no UI/route/schema/migration changes, no Supabase production commands, no provider/Twilio/send/webhook behavior, no env/flag/payment/QBO/portal changes, and no production writes
+    - admin readiness support is ready for future F4D-E3 UI planning; review/reject UI remains deferred unless team-review workflow is reopened; real provider-powered SMS remains deferred
+
   - SMS On-The-Way V1 Workflow Simplification is locked:
     - Mark On The Way is the user-facing operational trigger.
     - future SMS is a simple background operational/customer-care notification after the lifecycle event, not inline send behavior.
