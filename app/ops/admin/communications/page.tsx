@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import {
+  createOnTheWayTemplateDraftFromDefaultFromForm,
+  saveOnTheWayTemplateDraftFromForm,
+} from "@/lib/actions/sms-template-actions";
 import { getSmsProviderReadinessForAccount } from "@/lib/communications/sms-provider-readiness-read";
 import {
   getSmsOnTheWayTemplateGovernanceForAccount,
@@ -7,6 +11,57 @@ import {
 } from "@/lib/communications/sms-template-governance-read";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
+
+type SearchParams = Promise<{ notice?: string }>;
+
+type TemplateNoticeTone = "success" | "warn" | "error";
+
+type TemplateNotice = {
+  tone: TemplateNoticeTone;
+  message: string;
+};
+
+const TEMPLATE_NOTICE_TEXT: Record<string, TemplateNotice> = {
+  draft_created: { tone: "success", message: "Draft created from default wording." },
+  draft_available: { tone: "success", message: "Existing draft is available." },
+  draft_saved: { tone: "success", message: "Draft saved." },
+  template_submitted_for_review: { tone: "success", message: "Template submitted for review." },
+  template_approved_for_sandbox: {
+    tone: "success",
+    message: "Template approved for sandbox readiness. SMS is still disabled.",
+  },
+  template_rejected: { tone: "success", message: "Template version rejected." },
+  draft_validation_warning: { tone: "warn", message: "Draft saved with validation warnings." },
+  body_blank: { tone: "error", message: "Enter template wording before saving." },
+  template_review_validation_failed: { tone: "error", message: "Resolve validation blockers before review." },
+  template_review_invalid_status: { tone: "error", message: "This version is not in the required review state." },
+  template_review_stale_version: {
+    tone: "error",
+    message: "A newer version exists. Refresh and review latest wording.",
+  },
+  template_reject_reason_required: { tone: "error", message: "Enter a rejection reason." },
+  template_version_missing: { tone: "error", message: "Template version was missing." },
+  template_version_not_found: { tone: "error", message: "Template version was not found." },
+  template_submit_failed: {
+    tone: "error",
+    message: "Could not submit template for review. Please try again.",
+  },
+  template_approve_failed: {
+    tone: "error",
+    message: "Could not approve template for sandbox readiness. Please try again.",
+  },
+  template_sandbox_pointer_failed: {
+    tone: "error",
+    message: "Template was not marked as sandbox-ready. Please try again.",
+  },
+  template_reject_failed: { tone: "error", message: "Could not reject template version. Please try again." },
+  admin_required: { tone: "error", message: "Admin access is required." },
+};
+
+const TEMPLATE_NOTICE_FALLBACK: TemplateNotice = {
+  tone: "error",
+  message: "Could not update template governance. Please try again.",
+};
 
 function versionStatusTone(status: string) {
   if (status === "active" || status === "approved_for_activation" || status === "approved_for_sandbox") {
@@ -35,6 +90,18 @@ function tokenList(tokens: string[], emptyText: string) {
       ))}
     </div>
   );
+}
+
+function bannerClass(tone: TemplateNoticeTone) {
+  if (tone === "success") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (tone === "warn") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-red-200 bg-red-50 text-red-900";
+}
+
+function resolveTemplateNotice(rawNotice: string | undefined): TemplateNotice | null {
+  const noticeCode = String(rawNotice ?? "").trim().toLowerCase();
+  if (!noticeCode) return null;
+  return TEMPLATE_NOTICE_TEXT[noticeCode] ?? TEMPLATE_NOTICE_FALLBACK;
 }
 
 function VersionSummaryCard({
@@ -182,7 +249,14 @@ async function requireAdminOrRedirect() {
   }
 }
 
-export default async function AdminCommunicationsPage() {
+export default async function AdminCommunicationsPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
+  const sp = (searchParams ? await searchParams : {}) ?? {};
+  const templateNotice = resolveTemplateNotice(sp.notice);
+
   const { supabase, internalUser } = await requireAdminOrRedirect();
   // Fail closed to safe-empty readiness if local schemas do not yet include SMS readiness tables.
   const readiness = await getSmsProviderReadinessForAccount({
@@ -205,6 +279,9 @@ export default async function AdminCommunicationsPage() {
       accountOwnerUserId: "",
     }),
   );
+
+  const latestVersionIsMutableDraft =
+    templateGovernance.latestVersion.exists && templateGovernance.latestVersion.versionStatus === "draft";
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 text-gray-900 sm:p-6">
@@ -404,10 +481,19 @@ export default async function AdminCommunicationsPage() {
         <div className="mt-4 space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-700">
             <p className="font-medium text-slate-900">{templateGovernance.status.statusLabel}</p>
-            <p className="mt-1">SMS is not enabled and live sends are disabled.</p>
+            <p className="mt-1">SMS is not enabled.</p>
+            <p className="mt-1">Live sends are disabled.</p>
+            <p className="mt-1">Template approval does not enable sending.</p>
+            <p className="mt-1">Sample preview only.</p>
             <p className="mt-1">Mark On The Way does not send SMS.</p>
-            <p className="mt-1">Template readiness does not enable sending.</p>
+            <p className="mt-1">Final wording may still require legal/provider review.</p>
           </div>
+
+          {templateNotice ? (
+            <div className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${bannerClass(templateNotice.tone)}`}>
+              {templateNotice.message}
+            </div>
+          ) : null}
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -467,6 +553,132 @@ export default async function AdminCommunicationsPage() {
               </p>
             </div>
           ) : null}
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Draft Wording</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Create and save draft wording only in this slice. Review actions are intentionally not shown here.
+                </p>
+              </div>
+              {latestVersionIsMutableDraft ? (
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">
+                  Mutable draft available
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
+                  No mutable draft
+                </span>
+              )}
+            </div>
+
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-sm text-slate-700">
+              <p>SMS is not enabled.</p>
+              <p className="mt-1">Live sends are disabled.</p>
+              <p className="mt-1">Template approval does not enable sending.</p>
+              <p className="mt-1">Sample preview only.</p>
+              <p className="mt-1">Mark On The Way does not send SMS.</p>
+              <p className="mt-1">Final wording may still require legal/provider review.</p>
+            </div>
+
+            {latestVersionIsMutableDraft ? (
+              <form action={saveOnTheWayTemplateDraftFromForm} className="mt-4 space-y-3">
+                <div>
+                  <label htmlFor="draft-body-template" className="text-xs font-semibold text-slate-700">
+                    Draft template wording
+                  </label>
+                  <textarea
+                    id="draft-body-template"
+                    name="body_template"
+                    defaultValue={templateGovernance.latestVersion.bodyTemplate}
+                    rows={7}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition-[border-color,box-shadow] focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs text-slate-600">
+                    Latest version: {templateGovernance.latestVersion.versionStatusLabel} • Internal review: {templateGovernance.latestVersion.internalReviewLabel}
+                  </div>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
+                  >
+                    Save draft
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm text-slate-700">
+                  {templateGovernance.latestVersion.exists
+                    ? "Latest version is not a mutable draft. Create a new draft from default wording."
+                    : "No draft exists yet. Create one from default wording."}
+                </p>
+                <form action={createOnTheWayTemplateDraftFromDefaultFromForm}>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
+                  >
+                    Create draft from default
+                  </button>
+                </form>
+              </div>
+            )}
+
+            <div className="mt-4 grid gap-3 border-t border-slate-200 pt-3 md:grid-cols-2">
+              <div className="text-xs">
+                <div className="font-semibold text-slate-700">Detected tokens</div>
+                <div className="mt-1">
+                  {tokenList(
+                    latestVersionIsMutableDraft
+                      ? templateGovernance.latestVersion.detectedTokens
+                      : templateGovernance.planningDefault.bodyTemplate.match(/{{\s*([a-zA-Z0-9_]+)\s*}}/g)?.map((token) => token.replace(/[{}\s]/g, "")) ?? [],
+                    "No tokens detected.",
+                  )}
+                </div>
+              </div>
+              <div className="text-xs">
+                <div className="font-semibold text-slate-700">Unknown tokens</div>
+                <div className="mt-1">
+                  {tokenList(
+                    latestVersionIsMutableDraft ? templateGovernance.latestVersion.unknownTokens : [],
+                    "No unknown tokens.",
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="text-xs">
+                <div className="font-semibold text-slate-700">Validation/readiness status</div>
+                <p className="mt-1 text-slate-600">
+                  {latestVersionIsMutableDraft
+                    ? templateGovernance.latestVersion.approvalReadyLabel
+                    : "Draft status is not yet available. Create a draft to start editing."}
+                </p>
+              </div>
+              <div className="text-xs">
+                <div className="font-semibold text-slate-700">Estimated SMS segments</div>
+                <p className="mt-1 text-slate-600">
+                  {latestVersionIsMutableDraft
+                    ? templateGovernance.latestVersion.estimatedSegments
+                    : templateGovernance.planningDefault.samplePreview.length <= 160
+                      ? 1
+                      : Math.ceil(templateGovernance.planningDefault.samplePreview.length / 153)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3 text-xs">
+              <div className="font-semibold text-slate-700">Sample preview only.</div>
+              <p className="mt-1 whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-700">
+                {latestVersionIsMutableDraft
+                  ? templateGovernance.latestVersion.samplePreview
+                  : templateGovernance.planningDefault.samplePreview}
+              </p>
+            </div>
+          </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-700">
             <p className="font-medium text-slate-900">Current deferred items</p>

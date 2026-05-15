@@ -1,5 +1,3 @@
-"use server";
-
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -241,6 +239,8 @@ export function isVersionMutable(versionStatus: string): boolean {
 export async function createOnTheWayTemplateDraftFromDefaultFromForm(
   _formData: FormData,
 ): Promise<void> {
+  "use server";
+
   const supabase = await createClient();
   let userId: string;
   let accountOwnerUserId: string;
@@ -337,6 +337,8 @@ export async function createOnTheWayTemplateDraftFromDefaultFromForm(
 export async function saveOnTheWayTemplateDraftFromForm(
   formData: FormData,
 ): Promise<void> {
+  "use server";
+
   const supabase = await createClient();
   let userId: string;
   let accountOwnerUserId: string;
@@ -447,6 +449,8 @@ export async function saveOnTheWayTemplateDraftFromForm(
 export async function submitOnTheWayTemplateVersionForReviewFromForm(
   formData: FormData,
 ): Promise<void> {
+  "use server";
+
   const supabase = await createClient();
   let userId: string;
   let accountOwnerUserId: string;
@@ -533,6 +537,8 @@ export async function submitOnTheWayTemplateVersionForReviewFromForm(
 export async function approveOnTheWayTemplateVersionForSandboxFromForm(
   formData: FormData,
 ): Promise<void> {
+  "use server";
+
   const supabase = await createClient();
   let userId: string;
   let accountOwnerUserId: string;
@@ -655,6 +661,8 @@ export async function approveOnTheWayTemplateVersionForSandboxFromForm(
 export async function rejectOnTheWayTemplateVersionFromForm(
   formData: FormData,
 ): Promise<void> {
+  "use server";
+
   const supabase = await createClient();
   let userId: string;
   let accountOwnerUserId: string;
