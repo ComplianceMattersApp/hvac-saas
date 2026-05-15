@@ -312,7 +312,7 @@ SMS Slice F4D-D closeout note (May 2026):
 - no activation behavior, no provider/Twilio/send/webhook behavior, and no SMS send readiness implied by template approval/readiness.
 - validation recorded: template action tests `40/40`; template validation helper tests `19/19`; template governance read tests `15/15`; provider readiness tests `16/16`; SMS eligibility tests `16/16`; contact recipient tests `4/4`; `npx.cmd tsc --noEmit`; `git diff --check`; total `110/110` passed.
 - state after F4D-D: schema/read-model/read-only UI/validation helper/create-save draft/review actions exist; editable UI remains deferred (F4D-E); approve-for-activation remains deferred; provider/legal approval actions remain deferred; provider setup remains deferred; sandbox/live SMS remains deferred; real SMS remains deferred.
-- safe forward sequence: F4D-D docs closeout, then F4D-E1 create/save draft UI, then F4D-E2 safe version-id/action-eligibility read-model support for admin readiness, then F4D-E3 mark wording ready for sandbox/readiness UI (not full review/reject UI unless reopened), then later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
+- safe forward sequence: F4D-D docs closeout, then F4D-E1 create/save draft UI, then F4D-E2 safe version-id/action-eligibility read-model support for admin readiness, then F4D-E3A combined admin readiness action (complete), then F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination), then later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
 
 SMS Slice F4D-E1 closeout note (May 2026):
 - Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
@@ -336,6 +336,16 @@ SMS Slice F4D-E2 closeout note (May 2026):
 - F4D-E2 validation recorded: sms-template-governance-read tests passed; sms-template-governance-validation `19/19` passed; sms-template-actions `40/40` passed; sms-provider-readiness-read `16/16` passed; sms-eligibility-inputs-read `16/16` passed; contact-recipients-read `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed.
 - F4D-E2 boundaries preserved: no UI/route/schema/migration changes, no Supabase production commands, no provider/Twilio/send/webhook behavior, no env/flag/payment/QBO/portal changes, no production writes.
 - F4D-E2 forward state: admin readiness support is ready for future F4D-E3 UI planning; review/reject UI remains deferred unless team-review workflow is reopened; real provider-powered SMS remains deferred.
+
+SMS Slice F4D-E3A closeout note (May 2026):
+
+- Slice F4D-E3A Combined Admin Readiness Action is complete in commit `8cfa814`.
+- F4D-E3A touched `lib/actions/sms-template-actions.ts` adding `markOnTheWayTemplateReadyForSandboxFromForm` action and expanded tests in `lib/actions/__tests__/sms-template-actions.test.ts`.
+- F4D-E3A action supports simplified V1 admin-owned workflow: accepts latest draft or latest pending_review, validates to sandbox-approval standard, sets sandbox readiness only (version_status = approved_for_sandbox, internal_review_status = approved, sandbox_version_id only), does not set current_version_id or activate, does not enable SMS, does not call provider/Twilio/webhook.
+- F4D-E3A action safety: admin-only, account-scoped from authenticated context, accepts only version_id from form, re-validates server-side, uses pointer-failure rollback posture.
+- F4D-E3A validation recorded: sms-template-actions `54/54` passed, sms-template-governance-validation `19/19` passed, sms-template-governance-read `21/21` passed, sms-provider-readiness-read `16/16` passed, sms-eligibility-inputs-read `16/16` passed, contact-recipients-read `4/4` passed, `npx.cmd tsc --noEmit` passed, `git diff --check` passed.
+- F4D-E3A boundaries preserved: no UI/route/schema/migration changes, no Supabase production commands, no provider/Twilio/send/webhook behavior, no env/flag/payment/QBO/portal changes, no production writes.
+- F4D-E3A forward state: visible mark-ready UI wiring remains deferred to F4D-E3B pending team-review workflow determination; review/reject UI remains parked unless team-review workflow is reopened; real provider-powered SMS remains deferred.
 
 SMS On-The-Way V1 workflow simplification note (May 2026):
 - V1 product goal is simple: job users press Mark On The Way, and future provider SMS is a background operational/customer-care notification after that lifecycle event.

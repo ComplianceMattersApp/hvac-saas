@@ -229,7 +229,24 @@ State after F4D-B:
 - review actions remain deferred
 - editable UI remains deferred
 - real SMS remains deferred
+## F4D-E3A Completion Cross-Reference (May 2026)
 
+SMS Slice F4D-E3A Combined Admin Readiness Action is complete in commit `8cfa814`.
+
+- action file: `lib/actions/sms-template-actions.ts`
+- test file: `lib/actions/__tests__/sms-template-actions.test.ts`
+- new action: `markOnTheWayTemplateReadyForSandboxFromForm`
+- allows latest draft or latest pending_review version to be marked ready for sandbox testing
+- simplified V1 workflow: no visible submit/approve/reject queue
+- admin-only, account-scoped, accepts only version_id from form
+- validates body to sandbox-approval standard with `validateOnTheWayTemplateBody()`
+- sets version_status = approved_for_sandbox, internal_review_status = approved, sandbox_version_id only
+- does not set current_version_id, does not activate, does not enable SMS, does not call provider
+- uses rollback posture on pointer failure
+- all tests passed (54/54 sms-template-actions, 19/19 validation, 21/21 read-model, etc.)
+- visible mark-ready UI wiring remains deferred to F4D-E3B
+- review/reject UI remains parked unless team-review workflow reopened
+- real SMS remains deferred
 ## F4D-E1 Completion Cross-Reference (May 2026)
 
 SMS Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
@@ -644,10 +661,11 @@ G. F4D-C create/save draft server actions.
 H. F4D-D review actions.
 I. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 J. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
-K. F4D-E3 mark wording ready for sandbox/readiness UI, not full review/reject UI unless reopened.
-L. Later webhook/status callback contract planning.
-M. Later sandbox/provider planning.
-N. Later production activation only after legal/provider review and explicit approval.
+K. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
+L. F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination).
+M. Later webhook/status callback contract planning.
+N. Later sandbox/provider planning.
+O. Later production activation only after legal/provider review and explicit approval.
 
 ---
 

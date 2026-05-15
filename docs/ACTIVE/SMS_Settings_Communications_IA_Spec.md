@@ -380,7 +380,8 @@ K. F4D-C create/save draft server actions.
 L. F4D-D review actions.
 M. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 N. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
-O. F4D-E3 mark wording ready for sandbox/readiness UI, not full review/reject UI unless reopened.
+O. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
+P. F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination).
 P. Quiet-hours/timezone gate planning.
 Q. Provider/Twilio readiness and sandbox setup.
 R. Sandbox provider send after all gates.

@@ -230,7 +230,7 @@ Current Program Status Note (May 2026)
   - SMS Slice F4D-A Template Editing + Review Actions Model Lock is complete (docs/model-only):
     - spec added: `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md`
     - cross-references updated across ACTIVE SMS docs, source-of-truth strategy, Active Spine, and Business Layer Roadmap
-    - locked implementation sequence (updated): F4D-A docs/model lock, F4D-B validation helper, F4D-C create/save draft server actions, F4D-D review actions, F4D-E1 create/save draft UI (complete), F4D-E2 safe version-id/action-eligibility read-model support for admin readiness, F4D-E3 mark wording ready for sandbox/readiness UI (not full review/reject UI unless reopened), later provider/legal review, later sandbox/provider work, and later production activation only after explicit approval
+    - locked implementation sequence (updated): F4D-A docs/model lock, F4D-B validation helper, F4D-C create/save draft server actions, F4D-D review actions, F4D-E1 create/save draft UI (complete), F4D-E2 safe version-id/action-eligibility read-model support for admin readiness (complete), F4D-E3A combined admin readiness action (complete), F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination), later provider/legal review, later sandbox/provider work, and later production activation only after explicit approval
     - locked future validation helper: `lib/communications/sms-template-governance-validation.ts`
     - locked future action file: `lib/actions/sms-template-actions.ts`
     - locked first future actions: `createOnTheWayTemplateDraftFromDefaultFromForm` and `saveOnTheWayTemplateDraftFromForm`
@@ -305,6 +305,22 @@ Current Program Status Note (May 2026)
     - validation recorded: sms-template-governance-read tests passed; sms-template-governance-validation `19/19` passed; sms-template-actions `40/40` passed; sms-provider-readiness-read `16/16` passed; sms-eligibility-inputs-read `16/16` passed; contact-recipients-read `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed
     - boundaries preserved: no UI/route/schema/migration changes, no Supabase production commands, no provider/Twilio/send/webhook behavior, no env/flag/payment/QBO/portal changes, and no production writes
     - admin readiness support is ready for future F4D-E3 UI planning; review/reject UI remains deferred unless team-review workflow is reopened; real provider-powered SMS remains deferred
+
+  - SMS Slice F4D-E3A Combined Admin Readiness Action is complete:
+    - implementation commit: `8cfa814`
+    - files touched: `lib/actions/sms-template-actions.ts` and tests in `lib/actions/__tests__/sms-template-actions.test.ts`
+    - action added: `markOnTheWayTemplateReadyForSandboxFromForm`
+    - action purpose: supports simplified V1 admin-owned workflow avoiding queue-shaped submit/approve/reject UI exposure
+    - action posture: admin-only via `requireInternalRole("admin")`, account-scoped from authenticated internal-user context, accepts only `version_id` from form, re-validates all data server-side
+    - action accepts: latest draft or latest pending_review versions (combined readiness allows both states)
+    - action validation: runs `validateOnTheWayTemplateBody()` — requires sandbox-readiness standard (no unknown tokens, STOP language present, no prohibited wording, estimated segments <= 2, canApproveForSandbox = true)
+    - action mutations: sets version_status = approved_for_sandbox, internal_review_status = approved, legal_review_status = not_requested, provider_review_status = not_requested, approved_by_user_id, approved_at; updates parent sandbox_version_id only
+    - action non-mutations: does not set current_version_id, does not set lifecycle_status, does not enable SMS, does not call provider/Twilio/webhook, does not write job_events
+    - action safety: uses pointer-failure rollback posture when parent sandbox_version_id update fails
+    - action revalidation: revalidates `/ops/admin/communications` + `/ops/admin` on success
+    - validation recorded: sms-template-actions `54/54` passed; sms-template-governance-validation `19/19` passed; sms-template-governance-read `21/21` passed; sms-provider-readiness-read `16/16` passed; sms-eligibility-inputs-read `16/16` passed; contact-recipients-read `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed
+    - boundaries preserved: no UI/route/schema/migration changes, no Supabase production commands, no provider/Twilio/send/webhook behavior, no env/flag/payment/QBO/portal changes, and no production writes
+    - visible mark-ready UI wiring remains deferred to F4D-E3B; review/reject UI remains parked unless team-review workflow is reopened; real provider-powered SMS remains deferred
 
   - SMS On-The-Way V1 Workflow Simplification is locked:
     - Mark On The Way is the user-facing operational trigger.

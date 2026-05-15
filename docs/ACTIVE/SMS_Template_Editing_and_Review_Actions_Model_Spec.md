@@ -55,10 +55,11 @@ C. F4D-C create/save draft server actions. ✓ Complete (`f7cf8c0`)
 D. F4D-D review actions. ✓ Complete (`f5995d7`)
 E. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 F. F4D-E2 safe version-id/action-eligibility read-model support. ✓ Complete (`fededec`)
-G. F4D-E3 mark wording ready for sandbox/readiness UI, not full review/reject UI unless reopened.
-H. Later provider/legal review operations.
-I. Later sandbox/provider work.
-J. Later production activation only after explicit approval.
+G. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
+H. F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination).
+I. Later provider/legal review operations.
+J. Later sandbox/provider work.
+K. Later production activation only after explicit approval.
 
 Do not skip from this docs lock directly to full editable UI or review/approval controls.
 
@@ -307,6 +308,57 @@ State after F4D-D:
 
 ---
 
+## F4D-E3A Completion Cross-Reference (May 2026)
+
+SMS Slice F4D-E3A Combined Admin Readiness Action is complete.
+
+- implementation commit: `8cfa814`
+- action file: `lib/actions/sms-template-actions.ts`
+- test file: `lib/actions/__tests__/sms-template-actions.test.ts`
+- new action: `markOnTheWayTemplateReadyForSandboxFromForm`
+- this action supports the simplified V1 admin-owned workflow and avoids exposing a queue-shaped submit/approve/reject workflow
+- allows the latest draft or latest pending_review template version to be marked ready for sandbox testing
+- admin-only enforcement via `requireInternalRole("admin")` + account scope from authenticated context
+- accepts only `version_id` from form; re-validates all data server-side
+- validates body with `validateOnTheWayTemplateBody()` — requires sandbox-readiness standard
+- sets sandbox readiness only: `version_status = approved_for_sandbox`, `internal_review_status = approved`, `sandbox_version_id = version.id`
+- does not set `current_version_id`
+- does not activate SMS or set `lifecycle_status`
+- does not enable SMS, does not send SMS, does not call Twilio/provider/webhook behavior
+- uses pointer-failure rollback posture if parent `sandbox_version_id` update fails
+- revalidates `/ops/admin/communications` on success
+
+Validation recorded:
+
+- sms-template-actions.test.ts: 54/54 passed
+- sms-template-governance-validation.test.ts: 19/19 passed
+- sms-template-governance-read.test.ts: 21/21 passed
+- sms-provider-readiness-read.test.ts: 16/16 passed
+- sms-eligibility-inputs-read.test.ts: 16/16 passed
+- contact-recipients-read.test.ts: 4/4 passed
+- TypeScript passed
+- `git diff --check` passed
+
+State after F4D-E3A:
+
+- template governance schema exists
+- template governance read model exists with safe version IDs and admin readiness fields
+- template governance read-only UI exists
+- template validation helper exists
+- create/save draft actions exist
+- submit/approve-for-sandbox/reject review actions exist
+- create/save draft UI exists
+- combined admin readiness action exists for V1 workflow simplification
+- visible mark-ready UI wiring remains deferred to F4D-E3B
+- review/reject UI remains parked unless team-review workflow is reopened
+- approve-for-activation remains deferred
+- provider/legal approval actions remain deferred
+- provider setup remains deferred
+- sandbox/live SMS remains deferred
+- real SMS remains deferred
+
+---
+
 ## F4D-E2 Completion Cross-Reference (May 2026)
 
 SMS Slice F4D-E2 Admin Readiness Read-Model Support is complete.
@@ -345,8 +397,10 @@ State after F4D-E2:
 - create/save draft actions exist
 - submit/approve-for-sandbox/reject review actions exist
 - create/save draft UI exists
-- admin readiness support is available for future F4D-E3 review/readiness UI
+- combined admin readiness action exists (F4D-E3A complete)
+- admin readiness support is available for future F4D-E3B mark-ready UI wiring
 - review/reject UI remains deferred unless team-review workflow is reopened
+- mark-ready UI wiring remains deferred to F4D-E3B
 - approve-for-activation remains deferred
 - provider/legal approval actions remain deferred
 - provider setup remains deferred
@@ -357,7 +411,8 @@ Future sequence after this docs closeout:
 
 - F4D-E1 create/save draft UI
 - F4D-E2 safe version-id/action-eligibility read-model support for admin readiness
-- F4D-E3 mark wording ready for sandbox/readiness UI, not full review/reject UI unless reopened
+- F4D-E3A combined admin readiness action (complete, `8cfa814`)
+- F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination)
 - later provider/legal review workflow
 - later webhook/status callback contract planning
 - later provider/Twilio sandbox planning
