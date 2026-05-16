@@ -31,58 +31,6 @@ function uniqueStrings(values: string[]) {
   return Array.from(new Set(values.map((value) => asTrimmed(value)).filter(Boolean)));
 }
 
-function asBooleanIfPresent(value: unknown): boolean | undefined {
-  if (value === null || value === undefined) {
-    return undefined;
-  }
-
-  if (typeof value === "boolean") {
-    return value;
-  }
-
-  const lowered = asTrimmed(value).toLowerCase();
-  if (!lowered) {
-    return undefined;
-  }
-
-  if (["1", "true", "yes", "enabled", "on"].includes(lowered)) {
-    return true;
-  }
-
-  if (["0", "false", "no", "disabled", "off"].includes(lowered)) {
-    return false;
-  }
-
-  return undefined;
-}
-
-function readSandboxGateFromConfiguration(configuration: any) {
-  const candidateKeys = [
-    "sandbox_send_gate_enabled",
-    "sandbox_send_enabled",
-    "server_only_sandbox_send_gate_enabled",
-    "manual_sandbox_send_gate_enabled",
-  ];
-
-  let gateDiscovered = false;
-  let gateEnabled = false;
-
-  for (const key of candidateKeys) {
-    const parsed = asBooleanIfPresent(configuration?.[key]);
-    if (parsed === undefined) {
-      continue;
-    }
-
-    gateDiscovered = true;
-    if (parsed) {
-      gateEnabled = true;
-      break;
-    }
-  }
-
-  return { gateDiscovered, gateEnabled };
-}
-
 function blockedResult(input: {
   blockedReasons: string[];
   warnings?: string[];
@@ -116,6 +64,8 @@ async function readProviderConfiguration(params: {
     .from("sms_provider_configurations")
     .select("*")
     .eq("account_owner_user_id", params.accountOwnerUserId)
+    .eq("provider_name", "twilio")
+    .eq("provider_environment", "sandbox")
     .order("updated_at", { ascending: false })
     .maybeSingle();
 
@@ -275,8 +225,7 @@ export async function resolveSmsSandboxProviderConfig(
     });
   }
 
-  const { gateDiscovered, gateEnabled } = readSandboxGateFromConfiguration(providerConfiguration);
-  if (!gateDiscovered || !gateEnabled) {
+  if (providerConfiguration?.sandbox_send_enabled !== true) {
     return blockedResult({
       blockedReasons: ["sandbox_send_gate_missing_or_disabled"],
       providerEnvironment: "sandbox",

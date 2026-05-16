@@ -10,7 +10,7 @@ type ProviderConfigFixture = {
   readiness_status: string;
   activation_status: string;
   default_messaging_service_ref?: string | null;
-  sandbox_send_gate_enabled?: boolean;
+  sandbox_send_enabled?: boolean;
   provider_account_ref?: string | null;
   updated_at?: string;
 };
@@ -35,7 +35,7 @@ function makeProviderConfig(overrides?: Partial<ProviderConfigFixture>): Provide
     readiness_status: "ready_for_sandbox",
     activation_status: "disabled",
     default_messaging_service_ref: "MG-REDACTED",
-    sandbox_send_gate_enabled: true,
+    sandbox_send_enabled: true,
     provider_account_ref: "AC-REDACTED",
     updated_at: "2026-05-15T10:00:00Z",
     ...overrides,
@@ -57,28 +57,48 @@ function makeSenderIdentity(overrides?: Partial<SenderIdentityFixture>): SenderI
 }
 
 function makeSupabase(fixtures?: {
-  providerConfiguration?: ProviderConfigFixture | null;
-  senderIdentity?: SenderIdentityFixture | null;
+  providerConfigurations?: ProviderConfigFixture[];
+  senderIdentities?: SenderIdentityFixture[];
 }) {
-  const providerConfiguration = fixtures?.providerConfiguration ?? null;
-  const senderIdentity = fixtures?.senderIdentity ?? null;
+  const providerConfigurations = fixtures?.providerConfigurations ?? [];
+  const senderIdentities = fixtures?.senderIdentities ?? [];
   const calls: string[] = [];
+  const providerConfigurationFilters: Array<{ column: string; value: unknown }> = [];
 
   const supabase = {
     from: vi.fn((table: string) => {
       calls.push(table);
+      const filters = new Map<string, unknown>();
 
       const query: any = {
         select: vi.fn(() => query),
-        eq: vi.fn(() => query),
+        eq: vi.fn((column: string, value: unknown) => {
+          filters.set(column, value);
+          if (table === "sms_provider_configurations") {
+            providerConfigurationFilters.push({ column, value });
+          }
+          return query;
+        }),
         order: vi.fn(() => query),
         maybeSingle: vi.fn(async () => {
           if (table === "sms_provider_configurations") {
-            return { data: providerConfiguration, error: null };
+            const match = providerConfigurations.find((row) => {
+              return Array.from(filters.entries()).every(([column, value]) => {
+                return (row as Record<string, unknown>)[column] === value;
+              });
+            }) ?? null;
+
+            return { data: match, error: null };
           }
 
           if (table === "sms_sender_identities") {
-            return { data: senderIdentity, error: null };
+            const match = senderIdentities.find((row) => {
+              return Array.from(filters.entries()).every(([column, value]) => {
+                return (row as Record<string, unknown>)[column] === value;
+              });
+            }) ?? null;
+
+            return { data: match, error: null };
           }
 
           return { data: null, error: null };
@@ -89,7 +109,7 @@ function makeSupabase(fixtures?: {
     }),
   };
 
-  return { supabase, calls };
+  return { supabase, calls, providerConfigurationFilters };
 }
 
 describe("sms provider config resolver", () => {
@@ -118,7 +138,7 @@ describe("sms provider config resolver", () => {
 
   it("blocks when provider configuration is missing", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: null,
+      providerConfigurations: [],
     });
 
     const result = await resolveSmsSandboxProviderConfig({
@@ -130,9 +150,9 @@ describe("sms provider config resolver", () => {
     expect(result.blockedReasons).toContain("provider_configuration_missing");
   });
 
-  it("blocks non-twilio provider configuration", async () => {
+  it("treats non-twilio provider configuration as missing sandbox config", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: makeProviderConfig({ provider_name: "provider_other" }),
+      providerConfigurations: [],
     });
 
     const result = await resolveSmsSandboxProviderConfig({
@@ -141,12 +161,12 @@ describe("sms provider config resolver", () => {
     });
 
     expect(result.readyForSandboxProviderSubmit).toBe(false);
-    expect(result.blockedReasons).toContain("provider_not_twilio");
+    expect(result.blockedReasons).toContain("provider_configuration_missing");
   });
 
-  it("blocks non-sandbox provider environment", async () => {
+  it("treats non-sandbox provider environment as missing sandbox config", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: makeProviderConfig({ provider_environment: "production" }),
+      providerConfigurations: [],
     });
 
     const result = await resolveSmsSandboxProviderConfig({
@@ -155,12 +175,12 @@ describe("sms provider config resolver", () => {
     });
 
     expect(result.readyForSandboxProviderSubmit).toBe(false);
-    expect(result.blockedReasons).toContain("provider_environment_not_sandbox");
+    expect(result.blockedReasons).toContain("provider_configuration_missing");
   });
 
   it("blocks when provider is not sandbox-ready", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: makeProviderConfig({ readiness_status: "registration_pending" }),
+      providerConfigurations: [makeProviderConfig({ readiness_status: "registration_pending" })],
     });
 
     const result = await resolveSmsSandboxProviderConfig({
@@ -172,10 +192,62 @@ describe("sms provider config resolver", () => {
     expect(result.blockedReasons).toContain("provider_not_ready_for_sandbox");
   });
 
+  it("filters provider configuration by account + provider_name + provider_environment", async () => {
+    const sandboxConfig = makeProviderConfig({
+      id: "provider-sandbox",
+      account_owner_user_id: "owner-1",
+      provider_name: "twilio",
+      provider_environment: "sandbox",
+      sandbox_send_enabled: true,
+    });
+
+    const { supabase, providerConfigurationFilters } = makeSupabase({
+      providerConfigurations: [sandboxConfig],
+      senderIdentities: [
+        makeSenderIdentity({
+          provider_configuration_id: "provider-sandbox",
+        }),
+      ],
+    });
+
+    await resolveSmsSandboxProviderConfig({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(providerConfigurationFilters).toEqual(
+      expect.arrayContaining([
+        { column: "account_owner_user_id", value: "owner-1" },
+        { column: "provider_name", value: "twilio" },
+        { column: "provider_environment", value: "sandbox" },
+      ]),
+    );
+  });
+
+  it("does not allow production provider config to satisfy sandbox readiness", async () => {
+    const productionConfig = makeProviderConfig({
+      provider_environment: "production",
+      sandbox_send_enabled: true,
+    });
+
+    const { supabase } = makeSupabase({
+      providerConfigurations: [productionConfig],
+      senderIdentities: [makeSenderIdentity()],
+    });
+
+    const result = await resolveSmsSandboxProviderConfig({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result.readyForSandboxProviderSubmit).toBe(false);
+    expect(result.blockedReasons).toContain("provider_configuration_missing");
+  });
+
   it("blocks when sender identity is missing", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: makeProviderConfig(),
-      senderIdentity: null,
+      providerConfigurations: [makeProviderConfig()],
+      senderIdentities: [],
     });
 
     const result = await resolveSmsSandboxProviderConfig({
@@ -189,8 +261,10 @@ describe("sms provider config resolver", () => {
 
   it("blocks when sender identity is not verified and active", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: makeProviderConfig(),
-      senderIdentity: makeSenderIdentity({ verification_status: "pending_verification", activation_status: "disabled" }),
+      providerConfigurations: [makeProviderConfig()],
+      senderIdentities: [
+        makeSenderIdentity({ verification_status: "pending_verification", activation_status: "disabled" }),
+      ],
     });
 
     const result = await resolveSmsSandboxProviderConfig({
@@ -204,8 +278,8 @@ describe("sms provider config resolver", () => {
 
   it("blocks when messaging service reference is missing on provider and sender", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: makeProviderConfig({ default_messaging_service_ref: null }),
-      senderIdentity: makeSenderIdentity({ messaging_service_ref: null }),
+      providerConfigurations: [makeProviderConfig({ default_messaging_service_ref: null })],
+      senderIdentities: [makeSenderIdentity({ messaging_service_ref: null })],
     });
 
     const result = await resolveSmsSandboxProviderConfig({
@@ -217,10 +291,25 @@ describe("sms provider config resolver", () => {
     expect(result.blockedReasons).toContain("messaging_service_missing");
   });
 
-  it("blocks when sandbox send gate is missing or disabled", async () => {
+  it("blocks when sandbox send gate is disabled", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: makeProviderConfig({ sandbox_send_gate_enabled: false }),
-      senderIdentity: makeSenderIdentity(),
+      providerConfigurations: [makeProviderConfig({ sandbox_send_enabled: false })],
+      senderIdentities: [makeSenderIdentity()],
+    });
+
+    const result = await resolveSmsSandboxProviderConfig({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result.readyForSandboxProviderSubmit).toBe(false);
+    expect(result.blockedReasons).toContain("sandbox_send_gate_missing_or_disabled");
+  });
+
+  it("blocks when sandbox send gate field is missing", async () => {
+    const { supabase } = makeSupabase({
+      providerConfigurations: [makeProviderConfig({ sandbox_send_enabled: undefined })],
+      senderIdentities: [makeSenderIdentity()],
     });
 
     const result = await resolveSmsSandboxProviderConfig({
@@ -234,8 +323,8 @@ describe("sms provider config resolver", () => {
 
   it("returns ready true when sandbox config and sender identity are fully ready", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: makeProviderConfig({ sandbox_send_gate_enabled: true }),
-      senderIdentity: makeSenderIdentity(),
+      providerConfigurations: [makeProviderConfig({ sandbox_send_enabled: true })],
+      senderIdentities: [makeSenderIdentity()],
     });
 
     const result = await resolveSmsSandboxProviderConfig({
@@ -254,14 +343,18 @@ describe("sms provider config resolver", () => {
 
   it("does not expose raw provider refs or secrets", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: makeProviderConfig({
-        provider_account_ref: "AC123-secret",
-        default_messaging_service_ref: "MG123-secret",
-      }),
-      senderIdentity: makeSenderIdentity({
-        provider_sender_ref: "PN123-secret",
-        messaging_service_ref: "MG456-secret",
-      }),
+      providerConfigurations: [
+        makeProviderConfig({
+          provider_account_ref: "AC123-secret",
+          default_messaging_service_ref: "MG123-secret",
+        }),
+      ],
+      senderIdentities: [
+        makeSenderIdentity({
+          provider_sender_ref: "PN123-secret",
+          messaging_service_ref: "MG456-secret",
+        }),
+      ],
     });
 
     const result = await resolveSmsSandboxProviderConfig({
@@ -280,8 +373,8 @@ describe("sms provider config resolver", () => {
 
   it("does not return canSend", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: makeProviderConfig(),
-      senderIdentity: makeSenderIdentity(),
+      providerConfigurations: [makeProviderConfig()],
+      senderIdentities: [makeSenderIdentity()],
     });
 
     const result = await resolveSmsSandboxProviderConfig({
@@ -294,8 +387,8 @@ describe("sms provider config resolver", () => {
 
   it("always returns liveSendEnabled false", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: makeProviderConfig(),
-      senderIdentity: makeSenderIdentity(),
+      providerConfigurations: [makeProviderConfig()],
+      senderIdentities: [makeSenderIdentity()],
     });
 
     const result = await resolveSmsSandboxProviderConfig({
@@ -308,8 +401,8 @@ describe("sms provider config resolver", () => {
 
   it("does not call Twilio/provider APIs", async () => {
     const { supabase } = makeSupabase({
-      providerConfiguration: makeProviderConfig(),
-      senderIdentity: makeSenderIdentity(),
+      providerConfigurations: [makeProviderConfig()],
+      senderIdentities: [makeSenderIdentity()],
     });
 
     await resolveSmsSandboxProviderConfig({
@@ -322,8 +415,8 @@ describe("sms provider config resolver", () => {
 
   it("reads only provider configurations and sender identities tables", async () => {
     const { supabase, calls } = makeSupabase({
-      providerConfiguration: makeProviderConfig(),
-      senderIdentity: makeSenderIdentity(),
+      providerConfigurations: [makeProviderConfig()],
+      senderIdentities: [makeSenderIdentity()],
     });
 
     await resolveSmsSandboxProviderConfig({
