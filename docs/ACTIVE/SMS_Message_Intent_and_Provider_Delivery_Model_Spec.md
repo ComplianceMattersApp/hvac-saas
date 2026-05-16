@@ -175,6 +175,16 @@ Slice F5A cross-reference (docs/model-only):
 - Preferred future direction is explicit event-id anchoring before non-sending intent creation; querying for the latest matching `on_my_way` event is a fallback only.
 - Mark On The Way still does not send SMS, and real SMS remains deferred.
 
+Slice F5B cross-reference (implementation closeout):
+
+- SMS Slice F5B Non-Sending On-The-Way Intent Eligibility Helper is complete in commit `9814340`.
+- Files added: `lib/communications/sms-on-the-way-intent-eligibility.ts` and `lib/communications/__tests__/sms-on-the-way-intent-eligibility.test.ts`.
+- Helper API: `evaluateOnTheWayIntentEligibility(params): Promise<OnTheWayIntentEligibilityResult>`.
+- The helper is read-only and non-sending, composes existing recipient, eligibility, template-governance, and provider-readiness helpers, and adds F5B-specific job plus durable `on_my_way` event checks.
+- It validates durable `on_my_way` anchor readiness, separates structural `blockedReasons` from deferred live-send `warnings`, returns `liveSendEnabled` false, and does not return `canSend`.
+- No `sms_message_intents` rows are written yet, no `sms_provider_deliveries` rows are written, Mark On The Way behavior is unchanged, Mark On The Way still does not send SMS, and real SMS remains deferred.
+- F5C should be planned/audited before implementation; likely next is non-sending blocked/skipped/ready `sms_message_intents` creation from eligible durable `on_my_way` anchors, while provider send/webhook/activation remain deferred.
+
 ---
 
 ## 1) Current Decision
@@ -494,7 +504,7 @@ N. F4D-E2 safe version-id/action-eligibility read-model support for admin readin
 O. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 P. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
 Q. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
-R. F5B non-sending event-anchor/intent eligibility helper.
+R. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`9814340`)
 S. F5C create blocked/skipped/ready `sms_message_intents` from Mark On The Way without provider send.
 T. Provider/Twilio sandbox readiness.
 U. Provider webhook/send implementation only after all gates.

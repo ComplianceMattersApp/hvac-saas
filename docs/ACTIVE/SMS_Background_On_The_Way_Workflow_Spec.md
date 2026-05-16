@@ -82,6 +82,18 @@ Recorded boundary for this workflow spec:
 - Lifecycle success remains success even when SMS evaluation is blocked, skipped, or fails; SMS/provider failures must not roll back job status.
 - real SMS remains deferred.
 
+## Slice F5B Cross-Reference Closeout (2026-05-15)
+
+SMS Slice F5B Non-Sending On-The-Way Intent Eligibility Helper is complete in implementation commit `9814340`.
+
+- Added `lib/communications/sms-on-the-way-intent-eligibility.ts` and `lib/communications/__tests__/sms-on-the-way-intent-eligibility.test.ts`.
+- Helper API: `evaluateOnTheWayIntentEligibility(params): Promise<OnTheWayIntentEligibilityResult>`.
+- The helper is read-only and non-sending; it composes existing recipient, eligibility, template-governance, and provider-readiness helpers and adds F5B-specific job plus durable `on_my_way` event-anchor checks.
+- It validates durable `on_my_way` event-anchor readiness, separates structural `blockedReasons` from deferred live-send `warnings`, returns `liveSendEnabled` false, and does not return `canSend`.
+- No `sms_message_intents` rows are written yet, no `sms_provider_deliveries` rows are written, and no Mark On The Way behavior changed.
+- Mark On The Way still does not send SMS, and real SMS remains deferred.
+- F5C should be planned/audited before implementation; likely next is non-sending `sms_message_intents` creation from eligible durable `on_my_way` anchors, while provider send/webhook/status callback/activation remain deferred.
+
 ---
 
 ## 1) Current Decision
@@ -347,7 +359,7 @@ N. F4D-E2 safe version-id/action-eligibility read-model support for admin readin
 O. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 P. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
 Q. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
-R. F5B non-sending event-anchor/intent eligibility helper.
+R. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`9814340`)
 S. F5C create blocked/skipped/ready `sms_message_intents` from Mark On The Way without provider send.
 T. Quiet-hours/timezone gate planning.
 U. Provider/Twilio readiness and A2P sandbox planning.

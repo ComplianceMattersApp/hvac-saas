@@ -312,7 +312,7 @@ SMS Slice F4D-D closeout note (May 2026):
 - no activation behavior, no provider/Twilio/send/webhook behavior, and no SMS send readiness implied by template approval/readiness.
 - validation recorded: template action tests `40/40`; template validation helper tests `19/19`; template governance read tests `15/15`; provider readiness tests `16/16`; SMS eligibility tests `16/16`; contact recipient tests `4/4`; `npx.cmd tsc --noEmit`; `git diff --check`; total `110/110` passed.
 - state after F4D-D: schema/read-model/read-only UI/validation helper/create-save draft/review actions exist; editable UI remains deferred (F4D-E); approve-for-activation remains deferred; provider/legal approval actions remain deferred; provider setup remains deferred; sandbox/live SMS remains deferred; real SMS remains deferred.
-- safe forward sequence: F4D-D docs closeout, then F4D-E1 create/save draft UI, then F4D-E2 safe version-id/action-eligibility read-model support for admin readiness, then F4D-E3A combined admin readiness action (complete), then F4D-E3B mark-ready UI wiring (complete), then F5A docs/model lock for durable On-The-Way intent handoff (complete), then F5B non-sending event-anchor/intent eligibility helper, then F5C blocked/skipped/ready `sms_message_intents` creation without provider send, then later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
+- safe forward sequence: F4D-D docs closeout, then F4D-E1 create/save draft UI, then F4D-E2 safe version-id/action-eligibility read-model support for admin readiness, then F4D-E3A combined admin readiness action (complete), then F4D-E3B mark-ready UI wiring (complete), then F5A docs/model lock for durable On-The-Way intent handoff (complete), then F5B non-sending event-anchor/intent eligibility helper (complete, `9814340`), then F5C blocked/skipped/ready `sms_message_intents` creation without provider send, then later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
 
 SMS Slice F4D-E1 closeout note (May 2026):
 - Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
@@ -378,6 +378,15 @@ SMS Slice F5A closeout note (May 2026):
 - F5A records the preferred future direction: explicit event-id anchoring before non-sending intent creation; latest-event lookup remains fallback-only.
 - F5A preserves recipient truth in `contact_recipients`, preserves fail-closed behavior when no durable `on_my_way` event exists, preserves no job-status rollback, and preserves that Mark On The Way still does not send SMS.
 - real SMS remains deferred.
+
+SMS Slice F5B closeout note (May 2026):
+- Slice F5B Non-Sending On-The-Way Intent Eligibility Helper is complete in commit `9814340`.
+- F5B added `lib/communications/sms-on-the-way-intent-eligibility.ts` and `lib/communications/__tests__/sms-on-the-way-intent-eligibility.test.ts`.
+- F5B helper API is `evaluateOnTheWayIntentEligibility(params): Promise<OnTheWayIntentEligibilityResult>`.
+- F5B is read-only and non-sending; it composes existing recipient, eligibility, template-governance, and provider-readiness helpers and adds F5B-specific job plus durable `on_my_way` event-anchor checks.
+- F5B validates durable `on_my_way` anchor readiness, separates structural `blockedReasons` from deferred live-send `warnings`, returns `liveSendEnabled` false, and does not return `canSend`.
+- F5B writes no `sms_message_intents` rows yet, writes no `sms_provider_deliveries` rows, does not change Mark On The Way behavior, preserves that Mark On The Way still does not send SMS, and keeps real SMS deferred.
+- F5C should be planned/audited before implementation; likely next is non-sending blocked/skipped/ready `sms_message_intents` creation from eligible durable `on_my_way` anchors, while provider/Twilio send, webhook/status callback, and activation remain deferred.
 
 ---
 

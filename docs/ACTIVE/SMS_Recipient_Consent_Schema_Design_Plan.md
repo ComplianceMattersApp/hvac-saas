@@ -233,6 +233,18 @@ SMS Slice F5A Background On-The-Way Intent Handoff Model Lock is complete.
 - future blocked/skipped/failed intent outcomes belong in `sms_message_intents`; provider truth remains in `sms_provider_deliveries` only after later approved provider submission slices.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 
+## Slice F5B Docs Closeout Status (2026-05-15)
+
+SMS Slice F5B Non-Sending On-The-Way Intent Eligibility Helper is complete in implementation commit `9814340`.
+
+- Added `lib/communications/sms-on-the-way-intent-eligibility.ts` and `lib/communications/__tests__/sms-on-the-way-intent-eligibility.test.ts`.
+- Helper API: `evaluateOnTheWayIntentEligibility(params): Promise<OnTheWayIntentEligibilityResult>`.
+- The helper is read-only and non-sending; it composes existing recipient, eligibility, template-governance, and provider-readiness helpers and adds F5B-specific job plus durable `on_my_way` event-anchor checks.
+- It validates durable `on_my_way` event-anchor readiness, preserves `contact_recipients` as recipient truth, separates structural `blockedReasons` from deferred live-send `warnings`, returns `liveSendEnabled` false, and does not return `canSend`.
+- No `sms_message_intents` rows are written yet, no `sms_provider_deliveries` rows are written, and no Mark On The Way behavior changed.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+- F5C should be planned/audited before implementation; likely next is non-sending `sms_message_intents` creation from eligible durable `on_my_way` anchors, while provider send/webhook/activation remain deferred.
+
 ---
 
 ## Slice E1 Docs Closeout Status (2026-05-15)

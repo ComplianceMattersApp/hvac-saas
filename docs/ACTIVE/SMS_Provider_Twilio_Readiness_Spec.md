@@ -138,6 +138,18 @@ Slice F5A Background On-The-Way Intent Handoff Model Lock is complete in docs/mo
 - preferred future direction is explicit event-id anchoring before non-sending intent creation; latest-event lookup is fallback-only
 - Mark On The Way still does not send SMS; real SMS remains deferred
 
+## F5B Cross-Reference (May 2026)
+
+SMS Slice F5B Non-Sending On-The-Way Intent Eligibility Helper is complete in implementation commit `9814340`.
+
+- Added `lib/communications/sms-on-the-way-intent-eligibility.ts` and `lib/communications/__tests__/sms-on-the-way-intent-eligibility.test.ts`.
+- Helper API: `evaluateOnTheWayIntentEligibility(params): Promise<OnTheWayIntentEligibilityResult>`.
+- The helper is read-only and non-sending; it composes existing recipient, eligibility, template-governance, and provider-readiness helpers and adds F5B-specific job plus durable `on_my_way` event-anchor checks.
+- It validates durable `on_my_way` anchor readiness, separates structural blocks from deferred live-send warnings, returns `liveSendEnabled` false, and does not return `canSend`.
+- No `sms_message_intents` rows are written yet, no provider delivery rows are written, and no provider/Twilio send, webhook/status callback, or activation behavior is introduced here.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+- F5C should be planned/audited before implementation; likely next is non-sending `sms_message_intents` creation from eligible durable `on_my_way` anchors, while provider send/webhook/activation remain deferred.
+
 ---
 
 ## 1) Current Decision

@@ -58,13 +58,23 @@ F. F4D-E2 safe version-id/action-eligibility read-model support. ✓ Complete (`
 G. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 H. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
 I. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
-J. F5B non-sending event-anchor/intent eligibility helper.
+J. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`9814340`)
 K. F5C create blocked/skipped/ready `sms_message_intents` from Mark On The Way without provider send.
 L. Later provider/legal review operations.
 M. Later sandbox/provider work.
 N. Later production activation only after explicit approval.
 
 Do not skip from this docs lock directly to full editable UI or review/approval controls.
+
+F5B cross-reference closeout (May 2026):
+
+- SMS Slice F5B Non-Sending On-The-Way Intent Eligibility Helper is complete in commit `9814340`.
+- Added `lib/communications/sms-on-the-way-intent-eligibility.ts` and `lib/communications/__tests__/sms-on-the-way-intent-eligibility.test.ts`.
+- Helper API: `evaluateOnTheWayIntentEligibility(params): Promise<OnTheWayIntentEligibilityResult>`.
+- The helper remains read-only and non-sending, composes existing recipient, eligibility, template-governance, and provider-readiness helpers, and adds F5B-specific job plus durable `on_my_way` event checks.
+- It validates durable event-anchor readiness, separates structural `blockedReasons` from deferred live-send `warnings`, returns `liveSendEnabled` false, and does not return `canSend`.
+- No `sms_message_intents` rows are written yet, no provider delivery rows are written, Mark On The Way behavior is unchanged, Mark On The Way still does not send SMS, and real SMS remains deferred.
+- F5C should be planned/audited before implementation; likely next is non-sending blocked/skipped/ready `sms_message_intents` creation from eligible durable `on_my_way` anchors, while provider send/webhook/activation remain deferred.
 
 ---
 

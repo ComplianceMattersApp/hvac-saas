@@ -168,6 +168,18 @@ Slice F5A Background On-The-Way Intent Handoff Model Lock is complete in docs/mo
 - Communications UI remains status/readiness only; no intent/send/provider controls are introduced by this model lock
 - Mark On The Way still does not send SMS; real SMS remains deferred
 
+## F5B Cross-Reference (May 2026)
+
+SMS Slice F5B Non-Sending On-The-Way Intent Eligibility Helper is complete in implementation commit `9814340`.
+
+- Added `lib/communications/sms-on-the-way-intent-eligibility.ts` and `lib/communications/__tests__/sms-on-the-way-intent-eligibility.test.ts`.
+- Helper API: `evaluateOnTheWayIntentEligibility(params): Promise<OnTheWayIntentEligibilityResult>`.
+- The helper remains read-only and non-sending; it composes existing recipient, eligibility, template-governance, and provider-readiness helpers and adds F5B-specific job plus durable `on_my_way` event checks.
+- It validates durable `on_my_way` anchor readiness, separates structural `blockedReasons` from deferred live-send `warnings`, returns `liveSendEnabled` false, and does not return `canSend`.
+- Communications UI remains status/readiness only; no intent/send/provider controls are introduced by this closeout, no `sms_message_intents` rows are written yet, and no provider delivery rows are written.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+- F5C should be planned/audited before implementation; likely next is non-sending `sms_message_intents` creation from eligible durable `on_my_way` anchors, while provider send/webhook/activation remain deferred.
+
 ---
 
 ## 1) Current Decision
@@ -520,7 +532,7 @@ J. F4D-E2 safe version-id/action-eligibility read-model support for admin readin
 K. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 L. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
 M. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
-N. F5B non-sending event-anchor/intent eligibility helper.
+N. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`9814340`)
 O. F5C create blocked/skipped/ready `sms_message_intents` from Mark On The Way without provider send.
 P. Later slices: provider setup mutation planning, webhook/signature validation, sandbox send planning, activation planning.
 
