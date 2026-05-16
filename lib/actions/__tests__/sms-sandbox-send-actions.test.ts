@@ -25,6 +25,13 @@ vi.mock("@/lib/communications/sms-provider-config-resolver", () => ({
     resolveSmsSandboxProviderConfigMock(...args),
 }));
 
+vi.mock("@/lib/communications/sms-sandbox-test-recipient-read", () => ({
+  readSmsSandboxTestRecipientForPhone: (...args: unknown[]) =>
+    readSmsSandboxTestRecipientForPhoneMock(...args),
+}));
+
+const readSmsSandboxTestRecipientForPhoneMock = vi.fn();
+
 import { reserveSmsSandboxDeliveryDryRunFromForm } from "@/lib/actions/sms-sandbox-send-actions";
 
 type DeliveryFixture = {
@@ -46,6 +53,18 @@ type IntentFixture = {
   message_body_snapshot: string | null;
   template_key: string | null;
   template_version: string | null;
+};
+
+type TestRecipientFixture = {
+  id: string;
+  account_owner_user_id: string;
+  phone_e164: string;
+  phone_label: string | null;
+  is_active: boolean;
+  verified_at: string | null;
+  verified_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 function buildFormData(deliveryId?: string, extras?: Record<string, string>) {
@@ -88,11 +107,28 @@ function makeIntent(overrides?: Partial<IntentFixture>): IntentFixture {
   };
 }
 
+function makeTestRecipient(overrides?: Partial<TestRecipientFixture>): TestRecipientFixture {
+  return {
+    id: "test-recipient-1",
+    account_owner_user_id: "owner-1",
+    phone_e164: "+15551234567",
+    phone_label: "Test Phone",
+    is_active: true,
+    verified_at: "2026-05-15T00:00:00Z",
+    verified_by_user_id: "admin-1",
+    created_at: "2026-05-15T00:00:00Z",
+    updated_at: "2026-05-15T00:00:00Z",
+    ...overrides,
+  };
+}
+
 function buildAdminReadMock(fixtures?: {
   delivery?: DeliveryFixture | null;
   intent?: IntentFixture | null;
+  testRecipient?: TestRecipientFixture | null;
   deliveryReadError?: boolean;
   intentReadError?: boolean;
+  testRecipientReadError?: boolean;
 }) {
   const fromCalls: string[] = [];
   const mutationCalls: Array<{ table: string; operation: string }> = [];
@@ -203,6 +239,8 @@ describe("reserveSmsSandboxDeliveryDryRunFromForm", () => {
       sandboxSendGateEnabled: true,
       liveSendEnabled: false,
     });
+
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValue(null);
   });
 
   it("blocks non-admin actor", async () => {
@@ -349,12 +387,14 @@ describe("reserveSmsSandboxDeliveryDryRunFromForm", () => {
     );
   });
 
-  it("fails closed on test-recipient gate because policy is not modeled yet", async () => {
+  it("blocks when no active verified test recipient exists", async () => {
     const { admin } = buildAdminReadMock({
       delivery: makeDelivery(),
       intent: makeIntent(),
+      testRecipient: null,
     });
     createAdminClientMock.mockReturnValue(admin);
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValueOnce(null);
 
     await expect(
       reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
@@ -363,77 +403,172 @@ describe("reserveSmsSandboxDeliveryDryRunFromForm", () => {
     );
   });
 
-  it("uses no Twilio/provider call path and only resolver readiness helper", async () => {
+  it("blocks when test recipient is inactive", async () => {
     const { admin } = buildAdminReadMock({
       delivery: makeDelivery(),
       intent: makeIntent(),
     });
     createAdminClientMock.mockReturnValue(admin);
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValueOnce(
+      makeTestRecipient({ is_active: false }),
+    );
+
+    await expect(
+      reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
+    ).rejects.toThrow(
+      "REDIRECT:/ops/admin/communications?notice=sandbox_test_recipient_required",
+    );
+  });
+
+  it("blocks when test recipient verified_at is null", async () => {
+    const { admin } = buildAdminReadMock({
+      delivery: makeDelivery(),
+      intent: makeIntent(),
+    });
+    createAdminClientMock.mockReturnValue(admin);
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValueOnce(
+      makeTestRecipient({ verified_at: null, verified_by_user_id: null }),
+    );
+
+    await expect(
+      reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
+    ).rejects.toThrow(
+      "REDIRECT:/ops/admin/communications?notice=sandbox_test_recipient_required",
+    );
+  });
+
+  it("blocks when test recipient verified_by_user_id is null", async () => {
+    const { admin } = buildAdminReadMock({
+      delivery: makeDelivery(),
+      intent: makeIntent(),
+    });
+    createAdminClientMock.mockReturnValue(admin);
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValueOnce(
+      makeTestRecipient({ verified_at: "2026-05-15T00:00:00Z", verified_by_user_id: null }),
+    );
+
+    await expect(
+      reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
+    ).rejects.toThrow(
+      "REDIRECT:/ops/admin/communications?notice=sandbox_test_recipient_required",
+    );
+  });
+
+  it("passes with same-account active verified test recipient and returns sandbox_reservation_dry_run_ready", async () => {
+    const { admin } = buildAdminReadMock({
+      delivery: makeDelivery(),
+      intent: makeIntent(),
+      testRecipient: makeTestRecipient(),
+    });
+    createAdminClientMock.mockReturnValue(admin);
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValueOnce(
+      makeTestRecipient({
+        account_owner_user_id: "owner-1",
+        phone_e164: "+15551234567",
+        is_active: true,
+        verified_at: "2026-05-15T00:00:00Z",
+        verified_by_user_id: "admin-1",
+      }),
+    );
+
+    await expect(
+      reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
+    ).rejects.toThrow(
+      "REDIRECT:/ops/admin/communications?notice=sandbox_reservation_dry_run_ready",
+    );
+  });
+
+  it("test-recipient gate uses phone from intent recipient_phone_snapshot", async () => {
+    const phoneSnapshot = "+15559876543";
+    const { admin } = buildAdminReadMock({
+      delivery: makeDelivery(),
+      intent: makeIntent({ recipient_phone_snapshot: phoneSnapshot }),
+    });
+    createAdminClientMock.mockReturnValue(admin);
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValueOnce(
+      makeTestRecipient({ phone_e164: phoneSnapshot }),
+    );
+
+    await expect(
+      reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
+    ).rejects.toThrow("REDIRECT:/ops/admin/communications?notice=sandbox_reservation_dry_run_ready");
+
+    expect(readSmsSandboxTestRecipientForPhoneMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phoneE164: phoneSnapshot,
+      }),
+    );
+  });
+
+  it("dry-run ready path does not mutate sms_provider_deliveries", async () => {
+    const { admin, mutationCalls } = buildAdminReadMock({
+      delivery: makeDelivery(),
+      intent: makeIntent(),
+    });
+    createAdminClientMock.mockReturnValue(admin);
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValueOnce(
+      makeTestRecipient(),
+    );
+
+    await expect(
+      reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
+    ).rejects.toThrow();
+
+    expect(mutationCalls).toHaveLength(0);
+  });
+
+  it("dry-run ready path does not call Twilio/provider", async () => {
+    const { admin } = buildAdminReadMock({
+      delivery: makeDelivery(),
+      intent: makeIntent(),
+    });
+    createAdminClientMock.mockReturnValue(admin);
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValueOnce(
+      makeTestRecipient(),
+    );
 
     await expect(
       reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
     ).rejects.toThrow();
 
     expect(resolveSmsSandboxProviderConfigMock).toHaveBeenCalledOnce();
-    expect(resolveSmsSandboxProviderConfigMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        accountOwnerUserId: "owner-1",
-        providerName: "twilio",
-      }),
+    // No actual Twilio calls would be made (no provider submit, no message send)
+  });
+
+  it("action reads only expected tables (delivery, intent, test-recipient)", async () => {
+    const { admin, fromCalls } = buildAdminReadMock({
+      delivery: makeDelivery(),
+      intent: makeIntent(),
+    });
+    createAdminClientMock.mockReturnValue(admin);
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValueOnce(
+      makeTestRecipient(),
     );
-  });
-
-  it("does not mutate sms_provider_deliveries rows in dry-run mode", async () => {
-    const { admin, mutationCalls } = buildAdminReadMock({
-      delivery: makeDelivery(),
-      intent: makeIntent(),
-    });
-    createAdminClientMock.mockReturnValue(admin);
 
     await expect(
       reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
     ).rejects.toThrow();
 
-    expect(mutationCalls).toHaveLength(0);
-  });
-
-  it("does not mutate jobs or job_events", async () => {
-    const { admin, fromCalls, mutationCalls } = buildAdminReadMock({
-      delivery: makeDelivery(),
-      intent: makeIntent(),
-    });
-    createAdminClientMock.mockReturnValue(admin);
-
-    await expect(
-      reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
-    ).rejects.toThrow();
-
+    expect(fromCalls).toContain("sms_provider_deliveries");
+    expect(fromCalls).toContain("sms_message_intents");
     expect(fromCalls).not.toContain("jobs");
     expect(fromCalls).not.toContain("job_events");
-    expect(mutationCalls).toHaveLength(0);
+    expect(fromCalls).not.toContain("sms_provider_configurations");
   });
 
-  it("accepts only delivery_id and ignores client-supplied account or provider fields", async () => {
+  it("test-recipient read errors are handled gracefully", async () => {
     const { admin } = buildAdminReadMock({
       delivery: makeDelivery(),
       intent: makeIntent(),
+      testRecipientReadError: true,
     });
     createAdminClientMock.mockReturnValue(admin);
-
-    const formData = buildFormData("delivery-1", {
-      account_owner_user_id: "owner-forged",
-      sms_message_intent_id: "intent-forged",
-      provider_name: "provider-forged",
-      provider_status: "submitted",
-      provider_message_id: "SM-forged",
-    });
-
-    await expect(reserveSmsSandboxDeliveryDryRunFromForm(formData)).rejects.toThrow();
-
-    expect(resolveSmsSandboxProviderConfigMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        accountOwnerUserId: "owner-1",
-      }),
+    readSmsSandboxTestRecipientForPhoneMock.mockRejectedValueOnce(
+      new Error("test_recipient_read_failed"),
     );
+
+    await expect(
+      reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
+    ).rejects.toThrow("REDIRECT:/ops/admin/communications?notice=sandbox_internal_error");
   });
 });

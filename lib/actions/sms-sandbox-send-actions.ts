@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { requireInternalRole } from "@/lib/auth/internal-user";
 import { resolveSmsSandboxProviderConfig } from "@/lib/communications/sms-provider-config-resolver";
+import { readSmsSandboxTestRecipientForPhone } from "@/lib/communications/sms-sandbox-test-recipient-read";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 const COMMUNICATIONS_PATH = "/ops/admin/communications";
@@ -204,7 +205,35 @@ export async function reserveSmsSandboxDeliveryDryRunFromForm(formData: FormData
     redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_provider_not_ready"));
   }
 
-  // F6C-C1 lock: verified sandbox test-recipient policy is not modeled yet.
-  // F6C-C2 remains evaluation-only and fails closed before any reservation/send path.
-  redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_test_recipient_required"));
+  // F6C-C3D: Test-recipient dry-run gate.
+  // Verify recipient phone matches an active, verified sandbox test recipient for this account.
+  let testRecipient;
+  try {
+    testRecipient = await readSmsSandboxTestRecipientForPhone({
+      supabase: admin,
+      accountOwnerUserId,
+      phoneE164: asTrimmed(intent.recipient_phone_snapshot),
+    });
+  } catch {
+    redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_internal_error"));
+  }
+
+  if (!testRecipient) {
+    redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_test_recipient_required"));
+  }
+
+  if (!testRecipient.is_active) {
+    redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_test_recipient_required"));
+  }
+
+  if (!testRecipient.verified_at) {
+    redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_test_recipient_required"));
+  }
+
+  if (!testRecipient.verified_by_user_id) {
+    redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_test_recipient_required"));
+  }
+
+  // All gates passed. Return dry-run ready notice.
+  redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_reservation_dry_run_ready"));
 }
