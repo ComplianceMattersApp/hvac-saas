@@ -433,6 +433,69 @@ Forward sequence update:
 - F6D webhook/status callback planning/implementation remains required before live SMS.
 - Live SMS remains deferred until legal/provider/activation approval.
 
+## F6C-C3A Sandbox Test Recipient + Send Gate Model Lock (May 2026)
+
+F6C-C3A is docs/model lock only.
+
+- Real sandbox SMS send remains deferred.
+- Twilio/provider calls remain deferred.
+- Live SMS remains deferred.
+- Mark On The Way still does not send SMS.
+
+Verified sandbox/test-recipient gate lock:
+
+- First real sandbox send must be limited to verified sandbox/test recipients.
+- Current dry-run blocker `sandbox_test_recipient_required` remains correct until this gate is modeled.
+- Client input must not be trusted to mark a recipient as test-approved.
+- Test-recipient approval must be account-scoped and admin-controlled.
+- The gate must prevent accidental live/customer sends.
+- Future verification must require same account, recipient tied to the target intent/delivery, phone snapshot matching an approved test-recipient record (or approved admin-only test value), active recipient posture, and acceptable consent/suppression posture.
+- Quiet-hours may remain deferred only for verified sandbox/test recipients.
+- If recipient is not verified as sandbox/test-approved, sandbox send must fail closed.
+
+Preferred future test-recipient model:
+
+- Preferred model is account-scoped `sms_sandbox_test_recipients` table or equivalent account-level server setting.
+- Minimum fields likely needed: `account_owner_user_id`, normalized `phone_e164` (or safe phone hash), `display_label`, `is_active`, `verified_at`, `verified_by_user_id`, `created_at`, and `updated_at`.
+- No customer/job dependency is required for test-recipient approval records.
+- Test-recipient approval does not imply broad customer communication permission.
+- Test-recipient approval does not imply live-send approval.
+- Schema work is deferred to future slice and is not part of F6C-C3A.
+
+Sandbox send gate lock:
+
+- Current resolver gate requirement and fail-closed behavior remain correct (`sandbox_send_gate_missing_or_disabled`).
+- Preferred model remains explicit account-scoped/server-only gate on `sms_provider_configurations` (for example `sandbox_send_enabled boolean default false`), or an intentionally chosen dedicated account-level gate.
+- Gate must be account-scoped, admin/server controlled, and manual-sandbox-only.
+- Gate must not enable live SMS.
+- Schema work remains deferred beyond F6C-C3A.
+
+Resolver disambiguation lock:
+
+- Resolver must explicitly select by account + `provider_name = twilio` + `provider_environment = sandbox`.
+- Production provider configuration must never satisfy sandbox readiness.
+- Future resolver patch should be surgical and fully tested before real sandbox send.
+
+No-go boundaries:
+
+- No job-page send button.
+- No Mark On The Way trigger for sandbox send.
+- No live send.
+- No SMS enabled language.
+- No delivered claims without callback truth.
+- No provider credentials in browser.
+- No `NEXT_PUBLIC_*` secrets.
+
+Future sequence lock:
+
+- F6C-C3A docs/model lock.
+- F6C-C3B schema/model implementation for sandbox send gate + sandbox test-recipient gate if approved.
+- F6C-C3C resolver update to use schema-backed gate and explicit sandbox provider selection.
+- F6C-C3D dry-run action update to pass only when test-recipient and sandbox gate are configured.
+- F6C-C4 real manual sandbox send action only after explicit Twilio sandbox/env/test-recipient approval.
+- F6D webhook/status callback planning/implementation before live SMS.
+- Live SMS only after legal/provider/A2P/STOP/HELP/activation approval.
+
 Forward sequence update:
 
 - F6C-B docs closeout complete.

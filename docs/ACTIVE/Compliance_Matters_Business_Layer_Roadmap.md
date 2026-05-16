@@ -242,12 +242,30 @@ SMS Slice F6C-C2 closeout note (May 2026):
 - Validation recorded: `sms-sandbox-send-actions` tests passed (`16/16`), resolver/preflight/intent-create suites passed, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 
+SMS Slice F6C-C3A closeout note (May 2026):
+- Slice F6C-C3A Sandbox Test Recipient + Send Gate Model Lock is complete in docs/model-only mode.
+- F6C-C3A keeps real sandbox send deferred, Twilio/provider calls deferred, and live send deferred.
+- F6C-C3A keeps Mark On The Way non-sending.
+- F6C-C3A locks first real sandbox send to verified sandbox/test recipients only.
+- Current dry-run blocker `sandbox_test_recipient_required` remains correct until verified test-recipient gate is modeled.
+- Test-recipient approval must be account-scoped/admin-controlled and cannot be client-trusted.
+- Preferred future test-recipient model is account-scoped `sms_sandbox_test_recipients` (or equivalent account setting) with likely fields: account scope, normalized phone or safe hash, display label, active flag, verification actor/time, timestamps.
+- Test-recipient approval has no customer/job dependency, does not imply broad customer communication permission, and does not imply live-send approval.
+- F6C-C3A keeps send-gate requirement fail-closed on missing/disabled state and prefers explicit account-scoped/server-only gate field on `sms_provider_configurations` (for example `sandbox_send_enabled`) or intentionally chosen account-level gate.
+- F6C-C3A keeps resolver disambiguation requirement: account + `provider_name = twilio` + `provider_environment = sandbox`; production config cannot satisfy sandbox readiness.
+- F6C-C3A no-go boundaries remain: no job-page send button, no Mark On The Way trigger, no live send, no SMS-enabled language, no delivered claims, no provider credentials in browser, no `NEXT_PUBLIC_*` secrets.
+- Schema/model implementation for both gates remains deferred to future approved slice.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
 F6C sequence update:
 - F6C-C2 docs closeout complete.
-- Next: model/implement verified sandbox test-recipient gate and/or schema-backed sandbox send gate as explicitly approved.
-- F6C-C3 real manual sandbox send action remains deferred until explicit Twilio sandbox/env/test-recipient approval.
+- F6C-C3A docs/model lock complete.
+- Next F6C-C3B: schema/model implementation for sandbox send gate and sandbox test-recipient gate if approved.
+- Next F6C-C3C: resolver update to schema-backed gate and explicit sandbox provider selection.
+- Next F6C-C3D: dry-run action update to pass only when test-recipient and sandbox gate are configured.
+- F6C-C4 real manual sandbox send action remains deferred until explicit Twilio sandbox/env/test-recipient approval.
 - F6D webhook/status callback planning/implementation remains required before live SMS.
-- Live SMS remains deferred pending legal/provider/activation approval.
+- Live SMS remains deferred pending legal/provider/A2P/STOP/HELP/activation approval.
 
 SMS Slice F1 closeout note (May 2026):
 - Slice F1 Provider/Twilio Readiness Spec is complete in docs/model-only mode at `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md`.

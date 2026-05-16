@@ -369,6 +369,13 @@ Current Program Status Note (May 2026)
     - F6C-C2 action is admin-only, accepts only `delivery_id`, derives account scope from authenticated internal user context, and re-checks delivery + linked intent + provider resolver + sandbox gate + test-recipient posture server-side.
     - F6C-C2 remains evaluation-only and does not call Twilio/provider, does not send SMS, does not submit to provider, does not mutate `sms_provider_deliveries`, does not set `submitted_at`, does not set `provider_message_id`, does not change provider status, and does not mutate `jobs` or `job_events`.
     - F6C-C2 is fail-closed by safe notice codes and currently ends with `sandbox_test_recipient_required` until verified sandbox test-recipient policy is modeled.
+    - F6C-C3A sandbox test-recipient + send gate model lock is complete in docs/model-only mode; real sandbox send, provider calls, and live send remain deferred.
+    - F6C-C3A locks verified sandbox/test-recipient gate as account-scoped/admin-controlled with no client-trusted approval path; non-verified recipients fail closed.
+    - F6C-C3A preferred future test-recipient model is account-scoped `sms_sandbox_test_recipients` (or equivalent account setting) with normalized phone (or safe hash), display label, active flag, verification actor/time, and timestamps.
+    - F6C-C3A locks sandbox send gate as account-scoped/server-only/admin-controlled, preferring explicit `sms_provider_configurations` gate field (for example `sandbox_send_enabled`) or intentionally chosen account-level gate.
+    - F6C-C3A keeps resolver disambiguation requirement: account + `provider_name = twilio` + `provider_environment = sandbox`; production provider config is never sandbox-ready.
+    - F6C-C3A sequence lock: C3A docs/model lock, C3B gate schema/model implementation if approved, C3C resolver update, C3D dry-run update, C4 real manual sandbox send only after explicit Twilio sandbox/env/test-recipient approval, F6D callback/webhook before live-send consideration.
+    - F6C-C3A no-go boundaries remain: no job-page send button, no Mark On The Way send trigger, no SMS enabled language, no delivered claims, no browser credentials, no `NEXT_PUBLIC_*` secrets.
     - Mark On The Way still does not send SMS, and real SMS remains deferred.
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
