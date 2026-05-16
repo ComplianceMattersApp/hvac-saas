@@ -294,13 +294,34 @@ SMS Slice F6C-C3D closeout note (May 2026):
 - Validation recorded: `sms-sandbox-send-actions` tests `21/21`, resolver tests `18/18`, preflight tests `17/17`, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 
+SMS Slice F6C-C4 closeout note (May 2026):
+- Slice F6C-C4 Manual Sandbox Provider Submit Action is complete in implementation commit `98b057a`.
+- F6C-C4 is the first server-only Twilio sandbox provider call path in the codebase.
+- F6C-C4 added: `lib/communications/twilio-messages-client.ts` (server-only Twilio Messages REST client).
+- F6C-C4 updated action: `lib/actions/sms-sandbox-send-actions.ts` with `submitSmsSandboxDeliveryToProviderFromForm(formData)`.
+- F6C-C4 updated tests: `lib/actions/__tests__/sms-sandbox-send-actions.test.ts` with 26 new C4 tests (47 total).
+- F6C-C4 action is admin-only, accepts only `delivery_id`, requires all gate checks (delivery, intent, resolver, sandbox gate, active verified test recipient).
+- F6C-C4 performs guarded delivery reservation before calling Twilio; zero-row reservation returns `sandbox_delivery_reserved` without calling provider.
+- F6C-C4 on Twilio success: records `provider_message_id`, `provider_raw_status`, normalized provider status, and `provider_last_event_at`. Never writes `sent_at` or `delivered_at`.
+- F6C-C4 on immediate Twilio error: records failed status, `failed_at`, sanitized error code/message/raw status, and `provider_last_event_at`.
+- F6C-C4 does not mutate `jobs`, `job_events`, `sms_message_intents`, invoices, payments, QBO records, or portal records.
+- F6C-C4 does not add webhook/status callback behavior or UI/route exposure.
+- F6C-C4 does not trigger Mark On The Way behavior; Mark On The Way still does not send SMS.
+- F6C-C4 Twilio credentials are read from server env vars only; never exposed in notices, logs, or FormData.
+- All tests mock Twilio/provider behavior; no real Twilio calls were executed during tests.
+- Validation recorded: `sms-sandbox-send-actions` tests `47/47`, resolver tests `18/18`, preflight tests `17/17`, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed.
+- No sent/delivered claims exist until webhook/callback truth is established in F6D.
+- Webhook/status callback remains deferred to F6D.
+- Live SMS remains deferred pending legal/provider/A2P/STOP/HELP/activation approval.
+
 F6C sequence update:
 - F6C-C2 docs closeout complete.
 - F6C-C3A docs/model lock complete.
 - F6C-C3B schema/model implementation complete.
 - F6C-C3C resolver update complete.
 - F6C-C3D dry-run action test-recipient gate complete.
-- Next F6C-C4: real manual sandbox send action remains deferred until explicit Twilio sandbox/env/test-recipient approval.
+- F6C-C4 manual sandbox provider submit action complete.
+- Next: optional controlled sandbox smoke only after explicit approval and verified env/test-recipient setup.
 - F6D webhook/status callback planning/implementation remains required before live SMS.
 - Live SMS remains deferred pending legal/provider/A2P/STOP/HELP/activation approval.
 

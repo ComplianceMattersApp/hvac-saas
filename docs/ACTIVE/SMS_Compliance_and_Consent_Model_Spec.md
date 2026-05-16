@@ -153,6 +153,12 @@ Reference closeouts:
 - SMS On-The-Way V1 simplification: Mark On The Way is the operational trigger; future SMS is a background operational/customer-care notification after that lifecycle event; admin owns the wording in V1; field users do not write custom SMS; visible V1 UI should not become a multi-person approval/rejection queue unless explicitly reopened.
 - V1 compliance posture: the sample On-The-Way wording remains operational only (`Reply STOP to opt out` required); review-request SMS is a separate future message class; template readiness and sandbox readiness do not enable sending.
 - Quiet-hours scope lock: quiet-hours/timezone remains future conservative fail-closed SMS pre-send gate planning only; it must not block Mark On The Way or job lifecycle/status transitions.
+- F6C-C3D dry-run action test-recipient gate is complete in commit `e5060e9`; dry-run now passes only when all gates pass.
+- F6C-C4 Manual Sandbox Provider Submit Action is complete in commit `98b057a`; first server-only Twilio provider call path added.
+- F6C-C4 is admin-only, gated, and test-recipient-only; does not write `sent_at` or `delivered_at` and does not add delivered claims.
+- F6C-C4 does not mutate `sms_message_intents`, `jobs`, `job_events`, invoices, payments, QBO records, or portal records.
+- No sent/delivered claims until webhook/callback truth is established in F6D.
+- Webhook/status callback remains deferred to F6D; live SMS remains deferred pending legal/provider/A2P/STOP/HELP/activation approval.
 
 ---
 

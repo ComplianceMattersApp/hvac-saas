@@ -231,8 +231,16 @@ Job snapshot fields (`jobs.customer_phone`, `jobs.customer_email`, `jobs.job_add
 - F6C-C3C now reads provider configuration with explicit account + `provider_name = twilio` + `provider_environment = sandbox` selection.
 - F6C-C3C now uses schema-backed `sandbox_send_enabled`; missing/false gate blocks with `sandbox_send_gate_missing_or_disabled`.
 - F6C-C3C preserves server-only/no-secret/non-sending output boundaries (`liveSendEnabled = false`, no `canSend`, no provider calls, no SMS sends).
-- F6C lane now keeps dry-run follow-up for C3D (pass path when gate + verified test-recipient are configured) before any C4 real manual sandbox send consideration.
-- Mark On The Way still does not send SMS; real SMS remains deferred.
+- F6C-C3D dry-run action test-recipient gate is complete in implementation commit `e5060e9`; dry-run action now passes only when all gate checks pass; remains evaluation-only with no Twilio call, no delivery mutation, and no jobs/job_events mutation.
+- F6C-C4 Manual Sandbox Provider Submit Action is complete in implementation commit `98b057a`.
+- F6C-C4 is the first server-only Twilio provider call path; `submitSmsSandboxDeliveryToProviderFromForm` is admin-only, accepts only `delivery_id`, requires all gate checks (delivery, intent, resolver, sandbox gate, active verified test recipient), and performs guarded delivery reservation before calling Twilio Messages API.
+- F6C-C4 authority boundaries are locked: `sms_provider_deliveries` records the Twilio immediate response outcome (`provider_message_id`, `provider_raw_status`, normalized `provider_status`, `provider_last_event_at`) as the first provider submission/callback truth; `sent_at` and `delivered_at` are never written without callback truth from F6D.
+- F6C-C4 never mutates `sms_message_intents`, `jobs`, `job_events`, invoices, payments, QBO records, or portal records.
+- F6C-C4 does not add webhook/status callback behavior, UI/route exposure, or Mark On The Way send trigger.
+- Twilio credentials remain server-only (env vars); `MessagingServiceSid` is read from non-credential `sms_provider_configurations.default_messaging_service_ref` DB field.
+- No sent/delivered claims exist until webhook/callback truth is established in F6D.
+- F6D webhook/status callback planning/implementation is required before any live SMS consideration.
+- Mark On The Way still does not send SMS; real SMS remains deferred pending legal/provider/A2P/STOP/HELP/activation approval.
 - SMS On-The-Way V1 workflow simplification remains locked: Mark On The Way is the user-facing operational trigger, future SMS is a background operational/customer-care notification after that lifecycle event, admin owns the V1 wording, field users do not write custom SMS wording, and visible V1 UI should avoid multi-person approval/rejection workflow unless that product path is intentionally reopened.
 - Template governance remains admin/settings governance, not job timeline truth; `job_events` and manual contact logs are not provider delivery truth, and `sms_message_intents.message_body_snapshot` remains the future audit record of attempted SMS wording.
 - E2 did not add live SMS, send endpoint, webhook, provider integration, or provider delivery write path; real SMS remains deferred pending activation gates.

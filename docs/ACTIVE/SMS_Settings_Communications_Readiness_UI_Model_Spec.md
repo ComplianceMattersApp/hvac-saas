@@ -310,9 +310,11 @@ Settings/Communications closeout lock:
 - Future trusted admin/service-role paths must manage writes.
 - F6C-C3C resolver update is complete in commit `5af36cb` with explicit account + twilio + sandbox provider selection and schema-backed `sandbox_send_enabled` gate usage.
 - F6C-C3C preserves fail-closed gate behavior and server-only/no-secret/non-sending readiness output.
-- Dry-run action still requires F6C-C3D follow-up to pass when schema-backed gate + verified test-recipient are configured.
-- Real sandbox send remains deferred.
-- Mark On The Way still does not send SMS; real SMS remains deferred.
+- F6C-C3D dry-run action test-recipient gate is complete in commit `e5060e9`; dry-run now passes only when delivery/intent gates, resolver, and active verified sandbox test recipient all pass.
+- F6C-C4 Manual Sandbox Provider Submit Action is complete in commit `98b057a`; first server-only Twilio provider call path added.
+- F6C-C4 is admin-only, gated, test-recipient-only; does not write `sent_at` or `delivered_at`; does not mutate jobs/job_events/intents.
+- F6C-C4 does not add UI/route exposure; Settings Communications UI remains read-only/readiness-only posture.
+- Mark On The Way still does not send SMS; webhook/status callback remains deferred to F6D; live SMS remains deferred pending legal/provider/activation approval.
 
 ---
 

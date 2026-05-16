@@ -307,14 +307,20 @@ Slice F6C-C3B completion cross-reference (Sandbox send gate + test-recipient sch
 - Resolver now uses schema-backed `sandbox_send_enabled` and blocks missing/false with `sandbox_send_gate_missing_or_disabled`.
 - Production provider config does not satisfy sandbox readiness.
 - Resolver remains server-only, no-secret, and non-sending (`liveSendEnabled = false`, no `canSend`).
-- Dry-run action follow-up remains required in F6C-C3D to pass when schema-backed gate + verified test-recipient are configured.
-- Real sandbox send remains deferred; Mark On The Way still does not send SMS; real SMS remains deferred.
+- F6C-C3D dry-run action test-recipient gate is complete in commit `e5060e9`; dry-run now passes only when delivery/intent gates, resolver, and active verified sandbox test recipient all pass.
+- F6C-C3D does not call Twilio, does not send SMS, and does not mutate `sms_provider_deliveries`, `jobs`, or `job_events`.
+- F6C-C4 Manual Sandbox Provider Submit Action is complete in commit `98b057a`.\n- F6C-C4 is the first server-only Twilio provider call path; `submitSmsSandboxDeliveryToProviderFromForm` is admin-only, gated, and test-recipient-only.
+- F6C-C4 performs guarded delivery reservation, calls Twilio Messages API (server-only), records provider outcome on `sms_provider_deliveries`, and does not write `sent_at` or `delivered_at`.
+- F6C-C4 does not mutate `sms_message_intents`, `jobs`, `job_events`, invoices, payments, QBO records, or portal records.
+- No sent/delivered claims until webhook/callback truth is established in F6D.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
 
 Future sequence lock:
 
 - F6C-B docs closeout complete.
-- F6C-C manual admin-only sandbox send action remains deferred until explicit Twilio sandbox/env/test-recipient setup approval.
-- Webhook/status callback remains deferred.
+- F6C-C4 manual sandbox provider submit action complete (first server-only Twilio call path).
+- Next: optional controlled sandbox smoke only after explicit approval and verified env/test-recipient setup.
+- F6D webhook/status callback planning/implementation required before live SMS consideration.
 - Live SMS remains deferred pending legal/provider/activation approval.
 
 Slice SMS On-The-Way V1 workflow simplification cross-reference:

@@ -355,15 +355,35 @@ SMS Slice F6C-C3B Sandbox Send Gate + Test Recipient Schema is complete in imple
 - Real sandbox send remains deferred.
 - Mark On The Way still does not send SMS, and real SMS remains deferred.
 
+SMS Slice F6C-C3D closeout note: complete in implementation commit `e5060e9`.
+- F6C-C3D dry-run action now passes only when delivery/intent gates, provider resolver, and active verified sandbox test recipient all pass.
+- On success: returns `sandbox_reservation_dry_run_ready` dry-run notice (no send, no delivery mutation).
+- F6C-C3D does not call Twilio, does not send SMS, and does not mutate `sms_provider_deliveries`, `jobs`, or `job_events`.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
+SMS Slice F6C-C4 closeout note (May 2026): complete in implementation commit `98b057a`.
+- F6C-C4 adds `submitSmsSandboxDeliveryToProviderFromForm(formData)` as the first server-only Twilio sandbox provider call path.
+- Action is admin-only, accepts only `delivery_id`, requires all gate checks (delivery, intent, resolver, sandbox gate, active verified test recipient).
+- Performs guarded delivery reservation before calling Twilio; if reservation finds zero rows, returns `sandbox_delivery_reserved` without calling provider.
+- On Twilio success: records `provider_message_id`, `provider_raw_status`, normalized provider status, and `provider_last_event_at`.
+- On immediate Twilio error: records failed status, `failed_at`, sanitized error code/message/raw status, and `provider_last_event_at`.
+- Never writes `sent_at` or `delivered_at`.
+- Never mutates `jobs`, `job_events`, `sms_message_intents`, invoices, payments, QBO records, or portal records.
+- Does not add webhook/status callback behavior or UI/route exposure.
+- Mark On The Way still does not send SMS; Mark On The Way still does not trigger `submitSmsSandboxDeliveryToProviderFromForm`.
+- Webhook/status callback remains deferred to F6D.
+- Live SMS remains deferred pending legal/provider/A2P/STOP/HELP/activation approval.
+
 Forward sequence update:
 
 - F6C-C2 docs closeout complete.
 - F6C-C3A docs/model lock complete.
 - F6C-C3B schema/model implementation complete.
 - F6C-C3C resolver update complete.
-- Next F6C-C3D: dry-run action update to pass only when both gates are configured.
-- F6C-C4 real manual sandbox send remains deferred until explicit Twilio sandbox/env/test-recipient approval.
-- F6D webhook/status callback remains deferred before any live-send path.
+- F6C-C3D dry-run action test-recipient gate complete.
+- F6C-C4 manual sandbox provider submit action complete.
+- Next: optional controlled sandbox smoke only after explicit approval and verified env/test-recipient setup.
+- F6D webhook/status callback planning/implementation required before live SMS consideration.
 - Live SMS remains deferred pending legal/provider/A2P/STOP/HELP/activation approval.
 
 ---

@@ -383,8 +383,19 @@ Current Program Status Note (May 2026)
     - F6C-C3B keeps RLS/write posture fail-closed for writes (account-scoped select only; no authenticated insert/update/delete policies).
     - F6C-C3C resolver update is complete in commit `5af36cb` with explicit account + twilio + sandbox provider selection and schema-backed `sandbox_send_enabled` gating.
     - F6C-C3C keeps fail-closed gate behavior (`sandbox_send_gate_missing_or_disabled`) and retains server-only/no-secret/non-sending readiness output (`liveSendEnabled = false`, no `canSend`).
-    - F6C lane now keeps dry-run follow-up for C3D before any C4 real manual sandbox send consideration.
+    - F6C-C3D dry-run action test-recipient gate is complete in commit `e5060e9`; dry-run now passes only when all gate checks pass (delivery, intent, resolver, active verified sandbox test recipient); remains evaluation-only with no Twilio call, no delivery mutation, no jobs/job_events mutation.
+    - F6C-C4 Manual Sandbox Provider Submit Action is complete in commit `98b057a`; this is the first server-only Twilio provider call path.
+    - F6C-C4 adds `submitSmsSandboxDeliveryToProviderFromForm(formData)` as admin-only, gated, test-recipient-only provider submit action.
+    - F6C-C4 adds `lib/communications/twilio-messages-client.ts` as server-only Twilio Messages REST API client (credentials from server env vars only; never exposed).
+    - F6C-C4 performs guarded delivery reservation before calling Twilio; zero-row reservation returns `sandbox_delivery_reserved` without calling provider.
+    - F6C-C4 on Twilio success: records `provider_message_id`, `provider_raw_status`, normalized `provider_status`, and `provider_last_event_at` on `sms_provider_deliveries`; never writes `sent_at` or `delivered_at`.
+    - F6C-C4 on immediate Twilio error: records `provider_status = failed`, `failed_at`, sanitized error code/message/raw status, and `provider_last_event_at`.
+    - F6C-C4 never mutates `sms_message_intents`, `jobs`, `job_events`, invoices, payments, QBO records, or portal records.
+    - F6C-C4 does not add webhook/status callback behavior, UI/route exposure, or Mark On The Way send trigger.
+    - All F6C-C4 tests mock Twilio/provider behavior; no real Twilio calls were executed during tests (47/47 pass).
+    - No sent/delivered claims until webhook/callback truth is established in F6D.
     - Mark On The Way still does not send SMS, and real SMS remains deferred.
+    - Next: optional controlled sandbox smoke only after explicit approval and verified env/test-recipient setup; F6D webhook/status callback required before live SMS consideration.
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.
