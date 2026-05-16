@@ -105,9 +105,9 @@ function isUuid(v: string) {
 
 function formatDate(value?: string | null) {
   const raw = String(value ?? "").trim();
-  if (!raw) return "—";
+  if (!raw) return "â€”";
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return formatDateOnlyDisplay(raw);
-  return formatTimestampDateDisplayLA(raw) || "—";
+  return formatTimestampDateDisplayLA(raw) || "â€”";
 }
 
 function formatPhone(phone?: string | null) {
