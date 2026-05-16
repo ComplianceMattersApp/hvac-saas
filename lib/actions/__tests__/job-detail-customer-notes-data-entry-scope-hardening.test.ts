@@ -9,6 +9,9 @@ const healStalePaperworkOpsStatusMock = vi.fn();
 const forceSetOpsStatusMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
+const insertTargetedInternalNotificationMock = vi.fn();
+const assertAssignableInternalUserMock = vi.fn();
+const resolveUserDisplayMapMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
@@ -56,6 +59,19 @@ vi.mock("@/lib/actions/job-evaluator", () => ({
 
 vi.mock("@/lib/actions/ops-status", () => ({
   forceSetOpsStatus: (...args: unknown[]) => forceSetOpsStatusMock(...args),
+}));
+
+vi.mock("@/lib/actions/notification-actions", () => ({
+  createContractorIntakeProposalAwarenessNotification: vi.fn(),
+  insertInternalNotificationForEvent: vi.fn(),
+  insertTargetedInternalNotification: (...args: unknown[]) =>
+    insertTargetedInternalNotificationMock(...args),
+  markInternalNewWorkNotificationsResolved: vi.fn(),
+}));
+
+vi.mock("@/lib/staffing/human-layer", () => ({
+  assertAssignableInternalUser: (...args: unknown[]) => assertAssignableInternalUserMock(...args),
+  resolveUserDisplayMap: (...args: unknown[]) => resolveUserDisplayMapMock(...args),
 }));
 
 vi.mock("@/lib/actions/ecc-status", () => ({
@@ -142,7 +158,15 @@ function makeAllowSupabaseFixture(options?: { job?: Partial<JobRecord> }) {
           select: vi.fn(() => makeJobEventsSelectChain()),
           insert(values: Record<string, unknown>) {
             jobEventInserts.push(values);
-            return Promise.resolve({ error: null });
+            const response = { data: { id: "event-1" }, error: null };
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => response),
+              })),
+              single: vi.fn(async () => response),
+              then: (onFulfilled: (value: { data: { id: string }; error: null }) => unknown, onRejected?: (reason: unknown) => unknown) =>
+                Promise.resolve(response).then(onFulfilled, onRejected),
+            };
           },
         };
       }
@@ -196,7 +220,15 @@ function makeDenySupabaseFixture() {
           select: vi.fn(() => makeJobEventsSelectChain()),
           insert: vi.fn(() => {
             writeCalls.push({ table, method: "insert" });
-            return Promise.resolve({ error: null });
+            const response = { data: { id: "event-1" }, error: null };
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => response),
+              })),
+              single: vi.fn(async () => response),
+              then: (onFulfilled: (value: { data: { id: string }; error: null }) => unknown, onRejected?: (reason: unknown) => unknown) =>
+                Promise.resolve(response).then(onFulfilled, onRejected),
+            };
           }),
         };
       }
@@ -268,6 +300,15 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
       authorized: true,
       reason: "allowed_active",
+    });
+    insertTargetedInternalNotificationMock.mockResolvedValue("notif-tag-1");
+    assertAssignableInternalUserMock.mockResolvedValue({
+      user_id: "internal-user-2",
+      is_active: true,
+      account_owner_user_id: "owner-1",
+    });
+    resolveUserDisplayMapMock.mockResolvedValue({
+      "internal-user-1": "Alex Rivera",
     });
   });
 
@@ -342,6 +383,85 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
       },
       user_id: "internal-user-1",
     });
+  });
+
+  it("creates tagged internal notifications for valid same-account tagged teammates", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const formData = buildAddInternalNoteFormData();
+    formData.append("tagged_user_ids", "internal-user-2");
+
+    await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?tab=ops&banner=follow_up_note_added",
+    );
+
+    expect(assertAssignableInternalUserMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "internal-user-2",
+        accountOwnerUserId: "owner-1",
+      }),
+    );
+    expect(insertTargetedInternalNotificationMock).toHaveBeenCalledTimes(1);
+    expect(insertTargetedInternalNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: "job-1",
+        actorUserId: "internal-user-1",
+        recipientUserId: "internal-user-2",
+        notificationType: "internal_note_tag",
+      }),
+    );
+  });
+
+  it("does not notify out-of-account tagged users and still saves note", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    assertAssignableInternalUserMock.mockRejectedValueOnce(new Error("ASSIGNABLE_INTERNAL_USER_REQUIRED"));
+
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const formData = buildAddInternalNoteFormData();
+    formData.append("tagged_user_ids", "other-account-user");
+
+    await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?tab=ops&banner=follow_up_note_added",
+    );
+
+    expect(insertTargetedInternalNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("avoids self-tag and duplicate tag notifications", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const formData = buildAddInternalNoteFormData();
+    formData.append("tagged_user_ids", "internal-user-1");
+    formData.append("tagged_user_ids", "internal-user-2");
+    formData.append("tagged_user_ids", "internal-user-2");
+
+    await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?tab=ops&banner=follow_up_note_added",
+    );
+
+    expect(insertTargetedInternalNotificationMock).toHaveBeenCalledTimes(1);
+    expect(insertTargetedInternalNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientUserId: "internal-user-2" }),
+    );
+  });
+
+  it("keeps note save successful when tag notification side-effect fails", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    insertTargetedInternalNotificationMock.mockRejectedValueOnce(new Error("notification_insert_failed"));
+
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const formData = buildAddInternalNoteFormData();
+    formData.append("tagged_user_ids", "internal-user-2");
+
+    await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?tab=ops&banner=follow_up_note_added",
+    );
   });
 
   it("allows same-account internal completeDataEntryFromForm past scoped-job preflight", async () => {

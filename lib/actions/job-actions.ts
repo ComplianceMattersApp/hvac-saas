@@ -17,6 +17,7 @@ import { createMaintenanceAgreementVisitLinkFromJobCreation } from "@/lib/mainte
 import {
   createContractorIntakeProposalAwarenessNotification,
   insertInternalNotificationForEvent,
+  insertTargetedInternalNotification,
   markInternalNewWorkNotificationsResolved,
 } from "@/lib/actions/notification-actions";
 import { createOnTheWayIntentFromEvent } from "@/lib/communications/sms-on-the-way-intent-create";
@@ -52,7 +53,8 @@ import {
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { resolveNotificationAccountOwnerUserId } from "@/lib/notifications/account-owner";
-import { assertAssignableInternalUser } from "@/lib/staffing/human-layer";
+import { buildNotePreview, normalizeTaggedUserIds } from "@/lib/notifications/internal-note-tagging";
+import { assertAssignableInternalUser, resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import { getThresholdRuleForTest } from "@/lib/ecc/rule-profiles";
 import {
   buildAirFilterDevicePayload,
@@ -1538,6 +1540,8 @@ type JobAssignment = {
   removed_by: string | null;
 };
 
+type JobAssignmentCreatedCallback = (assignment: JobAssignment) => Promise<void> | void;
+
 /** Returns all currently-active assignment rows for a job. */
 async function listActiveJobAssignments(params: {
   supabase: any;
@@ -1623,6 +1627,37 @@ async function addJobAssignment(params: {
   if (timing) timing("assignmentAddedEventInsert", Date.now() - assignmentEventStartedAt);
 
   return data as JobAssignment;
+}
+
+async function notifyJobAssignmentCreated(params: {
+  supabase: any;
+  jobId: string;
+  accountOwnerUserId: string;
+  actorUserId: string;
+  recipientUserId: string;
+}) {
+  const displayMap = await resolveUserDisplayMap({
+    supabase: params.supabase,
+    userIds: [params.actorUserId],
+  });
+  const actorDisplayName = String(displayMap[params.actorUserId] ?? "").trim() || "A teammate";
+
+  await insertTargetedInternalNotification({
+    supabase: params.supabase,
+    jobId: params.jobId,
+    accountOwnerUserId: params.accountOwnerUserId,
+    actorUserId: params.actorUserId,
+    recipientUserId: params.recipientUserId,
+    notificationType: "internal_job_assigned",
+    subject: `${actorDisplayName} assigned you to a job`,
+    body: "Open the job to review dispatch details and next steps.",
+    payload: {
+      source: "job_assignments",
+      event_type: "assignment_added",
+      assigned_user_id: params.recipientUserId,
+      assigned_by_user_id: params.actorUserId,
+    },
+  });
 }
 
 /**
@@ -1753,8 +1788,17 @@ async function ensureActiveAssignmentForUser(params: {
   actorUserId: string;
   accountOwnerUserId?: string | null;
   timing?: FieldActionTimingRecorder;
+  onCreated?: JobAssignmentCreatedCallback;
 }): Promise<JobAssignment> {
-  const { supabase, jobId, userId, actorUserId, accountOwnerUserId = null, timing } = params;
+  const {
+    supabase,
+    jobId,
+    userId,
+    actorUserId,
+    accountOwnerUserId = null,
+    timing,
+    onCreated,
+  } = params;
 
   // Fast path: active row already exists
   const existingCheckStartedAt = timing ? Date.now() : 0;
@@ -1776,7 +1820,7 @@ async function ensureActiveAssignmentForUser(params: {
   // On 23505 unique-violation (parallel insert race), the winning call already
   // emitted assignment_added — re-select the surviving row without re-emitting.
   try {
-    return await addJobAssignment({
+    const createdAssignment = await addJobAssignment({
       supabase,
       jobId,
       userId,
@@ -1785,6 +1829,12 @@ async function ensureActiveAssignmentForUser(params: {
       isPrimary: false,
       timing,
     });
+
+    if (onCreated) {
+      await onCreated(createdAssignment);
+    }
+
+    return createdAssignment;
   } catch (addErr: any) {
     if (addErr?.code === "23505") {
       const { data: raced, error: racedErr } = await supabase
@@ -4394,6 +4444,24 @@ export async function assignJobAssigneeFromForm(formData: FormData) {
     userId,
     actorUserId,
     accountOwnerUserId: internalUser.account_owner_user_id,
+    onCreated: async () => {
+      try {
+        await notifyJobAssignmentCreated({
+          supabase,
+          jobId,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          actorUserId,
+          recipientUserId: userId,
+        });
+      } catch (notificationError) {
+        console.error("[jobs] job assignment notification failed", {
+          jobId,
+          actorUserId,
+          recipientUserId: userId,
+          error: notificationError,
+        });
+      }
+    },
   });
 
   if (makePrimary) {
@@ -9390,6 +9458,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
   const context = String(formData.get("context") || "").trim() || null;
   const anchorEventId = String(formData.get("anchor_event_id") || "").trim() || null;
   const anchorEventType = String(formData.get("anchor_event_type") || "").trim() || null;
+  const taggedUserIds = normalizeTaggedUserIds(formData.getAll("tagged_user_ids"));
 
   if (!jobId) throw new Error("Job ID is required");
   if (!note) {
@@ -9411,13 +9480,18 @@ export async function addInternalNoteFromForm(formData: FormData) {
   const meta = hasContextFields
     ? {
         note,
+        ...(taggedUserIds.length > 0 ? { tagged_user_ids: taggedUserIds } : {}),
         ...(context ? { context } : {}),
         ...(anchorEventId ? { anchor_event_id: anchorEventId } : {}),
         ...(anchorEventType ? { anchor_event_type: anchorEventType } : {}),
       }
-    : { note };
+    : {
+        note,
+        ...(taggedUserIds.length > 0 ? { tagged_user_ids: taggedUserIds } : {}),
+      };
 
   const duplicateMeta: Record<string, unknown> = { note };
+  if (taggedUserIds.length > 0) duplicateMeta.tagged_user_ids = taggedUserIds;
   if (context) duplicateMeta.context = context;
   if (anchorEventId) duplicateMeta.anchor_event_id = anchorEventId;
   if (anchorEventType) duplicateMeta.anchor_event_type = anchorEventType;
@@ -9453,6 +9527,65 @@ export async function addInternalNoteFromForm(formData: FormData) {
     meta,
     userId,
   });
+
+  if (taggedUserIds.length > 0) {
+    try {
+      const validRecipientIds: string[] = [];
+
+      for (const candidateId of taggedUserIds) {
+        if (!candidateId || candidateId === userId) continue;
+
+        await assertAssignableInternalUser({
+          userId: candidateId,
+          supabase,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+        });
+
+        validRecipientIds.push(candidateId);
+      }
+
+      const uniqueRecipientIds = Array.from(new Set(validRecipientIds));
+
+      if (uniqueRecipientIds.length > 0) {
+        const displayMap = await resolveUserDisplayMap({
+          supabase,
+          userIds: [userId],
+        });
+        const actorDisplayName =
+          String(displayMap[userId] ?? "").trim() || "A teammate";
+        const notePreview = buildNotePreview(note, 140);
+
+        for (const recipientId of uniqueRecipientIds) {
+          await insertTargetedInternalNotification({
+            supabase,
+            jobId,
+            accountOwnerUserId: internalUser.account_owner_user_id,
+            actorUserId: userId,
+            recipientUserId: recipientId,
+            notificationType: "internal_note_tag",
+            subject: `${actorDisplayName} tagged you on a job note`,
+            body: notePreview ? `\"${notePreview}\"` : "Open the job to review the tagged note.",
+            payload: {
+              source: "job_events",
+              event_type: "internal_note",
+              context: context ?? undefined,
+              anchor_event_id: anchorEventId ?? undefined,
+              anchor_event_type: anchorEventType ?? undefined,
+            },
+          });
+        }
+      }
+    } catch (notificationError) {
+      console.error("[jobs] internal note tag notification failed", {
+        jobId,
+        actorUserId: userId,
+        error:
+          notificationError instanceof Error
+            ? notificationError.message
+            : String(notificationError),
+      });
+    }
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);

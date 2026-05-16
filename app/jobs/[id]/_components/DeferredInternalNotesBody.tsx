@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 
 type DeferredInternalNotesBodyProps = {
   jobId: string;
@@ -33,6 +34,13 @@ function getEventNoteText(meta?: any) {
   return String(meta.note ?? meta.message ?? meta.caption ?? "").trim();
 }
 
+function getTaggedUserIds(meta?: any): string[] {
+  if (!meta || !Array.isArray(meta.tagged_user_ids)) return [];
+  return meta.tagged_user_ids
+    .map((value: unknown) => String(value ?? "").trim())
+    .filter(Boolean);
+}
+
 export default async function DeferredInternalNotesBody({
   jobId,
   timelineJobIds,
@@ -55,6 +63,17 @@ export default async function DeferredInternalNotesBody({
   const noteItems = (narrativeWindowEvents ?? []).filter(
     (eventRow: any) => String(eventRow?.event_type ?? "") === "internal_note",
   );
+
+  const taggedUserIds = Array.from(
+    new Set(noteItems.flatMap((eventRow: any) => getTaggedUserIds(eventRow?.meta))),
+  );
+  const taggedDisplayMap = taggedUserIds.length
+    ? await resolveUserDisplayMap({
+        supabase,
+        userIds: taggedUserIds,
+      })
+    : {};
+
   if (!noteItems.length) {
     return (
       <div className={emptyStateClassName}>
@@ -71,6 +90,9 @@ export default async function DeferredInternalNotesBody({
         const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "-";
         const meta = e?.meta ?? {};
         const noteText = getEventNoteText(meta);
+        const taggedDisplayNames = getTaggedUserIds(meta)
+          .map((id) => String((taggedDisplayMap as Record<string, string>)[id] ?? "").trim() || "Team member")
+          .filter(Boolean);
 
         return (
           <div key={idx} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
@@ -83,6 +105,12 @@ export default async function DeferredInternalNotesBody({
             {noteText ? (
               <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
                 {noteText}
+              </div>
+            ) : null}
+
+            {taggedDisplayNames.length > 0 ? (
+              <div className="mt-2 text-xs text-slate-600">
+                Tagged: {taggedDisplayNames.join(", ")}
               </div>
             ) : null}
           </div>

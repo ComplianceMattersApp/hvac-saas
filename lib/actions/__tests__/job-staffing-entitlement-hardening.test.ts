@@ -79,6 +79,23 @@ function makeStaffingFixture() {
 
   const supabase = {
     from(table: string) {
+      if (table === "profiles") {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(async () => ({
+              data: [
+                {
+                  id: "internal-user-1",
+                  full_name: "Alex Technician",
+                  email: "alex@example.com",
+                },
+              ],
+              error: null,
+            })),
+          })),
+        };
+      }
+
       if (table === "internal_users") {
         return {
           select: vi.fn(() => ({
@@ -185,7 +202,24 @@ function makeStaffingFixture() {
         return {
           insert: vi.fn((payload: Record<string, unknown>) => {
             writes.push({ table, op: "insert", payload });
-            return Promise.resolve({ error: null });
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({ data: { id: "event-1" }, error: null })),
+              })),
+            };
+          }),
+        };
+      }
+
+      if (table === "notifications") {
+        return {
+          insert: vi.fn((payload: Record<string, unknown>) => {
+            writes.push({ table, op: "insert", payload });
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({ data: { id: "notif-1" }, error: null })),
+              })),
+            };
           }),
         };
       }

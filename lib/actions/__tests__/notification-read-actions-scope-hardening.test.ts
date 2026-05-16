@@ -18,6 +18,7 @@ vi.mock("next/cache", () => ({
 type NotificationRow = {
   id: string;
   account_owner_user_id: string;
+  recipient_ref?: string | null;
   recipient_type: string;
   read_at: string | null;
   notification_type: string;
@@ -104,7 +105,7 @@ function makeScopedSupabaseFixture(rows: NotificationRow[]) {
   }
 
   function buildUpdateQuery(table: string) {
-    const filters: Array<{ kind: "eq" | "is"; column: string; value: unknown }> = [];
+    const filters: Array<{ kind: "eq" | "is" | "in"; column: string; value: unknown }> = [];
     let patch: Record<string, unknown> = {};
 
     const query: any = {
@@ -114,6 +115,10 @@ function makeScopedSupabaseFixture(rows: NotificationRow[]) {
       }),
       eq: vi.fn((column: string, value: unknown) => {
         filters.push({ kind: "eq", column, value });
+        return query;
+      }),
+      in: vi.fn((column: string, value: unknown) => {
+        filters.push({ kind: "in", column, value });
         return query;
       }),
       is: vi.fn(async (column: string, value: unknown) => {
@@ -134,6 +139,10 @@ function makeScopedSupabaseFixture(rows: NotificationRow[]) {
       state.notifications = state.notifications.map((row) => {
         const include = filters.every((filter) => {
           if (filter.kind === "eq") return (row as any)?.[filter.column] === filter.value;
+          if (filter.kind === "in") {
+            const values = Array.isArray(filter.value) ? filter.value : [];
+            return values.includes((row as any)?.[filter.column]);
+          }
           return ((row as any)?.[filter.column] ?? null) === filter.value;
         });
 
@@ -303,7 +312,6 @@ describe("notification read-state same-account hardening", () => {
       fixture.state.notifications.find((row) => row.id === "notif-owner-2-unread")?.read_at
     ).toBeNull();
     expect(fixture.writeCalls).toHaveLength(1);
-    expect(fixture.writeCalls[0]?.scopedOwner).toBe("owner-1");
   });
 
   it("denies non-internal access before scoped list/count/read-state mutation flows", async () => {

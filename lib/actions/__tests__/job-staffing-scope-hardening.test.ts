@@ -159,6 +159,7 @@ function makeDenySupabaseFixture() {
 
 function makeAllowSupabaseFixture() {
   const calls: Array<{ table: string; op: string; payload?: Record<string, unknown> }> = [];
+  const notificationWrites: Array<Record<string, unknown>> = [];
   let activeAssignmentSelectCount = 0;
 
   const makeEqChain = (result: { data: any; error: any }) => ({
@@ -170,6 +171,23 @@ function makeAllowSupabaseFixture() {
 
   const supabase = {
     from(table: string) {
+      if (table === "profiles") {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(async () => ({
+              data: [
+                {
+                  id: "internal-user-1",
+                  full_name: "Alex Technician",
+                  email: "alex@example.com",
+                },
+              ],
+              error: null,
+            })),
+          })),
+        };
+      }
+
       if (table === "internal_users") {
         return {
           select: vi.fn(() => ({
@@ -260,7 +278,24 @@ function makeAllowSupabaseFixture() {
         return {
           insert: vi.fn((payload: Record<string, unknown>) => {
             calls.push({ table, op: "insert", payload });
-            return Promise.resolve({ error: null });
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({ data: { id: "event-1" }, error: null })),
+              })),
+            };
+          }),
+        };
+      }
+
+      if (table === "notifications") {
+        return {
+          insert: vi.fn((payload: Record<string, unknown>) => {
+            notificationWrites.push(payload);
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({ data: { id: "notif-1" }, error: null })),
+              })),
+            };
           }),
         };
       }
@@ -269,7 +304,7 @@ function makeAllowSupabaseFixture() {
     },
   };
 
-  return { supabase, calls };
+  return { supabase, calls, notificationWrites };
 }
 
 describe("internal staffing same-account hardening", () => {
@@ -338,7 +373,7 @@ describe("internal staffing same-account hardening", () => {
   });
 
   it("allows same-account internal assignJobAssigneeFromForm and scopes assignable teammate validation", async () => {
-    const { supabase, calls } = makeAllowSupabaseFixture();
+    const { supabase, calls, notificationWrites } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
@@ -353,10 +388,21 @@ describe("internal staffing same-account hardening", () => {
     );
     expect(calls.some((call) => call.table === "job_assignments" && call.op === "insert")).toBe(true);
     expect(calls.some((call) => call.table === "job_events" && call.op === "insert")).toBe(true);
+    expect(notificationWrites).toHaveLength(1);
+    expect(notificationWrites[0]).toEqual(
+      expect.objectContaining({
+        job_id: "job-1",
+        account_owner_user_id: "owner-1",
+        recipient_type: "internal",
+        recipient_ref: "internal-user-2",
+        channel: "in_app",
+        notification_type: "internal_job_assigned",
+      }),
+    );
   });
 
   it("allows same-account internal setPrimaryJobAssigneeFromForm past scoped job preflight", async () => {
-    const { supabase, calls } = makeAllowSupabaseFixture();
+    const { supabase, calls, notificationWrites } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
@@ -373,10 +419,11 @@ describe("internal staffing same-account hardening", () => {
       calls.filter((call) => call.table === "job_assignments" && call.op === "update").length,
     ).toBeGreaterThan(0);
     expect(calls.some((call) => call.table === "job_events" && call.op === "insert")).toBe(true);
+    expect(notificationWrites).toHaveLength(0);
   });
 
   it("allows same-account internal removeJobAssigneeFromForm past scoped job preflight", async () => {
-    const { supabase, calls } = makeAllowSupabaseFixture();
+    const { supabase, calls, notificationWrites } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
@@ -393,5 +440,6 @@ describe("internal staffing same-account hardening", () => {
       calls.filter((call) => call.table === "job_assignments" && call.op === "update").length,
     ).toBeGreaterThan(0);
     expect(calls.some((call) => call.table === "job_events" && call.op === "insert")).toBe(true);
+    expect(notificationWrites).toHaveLength(0);
   });
 });

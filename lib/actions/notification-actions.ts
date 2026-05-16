@@ -89,6 +89,18 @@ type InsertInternalAwarenessNotificationInput = {
   payload?: Record<string, unknown>;
 };
 
+type InsertTargetedInternalNotificationInput = {
+  supabase: any;
+  jobId: string;
+  accountOwnerUserId: string;
+  actorUserId: string;
+  recipientUserId: string;
+  notificationType: string;
+  subject: string;
+  body: string;
+  payload?: Record<string, unknown>;
+};
+
 type CreateContractorIntakeProposalAwarenessNotificationInput = {
   supabase: any;
   contractorIntakeSubmissionId: string;
@@ -132,6 +144,58 @@ export async function insertInternalAwarenessNotification(
   const notificationId = String(data ?? "").trim();
   if (!notificationId) {
     throw new Error("Failed to create internal notification row");
+  }
+
+  revalidatePath("/", "layout");
+  return notificationId;
+}
+
+export async function insertTargetedInternalNotification(
+  input: InsertTargetedInternalNotificationInput,
+): Promise<string | null> {
+  const jobId = String(input.jobId ?? "").trim();
+  const accountOwnerUserId = String(input.accountOwnerUserId ?? "").trim();
+  const actorUserId = String(input.actorUserId ?? "").trim();
+  const recipientUserId = String(input.recipientUserId ?? "").trim();
+  const notificationType = String(input.notificationType ?? "").trim();
+  const subject = String(input.subject ?? "").trim();
+  const body = String(input.body ?? "").trim();
+
+  if (!jobId) throw new Error("Missing jobId for targeted internal notification");
+  if (!accountOwnerUserId) throw new Error("Missing accountOwnerUserId for targeted internal notification");
+  if (!actorUserId) throw new Error("Missing actorUserId for targeted internal notification");
+  if (!recipientUserId) throw new Error("Missing recipientUserId for targeted internal notification");
+  if (!notificationType) throw new Error("Missing notificationType for targeted internal notification");
+  if (recipientUserId === actorUserId) return null;
+
+  const payload: Record<string, unknown> = {
+    ...(input.payload ?? {}),
+    actor_user_id: actorUserId,
+    tagged_user_id: recipientUserId,
+  };
+
+  const { data, error } = await input.supabase
+    .from("notifications")
+    .insert({
+      job_id: jobId,
+      account_owner_user_id: accountOwnerUserId,
+      recipient_type: "internal",
+      recipient_ref: recipientUserId,
+      channel: "in_app",
+      notification_type: notificationType,
+      subject: subject || null,
+      body: body || null,
+      payload,
+      status: "queued",
+    })
+    .select("id")
+    .single();
+
+  if (error) throw error;
+
+  const notificationId = String(data?.id ?? "").trim();
+  if (!notificationId) {
+    throw new Error("Failed to create targeted internal notification row");
   }
 
   revalidatePath("/", "layout");

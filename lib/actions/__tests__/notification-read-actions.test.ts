@@ -19,6 +19,7 @@ type NotificationRow = {
   id: string;
   account_owner_user_id: string;
   job_id: string | null;
+  recipient_ref?: string | null;
   recipient_type: string;
   channel: string;
   notification_type: string;
@@ -250,6 +251,64 @@ describe("internal notification readers", () => {
     expect(notifications[0]?.proposal_enrichment?.job_type_label).toBe("ECC");
     expect(unreadCount).toBe(1);
     expect(unreadBadgeCount).toBe(1);
+  });
+
+  it("shows recipient-scoped internal notifications only to the tagged internal user", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-broadcast",
+            account_owner_user_id: "owner-1",
+            job_id: "job-1",
+            recipient_ref: null,
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_note",
+            subject: "Broadcast",
+            body: "visible to all internal users",
+            payload: {},
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-20T12:00:00.000Z",
+          },
+          {
+            id: "notif-tagged-other",
+            account_owner_user_id: "owner-1",
+            job_id: "job-1",
+            recipient_ref: "internal-2",
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "internal_note_tag",
+            subject: "Tagged",
+            body: "visible only to internal-2",
+            payload: {},
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-20T12:01:00.000Z",
+          },
+        ],
+        submissions: [],
+        jobs: [
+          {
+            id: "job-1",
+            title: "Service Visit",
+            customer_first_name: "Maya",
+            customer_last_name: "Lopez",
+            city: "Pasadena",
+            contractor_id: null,
+          },
+        ],
+      }),
+    );
+
+    const { listInternalNotifications } = await import("@/lib/actions/notification-read-actions");
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+    });
+
+    expect(notifications.map((row) => row.id)).toEqual(["notif-broadcast"]);
   });
 
   it("uses submission contractor_id for proposal enrichment when payload contractor_id is missing", async () => {

@@ -194,3 +194,76 @@ describe("markInternalNewWorkNotificationsResolved", () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe("insertTargetedInternalNotification", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it("creates a recipient-scoped internal in-app notification", async () => {
+    const singleMock = vi.fn(async () => ({ data: { id: "notif-tag-1" }, error: null }));
+    const selectMock = vi.fn(() => ({ single: singleMock }));
+    const insertMock = vi.fn(() => ({ select: selectMock }));
+    const fromMock = vi.fn(() => ({ insert: insertMock }));
+
+    const { insertTargetedInternalNotification } = await import("@/lib/actions/notification-actions");
+
+    const createdId = await insertTargetedInternalNotification({
+      supabase: { from: fromMock },
+      jobId: "job-1",
+      accountOwnerUserId: "owner-1",
+      actorUserId: "actor-1",
+      recipientUserId: "user-2",
+      notificationType: "internal_note_tag",
+      subject: "You were tagged by Alex",
+      body: "Tag context",
+      payload: { note_event_type: "internal_note" },
+    });
+
+    expect(createdId).toBe("notif-tag-1");
+    expect(fromMock).toHaveBeenCalledWith("notifications");
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        job_id: "job-1",
+        account_owner_user_id: "owner-1",
+        recipient_type: "internal",
+        recipient_ref: "user-2",
+        channel: "in_app",
+        notification_type: "internal_note_tag",
+        subject: "You were tagged by Alex",
+        body: "Tag context",
+        status: "queued",
+      }),
+    );
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          actor_user_id: "actor-1",
+          tagged_user_id: "user-2",
+          note_event_type: "internal_note",
+        }),
+      }),
+    );
+    expect(revalidatePathMock).toHaveBeenCalledWith("/", "layout");
+  });
+
+  it("skips self-targeted notifications", async () => {
+    const fromMock = vi.fn();
+    const { insertTargetedInternalNotification } = await import("@/lib/actions/notification-actions");
+
+    const createdId = await insertTargetedInternalNotification({
+      supabase: { from: fromMock },
+      jobId: "job-1",
+      accountOwnerUserId: "owner-1",
+      actorUserId: "user-1",
+      recipientUserId: "user-1",
+      notificationType: "internal_note_tag",
+      subject: "ignored",
+      body: "ignored",
+    });
+
+    expect(createdId).toBeNull();
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+});

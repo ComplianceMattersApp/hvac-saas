@@ -83,6 +83,8 @@ const JOB_AWARE_EVENT_HEADLINES: Record<string, string> = {
   contractor_schedule_updated: "Contractor scheduling updated",
   contractor_job_created: "New contractor job submitted",
   retest_ready_requested: "Retest ready requested",
+  internal_note_tag: "You were tagged in an internal note",
+  internal_job_assigned: "You were assigned to a job",
 };
 
 const JOB_AWARE_EVENT_HELPER_TEXT: Record<string, string> = {
@@ -91,6 +93,8 @@ const JOB_AWARE_EVENT_HELPER_TEXT: Record<string, string> = {
   contractor_schedule_updated: "Confirm scheduling details and update dispatch plan.",
   contractor_job_created: "Review the submitted request and schedule next steps.",
   retest_ready_requested: "Confirm retest readiness and schedule follow-up.",
+  internal_note_tag: "Open the job to review the tagged note and respond quickly.",
+  internal_job_assigned: "Open the job to review dispatch details and next steps.",
 };
 
 function isGenericContractorBody(value: string): boolean {
@@ -113,6 +117,8 @@ function notificationTypeLabel(value?: string | null) {
     contractor_note: "Contractor Note",
     contractor_correction_submission: "Correction Submission",
     contractor_schedule_updated: "Contractor Schedule Updated",
+    internal_note_tag: "Tagged Internal Note",
+    internal_job_assigned: "Job Assigned",
     contractor_intake_proposal_submitted: "Intake Proposal",
     contractor_report_email: "Contractor Report Email",
     customer_job_scheduled_email: "Customer Scheduled Email",
@@ -149,6 +155,14 @@ function JobAwareNotificationCard({
     notificationTypeLabel(notif.notification_type);
   const helperText = JOB_AWARE_EVENT_HELPER_TEXT[type] ?? null;
   const jobId = jobIdFromNotification(notif);
+  const jobHref =
+    jobId && type === "internal_note_tag"
+      ? `/jobs/${jobId}?tab=ops#internal-notes`
+      : jobId && type === "internal_job_assigned"
+      ? `/jobs/${jobId}?tab=ops`
+      : jobId
+      ? `/jobs/${jobId}`
+      : null;
 
   // Body text is shown only as a small secondary preview, not as the main message
   const rawBodyPreview = notif.body
@@ -232,9 +246,9 @@ function JobAwareNotificationCard({
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-2">
-          {jobId && (
+          {jobHref && (
             <Link
-              href={`/jobs/${jobId}`}
+              href={jobHref}
               className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
             >
               View job

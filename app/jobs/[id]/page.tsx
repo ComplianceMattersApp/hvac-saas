@@ -51,6 +51,7 @@ import ContractorReportPanel from "./_components/ContractorReportPanel";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import {
   getActiveJobAssignmentDisplayMap,
+  getAssignableInternalUsers,
 } from "@/lib/staffing/human-layer";
 import {
   type BillingMode,
@@ -922,6 +923,12 @@ export default async function JobDetailPage({
   const internalUser = actorResolution.internalUser;
   const contractors = await timedPhase("contractorsRead", () =>
     getContractors(internalUser.account_owner_user_id),
+  );
+  const internalTagCandidates = await timedPhase("internalTagCandidatesRead", () =>
+    getAssignableInternalUsers({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    }),
   );
 
   let isInternalUser = true;
@@ -4928,7 +4935,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
 
         {/* Internal Notes */}
-        <details className={workspaceDetailsClass}>
+        <details id="internal-notes" className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} />
           </summary>
@@ -4945,6 +4952,26 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       placeholder="Add an internal note visible only to your team..."
       className={workspaceTextareaClass}
     />
+
+    <div className="space-y-1">
+      <label className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
+        Tag teammates (optional)
+      </label>
+      <select
+        name="tagged_user_ids"
+        multiple
+        className={`${workspaceInputClass} min-h-[7rem]`}
+      >
+        {internalTagCandidates.map((candidate) => (
+          <option key={candidate.user_id} value={candidate.user_id}>
+            {candidate.display_name}
+          </option>
+        ))}
+      </select>
+      <p className="text-xs text-slate-500">
+        Tagged teammates receive an internal in-app alert with a direct link back to this job.
+      </p>
+    </div>
 
     <div className="flex justify-end">
       <SubmitButton

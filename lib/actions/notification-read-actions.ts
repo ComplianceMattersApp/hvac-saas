@@ -11,6 +11,7 @@ import {
 type NotificationRow = {
   id: string;
   job_id: string | null;
+  recipient_ref: string | null;
   recipient_type: string;
   channel: string;
   notification_type: string;
@@ -267,14 +268,20 @@ async function buildJobEnrichmentMap(
 
 async function requireScopedInternalNotificationContext() {
   const supabase = await createClient();
-  const { internalUser } = await requireInternalUser({ supabase });
+  const { userId, internalUser } = await requireInternalUser({ supabase });
   const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
 
   if (!accountOwnerUserId) {
     throw new Error("NOT_AUTHORIZED");
   }
 
-  return { supabase, accountOwnerUserId };
+  return { supabase, accountOwnerUserId, userId: String(userId ?? "").trim() };
+}
+
+function isNotificationVisibleToUser(row: Pick<NotificationRow, "recipient_ref">, userId: string): boolean {
+  const recipientRef = String(row.recipient_ref ?? "").trim();
+  if (!recipientRef) return true;
+  return recipientRef === String(userId ?? "").trim();
 }
 
 function isHiddenInternalNotificationType(value: string): boolean {
@@ -603,12 +610,12 @@ export async function listInternalNotifications(params: {
   onlyUnread?: boolean;
   filterKey?: InternalNotificationFilterKey | null;
 } = {}): Promise<NotificationRowForUI[]> {
-  const { supabase, accountOwnerUserId } = await requireScopedInternalNotificationContext();
+  const { supabase, accountOwnerUserId, userId } = await requireScopedInternalNotificationContext();
 
   let query = supabase
     .from("notifications")
     .select(
-      "id, job_id, recipient_type, channel, notification_type, subject, body, payload, status, read_at, created_at",
+      "id, job_id, recipient_ref, recipient_type, channel, notification_type, subject, body, payload, status, read_at, created_at",
       { count: "exact" }
     )
     .eq("recipient_type", "internal")
@@ -633,7 +640,9 @@ export async function listInternalNotifications(params: {
   const nowMs = Date.now();
   const readRetentionCutoffMs = nowMs - DEFAULT_READ_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-  const retainedRows = (data ?? []).filter((row) => {
+  const recipientScopedRows = (data ?? []).filter((row) => isNotificationVisibleToUser(row as NotificationRow, userId));
+
+  const retainedRows = recipientScopedRows.filter((row) => {
     if (row.read_at === null) return true;
     const readAtMs = Date.parse(String(row.read_at ?? ""));
     if (!Number.isFinite(readAtMs)) return true;
@@ -694,11 +703,11 @@ export async function listInternalContractorUpdateAwareness(params: {
   limit?: number;
   onlyUnread?: boolean;
 } = {}): Promise<NotificationAwarenessRow[]> {
-  const { supabase, accountOwnerUserId } = await requireScopedInternalNotificationContext();
+  const { supabase, accountOwnerUserId, userId } = await requireScopedInternalNotificationContext();
 
   let query = supabase
     .from("notifications")
-    .select("job_id, notification_type, read_at, created_at")
+    .select("job_id, recipient_ref, notification_type, read_at, created_at")
     .eq("recipient_type", "internal")
     .eq("account_owner_user_id", accountOwnerUserId)
     .order("created_at", { ascending: false });
@@ -718,11 +727,12 @@ export async function listInternalContractorUpdateAwareness(params: {
 
   const shouldTrackMapAndFilter = isOpsNotificationTimingEnabled();
   const mapAndFilterStartedAt = shouldTrackMapAndFilter ? Date.now() : 0;
-  const rows = (data ?? []) as Array<{
+  const rows = ((data ?? []) as Array<{
     job_id: string | null;
+    recipient_ref: string | null;
     notification_type: string | null;
     created_at: string | null;
-  }>;
+  }>).filter((row) => isNotificationVisibleToUser(row as NotificationRow, userId));
 
   const contractorUpdateRows = rows
     .filter((row) =>
@@ -750,12 +760,12 @@ export async function listInternalNewWorkRequestAwareness(params: {
   limit?: number;
   onlyUnread?: boolean;
 } = {}): Promise<NotificationAwarenessRow[]> {
-  const { supabase, accountOwnerUserId } = await requireScopedInternalNotificationContext();
+  const { supabase, accountOwnerUserId, userId } = await requireScopedInternalNotificationContext();
 
   let query = supabase
     .from("notifications")
     .select(
-      "id, job_id, recipient_type, channel, notification_type, subject, body, payload, status, read_at, created_at"
+      "id, job_id, recipient_ref, recipient_type, channel, notification_type, subject, body, payload, status, read_at, created_at"
     )
     .eq("recipient_type", "internal")
     .eq("account_owner_user_id", accountOwnerUserId)
@@ -774,7 +784,7 @@ export async function listInternalNewWorkRequestAwareness(params: {
 
   if (error) throw error;
 
-  const rows = (data ?? []) as NotificationRow[];
+  const rows = ((data ?? []) as NotificationRow[]).filter((row) => isNotificationVisibleToUser(row, userId));
   const newWorkRows = rows.filter((row) =>
     matchesInternalNotificationFilter(
       String(row.notification_type ?? "").trim().toLowerCase(),
@@ -803,20 +813,20 @@ export async function listInternalNewWorkRequestAwareness(params: {
 export async function markNotificationAsRead(input: {
   notificationId: string;
 }): Promise<void> {
-  const { supabase, accountOwnerUserId } = await requireScopedInternalNotificationContext();
+  const { supabase, accountOwnerUserId, userId } = await requireScopedInternalNotificationContext();
   const notificationId = String(input.notificationId ?? "").trim();
   if (!notificationId) return;
 
   const { data: scopedNotification, error: scopedNotificationErr } = await supabase
     .from("notifications")
-    .select("id")
+    .select("id, recipient_ref")
     .eq("id", notificationId)
     .eq("recipient_type", "internal")
     .eq("account_owner_user_id", accountOwnerUserId)
     .maybeSingle();
 
   if (scopedNotificationErr) throw scopedNotificationErr;
-  if (!scopedNotification?.id) {
+  if (!scopedNotification?.id || !isNotificationVisibleToUser(scopedNotification as NotificationRow, userId)) {
     throw new Error("NOT_AUTHORIZED");
   }
 
@@ -835,16 +845,30 @@ export async function markNotificationAsRead(input: {
 }
 
 export async function markAllNotificationsAsRead(): Promise<void> {
-  const { supabase, accountOwnerUserId } = await requireScopedInternalNotificationContext();
+  const { supabase, accountOwnerUserId, userId } = await requireScopedInternalNotificationContext();
 
-  const { error } = await supabase
+  const { data: unreadRows, error: unreadErr } = await supabase
     .from("notifications")
-    .update({ read_at: new Date().toISOString() })
+    .select("id, recipient_ref")
     .eq("recipient_type", "internal")
     .eq("account_owner_user_id", accountOwnerUserId)
     .is("read_at", null);
 
-  if (error) throw error;
+  if (unreadErr) throw unreadErr;
+
+  const targetIds = (unreadRows ?? [])
+    .filter((row: any) => isNotificationVisibleToUser(row as NotificationRow, userId))
+    .map((row: any) => String(row?.id ?? "").trim())
+    .filter(Boolean);
+
+  if (targetIds.length > 0) {
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .in("id", targetIds);
+
+    if (error) throw error;
+  }
 
   revalidatePath("/ops");
   revalidatePath("/ops/notifications");
@@ -857,16 +881,21 @@ export async function getInternalUnreadNotificationBadgeCount(params: {
 } = {}): Promise<number> {
   let supabase = params.supabase;
   let accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+  let currentUserId = "";
 
   if (!supabase || !accountOwnerUserId) {
     const context = await requireScopedInternalNotificationContext();
     supabase = context.supabase;
     accountOwnerUserId = context.accountOwnerUserId;
+    currentUserId = context.userId;
+  } else {
+    const { userId } = await requireInternalUser({ supabase });
+    currentUserId = String(userId ?? "").trim();
   }
 
   const { data, error } = await supabase
     .from("notifications")
-    .select("id, notification_type, payload, read_at, created_at")
+    .select("id, recipient_ref, notification_type, payload, read_at, created_at")
     .eq("recipient_type", "internal")
     .eq("account_owner_user_id", accountOwnerUserId)
     .order("created_at", { ascending: false })
@@ -874,10 +903,12 @@ export async function getInternalUnreadNotificationBadgeCount(params: {
 
   if (error) throw error;
 
-  const awarenessRows = ((data ?? []) as NotificationRow[]).filter((row) => {
+  const awarenessRows = ((data ?? []) as NotificationRow[])
+    .filter((row) => isNotificationVisibleToUser(row, currentUserId))
+    .filter((row) => {
     const type = String(row.notification_type ?? "").trim().toLowerCase();
     return !isHiddenInternalNotificationType(type);
-  });
+    });
 
   const pendingProposalRows = await filterPendingProposalVisibilityRows(
     supabase,
