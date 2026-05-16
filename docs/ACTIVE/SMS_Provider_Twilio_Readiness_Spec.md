@@ -538,11 +538,43 @@ SMS Slice F6C-C3C is complete in implementation commit `5af36cb`.
 - Mark On The Way still does not send SMS.
 - Real SMS remains deferred.
 
+## F6C-C3D Dry-Run Action Test-Recipient Gate Closeout (May 2026)
+
+SMS Slice F6C-C3D is complete in implementation commit `e5060e9`.
+
+- Added helper file: `lib/communications/sms-sandbox-test-recipient-read.ts`
+- Helper API: `readSmsSandboxTestRecipientForPhone(params): Promise<SmsSandboxTestRecipientRow | null>`
+- Helper reads only `sms_sandbox_test_recipients` by account scope and phone E.164 match.
+- Updated action file: `lib/actions/sms-sandbox-send-actions.ts` now includes test-recipient lookup gate.
+- Updated test file: `lib/actions/__tests__/sms-sandbox-send-actions.test.ts` with 21 focused gate tests.
+- Dry-run action now passes only when all gates pass:
+  - delivery/intent gates pass
+  - provider resolver gates pass
+  - matching active verified sandbox test recipient exists by `account_owner_user_id` and `phone_e164`
+- Test-recipient gate requires:
+  - `is_active = true`
+  - `verified_at` is not null
+  - `verified_by_user_id` is not null
+- On success: returns `sandbox_reservation_dry_run_ready` dry-run notice.
+- On missing/inactive/unverified test recipient: blocks with `sandbox_test_recipient_required` notice.
+- Action remains evaluation-only/dry-run and does not call Twilio/provider, does not send SMS, and does not mutate `sms_provider_deliveries`.
+- No `submitted_at`, no `provider_message_id`, no provider status transition.
+- No jobs/job_events mutation.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
+F6C-C3D validation recorded:
+
+- `npx.cmd vitest run lib/actions/__tests__/sms-sandbox-send-actions.test.ts` passed (`21/21`).
+- `npx.cmd vitest run lib/communications/__tests__/sms-provider-config-resolver.test.ts` passed (`18/18`).
+- `npx.cmd vitest run lib/communications/__tests__/sms-provider-delivery-preflight.test.ts` passed (`17/17`).
+- `npx.cmd tsc --noEmit` passed.
+- `git diff --check` passed.
+
 F6C sequence update:
 
-- F6C-C3C docs closeout complete.
-- Next F6C-C3D: dry-run action update to pass when sandbox gate and test-recipient are configured.
-- F6C-C4 real manual sandbox send action only after explicit Twilio sandbox/env/test-recipient approval.
+- F6C-C3C resolver update complete.
+- F6C-C3D dry-run action test-recipient gate complete.
+- Next F6C-C4: real manual sandbox send action only after explicit Twilio sandbox/env/test-recipient approval.
 - F6D webhook/status callback before live SMS.
 - Live SMS later only after legal/provider/A2P/STOP/HELP/activation approval.
 
