@@ -76,8 +76,10 @@ export default async function NotificationsPage({
   try {
     pushSubscriptions = await listCurrentInternalUserPushSubscriptions({ supabase });
   } catch (error) {
-    const code = String((error as { code?: unknown } | null)?.code ?? "");
-    if (code !== "42P01") throw error;
+    console.warn("[ops/notifications] push subscription hydration skipped", {
+      code: String((error as { code?: unknown } | null)?.code ?? ""),
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
 
   return (
