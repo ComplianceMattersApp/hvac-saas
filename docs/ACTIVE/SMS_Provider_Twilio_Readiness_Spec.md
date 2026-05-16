@@ -261,6 +261,24 @@ D. F6D status callback planning/implementation before live send.
 E. Later sandbox SMS only after explicit approval.
 F. Later live SMS only after provider/legal review, webhook readiness, STOP/HELP readiness, and explicit activation.
 
+## F6B Completion Cross-Reference (May 2026)
+
+SMS Slice F6B Provider Delivery Preflight Helper is complete in implementation commit `f1214ae`.
+
+- Added `lib/communications/sms-provider-delivery-preflight.ts` and `lib/communications/__tests__/sms-provider-delivery-preflight.test.ts`.
+- Helper API: `prepareSmsProviderDeliveryPreflight(params): Promise<PrepareSmsProviderDeliveryPreflightResult>`.
+- Helper reads scoped `sms_message_intents` row by id and account scope, validates `message_class = on_the_way` and `decision_outcome = ready_for_provider`, and checks all required fields present (message_body_snapshot, recipient_phone_snapshot, template_version, job_event_id).
+- Ready behavior: writes one `sms_provider_deliveries` row with `provider_name = twilio` and `provider_status = not_submitted` when all required truth exists and no delivery conflict.
+- Deduped behavior: existing delivery or insert unique conflict treated as deduped success (created false, deduped true, returns existing delivery id).
+- Blocked behavior: invalid intent or missing required fields returns blocked reasons array and no row insert.
+- Non-sending infrastructure: helper does not call Twilio/provider, does not send SMS, does not set `provider_message_id`, does not set `submitted_at`, does not mark sent/delivered/failed, and does not mutate jobs, job_events, or sms_message_intents.
+- Account scope enforced: missing `account_owner_user_id` or `sms_message_intent_id` blocks operation.
+- Helper returns `liveSendEnabled` false always and does not return `canSend`; provider submission eligibility is deferred to F6C/later layers.
+- Validation recorded: new preflight helper tests `17/17`, existing SMS intent create tests `12/12`, SMS eligibility tests `12/12`, template governance tests `15/15`, template validation tests `19/19`, provider readiness tests `16/16`, eligibility inputs tests `16/16`, contact recipient tests `4/4`, `npx.cmd tsc --noEmit` passed, `git diff --check` passed. Total: `52/52` tests passed.
+- No `sms_provider_deliveries` rows actually created (non-sending audit infrastructure/preflight only); no production writes.
+- F6C manual admin-only sandbox send action can now query for `sms_provider_deliveries` rows with `provider_status = not_submitted` and proceed with Twilio submission if all F6A sandbox gates pass.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
 ---
 
 ## 1) Current Decision

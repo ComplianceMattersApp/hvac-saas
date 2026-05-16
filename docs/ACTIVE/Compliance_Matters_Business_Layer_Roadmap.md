@@ -168,6 +168,22 @@ SMS Slice F6A provider/Twilio sandbox send model lock (May 2026):
 - Forward sequence: F6B provider delivery preflight/helper only, F6C manual admin-only sandbox send action, F6D status callback planning/implementation before live send, then later sandbox/live SMS only after explicit approval.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 
+SMS Slice F6B closeout note (May 2026):
+- Slice F6B Provider Delivery Preflight Helper is complete in implementation commit `f1214ae`.
+- F6B added `lib/communications/sms-provider-delivery-preflight.ts` and `lib/communications/__tests__/sms-provider-delivery-preflight.test.ts`.
+- F6B helper API: `prepareSmsProviderDeliveryPreflight(params): Promise<PrepareSmsProviderDeliveryPreflightResult>`.
+- F6B reads scoped `sms_message_intents` row, validates `message_class = on_the_way` and `decision_outcome = ready_for_provider`, checks required fields (message_body_snapshot, recipient_phone_snapshot, template_version, job_event_id).
+- F6B ready outcome writes one `sms_provider_deliveries` row with `provider_name = twilio` and `provider_status = not_submitted` when all required truth exists and no delivery conflict.
+- F6B deduped outcome (existing delivery or insert conflict) is allowed and returns deduped=true with existing delivery id.
+- F6B blocked outcome (invalid intent or missing required fields) returns blocked reasons array and no row insert.
+- F6B non-sending infrastructure: does not call Twilio/provider, does not send SMS, does not set `provider_message_id`, does not set `submitted_at`, does not mark sent/delivered/failed, does not mutate jobs/job_events/sms_message_intents.
+- F6B returns `liveSendEnabled` false always and does not return `canSend`; provider submission eligibility deferred to later layers.
+- F6B preserves account scope: missing `account_owner_user_id` or `sms_message_intent_id` blocks operation.
+- F6B did not add live SMS, Twilio integration, send endpoint, webhook, provider delivery write path, sandbox/live SMS, env/secrets changes, feature flags, schema changes, migrations, production migration apply, or production writes.
+- Validation recorded: 52/52 tests (17 preflight + 35 existing SMS tests), TypeScript passed, `git diff --check` passed.
+- F6C manual admin-only sandbox send action can now query for `sms_provider_deliveries` rows with `provider_status = not_submitted` to identify eligible intents for Twilio submission.
+- Mark On The Way still does not send SMS; real SMS remains deferred pending provider submission, status callback readiness, legal/provider review, and explicit activation decision.
+
 SMS Slice F1 closeout note (May 2026):
 - Slice F1 Provider/Twilio Readiness Spec is complete in docs/model-only mode at `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md`.
 - F1 records Twilio as likely provider direction while locking provider-neutral internal model and status semantics.
