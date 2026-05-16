@@ -304,6 +304,18 @@ Visible V1 UI should stay admin-readiness oriented:
 
 Template governance remains admin/settings governance, not job timeline truth. `job_events` and manual contact logs are not provider delivery truth, and `sms_message_intents.message_body_snapshot` remains the future audit record of attempted SMS wording.
 
+## F6A Provider/Twilio Sandbox Send Model Lock (May 2026)
+
+F6A confirms the boundary between template readiness and provider sandbox send:
+
+- Template sandbox readiness does not enable SMS.
+- Template readiness does not create `sms_provider_deliveries`.
+- Future sandbox send must consume an existing `sms_message_intents` row with `decision_outcome = ready_for_provider`.
+- Future sandbox send should require the current sandbox template/version to match the intent template/body snapshot unless a later slice explicitly approves frozen-intent snapshot sends without that match.
+- Mark On The Way remains intent/audit-only and must not trigger sandbox send yet.
+- First sandbox send must be manual/admin-only and server-gated in a later slice.
+- Real SMS remains deferred until provider/legal review, webhook/status callback readiness, STOP/HELP readiness, and explicit activation are complete.
+
 ---
 
 ## 2) Governance Location
@@ -685,12 +697,15 @@ L. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
 M. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
 N. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`9814340`)
 S. F5C-A On-The-Way intent creation model lock. ✓ Complete
-T. F5C-B non-sending `sms_message_intents` helper only.
-U. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper).
-V. F5C-D Mark On The Way best-effort integration (no lifecycle rollback).
-W. Provider/Twilio sandbox readiness.
-X. Provider webhook/send implementation only after all gates.
-Y. Production activation only after legal/provider review and explicit approval.
+T. F5C-B non-sending `sms_message_intents` helper only. Complete (`5833a23`)
+U. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper). Complete (`e7819e0`)
+V. F5C-D Mark On The Way best-effort integration (no lifecycle rollback). Complete (`67e4b32`)
+W. F6A provider/Twilio sandbox send model lock. Complete.
+X. F6B provider delivery preflight/helper only, no Twilio call.
+Y. F6C manual admin-only sandbox send action, server-only gated.
+Z. F6D status callback planning/implementation before live send.
+AA. Provider webhook/send implementation only after all gates.
+AB. Production activation only after legal/provider review and explicit approval.
 
 ---
 

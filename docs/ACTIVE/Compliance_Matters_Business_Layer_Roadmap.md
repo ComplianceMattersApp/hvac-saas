@@ -158,6 +158,16 @@ SMS Slice F5C-D closeout note (May 2026):
 - Mark On The Way still does not send SMS.
 - Next: provider/Twilio sandbox/send planning audit only.
 
+SMS Slice F6A provider/Twilio sandbox send model lock (May 2026):
+- F6A is docs/model-only and does not add Twilio helpers, env vars, provider calls, delivery writes, send actions, webhook routes, sandbox SMS, or live SMS.
+- First sandbox send must be manual/admin-only, consume existing `sms_message_intents` only, require `decision_outcome = ready_for_provider`, and must not be triggered from Mark On The Way.
+- Required gates include same-account intent, `message_class = on_the_way`, no existing delivery row, durable `job_event_id`, recipient/template/body snapshots, sandbox template match, active opted-in recipient with no suppression, sandbox provider configuration, verified/active sandbox sender identity, Messaging Service ref, server-only sandbox enablement, STOP/HELP readiness, and later legal/provider activation gates.
+- Future provider delivery write model creates `sms_provider_deliveries` before provider call with `provider_status = not_submitted`; Twilio `MessageSid` later maps to `provider_message_id`; immediate provider failure records provider error fields without updating job status or job timeline delivery claims.
+- Twilio secrets and provider refs remain server-only; no secrets belong in browser or `NEXT_PUBLIC_*`.
+- Webhook/status callback readiness is required before live send: request signature validation, status callback route, inbound/opt-out or Advanced Opt-Out handling, callback idempotency, duplicate/out-of-order handling, safe payload retention, STOP/HELP state recording, legal/provider review, and explicit activation.
+- Forward sequence: F6B provider delivery preflight/helper only, F6C manual admin-only sandbox send action, F6D status callback planning/implementation before live send, then later sandbox/live SMS only after explicit approval.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
 SMS Slice F1 closeout note (May 2026):
 - Slice F1 Provider/Twilio Readiness Spec is complete in docs/model-only mode at `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md`.
 - F1 records Twilio as likely provider direction while locking provider-neutral internal model and status semantics.

@@ -162,6 +162,105 @@ SMS Slice F5C-A On-The-Way Intent Creation Model Lock is complete in docs/model-
 - Mark On The Way remains lifecycle-first and unchanged; intent creation failure does not roll back lifecycle success.
 - Forward sequence: F5C-B helper only, F5C-C event-id handoff support, F5C-D best-effort Mark On The Way integration; provider/webhook/activation remain deferred.
 
+## F6A Provider/Twilio Sandbox Send Model Lock (May 2026)
+
+Slice F6A closes the provider/Twilio sandbox send model in documentation only.
+
+Locked boundary:
+
+- F6A is docs/model lock only.
+- The first sandbox send must be manual/admin-only.
+- Sandbox send must consume existing `sms_message_intents` only.
+- Sandbox send must require `decision_outcome = ready_for_provider`.
+- Sandbox send must not be triggered from Mark On The Way yet.
+- Mark On The Way remains lifecycle-first and intent/audit-only.
+- No Twilio helper, provider-delivery helper, env var, send action, webhook, sandbox SMS, or live SMS is approved in F6A.
+- Real SMS remains deferred.
+
+Required gates before any future sandbox submit:
+
+Intent gates:
+
+- same-account intent lookup
+- `message_class = on_the_way`
+- `decision_outcome = ready_for_provider`
+- no existing `sms_provider_deliveries` row for that intent
+- durable `job_event_id` exists
+- recipient snapshot, template key/version, and `message_body_snapshot` are present
+
+Template gates:
+
+- current sandbox template/version should match the intent template/body snapshot before sandbox send unless a later slice explicitly approves accepting frozen intent snapshots without a current sandbox-template match
+- template readiness and sandbox wording readiness do not equal SMS activation
+
+Recipient and consent gates:
+
+- contact recipient still exists and remains active
+- phone remains present
+- consent remains opted in for the On-The-Way message class
+- no active recipient-level or phone-level suppression exists
+- quiet-hours remains deferred, so manual sandbox send must either block until quiet-hours is implemented or be limited to verified sandbox/test recipients under an explicit server-only sandbox gate
+
+Provider and sender gates:
+
+- sandbox provider configuration exists
+- provider environment is `sandbox`
+- readiness state supports `sandbox_only`, `ready_for_sandbox`, or stronger
+- sender identity exists and is verified/active for sandbox
+- Messaging Service ref is configured
+- provider refs and secrets remain server-only and must not render in browser data
+
+Activation and legal gates:
+
+- a server-only sandbox enablement gate is required later before any sandbox submit path exists
+- STOP/HELP readiness is required before sandbox send work proceeds beyond controlled test-recipient smoke
+- live send requires provider/legal review and explicit activation
+
+Provider delivery write model:
+
+- create the `sms_provider_deliveries` row before the provider call as the durable submit reservation
+- initial row starts with `provider_status = not_submitted`
+- initial row includes `account_owner_user_id`, `sms_message_intent_id`, and `provider_name = twilio`
+- after a later Twilio response, store Twilio `MessageSid` in `provider_message_id`
+- map the initial Twilio status to normalized `provider_status`
+- store raw Twilio status in `provider_raw_status`
+- set `submitted_at` when provider handoff is accepted/attempted
+- on immediate failure, set `failed_at`, `provider_error_code`, and `provider_error_message`
+- provider delivery failure must not update job status
+- provider delivery failure must not create job timeline delivery claims
+
+Twilio integration boundary:
+
+- later Twilio send should use the Messages API
+- prefer `MessagingServiceSid` over direct `From`
+- `To` comes from the intent recipient phone snapshot
+- `Body` comes from the intent message body snapshot
+- likely future server-only secrets/config include `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` or API key/secret, `TWILIO_MESSAGING_SERVICE_SID`, callback base URL, and signature-validation config
+- no Twilio secrets or raw provider refs belong in browser HTML, browser JSON, logs intended for support users, or `NEXT_PUBLIC_*`
+
+Webhook/status callback lock:
+
+- webhook/status callback implementation can wait for a tightly controlled manual sandbox smoke only if the UI makes no delivery claim beyond immediate `submitted`/`queued`/`sandbox submit attempted` style language
+- live send must not proceed until Twilio request signature validation, status callback route, inbound/opt-out route or confirmed Advanced Opt-Out handling, provider-message-id idempotency, duplicate/out-of-order callback handling, safe payload retention, and STOP/HELP state recording are implemented or explicitly approved
+- if Twilio/provider Advanced Opt-Out is used, local suppression state still must be reconciled without double-replying
+
+Risk lock:
+
+- compliance risk remains high until A2P/STOP/HELP/legal/provider review is complete
+- duplicate send risk requires the unique intent/delivery guard and one delivery row per intent
+- tenant leakage risk requires same-account lookups and server-only provider refs
+- lifecycle rollback must remain impossible
+- UI/reporting must avoid false sent/delivered claims; use `sandbox submit attempted` language until callback truth exists
+
+Forward sequence:
+
+A. F6A docs/model lock.
+B. F6B provider delivery preflight/helper only, no Twilio call.
+C. F6C manual admin-only sandbox send action, server-only gated.
+D. F6D status callback planning/implementation before live send.
+E. Later sandbox SMS only after explicit approval.
+F. Later live SMS only after provider/legal review, webhook readiness, STOP/HELP readiness, and explicit activation.
+
 ---
 
 ## 1) Current Decision
@@ -456,10 +555,12 @@ O. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 P. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
 Q. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 R. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
-S. F5 webhook/status callback contract planning.
-T. F6 provider/Twilio sandbox implementation planning.
-U. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
-V. Production activation only after provider/legal review and explicit approval.
+S. F6A provider/Twilio sandbox send model lock. Complete.
+T. F6B provider delivery preflight/helper only, no Twilio call.
+U. F6C manual admin-only sandbox send action, server-only gated.
+V. F6D status callback planning/implementation before live send.
+W. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
+X. Production activation only after provider/legal review and explicit approval.
 
 ---
 

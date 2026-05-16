@@ -348,6 +348,10 @@ Current Program Status Note (May 2026)
     - F5C-A model lock is complete: F5C writes non-sending `sms_message_intents` only, never writes `sms_provider_deliveries`, requires real recipient/template/version/body snapshot truth for writes, enforces write-skipped/no-insert when required fields are missing, and keeps skipped non-target events as no-insert/no-op.
     - F5C-A anchor lock: preferred explicit event-id handoff from successful `on_my_way` insert, with latest-event query fallback only.
     - F5C sequence is explicit: F5C-B helper only, F5C-C event-id handoff support, F5C-D Mark On The Way best-effort integration; provider send/webhook/activation remain deferred.
+    - F6A provider/Twilio sandbox send model lock is complete in docs/model-only mode.
+    - F6A locks that first sandbox send must be manual/admin-only, consume existing `sms_message_intents` only, require `decision_outcome = ready_for_provider`, and must not be triggered from Mark On The Way.
+    - F6A locks provider-delivery posture: future sandbox submit creates `sms_provider_deliveries` before provider call with `provider_status = not_submitted`; Twilio `MessageSid` later maps to `provider_message_id`; provider failure must not roll back job status or create job timeline delivery claims.
+    - F6A keeps Twilio/provider secrets server-only and live SMS deferred until webhook/signature validation, status callback, inbound/opt-out or Advanced Opt-Out handling, STOP/HELP readiness, legal/provider review, and explicit activation are complete.
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

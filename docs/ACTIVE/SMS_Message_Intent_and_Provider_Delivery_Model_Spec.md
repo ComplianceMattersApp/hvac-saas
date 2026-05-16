@@ -171,6 +171,18 @@ Slice F5C-D completion cross-reference (Mark On The Way best-effort intent integ
 - targeted validation passed (`94/94`), TypeScript passed, `git diff --check` passed, working tree clean.
 - template readiness does not enable SMS, sandbox readiness does not send SMS, Mark On The Way still does not send SMS, and real SMS remains deferred.
 
+Slice F6A provider/Twilio sandbox send model lock:
+
+- F6A is docs/model-only and does not add provider delivery writes, Twilio helpers, env vars, send actions, webhook routes, sandbox SMS, or live SMS.
+- First sandbox send must be manual/admin-only and must consume existing `sms_message_intents` only.
+- A future sandbox submit must require same-account intent lookup, `message_class = on_the_way`, `decision_outcome = ready_for_provider`, durable `job_event_id`, required recipient/template/body snapshots, and no existing `sms_provider_deliveries` row for that intent.
+- Mark On The Way remains lifecycle-first and intent/audit-only; it must not trigger sandbox send yet.
+- `sms_provider_deliveries` should be created before a later provider call with `provider_status = not_submitted`, `provider_name = twilio`, `account_owner_user_id`, and `sms_message_intent_id`.
+- After a later Twilio response, Twilio `MessageSid` maps to `provider_message_id`, Twilio raw status maps to `provider_raw_status`, normalized status maps to `provider_status`, and `submitted_at` records handoff timing.
+- Immediate provider failure should set `failed_at`, `provider_error_code`, and `provider_error_message` without changing job status and without creating job timeline delivery claims.
+- Provider failure and callback state remain provider-delivery truth only; `job_events` and manual contact logs remain non-authoritative.
+- Live send remains blocked until webhook/status callback readiness, STOP/HELP handling, legal/provider review, and explicit activation are complete.
+
 Slice SMS On-The-Way V1 workflow simplification cross-reference:
 
 - Mark On The Way is the user-facing operational trigger.
@@ -573,10 +585,13 @@ R. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`981434
 S. F5C-A On-The-Way intent creation model lock. ✓ Complete
 T. F5C-B non-sending `sms_message_intents` helper only. ✓ Complete (`5833a23`)
 U. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper). ✓ Complete (`e7819e0`)
-V. F5C-D Mark On The Way best-effort integration (no lifecycle rollback).
-W. Provider/Twilio sandbox readiness.
-X. Provider webhook/send implementation only after all gates.
-Y. Production activation only after legal/provider review and explicit approval.
+V. F5C-D Mark On The Way best-effort integration (no lifecycle rollback). Complete (`67e4b32`)
+W. F6A provider/Twilio sandbox send model lock. Complete.
+X. F6B provider delivery preflight/helper only, no Twilio call.
+Y. F6C manual admin-only sandbox send action, server-only gated.
+Z. F6D status callback planning/implementation before live send.
+AA. Provider webhook/send implementation only after all gates.
+AB. Production activation only after legal/provider review and explicit approval.
 
 ---
 

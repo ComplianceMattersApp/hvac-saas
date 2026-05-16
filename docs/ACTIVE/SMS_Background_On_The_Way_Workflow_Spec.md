@@ -179,6 +179,49 @@ SMS Slice F5C-D Mark On The Way Best-Effort Intent Integration is complete in im
 - Mark On The Way still does not send SMS, and real SMS remains deferred.
 - Forward sequence: F5C-D complete; next is provider/Twilio sandbox/send planning audit; webhook/status callback planning is future; real SMS only after explicit approval.
 
+## Slice F6A Provider/Twilio Sandbox Send Model Lock (2026-05-15)
+
+SMS Slice F6A is complete in documentation/model-only mode.
+
+Workflow boundary recorded:
+
+- The first future sandbox send must be manual/admin-only.
+- Sandbox send must consume existing `sms_message_intents` only.
+- Sandbox send must require `decision_outcome = ready_for_provider`.
+- Sandbox send must not be triggered from Mark On The Way yet.
+- Mark On The Way remains lifecycle-first and intent/audit-only.
+- Mark On The Way still does not send SMS.
+- Real SMS remains deferred.
+
+Future sandbox send preconditions:
+
+- same-account intent lookup
+- `message_class = on_the_way`
+- no existing `sms_provider_deliveries` row for that intent
+- durable `job_event_id` exists
+- recipient/template/body snapshots are present
+- current sandbox template matches before sandbox send unless a later slice explicitly changes this
+- contact recipient remains active, phone remains present, consent remains opted in, and no suppression exists
+- quiet-hours remains deferred, so manual sandbox send must either block until quiet-hours is implemented or be limited to verified sandbox/test recipients
+- sandbox provider configuration and verified/active sandbox sender identity exist with Messaging Service ref configured
+- server-only sandbox enablement gate, STOP/HELP readiness, legal/provider review, and explicit activation remain later gates
+
+Future provider delivery posture:
+
+- create `sms_provider_deliveries` before the provider call with `provider_status = not_submitted`
+- later Twilio `MessageSid` maps to `provider_message_id`
+- later Twilio status maps to `provider_raw_status` and normalized `provider_status`
+- immediate provider failures are recorded on `sms_provider_deliveries` and must not roll back job status
+- no job timeline delivery claim is allowed unless backed by provider delivery truth and separately designed
+
+Forward sequence:
+
+- F6B provider delivery preflight/helper only, no Twilio call
+- F6C manual admin-only sandbox send action, server-only gated
+- F6D status callback planning/implementation before live send
+- later sandbox SMS only after explicit approval
+- later live SMS only after legal/provider/activation approval
+
 ---
 
 ## 1) Current Decision
@@ -448,11 +491,14 @@ R. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`981434
 S. F5C-A On-The-Way intent creation model lock. ✓ Complete
 T. F5C-B non-sending `sms_message_intents` helper only. ✓ Complete (`5833a23`)
 U. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper). ✓ Complete (`e7819e0`)
-V. F5C-D Mark On The Way best-effort integration (no lifecycle rollback).
-W. Quiet-hours/timezone gate planning.
-X. Provider/Twilio readiness and A2P sandbox planning.
-Y. Sandbox provider send only after all gates.
-Z. Production activation only after legal/provider review and explicit approval.
+V. F5C-D Mark On The Way best-effort integration (no lifecycle rollback). Complete (`67e4b32`)
+W. F6A provider/Twilio sandbox send model lock. Complete.
+X. F6B provider delivery preflight/helper only, no Twilio call.
+Y. F6C manual admin-only sandbox send action, server-only gated.
+Z. F6D status callback planning/implementation before live send.
+AA. Quiet-hours/timezone gate planning.
+AB. Sandbox provider send only after all gates and explicit approval.
+AC. Production activation only after legal/provider review and explicit approval.
 
 ---
 
