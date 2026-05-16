@@ -11,6 +11,7 @@ import {
   startOfTodayUtcIsoLA,
   startOfTomorrowUtcIsoLA,
 } from "@/lib/utils/schedule-la";
+import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
@@ -1315,9 +1316,10 @@ function assignmentSummaryForJob(jobId: string) {
   if (!assignments.length) return "Unassigned";
 
   const [primaryAssignee, ...overflow] = assignments;
+  const primaryAssigneeName = formatPersonNamePart(primaryAssignee.display_name);
   return overflow.length > 0
-    ? `${primaryAssignee.display_name} +${overflow.length}`
-    : primaryAssignee.display_name;
+    ? `${primaryAssigneeName} +${overflow.length}`
+    : primaryAssigneeName;
 }
 
 const signalEvents = signalRes.data ?? [];
@@ -1653,7 +1655,7 @@ for (const job of uniqueAllOpenOpsJobs) {
   const isWaiting = Boolean(waitingState?.status);
 
   for (const assignment of assignments) {
-    const displayName = String(assignment?.display_name ?? "").trim();
+    const displayName = formatPersonNamePart(assignment?.display_name);
     if (!displayName) continue;
 
     const existing = workByTechnicianMap.get(displayName) ?? { open: 0, scheduled: 0, waiting: 0 };
@@ -1924,7 +1926,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     : onHoldBannerText(j);
   const showPendingInfoBanner = pendingInfoSignal && Boolean(pendingInfoContext);
   const showOnHoldBanner = onHoldSignal && Boolean(onHoldContext);
-  const customerName = customerNameOnly(j);
+  const customerName = formatPersonNamePart(customerNameOnly(j));
   const customerPhone = customerPhoneOnly(j);
   const visitScope = buildVisitScopeReadModel(j?.visit_scope_summary, j?.visit_scope_items, {
     leadMaxLength: 82,

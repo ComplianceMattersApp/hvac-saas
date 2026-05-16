@@ -49,6 +49,35 @@ export function resolveHumanDisplayName(input: {
   return display || String(input.fallback ?? "User");
 }
 
+export function formatPersonNamePart(value: unknown): string {
+  const text = String(value ?? "").trim().replace(/\s+/g, " ");
+  if (!text) return "";
+
+  return text.replace(/[A-Za-z]+/g, (part) => {
+    const lower = part.toLowerCase();
+    const shouldNormalizeCase = part === lower || part === part.toUpperCase();
+    if (!shouldNormalizeCase) return part;
+    return part.charAt(0).toUpperCase() + lower.slice(1);
+  });
+}
+
+export function formatPersonDisplayName(input: {
+  fullName?: unknown;
+  firstName?: unknown;
+  lastName?: unknown;
+  fallback?: string;
+}): string {
+  const full = formatPersonNamePart(input.fullName);
+  if (full) return full;
+
+  const joined = [formatPersonNamePart(input.firstName), formatPersonNamePart(input.lastName)]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return joined || String(input.fallback ?? "");
+}
+
 export function firstNameFromDisplayName(displayName: string | null | undefined, fallback = "Account") {
   const text = String(displayName ?? "").trim();
   if (!text) return fallback;

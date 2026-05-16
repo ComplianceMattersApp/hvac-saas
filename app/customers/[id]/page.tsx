@@ -30,6 +30,8 @@ import {
 } from "@/lib/maintenance-agreements/read-model";
 import VisitScopeBuilder from "@/components/jobs/VisitScopeBuilder";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
+import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
+import { formatPersonDisplayName } from "@/lib/utils/identity-display";
 
 
 type CustomerRow = {
@@ -102,14 +104,10 @@ function isUuid(v: string) {
 }
 
 function formatDate(value?: string | null) {
-  if (!value) return "â€”";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "â€”";
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const raw = String(value ?? "").trim();
+  if (!raw) return "—";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return formatDateOnlyDisplay(raw);
+  return formatTimestampDateDisplayLA(raw) || "—";
 }
 
 function formatPhone(phone?: string | null) {
@@ -121,14 +119,12 @@ function formatPhone(phone?: string | null) {
 }
 
 function customerDisplayName(customer: CustomerRow) {
-  const full = String(customer.full_name ?? "").trim();
-  if (full) return full;
-
-  const first = String(customer.first_name ?? "").trim();
-  const last = String(customer.last_name ?? "").trim();
-  const joined = [first, last].filter(Boolean).join(" ").trim();
-
-  return joined || "Unnamed Customer";
+  return formatPersonDisplayName({
+    fullName: customer.full_name,
+    firstName: customer.first_name,
+    lastName: customer.last_name,
+    fallback: "Unnamed Customer",
+  });
 }
 
 function locationDisplayName(loc: LocationRow) {

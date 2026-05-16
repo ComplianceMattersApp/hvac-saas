@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
+import { formatPersonDisplayName } from "@/lib/utils/identity-display";
 
 type LifecycleFilter =
   | "all"
@@ -73,7 +74,11 @@ function getPendingInfoSignal(job: OpsPreviewJob) {
 }
 
 function customerLine(job: OpsPreviewJob) {
-  const fullName = `${job.customer_first_name ?? ""} ${job.customer_last_name ?? ""}`.trim() || "Customer";
+  const fullName = formatPersonDisplayName({
+    firstName: job.customer_first_name,
+    lastName: job.customer_last_name,
+    fallback: "Customer",
+  });
   const phone = String(job.customer_phone ?? "").trim() || "-";
   return `${fullName} • ${phone}`;
 }

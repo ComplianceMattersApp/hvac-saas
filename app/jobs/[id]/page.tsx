@@ -42,7 +42,8 @@ import {
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 
 import ServiceStatusActions from "./_components/ServiceStatusActions";
-import { displayDateLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { displayDateLA, formatBusinessDateUS, formatDateOnlyDisplay, formatTimestampDateDisplayLA, formatTimestampDateTimeDisplayLA } from "@/lib/utils/schedule-la";
+import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
 import UnscheduleButton from "./_components/UnscheduleButton";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
@@ -143,33 +144,11 @@ function dateToDateInput(value?: string | null) {
 
 
 function formatDateLAFromIso(iso: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(iso));
+  return formatTimestampDateDisplayLA(iso);
 }
 
 function formatDateTimeLAFromIso(iso: string) {
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return "";
-
-  const date = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
-
-  const time = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(d);
-
-  return `${date} ${time}`;
+  return formatTimestampDateTimeDisplayLA(iso);
 }
 
 
@@ -193,11 +172,7 @@ function formatYmdDisplay(value?: string | null) {
 }
 
 function formatDateOnlyUs(value?: string | null) {
-  const ymd = String(value ?? "").trim();
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
-  if (!match) return "";
-  const [, year, month, day] = match;
-  return `${month}/${day}/${year}`;
+  return formatDateOnlyDisplay(value);
 }
 
 function formatTimeDisplay(time?: string | null) {
@@ -1421,6 +1396,8 @@ export default async function JobDetailPage({
     [job.customer_first_name, job.customer_last_name].filter(Boolean).join(" ").trim() ||
     "—");
 
+  const customerDisplayName = formatPersonNamePart(customerName);
+
 const customerPhone =
   customerBilling?.phone ?? job.customer_phone ?? "—";
 
@@ -1886,7 +1863,7 @@ const serviceMapsLink =
 const permitNumber = String(job.permit_number ?? "").trim();
 const permitJurisdiction = String((job as any).jurisdiction ?? "").trim();
 const permitDateValue = String((job as any).permit_date ?? "").trim();
-const permitDateLabel = permitDateValue ? displayDateLA(permitDateValue) : "";
+const permitDateLabel = permitDateValue ? formatTimestampDateDisplayLA(permitDateValue) : "";
 const permitDetailCount = Number(Boolean(permitNumber)) + Number(Boolean(permitJurisdiction)) + Number(Boolean(permitDateValue));
 const hasPermitDetails = permitDetailCount > 0;
 
@@ -1909,7 +1886,7 @@ const equipmentSummaryLabel =
 
 const followUpOwnerLabel = String((job as any).action_required_by ?? "").trim();
 const followUpDateValue = String((job as any).follow_up_date ?? "").trim();
-const followUpDateSummary = followUpDateValue ? displayDateLA(followUpDateValue) : "";
+const followUpDateSummary = followUpDateValue ? formatTimestampDateDisplayLA(followUpDateValue) : "";
 const nextActionPreview = truncateSummaryText(String((job as any).next_action_note ?? ""), 78);
 const jobStatusSummaryText = activeWaitingState
   ? `Waiting${activeWaitingState.blockerReason ? ` • ${truncateSummaryText(activeWaitingState.blockerReason, 72)}` : ""}`
@@ -2082,8 +2059,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     const issuedInvoiceStatusMessage =
       internalInvoice?.status === "issued"
         ? job.job_type === "ecc" && !job.certs_complete
-          ? `Issued ${internalInvoice.issued_at ? displayDateLA(internalInvoice.issued_at) : ""}. Billing is satisfied, but certs are still open before this job can fully close.`
-          : `Issued ${internalInvoice.issued_at ? displayDateLA(internalInvoice.issued_at) : ""}. The job's billing-closeout requirement is currently satisfied.`
+          ? `Issued ${internalInvoice.issued_at ? formatTimestampDateDisplayLA(internalInvoice.issued_at) : ""}. Billing is satisfied, but certs are still open before this job can fully close.`
+          : `Issued ${internalInvoice.issued_at ? formatTimestampDateDisplayLA(internalInvoice.issued_at) : ""}. The job's billing-closeout requirement is currently satisfied.`
         : "";
 
     return (
@@ -2100,7 +2077,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Date</div>
               <div className="mt-1 text-sm font-semibold text-slate-950">
-                {internalInvoice ? displayDateLA(internalInvoice.invoice_date) : "Will auto-fill on draft"}
+                {internalInvoice ? formatTimestampDateDisplayLA(internalInvoice.invoice_date) : "Will auto-fill on draft"}
               </div>
             </div>
 
@@ -2209,7 +2186,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     </div>
                     <div className={workspaceSoftCardClass}>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Date</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-950">{displayDateLA(internalInvoice.invoice_date)}</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-950">{formatTimestampDateDisplayLA(internalInvoice.invoice_date)}</div>
                     </div>
                     <div className={workspaceSoftCardClass}>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Subtotal</div>
@@ -2887,10 +2864,10 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           href={`/customers/${job.customer_id}`}
           className="mt-2 block text-[1.55rem] font-semibold tracking-[-0.02em] text-slate-950 hover:underline"
         >
-          {customerName}
+          {customerDisplayName}
         </Link>
       ) : (
-        <h1 className="mt-2 text-[1.55rem] font-semibold tracking-[-0.02em] text-slate-950">{customerName}</h1>
+        <h1 className="mt-2 text-[1.55rem] font-semibold tracking-[-0.02em] text-slate-950">{customerDisplayName}</h1>
       )}
 
       <div className="mt-4 grid gap-x-6 gap-y-3 border-t border-slate-200/70 pt-4 text-sm sm:grid-cols-2">
@@ -2959,7 +2936,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 key={`${assignee.job_id}-${assignee.user_id}`}
                 className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-800 shadow-[0_8px_20px_-24px_rgba(15,23,42,0.22)]"
               >
-                <span className="max-w-full break-words">{assignee.display_name}</span>
+                <span className="max-w-full break-words">{formatPersonNamePart(assignee.display_name)}</span>
                 {assignee.is_primary ? (
                   <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                     Primary

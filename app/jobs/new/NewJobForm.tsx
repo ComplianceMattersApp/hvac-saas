@@ -28,6 +28,8 @@ import {
   resolveRestoredDraftJobType,
 } from "./new-job-defaults";
 import type { ProductMode } from "@/lib/business/product-mode-defaults";
+import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
+import { formatPersonDisplayName } from "@/lib/utils/identity-display";
 
 type Contractor = { id: string; name: string };
 
@@ -222,11 +224,12 @@ function componentUsesHeatingCapacity(t: ComponentType) {
 }
 
 function customerDisplayName(row: CustomerLookupRow | ExistingCustomer) {
-  const full = "full_name" in row ? String(row.full_name ?? "").trim() : "";
-  if (full) return full;
-  return [String(row.first_name ?? "").trim(), String(row.last_name ?? "").trim()]
-    .filter(Boolean)
-    .join(" ") || "Unnamed Customer";
+  return formatPersonDisplayName({
+    fullName: "full_name" in row ? row.full_name : null,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    fallback: "Unnamed Customer",
+  });
 }
 
 function onlyDigits(value: string | null | undefined) {
@@ -310,13 +313,9 @@ function relationshipOpsTone(value?: string | null) {
 
 function formatRelationshipDate(value?: string | null) {
   if (!value) return "Unscheduled";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Unscheduled";
-  return parsed.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const raw = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return formatDateOnlyDisplay(raw);
+  return formatTimestampDateDisplayLA(raw) || "Unscheduled";
 }
 
 function formatRelationshipWindow(job: RelationshipJobSummary) {
@@ -328,13 +327,8 @@ function formatRelationshipWindow(job: RelationshipJobSummary) {
 function formatPrefillDueDate(value?: string | null) {
   const raw = String(value ?? "").trim();
   if (!raw) return "No due date";
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return "No due date";
-  return parsed.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return formatDateOnlyDisplay(raw);
+  return formatTimestampDateDisplayLA(raw) || "No due date";
 }
 
 function mapPrefillVisitScopeItems(

@@ -18,6 +18,39 @@ export function formatBusinessDateUS(value?: string | null): string {
   return formatDateOnlyDisplay(value);
 }
 
+export function formatTimestampDateDisplayLA(value?: string | null): string {
+  if (!value) return "";
+  const s = String(value).trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return formatDateOnlyDisplay(s);
+
+  const d = new Date(s);
+  if (!Number.isFinite(d.getTime())) return "";
+  const ymd = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+  return formatDateOnlyDisplay(ymd);
+}
+
+export function formatTimestampDateTimeDisplayLA(value?: string | null): string {
+  const date = formatTimestampDateDisplayLA(value);
+  if (!date) return "";
+
+  const d = new Date(String(value ?? "").trim());
+  if (!Number.isFinite(d.getTime())) return date;
+  const time = new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+
+  return `${date} ${time}`;
+}
+
 // Accepts ISO/timestamptz strings. Also tolerates legacy "HH:MM[:SS]" strings.
 export function displayDateLA(value?: string | null): string {
   if (!value) return "";

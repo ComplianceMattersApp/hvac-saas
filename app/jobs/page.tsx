@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { buildPromotedCompanionReadModel, buildVisitScopeReadModel } from "@/lib/jobs/visit-scope";
+import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
+import { formatPersonDisplayName } from "@/lib/utils/identity-display";
 
 
 const QUEUES = [
@@ -18,12 +20,7 @@ const QUEUES = [
 type Queue = (typeof QUEUES)[number];
 
 function formatDateLA(iso: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(iso));
+  return formatTimestampDateDisplayLA(iso);
 }
 
 function safeQueue(value: string | undefined): Queue {
@@ -243,9 +240,12 @@ if (countsData) {
 const l: any = job.location_id ? locationsById.get(job.location_id) : null;
 
 const customerName: string | null =
-  (c?.full_name ||
-    `${c?.first_name ?? ""} ${c?.last_name ?? ""}`.trim() ||
-    `${job.customer_first_name ?? ""} ${job.customer_last_name ?? ""}`.trim()) || null;
+  formatPersonDisplayName({
+    fullName: c?.full_name,
+    firstName: c?.first_name ?? job.customer_first_name,
+    lastName: c?.last_name ?? job.customer_last_name,
+    fallback: "",
+  }) || null;
 
 const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.zip ?? null].filter(Boolean).join(" ")]
   .filter(Boolean)
@@ -269,6 +269,7 @@ const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.
     previewItemMaxLength: 34,
   });
   const promotedCompanion = buildPromotedCompanionReadModel(job.visit_scope_items);
+  const followUpDateDisplay = job.follow_up_date ? formatDateOnlyDisplay(job.follow_up_date) : "";
 
   return (
 
@@ -287,7 +288,7 @@ const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.
                   <div className="text-sm text-gray-600">
                     {displayCity} • {job.status ?? "—"} •{" "}
                     <span className="font-medium">{formatOpsStatusLabel(job.ops_status)}</span>
-                    {job.follow_up_date ? <> • Follow-up: {job.follow_up_date}</> : null}
+                    {job.follow_up_date ? <> • Follow-up: {followUpDateDisplay}</> : null}
                   </div>
 
                   {visitScope.hasContent ? (
@@ -324,7 +325,7 @@ const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.
                   {(job.customer_first_name || job.customer_last_name) ? (
                     <div className="text-sm text-gray-600 mt-1">
                       Customer:{" "}
-                      {`${job.customer_first_name ?? ""} ${job.customer_last_name ?? ""}`.trim()}
+                      {formatPersonDisplayName({ firstName: job.customer_first_name, lastName: job.customer_last_name })}
                     </div>
                   ) : null}
 

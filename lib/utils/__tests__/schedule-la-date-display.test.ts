@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBusinessDateUS, formatDateOnlyDisplay } from '@/lib/utils/schedule-la';
+import { formatBusinessDateUS, formatDateOnlyDisplay, formatTimestampDateDisplayLA } from '@/lib/utils/schedule-la';
 
 describe('date-only display formatting', () => {
   it('formats YYYY-MM-DD to MM-DD-YYYY', () => {
@@ -18,5 +18,9 @@ describe('date-only display formatting', () => {
 
   it('keeps formatBusinessDateUS aligned with date-only display helper', () => {
     expect(formatBusinessDateUS('2026-12-31')).toBe('12-31-2026');
+  });
+
+  it('formats LA timestamps to MM-DD-YYYY', () => {
+    expect(formatTimestampDateDisplayLA('2026-04-29T18:30:00.000Z')).toBe('04-29-2026');
   });
 });
