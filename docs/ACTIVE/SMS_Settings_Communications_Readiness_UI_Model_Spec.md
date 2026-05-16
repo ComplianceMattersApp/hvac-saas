@@ -211,6 +211,27 @@ Future UI language lock:
 - do not use `sent`, `delivered`, or activation language unless backed by `sms_provider_deliveries` callback truth and explicit live-send activation
 - no raw provider refs, provider secrets, account ids, customer/job data, or full phone numbers should render
 
+## F6C-A Manual Admin Sandbox Send Model Lock (May 2026)
+
+F6C-A is complete as docs/model lock only.
+
+Settings/Communications impact:
+
+- No UI change is approved by F6C-A.
+- No send/test/sandbox button is approved by F6C-A.
+- A future manual sandbox submit control must consume an existing same-account `sms_provider_deliveries` row with `provider_status = not_submitted`.
+- A future manual sandbox submit control must be admin-only and must not appear on Mark On The Way or job pages.
+- A future manual sandbox submit control must remain hidden until server-only provider config, sender identity, sandbox gate, and verified test-recipient gates pass.
+- A future manual sandbox submit control must not accept account ids, provider refs, phone numbers, message body, or provider status from the client.
+- Mark On The Way remains lifecycle + non-sending intent/preflight only.
+- Real SMS remains deferred.
+
+Future UI language lock:
+
+- allowed later wording: `Submit sandbox SMS test`, `Sandbox submit attempted`, `Queued by provider`, `Accepted by provider`
+- avoid: `Send to customer`, `Delivered`, `SMS enabled`, `Live SMS`, and any job-detail send button
+- missing webhook is acceptable only for tightly controlled manual sandbox smoke; live send requires callback/signature/opt-out/legal/provider/activation readiness first
+
 ---
 
 ## 1) Current Decision
@@ -569,7 +590,9 @@ P. F5C-B non-sending `sms_message_intents` helper only. Complete (`5833a23`)
 Q. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper). Complete (`e7819e0`)
 R. F5C-D Mark On The Way best-effort integration (no lifecycle rollback). Complete (`67e4b32`)
 S. F6A provider/Twilio sandbox send model lock. Complete.
-T. Later slices: provider delivery preflight/helper, manual admin-only sandbox action, webhook/signature validation, sandbox send planning, activation planning.
+T. F6B provider delivery preflight/helper only, no Twilio call. Complete.
+U. F6C-A manual sandbox send model lock. Complete.
+V. Later slices: server-only provider config resolver, manual admin-only sandbox action after explicit setup approval, webhook/signature validation, sandbox send planning, activation planning.
 
 ---
 

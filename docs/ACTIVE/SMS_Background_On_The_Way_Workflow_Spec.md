@@ -217,7 +217,9 @@ Future provider delivery posture:
 Forward sequence:
 
 - F6B provider delivery preflight/helper only, no Twilio call
-- F6C manual admin-only sandbox send action, server-only gated
+- F6C-A manual sandbox send model lock
+- F6C-B server-only provider config resolver, no sends
+- F6C-C manual admin-only sandbox send action, server-only gated and only after explicit Twilio sandbox/env/test-recipient setup approval
 - F6D status callback planning/implementation before live send
 - later sandbox SMS only after explicit approval
 - later live SMS only after legal/provider/activation approval
@@ -239,7 +241,26 @@ SMS Slice F6B Provider Delivery Preflight Helper is complete in implementation c
 - Validation recorded: new preflight tests `17/17`, existing SMS intent create tests `12/12`, SMS intent eligibility tests `12/12`, template governance read tests `15/15`, template validation tests `19/19`, provider readiness tests `16/16`, eligibility inputs tests `16/16`, contact recipient tests `4/4`, `npx.cmd tsc --noEmit` passed, `git diff --check` passed. Total: `52/52` tests passed.
 - No `sms_provider_deliveries` rows actually created (non-sending audit infrastructure only); no production writes.
 - Mark On The Way still does not send SMS, and real SMS remains deferred.
-- F6C manual admin-only sandbox send action can now query for `sms_provider_deliveries` rows with `provider_status = not_submitted` and proceed with Twilio submission if sandbox gates pass.
+- Future F6C-C manual admin-only sandbox send action can query for `sms_provider_deliveries` rows with `provider_status = not_submitted` and proceed with Twilio submission only after F6C-A/F6C-B gates and explicit Twilio sandbox/env/test-recipient setup approval.
+
+## Slice F6C-A Manual Admin Sandbox Send Model Lock (2026-05-15)
+
+SMS Slice F6C-A is complete in documentation/model-only mode.
+
+Workflow boundary recorded:
+
+- First sandbox send remains manual/admin-only.
+- Future sandbox send must consume an existing `sms_provider_deliveries` row with `provider_status = not_submitted`.
+- The future action must not be triggered by Mark On The Way and must not live on job pages.
+- Mark On The Way remains lifecycle + non-sending intent/preflight only.
+- The future manual action must be server-gated, account-scoped, and limited to verified sandbox/test recipients until quiet-hours and live compliance gates are complete.
+- Future provider submission must reserve the delivery row with a guarded update from `not_submitted` to `submitted` immediately before Twilio handoff.
+- The guarded update must require same account, same delivery id, `provider_status = not_submitted`, and no `provider_message_id`; if no row is reserved, no provider call may happen.
+- `submitted` as reservation state is acceptable only for tightly controlled manual sandbox smoke because the schema has no true in-flight status.
+- Future provider response writes belong only to `sms_provider_deliveries`; they must not update job status or create job timeline delivery claims.
+- Missing webhook is acceptable only for manual sandbox smoke; live send remains blocked until status callback, signature validation, opt-out/HELP handling, legal/provider review, and explicit activation are complete.
+- No code, schema, provider, send, webhook, env, or behavior change is approved by F6C-A.
+- Mark On The Way still does not send SMS, and real SMS remains deferred.
 
 ---
 
@@ -513,11 +534,13 @@ U. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equi
 V. F5C-D Mark On The Way best-effort integration (no lifecycle rollback). Complete (`67e4b32`)
 W. F6A provider/Twilio sandbox send model lock. Complete.
 X. F6B provider delivery preflight/helper only, no Twilio call.
-Y. F6C manual admin-only sandbox send action, server-only gated.
-Z. F6D status callback planning/implementation before live send.
-AA. Quiet-hours/timezone gate planning.
-AB. Sandbox provider send only after all gates and explicit approval.
-AC. Production activation only after legal/provider review and explicit approval.
+Y. F6C-A manual sandbox send model lock. Complete.
+Z. F6C-B server-only provider config resolver, no sends.
+AA. F6C-C manual admin-only sandbox send action, server-only gated and only after explicit Twilio sandbox/env/test-recipient setup approval.
+AB. F6D status callback planning/implementation before live send.
+AC. Quiet-hours/timezone gate planning.
+AD. Sandbox provider send only after all gates and explicit approval.
+AE. Production activation only after legal/provider review and explicit approval.
 
 ---
 

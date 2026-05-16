@@ -165,7 +165,7 @@ SMS Slice F6A provider/Twilio sandbox send model lock (May 2026):
 - Future provider delivery write model creates `sms_provider_deliveries` before provider call with `provider_status = not_submitted`; Twilio `MessageSid` later maps to `provider_message_id`; immediate provider failure records provider error fields without updating job status or job timeline delivery claims.
 - Twilio secrets and provider refs remain server-only; no secrets belong in browser or `NEXT_PUBLIC_*`.
 - Webhook/status callback readiness is required before live send: request signature validation, status callback route, inbound/opt-out or Advanced Opt-Out handling, callback idempotency, duplicate/out-of-order handling, safe payload retention, STOP/HELP state recording, legal/provider review, and explicit activation.
-- Forward sequence: F6B provider delivery preflight/helper only, F6C manual admin-only sandbox send action, F6D status callback planning/implementation before live send, then later sandbox/live SMS only after explicit approval.
+- Forward sequence: F6B provider delivery preflight/helper only, F6C-A manual sandbox send model lock, F6C-B server-only provider config resolver with no sends, F6C-C manual admin-only sandbox action only after explicit setup approval, F6D status callback planning/implementation before live send, then later sandbox/live SMS only after explicit approval.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 
 SMS Slice F6B closeout note (May 2026):
@@ -181,8 +181,23 @@ SMS Slice F6B closeout note (May 2026):
 - F6B preserves account scope: missing `account_owner_user_id` or `sms_message_intent_id` blocks operation.
 - F6B did not add live SMS, Twilio integration, send endpoint, webhook, provider delivery write path, sandbox/live SMS, env/secrets changes, feature flags, schema changes, migrations, production migration apply, or production writes.
 - Validation recorded: 52/52 tests (17 preflight + 35 existing SMS tests), TypeScript passed, `git diff --check` passed.
-- F6C manual admin-only sandbox send action can now query for `sms_provider_deliveries` rows with `provider_status = not_submitted` to identify eligible intents for Twilio submission.
+- Future F6C-C manual admin-only sandbox send action can query for `sms_provider_deliveries` rows with `provider_status = not_submitted` to identify eligible intents for Twilio submission only after F6C-A/F6C-B gates and explicit Twilio sandbox/env/test-recipient setup approval.
 - Mark On The Way still does not send SMS; real SMS remains deferred pending provider submission, status callback readiness, legal/provider review, and explicit activation decision.
+
+SMS Slice F6C-A manual sandbox send model lock (May 2026):
+- F6C-A is docs/model-only and does not add Twilio helpers, provider config resolver, env vars, provider calls, send actions, webhook routes, sandbox SMS, or live SMS.
+- First sandbox send remains manual/admin-only and must consume an existing `sms_provider_deliveries` row with `provider_status = not_submitted`.
+- Future action must not be triggered by Mark On The Way and must not live on job pages; Mark On The Way remains lifecycle + non-sending intent/preflight only.
+- Required gates include admin actor, same-account delivery, `provider_name = twilio`, no provider message id, linked same-account ready On-The-Way intent, durable event anchor, required snapshots, active opted-in unsuppressed recipient, sandbox template match, sandbox provider config, verified/active sandbox sender identity, Messaging Service ref, server-only sandbox gate, and verified sandbox/test recipient limitation.
+- Quiet-hours must not block lifecycle behavior; manual sandbox sends should remain verified-test-recipient-only or fail closed until quiet-hours exists.
+- Future provider delivery transition reserves with guarded update from `not_submitted` to `submitted` immediately before provider handoff; if no row is reserved, no Twilio call may happen.
+- On future Twilio response, Message SID maps to `provider_message_id`, raw status maps to `provider_raw_status`, and normalized initial status maps to `queued` or `submitted`; immediate provider error maps to `failed` with error fields.
+- Never set `sent` or `delivered` without callback truth; never update job status; never create job timeline delivery claims.
+- Current schema has no true in-flight status, so using `submitted` as reservation state is acceptable only for tightly controlled manual sandbox smoke; stronger retry/in-flight model remains parked.
+- UI remains deferred; later allowed wording is `Submit sandbox SMS test`, `Sandbox submit attempted`, `Queued by provider`, or `Accepted by provider`; avoid `Send to customer`, `Delivered`, `SMS enabled`, `Live SMS`, and job-detail send buttons.
+- Missing webhook is acceptable only for manual sandbox smoke; live send remains blocked until callback/signature validation, inbound opt-out or Advanced Opt-Out handling, idempotency, duplicate/out-of-order handling, payload retention, legal/provider/A2P/STOP/HELP review, and explicit activation.
+- Recommended sequence: F6C-B server-only provider config resolver with no sends, then F6C-C manual admin sandbox action only after explicit Twilio sandbox/env/test-recipient setup approval, then F6D callback/webhook work before live.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
 
 SMS Slice F1 closeout note (May 2026):
 - Slice F1 Provider/Twilio Readiness Spec is complete in docs/model-only mode at `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md`.
