@@ -308,7 +308,8 @@ Settings/Communications closeout lock:
 - Test-recipient schema is independent from customer/job linkage and does not imply live communication permission.
 - RLS/write posture remains fail-closed for writes (account-scoped authenticated select only; no authenticated insert/update/delete policies).
 - Future trusted admin/service-role paths must manage writes.
-- Resolver still requires F6C-C3C follow-up to use schema-backed gate and explicit sandbox provider selection.
+- F6C-C3C resolver update is complete in commit `5af36cb` with explicit account + twilio + sandbox provider selection and schema-backed `sandbox_send_enabled` gate usage.
+- F6C-C3C preserves fail-closed gate behavior and server-only/no-secret/non-sending readiness output.
 - Dry-run action still requires F6C-C3D follow-up to pass when schema-backed gate + verified test-recipient are configured.
 - Real sandbox send remains deferred.
 - Mark On The Way still does not send SMS; real SMS remains deferred.

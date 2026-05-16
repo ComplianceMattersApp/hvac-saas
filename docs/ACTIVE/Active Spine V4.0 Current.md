@@ -381,7 +381,9 @@ Current Program Status Note (May 2026)
     - F6C-C3B adds `sms_sandbox_test_recipients` as account-scoped verified sandbox/test-recipient registry foundation (no customer/job linkage required).
     - F6C-C3B keeps gate semantics manual-sandbox-only, non-live, and non-sending by itself.
     - F6C-C3B keeps RLS/write posture fail-closed for writes (account-scoped select only; no authenticated insert/update/delete policies).
-    - F6C-C3B keeps resolver follow-up for C3C and dry-run follow-up for C3D before any C4 real manual sandbox send consideration.
+    - F6C-C3C resolver update is complete in commit `5af36cb` with explicit account + twilio + sandbox provider selection and schema-backed `sandbox_send_enabled` gating.
+    - F6C-C3C keeps fail-closed gate behavior (`sandbox_send_gate_missing_or_disabled`) and retains server-only/no-secret/non-sending readiness output (`liveSendEnabled = false`, no `canSend`).
+    - F6C lane now keeps dry-run follow-up for C3D before any C4 real manual sandbox send consideration.
     - Mark On The Way still does not send SMS, and real SMS remains deferred.
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:

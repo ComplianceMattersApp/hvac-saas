@@ -145,8 +145,9 @@ Reference closeouts:
 - F6C-C3B test-recipient schema is independent from customer/job linkage and does not imply live communication permission.
 - F6C-C3B RLS/write posture remains fail-closed for writes (account-scoped authenticated select only; no authenticated insert/update/delete policies).
 - F6C-C3B keeps future writes reserved for trusted admin/service-role server paths.
-- F6C-C3B leaves resolver follow-up for F6C-C3C (schema-backed gate usage + explicit sandbox provider disambiguation).
-- F6C-C3B leaves dry-run follow-up for F6C-C3D (pass path once gate + verified test-recipient are configured).
+- F6C-C3C resolver follow-up is complete in commit `5af36cb` with explicit account + twilio + sandbox selection and schema-backed `sandbox_send_enabled` gating.
+- F6C-C3C continues fail-closed gate behavior (`sandbox_send_gate_missing_or_disabled`) and keeps server-only/non-secret/non-sending output (`liveSendEnabled = false`, no `canSend`).
+- F6C-C3B/C3C now leave only dry-run follow-up for F6C-C3D (pass path once gate + verified test-recipient are configured).
 - Real sandbox send remains deferred; Mark On The Way still does not send SMS; real SMS remains deferred.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 - SMS On-The-Way V1 simplification: Mark On The Way is the operational trigger; future SMS is a background operational/customer-care notification after that lifecycle event; admin owns the wording in V1; field users do not write custom SMS; visible V1 UI should not become a multi-person approval/rejection queue unless explicitly reopened.

@@ -522,10 +522,25 @@ F6C-C3B validation recorded:
 
 - `git diff --check` passed.
 
+## F6C-C3C Schema-Backed Sandbox Provider Resolver Closeout (May 2026)
+
+SMS Slice F6C-C3C is complete in implementation commit `5af36cb`.
+
+- Updated `lib/communications/sms-provider-config-resolver.ts` and `lib/communications/__tests__/sms-provider-config-resolver.test.ts`.
+- Resolver now explicitly selects provider configuration by account + `provider_name = twilio` + `provider_environment = sandbox`.
+- Production provider configuration can no longer satisfy sandbox readiness.
+- Resolver now uses schema-backed `sandbox_send_enabled` directly.
+- Missing/false gate blocks with `sandbox_send_gate_missing_or_disabled`.
+- Sender identity readiness and Messaging Service checks remain required.
+- Resolver remains server-only readiness infrastructure.
+- Resolver does not read env secrets, does not call Twilio/provider APIs, and does not send SMS.
+- Resolver does not expose raw provider refs/secrets, does not return `canSend`, and keeps `liveSendEnabled = false`.
+- Mark On The Way still does not send SMS.
+- Real SMS remains deferred.
+
 F6C sequence update:
 
-- F6C-C3B docs closeout complete.
-- Next F6C-C3C: resolver update to use schema-backed sandbox send gate and explicit sandbox provider selection.
+- F6C-C3C docs closeout complete.
 - Next F6C-C3D: dry-run action update to pass when sandbox gate and test-recipient are configured.
 - F6C-C4 real manual sandbox send action only after explicit Twilio sandbox/env/test-recipient approval.
 - F6D webhook/status callback before live SMS.

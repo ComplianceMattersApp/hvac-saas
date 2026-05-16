@@ -268,7 +268,9 @@ SMS Slice F6C-C3B closeout note (May 2026):
 - Test-recipient approval does not imply live communication permission.
 - RLS posture remains fail-closed for writes (account-scoped authenticated select only; no authenticated insert/update/delete policies).
 - Future trusted admin/service-role server paths must manage writes.
-- Resolver follow-up remains required in F6C-C3C for schema-backed gate usage + explicit sandbox provider selection.
+- F6C-C3C resolver update is complete in implementation commit `5af36cb`.
+- F6C-C3C now uses explicit account + `provider_name = twilio` + `provider_environment = sandbox` selection and schema-backed `sandbox_send_enabled` gating.
+- F6C-C3C keeps fail-closed behavior (`sandbox_send_gate_missing_or_disabled`) and preserves server-only/no-secret/non-sending readiness output (`liveSendEnabled = false`, no `canSend`).
 - Dry-run follow-up remains required in F6C-C3D to pass when sandbox gate + test-recipient are configured.
 - Real sandbox send remains deferred.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
@@ -277,7 +279,7 @@ F6C sequence update:
 - F6C-C2 docs closeout complete.
 - F6C-C3A docs/model lock complete.
 - F6C-C3B schema/model implementation complete.
-- Next F6C-C3C: resolver update to schema-backed gate and explicit sandbox provider selection.
+- F6C-C3C resolver update complete.
 - Next F6C-C3D: dry-run action update to pass only when test-recipient and sandbox gate are configured.
 - F6C-C4 real manual sandbox send action remains deferred until explicit Twilio sandbox/env/test-recipient approval.
 - F6D webhook/status callback planning/implementation remains required before live SMS.

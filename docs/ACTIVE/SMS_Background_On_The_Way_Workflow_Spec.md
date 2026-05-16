@@ -347,7 +347,10 @@ SMS Slice F6C-C3B Sandbox Send Gate + Test Recipient Schema is complete in imple
 - Test-recipient schema remains independent of customer/job linkage and does not imply live communication permission.
 - RLS posture remains fail-closed for writes: account-scoped authenticated select is present; authenticated insert/update/delete policies remain intentionally absent.
 - Future trusted admin/service-role server paths must manage writes.
-- Resolver follow-up remains required (F6C-C3C) for schema-backed gate usage + explicit sandbox provider selection.
+- F6C-C3C resolver follow-up is complete in commit `5af36cb`.
+- Resolver now uses explicit account + twilio + sandbox selection and schema-backed `sandbox_send_enabled` gate checks.
+- Production provider configuration cannot satisfy sandbox readiness.
+- Missing/false gate blocks with `sandbox_send_gate_missing_or_disabled`.
 - Dry-run action follow-up remains required (F6C-C3D) to pass when sandbox gate + verified test-recipient are configured.
 - Real sandbox send remains deferred.
 - Mark On The Way still does not send SMS, and real SMS remains deferred.
@@ -357,7 +360,7 @@ Forward sequence update:
 - F6C-C2 docs closeout complete.
 - F6C-C3A docs/model lock complete.
 - F6C-C3B schema/model implementation complete.
-- Next F6C-C3C: resolver update to schema-backed gate + explicit sandbox provider selection.
+- F6C-C3C resolver update complete.
 - Next F6C-C3D: dry-run action update to pass only when both gates are configured.
 - F6C-C4 real manual sandbox send remains deferred until explicit Twilio sandbox/env/test-recipient approval.
 - F6D webhook/status callback remains deferred before any live-send path.

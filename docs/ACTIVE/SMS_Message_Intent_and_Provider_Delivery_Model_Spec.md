@@ -302,7 +302,11 @@ Slice F6C-C3B completion cross-reference (Sandbox send gate + test-recipient sch
 - Table constraints/indexes include E.164 format check, label check, verification-pair check, active account+phone uniqueness, and account/is_active index.
 - RLS/write posture is fail-closed for writes: account-scoped authenticated select policy only, no authenticated insert/update/delete policies.
 - Future writes remain reserved for trusted admin/service-role server paths.
-- Resolver follow-up remains required in F6C-C3C for schema-backed gate usage plus explicit sandbox provider disambiguation.
+- F6C-C3C resolver update is complete in commit `5af36cb`.
+- Resolver now explicitly reads provider config by account + `provider_name = twilio` + `provider_environment = sandbox`.
+- Resolver now uses schema-backed `sandbox_send_enabled` and blocks missing/false with `sandbox_send_gate_missing_or_disabled`.
+- Production provider config does not satisfy sandbox readiness.
+- Resolver remains server-only, no-secret, and non-sending (`liveSendEnabled = false`, no `canSend`).
 - Dry-run action follow-up remains required in F6C-C3D to pass when schema-backed gate + verified test-recipient are configured.
 - Real sandbox send remains deferred; Mark On The Way still does not send SMS; real SMS remains deferred.
 
