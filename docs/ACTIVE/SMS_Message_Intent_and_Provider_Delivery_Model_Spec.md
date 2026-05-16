@@ -164,6 +164,17 @@ Slice SMS On-The-Way V1 workflow simplification cross-reference:
 - Manual contact logs remain non-authoritative for provider delivery truth.
 - `sms_message_intents.message_body_snapshot` remains the future audit record of attempted SMS wording.
 
+Slice F5A cross-reference (docs/model-only):
+
+- F5A locks the future non-sending Background On-The-Way intent handoff model.
+- Future On-The-Way intent creation must anchor to a successful `on_my_way` `job_events` row.
+- `sms_message_intents` is the first future SMS decision/audit truth after that durable lifecycle anchor.
+- `sms_provider_deliveries` remains provider submission/callback truth and stays deferred for this lane.
+- Current implementation constraint is explicit: current `insertJobEvent` does not return the inserted event id, and the current `on_my_way` breadcrumb write is best-effort after the `jobs.status` update.
+- Future F5B/F5C work must not rely on provider work inside synchronous Mark On The Way.
+- Preferred future direction is explicit event-id anchoring before non-sending intent creation; querying for the latest matching `on_my_way` event is a fallback only.
+- Mark On The Way still does not send SMS, and real SMS remains deferred.
+
 ---
 
 ## 1) Current Decision
@@ -225,6 +236,12 @@ Locked rule:
 - future non-lifecycle sends may need a different source event/ref, and it must be explicit
 - no arbitrary job snapshot phone/email participates in idempotency
 
+F5A handoff lock:
+
+- preferred future direction is direct event-id anchoring from the successful `on_my_way` lifecycle breadcrumb
+- if direct event-id handoff is not yet available, a background lookup for the latest matching `on_my_way` event is a fallback only and must be protected by strict idempotency plus revert/current-status checks
+- future provider work must remain outside the synchronous Mark On The Way action
+
 ---
 
 ## 5) `sms_message_intents` Purpose
@@ -277,6 +294,8 @@ Constraints and source-of-truth behavior:
 - no delete policy in V1 unless explicitly added later
 - blocked intents are decision truth only; they do not create provider delivery truth
 - `quiet_hours_decision` captures SMS send-eligibility evaluation state only and is not lifecycle control truth
+- future blocked/skipped/failed On-The-Way evaluation should still record decision outcome when a durable `on_my_way` event anchor exists
+- if no durable `on_my_way` event exists, fail closed and do not create an intent
 
 ---
 
@@ -407,6 +426,7 @@ Locked posture:
 Locked boundary:
 
 - `job_events` is not provider delivery truth
+- `job_events` remains lifecycle breadcrumb truth for the future On-The-Way intent handoff anchor
 - future provider send/delivery may create summary-only timeline entries only after explicitly designed
 - summary entries must never claim provider delivery unless backed by `sms_provider_deliveries`
 - manual contact logs remain separate from provider delivery truth
@@ -473,9 +493,12 @@ M. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 N. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
 O. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 P. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
-Q. Provider/Twilio sandbox readiness.
-R. Provider webhook/send implementation only after all gates.
-S. Production activation only after legal/provider review and explicit approval.
+Q. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
+R. F5B non-sending event-anchor/intent eligibility helper.
+S. F5C create blocked/skipped/ready `sms_message_intents` from Mark On The Way without provider send.
+T. Provider/Twilio sandbox readiness.
+U. Provider webhook/send implementation only after all gates.
+V. Production activation only after legal/provider review and explicit approval.
 
 ---
 

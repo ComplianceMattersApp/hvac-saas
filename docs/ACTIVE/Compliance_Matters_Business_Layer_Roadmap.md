@@ -312,7 +312,7 @@ SMS Slice F4D-D closeout note (May 2026):
 - no activation behavior, no provider/Twilio/send/webhook behavior, and no SMS send readiness implied by template approval/readiness.
 - validation recorded: template action tests `40/40`; template validation helper tests `19/19`; template governance read tests `15/15`; provider readiness tests `16/16`; SMS eligibility tests `16/16`; contact recipient tests `4/4`; `npx.cmd tsc --noEmit`; `git diff --check`; total `110/110` passed.
 - state after F4D-D: schema/read-model/read-only UI/validation helper/create-save draft/review actions exist; editable UI remains deferred (F4D-E); approve-for-activation remains deferred; provider/legal approval actions remain deferred; provider setup remains deferred; sandbox/live SMS remains deferred; real SMS remains deferred.
-- safe forward sequence: F4D-D docs closeout, then F4D-E1 create/save draft UI, then F4D-E2 safe version-id/action-eligibility read-model support for admin readiness, then F4D-E3A combined admin readiness action (complete), then F4D-E3B mark-ready UI wiring (complete), then planning/audit for the actual background On-The-Way send path, then later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
+- safe forward sequence: F4D-D docs closeout, then F4D-E1 create/save draft UI, then F4D-E2 safe version-id/action-eligibility read-model support for admin readiness, then F4D-E3A combined admin readiness action (complete), then F4D-E3B mark-ready UI wiring (complete), then F5A docs/model lock for durable On-The-Way intent handoff (complete), then F5B non-sending event-anchor/intent eligibility helper, then F5C blocked/skipped/ready `sms_message_intents` creation without provider send, then later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
 
 SMS Slice F4D-E1 closeout note (May 2026):
 - Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
@@ -368,6 +368,16 @@ SMS On-The-Way V1 workflow simplification note (May 2026):
 - Future UI should prefer readiness language like `Mark wording ready for sandbox` or `Wording ready for future SMS testing`, not `Approve SMS`, `Activate SMS`, or `Enable SMS`.
 - Template readiness and sandbox readiness do not send SMS; real SMS remains deferred.
 - `job_events` and manual contact logs are not provider delivery truth; `sms_message_intents.message_body_snapshot` remains the future audit record of attempted SMS wording.
+
+SMS Slice F5A closeout note (May 2026):
+- Slice F5A Background On-The-Way Intent Handoff Model Lock is complete in docs/model-only mode.
+- F5A locks the durable handoff sequence: Mark On The Way lifecycle update first, successful `on_my_way` `job_events` anchor second, non-sending `sms_message_intents` decision/audit record third, provider delivery truth later.
+- F5A keeps `job_events` as lifecycle breadcrumb truth only; it does not become provider delivery truth.
+- F5A keeps `sms_message_intents` as the first future SMS decision/audit truth and keeps `sms_provider_deliveries` deferred for later provider submission/callback slices.
+- F5A records the current implementation constraint: current `insertJobEvent` does not return inserted event id and the current `on_my_way` breadcrumb write is best-effort after the `jobs.status` update.
+- F5A records the preferred future direction: explicit event-id anchoring before non-sending intent creation; latest-event lookup remains fallback-only.
+- F5A preserves recipient truth in `contact_recipients`, preserves fail-closed behavior when no durable `on_my_way` event exists, preserves no job-status rollback, and preserves that Mark On The Way still does not send SMS.
+- real SMS remains deferred.
 
 ---
 

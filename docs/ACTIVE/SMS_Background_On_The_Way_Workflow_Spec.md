@@ -64,6 +64,24 @@ Recorded boundary for this workflow spec:
 - F4D-E3B does not add On-The-Way automation, provider calls, send endpoint, webhook behavior, sandbox SMS sends, or live SMS sends; Mark On The Way still does not send SMS and real SMS remains deferred.
 - targeted validation passed (`94/94`), TypeScript passed, `git diff --check` passed, and working tree was clean.
 
+## Slice F5A Cross-Reference Closeout (2026-05-15)
+
+SMS Slice F5A Background On-The-Way Intent Handoff Model Lock is complete in documentation/model-only mode.
+
+Recorded boundary for this workflow spec:
+
+- Mark On The Way remains the user-facing operational trigger and the lifecycle/status update must happen first.
+- Future SMS remains background/event-driven only; Mark On The Way still does not send SMS today.
+- Future SMS intent creation must be anchored to a successful `on_my_way` `job_events` row.
+- `job_events` remains lifecycle breadcrumb truth and is not provider delivery truth.
+- `sms_message_intents` is the first future SMS decision/audit truth; `sms_provider_deliveries` remains provider submission/callback truth and remains deferred for this lane.
+- Current implementation constraint is now explicit: the current `insertJobEvent` helper does not return the inserted event id, and the current `on_my_way` breadcrumb write is best-effort after the `jobs.status` update.
+- Future F5B/F5C work must not rely on provider work inside the synchronous Mark On The Way action.
+- Preferred future direction is explicit event-id anchoring before non-sending intent creation; background query/recovery of the latest matching `on_my_way` event is a fallback option, not the preferred contract.
+- Recipient truth must continue to come from `contact_recipients`; job snapshot phone/email must not become SMS recipient truth.
+- Lifecycle success remains success even when SMS evaluation is blocked, skipped, or fails; SMS/provider failures must not roll back job status.
+- real SMS remains deferred.
+
 ---
 
 ## 1) Current Decision
@@ -97,9 +115,10 @@ Future intended flow (planning only):
 
 1. Tech/operator presses Mark On The Way.
 2. Job lifecycle/status transition remains primary and must not depend on SMS.
-3. Future SMS send evaluation runs after lifecycle transition as background/event-driven workflow.
-4. If all gates pass, future provider SMS may be sent.
-5. If any gate fails, no SMS is sent and lifecycle transition remains successful.
+3. Future intent handoff must anchor to a successful `on_my_way` `job_events` row after the lifecycle transition.
+4. Future non-sending SMS intent evaluation runs after that durable event handoff as background/event-driven workflow.
+5. If all later gates pass in approved future slices, provider SMS may be submitted.
+6. If any gate fails, no SMS is sent and lifecycle transition remains successful.
 
 Quiet-hours/timezone clarification:
 
@@ -116,8 +135,17 @@ Recommended future architecture:
 - prefer event-driven or queued/background workflow
 - do not send directly inside Mark On The Way action
 - keep Mark On The Way responsive and lifecycle-focused
-- consume on-the-way lifecycle signal/event as background trigger
+- consume a durable `on_my_way` lifecycle event as the background trigger
+- create `sms_message_intents` as the first non-sending decision/audit record before any provider work exists
+- keep `sms_provider_deliveries` parked for later approved provider submission/callback slices
 - provider failure must not roll back job status
+
+Current implementation constraint:
+
+- current `insertJobEvent` helper does not return the inserted event id
+- current `on_my_way` breadcrumb write is best-effort after the `jobs.status` update
+- preferred future direction is explicit event-id anchoring for the non-sending intent handoff
+- option to query for the latest matching `on_my_way` event after status mutation remains a fallback only and requires strict idempotency/revert protection
 
 This is a control contract only. No automation is added in this slice.
 
@@ -127,6 +155,10 @@ This is a control contract only. No automation is added in this slice.
 
 All gates below must pass before any future background send is allowed:
 
+- feature/activation gate passes
+- durable `on_my_way` event anchor exists
+- current job still resolves as `on_the_way`
+- no later revert/protective block is present for the same lifecycle movement
 - recipient exists in contact_recipients
 - recipient role explicit
 - recipient active
@@ -135,9 +167,11 @@ All gates below must pass before any future background send is allowed:
 - no active recipient-level suppression
 - no active phone-level suppression
 - quiet-hours/timezone gate passes
-- admin-approved template exists
+- STOP/help readiness is available for the chosen provider path
+- template sandbox/current readiness gate passes for the approved future send posture
+- account/provider readiness gate passes
 - sender identity/provider registration ready
-- SMS message intent/provider delivery audit tables exist
+- SMS intent audit table exists and can record decision outcome
 - provider/Twilio sandbox validated
 - legal/provider review complete
 - explicit activation decision approved
@@ -155,6 +189,8 @@ Scope clarification:
 
 If a future background send is blocked:
 
+- no intent is created unless a durable `on_my_way` event anchor exists
+- if a durable event anchor exists, future intent evaluation should still record blocked/skipped/failed decision outcome in `sms_message_intents`
 - no SMS send attempt
 - no customer-facing sent/delivered claim
 - no fake delivery status
@@ -162,6 +198,7 @@ If a future background send is blocked:
 - optional internal-only note/event may be added later only after that event model is designed
 - Mark On The Way remains successful when lifecycle action itself succeeded
 - quiet-hours/timezone blocked-send outcomes are SMS-only and do not change lifecycle success
+- provider failure later must write to provider delivery truth, not lifecycle truth
 
 ---
 
@@ -309,12 +346,13 @@ M. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 N. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
 O. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 P. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
-Q. Planning/audit for the actual background On-The-Way send path.
-R. Quiet-hours/timezone gate planning.
-S. Provider/Twilio readiness and A2P sandbox planning.
-T. Non-sending background evaluator.
-U. Sandbox provider send only after all gates.
-V. Production activation only after legal/provider review and explicit approval.
+Q. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
+R. F5B non-sending event-anchor/intent eligibility helper.
+S. F5C create blocked/skipped/ready `sms_message_intents` from Mark On The Way without provider send.
+T. Quiet-hours/timezone gate planning.
+U. Provider/Twilio readiness and A2P sandbox planning.
+V. Sandbox provider send only after all gates.
+W. Production activation only after legal/provider review and explicit approval.
 
 ---
 

@@ -126,6 +126,18 @@ Provider planning remains subordinate to the simple V1 product goal:
 - Template readiness does not enable provider/Twilio behavior.
 - Real SMS remains deferred until provider setup, webhook/signature validation, consent/suppression gates, legal/provider review, and explicit activation are approved later.
 
+## F5A Cross-Reference (May 2026)
+
+Slice F5A Background On-The-Way Intent Handoff Model Lock is complete in docs/model-only mode.
+
+- future On-The-Way SMS intent creation must anchor to a successful `on_my_way` `job_events` row before any provider path exists
+- `sms_message_intents` is the first future SMS decision/audit truth after that handoff
+- `sms_provider_deliveries` remains later provider submission/callback truth only
+- current implementation constraint is explicit: current `insertJobEvent` does not return inserted event id and the current breadcrumb write is best-effort after the status update
+- future provider/Twilio work must remain outside the synchronous Mark On The Way action
+- preferred future direction is explicit event-id anchoring before non-sending intent creation; latest-event lookup is fallback-only
+- Mark On The Way still does not send SMS; real SMS remains deferred
+
 ---
 
 ## 1) Current Decision

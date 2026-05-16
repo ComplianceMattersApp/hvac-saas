@@ -606,6 +606,8 @@ Locked F4 relationship posture:
   - `template_version`
   - rendered `message_body_snapshot`
 - `sms_message_intents.message_body_snapshot` remains the audit record of what was attempted
+- future On-The-Way intent creation must anchor to a durable `on_my_way` `job_events` row before those template values are copied into `sms_message_intents`
+- template governance remains admin/settings truth only; template actions and readiness UI must not create `sms_message_intents` directly
 
 Parked E2 linkage note:
 
@@ -680,10 +682,12 @@ I. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 J. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
 K. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 L. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
-M. Planning/audit for the future background On-The-Way send path.
-N. Later webhook/status callback contract planning.
-O. Later sandbox/provider planning.
-P. Later production activation only after legal/provider review and explicit approval.
+M. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
+N. F5B non-sending event-anchor/intent eligibility helper.
+O. F5C create blocked/skipped/ready `sms_message_intents` from Mark On The Way without provider send.
+P. Later webhook/status callback contract planning.
+Q. Later sandbox/provider planning.
+R. Later production activation only after legal/provider review and explicit approval.
 
 ---
 

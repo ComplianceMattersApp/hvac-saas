@@ -230,7 +230,7 @@ Current Program Status Note (May 2026)
   - SMS Slice F4D-A Template Editing + Review Actions Model Lock is complete (docs/model-only):
     - spec added: `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md`
     - cross-references updated across ACTIVE SMS docs, source-of-truth strategy, Active Spine, and Business Layer Roadmap
-    - locked implementation sequence (updated): F4D-A docs/model lock, F4D-B validation helper, F4D-C create/save draft server actions, F4D-D review actions, F4D-E1 create/save draft UI (complete), F4D-E2 safe version-id/action-eligibility read-model support for admin readiness (complete), F4D-E3A combined admin readiness action (complete), F4D-E3B mark-ready UI wiring (complete), then planning/audit for the future background On-The-Way send path, later provider/legal review, later sandbox/provider work, and later production activation only after explicit approval
+    - locked implementation sequence (updated): F4D-A docs/model lock, F4D-B validation helper, F4D-C create/save draft server actions, F4D-D review actions, F4D-E1 create/save draft UI (complete), F4D-E2 safe version-id/action-eligibility read-model support for admin readiness (complete), F4D-E3A combined admin readiness action (complete), F4D-E3B mark-ready UI wiring (complete), F5A docs/model lock for durable On-The-Way intent handoff (complete), then F5B non-sending event-anchor/intent eligibility helper, then F5C blocked/skipped/ready `sms_message_intents` creation without provider send, later provider/legal review, later sandbox/provider work, and later production activation only after explicit approval
     - locked future validation helper: `lib/communications/sms-template-governance-validation.ts`
     - locked future action file: `lib/actions/sms-template-actions.ts`
     - locked first future actions: `createOnTheWayTemplateDraftFromDefaultFromForm` and `saveOnTheWayTemplateDraftFromForm`
@@ -342,6 +342,7 @@ Current Program Status Note (May 2026)
     - future UI should prefer readiness language such as `Mark wording ready for sandbox` or `Wording ready for future SMS testing`.
     - template readiness and sandbox readiness do not send SMS; real provider-powered SMS remains deferred.
     - `job_events` and manual contact logs are not provider delivery truth; `sms_message_intents.message_body_snapshot` remains the future audit record of attempted SMS wording.
+    - F5A model lock adds the durable handoff contract: future On-The-Way SMS intent creation must anchor to a successful `on_my_way` `job_events` row, `sms_message_intents` becomes the first SMS decision/audit truth after that anchor, `sms_provider_deliveries` remains later provider submission/callback truth, current `insertJobEvent` does not return inserted event id, and future F5B/F5C work must explicitly solve event-id anchoring without adding provider work to synchronous Mark On The Way.
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

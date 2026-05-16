@@ -222,6 +222,19 @@ Live-SMS status:
 
 ---
 
+## Slice F5A Docs Closeout Status (2026-05-15)
+
+SMS Slice F5A Background On-The-Way Intent Handoff Model Lock is complete.
+
+- F5A locks that future On-The-Way SMS intent creation must anchor to a successful `on_my_way` `job_events` row.
+- `contact_recipients` remains the only future SMS recipient truth; job snapshot phone/email must not be used as provider recipient truth.
+- current implementation constraint is explicit: current `insertJobEvent` does not return inserted event id, and the current `on_my_way` breadcrumb write is best-effort after the `jobs.status` update.
+- preferred future direction is explicit event-id anchoring before non-sending `sms_message_intents` creation; latest-event lookup remains fallback-only.
+- future blocked/skipped/failed intent outcomes belong in `sms_message_intents`; provider truth remains in `sms_provider_deliveries` only after later approved provider submission slices.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
+---
+
 ## Slice E1 Docs Closeout Status (2026-05-15)
 
 SMS Slice E1 Message Intent + Provider Delivery Model Lock (docs/model-only) is complete.
@@ -511,10 +524,11 @@ The following table concepts are proposed at a planning level. Table names, colu
 
 **Future workflow:**
 1. Operator requests send of message class X to recipient R.
-2. System creates `sms_message_intents` record with decision checkpoint (consent/suppression/quiet hours checked).
-3. If decision = `approved_submit`, system submits to provider and creates `sms_provider_deliveries` record.
-4. Provider webhooks update `sms_provider_deliveries` with delivery status.
-5. Neither table replaces `job_events` manual logs; they coexist. Manual logs + provider intents + provider deliveries together form the full audit trail.
+2. For lifecycle-driven On-The-Way messaging, the system must first confirm a durable `on_my_way` `job_events` anchor before any intent is created.
+3. System creates `sms_message_intents` record with decision checkpoint (consent/suppression/quiet hours checked).
+4. If decision = `approved_submit`, system submits to provider and creates `sms_provider_deliveries` record.
+5. Provider webhooks update `sms_provider_deliveries` with delivery status.
+6. Neither table replaces `job_events` manual logs; they coexist. Manual logs + provider intents + provider deliveries together form the full audit trail.
 
 ---
 

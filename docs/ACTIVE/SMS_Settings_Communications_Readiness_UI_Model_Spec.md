@@ -158,6 +158,16 @@ Visible V1 UI should reflect the simple product goal:
 
 Non-live copy must remain visible: template readiness does not enable SMS, sandbox readiness does not send SMS, Mark On The Way does not send SMS yet, and real SMS remains deferred.
 
+## F5A Cross-Reference (May 2026)
+
+Slice F5A Background On-The-Way Intent Handoff Model Lock is complete in docs/model-only mode.
+
+- future On-The-Way SMS intent creation must anchor to a successful `on_my_way` `job_events` row
+- future SMS intent evaluation remains background/event-driven and outside the synchronous Mark On The Way action
+- current implementation constraint is explicit: current `insertJobEvent` does not return inserted event id and the current breadcrumb write is best-effort after the lifecycle/status update
+- Communications UI remains status/readiness only; no intent/send/provider controls are introduced by this model lock
+- Mark On The Way still does not send SMS; real SMS remains deferred
+
 ---
 
 ## 1) Current Decision
@@ -509,7 +519,10 @@ I. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 J. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
 K. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 L. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
-M. Later slices: planning/audit for the future background On-The-Way send path, provider setup mutation planning, webhook/signature validation, sandbox send planning, activation planning.
+M. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
+N. F5B non-sending event-anchor/intent eligibility helper.
+O. F5C create blocked/skipped/ready `sms_message_intents` from Mark On The Way without provider send.
+P. Later slices: provider setup mutation planning, webhook/signature validation, sandbox send planning, activation planning.
 
 ---
 

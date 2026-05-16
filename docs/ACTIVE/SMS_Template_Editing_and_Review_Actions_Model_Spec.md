@@ -57,9 +57,12 @@ E. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 F. F4D-E2 safe version-id/action-eligibility read-model support. ✓ Complete (`fededec`)
 G. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 H. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
-I. Later provider/legal review operations.
-J. Later sandbox/provider work.
-K. Later production activation only after explicit approval.
+I. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
+J. F5B non-sending event-anchor/intent eligibility helper.
+K. F5C create blocked/skipped/ready `sms_message_intents` from Mark On The Way without provider send.
+L. Later provider/legal review operations.
+M. Later sandbox/provider work.
+N. Later production activation only after explicit approval.
 
 Do not skip from this docs lock directly to full editable UI or review/approval controls.
 
@@ -710,6 +713,13 @@ No send endpoint in template actions.
 No webhook behavior in template actions.
 
 Mark On The Way remains lifecycle-only.
+
+F5A handoff boundary:
+
+- future template actions and readiness UI remain governance-only and must not create `sms_message_intents` directly
+- future On-The-Way intent creation must happen only after a durable `on_my_way` `job_events` anchor exists
+- current implementation constraint is explicit: the current `insertJobEvent` helper does not return inserted event id and the current breadcrumb write is best-effort after the status update
+- future F5B/F5C work must not introduce provider work into the synchronous Mark On The Way action
 
 ---
 
