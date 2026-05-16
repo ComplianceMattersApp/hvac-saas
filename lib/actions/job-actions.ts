@@ -9454,7 +9454,6 @@ export async function addPublicNoteFromForm(formData: FormData) {
 export async function addInternalNoteFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const note = String(formData.get("note") || "").trim();
-  const tab = String(formData.get("tab") || "ops").trim() || "ops";
   const context = String(formData.get("context") || "").trim() || null;
   const anchorEventId = String(formData.get("anchor_event_id") || "").trim() || null;
   const anchorEventType = String(formData.get("anchor_event_type") || "").trim() || null;
@@ -9508,16 +9507,11 @@ export async function addInternalNoteFromForm(formData: FormData) {
 
   if (duplicateErr) throw duplicateErr;
 
-  const isFollowUpContext = context === "contractor_report_review";
-
   if (recentDuplicate?.id) {
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath(`/ops`);
-    redirect(
-      `/jobs/${jobId}?tab=${tab}&banner=${
-        isFollowUpContext ? "follow_up_note_already_added" : "note_already_added"
-      }`
-    );
+    refresh();
+    return;
   }
 
   await insertJobEvent({
@@ -9589,9 +9583,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  redirect(
-    `/jobs/${jobId}?tab=${tab}&banner=${isFollowUpContext ? "follow_up_note_added" : "note_added"}`
-  );
+  refresh();
 }
 
 export async function completeDataEntryFromForm(formData: FormData) {

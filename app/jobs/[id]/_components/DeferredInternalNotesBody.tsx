@@ -41,6 +41,42 @@ function getTaggedUserIds(meta?: any): string[] {
     .filter(Boolean);
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderInlineMentionText(
+  text: string,
+  taggedDisplayNames: Array<{ id: string; name: string }>,
+) {
+  const sourceText = String(text ?? "");
+  const mentionTokens = Array.from(
+    new Set(
+      taggedDisplayNames
+        .map((entry) => `@${String(entry.name ?? "").trim()}`)
+        .filter((value) => value.length > 1),
+    ),
+  ).sort((a, b) => b.length - a.length);
+
+  if (!mentionTokens.length) return sourceText;
+
+  const tokenSet = new Set(mentionTokens);
+  const mentionPattern = new RegExp(`(${mentionTokens.map(escapeRegExp).join("|")})`, "g");
+
+  return sourceText.split(mentionPattern).map((part, index) => {
+    if (!tokenSet.has(part)) return part;
+
+    return (
+      <span
+        key={`${part}-${index}`}
+        className="font-semibold text-blue-700 underline decoration-blue-200 decoration-2 underline-offset-4"
+      >
+        {part}
+      </span>
+    );
+  });
+}
+
 export default async function DeferredInternalNotesBody({
   jobId,
   timelineJobIds,
@@ -101,27 +137,9 @@ export default async function DeferredInternalNotesBody({
           <div key={idx} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
             <div className="text-xs text-slate-500">{when}</div>
 
-            <div className="mt-2 text-sm font-medium text-slate-950">
-              Internal note
-            </div>
-
             {noteText ? (
               <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
-                {noteText}
-              </div>
-            ) : null}
-
-            {taggedDisplayNames.length > 0 ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                <span className="font-medium uppercase tracking-[0.08em] text-slate-500">Mentioned</span>
-                {taggedDisplayNames.map((entry) => (
-                  <span
-                    key={entry.id}
-                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-700"
-                  >
-                    @{entry.name}
-                  </span>
-                ))}
+                {renderInlineMentionText(noteText, taggedDisplayNames)}
               </div>
             ) : null}
           </div>
