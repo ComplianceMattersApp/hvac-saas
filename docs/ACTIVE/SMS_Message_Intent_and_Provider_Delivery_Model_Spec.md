@@ -232,6 +232,27 @@ Slice F6C-B completion cross-reference (Server-only provider config resolver):
 - Validation recorded: resolver tests `15/15`, provider delivery preflight tests `17/17`, provider readiness tests `16/16`, intent create tests `12/12`, `npx.cmd tsc --noEmit` passed, `git diff --check` passed.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 
+Slice F6C-C1 model lock (Manual sandbox send gate + resolver refinement):
+
+- F6C-C1 is docs/model lock only.
+- Manual sandbox send remains deferred.
+- Twilio/provider calls remain deferred.
+- Dry-run/reservation action is deferred until after this lock.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+- A deterministic server-only sandbox send gate is required before F6C-C2/F6C-C3.
+- Preferred future gate model is explicit field on `sms_provider_configurations` (for example `sandbox_send_enabled boolean default false`); alternative is separate account-level gate surface.
+- Schema work for preferred gate is future slice and not included in F6C-C1.
+- Resolver fail-closed behavior is correct when gate is missing (`sandbox_send_gate_missing_or_disabled`) and must not be bypassed.
+- Resolver must disambiguate provider config by account + `provider_name = twilio` + `provider_environment = sandbox`; account-only lookup is not acceptable for send readiness.
+- First manual sandbox send must be limited to verified sandbox/test recipients; conservative lock is fail closed until verified test-recipient policy is modeled.
+- Quiet-hours remains deferred only for verified test recipients; otherwise sandbox send should fail closed.
+- F6C-C2 should be dry-run/manual reservation readiness action only, accept `delivery_id` only, evaluate all gates, and return safe notice/readiness output only.
+- F6C-C2 should not mutate delivery row unless explicitly approved; any approved mutation in F6C-C2 must not call Twilio and must not imply sent.
+- F6C-C3 real manual sandbox send remains deferred until explicit Twilio sandbox/env/test-recipient setup approval plus server-only credentials/config and gate/disambiguation readiness.
+- Notice-code categories are locked for future action outputs: `sandbox_provider_not_ready`, `sandbox_send_gate_missing_or_disabled`, `sandbox_test_recipient_required`, `sandbox_delivery_missing`, `sandbox_delivery_not_ready`, `sandbox_delivery_already_submitted`, `sandbox_delivery_reserved`, `sandbox_provider_submit_attempted`, `sandbox_provider_immediate_failure`, `sandbox_internal_error`.
+- Crash risk lock remains: schema has no true in-flight state; using `submitted` as reservation is acceptable only for controlled sandbox smoke; reconciliation/retry policy remains later work unless schema change is chosen first.
+- Webhook/status callback remains deferred for manual sandbox smoke only and required before live SMS; live SMS remains deferred pending legal/provider/A2P/STOP/HELP review and explicit activation.
+
 Future sequence lock:
 
 - F6C-B docs closeout complete.

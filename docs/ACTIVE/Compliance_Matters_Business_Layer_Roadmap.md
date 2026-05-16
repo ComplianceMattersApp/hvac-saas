@@ -213,6 +213,22 @@ SMS Slice F6C-B closeout note (May 2026):
 - Forward sequence: F6C-B docs closeout complete; F6C-C remains deferred until explicit Twilio sandbox/env/test-recipient setup approval; webhook/status callback remains deferred; live SMS remains deferred pending legal/provider/activation approval.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 
+SMS Slice F6C-C1 closeout note (May 2026):
+- Slice F6C-C1 Manual Sandbox Send Gate + Resolver Model Lock is complete in docs/model-only mode.
+- F6C-C1 does not implement manual sandbox send action, Twilio/provider calls, dry-run/reservation writes, schema changes, or UI changes.
+- F6C-C1 locks deterministic server-only sandbox send gate requirement before F6C-C2/F6C-C3 and preserves fail-closed behavior when gate is missing/disabled.
+- Preferred future gate model is explicit `sms_provider_configurations` gate field (for example `sandbox_send_enabled boolean default false`); alternative account-level gate surface remains acceptable only if deterministic/server-only.
+- F6C-C1 does not select the final schema implementation; schema work remains deferred to later approved slice.
+- F6C-C1 locks resolver disambiguation: sandbox readiness must be account + `provider_name = twilio` + `provider_environment = sandbox`; account-only provider selection is not acceptable.
+- F6C-C1 locks first sandbox send to verified sandbox/test recipients only and conservative fail-closed posture until test-recipient policy is modeled.
+- F6C-C1 keeps quiet-hours deferred only for verified test recipients; otherwise sandbox send should fail closed.
+- F6C-C1 locks F6C-C2 as dry-run/manual reservation readiness action only (`delivery_id` only, safe notice/readiness output only, no Twilio call).
+- F6C-C1 keeps F6C-C3 real manual sandbox send deferred until explicit Twilio sandbox/env/test-recipient setup approval plus server-only gate/config readiness.
+- F6C-C1 locks future notice-code categories: `sandbox_provider_not_ready`, `sandbox_send_gate_missing_or_disabled`, `sandbox_test_recipient_required`, `sandbox_delivery_missing`, `sandbox_delivery_not_ready`, `sandbox_delivery_already_submitted`, `sandbox_delivery_reserved`, `sandbox_provider_submit_attempted`, `sandbox_provider_immediate_failure`, `sandbox_internal_error`.
+- F6C-C1 records crash/reconciliation posture: schema has no true in-flight status; `submitted` reservation remains controlled sandbox-only posture; reconciliation/retry remains later work unless schema change is explicitly chosen.
+- F6C-C1 keeps webhook/status callback deferred for manual sandbox smoke only; callback/signature/opt-out/legal/provider/A2P/STOP/HELP/activation gates remain required before live SMS.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
 SMS Slice F1 closeout note (May 2026):
 - Slice F1 Provider/Twilio Readiness Spec is complete in docs/model-only mode at `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md`.
 - F1 records Twilio as likely provider direction while locking provider-neutral internal model and status semantics.

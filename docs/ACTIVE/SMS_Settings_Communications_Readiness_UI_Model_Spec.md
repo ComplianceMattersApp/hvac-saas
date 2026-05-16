@@ -232,6 +232,28 @@ Future UI language lock:
 - avoid: `Send to customer`, `Delivered`, `SMS enabled`, `Live SMS`, and any job-detail send button
 - missing webhook is acceptable only for tightly controlled manual sandbox smoke; live send requires callback/signature/opt-out/legal/provider/activation readiness first
 
+## F6C-C1 Manual Sandbox Send Gate + Resolver Model Lock (May 2026)
+
+F6C-C1 is complete as docs/model lock only.
+
+Settings/Communications impact lock:
+
+- No UI change is approved by F6C-C1.
+- No send/test/sandbox button is approved by F6C-C1.
+- Manual sandbox send remains deferred.
+- Twilio/provider calls remain deferred.
+- Dry-run/reservation action remains deferred until after this lock.
+- Deterministic server-only sandbox send gate is required before F6C-C2/F6C-C3.
+- Resolver fail-closed gate behavior remains correct and must not be bypassed.
+- Preferred future gate location is explicit `sms_provider_configurations` field (for example `sandbox_send_enabled boolean default false`); alternative account-level gate model remains acceptable if deterministic/server-only.
+- Resolver disambiguation lock: sandbox readiness must resolve by account + `provider_name = twilio` + `provider_environment = sandbox`; account-only provider lookup is not acceptable.
+- First sandbox send remains verified sandbox/test-recipient only; conservative posture is fail closed until policy exists.
+- Quiet-hours remains deferred only for verified test recipients; otherwise sandbox send should fail closed.
+- F6C-C2 target remains dry-run/manual reservation readiness action only (`delivery_id` only), safe notice/readiness output only, no Twilio call.
+- F6C-C3 real manual sandbox send remains deferred until explicit Twilio sandbox/env/test-recipient setup approval plus server-only credentials/config and gate/disambiguation readiness.
+- Webhook/status callback remains deferred for manual sandbox smoke only and required before live SMS.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
 ---
 
 ## 1) Current Decision
