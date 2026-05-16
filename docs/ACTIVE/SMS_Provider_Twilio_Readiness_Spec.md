@@ -297,6 +297,29 @@ Locked boundary:
 - No Twilio helper, provider config resolver, env var, provider call, send action, webhook, sandbox SMS, or live SMS is approved in F6C-A.
 - Real SMS remains deferred.
 
+## F6C-B Completion Cross-Reference (May 2026)
+
+SMS Slice F6C-B Server-Only Provider Config Resolver is complete in implementation commit `e292c34`.
+
+- Added `lib/communications/sms-provider-config-resolver.ts` and `lib/communications/__tests__/sms-provider-config-resolver.test.ts`.
+- Helper API: `resolveSmsSandboxProviderConfig(params): Promise<ResolveSmsSandboxProviderConfigResult>`.
+- Resolver is server-only readiness infrastructure; no provider submit behavior is implemented.
+- Resolver reads only `sms_provider_configurations` and `sms_sender_identities` under account scope.
+- Resolver requires `provider_name = twilio`, `provider_environment = sandbox`, sandbox-capable provider readiness, verified/active sender identity, and Messaging Service configuration.
+- Resolver enforces server-only sandbox send gate and fails closed with `sandbox_send_gate_missing_or_disabled` when gate is missing or disabled.
+- Resolver does not read env secrets, does not call Twilio/provider, does not send SMS, and does not mutate provider config/sender identity rows.
+- Resolver output is safe-readiness only and does not expose Account SID/Auth Token/API keys/Messaging Service SID or raw provider refs/secrets.
+- Resolver does not return `canSend` and always returns `liveSendEnabled = false`.
+- Validation recorded: new resolver tests `15/15`, provider delivery preflight tests `17/17`, provider readiness tests `16/16`, intent create tests `12/12`, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
+Forward sequence update:
+
+- F6C-B docs closeout complete.
+- F6C-C manual admin-only sandbox send action is deferred until explicit Twilio sandbox/env/test-recipient setup approval.
+- Webhook/status callback remains deferred.
+- Live SMS remains deferred pending legal/provider/activation approval.
+
 Recommended F6C sequence:
 
 A. F6C-A docs/model lock.

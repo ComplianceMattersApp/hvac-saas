@@ -218,6 +218,27 @@ Slice F6C-A manual sandbox send model lock:
 - Never update `jobs`, never update `job_events`, and never create job timeline delivery claims from the manual sandbox action.
 - Missing webhook is acceptable only for controlled manual sandbox smoke; live send remains blocked until status callback, signature validation, inbound/opt-out or Advanced Opt-Out handling, callback idempotency, duplicate/out-of-order handling, payload retention, legal/provider review, and explicit activation exist.
 
+Slice F6C-B completion cross-reference (Server-only provider config resolver):
+
+- F6C-B is complete in implementation commit `e292c34`.
+- Files added: `lib/communications/sms-provider-config-resolver.ts` and `lib/communications/__tests__/sms-provider-config-resolver.test.ts`.
+- Helper API: `resolveSmsSandboxProviderConfig(params): Promise<ResolveSmsSandboxProviderConfigResult>`.
+- Resolver is server-only readiness infrastructure and reads only `sms_provider_configurations` plus `sms_sender_identities` under account scope.
+- Resolver requires `provider_name = twilio`, `provider_environment = sandbox`, sandbox-capable provider readiness, sender identity verified/active readiness, Messaging Service configured, and sandbox send gate enabled.
+- Resolver fails closed when sandbox gate is missing or disabled (`sandbox_send_gate_missing_or_disabled`).
+- Resolver does not read env secrets, does not call Twilio/provider, does not send SMS, and does not mutate provider/sender rows.
+- Resolver output is safe readiness only: no Account SID/Auth Token/API key/Messaging Service SID or raw provider refs/secrets are returned.
+- Resolver does not return `canSend` and always returns `liveSendEnabled = false`.
+- Validation recorded: resolver tests `15/15`, provider delivery preflight tests `17/17`, provider readiness tests `16/16`, intent create tests `12/12`, `npx.cmd tsc --noEmit` passed, `git diff --check` passed.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
+Future sequence lock:
+
+- F6C-B docs closeout complete.
+- F6C-C manual admin-only sandbox send action remains deferred until explicit Twilio sandbox/env/test-recipient setup approval.
+- Webhook/status callback remains deferred.
+- Live SMS remains deferred pending legal/provider/activation approval.
+
 Slice SMS On-The-Way V1 workflow simplification cross-reference:
 
 - Mark On The Way is the user-facing operational trigger.

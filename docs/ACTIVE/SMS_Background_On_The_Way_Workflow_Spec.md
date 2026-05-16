@@ -262,6 +262,29 @@ Workflow boundary recorded:
 - No code, schema, provider, send, webhook, env, or behavior change is approved by F6C-A.
 - Mark On The Way still does not send SMS, and real SMS remains deferred.
 
+## Slice F6C-B Cross-Reference Closeout (2026-05-15)
+
+SMS Slice F6C-B Server-Only Provider Config Resolver is complete in implementation commit `e292c34`.
+
+- Added `lib/communications/sms-provider-config-resolver.ts` and `lib/communications/__tests__/sms-provider-config-resolver.test.ts`.
+- Helper API: `resolveSmsSandboxProviderConfig(params): Promise<ResolveSmsSandboxProviderConfigResult>`.
+- Resolver is server-only readiness infrastructure; no provider submit behavior is added.
+- Resolver reads account-scoped `sms_provider_configurations` and `sms_sender_identities` only.
+- Resolver enforces `provider_name = twilio`, `provider_environment = sandbox`, sandbox-capable provider readiness, sender identity verified/active readiness, Messaging Service configured, and sandbox send gate enabled.
+- Resolver fails closed with `sandbox_send_gate_missing_or_disabled` when sandbox gate is missing or disabled.
+- Resolver does not read env secrets, does not call Twilio/provider, does not send SMS, and does not mutate provider/sender rows.
+- Resolver does not expose Account SID/Auth Token/API key/Messaging Service SID or raw provider refs/secrets.
+- Resolver does not return `canSend` and always returns `liveSendEnabled = false`.
+- Validation recorded: resolver tests `15/15`, provider delivery preflight tests `17/17`, provider readiness tests `16/16`, intent create tests `12/12`, `npx.cmd tsc --noEmit` passed, `git diff --check` passed.
+- Mark On The Way still does not send SMS, and real SMS remains deferred.
+
+Forward sequence update:
+
+- F6C-B docs closeout complete.
+- F6C-C manual admin-only sandbox send action remains deferred until explicit Twilio sandbox/env/test-recipient setup approval.
+- Webhook/status callback remains deferred.
+- Live SMS remains deferred pending legal/provider/activation approval.
+
 ---
 
 ## 1) Current Decision

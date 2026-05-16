@@ -199,6 +199,20 @@ SMS Slice F6C-A manual sandbox send model lock (May 2026):
 - Recommended sequence: F6C-B server-only provider config resolver with no sends, then F6C-C manual admin sandbox action only after explicit Twilio sandbox/env/test-recipient setup approval, then F6D callback/webhook work before live.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 
+SMS Slice F6C-B closeout note (May 2026):
+- Slice F6C-B Server-Only Provider Config Resolver is complete in implementation commit `e292c34`.
+- F6C-B added `lib/communications/sms-provider-config-resolver.ts` and `lib/communications/__tests__/sms-provider-config-resolver.test.ts`.
+- F6C-B helper API: `resolveSmsSandboxProviderConfig(params): Promise<ResolveSmsSandboxProviderConfigResult>`.
+- F6C-B is server-only readiness infrastructure and reads only account-scoped `sms_provider_configurations` and `sms_sender_identities`.
+- F6C-B requires `provider_name = twilio`, `provider_environment = sandbox`, sandbox-capable provider readiness, sender identity verified/active readiness, Messaging Service configured, and sandbox send gate enabled.
+- F6C-B fails closed with `sandbox_send_gate_missing_or_disabled` when sandbox gate is missing or disabled.
+- F6C-B does not read env secrets, does not call Twilio/provider, does not send SMS, does not mutate provider/sender rows, and does not expose Account SID/Auth Token/API key/Messaging Service SID/raw provider refs/secrets.
+- F6C-B does not return `canSend`; `liveSendEnabled` is always false.
+- F6C-B did not add UI/routes, provider sends, webhook behavior, schema/migration changes, feature flags, or production writes.
+- Validation recorded: resolver tests `15/15`, provider delivery preflight tests `17/17`, provider readiness tests `16/16`, intent create tests `12/12`, `npx.cmd tsc --noEmit` passed, `git diff --check` passed.
+- Forward sequence: F6C-B docs closeout complete; F6C-C remains deferred until explicit Twilio sandbox/env/test-recipient setup approval; webhook/status callback remains deferred; live SMS remains deferred pending legal/provider/activation approval.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
 SMS Slice F1 closeout note (May 2026):
 - Slice F1 Provider/Twilio Readiness Spec is complete in docs/model-only mode at `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md`.
 - F1 records Twilio as likely provider direction while locking provider-neutral internal model and status semantics.
