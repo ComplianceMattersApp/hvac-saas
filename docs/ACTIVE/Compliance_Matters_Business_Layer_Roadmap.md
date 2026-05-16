@@ -257,10 +257,26 @@ SMS Slice F6C-C3A closeout note (May 2026):
 - Schema/model implementation for both gates remains deferred to future approved slice.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 
+SMS Slice F6C-C3B closeout note (May 2026):
+- Slice F6C-C3B Sandbox Send Gate + Test Recipient Schema is complete in implementation commit `75800d3`.
+- Migration added: `supabase/migrations/20260515150000_sms_sandbox_gate_test_recipients_foundation.sql`.
+- Sandbox send gate is now schema-backed on `sms_provider_configurations` with fail-closed default (`sandbox_send_enabled = false`) and gate audit metadata fields.
+- Gate remains manual sandbox test-submission only and does not enable live SMS.
+- Gate does not trigger provider sending by itself.
+- `sms_sandbox_test_recipients` now exists as account-scoped verified sandbox/test-recipient registry foundation.
+- Test-recipient registry is independent from customer/job linkage.
+- Test-recipient approval does not imply live communication permission.
+- RLS posture remains fail-closed for writes (account-scoped authenticated select only; no authenticated insert/update/delete policies).
+- Future trusted admin/service-role server paths must manage writes.
+- Resolver follow-up remains required in F6C-C3C for schema-backed gate usage + explicit sandbox provider selection.
+- Dry-run follow-up remains required in F6C-C3D to pass when sandbox gate + test-recipient are configured.
+- Real sandbox send remains deferred.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
 F6C sequence update:
 - F6C-C2 docs closeout complete.
 - F6C-C3A docs/model lock complete.
-- Next F6C-C3B: schema/model implementation for sandbox send gate and sandbox test-recipient gate if approved.
+- F6C-C3B schema/model implementation complete.
 - Next F6C-C3C: resolver update to schema-backed gate and explicit sandbox provider selection.
 - Next F6C-C3D: dry-run action update to pass only when test-recipient and sandbox gate are configured.
 - F6C-C4 real manual sandbox send action remains deferred until explicit Twilio sandbox/env/test-recipient approval.

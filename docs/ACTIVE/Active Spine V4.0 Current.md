@@ -376,6 +376,12 @@ Current Program Status Note (May 2026)
     - F6C-C3A keeps resolver disambiguation requirement: account + `provider_name = twilio` + `provider_environment = sandbox`; production provider config is never sandbox-ready.
     - F6C-C3A sequence lock: C3A docs/model lock, C3B gate schema/model implementation if approved, C3C resolver update, C3D dry-run update, C4 real manual sandbox send only after explicit Twilio sandbox/env/test-recipient approval, F6D callback/webhook before live-send consideration.
     - F6C-C3A no-go boundaries remain: no job-page send button, no Mark On The Way send trigger, no SMS enabled language, no delivered claims, no browser credentials, no `NEXT_PUBLIC_*` secrets.
+    - F6C-C3B schema foundation is complete in commit `75800d3` with migration `supabase/migrations/20260515150000_sms_sandbox_gate_test_recipients_foundation.sql`.
+    - F6C-C3B adds schema-backed sandbox send gate fields to `sms_provider_configurations` with fail-closed default (`sandbox_send_enabled = false`) and gate audit metadata.
+    - F6C-C3B adds `sms_sandbox_test_recipients` as account-scoped verified sandbox/test-recipient registry foundation (no customer/job linkage required).
+    - F6C-C3B keeps gate semantics manual-sandbox-only, non-live, and non-sending by itself.
+    - F6C-C3B keeps RLS/write posture fail-closed for writes (account-scoped select only; no authenticated insert/update/delete policies).
+    - F6C-C3B keeps resolver follow-up for C3C and dry-run follow-up for C3D before any C4 real manual sandbox send consideration.
     - Mark On The Way still does not send SMS, and real SMS remains deferred.
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:

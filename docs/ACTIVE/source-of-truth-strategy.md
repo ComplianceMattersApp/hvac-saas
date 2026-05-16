@@ -222,6 +222,12 @@ Job snapshot fields (`jobs.customer_phone`, `jobs.customer_email`, `jobs.job_add
 - F6C-C3A keeps resolver disambiguation lock: account + `provider_name = twilio` + `provider_environment = sandbox`; production config cannot satisfy sandbox readiness.
 - F6C-C3A keeps no-go boundaries: no job-page send control, no Mark On The Way trigger, no SMS enabled language, no delivered claims without callback truth, no browser credentials, no `NEXT_PUBLIC_*` secrets.
 - F6C-C3A sequence lock: C3A docs/model lock, C3B gate schema/model implementation if approved, C3C resolver update, C3D dry-run update, C4 real manual sandbox send only after explicit Twilio sandbox/env/test-recipient approval, then F6D callback/webhook before live-send consideration.
+- F6C-C3B sandbox send gate + test-recipient schema is complete in implementation commit `75800d3` via migration `supabase/migrations/20260515150000_sms_sandbox_gate_test_recipients_foundation.sql`.
+- F6C-C3B makes sandbox send gate schema-backed on `sms_provider_configurations` with fail-closed default and audit metadata fields; gate is manual-sandbox-only and never implies live-send enablement.
+- F6C-C3B adds `sms_sandbox_test_recipients` as account-scoped verified sandbox/test-recipient registry foundation, independent from customer/job linkage and without implied live communication permission.
+- F6C-C3B preserves fail-closed write posture: account-scoped authenticated select policy only; no authenticated insert/update/delete policies.
+- F6C-C3B keeps trusted write ownership on future admin/service-role server paths only.
+- F6C-C3B leaves functional follow-ups to C3C (resolver schema-backed gate + explicit sandbox provider selection) and C3D (dry-run pass path when gate + test-recipient are configured).
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 - SMS On-The-Way V1 workflow simplification remains locked: Mark On The Way is the user-facing operational trigger, future SMS is a background operational/customer-care notification after that lifecycle event, admin owns the V1 wording, field users do not write custom SMS wording, and visible V1 UI should avoid multi-person approval/rejection workflow unless that product path is intentionally reopened.
 - Template governance remains admin/settings governance, not job timeline truth; `job_events` and manual contact logs are not provider delivery truth, and `sms_message_intents.message_body_snapshot` remains the future audit record of attempted SMS wording.

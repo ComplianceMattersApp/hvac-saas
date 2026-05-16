@@ -138,6 +138,16 @@ Reference closeouts:
 - F6C-C3A resolver disambiguation lock remains required: account + `provider_name = twilio` + `provider_environment = sandbox`; production config must never satisfy sandbox readiness.
 - F6C-C3A sequence lock: C3A docs/model lock, C3B gate schema/model implementation if approved, C3C resolver update, C3D dry-run update to pass with configured gates, C4 real manual sandbox send only after explicit Twilio sandbox/env/test-recipient approval, F6D callback/webhook before live, and live send only after legal/provider/A2P/STOP/HELP/activation approval.
 - F6C-C3A no-go boundaries remain: no job-page send button, no Mark On The Way trigger, no SMS enabled language, no delivered claims without callback truth, no browser credentials, and no `NEXT_PUBLIC_*` secrets.
+- Slice F6C-C3B closeout is complete in implementation commit `75800d3` with migration `supabase/migrations/20260515150000_sms_sandbox_gate_test_recipients_foundation.sql`.
+- F6C-C3B makes sandbox send gate schema-backed on `sms_provider_configurations` with fail-closed default (`sandbox_send_enabled = false`) and optional audit metadata.
+- F6C-C3B gate remains manual-sandbox-only, does not enable live SMS, and does not trigger provider sending by itself.
+- F6C-C3B introduces `sms_sandbox_test_recipients` as account-scoped verified sandbox/test-recipient registry foundation.
+- F6C-C3B test-recipient schema is independent from customer/job linkage and does not imply live communication permission.
+- F6C-C3B RLS/write posture remains fail-closed for writes (account-scoped authenticated select only; no authenticated insert/update/delete policies).
+- F6C-C3B keeps future writes reserved for trusted admin/service-role server paths.
+- F6C-C3B leaves resolver follow-up for F6C-C3C (schema-backed gate usage + explicit sandbox provider disambiguation).
+- F6C-C3B leaves dry-run follow-up for F6C-C3D (pass path once gate + verified test-recipient are configured).
+- Real sandbox send remains deferred; Mark On The Way still does not send SMS; real SMS remains deferred.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 - SMS On-The-Way V1 simplification: Mark On The Way is the operational trigger; future SMS is a background operational/customer-care notification after that lifecycle event; admin owns the wording in V1; field users do not write custom SMS; visible V1 UI should not become a multi-person approval/rejection queue unless explicitly reopened.
 - V1 compliance posture: the sample On-The-Way wording remains operational only (`Reply STOP to opt out` required); review-request SMS is a separate future message class; template readiness and sandbox readiness do not enable sending.

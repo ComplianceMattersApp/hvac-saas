@@ -496,6 +496,41 @@ Future sequence lock:
 - F6D webhook/status callback planning/implementation before live SMS.
 - Live SMS only after legal/provider/A2P/STOP/HELP/activation approval.
 
+## F6C-C3B Sandbox Send Gate + Test Recipient Schema Closeout (May 2026)
+
+SMS Slice F6C-C3B is complete in implementation commit `75800d3`.
+
+- Migration added: `supabase/migrations/20260515150000_sms_sandbox_gate_test_recipients_foundation.sql`.
+- Sandbox send gate is now schema-backed on `sms_provider_configurations`.
+- Gate fields include `sandbox_send_enabled` (default `false`), plus enable/disable audit metadata fields.
+- Gate default is fail-closed.
+- Gate is for manual sandbox test submission only.
+- Gate does not enable live SMS.
+- Gate does not trigger provider sending by itself.
+- `sms_sandbox_test_recipients` now exists as account-scoped verified sandbox/test-recipient registry foundation.
+- Test-recipient registry is independent from customer/job linkage.
+- Test-recipient approval does not imply live communication permission.
+- RLS posture remains fail-closed for writes: select is account-scoped for authenticated active internal users; authenticated insert/update/delete policies are intentionally absent.
+- Future trusted admin/service-role paths must manage writes.
+- Resolver still requires follow-up update to use schema-backed gate and explicit `provider_name = twilio` + `provider_environment = sandbox` selection.
+- Dry-run action still requires follow-up update to pass when sandbox gate + test recipient are configured.
+- Real sandbox send remains deferred.
+- Mark On The Way still does not send SMS.
+- Real SMS remains deferred.
+
+F6C-C3B validation recorded:
+
+- `git diff --check` passed.
+
+F6C sequence update:
+
+- F6C-C3B docs closeout complete.
+- Next F6C-C3C: resolver update to use schema-backed sandbox send gate and explicit sandbox provider selection.
+- Next F6C-C3D: dry-run action update to pass when sandbox gate and test-recipient are configured.
+- F6C-C4 real manual sandbox send action only after explicit Twilio sandbox/env/test-recipient approval.
+- F6D webhook/status callback before live SMS.
+- Live SMS later only after legal/provider/A2P/STOP/HELP/activation approval.
+
 Forward sequence update:
 
 - F6C-B docs closeout complete.

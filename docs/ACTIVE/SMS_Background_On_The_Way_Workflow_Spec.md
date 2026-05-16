@@ -336,11 +336,27 @@ SMS Slice F6C-C3A Sandbox Test Recipient + Send Gate Model Lock is complete in d
 - Resolver disambiguation remains required before real sandbox send: account + `provider_name = twilio` + `provider_environment = sandbox`; production provider rows are never acceptable for sandbox readiness.
 - No-go boundaries remain: no job-page send button, no Mark On The Way trigger, no SMS enabled language, no delivered claims, no browser credentials, no `NEXT_PUBLIC_*` secrets.
 
+## Slice F6C-C3B Closeout (2026-05-15)
+
+SMS Slice F6C-C3B Sandbox Send Gate + Test Recipient Schema is complete in implementation commit `75800d3`.
+
+- Migration added: `supabase/migrations/20260515150000_sms_sandbox_gate_test_recipients_foundation.sql`.
+- Sandbox send gate is now schema-backed on `sms_provider_configurations` with fail-closed default (`sandbox_send_enabled = false`).
+- Gate remains manual-sandbox-only and does not imply live send or trigger provider send behavior by itself.
+- `sms_sandbox_test_recipients` now exists as account-scoped verified sandbox/test-recipient registry foundation.
+- Test-recipient schema remains independent of customer/job linkage and does not imply live communication permission.
+- RLS posture remains fail-closed for writes: account-scoped authenticated select is present; authenticated insert/update/delete policies remain intentionally absent.
+- Future trusted admin/service-role server paths must manage writes.
+- Resolver follow-up remains required (F6C-C3C) for schema-backed gate usage + explicit sandbox provider selection.
+- Dry-run action follow-up remains required (F6C-C3D) to pass when sandbox gate + verified test-recipient are configured.
+- Real sandbox send remains deferred.
+- Mark On The Way still does not send SMS, and real SMS remains deferred.
+
 Forward sequence update:
 
 - F6C-C2 docs closeout complete.
 - F6C-C3A docs/model lock complete.
-- Next F6C-C3B: schema/model implementation for sandbox send gate + sandbox test-recipient gate if approved.
+- F6C-C3B schema/model implementation complete.
 - Next F6C-C3C: resolver update to schema-backed gate + explicit sandbox provider selection.
 - Next F6C-C3D: dry-run action update to pass only when both gates are configured.
 - F6C-C4 real manual sandbox send remains deferred until explicit Twilio sandbox/env/test-recipient approval.

@@ -291,6 +291,21 @@ Slice F6C-C3A model lock (Sandbox test-recipient gate + send gate):
 - Schema work remains future slice; no schema work is included in F6C-C3A.
 - No-go boundaries remain locked: no job-page send button, no Mark On The Way trigger, no live send, no SMS enabled language, no delivered claims, no browser credentials, no `NEXT_PUBLIC_*` secrets.
 
+Slice F6C-C3B completion cross-reference (Sandbox send gate + test-recipient schema):
+
+- F6C-C3B is complete in implementation commit `75800d3`.
+- Migration added: `supabase/migrations/20260515150000_sms_sandbox_gate_test_recipients_foundation.sql`.
+- Sandbox send gate is now schema-backed on `sms_provider_configurations` with fail-closed default (`sandbox_send_enabled = false`) and audit metadata fields.
+- Gate is manual-sandbox-only and does not imply live send or trigger provider submission by itself.
+- `sms_sandbox_test_recipients` now exists as account-scoped verified sandbox/test-recipient registry foundation.
+- Test-recipient schema is independent from customer/job linkage and does not imply live communication permission.
+- Table constraints/indexes include E.164 format check, label check, verification-pair check, active account+phone uniqueness, and account/is_active index.
+- RLS/write posture is fail-closed for writes: account-scoped authenticated select policy only, no authenticated insert/update/delete policies.
+- Future writes remain reserved for trusted admin/service-role server paths.
+- Resolver follow-up remains required in F6C-C3C for schema-backed gate usage plus explicit sandbox provider disambiguation.
+- Dry-run action follow-up remains required in F6C-C3D to pass when schema-backed gate + verified test-recipient are configured.
+- Real sandbox send remains deferred; Mark On The Way still does not send SMS; real SMS remains deferred.
+
 Future sequence lock:
 
 - F6C-B docs closeout complete.
