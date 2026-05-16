@@ -312,7 +312,7 @@ SMS Slice F4D-D closeout note (May 2026):
 - no activation behavior, no provider/Twilio/send/webhook behavior, and no SMS send readiness implied by template approval/readiness.
 - validation recorded: template action tests `40/40`; template validation helper tests `19/19`; template governance read tests `15/15`; provider readiness tests `16/16`; SMS eligibility tests `16/16`; contact recipient tests `4/4`; `npx.cmd tsc --noEmit`; `git diff --check`; total `110/110` passed.
 - state after F4D-D: schema/read-model/read-only UI/validation helper/create-save draft/review actions exist; editable UI remains deferred (F4D-E); approve-for-activation remains deferred; provider/legal approval actions remain deferred; provider setup remains deferred; sandbox/live SMS remains deferred; real SMS remains deferred.
-- safe forward sequence: F4D-D docs closeout, then F4D-E1 create/save draft UI, then F4D-E2 safe version-id/action-eligibility read-model support for admin readiness, then F4D-E3A combined admin readiness action (complete), then F4D-E3B mark-ready UI wiring (complete), then F5A docs/model lock for durable On-The-Way intent handoff (complete), then F5B non-sending event-anchor/intent eligibility helper (complete, `9814340`), then F5C-A On-The-Way intent creation model lock (complete), then F5C-B helper only (complete, `5833a23`), then F5C-C event-id handoff support, then F5C-D Mark On The Way best-effort integration, then later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
+- safe forward sequence: F4D-D docs closeout, then F4D-E1 create/save draft UI, then F4D-E2 safe version-id/action-eligibility read-model support for admin readiness, then F4D-E3A combined admin readiness action (complete), then F4D-E3B mark-ready UI wiring (complete), then F5A docs/model lock for durable On-The-Way intent handoff (complete), then F5B non-sending event-anchor/intent eligibility helper (complete, `9814340`), then F5C-A On-The-Way intent creation model lock (complete), then F5C-B helper only (complete, `5833a23`), then F5C-C event-id handoff support (complete, `e7819e0`), then F5C-D Mark On The Way best-effort integration, then later provider/legal review workflow, later webhook/status callback contract planning, later provider/Twilio sandbox planning, and later production activation only after legal/provider review and explicit approval.
 
 SMS Slice F4D-E1 closeout note (May 2026):
 - Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
@@ -397,7 +397,7 @@ SMS Slice F5C-A model lock note (May 2026):
 - F5C-A skipped policy: non-target events are no-insert/no-op and are not forced into blocked.
 - F5C-A idempotency lock: `${accountOwnerUserId}:${jobEventId}:on_the_way:${contactRecipientId}` with idempotency conflict treated as deduped success.
 - F5C-A failure lock: intent creation remains best-effort and must not roll back job status or job event; Mark On The Way still does not send SMS; real SMS remains deferred.
-- F5C sequence lock: F5C-B helper only, F5C-C event-id handoff support, F5C-D Mark On The Way best-effort integration; provider/webhook/activation remain deferred.
+- F5C sequence lock: F5C-B helper only (complete), F5C-C event-id handoff support (complete, `e7819e0`), F5C-D Mark On The Way best-effort integration; provider/webhook/activation remain deferred.
 
 SMS Slice F5C-B implementation note (May 2026):
 - Slice F5C-B On-The-Way Intent Creation Helper is complete in implementation commit `5833a23`.
@@ -411,6 +411,19 @@ SMS Slice F5C-B implementation note (May 2026):
 - F5C-B does not modify jobs/job_events, does not return `canSend`, returns `liveSendEnabled` false always, and is not yet wired into Mark On The Way.
 - F5C-B validation: new helper tests `12/12`, F5B eligibility tests `12/12`, template governance tests `15/15`, validation tests `19/19`, provider readiness tests `16/16`, eligibility inputs tests `16/16`, contact recipient tests `4/4`, TypeScript passed, `git diff --check` passed.
 - F5C-B boundaries: no production writes, no intent/delivery rows actually inserted, Mark On The Way still does not send SMS, and real SMS remains deferred.
+
+SMS Slice F5C-C implementation note (May 2026):
+- Slice F5C-C Durable On-The-Way Event-ID Handoff Support is complete in implementation commit `e7819e0`.
+- F5C-C modified `lib/actions/job-actions.ts` and added `lib/actions/__tests__/job-event-id-handoff.test.ts`.
+- `insertJobEvent` now returns `Promise<string>` with the inserted durable `job_events.id` (previously returned `void`).
+- Backward compatibility preserved: all 49 existing call sites continue to work without modification; callers can ignore or capture the returned id.
+- Mark On The Way enhancement: now captures `onMyWayEventId` from the `on_my_way` event insert for future F5C-D intent creation integration.
+- Event-id handoff boundary: captured `onMyWayEventId` is not used for SMS intent creation in F5C-C; integration is deferred to F5C-D.
+- Return behavior: on success, returns Supabase-generated event id; on error, throws with error message; if id missing in response, throws clear error.
+- Call-site audit: 40 in job-actions.ts, 2 in internal-invoice-actions.ts, 1 in internal-invoice-payment-actions.ts; all previously awaiting without capturing return; all continue working.
+- F5C-C validation: new event-id handoff tests `4/4`, existing SMS tests passing (100/100 total across all communication suites), `npx.cmd tsc --noEmit` passed, `git diff --check` passed. Total: 104/104 tests passed.
+- F5C-C no SMS intent creation (handoff infrastructure only), no provider/Twilio/send/webhook behavior added, no schema/migration changes, no Supabase production commands.
+- F5C-C boundaries: Mark On The Way still does not send SMS, real SMS remains deferred, no production writes.
 
 ---
 

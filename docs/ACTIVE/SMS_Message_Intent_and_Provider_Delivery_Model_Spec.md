@@ -216,6 +216,23 @@ Slice F5C-B completion cross-reference (On-The-Way intent creation helper):
 - No production writes; no intent/delivery rows actually inserted (non-sending audit truth only).
 - Mark On The Way still does not send SMS, and real SMS remains deferred.
 
+Slice F5C-C completion cross-reference (Durable On-The-Way Event-ID Handoff):
+
+- F5C-C is complete in implementation commit `e7819e0`.
+- Files modified/added: `lib/actions/job-actions.ts` (modified), `lib/actions/__tests__/job-event-id-handoff.test.ts` (new).
+- `insertJobEvent` now returns `Promise<string>` with the inserted durable `job_events.id`.
+- Return value behavior: on success, returns the Supabase-generated event id; on error, throws with error message; if id missing in response, throws clear error.
+- Backward compatibility preserved: all 49 existing call sites continue to work without modification (can ignore return value or capture it).
+- Mark On The Way enhancement: captures `onMyWayEventId` from the `on_my_way` event insert for future use in F5C-D intent creation.
+- Event-anchor handoff boundary: captured id is not used in F5C-C; integration into intent creation is deferred to F5C-D.
+- E2 boundary preserved: event-id return does not alter intent/delivery tables, read behavior, or write path decisions; intent creation remains deferred.
+- Call-site audit recorded: 40 in job-actions.ts, 2 in internal-invoice-actions.ts, 1 in internal-invoice-payment-actions.ts; all previously awaiting without capturing return; all continue working.
+- Validation recorded: new event-id handoff tests `4/4`, existing SMS tests passing (100/100 total across all suites), `npx.cmd tsc --noEmit` passed, `git diff --check` passed.
+- No schema/migration changes; no Supabase production commands; event-id return sourced directly from standard Supabase `.select("id").single()` chain.
+- No SMS intent creation in F5C-C (infrastructure only).
+- No provider/Twilio/send/webhook behavior added.
+- Mark On The Way still does not send SMS, and real SMS remains deferred.
+
 ---
 
 ## 1) Current Decision
@@ -538,7 +555,7 @@ Q. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
 R. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`9814340`)
 S. F5C-A On-The-Way intent creation model lock. ✓ Complete
 T. F5C-B non-sending `sms_message_intents` helper only. ✓ Complete (`5833a23`)
-U. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper).
+U. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper). ✓ Complete (`e7819e0`)
 V. F5C-D Mark On The Way best-effort integration (no lifecycle rollback).
 W. Provider/Twilio sandbox readiness.
 X. Provider webhook/send implementation only after all gates.

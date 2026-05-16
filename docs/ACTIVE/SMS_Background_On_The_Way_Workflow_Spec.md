@@ -130,6 +130,26 @@ SMS Slice F5C-B On-The-Way Intent Creation Helper is complete in implementation 
 - Mark On The Way still does not send SMS, and real SMS remains deferred.
 - F5C-C should focus on event-id handoff support to provide explicit anchor before job-actions integration; F5C-D will add best-effort Mark On The Way integration after event-id handoff is ready.
 
+## Slice F5C-C Cross-Reference Closeout (2026-05-15)
+
+SMS Slice F5C-C Durable On-The-Way Event-ID Handoff Support is complete in implementation commit `e7819e0`.
+
+- Modified `lib/actions/job-actions.ts` and added `lib/actions/__tests__/job-event-id-handoff.test.ts`.
+- `insertJobEvent` now returns the inserted durable `job_events.id` (changed return type from `void` to `Promise<string>`).
+- Existing callers remain backward compatible: all 49 call sites can ignore the returned value or capture it as needed.
+- Mark On The Way path now captures `onMyWayEventId` from the `on_my_way` event insert for future F5C-D integration.
+- Captured `onMyWayEventId` is not yet used for SMS intent creation in F5C-C; intent integration is deferred to F5C-D.
+- Payload semantics unchanged: meta, userId, jobId, event_type all preserved; error handling preserved.
+- Call-site audit recorded: 49 total call sites (40 in job-actions.ts, 2 in internal-invoice-actions.ts, 1 in internal-invoice-payment-actions.ts); all awaiting the helper and ignoring return value; no behavioral changes required.
+- Helper behavior on error: throws original error message; if event id missing in response, throws clear error with context.
+- Event-id handoff boundary preserved: E2 intent/delivery audit tables unchanged; helper only returns the Supabase-generated id from the successful insert.
+- Validation recorded: new event-id handoff tests `4/4`, existing SMS intent create tests `12/12`, SMS intent eligibility tests `12/12`, template governance read tests `15/15`, template validation tests `19/19`, provider readiness tests `16/16`, eligibility inputs tests `16/16`, contact recipient tests `4/4`, `npx.cmd tsc --noEmit` passed, `git diff --check` passed. Total: `104/104` tests passed.
+- No `sms_message_intents` or `sms_provider_deliveries` rows created in F5C-C (handoff infrastructure only).
+- No provider/Twilio/send/webhook behavior added.
+- No schema changes; no migrations; no Supabase production commands.
+- Mark On The Way still does not send SMS, and real SMS remains deferred.
+- F5C-D will integrate the captured `onMyWayEventId` into `createOnTheWayIntentFromEvent` for non-sending intent creation after lifecycle success.
+
 ---
 
 ## 1) Current Decision
@@ -398,7 +418,7 @@ Q. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
 R. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`9814340`)
 S. F5C-A On-The-Way intent creation model lock. ✓ Complete
 T. F5C-B non-sending `sms_message_intents` helper only. ✓ Complete (`5833a23`)
-U. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper).
+U. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper). ✓ Complete (`e7819e0`)
 V. F5C-D Mark On The Way best-effort integration (no lifecycle rollback).
 W. Quiet-hours/timezone gate planning.
 X. Provider/Twilio readiness and A2P sandbox planning.
