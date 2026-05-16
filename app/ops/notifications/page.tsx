@@ -9,6 +9,14 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
 } from "@/lib/actions/notification-read-actions";
+import {
+  deactivateBrowserPushSubscriptionAction,
+  registerBrowserPushSubscriptionAction,
+} from "@/lib/actions/push-subscription-actions";
+import {
+  listCurrentInternalUserPushSubscriptions,
+  type PushSubscriptionSafeRow,
+} from "@/lib/notifications/push-subscriptions";
 import { NotificationsPageClient } from "./_components/NotificationsPageClient";
 
 export const metadata = {
@@ -64,14 +72,25 @@ export default async function NotificationsPage({
     limit: 100,
     onlyUnread,
   });
+  let pushSubscriptions: PushSubscriptionSafeRow[] = [];
+  try {
+    pushSubscriptions = await listCurrentInternalUserPushSubscriptions({ supabase });
+  } catch (error) {
+    const code = String((error as { code?: unknown } | null)?.code ?? "");
+    if (code !== "42P01") throw error;
+  }
 
   return (
     <NotificationsPageClient
       initialNotifications={notifications}
+      initialPushSubscriptions={pushSubscriptions}
+      publicVapidKey={process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY ?? null}
       categoryKey={categoryKey}
       onlyUnread={onlyUnread}
       onMarkAsRead={markNotificationAsRead}
       onMarkAllAsRead={markAllNotificationsAsRead}
+      onRegisterPushSubscription={registerBrowserPushSubscriptionAction}
+      onDeactivatePushSubscription={deactivateBrowserPushSubscriptionAction}
     />
   );
 }

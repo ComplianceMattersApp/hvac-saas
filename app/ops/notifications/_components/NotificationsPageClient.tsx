@@ -4,17 +4,32 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { NotificationRowForUI } from "@/lib/actions/notification-read-actions";
+import type {
+  DeactivateBrowserPushSubscriptionResult,
+  RegisterBrowserPushSubscriptionResult,
+} from "@/lib/actions/push-subscription-actions";
+import type { PushSubscriptionSafeRow } from "@/lib/notifications/push-subscriptions";
 import { matchesInternalNotificationFilter } from "@/lib/notifications/internal-awareness";
+import { DeviceNotificationsCard } from "./DeviceNotificationsCard";
 import { NotificationListClient } from "./NotificationListClient";
 
 type NotificationCategoryKey = "contractor_updates" | "new_job_notifications";
 
 type NotificationsPageClientProps = {
   initialNotifications: NotificationRowForUI[];
+  initialPushSubscriptions: PushSubscriptionSafeRow[];
+  publicVapidKey: string | null;
   categoryKey: NotificationCategoryKey | null;
   onlyUnread: boolean;
   onMarkAsRead: (input: { notificationId: string }) => Promise<void>;
   onMarkAllAsRead: () => Promise<void>;
+  onRegisterPushSubscription: (input: {
+    subscription: unknown;
+    userAgent?: string | null;
+    deviceLabel?: string | null;
+    permissionState?: string | null;
+  }) => Promise<RegisterBrowserPushSubscriptionResult>;
+  onDeactivatePushSubscription: (input: { endpoint?: string | null }) => Promise<DeactivateBrowserPushSubscriptionResult>;
 };
 
 function buildNotificationsHref(params: {
@@ -37,10 +52,14 @@ function buildNotificationsHref(params: {
 
 export function NotificationsPageClient({
   initialNotifications,
+  initialPushSubscriptions,
+  publicVapidKey,
   categoryKey,
   onlyUnread,
   onMarkAsRead,
   onMarkAllAsRead,
+  onRegisterPushSubscription,
+  onDeactivatePushSubscription,
 }: NotificationsPageClientProps) {
   const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationRowForUI[]>(initialNotifications);
@@ -215,6 +234,12 @@ export function NotificationsPageClient({
       </div>
 
       <div className="mx-auto max-w-4xl px-6 py-7">
+        <DeviceNotificationsCard
+          initialSubscriptions={initialPushSubscriptions}
+          publicVapidKey={publicVapidKey}
+          onRegister={onRegisterPushSubscription}
+          onDeactivate={onDeactivatePushSubscription}
+        />
         <NotificationListClient
           notifications={visibleNotifications}
           pendingReadId={pendingReadId}

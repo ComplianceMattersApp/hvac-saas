@@ -9454,6 +9454,7 @@ export async function addPublicNoteFromForm(formData: FormData) {
 export async function addInternalNoteFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const note = String(formData.get("note") || "").trim();
+  const tab = String(formData.get("tab") || "ops").trim() || "ops";
   const context = String(formData.get("context") || "").trim() || null;
   const anchorEventId = String(formData.get("anchor_event_id") || "").trim() || null;
   const anchorEventType = String(formData.get("anchor_event_type") || "").trim() || null;
@@ -9583,7 +9584,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  refresh();
+  redirect(`/jobs/${jobId}?tab=${tab}&banner=follow_up_note_added`);
 }
 
 export async function completeDataEntryFromForm(formData: FormData) {

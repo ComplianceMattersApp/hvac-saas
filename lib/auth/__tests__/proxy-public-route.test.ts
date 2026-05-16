@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isUnauthedPublicRoute } from "@/proxy";
+import { isPublicAssetPath, isUnauthedPublicRoute } from "@/proxy";
 
 describe("isUnauthedPublicRoute", () => {
   it("allows /signup without auth", () => {
@@ -17,5 +17,9 @@ describe("isUnauthedPublicRoute", () => {
   it("does not allow protected ops routes", () => {
     expect(isUnauthedPublicRoute("/ops")).toBe(false);
     expect(isUnauthedPublicRoute("/ops/admin")).toBe(false);
+  });
+
+  it("allows the push service worker through as a public asset", () => {
+    expect(isPublicAssetPath("/sw.js")).toBe(true);
   });
 });

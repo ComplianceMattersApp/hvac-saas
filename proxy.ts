@@ -6,18 +6,7 @@ export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Bypass auth for static assets so they never redirect through the auth gate.
-  const isPublicAsset =
-    pathname.startsWith("/_next") ||
-    pathname === "/favicon.ico" ||
-    pathname === "/robots.txt" ||
-    pathname === "/sitemap.xml" ||
-    pathname === "/manifest.webmanifest" ||
-    pathname === "/icon.png" ||
-    pathname === "/icon-192.png" ||
-    pathname === "/apple-icon.png" ||
-    /\.(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|otf)$/i.test(pathname);
-
-  if (isPublicAsset) return NextResponse.next();
+  if (isPublicAssetPath(pathname)) return NextResponse.next();
 
   // Allow Stripe webhook to bypass auth — signature verification happens inside the route.
   if (pathname === "/api/stripe/webhook") return NextResponse.next();
@@ -67,8 +56,23 @@ export function isUnauthedPublicRoute(pathname: string) {
   );
 }
 
+export function isPublicAssetPath(pathname: string) {
+  return (
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/sw.js" ||
+    pathname === "/icon.png" ||
+    pathname === "/icon-192.png" ||
+    pathname === "/apple-icon.png" ||
+    /\.(png|jpg|jpeg|gif|webp|svg|ico|js|woff|woff2|ttf|otf)$/i.test(pathname)
+  );
+}
+
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|icon.png|icon-192.png|apple-icon.png).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|sw.js|icon.png|icon-192.png|apple-icon.png).*)",
   ],
 };
