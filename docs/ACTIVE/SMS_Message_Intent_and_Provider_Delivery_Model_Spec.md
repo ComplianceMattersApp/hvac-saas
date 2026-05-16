@@ -200,6 +200,22 @@ Slice F5C-A model lock (docs/model-only):
 - Future helper lock: `lib/communications/sms-on-the-way-intent-create.ts` with `createOnTheWayIntentFromEvent(params)` returning `created`, `deduped`, optional `intentId`, `decisionStatus`, `decisionOutcomeWritten`, `blockedReasons`, `warnings`, and optional `writeSkippedReason`.
 - Forward sequence lock: F5C-B helper only, F5C-C event-id handoff support, F5C-D Mark On The Way best-effort integration, later provider/webhook/activation work only after explicit approval.
 
+Slice F5C-B completion cross-reference (On-The-Way intent creation helper):
+
+- F5C-B is complete in implementation commit `5833a23`.
+- Files added: `lib/communications/sms-on-the-way-intent-create.ts` and `lib/communications/__tests__/sms-on-the-way-intent-create.test.ts`.
+- Helper API: `createOnTheWayIntentFromEvent(params): Promise<CreateOnTheWayIntentFromEventResult>`.
+- The helper is non-sending and creates `sms_message_intents` rows only; it calls `evaluateOnTheWayIntentEligibility` first and uses `getSmsEligibilityInputsForRecipient` for recipient snapshots.
+- Ready behavior: writes one intent row when all required truth exists with `decision_outcome = ready_for_provider` and `blocked_reason_codes = []`.
+- Blocked behavior: writes one blocked intent only when required recipient/template/body truth exists with `decision_outcome = blocked` and `blocked_reason_codes` from eligibility; otherwise no-insert with `writeSkippedReason`.
+- Skipped/write-skipped behavior: non-target events return skipped/no-op; missing durable event anchor/recipient/template/body/required schema fields return no-insert with `writeSkippedReason`; no fake data is inserted.
+- Idempotency: uses `${accountOwnerUserId}:${jobEventId}:on_the_way:${contactRecipientId}`; unique conflict is treated as deduped success (created false, deduped true).
+- Helper does not write `sms_provider_deliveries`, does not send SMS, does not call provider/Twilio, does not modify jobs/job_events, does not return `canSend`, returns `liveSendEnabled` false always, and is not yet wired into Mark On The Way.
+- E2 boundary preserved: helper reads only helper-owned data and reads back the written intent rows; it does not read `sms_provider_deliveries`.
+- Validation recorded: new helper tests `12/12`, existing F5B eligibility tests `12/12`, template governance read tests `15/15`, template validation tests `19/19`, provider readiness tests `16/16`, eligibility inputs tests `16/16`, contact recipient tests `4/4`, `npx.cmd tsc --noEmit` passed, `git diff --check` passed.
+- No production writes; no intent/delivery rows actually inserted (non-sending audit truth only).
+- Mark On The Way still does not send SMS, and real SMS remains deferred.
+
 ---
 
 ## 1) Current Decision
@@ -521,7 +537,7 @@ P. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
 Q. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
 R. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`9814340`)
 S. F5C-A On-The-Way intent creation model lock. ✓ Complete
-T. F5C-B non-sending `sms_message_intents` helper only.
+T. F5C-B non-sending `sms_message_intents` helper only. ✓ Complete (`5833a23`)
 U. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper).
 V. F5C-D Mark On The Way best-effort integration (no lifecycle rollback).
 W. Provider/Twilio sandbox readiness.
