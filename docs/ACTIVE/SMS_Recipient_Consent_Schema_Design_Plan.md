@@ -245,6 +245,20 @@ SMS Slice F5B Non-Sending On-The-Way Intent Eligibility Helper is complete in im
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 - F5C should be planned/audited before implementation; likely next is non-sending `sms_message_intents` creation from eligible durable `on_my_way` anchors, while provider send/webhook/activation remain deferred.
 
+## Slice F5C-A Docs Model Lock Status (2026-05-15)
+
+SMS Slice F5C-A On-The-Way Intent Creation Model Lock is complete in docs/model-only mode.
+
+- F5C creates non-sending `sms_message_intents` only; no `sms_provider_deliveries` writes, no provider/Twilio calls, and no SMS sends.
+- Preferred anchor is explicit event-id handoff from successful `on_my_way` insert; optional returned id from `insertJobEvent` (or equivalent minimal helper) is the recommended support before job-actions integration.
+- Write intent rows only when required schema fields can be populated from truth.
+- Missing recipient or missing governed template/version/body snapshot means no-insert/write-skipped (`created = false` + `writeSkippedReason`), with no fake data.
+- Ready mapping lock: `decision_outcome = ready_for_provider`; blocked mapping lock: `decision_outcome = blocked` only when required fields still exist.
+- Skipped mapping lock: non-target events do not create intent rows in F5C-A.
+- Idempotency lock: `${accountOwnerUserId}:${jobEventId}:on_the_way:${contactRecipientId}` with idempotency conflicts treated as deduped success.
+- Mark On The Way lifecycle behavior remains unchanged; intent creation failure does not roll back job status or job event.
+- Real SMS remains deferred.
+
 ---
 
 ## Slice E1 Docs Closeout Status (2026-05-15)

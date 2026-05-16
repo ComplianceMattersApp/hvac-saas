@@ -94,6 +94,24 @@ SMS Slice F5B Non-Sending On-The-Way Intent Eligibility Helper is complete in im
 - Mark On The Way still does not send SMS, and real SMS remains deferred.
 - F5C should be planned/audited before implementation; likely next is non-sending `sms_message_intents` creation from eligible durable `on_my_way` anchors, while provider send/webhook/status callback/activation remain deferred.
 
+## Slice F5C-A Model Lock (2026-05-15)
+
+SMS Slice F5C-A On-The-Way Intent Creation Model Lock is complete in docs/model-only mode.
+
+- F5C creates non-sending `sms_message_intents` only. F5C does not create `sms_provider_deliveries`, does not send SMS, and does not call provider/Twilio.
+- Mark On The Way remains lifecycle-first; intent creation runs only after lifecycle success and successful `on_my_way` event insert.
+- Preferred anchor is explicit event-id handoff from the successful `on_my_way` insert. Recommended implementation is to enhance `insertJobEvent` with optional returned id (or equivalent minimal helper) before job-actions integration.
+- Query-latest-event remains fallback-only.
+- Intent row writes are allowed only when required schema fields can be populated from real truth: durable event anchor, scoped account/job/event, recipient truth from `contact_recipients`, and governed template/version/body snapshot.
+- No fake data is allowed for blocked/skipped rows. Missing required fields (recipient/template/version/body snapshot) must return write-skipped/no-insert.
+- For no-insert outcomes the future helper should return `created = false` with `writeSkippedReason`, no provider row, no SMS send, and no lifecycle rollback.
+- Ready mapping lock: `decision_outcome = ready_for_provider`, `blocked_reason_codes = []`, `quiet_hours_decision = not_checked`, and required template/recipient snapshots populated from governed/recipient truth.
+- Blocked mapping lock: `decision_outcome = blocked` only when required fields still exist; otherwise no-insert with `writeSkippedReason`.
+- Skipped mapping lock: non-target events do not create intent rows in F5C-A; return skipped/no-op helper result.
+- Idempotency key lock: `${accountOwnerUserId}:${jobEventId}:on_the_way:${contactRecipientId}`. Idempotency conflict is treated as deduped success.
+- Failure lock: intent creation is best-effort and must not roll back job status or job event; no provider-send or SMS-sent claim is allowed.
+- Forward sequence lock: F5C-B intent helper only, F5C-C event-id handoff support, F5C-D Mark On The Way best-effort integration, later provider/webhook/sandbox/activation slices only after explicit approval.
+
 ---
 
 ## 1) Current Decision
@@ -360,11 +378,14 @@ O. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 P. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
 Q. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
 R. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`9814340`)
-S. F5C create blocked/skipped/ready `sms_message_intents` from Mark On The Way without provider send.
-T. Quiet-hours/timezone gate planning.
-U. Provider/Twilio readiness and A2P sandbox planning.
-V. Sandbox provider send only after all gates.
-W. Production activation only after legal/provider review and explicit approval.
+S. F5C-A On-The-Way intent creation model lock. ✓ Complete
+T. F5C-B non-sending `sms_message_intents` helper only.
+U. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper).
+V. F5C-D Mark On The Way best-effort integration (no lifecycle rollback).
+W. Quiet-hours/timezone gate planning.
+X. Provider/Twilio readiness and A2P sandbox planning.
+Y. Sandbox provider send only after all gates.
+Z. Production activation only after legal/provider review and explicit approval.
 
 ---
 

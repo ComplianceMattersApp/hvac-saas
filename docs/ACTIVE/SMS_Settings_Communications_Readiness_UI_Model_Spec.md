@@ -180,6 +180,17 @@ SMS Slice F5B Non-Sending On-The-Way Intent Eligibility Helper is complete in im
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 - F5C should be planned/audited before implementation; likely next is non-sending `sms_message_intents` creation from eligible durable `on_my_way` anchors, while provider send/webhook/activation remain deferred.
 
+## F5C-A Model Lock (May 2026)
+
+SMS Slice F5C-A On-The-Way Intent Creation Model Lock is complete in docs/model-only mode.
+
+- F5C remains backend/helper-only and non-sending: no UI controls, no provider controls, no send claims.
+- F5C writes non-sending `sms_message_intents` only when required schema fields exist from recipient + governed template truth.
+- Missing required fields for blocked/skipped outcomes returns no-insert/write-skipped and does not fabricate data.
+- Preferred event anchor remains explicit event-id handoff from successful `on_my_way` insert; latest-event lookup remains fallback-only.
+- Mark On The Way lifecycle behavior remains unchanged; intent creation failure is best-effort and does not roll back lifecycle success.
+- Forward sequence: F5C-B helper only, F5C-C event-id handoff support, F5C-D best-effort integration, then later provider/webhook/activation slices.
+
 ---
 
 ## 1) Current Decision
@@ -533,8 +544,11 @@ K. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 L. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
 M. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
 N. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`9814340`)
-O. F5C create blocked/skipped/ready `sms_message_intents` from Mark On The Way without provider send.
-P. Later slices: provider setup mutation planning, webhook/signature validation, sandbox send planning, activation planning.
+O. F5C-A On-The-Way intent creation model lock. ✓ Complete
+P. F5C-B non-sending `sms_message_intents` helper only.
+Q. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper).
+R. F5C-D Mark On The Way best-effort integration (no lifecycle rollback).
+S. Later slices: provider setup mutation planning, webhook/signature validation, sandbox send planning, activation planning.
 
 ---
 

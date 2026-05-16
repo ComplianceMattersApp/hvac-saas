@@ -684,10 +684,13 @@ K. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
 L. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
 M. F5A docs/model lock for durable On-The-Way intent handoff. ✓ Complete
 N. F5B non-sending event-anchor/intent eligibility helper. ✓ Complete (`9814340`)
-O. F5C create blocked/skipped/ready `sms_message_intents` from Mark On The Way without provider send.
-P. Later webhook/status callback contract planning.
-Q. Later sandbox/provider planning.
-R. Later production activation only after legal/provider review and explicit approval.
+S. F5C-A On-The-Way intent creation model lock. ✓ Complete
+T. F5C-B non-sending `sms_message_intents` helper only.
+U. F5C-C event-id handoff support (`insertJobEvent` optional returned id or equivalent minimal helper).
+V. F5C-D Mark On The Way best-effort integration (no lifecycle rollback).
+W. Provider/Twilio sandbox readiness.
+X. Provider webhook/send implementation only after all gates.
+Y. Production activation only after legal/provider review and explicit approval.
 
 ---
 
@@ -702,6 +705,14 @@ F5B cross-reference closeout (May 2026):
 - It validates durable `on_my_way` anchor readiness, separates structural blocks from deferred live-send warnings, returns `liveSendEnabled` false, and does not return `canSend`.
 - No `sms_message_intents` rows are written yet, no provider delivery rows are written, Mark On The Way behavior did not change, Mark On The Way still does not send SMS, and real SMS remains deferred.
 - F5C should be planned/audited before implementation; likely next is non-sending `sms_message_intents` creation from eligible durable `on_my_way` anchors, while provider send/webhook/activation remain deferred.
+
+F5C-A model lock (May 2026):
+
+- F5C writes non-sending `sms_message_intents` only and keeps `sms_provider_deliveries` deferred.
+- F5C writes only when governed template/version/body snapshot and recipient truth exist; no fake template/recipient/snapshot values are allowed.
+- Missing required fields for blocked/skipped outcomes returns no-insert/write-skipped result.
+- Preferred anchor remains explicit event-id handoff from successful `on_my_way` insert; latest-event query remains fallback-only.
+- Forward sequence: F5C-B helper only, F5C-C event-id handoff support, F5C-D best-effort Mark On The Way integration.
 
 F4B scope and boundary confirmation:
 

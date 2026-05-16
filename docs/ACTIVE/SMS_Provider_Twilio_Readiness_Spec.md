@@ -150,6 +150,18 @@ SMS Slice F5B Non-Sending On-The-Way Intent Eligibility Helper is complete in im
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 - F5C should be planned/audited before implementation; likely next is non-sending `sms_message_intents` creation from eligible durable `on_my_way` anchors, while provider send/webhook/activation remain deferred.
 
+## F5C-A Model Lock (May 2026)
+
+SMS Slice F5C-A On-The-Way Intent Creation Model Lock is complete in docs/model-only mode.
+
+- F5C writes non-sending `sms_message_intents` only and does not create `sms_provider_deliveries`.
+- F5C does not call provider/Twilio and does not send SMS.
+- F5C writes only when required recipient/template/version/body snapshot fields exist from truth.
+- Missing required fields for blocked/skipped outcomes returns no-insert/write-skipped; no fake recipient/template/snapshot values.
+- Preferred anchor remains explicit event-id handoff from successful `on_my_way` event insert; query-latest remains fallback-only.
+- Mark On The Way remains lifecycle-first and unchanged; intent creation failure does not roll back lifecycle success.
+- Forward sequence: F5C-B helper only, F5C-C event-id handoff support, F5C-D best-effort Mark On The Way integration; provider/webhook/activation remain deferred.
+
 ---
 
 ## 1) Current Decision
