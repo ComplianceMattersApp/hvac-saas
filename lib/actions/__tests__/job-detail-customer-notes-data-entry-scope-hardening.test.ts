@@ -259,10 +259,10 @@ function buildAddPublicNoteFormData() {
   return formData;
 }
 
-function buildAddInternalNoteFormData() {
+function buildAddInternalNoteFormData(note = "Internal follow-up logged.") {
   const formData = new FormData();
   formData.set("job_id", "job-1");
-  formData.set("note", "Internal follow-up logged.");
+  formData.set("note", note);
   formData.set("tab", "ops");
   formData.set("context", "contractor_report_review");
   formData.set("anchor_event_id", "event-1");
@@ -414,6 +414,20 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     );
   });
 
+  it("does not notify raw @text without validated tagged user ids", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const formData = buildAddInternalNoteFormData("Please review @Eddie before the visit.");
+
+    await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?tab=ops&banner=follow_up_note_added",
+    );
+
+    expect(insertTargetedInternalNotificationMock).not.toHaveBeenCalled();
+  });
+
   it("does not notify out-of-account tagged users and still saves note", async () => {
     const { supabase } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
@@ -422,6 +436,22 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
     const formData = buildAddInternalNoteFormData();
     formData.append("tagged_user_ids", "other-account-user");
+
+    await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?tab=ops&banner=follow_up_note_added",
+    );
+
+    expect(insertTargetedInternalNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("does not notify inactive tagged users and still saves note", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    assertAssignableInternalUserMock.mockRejectedValueOnce(new Error("INACTIVE_INTERNAL_USER_REQUIRED"));
+
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const formData = buildAddInternalNoteFormData();
+    formData.append("tagged_user_ids", "inactive-user-1");
 
     await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
       "REDIRECT:/jobs/job-1?tab=ops&banner=follow_up_note_added",

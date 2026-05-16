@@ -109,6 +109,7 @@ import ContactLoggingQuickActions from "./_components/ContactLoggingQuickActions
 import DeferredTimelineBody from "./_components/DeferredTimelineBody";
 import DeferredSharedNotesBody from "./_components/DeferredSharedNotesBody";
 import DeferredInternalNotesBody from "./_components/DeferredInternalNotesBody";
+import InternalNoteMentionComposer from "./_components/InternalNoteMentionComposer";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "./_components/InternalInvoiceLineItemsTable";
@@ -4942,46 +4943,16 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
 
-  <form action={addInternalNoteFromForm} className="mb-4 space-y-3">
-    <input type="hidden" name="job_id" value={job.id} />
-    <input type="hidden" name="tab" value={tab} />
-
-    <textarea
-      name="note"
-      rows={3}
-      placeholder="Add an internal note visible only to your team..."
-      className={workspaceTextareaClass}
-    />
-
-    <div className="space-y-1">
-      <label className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
-        Tag teammates (optional)
-      </label>
-      <select
-        name="tagged_user_ids"
-        multiple
-        className={`${workspaceInputClass} min-h-[7rem]`}
-      >
-        {internalTagCandidates.map((candidate) => (
-          <option key={candidate.user_id} value={candidate.user_id}>
-            {candidate.display_name}
-          </option>
-        ))}
-      </select>
-      <p className="text-xs text-slate-500">
-        Tagged teammates receive an internal in-app alert with a direct link back to this job.
-      </p>
-    </div>
-
-    <div className="flex justify-end">
-      <SubmitButton
-        loadingText="Adding note..."
-        className={secondaryButtonClass}
-      >
-        Save internal note
-      </SubmitButton>
-    </div>
-  </form>
+  <InternalNoteMentionComposer
+    action={addInternalNoteFromForm}
+    jobId={String(job.id)}
+    tab={tab}
+    candidates={internalTagCandidates}
+    textareaClassName={workspaceTextareaClass}
+    selectClassName={workspaceInputClass}
+    helperTextClassName="text-xs text-slate-500"
+    buttonClassName={secondaryButtonClass}
+  />
 
   <Suspense fallback={<NarrativeNotesBodyFallback />}>
     <DeferredInternalNotesBody

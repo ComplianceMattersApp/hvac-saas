@@ -91,8 +91,11 @@ export default async function DeferredInternalNotesBody({
         const meta = e?.meta ?? {};
         const noteText = getEventNoteText(meta);
         const taggedDisplayNames = getTaggedUserIds(meta)
-          .map((id) => String((taggedDisplayMap as Record<string, string>)[id] ?? "").trim() || "Team member")
-          .filter(Boolean);
+          .map((id) => ({
+            id,
+            name: String((taggedDisplayMap as Record<string, string>)[id] ?? "").trim() || "Team member",
+          }))
+          .filter((entry) => Boolean(entry.id && entry.name));
 
         return (
           <div key={idx} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
@@ -109,8 +112,16 @@ export default async function DeferredInternalNotesBody({
             ) : null}
 
             {taggedDisplayNames.length > 0 ? (
-              <div className="mt-2 text-xs text-slate-600">
-                Tagged: {taggedDisplayNames.join(", ")}
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                <span className="font-medium uppercase tracking-[0.08em] text-slate-500">Mentioned</span>
+                {taggedDisplayNames.map((entry) => (
+                  <span
+                    key={entry.id}
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-700"
+                  >
+                    @{entry.name}
+                  </span>
+                ))}
               </div>
             ) : null}
           </div>
