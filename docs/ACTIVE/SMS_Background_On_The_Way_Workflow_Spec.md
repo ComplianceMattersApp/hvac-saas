@@ -301,6 +301,21 @@ SMS Slice F6C-C1 Manual Sandbox Send Gate + Resolver Model Lock is complete in d
 - Webhook/status callback remains deferred for manual sandbox smoke only and required before live SMS.
 - Mark On The Way still does not send SMS, and real SMS remains deferred.
 
+## Slice F6C-C2 Closeout (2026-05-15)
+
+SMS Slice F6C-C2 Dry-Run Sandbox Delivery Reservation Action is complete in implementation commit `8d6043e`.
+
+- Added `lib/actions/sms-sandbox-send-actions.ts` and `lib/actions/__tests__/sms-sandbox-send-actions.test.ts`.
+- Action API: `reserveSmsSandboxDeliveryDryRunFromForm(formData: FormData): Promise<void>`.
+- Action is admin-only, accepts `delivery_id` only, derives account scope from authenticated internal user context, and re-reads delivery/intent/provider-readiness server-side.
+- Action re-checks delivery (`twilio`, `not_submitted`, no provider message id), linked intent readiness (`on_the_way`, `ready_for_provider`, durable anchor, required snapshots), provider resolver readiness, and sandbox send gate status.
+- Action remains evaluation-only/dry-run in this slice.
+- Action does not call Twilio/provider, does not send SMS, and does not submit to provider.
+- Action does not mutate `sms_provider_deliveries`, does not set `submitted_at`, does not set `provider_message_id`, and does not change provider status.
+- Action does not mutate `jobs` or `job_events`.
+- Action is fail-closed and returns safe notice codes; current expected end-state remains `sandbox_test_recipient_required` until verified sandbox test-recipient policy is modeled.
+- Mark On The Way still does not send SMS, and real SMS remains deferred.
+
 Forward sequence update:
 
 - F6C-B docs closeout complete.

@@ -396,6 +396,43 @@ Forward sequence lock:
 - F6D webhook/status callback planning/implementation before live SMS.
 - Live SMS later only after legal/provider/activation approval.
 
+## F6C-C2 Dry-Run Sandbox Delivery Reservation Action Closeout (May 2026)
+
+SMS Slice F6C-C2 is complete in implementation commit `8d6043e`.
+
+- Added `lib/actions/sms-sandbox-send-actions.ts` and `lib/actions/__tests__/sms-sandbox-send-actions.test.ts`.
+- Action API: `reserveSmsSandboxDeliveryDryRunFromForm(formData: FormData): Promise<void>`.
+- Action is admin-only and accepts `delivery_id` only.
+- Action derives account scope from authenticated internal user context.
+- Action re-reads same-account delivery and linked intent server-side.
+- Action re-checks delivery readiness (`provider_name = twilio`, `provider_status = not_submitted`, no `provider_message_id`).
+- Action re-checks linked intent readiness (`message_class = on_the_way`, `decision_outcome = ready_for_provider`, durable `job_event_id`, recipient/body/template snapshots present).
+- Action uses `resolveSmsSandboxProviderConfig` and fails closed when sandbox send gate is missing/disabled.
+- Action remains evaluation-only/dry-run infrastructure and does not reserve/consume delivery rows.
+- Action does not call Twilio/provider, does not send SMS, and does not submit to provider.
+- Action does not mutate `sms_provider_deliveries`, does not set `submitted_at`, does not set `provider_message_id`, and does not change provider status.
+- Action does not mutate `jobs` or `job_events` and does not create provider timeline claims.
+- Action returns safe redirect notice codes only and remains fail-closed.
+- Current expected dry-run end-state is `sandbox_test_recipient_required` until verified sandbox test-recipient policy is modeled.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
+F6C-C2 validation recorded:
+
+- `npx.cmd vitest run lib/actions/__tests__/sms-sandbox-send-actions.test.ts` passed (`16/16`).
+- `npx.cmd vitest run lib/communications/__tests__/sms-provider-config-resolver.test.ts` passed (`15/15`).
+- `npx.cmd vitest run lib/communications/__tests__/sms-provider-delivery-preflight.test.ts` passed (`17/17`).
+- `npx.cmd vitest run lib/communications/__tests__/sms-on-the-way-intent-create.test.ts` passed (`12/12`).
+- `npx.cmd tsc --noEmit` passed.
+- `git diff --check` passed.
+
+Forward sequence update:
+
+- F6C-C2 docs closeout complete.
+- Next: model/implement verified sandbox test-recipient gate and/or schema-backed sandbox send gate as explicitly approved.
+- F6C-C3 real manual sandbox send action remains deferred until explicit Twilio sandbox/env/test-recipient approval.
+- F6D webhook/status callback planning/implementation remains required before live SMS.
+- Live SMS remains deferred until legal/provider/activation approval.
+
 Forward sequence update:
 
 - F6C-B docs closeout complete.

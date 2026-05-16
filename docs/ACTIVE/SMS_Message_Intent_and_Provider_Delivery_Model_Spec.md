@@ -253,6 +253,24 @@ Slice F6C-C1 model lock (Manual sandbox send gate + resolver refinement):
 - Crash risk lock remains: schema has no true in-flight state; using `submitted` as reservation is acceptable only for controlled sandbox smoke; reconciliation/retry policy remains later work unless schema change is chosen first.
 - Webhook/status callback remains deferred for manual sandbox smoke only and required before live SMS; live SMS remains deferred pending legal/provider/A2P/STOP/HELP review and explicit activation.
 
+Slice F6C-C2 completion cross-reference (Dry-run sandbox delivery reservation action):
+
+- F6C-C2 is complete in implementation commit `8d6043e`.
+- Files added: `lib/actions/sms-sandbox-send-actions.ts` and `lib/actions/__tests__/sms-sandbox-send-actions.test.ts`.
+- Action API: `reserveSmsSandboxDeliveryDryRunFromForm(formData: FormData): Promise<void>`.
+- Action is admin-only, accepts only `delivery_id`, and derives account scope from authenticated internal user context.
+- Action re-reads same-account `sms_provider_deliveries` and linked same-account `sms_message_intents` server-side; client-supplied account/intent/provider fields are ignored.
+- Action re-checks delivery readiness (`provider_name = twilio`, `provider_status = not_submitted`, no `provider_message_id`).
+- Action re-checks intent readiness (`message_class = on_the_way`, `decision_outcome = ready_for_provider`, durable `job_event_id`, recipient/body/template snapshots present).
+- Action resolves sandbox provider readiness with `resolveSmsSandboxProviderConfig` and fails closed on `sandbox_send_gate_missing_or_disabled`.
+- Action enforces current test-recipient fail-closed posture and currently exits with `sandbox_test_recipient_required` until verified test-recipient policy is modeled.
+- Action is evaluation-only/dry-run in F6C-C2 and does not mutate `sms_provider_deliveries`.
+- Action does not set `submitted_at`, does not set `provider_message_id`, and does not change provider status.
+- Action does not call Twilio/provider, does not send SMS, does not attempt provider submit, and does not return `canSend`.
+- Action does not mutate `jobs` or `job_events`.
+- Action returns safe notice codes only and keeps live send deferred.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
 Future sequence lock:
 
 - F6C-B docs closeout complete.

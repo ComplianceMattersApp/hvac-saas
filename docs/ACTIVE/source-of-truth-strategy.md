@@ -210,6 +210,12 @@ Job snapshot fields (`jobs.customer_phone`, `jobs.customer_email`, `jobs.job_add
 - F6C-C1 locks first sandbox send to verified sandbox/test recipients and conservative fail-closed posture until test-recipient policy is modeled.
 - F6C-C1 locks F6C-C2 as dry-run/manual reservation readiness action only (no Twilio call) and keeps F6C-C3 real manual sandbox send deferred until explicit Twilio sandbox/env/test-recipient setup approval.
 - F6C-C1 keeps webhook/status callback deferred for manual sandbox smoke only and still required before live SMS.
+- F6C-C2 dry-run sandbox delivery reservation action is complete in implementation commit `8d6043e` with `lib/actions/sms-sandbox-send-actions.ts` and `lib/actions/__tests__/sms-sandbox-send-actions.test.ts`.
+- F6C-C2 action API is `reserveSmsSandboxDeliveryDryRunFromForm(formData: FormData): Promise<void>` and remains admin-only.
+- F6C-C2 accepts only `delivery_id`, derives account scope from authenticated internal user context, and re-reads delivery/intent/provider-readiness under account scope server-side.
+- F6C-C2 remains evaluation-only and preserves authority boundaries: no Twilio/provider call, no SMS send, no provider submit, no delivery mutation, no `submitted_at`, no `provider_message_id`, no provider status transition, and no jobs/job_events mutation.
+- F6C-C2 keeps fail-closed notice posture with gate-aware mapping (`sandbox_send_gate_missing_or_disabled`) and current expected end-state `sandbox_test_recipient_required` until verified sandbox test-recipient policy is modeled.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
 - SMS On-The-Way V1 workflow simplification remains locked: Mark On The Way is the user-facing operational trigger, future SMS is a background operational/customer-care notification after that lifecycle event, admin owns the V1 wording, field users do not write custom SMS wording, and visible V1 UI should avoid multi-person approval/rejection workflow unless that product path is intentionally reopened.
 - Template governance remains admin/settings governance, not job timeline truth; `job_events` and manual contact logs are not provider delivery truth, and `sms_message_intents.message_body_snapshot` remains the future audit record of attempted SMS wording.
 - E2 did not add live SMS, send endpoint, webhook, provider integration, or provider delivery write path; real SMS remains deferred pending activation gates.

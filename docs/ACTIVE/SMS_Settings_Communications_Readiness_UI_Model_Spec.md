@@ -254,6 +254,24 @@ Settings/Communications impact lock:
 - Webhook/status callback remains deferred for manual sandbox smoke only and required before live SMS.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 
+## F6C-C2 Dry-Run Sandbox Delivery Reservation Action Closeout (May 2026)
+
+F6C-C2 is complete in implementation commit `8d6043e`.
+
+Settings/Communications closeout impact:
+
+- Added action file `lib/actions/sms-sandbox-send-actions.ts` and test file `lib/actions/__tests__/sms-sandbox-send-actions.test.ts`.
+- Action API: `reserveSmsSandboxDeliveryDryRunFromForm(formData: FormData): Promise<void>`.
+- Action is admin-only and accepts only `delivery_id`.
+- Action derives account scope from authenticated internal user context and re-checks delivery/intent/provider/gate posture server-side.
+- Action remains evaluation-only/dry-run infrastructure and returns safe redirect notices.
+- Action does not call Twilio/provider, does not send SMS, and does not attempt provider submit.
+- Action does not mutate `sms_provider_deliveries`, does not set `submitted_at`, does not set `provider_message_id`, and does not change provider status.
+- Action does not mutate `jobs` or `job_events`.
+- Current expected end-state remains `sandbox_test_recipient_required` until verified sandbox test-recipient policy is modeled.
+- No UI/route changes are introduced by F6C-C2.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
 ---
 
 ## 1) Current Decision

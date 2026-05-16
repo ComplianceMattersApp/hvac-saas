@@ -229,6 +229,26 @@ SMS Slice F6C-C1 closeout note (May 2026):
 - F6C-C1 keeps webhook/status callback deferred for manual sandbox smoke only; callback/signature/opt-out/legal/provider/A2P/STOP/HELP/activation gates remain required before live SMS.
 - Mark On The Way still does not send SMS; real SMS remains deferred.
 
+SMS Slice F6C-C2 closeout note (May 2026):
+- Slice F6C-C2 Dry-Run Sandbox Delivery Reservation Action is complete in implementation commit `8d6043e`.
+- F6C-C2 added `lib/actions/sms-sandbox-send-actions.ts` and `lib/actions/__tests__/sms-sandbox-send-actions.test.ts`.
+- F6C-C2 action API: `reserveSmsSandboxDeliveryDryRunFromForm(formData: FormData): Promise<void>`.
+- F6C-C2 action is admin-only and accepts only `delivery_id`.
+- F6C-C2 derives account scope from authenticated internal user context and re-checks same-account delivery + linked intent + provider resolver + sandbox gate + test-recipient posture server-side.
+- F6C-C2 is evaluation-only/dry-run and does not call Twilio/provider, does not send SMS, and does not attempt provider submit.
+- F6C-C2 does not mutate `sms_provider_deliveries`, does not set `submitted_at`, does not set `provider_message_id`, and does not change provider status.
+- F6C-C2 does not mutate `jobs` or `job_events`.
+- F6C-C2 keeps fail-closed notice posture and currently ends at `sandbox_test_recipient_required` until verified sandbox test-recipient policy is modeled.
+- Validation recorded: `sms-sandbox-send-actions` tests passed (`16/16`), resolver/preflight/intent-create suites passed, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
+
+F6C sequence update:
+- F6C-C2 docs closeout complete.
+- Next: model/implement verified sandbox test-recipient gate and/or schema-backed sandbox send gate as explicitly approved.
+- F6C-C3 real manual sandbox send action remains deferred until explicit Twilio sandbox/env/test-recipient approval.
+- F6D webhook/status callback planning/implementation remains required before live SMS.
+- Live SMS remains deferred pending legal/provider/activation approval.
+
 SMS Slice F1 closeout note (May 2026):
 - Slice F1 Provider/Twilio Readiness Spec is complete in docs/model-only mode at `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md`.
 - F1 records Twilio as likely provider direction while locking provider-neutral internal model and status semantics.

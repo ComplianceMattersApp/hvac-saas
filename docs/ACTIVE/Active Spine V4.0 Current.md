@@ -364,6 +364,12 @@ Current Program Status Note (May 2026)
     - F6C-C1 locks resolver disambiguation to account + `provider_name = twilio` + `provider_environment = sandbox`; account-only lookup cannot satisfy sandbox readiness.
     - F6C-C1 locks first sandbox send to verified sandbox/test recipients and conservative fail-closed behavior until test-recipient policy is modeled.
     - F6C-C1 sequence lock: F6C-C2 dry-run/manual reservation readiness action only (no Twilio call), then F6C-C3 real manual sandbox send only after explicit Twilio sandbox/env/test-recipient setup approval, then F6D callback/webhook readiness before any live-send path.
+    - F6C-C2 dry-run sandbox delivery reservation action is complete in commit `8d6043e` with `lib/actions/sms-sandbox-send-actions.ts` and `lib/actions/__tests__/sms-sandbox-send-actions.test.ts`.
+    - F6C-C2 action API: `reserveSmsSandboxDeliveryDryRunFromForm(formData: FormData): Promise<void>`.
+    - F6C-C2 action is admin-only, accepts only `delivery_id`, derives account scope from authenticated internal user context, and re-checks delivery + linked intent + provider resolver + sandbox gate + test-recipient posture server-side.
+    - F6C-C2 remains evaluation-only and does not call Twilio/provider, does not send SMS, does not submit to provider, does not mutate `sms_provider_deliveries`, does not set `submitted_at`, does not set `provider_message_id`, does not change provider status, and does not mutate `jobs` or `job_events`.
+    - F6C-C2 is fail-closed by safe notice codes and currently ends with `sandbox_test_recipient_required` until verified sandbox test-recipient policy is modeled.
+    - Mark On The Way still does not send SMS, and real SMS remains deferred.
 
 - Job Detail responsiveness closeout is complete and pushed across commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`) removed a duplicate blocking read from `ServiceStatusActions`; `app/jobs/[id]/page.tsx` now passes already-loaded `jobType` and `opsStatus` into the panel.

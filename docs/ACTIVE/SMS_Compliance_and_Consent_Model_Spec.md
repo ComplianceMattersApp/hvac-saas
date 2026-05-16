@@ -121,6 +121,15 @@ Reference closeouts:
 - F6C-C1 notice-code category lock for future actions includes provider-not-ready, gate-missing-or-disabled, test-recipient-required, delivery-missing/not-ready/already-submitted/reserved, provider-submit-attempted, provider-immediate-failure, and internal-error categories.
 - F6C-C1 crash/reconciliation lock: absence of true in-flight status remains known risk; `submitted` reservation remains sandbox-only controlled posture; reconciliation/retry remains later work unless schema change is explicitly chosen first.
 - F6C-C1 sequence lock: F6C-C2 dry-run/manual reservation action only (no Twilio call), then F6C-C3 real manual sandbox send only after explicit Twilio sandbox/env/test-recipient setup approval, then F6D callback/webhook readiness before live SMS.
+- Slice F6C-C2 closeout is complete in implementation commit `8d6043e` with `lib/actions/sms-sandbox-send-actions.ts` and `lib/actions/__tests__/sms-sandbox-send-actions.test.ts`.
+- F6C-C2 action API is `reserveSmsSandboxDeliveryDryRunFromForm(formData: FormData): Promise<void>` and is admin-only.
+- F6C-C2 accepts only `delivery_id`, derives account scope from authenticated internal user context, and re-checks delivery/intent/provider-readiness server-side.
+- F6C-C2 remains evaluation-only/dry-run and does not mutate `sms_provider_deliveries`.
+- F6C-C2 does not set `submitted_at`, does not set `provider_message_id`, and does not change provider status.
+- F6C-C2 does not call Twilio/provider, does not send SMS, and does not attempt provider submit.
+- F6C-C2 does not mutate `jobs` or `job_events`.
+- F6C-C2 keeps fail-closed notice posture, including explicit gate mapping for `sandbox_send_gate_missing_or_disabled` and current expected end-state `sandbox_test_recipient_required` until verified sandbox test-recipient policy is modeled.
+- Mark On The Way still does not send SMS; real SMS remains deferred.
 - SMS On-The-Way V1 simplification: Mark On The Way is the operational trigger; future SMS is a background operational/customer-care notification after that lifecycle event; admin owns the wording in V1; field users do not write custom SMS; visible V1 UI should not become a multi-person approval/rejection queue unless explicitly reopened.
 - V1 compliance posture: the sample On-The-Way wording remains operational only (`Reply STOP to opt out` required); review-request SMS is a separate future message class; template readiness and sandbox readiness do not enable sending.
 - Quiet-hours scope lock: quiet-hours/timezone remains future conservative fail-closed SMS pre-send gate planning only; it must not block Mark On The Way or job lifecycle/status transitions.
