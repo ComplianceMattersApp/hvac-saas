@@ -445,19 +445,29 @@ export async function insertJobEvent(params: {
   event_type: string;
   meta?: Record<string, any> | null;
   userId?: string | null;
-}) {
+}): Promise<string> {
   const { supabase, jobId, event_type } = params;
   const meta = params.meta ?? null;
   const userId = params.userId ?? null;
 
-  const { error } = await supabase.from("job_events").insert({
-    job_id: jobId,
-    event_type,
-    meta,
-    user_id: userId,
-  });
+  const { data, error } = await supabase
+    .from("job_events")
+    .insert({
+      job_id: jobId,
+      event_type,
+      meta,
+      user_id: userId,
+    })
+    .select("id")
+    .single();
 
   if (error) throw error;
+
+  if (!data?.id) {
+    throw new Error("Failed to retrieve inserted event id");
+  }
+
+  return data.id;
 }
 
 type FieldActionTimingRecorder = (phase: string, elapsedMs: number) => void;
@@ -8462,8 +8472,9 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     try {
       // Keep on_my_way close to user intent in event order.
       // assignment_added (if any) -> on_my_way -> schedule_updated (if any)
+      let onMyWayEventId: string | null = null;
       await _ftTimeSubphase("eventBreadcrumb.insertJobEvent.on_my_way", async () =>
-        insertJobEvent({
+        onMyWayEventId = await insertJobEvent({
           supabase,
           jobId: id,
           event_type: "on_my_way",
