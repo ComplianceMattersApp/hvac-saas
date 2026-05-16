@@ -19,6 +19,7 @@ import {
   insertInternalNotificationForEvent,
   markInternalNewWorkNotificationsResolved,
 } from "@/lib/actions/notification-actions";
+import { createOnTheWayIntentFromEvent } from "@/lib/communications/sms-on-the-way-intent-create";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import {
   loadScopedInternalJobForMutation,
@@ -8514,6 +8515,30 @@ export async function advanceJobStatusFromForm(formData: FormData) {
             },
           }),
         );
+      }
+
+      // Best-effort: attempt to create SMS on-the-way intent after successful lifecycle update
+      // and event insert. Failures do not rollback job status or event.
+      if (onMyWayEventId) {
+        try {
+          await _ftTimeSubphase("eventBreadcrumb.smsOnTheWayIntentCreate", async () =>
+            createOnTheWayIntentFromEvent({
+              supabase,
+              accountOwnerUserId: internalUser.account_owner_user_id,
+              actingUserId,
+              jobId: id,
+              jobEventId: onMyWayEventId,
+            }),
+          );
+          console.log("[SMS_INTENT_CREATE_SUCCESS]", { jobId: id, onMyWayEventId });
+        } catch (intentError) {
+          console.error("[SMS_INTENT_CREATE_BEST_EFFORT_FAILED]", {
+            jobId: id,
+            onMyWayEventId,
+            error: intentError instanceof Error ? intentError.message : String(intentError),
+          });
+          // Intentionally swallowed: intent creation failure does not affect job lifecycle
+        }
       }
     } catch (ancillaryError) {
       console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
