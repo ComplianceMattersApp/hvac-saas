@@ -150,6 +150,35 @@ SMS Slice F5C-C Durable On-The-Way Event-ID Handoff Support is complete in imple
 - Mark On The Way still does not send SMS, and real SMS remains deferred.
 - F5C-D will integrate the captured `onMyWayEventId` into `createOnTheWayIntentFromEvent` for non-sending intent creation after lifecycle success.
 
+## Slice F5C-D Cross-Reference Closeout (2026-05-15)
+
+SMS Slice F5C-D Mark On The Way Best-Effort Intent Integration is complete in implementation commit `67e4b32`.
+
+- Modified `lib/actions/job-actions.ts` and added `lib/actions/__tests__/sms-on-the-way-intent-integration.test.ts`.
+- Mark On The Way now calls `createOnTheWayIntentFromEvent` best-effort after:
+  1. Job lifecycle status update succeeds (e.g., on_the_way_at timestamp written).
+  2. Durable `on_my_way` job_event insert succeeds and `onMyWayEventId` is captured.
+  3. Intent creation is wrapped in best-effort try/catch; failures do not rollback lifecycle.
+- Intent creation passes:
+  - `supabase`: Database client for audit writes.
+  - `accountOwnerUserId`: From `internalUser.account_owner_user_id`.
+  - `actingUserId`: Current user ID from auth.
+  - `jobId`: The job being transitioned.
+  - `jobEventId`: The captured durable `onMyWayEventId`.
+- Intent helper behavior:
+  - Ready outcome: creates `sms_message_intents` row if all required truth exists (recipient, template, body snapshot).
+  - Blocked outcome: creates blocked intent row with reason codes if recipient/template/body truth exists; otherwise no-insert.
+  - Skipped/write-skipped outcome: non-target events or missing required truth returns no-insert with `writeSkippedReason`.
+  - Deduped outcome: idempotency conflict (same account/event/message-class/recipient) is allowed and does not fail.
+  - Error outcome: logged and swallowed; does not rollback job status, event, or Mark On The Way success.
+- Mark On The Way success behavior unchanged: blocked/skipped/write-skipped/deduped outcomes do not fail or change user-facing success message.
+- Validation recorded: 7 new integration tests, existing SMS intent create tests `12/12`, SMS intent eligibility tests `12/12`, job event id handoff tests `4/4`, SMS template action tests `54/54`, `npx.cmd tsc --noEmit` passed, `git diff --check` passed. Total: `89/89` tests passed.
+- No `sms_provider_deliveries` rows created; intent creation is audit-only.
+- No provider/Twilio/send/webhook behavior added.
+- No schema changes; no migrations; no Supabase production commands.
+- Mark On The Way still does not send SMS, and real SMS remains deferred.
+- Forward sequence: F5C-D complete; next is provider/Twilio sandbox/send planning audit; webhook/status callback planning is future; real SMS only after explicit approval.
+
 ---
 
 ## 1) Current Decision

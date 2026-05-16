@@ -148,6 +148,23 @@ Slice F4D-E3B completion cross-reference (Admin Readiness UI Wiring):
 - F4D-E3B is complete in commit `c998d0e`.
 - F4D-E3B changed `app/ops/admin/communications/page.tsx` only and added visible `Mark wording ready for sandbox` UI to the existing `On-The-Way Template Governance` section.
 - the visible button appears only when the latest wording is eligible, posts only `version_id`, and uses `markOnTheWayTemplateReadyForSandboxFromForm`.
+
+Slice F5C-D completion cross-reference (Mark On The Way best-effort intent integration):
+
+- F5C-D is complete in implementation commit `67e4b32`.
+- F5C-D changed `lib/actions/job-actions.ts` and added `lib/actions/__tests__/sms-on-the-way-intent-integration.test.ts`.
+- Mark On The Way now calls `createOnTheWayIntentFromEvent` best-effort after lifecycle update and event insert succeed with captured `onMyWayEventId`.
+- Intent creation returns `CreateOnTheWayIntentFromEventResult` with `created` (boolean), `deduped` (boolean), `intentId` (string or undefined), `decisionStatus`, `decisionOutcomeWritten` (`ready_for_provider` or `blocked`), `blockedReasons` (array), `warnings` (array), and `liveSendEnabled` (false always).
+- E2 boundary preserved: Only `sms_message_intents` rows are created; no `sms_provider_deliveries` writes occur in F5C-D.
+- Ready outcome writes one intent row with `decision_outcome = ready_for_provider` and `blocked_reason_codes = []`.
+- Blocked outcome writes one intent row with `decision_outcome = blocked` and `blocked_reason_codes` populated only if required recipient/template/body truth exists; otherwise no-insert.
+- Skipped/write-skipped outcome (non-target event or missing required fields) returns no-insert with `writeSkippedReason`; no fake data is written.
+- Deduped outcome (idempotency conflict) is allowed and returns `created = false, deduped = true`.
+- Error outcome (helper throws) is caught, logged, and swallowed; does not rollback job status, event, or Mark On The Way success.
+- Validation recorded: 89/89 tests total (7 integration + 12 create + 12 eligibility + 4 event-id + 54 template + existing), TypeScript passed, `git diff --check` passed.
+- No provider delivery write path was added in F5C-D.
+- No send endpoint, webhook, provider integration, or live SMS behavior was added.
+- real SMS remains deferred pending provider readiness, sandbox validation, legal/provider review, and explicit activation approval.
 - visible V1 UI remains admin-owned readiness UI, not a queue-shaped review/reject workflow; activation language is intentionally avoided.
 - E2 boundary remains preserved: no `sms_message_intents` or `sms_provider_deliveries` writes are added by F4D-E3B.
 - browser smoke passed with `draft_created`, `draft_saved`, `template_marked_ready_for_sandbox`, sandbox version `Approved for sandbox`, forbidden controls absent, and browser-safe rendering confirmed.

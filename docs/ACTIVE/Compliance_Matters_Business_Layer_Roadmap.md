@@ -147,6 +147,17 @@ SMS Slice E2 closeout note (May 2026):
 - Quiet-hours/timezone is scoped to future conservative fail-closed SMS pre-send eligibility only; Mark On The Way and job lifecycle/status transitions remain direct workflow and are not blocked.
 - No quiet-hours settings UI is approved for V1 direct job workflows.
 
+SMS Slice F5C-D closeout note (May 2026):
+- Slice F5C-D Mark On The Way Best-Effort Intent Integration is complete in commit `67e4b32`.
+- F5C-D added intent creation after Mark On The Way lifecycle update and event insert succeed.
+- F5C-D calls `createOnTheWayIntentFromEvent` best-effort with captured `onMyWayEventId`, `accountOwnerUserId`, `actingUserId`, `jobId`.
+- F5C-D allows ready (write intent), blocked (write blocked intent), skipped/write-skipped (no-insert), deduped (idempotency ok), and error (log/swallow) outcomes without failing Mark On The Way.
+- F5C-D did not add live SMS, send endpoint, webhook, provider integration, provider delivery write path, `job_events` provider summary behavior, schema changes, migrations, production migration apply, or production writes.
+- Validation recorded: 89/89 tests (7 integration + 12 create + 12 eligibility + 4 event-id + 54 template + existing), TypeScript passed, `git diff --check` passed.
+- Real SMS remains deferred pending provider readiness, sandbox validation, legal/provider review, and explicit activation decision.
+- Mark On The Way still does not send SMS.
+- Next: provider/Twilio sandbox/send planning audit only.
+
 SMS Slice F1 closeout note (May 2026):
 - Slice F1 Provider/Twilio Readiness Spec is complete in docs/model-only mode at `docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md`.
 - F1 records Twilio as likely provider direction while locking provider-neutral internal model and status semantics.
