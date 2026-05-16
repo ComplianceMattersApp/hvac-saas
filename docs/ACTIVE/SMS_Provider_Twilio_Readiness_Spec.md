@@ -100,6 +100,19 @@ Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
 - initial `template_create_failed` was caused by runtime target mismatch (local reset target vs remote app runtime target), not a code defect
 - real SMS remains deferred
 
+## F4D-E3B Completion Cross-Reference (May 2026)
+
+Slice F4D-E3B Admin Readiness UI Wiring is complete in commit `c998d0e`.
+
+- page changed: `app/ops/admin/communications/page.tsx`
+- existing `On-The-Way Template Governance` section now includes visible `Mark wording ready for sandbox` UI
+- button appears only when the latest wording is eligible, posts only `version_id`, and uses `markOnTheWayTemplateReadyForSandboxFromForm`
+- visible V1 copy stays readiness/testing oriented and does not imply provider activation, send enablement, or Twilio readiness
+- UI avoids queue-shaped submit/review/reject workflow; review/reject UI remains parked unless team-review workflow is intentionally reopened
+- browser smoke passed with `draft_created`, `draft_saved`, `template_marked_ready_for_sandbox`, sandbox version `Approved for sandbox`, forbidden controls absent, and browser-safe rendering confirmed
+- targeted validation passed (`94/94`), TypeScript passed, `git diff --check` passed, working tree clean
+- template readiness does not enable SMS, sandbox readiness does not send SMS, Mark On The Way still does not send SMS, and real SMS remains deferred until later provider setup, webhook/signature validation, send path, and explicit activation work
+
 ## SMS On-The-Way V1 Workflow Simplification (May 2026)
 
 Provider planning remains subordinate to the simple V1 product goal:
@@ -406,11 +419,11 @@ N. F4D-D review actions.
 O. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 P. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
 Q. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
-R. F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination).
-R. F5 webhook/status callback contract planning.
-S. F6 provider/Twilio sandbox implementation planning.
-T. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
-U. Production activation only after provider/legal review and explicit approval.
+R. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
+S. F5 webhook/status callback contract planning.
+T. F6 provider/Twilio sandbox implementation planning.
+U. Sandbox send only after sender identity, template governance, consent/suppression, audit model, webhook contract, and activation gates are ready.
+V. Production activation only after provider/legal review and explicit approval.
 
 ---
 

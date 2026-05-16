@@ -127,6 +127,22 @@ Slice F4D-E1 Create/Save Draft UI is complete in commit `1b8b671`.
 - runtime mismatch finding recorded: initial `template_create_failed` came from local-reset vs runtime-target mismatch, not a code defect
 - real SMS remains deferred
 
+## F4D-E3B Completion Cross-Reference (May 2026)
+
+Slice F4D-E3B Admin Readiness UI Wiring is complete in commit `c998d0e`.
+
+- page updated: `app/ops/admin/communications/page.tsx`
+- existing `On-The-Way Template Governance` section now includes visible `Mark wording ready for sandbox` UI
+- button appears only when the latest wording is eligible and the form posts only `version_id`
+- visible button/form uses `markOnTheWayTemplateReadyForSandboxFromForm`
+- UI keeps the simplified V1 admin-owned posture and avoids queue-shaped submit/review/reject workflow
+- review/reject UI remains parked unless team-review workflow is intentionally reopened
+- language remains readiness/testing oriented, not activation oriented
+- template readiness does not enable SMS, sandbox readiness does not send SMS, and Mark On The Way still does not send SMS
+- browser smoke passed with `draft_created`, `draft_saved`, `template_marked_ready_for_sandbox`, sandbox version shown as `Approved for sandbox`, forbidden controls absent, and browser-safe rendering confirmed
+- targeted validation passed (`94/94`), TypeScript passed, `git diff --check` passed, and working tree was clean
+- real SMS remains deferred
+
 ## SMS On-The-Way V1 Workflow Simplification (May 2026)
 
 Visible V1 UI should reflect the simple product goal:
@@ -492,8 +508,8 @@ H. F4D-D review actions.
 I. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 J. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
 K. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
-L. F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination).
-L. Later slices: provider setup mutation planning, webhook/signature validation, sandbox send planning, activation planning.
+L. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
+M. Later slices: planning/audit for the future background On-The-Way send path, provider setup mutation planning, webhook/signature validation, sandbox send planning, activation planning.
 
 ---
 

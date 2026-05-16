@@ -56,7 +56,7 @@ D. F4D-D review actions. ✓ Complete (`f5995d7`)
 E. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 F. F4D-E2 safe version-id/action-eligibility read-model support. ✓ Complete (`fededec`)
 G. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
-H. F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination).
+H. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
 I. Later provider/legal review operations.
 J. Later sandbox/provider work.
 K. Later production activation only after explicit approval.
@@ -349,13 +349,57 @@ State after F4D-E3A:
 - submit/approve-for-sandbox/reject review actions exist
 - create/save draft UI exists
 - combined admin readiness action exists for V1 workflow simplification
-- visible mark-ready UI wiring remains deferred to F4D-E3B
+- visible mark-ready UI wiring is complete in F4D-E3B
 - review/reject UI remains parked unless team-review workflow is reopened
 - approve-for-activation remains deferred
 - provider/legal approval actions remain deferred
 - provider setup remains deferred
 - sandbox/live SMS remains deferred
 - real SMS remains deferred
+
+---
+
+## F4D-E3B Completion Cross-Reference (May 2026)
+
+SMS Slice F4D-E3B Admin Readiness UI Wiring is complete.
+
+- implementation commit: `c998d0e`
+- UI file: `app/ops/admin/communications/page.tsx`
+- the existing `On-The-Way Template Governance` section on `/ops/admin/communications` now includes visible `Mark wording ready for sandbox` UI
+- the button appears only when the latest wording is eligible
+- the form posts only `version_id`
+- the UI uses the combined admin readiness action `markOnTheWayTemplateReadyForSandboxFromForm`
+- the visible V1 UI avoids queue-shaped submit/review/reject workflow
+- review/reject UI remains parked unless a larger team-review workflow is intentionally reopened
+- button language stays readiness/testing oriented, not activation language
+- template readiness does not enable SMS
+- sandbox readiness does not send SMS
+- Mark On The Way on a job still does not send SMS
+- real SMS remains deferred
+
+Smoke recorded:
+
+- create draft from default: `draft_created`
+- save draft: `draft_saved`
+- mark wording ready for sandbox: `template_marked_ready_for_sandbox`
+- sandbox version displayed as `Approved for sandbox`
+- forbidden controls absent: submit for review, reject, approve for activation, send/test/sandbox send, activation toggle, provider/Twilio/webhook, job-detail preview, field-user editor
+- browser-safe rendering confirmed: no raw provider refs, secrets, full phone numbers, customer/job data, account owner ids, or raw JSON dumps
+
+Validation recorded:
+
+- targeted smoke-validation subset passed (`94/94`)
+- TypeScript passed
+- `git diff --check` passed
+- working tree clean
+
+State after F4D-E3B:
+
+- visible admin readiness UI wiring exists on the Communications page
+- create/save draft UI and combined mark-ready action now complete the intended V1 admin-owned readiness flow
+- review/reject UI remains parked unless team-review workflow is intentionally reopened
+- provider/Twilio sandbox setup, send endpoint, webhook/status callback, and activation remain deferred
+- next natural lane is planning/audit for the future background On-The-Way SMS send path; send behavior remains unimplemented
 
 ---
 
@@ -412,7 +456,7 @@ Future sequence after this docs closeout:
 - F4D-E1 create/save draft UI
 - F4D-E2 safe version-id/action-eligibility read-model support for admin readiness
 - F4D-E3A combined admin readiness action (complete, `8cfa814`)
-- F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination)
+- F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
 - later provider/legal review workflow
 - later webhook/status callback contract planning
 - later provider/Twilio sandbox planning

@@ -244,8 +244,25 @@ SMS Slice F4D-E3A Combined Admin Readiness Action is complete in commit `8cfa814
 - does not set current_version_id, does not activate, does not enable SMS, does not call provider
 - uses rollback posture on pointer failure
 - all tests passed (54/54 sms-template-actions, 19/19 validation, 21/21 read-model, etc.)
-- visible mark-ready UI wiring remains deferred to F4D-E3B
+- visible mark-ready UI wiring is complete in F4D-E3B
 - review/reject UI remains parked unless team-review workflow reopened
+- real SMS remains deferred
+
+## F4D-E3B Completion Cross-Reference (May 2026)
+
+SMS Slice F4D-E3B Admin Readiness UI Wiring is complete in commit `c998d0e`.
+
+- page changed: `app/ops/admin/communications/page.tsx`
+- existing `On-The-Way Template Governance` section now includes visible `Mark wording ready for sandbox` UI
+- the button appears only when the latest wording is eligible and the form posts only `version_id`
+- the UI uses `markOnTheWayTemplateReadyForSandboxFromForm`
+- visible V1 posture stays admin-readiness oriented and avoids queue-shaped submit/review/reject workflow
+- review/reject UI remains parked unless a larger team-review workflow is intentionally reopened
+- button language remains readiness/testing language, not activation language
+- template readiness does not enable SMS, sandbox readiness does not send SMS, and Mark On The Way still does not send SMS
+- browser smoke passed with `draft_created`, `draft_saved`, `template_marked_ready_for_sandbox`, and sandbox version shown as `Approved for sandbox`
+- forbidden controls remained absent and browser-safe rendering remained intact
+- targeted validation passed (`94/94`), TypeScript passed, `git diff --check` passed, working tree clean
 - real SMS remains deferred
 ## F4D-E1 Completion Cross-Reference (May 2026)
 
@@ -280,7 +297,7 @@ Visible V1 UI should stay admin-readiness oriented:
 
 - Create draft from default.
 - Edit/save draft wording.
-- Later, mark wording ready for sandbox/readiness.
+- Mark wording ready for sandbox/readiness when latest wording is eligible.
 - Do not expose `Reject version` unless a larger-company/team-review workflow is intentionally reopened.
 - Do not make `Submit for review` feel required for owner-led/admin-owned V1 unless explicitly reopened.
 - Prefer `Mark wording ready for sandbox` or `Wording ready for future SMS testing` over approval-queue language.
@@ -662,10 +679,11 @@ H. F4D-D review actions.
 I. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 J. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
 K. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
-L. F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination).
-M. Later webhook/status callback contract planning.
-N. Later sandbox/provider planning.
-O. Later production activation only after legal/provider review and explicit approval.
+L. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
+M. Planning/audit for the future background On-The-Way send path.
+N. Later webhook/status callback contract planning.
+O. Later sandbox/provider planning.
+P. Later production activation only after legal/provider review and explicit approval.
 
 ---
 

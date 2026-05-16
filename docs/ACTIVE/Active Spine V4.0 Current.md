@@ -230,7 +230,7 @@ Current Program Status Note (May 2026)
   - SMS Slice F4D-A Template Editing + Review Actions Model Lock is complete (docs/model-only):
     - spec added: `docs/ACTIVE/SMS_Template_Editing_and_Review_Actions_Model_Spec.md`
     - cross-references updated across ACTIVE SMS docs, source-of-truth strategy, Active Spine, and Business Layer Roadmap
-    - locked implementation sequence (updated): F4D-A docs/model lock, F4D-B validation helper, F4D-C create/save draft server actions, F4D-D review actions, F4D-E1 create/save draft UI (complete), F4D-E2 safe version-id/action-eligibility read-model support for admin readiness (complete), F4D-E3A combined admin readiness action (complete), F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination), later provider/legal review, later sandbox/provider work, and later production activation only after explicit approval
+    - locked implementation sequence (updated): F4D-A docs/model lock, F4D-B validation helper, F4D-C create/save draft server actions, F4D-D review actions, F4D-E1 create/save draft UI (complete), F4D-E2 safe version-id/action-eligibility read-model support for admin readiness (complete), F4D-E3A combined admin readiness action (complete), F4D-E3B mark-ready UI wiring (complete), then planning/audit for the future background On-The-Way send path, later provider/legal review, later sandbox/provider work, and later production activation only after explicit approval
     - locked future validation helper: `lib/communications/sms-template-governance-validation.ts`
     - locked future action file: `lib/actions/sms-template-actions.ts`
     - locked first future actions: `createOnTheWayTemplateDraftFromDefaultFromForm` and `saveOnTheWayTemplateDraftFromForm`
@@ -320,7 +320,17 @@ Current Program Status Note (May 2026)
     - action revalidation: revalidates `/ops/admin/communications` + `/ops/admin` on success
     - validation recorded: sms-template-actions `54/54` passed; sms-template-governance-validation `19/19` passed; sms-template-governance-read `21/21` passed; sms-provider-readiness-read `16/16` passed; sms-eligibility-inputs-read `16/16` passed; contact-recipients-read `4/4` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed
     - boundaries preserved: no UI/route/schema/migration changes, no Supabase production commands, no provider/Twilio/send/webhook behavior, no env/flag/payment/QBO/portal changes, and no production writes
-    - visible mark-ready UI wiring remains deferred to F4D-E3B; review/reject UI remains parked unless team-review workflow is reopened; real provider-powered SMS remains deferred
+    - visible mark-ready UI wiring is completed in F4D-E3B; review/reject UI remains parked unless team-review workflow is reopened; real provider-powered SMS remains deferred
+
+  - SMS Slice F4D-E3B Admin Readiness UI Wiring is complete:
+    - implementation commit: `c998d0e`
+    - page changed: `app/ops/admin/communications/page.tsx`
+    - existing `On-The-Way Template Governance` section now includes visible `Mark wording ready for sandbox` UI using `markOnTheWayTemplateReadyForSandboxFromForm`
+    - button visibility is eligibility-gated from latest-version admin readiness fields and form input is limited to `version_id`
+    - visible V1 posture avoids queue-shaped submit/review/reject workflow, keeps review/reject UI parked unless intentionally reopened, and uses readiness/testing language instead of activation language
+    - browser smoke recorded `draft_created`, `draft_saved`, `template_marked_ready_for_sandbox`, sandbox version `Approved for sandbox`, forbidden controls absent, and browser-safe rendering confirmed
+    - validation recorded: targeted tests `94/94` passed; `npx.cmd tsc --noEmit` passed; `git diff --check` passed; working tree clean
+    - boundaries preserved: no code outside admin Communications UI, no schema/migration/provider/Twilio/send/webhook/activation behavior changes, template readiness does not enable SMS, sandbox readiness does not send SMS, Mark On The Way still does not send SMS, and real provider-powered SMS remains deferred
 
   - SMS On-The-Way V1 Workflow Simplification is locked:
     - Mark On The Way is the user-facing operational trigger.

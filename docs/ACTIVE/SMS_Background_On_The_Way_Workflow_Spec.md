@@ -57,6 +57,12 @@ Recorded boundary for this workflow spec:
 - F4D-E1 adds local notice rendering, `Draft Wording` card, create-draft form, and latest-draft-only save form while preserving required non-sending copy.
 - F4D-E1 wires only create/save draft actions and intentionally does not add review controls, activation controls, provider setup, send endpoint, webhook, or automation behavior.
 - Browser smoke passed after local runtime target alignment (`draft_created`, `draft_saved`); initial `template_create_failed` was runtime-target mismatch and not a code defect.
+- Slice F4D-E3B Admin Readiness UI Wiring is complete in commit `c998d0e`.
+- F4D-E3B keeps all behavior inside `app/ops/admin/communications/page.tsx`; it adds visible `Mark wording ready for sandbox` UI to the existing `On-The-Way Template Governance` section and uses `markOnTheWayTemplateReadyForSandboxFromForm`.
+- the button appears only when latest wording is eligible, posts only `version_id`, avoids queue-shaped submit/review/reject UI, and keeps readiness/testing language instead of activation language.
+- browser smoke passed end-to-end with `draft_created`, `draft_saved`, `template_marked_ready_for_sandbox`, sandbox version `Approved for sandbox`, forbidden controls absent, and browser-safe rendering confirmed.
+- F4D-E3B does not add On-The-Way automation, provider calls, send endpoint, webhook behavior, sandbox SMS sends, or live SMS sends; Mark On The Way still does not send SMS and real SMS remains deferred.
+- targeted validation passed (`94/94`), TypeScript passed, `git diff --check` passed, and working tree was clean.
 
 ---
 
@@ -302,12 +308,13 @@ L. F4D-D review actions.
 M. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 N. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
 O. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
-P. F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination).
-P. Quiet-hours/timezone gate planning.
-Q. Provider/Twilio readiness and A2P sandbox planning.
-R. Non-sending background evaluator.
-S. Sandbox provider send only after all gates.
-T. Production activation only after legal/provider review and explicit approval.
+P. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
+Q. Planning/audit for the actual background On-The-Way send path.
+R. Quiet-hours/timezone gate planning.
+S. Provider/Twilio readiness and A2P sandbox planning.
+T. Non-sending background evaluator.
+U. Sandbox provider send only after all gates.
+V. Production activation only after legal/provider review and explicit approval.
 
 ---
 

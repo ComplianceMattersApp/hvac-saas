@@ -143,6 +143,17 @@ Slice F4D-E1 completion cross-reference (Create/Save Draft UI):
 - E2 boundary remains preserved: no `sms_message_intents` or `sms_provider_deliveries` writes are added by F4D-E1.
 - browser smoke passed after local runtime target alignment (`draft_created`, `draft_saved`); initial `template_create_failed` was runtime-target mismatch, not a code defect.
 
+Slice F4D-E3B completion cross-reference (Admin Readiness UI Wiring):
+
+- F4D-E3B is complete in commit `c998d0e`.
+- F4D-E3B changed `app/ops/admin/communications/page.tsx` only and added visible `Mark wording ready for sandbox` UI to the existing `On-The-Way Template Governance` section.
+- the visible button appears only when the latest wording is eligible, posts only `version_id`, and uses `markOnTheWayTemplateReadyForSandboxFromForm`.
+- visible V1 UI remains admin-owned readiness UI, not a queue-shaped review/reject workflow; activation language is intentionally avoided.
+- E2 boundary remains preserved: no `sms_message_intents` or `sms_provider_deliveries` writes are added by F4D-E3B.
+- browser smoke passed with `draft_created`, `draft_saved`, `template_marked_ready_for_sandbox`, sandbox version `Approved for sandbox`, forbidden controls absent, and browser-safe rendering confirmed.
+- targeted validation passed (`94/94`), TypeScript passed, `git diff --check` passed, working tree clean.
+- template readiness does not enable SMS, sandbox readiness does not send SMS, Mark On The Way still does not send SMS, and real SMS remains deferred.
+
 Slice SMS On-The-Way V1 workflow simplification cross-reference:
 
 - Mark On The Way is the user-facing operational trigger.
@@ -461,10 +472,10 @@ L. F4D-D review actions.
 M. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 N. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
 O. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
-P. F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination).
-P. Provider/Twilio sandbox readiness.
-Q. Provider webhook/send implementation only after all gates.
-R. Production activation only after legal/provider review and explicit approval.
+P. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
+Q. Provider/Twilio sandbox readiness.
+R. Provider webhook/send implementation only after all gates.
+S. Production activation only after legal/provider review and explicit approval.
 
 ---
 

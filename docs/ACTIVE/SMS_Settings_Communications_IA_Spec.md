@@ -145,6 +145,17 @@ Slice F4D-E1 completion cross-reference (May 2026):
 - F4D-E1 preserves required non-sending copy and browser-safe posture.
 - Browser smoke passed after local runtime target alignment (`draft_created`, `draft_saved`); initial `template_create_failed` was runtime-target mismatch, not a code defect.
 
+Slice F4D-E3B completion cross-reference (May 2026):
+
+- Admin Readiness UI Wiring is complete in commit `c998d0e`.
+- `app/ops/admin/communications/page.tsx` now keeps `On-The-Way Template Governance` as the visible admin home for `Mark wording ready for sandbox`.
+- the visible button appears only when the latest wording is eligible, posts only `version_id`, and uses `markOnTheWayTemplateReadyForSandboxFromForm`.
+- V1 IA stays intentionally simple: no visible submit/review/reject queue, no activation language, no job-detail preview, and no field-user editor.
+- review/reject UI remains deferred unless a larger team-review workflow is intentionally reopened.
+- browser smoke recorded `draft_created`, `draft_saved`, `template_marked_ready_for_sandbox`, sandbox version `Approved for sandbox`, forbidden controls absent, and browser-safe rendering confirmed.
+- targeted validation passed (`94/94`), TypeScript passed, `git diff --check` passed, working tree clean.
+- template readiness does not enable SMS, sandbox readiness does not send SMS, Mark On The Way still does not send SMS, and real SMS remains deferred.
+
 SMS On-The-Way V1 workflow simplification cross-reference (May 2026):
 
 - Settings -> Communications remains the admin home for On-The-Way wording control.
@@ -381,11 +392,12 @@ L. F4D-D review actions.
 M. F4D-E1 create/save draft UI. ✓ Complete (`1b8b671`)
 N. F4D-E2 safe version-id/action-eligibility read-model support for admin readiness. ✓ Complete (`fededec`)
 O. F4D-E3A combined admin readiness action. ✓ Complete (`8cfa814`)
-P. F4D-E3B mark-ready UI wiring (deferred pending team-review workflow determination).
-P. Quiet-hours/timezone gate planning.
-Q. Provider/Twilio readiness and sandbox setup.
-R. Sandbox provider send after all gates.
-S. Production activation only after legal/provider review and explicit approval.
+P. F4D-E3B mark-ready UI wiring. ✓ Complete (`c998d0e`)
+Q. Planning/audit for the future background On-The-Way send path.
+R. Quiet-hours/timezone gate planning.
+S. Provider/Twilio readiness and sandbox setup.
+T. Sandbox provider send after all gates.
+U. Production activation only after legal/provider review and explicit approval.
 
 ---
 
