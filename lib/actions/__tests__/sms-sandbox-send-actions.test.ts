@@ -551,7 +551,87 @@ describe("reserveSmsSandboxDeliveryDryRunFromForm", () => {
     ).rejects.toThrow();
 
     expect(resolveSmsSandboxProviderConfigMock).toHaveBeenCalledOnce();
-    // No actual Twilio calls would be made (no provider submit, no message send)
+    expect(sendTwilioSandboxMessageMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks when test recipient phone does not match intent snapshot", async () => {
+    const intentPhone = "+15550001111";
+    const { admin } = buildAdminReadMock({
+      delivery: makeDelivery(),
+      intent: makeIntent({ recipient_phone_snapshot: intentPhone }),
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValueOnce(null);
+
+    await expect(
+      reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
+    ).rejects.toThrow(
+      "REDIRECT:/ops/admin/communications?notice=sandbox_test_recipient_required",
+    );
+
+    expect(readSmsSandboxTestRecipientForPhoneMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountOwnerUserId: "owner-1",
+        phoneE164: intentPhone,
+      }),
+    );
+  });
+
+  it("blocks cross-account test recipient by account-scoped lookup", async () => {
+    const { admin } = buildAdminReadMock({
+      delivery: makeDelivery(),
+      intent: makeIntent(),
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    // Account-scoped helper should return null for cross-account rows.
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValueOnce(null);
+
+    await expect(
+      reserveSmsSandboxDeliveryDryRunFromForm(buildFormData("delivery-1")),
+    ).rejects.toThrow(
+      "REDIRECT:/ops/admin/communications?notice=sandbox_test_recipient_required",
+    );
+
+    expect(readSmsSandboxTestRecipientForPhoneMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountOwnerUserId: "owner-1",
+      }),
+    );
+  });
+
+  it("ignores forged client test-recipient fields and still uses server-side intent snapshot", async () => {
+    const intentPhone = "+15551234567";
+    const { admin } = buildAdminReadMock({
+      delivery: makeDelivery(),
+      intent: makeIntent({ recipient_phone_snapshot: intentPhone }),
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    readSmsSandboxTestRecipientForPhoneMock.mockResolvedValueOnce(
+      makeTestRecipient({ phone_e164: intentPhone }),
+    );
+
+    await expect(
+      reserveSmsSandboxDeliveryDryRunFromForm(
+        buildFormData("delivery-1", {
+          recipient_phone_snapshot: "+19999999999",
+          phone_e164: "+18888888888",
+          account_owner_user_id: "forged-owner",
+          test_recipient_id: "forged-test-recipient",
+        }),
+      ),
+    ).rejects.toThrow(
+      "REDIRECT:/ops/admin/communications?notice=sandbox_reservation_dry_run_ready",
+    );
+
+    expect(readSmsSandboxTestRecipientForPhoneMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountOwnerUserId: "owner-1",
+        phoneE164: intentPhone,
+      }),
+    );
   });
 
   it("action reads only expected tables (delivery, intent, test-recipient)", async () => {
