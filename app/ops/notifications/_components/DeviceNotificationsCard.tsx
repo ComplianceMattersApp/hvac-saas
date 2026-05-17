@@ -89,6 +89,10 @@ export function DeviceNotificationsCard({
   const [message, setMessage] = useState<string | null>(null);
   const [currentEndpoint, setCurrentEndpoint] = useState<string | null>(null);
   const [activeCount, setActiveCount] = useState(initialSubscriptions.length);
+  const savedEndpoints = useMemo(
+    () => new Set(initialSubscriptions.map((subscription) => subscription.endpoint)),
+    [initialSubscriptions],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -116,7 +120,13 @@ export function DeviceNotificationsCard({
 
         if (subscription?.endpoint) {
           setCurrentEndpoint(subscription.endpoint);
-          setState("enabled");
+          if (savedEndpoints.has(subscription.endpoint)) {
+            setState("enabled");
+            return;
+          }
+
+          setState("failed");
+          setMessage("This browser subscription is not saved on the server. Re-enroll to sync it.");
           return;
         }
 
@@ -131,7 +141,7 @@ export function DeviceNotificationsCard({
     return () => {
       cancelled = true;
     };
-  }, [publicVapidKey]);
+  }, [publicVapidKey, savedEndpoints]);
 
   const statusText = useMemo(() => {
     if (state === "unsupported") return "Device notifications are not supported in this browser.";
