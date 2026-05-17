@@ -77,6 +77,7 @@ export async function registerBrowserPushSubscriptionAction(input: {
 
     if (result.subscription) {
       revalidatePath("/ops/notifications");
+      revalidatePath("/account");
     }
 
     return result;
@@ -95,6 +96,7 @@ export async function deactivateBrowserPushSubscriptionAction(input: {
     const result = await deactivateCurrentInternalUserPushSubscription({ endpoint });
     if (result.deactivated) {
       revalidatePath("/ops/notifications");
+      revalidatePath("/account");
     }
     return result;
   } catch {

@@ -3,6 +3,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
+import {
+  deactivateBrowserPushSubscriptionAction,
+  registerBrowserPushSubscriptionAction,
+} from "@/lib/actions/push-subscription-actions";
+import {
+  listCurrentInternalUserPushSubscriptions,
+  type PushSubscriptionSafeRow,
+} from "@/lib/notifications/push-subscriptions";
+import { DeviceNotificationsCard } from "@/app/ops/notifications/_components/DeviceNotificationsCard";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -69,6 +78,16 @@ export default async function AccountPage({
     String(userMetadata.phone_number ?? "").trim() ||
     String(user.phone ?? "").trim();
 
+  let pushSubscriptions: PushSubscriptionSafeRow[] = [];
+  try {
+    pushSubscriptions = await listCurrentInternalUserPushSubscriptions({ supabase });
+  } catch (error) {
+    console.warn("[account] push subscription hydration skipped", {
+      code: String((error as { code?: unknown } | null)?.code ?? ""),
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 text-gray-900 sm:p-6">
       {banner === "profile_updated" ? (
@@ -121,6 +140,15 @@ export default async function AccountPage({
             <div className="mt-1 text-sm font-medium text-slate-900 sm:text-base">{formatPhone(phone)}</div>
           </div>
         </div>
+      </section>
+
+      <section className="space-y-4">
+        <DeviceNotificationsCard
+          initialSubscriptions={pushSubscriptions}
+          publicVapidKey={process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY ?? null}
+          onRegister={registerBrowserPushSubscriptionAction}
+          onDeactivate={deactivateBrowserPushSubscriptionAction}
+        />
       </section>
     </div>
   );

@@ -1754,7 +1754,8 @@ const hasActiveSystemAlerts = visibleSignalCards.some((card) => card.count > 0);
 const showContractorFilter = (contractors ?? []).length > 0;
 const showContractorFilterInPrimary = showContractorFilter && !isHvacServiceMode;
 const showContractorSignalsSection = visibleSignalCards.length > 0 || Boolean(signal);
-const showOperationalNotificationAwareness = !isHvacServiceMode && showContractorSignalsSection;
+// Show contractor signals for ECC/Hybrid modes, OR show collaboration signals for HVAC Service mode
+const showOperationalNotificationAwareness = (!isHvacServiceMode && showContractorSignalsSection) || isHvacServiceMode;
 
 const activeQueueLabel = OPS_TABS.find((t) => t.key === bucket)?.label ?? bucket;
 const activeSignalLabel =
@@ -2516,7 +2517,7 @@ return (
             href="/ops/notifications?state=unread"
             className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300"
           >
-            Review notifications
+            {isHvacServiceMode ? "View alerts" : "Review notifications"}
           </Link>
         </div>
         {visibleSignalCards.length === 0 && !signal

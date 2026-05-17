@@ -33,8 +33,9 @@ describe("Operational notification awareness visibility by product mode", () => 
     expect(mobileShellSource).toContain("isInternalUser && showOperationalNotificationAwareness");
   });
 
-  it("hides Ops notification awareness section in hvac_service mode", () => {
-    expect(opsPageSource).toContain("const showOperationalNotificationAwareness = !isHvacServiceMode && showContractorSignalsSection;");
+  it("shows Ops collaboration signals section for hvac_service mode while hiding contractor signals", () => {
+    expect(opsPageSource).toContain("const showOperationalNotificationAwareness = (!isHvacServiceMode && showContractorSignalsSection) || isHvacServiceMode;");
     expect(opsPageSource).toContain("{showOperationalNotificationAwareness ? (");
+    expect(opsPageSource).toContain('isHvacServiceMode ? "Collaboration Signals" : "Contractor Signals"');
   });
 });

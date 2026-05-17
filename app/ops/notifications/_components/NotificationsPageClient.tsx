@@ -9,6 +9,7 @@ import type {
   RegisterBrowserPushSubscriptionResult,
 } from "@/lib/actions/push-subscription-actions";
 import type { PushSubscriptionSafeRow } from "@/lib/notifications/push-subscriptions";
+import type { ProductMode } from "@/lib/business/product-mode-defaults";
 import { matchesInternalNotificationFilter } from "@/lib/notifications/internal-awareness";
 import { DeviceNotificationsCard } from "./DeviceNotificationsCard";
 import { NotificationListClient } from "./NotificationListClient";
@@ -21,6 +22,7 @@ type NotificationsPageClientProps = {
   publicVapidKey: string | null;
   categoryKey: NotificationCategoryKey | null;
   onlyUnread: boolean;
+  productMode: ProductMode;
   onMarkAsRead: (input: { notificationId: string }) => Promise<void>;
   onMarkAllAsRead: () => Promise<void>;
   onRegisterPushSubscription: (input: {
@@ -56,11 +58,13 @@ export function NotificationsPageClient({
   publicVapidKey,
   categoryKey,
   onlyUnread,
+  productMode,
   onMarkAsRead,
   onMarkAllAsRead,
   onRegisterPushSubscription,
   onDeactivatePushSubscription,
 }: NotificationsPageClientProps) {
+  const isHvacServiceMode = productMode === "hvac_service";
   const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationRowForUI[]>(initialNotifications);
   const [pendingReadId, setPendingReadId] = useState<string | null>(null);
@@ -103,11 +107,17 @@ export function NotificationsPageClient({
     }
 
     if (categoryKey === "new_job_notifications") {
+      if (isHvacServiceMode) {
+        return onlyUnread ? "Unread team alerts" : "Team alerts";
+      }
       return onlyUnread ? "Unread new job notifications" : "New job notifications";
     }
 
+    if (isHvacServiceMode) {
+      return onlyUnread ? "Unread alerts" : "All alerts";
+    }
     return onlyUnread ? "Unread notifications" : "All notifications";
-  }, [categoryKey, onlyUnread]);
+  }, [categoryKey, onlyUnread, isHvacServiceMode]);
 
   const countSummary = useMemo(() => {
     if (onlyUnread) {
@@ -176,10 +186,10 @@ export function NotificationsPageClient({
           <div className="space-y-3">
             <div className="space-y-1">
               <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-                Notifications
+                {isHvacServiceMode ? "My Alerts" : "Notifications"}
               </h1>
               <p className="text-sm text-slate-600">
-                Internal event visibility for ops workflow.
+                {isHvacServiceMode ? "Team assignment and mention alerts" : "Internal event visibility for ops workflow."}
               </p>
               <p className="text-sm text-slate-600">
                 Signals for awareness; action ownership remains in Ops queues.
@@ -191,19 +201,21 @@ export function NotificationsPageClient({
                 href={buildNotificationsHref({})}
                 className={`inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300 ${!categoryKey ? "border-slate-900 bg-slate-900 text-white hover:bg-slate-800" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
               >
-                All notifications
+                All
               </Link>
-              <Link
-                href={buildNotificationsHref({ category: "contractor_updates", state: onlyUnread ? "unread" : null })}
-                className={`inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300 ${categoryKey === "contractor_updates" ? "border-blue-700 bg-blue-700 text-white hover:bg-blue-600" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
-              >
-                Contractor updates
-              </Link>
+              {!isHvacServiceMode ? (
+                <Link
+                  href={buildNotificationsHref({ category: "contractor_updates", state: onlyUnread ? "unread" : null })}
+                  className={`inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300 ${categoryKey === "contractor_updates" ? "border-blue-700 bg-blue-700 text-white hover:bg-blue-600" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
+                >
+                  Contractor updates
+                </Link>
+              ) : null}
               <Link
                 href={buildNotificationsHref({ category: "new_job_notifications", state: onlyUnread ? "unread" : null })}
                 className={`inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300 ${categoryKey === "new_job_notifications" ? "border-blue-700 bg-blue-700 text-white hover:bg-blue-600" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
               >
-                New job notifications
+                {isHvacServiceMode ? "Team alerts" : "New job notifications"}
               </Link>
               <Link
                 href={buildNotificationsHref({ category: categoryKey, state: onlyUnread ? null : "unread" })}

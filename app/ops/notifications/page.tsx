@@ -17,6 +17,7 @@ import {
   listCurrentInternalUserPushSubscriptions,
   type PushSubscriptionSafeRow,
 } from "@/lib/notifications/push-subscriptions";
+import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { NotificationsPageClient } from "./_components/NotificationsPageClient";
 
 export const metadata = {
@@ -51,8 +52,10 @@ export default async function NotificationsPage({
 
   if (!user) redirect("/login");
 
+  let internalUser;
   try {
-    await requireInternalUser({ supabase, userId: user.id });
+    const result = await requireInternalUser({ supabase, userId: user.id });
+    internalUser = result.internalUser;
   } catch (error) {
     if (isInternalAccessError(error)) {
       const { data: cu, error: cuErr } = await supabase
@@ -67,6 +70,11 @@ export default async function NotificationsPage({
     }
     throw error;
   }
+
+  const productMode = await resolveProductModeForAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   const notifications = await listInternalNotifications({
     limit: 100,
@@ -89,6 +97,7 @@ export default async function NotificationsPage({
       publicVapidKey={process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY ?? null}
       categoryKey={categoryKey}
       onlyUnread={onlyUnread}
+      productMode={productMode}
       onMarkAsRead={markNotificationAsRead}
       onMarkAllAsRead={markAllNotificationsAsRead}
       onRegisterPushSubscription={registerBrowserPushSubscriptionAction}
