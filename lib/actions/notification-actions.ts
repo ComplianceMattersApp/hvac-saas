@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { resolveNotificationAccountOwnerUserId } from "@/lib/notifications/account-owner";
+import { sendWebPushNotificationForInternalNotification } from "@/lib/notifications/web-push-delivery";
 
 export type NotificationTriggerEventType =
   | "contractor_report_sent"
@@ -197,6 +198,23 @@ export async function insertTargetedInternalNotification(
   if (!notificationId) {
     throw new Error("Failed to create targeted internal notification row");
   }
+
+  // Fire-and-forget: send web push if feature-gated and enabled
+  // Failures are logged and swallowed; never blocks notification creation
+  sendWebPushNotificationForInternalNotification({
+    supabase: input.supabase,
+    notificationId,
+    accountOwnerUserId,
+    recipientUserId,
+    notificationType,
+    jobId,
+  }).catch((err) => {
+    console.warn("[notification-actions] Push delivery failed (safe to ignore)", {
+      notificationId,
+      recipientUserId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
 
   revalidatePath("/", "layout");
   return notificationId;
