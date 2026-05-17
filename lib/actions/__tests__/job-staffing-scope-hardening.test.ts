@@ -157,10 +157,11 @@ function makeDenySupabaseFixture() {
   return { supabase, assignmentWrites, jobEventWrites };
 }
 
-function makeAllowSupabaseFixture() {
+function makeAllowSupabaseFixture(options?: { existingActiveAssignment?: boolean }) {
   const calls: Array<{ table: string; op: string; payload?: Record<string, unknown> }> = [];
   const notificationWrites: Array<Record<string, unknown>> = [];
   let activeAssignmentSelectCount = 0;
+  const existingActiveAssignment = Boolean(options?.existingActiveAssignment);
 
   const makeEqChain = (result: { data: any; error: any }) => ({
     eq: vi.fn(() => makeEqChain(result)),
@@ -213,7 +214,7 @@ function makeAllowSupabaseFixture() {
             if (normalizedSelection.includes("assigned_by")) {
               activeAssignmentSelectCount += 1;
               const result =
-                activeAssignmentSelectCount === 1
+                activeAssignmentSelectCount === 1 && !existingActiveAssignment
                   ? { data: null, error: null }
                   : {
                       data: {
@@ -399,6 +400,23 @@ describe("internal staffing same-account hardening", () => {
         notification_type: "internal_job_assigned",
       }),
     );
+  });
+
+  it("does not create duplicate assignment notifications when the assignee is already active", async () => {
+    const { supabase, calls, notificationWrites } = makeAllowSupabaseFixture({
+      existingActiveAssignment: true,
+    });
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(assignJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_added",
+    );
+
+    expect(calls.some((call) => call.table === "job_assignments" && call.op === "insert")).toBe(false);
+    expect(notificationWrites).toHaveLength(0);
   });
 
   it("allows same-account internal setPrimaryJobAssigneeFromForm past scoped job preflight", async () => {

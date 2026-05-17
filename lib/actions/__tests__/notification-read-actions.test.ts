@@ -311,6 +311,76 @@ describe("internal notification readers", () => {
     expect(notifications.map((row) => row.id)).toEqual(["notif-broadcast"]);
   });
 
+  it("shows internal_job_assigned to the assigned user in new-job notifications filter", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-assigned-self",
+            account_owner_user_id: "owner-1",
+            job_id: "job-assign-1",
+            recipient_ref: "internal-1",
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "internal_job_assigned",
+            subject: "Alex assigned you to a job",
+            body: "Open the job to review dispatch details and next steps.",
+            payload: {
+              source: "job_assignments",
+              event_type: "assignment_added",
+              assigned_user_id: "internal-1",
+              assigned_by_user_id: "internal-2",
+            },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-20T12:05:00.000Z",
+          },
+          {
+            id: "notif-assigned-other",
+            account_owner_user_id: "owner-1",
+            job_id: "job-assign-2",
+            recipient_ref: "internal-2",
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "internal_job_assigned",
+            subject: "Alex assigned you to a job",
+            body: "Open the job to review dispatch details and next steps.",
+            payload: {
+              source: "job_assignments",
+              event_type: "assignment_added",
+              assigned_user_id: "internal-2",
+              assigned_by_user_id: "internal-3",
+            },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-20T12:04:00.000Z",
+          },
+        ],
+        submissions: [],
+        jobs: [
+          {
+            id: "job-assign-1",
+            title: "Air Handler Service",
+            customer_first_name: "Maya",
+            customer_last_name: "Lopez",
+            city: "Pasadena",
+            contractor_id: null,
+          },
+        ],
+      }),
+    );
+
+    const { listInternalNotifications } = await import("@/lib/actions/notification-read-actions");
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+      filterKey: "new_job_notifications",
+    });
+
+    expect(notifications.map((row) => row.id)).toEqual(["notif-assigned-self"]);
+    expect(notifications[0]?.notification_type).toBe("internal_job_assigned");
+  });
+
   it("uses submission contractor_id for proposal enrichment when payload contractor_id is missing", async () => {
     createClientMock.mockResolvedValue(
       makeSupabase({

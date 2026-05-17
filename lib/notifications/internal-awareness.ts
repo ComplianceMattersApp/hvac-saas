@@ -9,6 +9,8 @@ export const NEW_JOB_NOTIFICATION_TYPES = [
   "contractor_intake_proposal_submitted",
   "internal_contractor_job_intake_email",
   "internal_contractor_intake_proposal_email",
+  "internal_job_assigned",
+  "internal_note_tag",
 ] as const;
 
 export type InternalNotificationFilterKey = "contractor_updates" | "new_job_notifications";

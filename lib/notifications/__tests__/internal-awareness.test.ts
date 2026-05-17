@@ -36,6 +36,18 @@ describe("contractor awareness notification matching", () => {
     }
   });
 
+  it("internal assignment and mention alerts are included in new job notifications", () => {
+    const teamAlertTypes = ["internal_job_assigned", "internal_note_tag"];
+
+    for (const type of teamAlertTypes) {
+      expect(NEW_JOB_NOTIFICATION_TYPES).toContain(type);
+      expect(isNewJobNotificationType(type)).toBe(true);
+      expect(matchesInternalNotificationFilter(type, "new_job_notifications")).toBe(true);
+      expect(isContractorUpdateNotificationType(type)).toBe(false);
+      expect(matchesInternalNotificationFilter(type, "contractor_updates")).toBe(false);
+    }
+  });
+
   it("contractor follow-up events are contractor updates, not new job notifications", () => {
     const updateTypes = [
       "contractor_note",
