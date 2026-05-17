@@ -26,6 +26,7 @@ type CapabilityState =
   | "missing_config"
   | "denied"
   | "enabled"
+  | "needs_resync"
   | "not_enabled"
   | "saving"
   | "failed";
@@ -125,8 +126,8 @@ export function DeviceNotificationsCard({
             return;
           }
 
-          setState("failed");
-          setMessage("This browser subscription is not saved on the server. Re-enroll to sync it.");
+          setState("needs_resync");
+          setMessage("This browser subscription needs to be re-synced with the server.");
           return;
         }
 
@@ -148,14 +149,16 @@ export function DeviceNotificationsCard({
     if (state === "missing_config") return "Device notification setup needs a public push key.";
     if (state === "denied") return "Notifications are blocked in this browser.";
     if (state === "enabled") return "Device notifications are enabled for this browser.";
+    if (state === "needs_resync") return message ?? "This browser subscription needs to be re-synced with the server.";
     if (state === "saving") return "Saving this device...";
     if (state === "failed") return message ?? "Device notification setup failed. Try again.";
     if (activeCount > 0) return "Device notifications are enabled on another device.";
     return "Enable this browser to receive future device notifications.";
   }, [activeCount, message, state]);
 
-  const canEnable = state === "not_enabled" || state === "failed";
+  const canEnable = state === "not_enabled" || state === "failed" || state === "needs_resync";
   const canDisable = state === "enabled" && Boolean(currentEndpoint);
+  const enableButtonLabel = state === "needs_resync" ? "Re-sync this device" : "Enable device notifications";
 
   async function handleEnable() {
     setMessage(null);
@@ -212,8 +215,8 @@ export function DeviceNotificationsCard({
       });
 
       if (result.status !== "registered" && result.status !== "updated") {
-        setState(result.status === "not_internal" ? "unsupported" : "failed");
-        setMessage("The subscription could not be saved.");
+        setState("needs_resync");
+        setMessage("The subscription could not be saved. Re-sync this device.");
         return;
       }
 
@@ -294,7 +297,7 @@ export function DeviceNotificationsCard({
               disabled={!canEnable}
             >
               <Bell className="h-4 w-4" aria-hidden="true" />
-              Enable device notifications
+              {enableButtonLabel}
             </button>
           )}
         </div>
