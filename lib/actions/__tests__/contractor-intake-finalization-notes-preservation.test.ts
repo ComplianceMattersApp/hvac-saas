@@ -171,6 +171,7 @@ function makeAdminClient(fixture: {
         const updateQuery: any = {
           eq: vi.fn(() => updateQuery),
           contains: vi.fn(() => updateQuery),
+          in: vi.fn(() => updateQuery),
           is: vi.fn(async () => ({ error: null })),
         };
 
@@ -185,6 +186,22 @@ function makeAdminClient(fixture: {
             eq: vi.fn(() => ({
               order: vi.fn(() => ({
                 limit: vi.fn(async () => ({ data: fixture.comments ?? [], error: null })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "contractor_intake_contact_candidates") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  order: vi.fn(() => ({
+                    limit: vi.fn(async () => ({ data: [], error: null })),
+                  })),
+                })),
               })),
             })),
           })),

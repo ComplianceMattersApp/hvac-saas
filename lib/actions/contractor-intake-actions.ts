@@ -50,6 +50,20 @@ type IntakeSubmissionCommentRow = {
   created_at: string | null;
 };
 
+type IntakeContactCandidateRow = {
+  id: string;
+  account_owner_user_id: string;
+  contractor_intake_submission_id: string;
+  proposed_role: string;
+  display_name: string;
+  phone: string | null;
+  email: string | null;
+  preferred_contact_method: string | null;
+  proposed_link_target: string;
+  source_type: string | null;
+  status: string;
+};
+
 const INTAKE_CANDIDATE_ALLOWED_ROLES = new Set([
   "homeowner",
   "tenant_or_occupant",
@@ -72,6 +86,257 @@ function isValidIntakeCandidateRoleTargetPair(role: string, target: string) {
   }
 
   return target === "customer" || target === "undecided";
+}
+
+function normalizeEmailForContactRecipient(value: string | null | undefined) {
+  const email = normalizeText(value).toLowerCase();
+  if (!email) return null;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  return email;
+}
+
+function normalizePhoneE164ForContactRecipient(value: string | null | undefined) {
+  const raw = normalizeText(value);
+  if (!raw) return null;
+
+  const compact = raw.replace(/[\s().-]/g, "");
+  const digits = compact.replace(/\D/g, "");
+
+  if (compact.startsWith("+")) {
+    if (digits.length >= 8 && digits.length <= 15) {
+      return `+${digits}`;
+    }
+    return null;
+  }
+
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+${digits}`;
+  }
+
+  if (digits.length >= 8 && digits.length <= 15) {
+    return `+${digits}`;
+  }
+
+  return null;
+}
+
+function phoneLast10FromE164(phoneE164: string | null) {
+  if (!phoneE164) return null;
+  const digits = phoneE164.replace(/\D/g, "");
+  return digits.length >= 10 ? digits.slice(-10) : null;
+}
+
+function normalizePreferredMethodForContactRecipient(
+  value: string | null | undefined,
+  params: { hasPhone: boolean; hasEmail: boolean },
+) {
+  const method = normalizeText(value).toLowerCase();
+  const allowed = new Set(["sms", "phone", "email", "none"]);
+  const normalized = allowed.has(method) ? method : "none";
+
+  if ((normalized === "sms" || normalized === "phone") && !params.hasPhone) {
+    return params.hasEmail ? "email" : "none";
+  }
+
+  if (normalized === "email" && !params.hasEmail) {
+    return params.hasPhone ? "phone" : "none";
+  }
+
+  if (normalized === "none") {
+    if (params.hasPhone) return "phone";
+    if (params.hasEmail) return "email";
+  }
+
+  return normalized;
+}
+
+function candidateSourceTypeForContactRecipient(value: string | null | undefined) {
+  const source = normalizeText(value).toLowerCase();
+  if (source === "intake_submission") return "intake_submission";
+  return "internal_review";
+}
+
+function isDuplicateActiveContact(params: {
+  existingRows: Array<{ phone_e164?: string | null; email?: string | null; display_name?: string | null }>;
+  phoneE164: string | null;
+  email: string | null;
+  displayName: string;
+}) {
+  const phone = normalizeText(params.phoneE164);
+  const mail = normalizeText(params.email).toLowerCase();
+  const name = normalizeText(params.displayName).toLowerCase();
+
+  return params.existingRows.some((row) => {
+    const existingPhone = normalizeText(row.phone_e164);
+    const existingEmail = normalizeText(row.email).toLowerCase();
+    const existingName = normalizeText(row.display_name).toLowerCase();
+
+    if (phone && existingPhone && phone === existingPhone) return true;
+    if (mail && existingEmail && mail === existingEmail) return true;
+    if (!phone && !mail && name && existingName && name === existingName) return true;
+    return false;
+  });
+}
+
+async function promoteApprovedIntakeContactCandidates(params: {
+  admin: ReturnType<typeof createAdminClient>;
+  accountOwnerUserId: string;
+  submissionId: string;
+  finalizedCustomerId: string;
+  finalizedJobId: string;
+  reviewerUserId: string;
+}) {
+  const { admin, accountOwnerUserId, submissionId, finalizedCustomerId, finalizedJobId, reviewerUserId } = params;
+
+  let candidateRows: IntakeContactCandidateRow[] = [];
+  try {
+    const { data, error } = await admin
+      .from("contractor_intake_contact_candidates")
+      .select(
+        "id, account_owner_user_id, contractor_intake_submission_id, proposed_role, display_name, phone, email, preferred_contact_method, proposed_link_target, source_type, status",
+      )
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("contractor_intake_submission_id", submissionId)
+      .eq("status", "approved_for_promotion")
+      .order("created_at", { ascending: true })
+      .limit(500);
+
+    if (error) throw error;
+    candidateRows = (data ?? []) as IntakeContactCandidateRow[];
+  } catch (error) {
+    if (isMissingIntakeContactCandidatesWriteError(error)) {
+      console.warn("[contractor-intake] candidate promotion skipped (table unavailable)", {
+        submissionId,
+        accountOwnerUserId,
+      });
+      return;
+    }
+    throw error;
+  }
+
+  for (const candidate of candidateRows) {
+    try {
+      const role = normalizeText(candidate.proposed_role).toLowerCase();
+      const displayName = normalizeText(candidate.display_name);
+      const target = normalizeText(candidate.proposed_link_target).toLowerCase();
+
+      if (!INTAKE_CANDIDATE_ALLOWED_ROLES.has(role)) {
+        console.warn("[contractor-intake] candidate promotion skipped (invalid role)", {
+          submissionId,
+          candidateId: candidate.id,
+          role,
+        });
+        continue;
+      }
+
+      if (!displayName) {
+        console.warn("[contractor-intake] candidate promotion skipped (missing display name)", {
+          submissionId,
+          candidateId: candidate.id,
+        });
+        continue;
+      }
+
+      if (target === "undecided") {
+        console.warn("[contractor-intake] candidate promotion skipped (undecided target)", {
+          submissionId,
+          candidateId: candidate.id,
+        });
+        continue;
+      }
+
+      if (!isValidIntakeCandidateRoleTargetPair(role, target)) {
+        console.warn("[contractor-intake] candidate promotion skipped (invalid role-target pairing)", {
+          submissionId,
+          candidateId: candidate.id,
+          role,
+          target,
+        });
+        continue;
+      }
+
+      const linkedEntityType = target === "job" ? "job" : "customer";
+      const linkedEntityId = target === "job" ? finalizedJobId : finalizedCustomerId;
+
+      const phoneE164 = normalizePhoneE164ForContactRecipient(candidate.phone);
+      const phoneLast10 = phoneLast10FromE164(phoneE164);
+      const email = normalizeEmailForContactRecipient(candidate.email);
+
+      if (!phoneE164 && !email) {
+        console.warn("[contractor-intake] candidate promotion skipped (no usable phone/email)", {
+          submissionId,
+          candidateId: candidate.id,
+        });
+        continue;
+      }
+
+      const preferredContactMethod = normalizePreferredMethodForContactRecipient(
+        candidate.preferred_contact_method,
+        { hasPhone: Boolean(phoneE164), hasEmail: Boolean(email) },
+      );
+
+      const { data: existingRows, error: existingErr } = await admin
+        .from("contact_recipients")
+        .select("id, phone_e164, email, display_name")
+        .eq("account_owner_user_id", accountOwnerUserId)
+        .eq("linked_entity_type", linkedEntityType)
+        .eq("linked_entity_id", linkedEntityId)
+        .eq("recipient_role", role)
+        .eq("status", "active")
+        .limit(200);
+
+      if (existingErr) throw existingErr;
+
+      if (
+        isDuplicateActiveContact({
+          existingRows: (existingRows ?? []) as Array<{
+            phone_e164?: string | null;
+            email?: string | null;
+            display_name?: string | null;
+          }>,
+          phoneE164,
+          email,
+          displayName,
+        })
+      ) {
+        continue;
+      }
+
+      const { error: insertErr } = await admin
+        .from("contact_recipients")
+        .insert({
+          account_owner_user_id: accountOwnerUserId,
+          linked_entity_type: linkedEntityType,
+          linked_entity_id: linkedEntityId,
+          recipient_role: role,
+          display_name: displayName,
+          phone_e164: phoneE164,
+          phone_last10: phoneLast10,
+          email,
+          preferred_contact_method: preferredContactMethod,
+          source_type: candidateSourceTypeForContactRecipient(candidate.source_type),
+          source_ref: `contractor_intake_candidate:${candidate.id}`,
+          status: "active",
+          created_by_user_id: reviewerUserId,
+          updated_by_user_id: reviewerUserId,
+        });
+
+      if (insertErr) throw insertErr;
+    } catch (candidateError) {
+      console.error("[contractor-intake] candidate promotion failed for candidate", {
+        submissionId,
+        candidateId: candidate.id,
+        accountOwnerUserId,
+        error: getSafeErrorDetails(candidateError),
+      });
+      // V1: best-effort candidate promotion should not block finalization.
+      continue;
+    }
+  }
 }
 
 function normalizeText(value: unknown) {
@@ -923,6 +1188,25 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
     .eq("review_status", "pending");
 
   if (proposalUpdateErr) throw proposalUpdateErr;
+
+  try {
+    await promoteApprovedIntakeContactCandidates({
+      admin,
+      accountOwnerUserId,
+      submissionId: submission.id,
+      finalizedCustomerId: customer.id,
+      finalizedJobId: created.id,
+      reviewerUserId: userId,
+    });
+  } catch (promotionError) {
+    console.error("[contractor-intake] approved candidate promotion failed", {
+      submissionId: submission.id,
+      jobId: created.id,
+      accountOwnerUserId,
+      error: getSafeErrorDetails(promotionError),
+    });
+    // V1: preserve successful finalization even if promotion encounters errors.
+  }
 
   try {
     await markInternalNewWorkNotificationsResolved({
