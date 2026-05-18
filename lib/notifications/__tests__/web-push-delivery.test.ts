@@ -15,6 +15,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const webPushSendNotificationMock = vi.fn();
 const webPushSetVapidDetailsMock = vi.fn();
+const createAdminClientMock = vi.fn();
+
+vi.mock("@/lib/supabase/server", () => ({
+  createAdminClient: () => createAdminClientMock(),
+}));
 
 vi.mock("web-push", async () => {
   return {
@@ -27,6 +32,7 @@ describe("web-push-delivery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    createAdminClientMock.mockReset();
 
     // Reset environment variables to known state
     delete process.env.ENABLE_WEB_PUSH;
@@ -93,6 +99,44 @@ describe("web-push-delivery", () => {
   });
 
   describe("2. supported notification type + active subscription -> send attempted", () => {
+    it("uses the privileged delivery client instead of the acting user's RLS client", async () => {
+      process.env.ENABLE_WEB_PUSH = "true";
+      process.env.WEB_PUSH_PRIVATE_KEY = "test-private-key";
+      process.env.WEB_PUSH_SUBJECT = "test-subject";
+      process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY = "test-public-key";
+
+      const { sendWebPushNotificationForInternalNotification } = await import(
+        "@/lib/notifications/web-push-delivery"
+      );
+
+      const adminSupabase = makeMemorySupabase([
+        {
+          id: "sub-1",
+          endpoint: "https://push.example/device-1",
+          p256dh: "p256dh-1",
+          auth: "auth-1",
+        },
+      ]);
+      const actingUserSupabase = {
+        from: vi.fn(() => {
+          throw new Error("acting user client should not be used for delivery");
+        }),
+      };
+
+      await sendWebPushNotificationForInternalNotification({
+        supabase: actingUserSupabase,
+        notificationId: "notif-2",
+        accountOwnerUserId: "owner-1",
+        recipientUserId: "user-1",
+        notificationType: "internal_note_tag",
+        jobId: "job-2",
+      });
+
+      expect(actingUserSupabase.from).not.toHaveBeenCalled();
+      expect(webPushSendNotificationMock).toHaveBeenCalledTimes(1);
+      expect(adminSupabase.getInsertedRows("notification_delivery_attempts")).toHaveLength(1);
+    });
+
     it("sends to active subscription for internal_job_assigned type", async () => {
       process.env.ENABLE_WEB_PUSH = "true";
       process.env.WEB_PUSH_PRIVATE_KEY = "test-private-key";
@@ -109,6 +153,20 @@ describe("web-push-delivery", () => {
           endpoint: "https://push.example/device-1",
           p256dh: "p256dh-1",
           auth: "auth-1",
+        },
+        {
+          id: "sub-other-account",
+          account_owner_user_id: "owner-2",
+          endpoint: "https://push.example/device-2",
+          p256dh: "p256dh-2",
+          auth: "auth-2",
+        },
+        {
+          id: "sub-other-user",
+          user_id: "user-2",
+          endpoint: "https://push.example/device-3",
+          p256dh: "p256dh-3",
+          auth: "auth-3",
         },
       ]);
 
@@ -246,7 +304,7 @@ describe("web-push-delivery", () => {
 
       await sendWebPushNotificationForInternalNotification({
         supabase: mockSupabase,
-        notificationId: "notif-1",
+        notificationId: "notif-unsupported",
         accountOwnerUserId: "owner-1",
         recipientUserId: "user-1",
         notificationType: "contractor_intake_proposal_submitted",
@@ -309,7 +367,10 @@ describe("web-push-delivery", () => {
         "@/lib/notifications/web-push-delivery"
       );
 
-      const mockSupabase = {
+      const mockSupabase = makeMemorySupabase([], {
+        fetchSubscriptionsError: "Database error",
+      });
+      const userSupabase = {
         from: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({
             eq: vi.fn()
@@ -340,7 +401,7 @@ describe("web-push-delivery", () => {
 
       await expect(
         sendWebPushNotificationForInternalNotification({
-          supabase: mockSupabase,
+          supabase: userSupabase,
           notificationId: "notif-1",
           accountOwnerUserId: "owner-1",
           recipientUserId: "user-1",
@@ -414,6 +475,7 @@ describe("web-push-delivery", () => {
           throw new Error("Supabase client error");
         }),
       };
+      createAdminClientMock.mockReturnValueOnce(mockSupabase);
 
       await expect(
         sendWebPushNotificationForInternalNotification({
@@ -532,22 +594,6 @@ describe("web-push-delivery", () => {
         },
       ]);
 
-      // Track the query parameters used
-      let selectCalls: any[] = [];
-      const originalFrom = mockSupabase.from.bind(mockSupabase);
-      mockSupabase.from = vi.fn().mockImplementation((table: string) => {
-        const builder = originalFrom(table);
-        const originalSelect = builder.select.bind(builder);
-        builder.select = vi.fn().mockImplementation((columns) => {
-          const result = originalSelect(columns);
-          if (table === "push_subscriptions") {
-            selectCalls.push({ table, columns });
-          }
-          return result;
-        });
-        return builder;
-      });
-
       await sendWebPushNotificationForInternalNotification({
         supabase: mockSupabase,
         notificationId: "notif-1",
@@ -559,6 +605,9 @@ describe("web-push-delivery", () => {
 
       // Verify filters included account_owner_user_id AND user_id
       expect(webPushSendNotificationMock).toHaveBeenCalledTimes(1);
+      const deliveryAttempts = mockSupabase.getInsertedRows("notification_delivery_attempts");
+      expect(deliveryAttempts).toHaveLength(1);
+      expect(deliveryAttempts[0]?.push_subscription_id).toBe("sub-1");
     });
   });
 
@@ -599,6 +648,7 @@ describe("web-push-delivery", () => {
       // Verify safe content
       expect(payload.title).toBe("You were assigned to a job");
       expect(payload.body).toBe("Open Compliance Matters to view details");
+      expect(payload.url).toBe("/jobs/job-1?tab=ops");
       expect(payload.data?.url).toBe("/jobs/job-1?tab=ops");
 
       // Verify no sensitive data
@@ -652,15 +702,28 @@ describe("web-push-delivery", () => {
  * Memory Supabase Helper
  * Provides a mock Supabase client with in-memory storage
  */
-function makeMemorySupabase(initialSubscriptions: any[] = []) {
+function makeMemorySupabase(
+  initialSubscriptions: any[] = [],
+  options: {
+    fetchSubscriptionsError?: string;
+    notifications?: Array<{
+      id: string;
+      job_id: string | null;
+      recipient_ref: string | null;
+      recipient_type: string | null;
+      account_owner_user_id: string | null;
+      notification_type: string | null;
+    }>;
+  } = {},
+) {
   const insertedRows: Record<string, any[]> = {
     notification_delivery_attempts: [],
   };
 
   const subscriptions = initialSubscriptions.map((sub, idx) => ({
     id: sub.id,
-    account_owner_user_id: "owner-1",
-    user_id: "user-1",
+    account_owner_user_id: sub.account_owner_user_id ?? "owner-1",
+    user_id: sub.user_id ?? "user-1",
     endpoint: sub.endpoint,
     p256dh: sub.p256dh || null,
     auth: sub.auth || null,
@@ -669,10 +732,49 @@ function makeMemorySupabase(initialSubscriptions: any[] = []) {
 
   let updatedSubscriptions: any[] = [];
 
-  return {
+  const notifications =
+    options.notifications ??
+    [
+      {
+        id: "notif-1",
+        job_id: "job-1",
+        recipient_ref: "user-1",
+        recipient_type: "internal",
+        account_owner_user_id: "owner-1",
+        notification_type: "internal_job_assigned",
+      },
+      {
+        id: "notif-2",
+        job_id: "job-2",
+        recipient_ref: "user-1",
+        recipient_type: "internal",
+        account_owner_user_id: "owner-1",
+        notification_type: "internal_note_tag",
+      },
+      {
+        id: "notif-unsupported",
+        job_id: "job-1",
+        recipient_ref: "user-1",
+        recipient_type: "internal",
+        account_owner_user_id: "owner-1",
+        notification_type: "contractor_intake_proposal_submitted",
+      },
+    ];
+
+  const client = {
     from: (table: string) => ({
       select: (columns: string) => ({
         eq: (column: string, value: any) => ({
+          maybeSingle: async () => {
+            if (table === "notifications" && column === "id") {
+              const notification = notifications.find((row) => row.id === value);
+              return {
+                data: notification ?? null,
+                error: null,
+              };
+            }
+            return { data: null, error: null };
+          },
           eq: (column2: string, value2: any) => ({
             eq: (column3: string, value3: any) => ({
               then: (onFulfill: Function) => {
@@ -682,6 +784,12 @@ function makeMemorySupabase(initialSubscriptions: any[] = []) {
                   column2 === "user_id" &&
                   column3 === "is_active"
                 ) {
+                  if (options.fetchSubscriptionsError) {
+                    return onFulfill({
+                      data: null,
+                      error: { message: options.fetchSubscriptionsError },
+                    });
+                  }
                   const filtered = subscriptions.filter(
                     (s) =>
                       s.account_owner_user_id === value &&
@@ -713,19 +821,33 @@ function makeMemorySupabase(initialSubscriptions: any[] = []) {
       }),
       update: (payload: any) => ({
         eq: (column: string, value: any) => ({
-          then: (onFulfill: Function) => {
-            if (table === "push_subscriptions" && column === "id") {
-              const subscription = subscriptions.find((s) => s.id === value);
-              if (subscription) {
-                Object.assign(subscription, payload);
-                updatedSubscriptions.push({ id: value, ...payload });
-              }
-            }
-            return onFulfill({
-              data: null,
-              error: null,
-            });
-          },
+          eq: (column2: string, value2: any) => ({
+            eq: (column3: string, value3: any) => ({
+              then: (onFulfill: Function) => {
+                if (
+                  table === "push_subscriptions" &&
+                  column === "id" &&
+                  column2 === "account_owner_user_id" &&
+                  column3 === "user_id"
+                ) {
+                  const subscription = subscriptions.find(
+                    (s) =>
+                      s.id === value &&
+                      s.account_owner_user_id === value2 &&
+                      s.user_id === value3,
+                  );
+                  if (subscription) {
+                    Object.assign(subscription, payload);
+                    updatedSubscriptions.push({ id: value, ...payload });
+                  }
+                }
+                return onFulfill({
+                  data: null,
+                  error: null,
+                });
+              },
+            }),
+          }),
         }),
       }),
     }),
@@ -733,4 +855,7 @@ function makeMemorySupabase(initialSubscriptions: any[] = []) {
     getInsertedRows: (table: string) => insertedRows[table] || [],
     getUpdatedRows: (table: string) => updatedSubscriptions.filter((u) => true),
   };
+
+  createAdminClientMock.mockReturnValue(client);
+  return client;
 }

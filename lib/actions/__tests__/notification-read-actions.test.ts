@@ -311,6 +311,74 @@ describe("internal notification readers", () => {
     expect(notifications.map((row) => row.id)).toEqual(["notif-broadcast"]);
   });
 
+  it("shows recipient-targeted internal_note_tag rows to the recipient with the production recipient type", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-mention-recipient",
+            account_owner_user_id: "owner-1",
+            job_id: "job-1",
+            recipient_ref: "internal-1",
+            recipient_type: "internal_user",
+            channel: "in_app",
+            notification_type: "internal_note_tag",
+            subject: "Alex tagged you on a job note",
+            body: "Open the job to review the tagged note.",
+            payload: { source: "job_events", event_type: "internal_note" },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-20T12:02:00.000Z",
+          },
+          {
+            id: "notif-mention-sender-hidden",
+            account_owner_user_id: "owner-1",
+            job_id: "job-1",
+            recipient_ref: "internal-2",
+            recipient_type: "internal_user",
+            channel: "in_app",
+            notification_type: "internal_note_tag",
+            subject: "Alex tagged another teammate",
+            body: "Open the job to review the tagged note.",
+            payload: { source: "job_events", event_type: "internal_note" },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-20T12:03:00.000Z",
+          },
+        ],
+        submissions: [],
+        jobs: [
+          {
+            id: "job-1",
+            title: "Service Visit",
+            customer_first_name: "Maya",
+            customer_last_name: "Lopez",
+            city: "Pasadena",
+            contractor_id: null,
+          },
+        ],
+      }),
+    );
+
+    const {
+      listInternalNotifications,
+      getInternalUnreadNotificationCount,
+      getInternalUnreadNotificationBadgeCount,
+    } = await import("@/lib/actions/notification-read-actions");
+
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+      filterKey: "new_job_notifications",
+    });
+
+    expect(notifications.map((row) => row.id)).toEqual(["notif-mention-recipient"]);
+    expect(notifications[0]?.notification_type).toBe("internal_note_tag");
+    expect(notifications[0]?.job_enrichment?.job_title).toBe("Service Visit");
+    await expect(getInternalUnreadNotificationCount()).resolves.toBe(1);
+    await expect(getInternalUnreadNotificationBadgeCount()).resolves.toBe(1);
+  });
+
   it("shows internal_job_assigned to the assigned user in new-job notifications filter", async () => {
     createClientMock.mockResolvedValue(
       makeSupabase({

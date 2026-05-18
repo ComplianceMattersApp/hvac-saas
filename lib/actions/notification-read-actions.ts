@@ -25,6 +25,8 @@ type NotificationRow = {
 
 type NotificationPayload = Record<string, unknown>;
 
+const INTERNAL_NOTIFICATION_RECIPIENT_TYPES = ["internal", "internal_user"] as const;
+
 export type ProposalEnrichment = {
   contractor_name: string | null;
   customer_name: string | null;
@@ -618,7 +620,7 @@ export async function listInternalNotifications(params: {
       "id, job_id, recipient_ref, recipient_type, channel, notification_type, subject, body, payload, status, read_at, created_at",
       { count: "exact" }
     )
-    .eq("recipient_type", "internal")
+    .in("recipient_type", INTERNAL_NOTIFICATION_RECIPIENT_TYPES)
     .eq("account_owner_user_id", accountOwnerUserId)
     .order("created_at", { ascending: false });
 
@@ -708,7 +710,7 @@ export async function listInternalContractorUpdateAwareness(params: {
   let query = supabase
     .from("notifications")
     .select("job_id, recipient_ref, notification_type, read_at, created_at")
-    .eq("recipient_type", "internal")
+    .in("recipient_type", INTERNAL_NOTIFICATION_RECIPIENT_TYPES)
     .eq("account_owner_user_id", accountOwnerUserId)
     .order("created_at", { ascending: false });
 
@@ -767,7 +769,7 @@ export async function listInternalNewWorkRequestAwareness(params: {
     .select(
       "id, job_id, recipient_ref, recipient_type, channel, notification_type, subject, body, payload, status, read_at, created_at"
     )
-    .eq("recipient_type", "internal")
+    .in("recipient_type", INTERNAL_NOTIFICATION_RECIPIENT_TYPES)
     .eq("account_owner_user_id", accountOwnerUserId)
     .order("created_at", { ascending: false });
 
@@ -821,7 +823,7 @@ export async function markNotificationAsRead(input: {
     .from("notifications")
     .select("id, recipient_ref")
     .eq("id", notificationId)
-    .eq("recipient_type", "internal")
+    .in("recipient_type", INTERNAL_NOTIFICATION_RECIPIENT_TYPES)
     .eq("account_owner_user_id", accountOwnerUserId)
     .maybeSingle();
 
@@ -834,7 +836,7 @@ export async function markNotificationAsRead(input: {
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
     .eq("id", notificationId)
-    .eq("recipient_type", "internal")
+    .in("recipient_type", INTERNAL_NOTIFICATION_RECIPIENT_TYPES)
     .eq("account_owner_user_id", accountOwnerUserId);
 
   if (error) throw error;
@@ -850,7 +852,7 @@ export async function markAllNotificationsAsRead(): Promise<void> {
   const { data: unreadRows, error: unreadErr } = await supabase
     .from("notifications")
     .select("id, recipient_ref")
-    .eq("recipient_type", "internal")
+    .in("recipient_type", INTERNAL_NOTIFICATION_RECIPIENT_TYPES)
     .eq("account_owner_user_id", accountOwnerUserId)
     .is("read_at", null);
 
@@ -896,7 +898,7 @@ export async function getInternalUnreadNotificationBadgeCount(params: {
   const { data, error } = await supabase
     .from("notifications")
     .select("id, recipient_ref, notification_type, payload, read_at, created_at")
-    .eq("recipient_type", "internal")
+    .in("recipient_type", INTERNAL_NOTIFICATION_RECIPIENT_TYPES)
     .eq("account_owner_user_id", accountOwnerUserId)
     .order("created_at", { ascending: false })
     .is("read_at", null);

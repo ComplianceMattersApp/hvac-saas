@@ -1,15 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const revalidatePathMock = vi.fn();
+const sendWebPushNotificationForInternalNotificationMock = vi.fn(
+  async (..._args: unknown[]) => undefined,
+);
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
+}));
+
+vi.mock("@/lib/notifications/web-push-delivery", () => ({
+  sendWebPushNotificationForInternalNotification: (...args: unknown[]) =>
+    sendWebPushNotificationForInternalNotificationMock(...args),
 }));
 
 describe("createContractorIntakeProposalAwarenessNotification", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    sendWebPushNotificationForInternalNotificationMock.mockResolvedValue(undefined);
   });
 
   it("creates the internal awareness notification row for proposal submission", async () => {
@@ -44,6 +53,34 @@ describe("createContractorIntakeProposalAwarenessNotification", () => {
         account_owner_user_id: "owner-1",
       },
     });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/", "layout");
+  });
+
+  it("still returns the in-app notification id when best-effort push fails", async () => {
+    sendWebPushNotificationForInternalNotificationMock.mockRejectedValueOnce(
+      new Error("push runtime ended"),
+    );
+    const singleMock = vi.fn(async () => ({ data: { id: "notif-tag-1" }, error: null }));
+    const selectMock = vi.fn(() => ({ single: singleMock }));
+    const insertMock = vi.fn(() => ({ select: selectMock }));
+    const fromMock = vi.fn(() => ({ insert: insertMock }));
+    const supabase = { from: fromMock };
+
+    const { insertTargetedInternalNotification } = await import("@/lib/actions/notification-actions");
+
+    const createdId = await insertTargetedInternalNotification({
+      supabase,
+      jobId: "job-1",
+      accountOwnerUserId: "owner-1",
+      actorUserId: "actor-1",
+      recipientUserId: "user-2",
+      notificationType: "internal_note_tag",
+      subject: "You were tagged by Alex",
+      body: "Tag context",
+    });
+
+    expect(createdId).toBe("notif-tag-1");
+    expect(sendWebPushNotificationForInternalNotificationMock).toHaveBeenCalledTimes(1);
     expect(revalidatePathMock).toHaveBeenCalledWith("/", "layout");
   });
 
@@ -206,11 +243,12 @@ describe("insertTargetedInternalNotification", () => {
     const selectMock = vi.fn(() => ({ single: singleMock }));
     const insertMock = vi.fn(() => ({ select: selectMock }));
     const fromMock = vi.fn(() => ({ insert: insertMock }));
+    const supabase = { from: fromMock };
 
     const { insertTargetedInternalNotification } = await import("@/lib/actions/notification-actions");
 
     const createdId = await insertTargetedInternalNotification({
-      supabase: { from: fromMock },
+      supabase,
       jobId: "job-1",
       accountOwnerUserId: "owner-1",
       actorUserId: "actor-1",
@@ -246,6 +284,14 @@ describe("insertTargetedInternalNotification", () => {
       }),
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/", "layout");
+    expect(sendWebPushNotificationForInternalNotificationMock).toHaveBeenCalledWith({
+      supabase,
+      notificationId: "notif-tag-1",
+      accountOwnerUserId: "owner-1",
+      recipientUserId: "user-2",
+      notificationType: "internal_note_tag",
+      jobId: "job-1",
+    });
   });
 
   it("skips self-targeted notifications", async () => {

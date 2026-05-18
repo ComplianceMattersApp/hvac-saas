@@ -309,6 +309,8 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     });
     resolveUserDisplayMapMock.mockResolvedValue({
       "internal-user-1": "Alex Rivera",
+      "internal-user-2": "Eddie",
+      "internal-user-3": "Riley",
     });
   });
 
@@ -394,7 +396,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     formData.append("tagged_user_ids", "internal-user-2");
 
     await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?tab=ops&banner=follow_up_note_added",
+      "REDIRECT:/jobs/job-1?tab=ops&banner=internal_note_mention_alert_created&mention_recipient=Eddie",
     );
 
     expect(assertAssignableInternalUserMock).toHaveBeenCalledWith(
@@ -471,13 +473,29 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     formData.append("tagged_user_ids", "internal-user-2");
 
     await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?tab=ops&banner=follow_up_note_added",
+      "REDIRECT:/jobs/job-1?tab=ops&banner=internal_note_mention_alert_created&mention_recipient=Eddie",
     );
 
     expect(insertTargetedInternalNotificationMock).toHaveBeenCalledTimes(1);
     expect(insertTargetedInternalNotificationMock).toHaveBeenCalledWith(
       expect.objectContaining({ recipientUserId: "internal-user-2" }),
     );
+  });
+
+  it("confirms multiple created mention alerts without implying push delivery", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const formData = buildAddInternalNoteFormData();
+    formData.append("tagged_user_ids", "internal-user-2");
+    formData.append("tagged_user_ids", "internal-user-3");
+
+    await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?tab=ops&banner=internal_note_mention_alerts_created&mention_count=2",
+    );
+
+    expect(insertTargetedInternalNotificationMock).toHaveBeenCalledTimes(2);
   });
 
   it("keeps note save successful when tag notification side-effect fails", async () => {
@@ -490,7 +508,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     formData.append("tagged_user_ids", "internal-user-2");
 
     await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?tab=ops&banner=follow_up_note_added",
+      "REDIRECT:/jobs/job-1?tab=ops&banner=internal_note_mention_alert_failed",
     );
   });
 

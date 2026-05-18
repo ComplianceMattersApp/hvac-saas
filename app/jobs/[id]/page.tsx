@@ -807,6 +807,21 @@ export default async function JobDetailPage({
       : typeof bannerRaw === "string"
       ? bannerRaw
       : "";
+  const mentionRecipientRaw = sp.mention_recipient;
+  const mentionRecipientName =
+    Array.isArray(mentionRecipientRaw)
+      ? mentionRecipientRaw[0]
+      : typeof mentionRecipientRaw === "string"
+      ? mentionRecipientRaw
+      : "";
+  const mentionCountRaw = sp.mention_count;
+  const mentionCountValue =
+    Array.isArray(mentionCountRaw)
+      ? mentionCountRaw[0]
+      : typeof mentionCountRaw === "string"
+      ? mentionCountRaw
+      : "";
+  const mentionCount = Number.parseInt(mentionCountValue, 10);
 
   const timingEnabled = process.env.JOB_DETAIL_TIMING_DEBUG === "true";
   const renderStartMs = Date.now();
@@ -3761,6 +3776,27 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <FlashBanner
           type="success"
           message="Follow-up note added."
+        />
+      )}
+
+      {banner === "internal_note_mention_alert_created" && (
+        <FlashBanner
+          type="success"
+          message={`Mention alert created for ${mentionRecipientName.trim() || "teammate"}.`}
+        />
+      )}
+
+      {banner === "internal_note_mention_alerts_created" && (
+        <FlashBanner
+          type="success"
+          message={`Mention alerts created for ${Number.isFinite(mentionCount) && mentionCount > 0 ? mentionCount : 2} teammates.`}
+        />
+      )}
+
+      {banner === "internal_note_mention_alert_failed" && (
+        <FlashBanner
+          type="warning"
+          message="Note saved, but mention alert could not be created."
         />
       )}
 

@@ -83,7 +83,7 @@ const JOB_AWARE_EVENT_HEADLINES: Record<string, string> = {
   contractor_schedule_updated: "Contractor scheduling updated",
   contractor_job_created: "New contractor job submitted",
   retest_ready_requested: "Retest ready requested",
-  internal_note_tag: "You were tagged in an internal note",
+  internal_note_tag: "You were mentioned in an internal note",
   internal_job_assigned: "You were assigned to a job",
 };
 
@@ -93,7 +93,7 @@ const JOB_AWARE_EVENT_HELPER_TEXT: Record<string, string> = {
   contractor_schedule_updated: "Confirm scheduling details and update dispatch plan.",
   contractor_job_created: "Review the submitted request and schedule next steps.",
   retest_ready_requested: "Confirm retest readiness and schedule follow-up.",
-  internal_note_tag: "Open the job to review the tagged note and respond quickly.",
+  internal_note_tag: "Open the job to review the internal note.",
   internal_job_assigned: "Open the job to review dispatch details and next steps.",
 };
 
@@ -117,7 +117,7 @@ function notificationTypeLabel(value?: string | null) {
     contractor_note: "Contractor Note",
     contractor_correction_submission: "Correction Submission",
     contractor_schedule_updated: "Contractor Schedule Updated",
-    internal_note_tag: "Tagged Internal Note",
+    internal_note_tag: "Internal Note Mention",
     internal_job_assigned: "Job Assigned",
     contractor_intake_proposal_submitted: "Intake Proposal",
     contractor_report_email: "Contractor Report Email",
@@ -171,6 +171,7 @@ function JobAwareNotificationCard({
       : notif.body
     : null;
   const bodyPreview =
+    type !== "internal_note_tag" &&
     rawBodyPreview &&
     rawBodyPreview.trim() !== helperText?.trim() &&
     !isGenericContractorBody(rawBodyPreview)
@@ -251,7 +252,7 @@ function JobAwareNotificationCard({
               href={jobHref}
               className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
             >
-              View job
+              {type === "internal_note_tag" ? "Open job" : "View job"}
             </Link>
           )}
           {notif.is_unread && (

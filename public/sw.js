@@ -13,7 +13,11 @@ self.addEventListener("push", (event) => {
     typeof data.body === "string" && data.body
       ? data.body
       : "Open Compliance Matters to view details";
-  const url = typeof data.url === "string" && data.url.startsWith("/") ? data.url : "/";
+  const nestedUrl =
+    data.data && typeof data.data.url === "string" && data.data.url.startsWith("/")
+      ? data.data.url
+      : null;
+  const url = typeof data.url === "string" && data.url.startsWith("/") ? data.url : nestedUrl || "/";
 
   event.waitUntil(
     self.registration.showNotification(title, {

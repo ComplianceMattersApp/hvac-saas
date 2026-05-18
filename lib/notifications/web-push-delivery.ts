@@ -18,6 +18,8 @@
  * - No sensitive data in payloads (no note text, addresses, customer details)
  */
 
+import { createAdminClient } from "@/lib/supabase/server";
+
 type NotificationDeliveryAttemptInput = {
   supabase: any;
   notificationId: string;
@@ -33,9 +35,109 @@ type WebPushPayload = {
   data?: Record<string, string>;
 };
 
-const ENABLE_WEB_PUSH = process.env.ENABLE_WEB_PUSH === "true";
-const WEB_PUSH_PRIVATE_KEY = process.env.WEB_PUSH_PRIVATE_KEY;
-const WEB_PUSH_SUBJECT = process.env.WEB_PUSH_SUBJECT;
+type PushNotificationContext = {
+  notificationId: string;
+  accountOwnerUserId: string;
+  recipientUserId: string;
+  notificationType: "internal_job_assigned" | "internal_note_tag";
+  jobId: string;
+};
+
+type PushSubscriptionRow = {
+  id: string;
+  account_owner_user_id?: string | null;
+  user_id?: string | null;
+  endpoint: string;
+  p256dh?: string | null;
+  auth?: string | null;
+};
+
+const SUPPORTED_PUSH_NOTIFICATION_TYPES = ["internal_job_assigned", "internal_note_tag"] as const;
+const SUPPORTED_INTERNAL_RECIPIENT_TYPES = ["internal", "internal_user"] as const;
+
+function isWebPushEnabled(): boolean {
+  return process.env.ENABLE_WEB_PUSH === "true";
+}
+
+function normalizeText(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+function isSupportedPushNotificationType(value: unknown): value is PushNotificationContext["notificationType"] {
+  return SUPPORTED_PUSH_NOTIFICATION_TYPES.includes(
+    normalizeText(value).toLowerCase() as PushNotificationContext["notificationType"],
+  );
+}
+
+function isSupportedInternalRecipientType(value: unknown): boolean {
+  return SUPPORTED_INTERNAL_RECIPIENT_TYPES.includes(
+    normalizeText(value).toLowerCase() as (typeof SUPPORTED_INTERNAL_RECIPIENT_TYPES)[number],
+  );
+}
+
+async function resolvePushNotificationContext(params: {
+  admin: any;
+  input: NotificationDeliveryAttemptInput;
+}): Promise<PushNotificationContext | null> {
+  const notificationId = normalizeText(params.input.notificationId);
+  if (!notificationId) return null;
+
+  const { data, error } = await params.admin
+    .from("notifications")
+    .select("id, job_id, recipient_ref, recipient_type, account_owner_user_id, notification_type")
+    .eq("id", notificationId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("[web-push] Failed to resolve notification context", {
+      marker: "web_push_notification_context_resolve_failed",
+      notificationId,
+      error: error.message,
+    });
+    return null;
+  }
+
+  const notificationType = normalizeText(data?.notification_type).toLowerCase();
+  if (!isSupportedPushNotificationType(notificationType)) {
+    console.info("[web-push] unsupported notification type skipped", {
+      marker: "web_push_unsupported_notification_type_skipped",
+      notificationId,
+      notificationType: notificationType || normalizeText(params.input.notificationType),
+    });
+    return null;
+  }
+
+  const recipientType = normalizeText(data?.recipient_type).toLowerCase();
+  const recipientUserId = normalizeText(data?.recipient_ref);
+  const accountOwnerUserId = normalizeText(data?.account_owner_user_id);
+  const jobId = normalizeText(data?.job_id);
+
+  if (
+    !isSupportedInternalRecipientType(recipientType) ||
+    !recipientUserId ||
+    !accountOwnerUserId ||
+    !jobId
+  ) {
+    console.warn("[web-push] Invalid notification context for push", {
+      marker: "web_push_notification_context_invalid",
+      notificationId,
+      notificationType,
+      recipientType,
+      hasRecipientRef: Boolean(recipientUserId),
+      hasAccountOwnerUserId: Boolean(accountOwnerUserId),
+      hasJobId: Boolean(jobId),
+    });
+    return null;
+  }
+
+  return {
+    notificationId,
+    accountOwnerUserId,
+    recipientUserId,
+    notificationType,
+    jobId,
+  };
+}
 
 /**
  * Record a delivery attempt in the audit table
@@ -133,7 +235,11 @@ async function sendToSubscription(params: {
     // Dynamically import web-push only if needed
     const webpush = await import("web-push");
 
-    if (!WEB_PUSH_PRIVATE_KEY || !WEB_PUSH_SUBJECT) {
+    const privateKey = process.env.WEB_PUSH_PRIVATE_KEY;
+    const subject = process.env.WEB_PUSH_SUBJECT;
+    const publicKey = process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY ?? "";
+
+    if (!privateKey || !subject) {
       return {
         sent: false,
         error: "Missing VAPID credentials",
@@ -141,7 +247,7 @@ async function sendToSubscription(params: {
     }
 
     // Configure VAPID keys (public key can be omitted here as it's already configured)
-    webpush.setVapidDetails(WEB_PUSH_SUBJECT, process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY ?? "", WEB_PUSH_PRIVATE_KEY);
+    webpush.setVapidDetails(subject, publicKey, privateKey);
 
     const pushSubscription = {
       endpoint: params.subscription.endpoint,
@@ -154,6 +260,7 @@ async function sendToSubscription(params: {
     const payload = JSON.stringify({
       title: params.payload.title,
       body: params.payload.body,
+      url: params.payload.data?.url,
       data: params.payload.data,
     });
 
@@ -180,7 +287,9 @@ async function sendToSubscription(params: {
  */
 async function markSubscriptionInactiveIfExpired(params: {
   supabase: any;
-  subscriptionId: string;
+  subscription: PushSubscriptionRow;
+  accountOwnerUserId: string;
+  recipientUserId: string;
   statusCode?: number;
 }): Promise<void> {
   const statusCode = params.statusCode;
@@ -191,17 +300,19 @@ async function markSubscriptionInactiveIfExpired(params: {
       const { error } = await params.supabase
         .from("push_subscriptions")
         .update({ is_active: false })
-        .eq("id", params.subscriptionId);
+        .eq("id", params.subscription.id)
+        .eq("account_owner_user_id", params.accountOwnerUserId)
+        .eq("user_id", params.recipientUserId);
 
       if (error) {
         console.warn("[web-push] Failed to mark subscription inactive", {
-          subscriptionId: params.subscriptionId,
+          subscriptionId: params.subscription.id,
           error: error.message,
         });
       }
     } catch (error) {
       console.warn("[web-push] Exception marking subscription inactive", {
-        subscriptionId: params.subscriptionId,
+        subscriptionId: params.subscription.id,
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -219,42 +330,60 @@ async function markSubscriptionInactiveIfExpired(params: {
 export async function sendWebPushNotificationForInternalNotification(
   input: NotificationDeliveryAttemptInput,
 ): Promise<void> {
+  console.info("[web-push] helper started", {
+    marker: "web_push_helper_started",
+    notificationId: input.notificationId,
+  });
+
+  const enabled = isWebPushEnabled();
+  console.info("[web-push] delivery gate evaluated", {
+    marker: "web_push_delivery_gate_evaluated",
+    notificationId: input.notificationId,
+    notificationType: input.notificationType,
+    recipientUserId: input.recipientUserId,
+    enabled,
+    hasPrivateKey: Boolean(process.env.WEB_PUSH_PRIVATE_KEY),
+    hasSubject: Boolean(process.env.WEB_PUSH_SUBJECT),
+    hasPublicKey: Boolean(process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY),
+  });
+
   // Feature gate: off by default
-  if (!ENABLE_WEB_PUSH) {
+  if (!enabled) {
     return;
   }
 
   try {
+    const admin = createAdminClient();
+    const context = await resolvePushNotificationContext({ admin, input });
+    if (!context) return;
+
     // Only send for supported notification types
     const payload = buildSafePayload({
-      notificationType: input.notificationType,
-      jobId: input.jobId,
+      notificationType: context.notificationType,
+      jobId: context.jobId,
     });
 
-    if (!payload) {
-      // Unsupported type; skip without recording attempt
-      return;
-    }
+    if (!payload) return;
 
     // Fetch active subscriptions for recipient
-    const { data: subscriptions, error: fetchError } = await input.supabase
+    const { data: subscriptions, error: fetchError } = await admin
       .from("push_subscriptions")
-      .select("id, endpoint, p256dh, auth")
-      .eq("account_owner_user_id", input.accountOwnerUserId)
-      .eq("user_id", input.recipientUserId)
+      .select("id, account_owner_user_id, user_id, endpoint, p256dh, auth")
+      .eq("account_owner_user_id", context.accountOwnerUserId)
+      .eq("user_id", context.recipientUserId)
       .eq("is_active", true);
 
     if (fetchError) {
       console.warn("[web-push] Failed to fetch subscriptions", {
-        recipientUserId: input.recipientUserId,
+        recipientUserId: context.recipientUserId,
         error: fetchError.message,
       });
 
       await recordDeliveryAttempt({
-        supabase: input.supabase,
-        notificationId: input.notificationId,
-        accountOwnerUserId: input.accountOwnerUserId,
-        recipientUserId: input.recipientUserId,
+        supabase: admin,
+        notificationId: context.notificationId,
+        accountOwnerUserId: context.accountOwnerUserId,
+        recipientUserId: context.recipientUserId,
         channel: "web_push",
         status: "skipped",
         errorCode: "FETCH_SUBSCRIPTIONS_FAILED",
@@ -264,13 +393,21 @@ export async function sendWebPushNotificationForInternalNotification(
       return;
     }
 
+    console.info("[web-push] active subscriptions fetched", {
+      marker: "web_push_active_subscriptions_fetched",
+      notificationId: context.notificationId,
+      notificationType: context.notificationType,
+      recipientUserId: context.recipientUserId,
+      activeSubscriptionCount: subscriptions?.length ?? 0,
+    });
+
     if (!subscriptions || subscriptions.length === 0) {
       // No active subscriptions; this is normal and expected
       await recordDeliveryAttempt({
-        supabase: input.supabase,
-        notificationId: input.notificationId,
-        accountOwnerUserId: input.accountOwnerUserId,
-        recipientUserId: input.recipientUserId,
+        supabase: admin,
+        notificationId: context.notificationId,
+        accountOwnerUserId: context.accountOwnerUserId,
+        recipientUserId: context.recipientUserId,
         channel: "web_push",
         status: "skipped",
         errorCode: "NO_ACTIVE_SUBSCRIPTIONS",
@@ -280,25 +417,36 @@ export async function sendWebPushNotificationForInternalNotification(
     }
 
     // Send to all active subscriptions for this user
-    for (const subscription of subscriptions) {
+    for (const subscription of subscriptions as PushSubscriptionRow[]) {
       const result = await sendToSubscription({
         subscription,
         payload,
       });
 
+      console.info("[web-push] provider send completed", {
+        marker: "web_push_provider_send_completed",
+        notificationId: context.notificationId,
+        notificationType: context.notificationType,
+        sent: result.sent,
+        providerStatusCode: result.statusCode ?? null,
+        errorCode: result.error ? "PROVIDER_SEND_FAILED" : null,
+      });
+
       if (result.statusCode === 410 || result.statusCode === 404) {
         await markSubscriptionInactiveIfExpired({
-          supabase: input.supabase,
-          subscriptionId: subscription.id,
+          supabase: admin,
+          subscription,
+          accountOwnerUserId: context.accountOwnerUserId,
+          recipientUserId: context.recipientUserId,
           statusCode: result.statusCode,
         });
       }
 
       await recordDeliveryAttempt({
-        supabase: input.supabase,
-        notificationId: input.notificationId,
-        accountOwnerUserId: input.accountOwnerUserId,
-        recipientUserId: input.recipientUserId,
+        supabase: admin,
+        notificationId: context.notificationId,
+        accountOwnerUserId: context.accountOwnerUserId,
+        recipientUserId: context.recipientUserId,
         pushSubscriptionId: subscription.id,
         channel: "web_push",
         status: result.sent ? "sent" : "failed",
@@ -309,10 +457,13 @@ export async function sendWebPushNotificationForInternalNotification(
     }
   } catch (error) {
     // Top-level catch: swallow all exceptions; log for debugging
+    const maybeRecord = error as Record<string, unknown>;
     console.warn("[web-push] Unexpected error in push delivery", {
+      marker: "web_push_helper_failed_before_attempt",
       notificationId: input.notificationId,
       recipientUserId: input.recipientUserId,
-      error: error instanceof Error ? error.message : String(error),
+      error_code: typeof maybeRecord?.code === "string" ? maybeRecord.code : null,
+      error_message: error instanceof Error ? error.message : String(error),
     });
   }
 }

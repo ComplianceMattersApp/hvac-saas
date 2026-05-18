@@ -252,22 +252,41 @@ export async function insertTargetedInternalNotification(
     job_id: jobId,
   });
 
-  // Fire-and-forget: send web push if feature-gated and enabled
-  // Failures are logged and swallowed; never blocks notification creation
-  sendWebPushNotificationForInternalNotification({
-    supabase: input.supabase,
-    notificationId,
-    accountOwnerUserId,
-    recipientUserId,
-    notificationType,
-    jobId,
-  }).catch((err) => {
+  // Best-effort: await so serverless runtimes do not end before attempt audit writes.
+  // Failures are logged and swallowed; never blocks notification creation.
+  try {
+    console.info("[notification-actions] web push invocation about to start", {
+      marker: "web_push_invocation_about_to_start",
+      notification_id: notificationId,
+      notification_type: notificationType,
+      recipient_type: recipientType,
+      recipient_ref: recipientUserId,
+      account_owner_user_id: accountOwnerUserId,
+    });
+
+    await sendWebPushNotificationForInternalNotification({
+      supabase: input.supabase,
+      notificationId,
+      accountOwnerUserId,
+      recipientUserId,
+      notificationType,
+      jobId,
+    });
+
+    console.info("[notification-actions] web push invocation completed", {
+      marker: "web_push_invocation_completed",
+      notification_id: notificationId,
+    });
+  } catch (err) {
+    const safeError = getSafeErrorDetails(err);
     console.warn("[notification-actions] Push delivery failed (safe to ignore)", {
+      marker: "web_push_invocation_failed",
       notificationId,
       recipientUserId,
-      error: err instanceof Error ? err.message : String(err),
+      error_code: safeError.error_code,
+      error_message: safeError.error_message,
     });
-  });
+  }
 
   revalidatePath("/", "layout");
   return notificationId;

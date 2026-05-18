@@ -189,7 +189,7 @@ export function NotificationsPageClient({
                 {isHvacServiceMode ? "My Alerts" : "Notifications"}
               </h1>
               <p className="text-sm text-slate-600">
-                {isHvacServiceMode ? "Team assignment and mention alerts" : "Internal event visibility for ops workflow."}
+                {isHvacServiceMode ? "Your assignment and internal note mention alerts." : "Internal event visibility for ops workflow."}
               </p>
               <p className="text-sm text-slate-600">
                 Signals for awareness; action ownership remains in Ops queues.
