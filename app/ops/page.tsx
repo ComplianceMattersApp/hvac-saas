@@ -2079,7 +2079,6 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
           key: "last_attempt",
           label: "Last attempt",
           value: recentAttemptDisplay,
-          framed: recentAttemptDisplay === "No attempts logged",
         }
       : null,
   ].filter(Boolean) as Array<{ key: string; label: string; value: string; href?: string; framed?: boolean }>;

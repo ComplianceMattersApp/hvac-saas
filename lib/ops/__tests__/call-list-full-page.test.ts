@@ -24,6 +24,15 @@ describe("/ops call list — Full Page link", () => {
   it("contractor filter is preserved in the Full page link href", () => {
     expect(opsPageSource).toContain("encodeURIComponent(contractorScopeFilter)");
   });
+
+  it("renders Last attempt metadata sourced from customer_attempt events", () => {
+    expect(opsPageSource).toContain('.eq("event_type", "customer_attempt")');
+    expect(opsPageSource).toContain('label: "Last attempt"');
+  });
+
+  it("uses a subtle no-attempt fallback copy on ops cards", () => {
+    expect(opsPageSource).toContain("No attempts yet");
+  });
 });
 
 describe("/ops/call-list page", () => {

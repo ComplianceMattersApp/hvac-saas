@@ -24,6 +24,6 @@ describe("recent attempt display", () => {
   });
 
   it("returns fallback when attempt timestamp is missing", () => {
-    expect(resolveRecentAttemptDisplay(null)).toBe("No attempts logged");
+    expect(resolveRecentAttemptDisplay(null)).toBe("No attempts yet");
   });
 });

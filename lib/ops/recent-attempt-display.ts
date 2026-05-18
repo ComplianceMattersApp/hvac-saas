@@ -55,5 +55,5 @@ export function formatRecentAttemptDateTime(isoLike: string) {
 
 export function resolveRecentAttemptDisplay(isoLike?: string | null) {
   const formatted = formatRecentAttemptDateTime(String(isoLike ?? ""));
-  return formatted || "No attempts logged";
+  return formatted || "No attempts yet";
 }
