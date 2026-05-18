@@ -32,14 +32,14 @@ export default function RoleContactsCard({
   }
 
   return (
-    <div className={`border border-gray-300 rounded-md p-4 ${className}`}>
-      <h3 className="text-lg font-semibold mb-3">{title}</h3>
-      <div className="space-y-3">
+    <section className={`rounded-xl border border-slate-200/80 bg-white/85 p-3 shadow-sm sm:p-4 ${className}`}>
+      <h3 className="text-sm font-semibold tracking-tight text-slate-900">{title}</h3>
+      <div className="mt-3 space-y-2.5 sm:space-y-3">
         {displayable.map((recipient) => (
           <RoleContactItem key={recipient.id} recipient={recipient} />
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -62,27 +62,36 @@ function RoleContactItem({ recipient }: RoleContactItemProps) {
   const isInactive = recipient.status === "inactive";
 
   return (
-    <div className="flex flex-col gap-1 text-sm pb-2 border-b border-gray-200 last:border-b-0">
-      {/* Role + Status Badge */}
-      <div className="flex items-center gap-2">
-        <span className="font-medium text-gray-800">{roleLabel}</span>
+    <div className="rounded-lg border border-slate-200/70 bg-white/70 px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+          {roleLabel}
+        </span>
         {isInactive && (
-          <span className="inline-block px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded">
+          <span className="inline-flex rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-700">
             Inactive
           </span>
         )}
       </div>
 
-      {/* Display Name */}
       {recipient.display_name && (
-        <div className="text-gray-700">{recipient.display_name}</div>
+        <div className="mt-1 text-sm font-semibold text-slate-900">{recipient.display_name}</div>
       )}
 
-      {/* Contact Info (phone and/or email, if present) */}
-      <div className="text-gray-600 flex flex-col gap-0.5">
-        {recipient.phone_e164 && <div>Phone: {recipient.phone_e164}</div>}
-        {recipient.email && <div>Email: {recipient.email}</div>}
-      </div>
+      {(recipient.phone_e164 || recipient.email) && (
+        <div className="mt-1.5 space-y-1 text-xs text-slate-600">
+          {recipient.phone_e164 ? (
+            <div className="break-all">
+              <span className="font-medium text-slate-500">Phone:</span> {recipient.phone_e164}
+            </div>
+          ) : null}
+          {recipient.email ? (
+            <div className="break-all">
+              <span className="font-medium text-slate-500">Email:</span> {recipient.email}
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

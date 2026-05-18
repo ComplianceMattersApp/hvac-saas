@@ -315,6 +315,7 @@ export default async function CustomerDetailPage(props: {
   const maintenanceAgreementFocusId = String(sp.maFocus ?? "").trim();
   const roleContactSaved = String(sp.rcSaved ?? "").trim() === "1";
   const roleContactError = String(sp.rcError ?? "").trim() === "1";
+  const roleContactSummaryLabel = roleContactSaved ? "Add another role contact" : "Contact details";
 
   if (!id || !isUuid(id)) {
     redirect("/customers");
@@ -710,7 +711,7 @@ export default async function CustomerDetailPage(props: {
               recipients={customerRoleContacts}
             />
 
-            <section className="rounded-xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
+            <section className="rounded-xl border border-slate-200/80 bg-slate-50/65 p-4">
               <div className="space-y-1">
                 <h2 className="text-sm font-semibold text-slate-900">Add role contact</h2>
                 <p className="text-xs text-slate-600">
@@ -732,7 +733,7 @@ export default async function CustomerDetailPage(props: {
 
               <details className="mt-3" open={roleContactError}>
                 <summary className="cursor-pointer select-none text-sm font-medium text-slate-800">
-                  Add role contact
+                  {roleContactSummaryLabel}
                 </summary>
 
                 <form action={addCustomerRoleContactFromForm} className="mt-3 grid gap-3 sm:grid-cols-2">

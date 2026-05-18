@@ -3060,7 +3060,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           key={section.title}
           title={section.title}
           recipients={section.recipients}
-          className={index === 0 ? "mt-4" : "mt-3"}
+          className={index === 0 ? "mt-3 bg-white/70" : "mt-2 bg-white/65"}
         />
       ))}
 
