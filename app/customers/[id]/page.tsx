@@ -32,6 +32,10 @@ import VisitScopeBuilder from "@/components/jobs/VisitScopeBuilder";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonDisplayName } from "@/lib/utils/identity-display";
+import {
+  listContactRecipientsForEntity,
+} from "@/lib/communications/contact-recipients-read";
+import RoleContactsCard from "@/components/RoleContactsCard";
 
 
 type CustomerRow = {
@@ -387,6 +391,17 @@ export default async function CustomerDetailPage(props: {
 
   const customer = customerData as CustomerRow;
 
+  let customerRoleContacts = [] as Awaited<ReturnType<typeof listContactRecipientsForEntity>>;
+  if (isInternalViewer && visibilityScope.kind === "internal") {
+    customerRoleContacts = await listContactRecipientsForEntity({
+      supabase,
+      accountOwnerUserId: visibilityScope.accountOwnerUserId,
+      linkedEntityType: "customer",
+      linkedEntityId: customerId,
+      limit: 100,
+    }).catch(() => []);
+  }
+
   let locationsData: LocationRow[] = [];
 
   const { data: locationRows, error: locationsErr } = await supabase
@@ -684,6 +699,13 @@ export default async function CustomerDetailPage(props: {
         </div>
 
         <div className="space-y-6 md:space-y-7">
+
+        {isInternalViewer && customerRoleContacts.length > 0 ? (
+          <RoleContactsCard
+            title="Role Contacts"
+            recipients={customerRoleContacts}
+          />
+        ) : null}
 
         {/* Open status summary */}
         <section className="rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">

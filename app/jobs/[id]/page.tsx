@@ -131,6 +131,10 @@ import {
 import InterruptStateFields from "./_components/InterruptStateFields";
 import MarkVisitCountedActionButton from "./_components/MarkVisitCountedActionButton";
 import ConfirmNextDueDateActionButton from "./_components/ConfirmNextDueDateActionButton";
+import {
+  listContactRecipientsForEntity,
+} from "@/lib/communications/contact-recipients-read";
+import RoleContactsCard from "@/components/RoleContactsCard";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -1254,6 +1258,14 @@ export default async function JobDetailPage({
     getOnTheWayUndoEligibility(jobId),
   );
 
+  const jobRoleContactsPromise = listContactRecipientsForEntity({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    linkedEntityType: "job",
+    linkedEntityId: jobId,
+    limit: 100,
+  }).catch(() => []);
+
   const contractorBillingPromise = contractorId
     ? supabase
         .from("contractors")
@@ -1427,6 +1439,7 @@ export default async function JobDetailPage({
     onTheWayUndoEligibility,
     billingPartyReads,
     visitScopePricebookTemplates,
+    jobRoleContacts,
   ] = await Promise.all([
     assignmentDisplayPromise,
     serviceCaseSummaryPromise,
@@ -1434,6 +1447,7 @@ export default async function JobDetailPage({
     onTheWayUndoEligibilityPromise,
     billingPartyReadsPromise(),
     visitScopePricebookTemplatesPromise,
+    jobRoleContactsPromise,
   ]);
 
   const contractorBilling = billingPartyReads.contractorBilling;
@@ -3022,6 +3036,12 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         lastAttemptLabel={lastAttemptLabel}
         action={logCustomerContactAttemptFromForm}
         buttonClassName="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+      />
+
+      <RoleContactsCard
+        title="Role Contacts"
+        recipients={jobRoleContacts}
+        className="mt-4"
       />
 
       <div id="assigned-team" className="mt-4 scroll-mt-24 border-t border-slate-200/80 pt-4">
