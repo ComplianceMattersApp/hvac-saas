@@ -3030,7 +3030,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
   </div>
 
-  <div className="mb-4 grid items-stretch gap-4 xl:grid-cols-[minmax(300px,0.94fr)_minmax(420px,1.22fr)_minmax(250px,0.74fr)]">
+  <div className="mb-4 grid items-start gap-4 xl:grid-cols-[minmax(300px,0.94fr)_minmax(420px,1.22fr)_minmax(250px,0.74fr)]">
     {/* Left: customer / contact info */}
     <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4`}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -3129,7 +3129,46 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         />
       ))}
 
-      <div id="assigned-team" className="mt-4 scroll-mt-24 border-t border-slate-200/80 pt-4">
+    </div>
+
+    {/* Center: destination panel */}
+    <div className="space-y-3">
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.28)]">
+        <div className="absolute left-3 top-3 z-10">
+          <div className="rounded-full border border-white/70 bg-white/76 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.3)] backdrop-blur-sm">
+            Service Location
+          </div>
+        </div>
+        <div className="bg-slate-100 p-3 pt-10">
+          <Suspense
+            fallback={
+              <JobLocationPreviewFallback
+                addressLine1={serviceAddressLine1}
+                addressLine2={serviceAddressLine2}
+                city={serviceCity}
+                state={serviceState}
+                zip={serviceZip}
+                showAddressFooter
+                className="[&>div:last-child]:pt-1"
+              />
+            }
+          >
+            <TimedJobLocationPreview
+              addressLine1={serviceAddressLine1}
+              addressLine2={serviceAddressLine2}
+              city={serviceCity}
+              state={serviceState}
+              zip={serviceZip}
+              showAddressFooter
+              className="[&>div:last-child]:pt-1"
+              timingEnabled={timingEnabled}
+              onPhaseTiming={recordBlockingPhase}
+            />
+          </Suspense>
+        </div>
+      </div>
+
+      <div id="assigned-team" className={`${workspaceSubtleCardClass} scroll-mt-24 border-slate-200/70 bg-white/92 p-4`}>
         {assignmentBannerMessage ? (
           <FlashBanner
             type={assignmentBannerType as "success" | "warning"}
@@ -3138,7 +3177,10 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Assigned Team</div>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Assigned Team</div>
+            <div className="mt-1 text-sm text-slate-600">Field ownership for this visit.</div>
+          </div>
           <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
         </div>
         {assignedTeam.length > 0 ? (
@@ -3210,42 +3252,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             />
           </Suspense>
         ) : null}
-      </div>
-    </div>
-
-    {/* Center: destination panel */}
-    <div className="relative flex min-h-[20rem] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.28)]">
-      <div className="absolute left-3 top-3 z-10">
-        <div className="rounded-full border border-white/70 bg-white/76 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.3)] backdrop-blur-sm">
-          Service Location
-        </div>
-      </div>
-      <div className="w-full flex-1 overflow-hidden bg-slate-100">
-        <Suspense
-          fallback={
-            <JobLocationPreviewFallback
-              addressLine1={serviceAddressLine1}
-              addressLine2={serviceAddressLine2}
-              city={serviceCity}
-              state={serviceState}
-              zip={serviceZip}
-              showAddressFooter
-              className="flex h-full flex-col [&>div:last-child]:!mt-auto [&>div:last-child]:pt-3"
-            />
-          }
-        >
-          <TimedJobLocationPreview
-            addressLine1={serviceAddressLine1}
-            addressLine2={serviceAddressLine2}
-            city={serviceCity}
-            state={serviceState}
-            zip={serviceZip}
-            showAddressFooter
-            className="flex h-full flex-col [&>div:last-child]:!mt-auto [&>div:last-child]:pt-3"
-            timingEnabled={timingEnabled}
-            onPhaseTiming={recordBlockingPhase}
-          />
-        </Suspense>
       </div>
     </div>
 

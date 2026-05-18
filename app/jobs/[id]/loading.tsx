@@ -52,8 +52,30 @@ export default function JobDetailLoading() {
           </div>
         </div>
 
-        <div className="min-h-80 rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
-          <div className="h-full min-h-80 animate-pulse rounded-2xl bg-slate-100" />
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-3 pt-10 shadow-sm shadow-slate-950/5">
+            <div className="aspect-[16/9] animate-pulse rounded-lg bg-slate-100" />
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-between">
+              <div className="flex gap-2">
+                <div className="h-10 w-24 animate-pulse rounded-lg bg-slate-100" />
+                <div className="h-10 w-28 animate-pulse rounded-lg bg-slate-100" />
+              </div>
+              <div className="h-14 w-full animate-pulse rounded-lg bg-slate-100 sm:w-56" />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="h-3 w-28 animate-pulse rounded bg-slate-200" />
+              <div className="h-7 w-24 animate-pulse rounded-full bg-slate-100" />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <div key={index} className="h-10 w-36 animate-pulse rounded-lg border border-slate-100 bg-slate-50" />
+              ))}
+            </div>
+            <div className="mt-3 h-10 w-full animate-pulse rounded-lg bg-slate-100" />
+          </div>
         </div>
 
         <aside className="space-y-3">
