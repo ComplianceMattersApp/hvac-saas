@@ -30,6 +30,7 @@ export type SetOpsStatusResult = {
   finalStatus: OpsStatus | "";
   updated: boolean;
   manualLockPrevented: boolean;
+  note?: string;
 };
 
 type OpsStatusTimingRecorder = (phase: string, elapsedMs: number) => void;
@@ -70,6 +71,22 @@ export async function setOpsStatusIfNotManual(
 
   const current = (job.ops_status ?? "") as OpsStatus;
 
+  // Idempotent no-op: do nothing and do not treat this as a lock-prevented change.
+  if (current === nextStatus) {
+    const unchangedResult: SetOpsStatusResult = {
+      jobId,
+      previousStatus: current,
+      requestedStatus: nextStatus,
+      finalStatus: current,
+      updated: false,
+      manualLockPrevented: false,
+      note: "same_status_noop",
+    };
+
+    console.info("[OPS_STATUS_SET]", unchangedResult);
+    return unchangedResult;
+  }
+
   // Manual lock: do nothing
   if (MANUAL_STATUSES.includes(current)) {
     const blockedResult: SetOpsStatusResult = {
@@ -81,22 +98,8 @@ export async function setOpsStatusIfNotManual(
       manualLockPrevented: true,
     };
 
-    console.error("[OPS_STATUS_SET]", blockedResult);
+    console.warn("[OPS_STATUS_SET]", blockedResult);
     return blockedResult;
-  }
-
-  if (current === nextStatus) {
-    const unchangedResult: SetOpsStatusResult = {
-      jobId,
-      previousStatus: current,
-      requestedStatus: nextStatus,
-      finalStatus: current,
-      updated: false,
-      manualLockPrevented: false,
-    };
-
-    console.error("[OPS_STATUS_SET]", unchangedResult);
-    return unchangedResult;
   }
 
   const { error: upErr } = await timeOpsStatusPhase(
@@ -134,7 +137,7 @@ export async function setOpsStatusIfNotManual(
     manualLockPrevented: false,
   };
 
-  console.error("[OPS_STATUS_SET]", result);
+  console.info("[OPS_STATUS_SET]", result);
   return result;
 }
 

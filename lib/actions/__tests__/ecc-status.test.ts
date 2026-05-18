@@ -393,6 +393,9 @@ describe("evaluateEccOpsStatus", () => {
   });
 
   it("does not reopen a closed ECC job via field_complete_fallback", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
     await runEvaluation({
       job: {
         id: "job-closed",
@@ -424,6 +427,23 @@ describe("evaluateEccOpsStatus", () => {
 
     expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
     expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
+
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      "[ECC_EVAL]",
+      expect.objectContaining({ reason: "closed_terminal_noop" })
+    );
+    expect(infoSpy).toHaveBeenCalledWith(
+      "[ECC_EVAL]",
+      expect.objectContaining({
+        jobId: "job-closed",
+        reason: "closed_terminal_noop",
+        final_ops_status: "closed",
+        updated: false,
+      })
+    );
+
+    errorSpy.mockRestore();
+    infoSpy.mockRestore();
   });
 
   it("preserves manual-lock handling for non-closed field-complete fallback", async () => {
@@ -468,5 +488,62 @@ describe("evaluateEccOpsStatus", () => {
       expect.objectContaining({ timing: undefined })
     );
     expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("same-status field_complete_fallback logs as info, not error", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    setOpsStatusIfNotManualMock.mockResolvedValueOnce({
+      finalStatus: "paperwork_required",
+      manualLockPrevented: false,
+      updated: false,
+      note: "same_status_noop",
+    });
+
+    await runEvaluation({
+      job: {
+        id: "job-same-status-fallback",
+        status: "completed",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        ops_status: "paperwork_required",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+      },
+      runs: [
+        {
+          id: "run-1",
+          system_id: "sys-1",
+          test_type: "duct_leakage",
+          is_completed: true,
+          computed_pass: null,
+          override_pass: null,
+          data: { verification_method: "photo_taken" },
+          computed: { status: "photo_evidence" },
+        },
+      ],
+      correctionResolutionEvent: null,
+    });
+
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      "[ECC_EVAL]",
+      expect.objectContaining({ reason: "field_complete_fallback" })
+    );
+    expect(infoSpy).toHaveBeenCalledWith(
+      "[ECC_EVAL]",
+      expect.objectContaining({
+        jobId: "job-same-status-fallback",
+        reason: "field_complete_fallback",
+        updated: false,
+      })
+    );
+
+    errorSpy.mockRestore();
+    infoSpy.mockRestore();
   });
 });

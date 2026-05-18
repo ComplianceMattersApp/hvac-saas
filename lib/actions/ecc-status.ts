@@ -68,7 +68,7 @@ async function applyResolvedEccCloseoutStatus(params: {
   const { jobId, currentOps, resolvedNextStatus, reason, timing } = params;
 
   if (ECC_HARD_LOCKS.has(currentOps)) {
-    console.error("[ECC_EVAL]", {
+    console.warn("[ECC_EVAL]", {
       jobId,
       current_ops_status: currentOps,
       computed_next_status: resolvedNextStatus,
@@ -80,7 +80,7 @@ async function applyResolvedEccCloseoutStatus(params: {
   }
 
   if (RESOLVED_ECC_PRE_FIELD_STATUSES.has(resolvedNextStatus)) {
-    console.error("[ECC_EVAL]", {
+    console.info("[ECC_EVAL]", {
       jobId,
       current_ops_status: currentOps,
       computed_next_status: resolvedNextStatus,
@@ -98,13 +98,14 @@ async function applyResolvedEccCloseoutStatus(params: {
         ? (phase, elapsedMs) => timing(`opsStatus.${phase}`, elapsedMs)
         : undefined,
     });
-    console.error("[ECC_EVAL]", {
+    console.info("[ECC_EVAL]", {
       jobId,
       current_ops_status: currentOps,
       computed_next_status: resolvedNextStatus,
       reason,
       manual_lock_prevented: setResult.manualLockPrevented,
       final_ops_status: setResult.finalStatus,
+      updated: setResult.updated,
     });
     return;
   }
@@ -114,7 +115,7 @@ async function applyResolvedEccCloseoutStatus(params: {
       ? (phase, elapsedMs) => timing(`opsStatus.${phase}`, elapsedMs)
       : undefined,
   });
-  console.error("[ECC_EVAL]", {
+  console.info("[ECC_EVAL]", {
     jobId,
     current_ops_status: currentOps,
     computed_next_status: resolvedNextStatus,
@@ -175,7 +176,7 @@ export async function evaluateEccOpsStatus(
 
   const currentOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
   if (currentOpsStatus === "closed") {
-    console.error("[ECC_EVAL]", {
+    console.info("[ECC_EVAL]", {
       jobId,
       current_ops_status: job.ops_status ?? null,
       computed_next_status: null,
@@ -418,13 +419,14 @@ export async function evaluateEccOpsStatus(
         ? (phase, elapsedMs) => options.timing?.(`opsStatus.${phase}`, elapsedMs)
         : undefined,
     });
-    console.error("[ECC_EVAL]", {
+    console.info("[ECC_EVAL]", {
       jobId,
       current_ops_status: job.ops_status ?? null,
       computed_next_status: "paperwork_required",
       reason: "field_complete_fallback",
       manual_lock_prevented: setResult.manualLockPrevented,
       final_ops_status: setResult.finalStatus,
+      updated: setResult.updated,
     });
     return;
   }
