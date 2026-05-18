@@ -35,6 +35,7 @@ import { formatPersonDisplayName } from "@/lib/utils/identity-display";
 import {
   listContactRecipientsForEntity,
 } from "@/lib/communications/contact-recipients-read";
+import { addCustomerRoleContactFromForm } from "@/lib/actions/contact-recipient-actions";
 import RoleContactsCard from "@/components/RoleContactsCard";
 
 
@@ -290,7 +291,7 @@ function summaryOrder() {
 
 export default async function CustomerDetailPage(props: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ err?: string; maSaved?: string; maError?: string; maFocus?: string }>;
+  searchParams?: Promise<{ err?: string; maSaved?: string; maError?: string; maFocus?: string; rcSaved?: string; rcError?: string }>;
 }) {
   const supabase = await createClient();
 
@@ -312,6 +313,8 @@ export default async function CustomerDetailPage(props: {
   const maintenanceAgreementSaved = String(sp.maSaved ?? "").trim().toLowerCase();
   const maintenanceAgreementError = String(sp.maError ?? "").trim();
   const maintenanceAgreementFocusId = String(sp.maFocus ?? "").trim();
+  const roleContactSaved = String(sp.rcSaved ?? "").trim() === "1";
+  const roleContactError = String(sp.rcError ?? "").trim() === "1";
 
   if (!id || !isUuid(id)) {
     redirect("/customers");
@@ -700,11 +703,115 @@ export default async function CustomerDetailPage(props: {
 
         <div className="space-y-6 md:space-y-7">
 
-        {isInternalViewer && customerRoleContacts.length > 0 ? (
-          <RoleContactsCard
-            title="Role Contacts"
-            recipients={customerRoleContacts}
-          />
+        {isInternalViewer ? (
+          <div id="role-contacts" className="space-y-3">
+            <RoleContactsCard
+              title="Role Contacts"
+              recipients={customerRoleContacts}
+            />
+
+            <section className="rounded-xl border border-slate-200/80 bg-white/90 p-4 shadow-sm">
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold text-slate-900">Add role contact</h2>
+                <p className="text-xs text-slate-600">
+                  Use this for people related to the customer/account, such as a tenant, responsible party, billing contact, or third-party oversight contact.
+                </p>
+              </div>
+
+              {roleContactSaved ? (
+                <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                  Role contact added.
+                </div>
+              ) : null}
+
+              {roleContactError ? (
+                <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+                  Role contact could not be added.
+                </div>
+              ) : null}
+
+              <details className="mt-3" open={roleContactError}>
+                <summary className="cursor-pointer select-none text-sm font-medium text-slate-800">
+                  Add role contact
+                </summary>
+
+                <form action={addCustomerRoleContactFromForm} className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <input type="hidden" name="customer_id" value={customerId} />
+
+                  <label className="grid gap-1 text-xs text-slate-700">
+                    <span className="font-medium">Role</span>
+                    <select
+                      name="recipient_role"
+                      required
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                    >
+                      <option value="">Select role</option>
+                      <option value="homeowner">Homeowner</option>
+                      <option value="tenant_or_occupant">Tenant / Occupant</option>
+                      <option value="responsible_party">Responsible Party</option>
+                      <option value="billing_contact">Billing Contact</option>
+                      <option value="third_party_oversight">Third-Party Oversight</option>
+                    </select>
+                  </label>
+
+                  <label className="grid gap-1 text-xs text-slate-700">
+                    <span className="font-medium">Display name</span>
+                    <input
+                      name="display_name"
+                      required
+                      maxLength={120}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                      placeholder="Full name"
+                    />
+                  </label>
+
+                  <label className="grid gap-1 text-xs text-slate-700">
+                    <span className="font-medium">Phone</span>
+                    <input
+                      name="phone"
+                      inputMode="tel"
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                      placeholder="+15551234567"
+                    />
+                  </label>
+
+                  <label className="grid gap-1 text-xs text-slate-700">
+                    <span className="font-medium">Email</span>
+                    <input
+                      name="email"
+                      type="email"
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                      placeholder="name@example.com"
+                    />
+                  </label>
+
+                  <label className="grid gap-1 text-xs text-slate-700 sm:col-span-2">
+                    <span className="font-medium">Preferred contact method</span>
+                    <select
+                      name="preferred_contact_method"
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                      defaultValue=""
+                    >
+                      <option value="">Auto</option>
+                      <option value="phone">Phone</option>
+                      <option value="email">Email</option>
+                      <option value="sms">SMS</option>
+                      <option value="none">None</option>
+                    </select>
+                  </label>
+
+                  <div className="sm:col-span-2">
+                    <button
+                      type="submit"
+                      className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                    >
+                      Save role contact
+                    </button>
+                  </div>
+                </form>
+              </details>
+            </section>
+          </div>
         ) : null}
 
         {/* Open status summary */}
