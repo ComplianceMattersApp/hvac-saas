@@ -2093,6 +2093,13 @@ const sharedNotesTitle = hasDirectNarrativeChain ? "Shared Notes Across Job Chai
 const internalNotesTitle = hasDirectNarrativeChain ? "Internal Notes Across Job Chain" : "Internal Notes";
 const timelineTitle = hasDirectNarrativeChain ? "Job Chain Timeline" : "Timeline";
 const isHvacServiceMode = productMode === "hvac_service";
+const showSharedNotesCard = !isHvacServiceMode;
+const showEccSummaryCard = job.job_type === "ecc";
+const lowerGridCardCount = 6 + (showSharedNotesCard ? 1 : 0) + (showEccSummaryCard ? 1 : 0);
+const lowerGridHasOrphan = lowerGridCardCount % 2 === 1;
+const sharedNotesCardClass = `${workspaceDetailsClass}${lowerGridHasOrphan && showSharedNotesCard && !showEccSummaryCard ? " xl:col-span-2" : ""}`;
+const serviceChainCardClass = `${workspaceDetailsClass}${lowerGridHasOrphan && !showSharedNotesCard && !showEccSummaryCard ? " xl:col-span-2" : ""}`;
+const eccSummaryCardClass = `${workspaceDetailsClass}${lowerGridHasOrphan && showEccSummaryCard ? " xl:col-span-2" : ""}`;
 const sharedNotesMeta = noteCountSummary.sharedCount
   ? `${noteCountSummary.sharedCount} note${noteCountSummary.sharedCount === 1 ? "" : "s"}`
   : undefined;
@@ -4955,130 +4962,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 </details>
 
 
-  <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.92fr)] xl:items-start">
-  <div className="order-2 flex flex-col gap-5 xl:order-2">
-    {/* Attachments - moved up from bottom */}
-    <details className={workspaceDetailsClass}>
-      <summary className="cursor-pointer list-none">
-        <CollapsibleHeader
-          title="Attachments"
-          subtitle="Uploaded files and shareable job records."
-        />
-      </summary>
-      <div className={`${workspaceDetailsDividerClass} px-0 pb-0`}>
-        <div className="mb-3 flex items-center justify-end">
-          <Link
-            href={`/jobs/${job.id}/attachments`}
-            className={secondaryButtonClass}
-          >
-            View All Attachments
-          </Link>
-        </div>
-        <Suspense fallback={<JobAttachmentsSectionFallback />}>
-          <DeferredJobAttachmentsInternal
-            jobId={String(job.id)}
-            accountOwnerUserId={String(internalUser.account_owner_user_id)}
-          />
-        </Suspense>
-      </div>
-    </details>
-
-    <details className={workspaceDetailsClass}>
-      <summary className="cursor-pointer list-none">
-        <CollapsibleHeader
-          title="Follow-Up History"
-          subtitle={followUpHistorySummaryText}
-        />
-      </summary>
-
-      <div className={`${workspaceDetailsDividerClass} rounded-xl border border-slate-200/80 bg-white/96 p-4`}>
-        <Suspense fallback={<FollowUpHistorySectionFallback />}>
-          <DeferredCustomerAttemptsHistory
-            jobId={String(job.id)}
-            emptyStateClassName={workspaceEmptyStateClass}
-            infoChipClassName={infoChipClass}
-          />
-        </Suspense>
-      </div>
-    </details>
-
-
-
-  <details id="service-chain" className={`${workspaceDetailsClass} xl:order-1`}>
-      <summary className="cursor-pointer list-none">
-        <CollapsibleHeader
-          title="Service Chain"
-          subtitle={serviceChainSummaryText}
-          meta={`${serviceCaseVisitCount} visit${serviceCaseVisitCount === 1 ? "" : "s"}`}
-        />
-      </summary>
-
-      <div className={workspaceDetailsDividerClass}>
-        {serviceCaseId ? (
-          <div className="mb-3 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-            Case: {serviceCaseId.slice(0, 8)}…
-          </div>
-        ) : null}
-
-        {!serviceCaseId ? (
-          <div className={workspaceEmptyStateClass}>
-            This job is not attached to a service case yet.
-          </div>
-        ) : (
-          <Suspense fallback={<ServiceChainPanelBodyFallback />}>
-            <DeferredServiceChainPanelBody
-              accountOwnerUserId={String(internalUser.account_owner_user_id)}
-              currentJobId={String(jobId)}
-              serviceCaseId={String(serviceCaseId)}
-              emptyStateClassName={workspaceEmptyStateClass}
-            />
-          </Suspense>
-        )}
-      </div>
-    </details>
-
-    {job.job_type === "ecc" ? (
-      <details className={`${workspaceDetailsClass} xl:order-3`}>
-        <summary className="cursor-pointer list-none">
-          <CollapsibleHeader
-            title="ECC Summary"
-            subtitle="Test history, runs, and compliance workspace context."
-            meta={`${eccRunCount} run${eccRunCount === 1 ? "" : "s"}`}
-          />
-        </summary>
-
-        <div className={workspaceDetailsDividerClass}>
-          <div className="rounded-xl border border-slate-200/80 bg-white/96 px-4 py-4 text-sm text-slate-700">
-            <p className="text-sm leading-6 text-slate-700">
-              Test history, runs, and compliance workspace context.
-            </p>
-            {eccRunCount > 0 ? (
-              <p className="mt-2 text-xs leading-5 text-slate-600">
-                Latest result: <span className="font-semibold text-slate-800">{latestEccRunResultLabel}</span>
-                {latestEccRunDateLabel ? ` • ${latestEccRunDateLabel}` : ""}
-              </p>
-            ) : (
-              <p className="mt-2 text-xs leading-5 text-slate-600">No tests recorded yet.</p>
-            )}
-          </div>
-
-          <div className="mt-3">
-            <Link
-              href={`/jobs/${job.id}/tests`}
-              className={darkButtonClass}
-            >
-              Open Tests Workspace
-            </Link>
-          </div>
-        </div>
-      </details>
-    ) : null}
-
-    </div>
-
-    <div className="order-1 flex flex-col gap-6 xl:order-1">
-      {/* Unified operations workspace */}
-  <div className="order-1 space-y-5 xl:order-1">
+  <div className="mb-8 space-y-5">
       {markVisitCountedLinkId && !suggestedNextDueProjection ? (
         <div id="service-plan-visit-count" className="mt-4 scroll-mt-24 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-slate-900">
           <div className="text-sm font-semibold text-emerald-900">Service Plan Visit Count Review</div>
@@ -5139,64 +5023,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       ) : null}
 
- </div>
-
-    <section className="order-1 space-y-4 xl:order-5">
+    <section className="space-y-4">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {/* Shared Notes */}
-        {!isHvacServiceMode ? (
-          <details id="shared-notes" className={workspaceDetailsClass} open={Boolean(sharedNoteBannerMessage)}>
-            <summary className="cursor-pointer list-none">
-              <CollapsibleHeader
-                title={sharedNotesTitle}
-                subtitle={sharedNotesSummaryText}
-                meta={sharedNotesMeta}
-              />
-            </summary>
-
-            <div className={`${workspaceDetailsDividerClass} space-y-2`}>
-              {sharedNoteBannerMessage ? (
-                <FlashBanner
-                  type={sharedNoteBannerType as "success" | "warning" | "error"}
-                  message={sharedNoteBannerMessage}
-                />
-              ) : null}
-
-  <form action={addPublicNoteFromForm} className="mb-4 space-y-3">
-      <input type="hidden" name="note_scope" value="shared" />
-      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#shared-notes`} />
-    <input type="hidden" name="job_id" value={job.id} />
-    <input type="hidden" name="tab" value={tab} />
-
-    <textarea
-      name="note"
-      rows={3}
-      placeholder="Add a note visible to the contractor..."
-      className={workspaceTextareaClass}
-    />
-
-    <div className="flex justify-end">
-      <SubmitButton
-        loadingText="Adding note..."
-        className={secondaryButtonClass}
-      >
-        Save shared note
-      </SubmitButton>
-    </div>
-  </form>
-
-  <Suspense fallback={<NarrativeNotesBodyFallback />}>
-    <DeferredSharedNotesBody
-      jobId={String(job.id)}
-      timelineJobIds={narrativeScopeJobIds}
-      hasDirectNarrativeChain={hasDirectNarrativeChain}
-      emptyStateClassName={workspaceEmptyStateClass}
-    />
-  </Suspense>
-            </div>
-          </details>
-        ) : null}
-
         {/* Internal Notes */}
         <details id="internal-notes" className={workspaceDetailsClass} open={Boolean(internalNoteBannerMessage)}>
           <summary className="cursor-pointer list-none">
@@ -5232,6 +5060,32 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 timelineJobIds={narrativeScopeJobIds}
                 hasDirectNarrativeChain={hasDirectNarrativeChain}
                 emptyStateClassName={workspaceEmptyStateClass}
+              />
+            </Suspense>
+          </div>
+        </details>
+
+        {/* Attachments */}
+        <details className={workspaceDetailsClass}>
+          <summary className="cursor-pointer list-none">
+            <CollapsibleHeader
+              title="Attachments"
+              subtitle="Uploaded files and shareable job records."
+            />
+          </summary>
+          <div className={`${workspaceDetailsDividerClass} px-0 pb-0`}>
+            <div className="mb-3 flex items-center justify-end">
+              <Link
+                href={`/jobs/${job.id}/attachments`}
+                className={secondaryButtonClass}
+              >
+                View All Attachments
+              </Link>
+            </div>
+            <Suspense fallback={<JobAttachmentsSectionFallback />}>
+              <DeferredJobAttachmentsInternal
+                jobId={String(job.id)}
+                accountOwnerUserId={String(internalUser.account_owner_user_id)}
               />
             </Suspense>
           </div>
@@ -5303,8 +5157,27 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
         </details>
 
+        <details className={workspaceDetailsClass}>
+          <summary className="cursor-pointer list-none">
+            <CollapsibleHeader
+              title="Follow-Up History"
+              subtitle={followUpHistorySummaryText}
+            />
+          </summary>
+
+          <div className={`${workspaceDetailsDividerClass} rounded-xl border border-slate-200/80 bg-white/96 p-4`}>
+            <Suspense fallback={<FollowUpHistorySectionFallback />}>
+              <DeferredCustomerAttemptsHistory
+                jobId={String(job.id)}
+                emptyStateClassName={workspaceEmptyStateClass}
+                infoChipClassName={infoChipClass}
+              />
+            </Suspense>
+          </div>
+        </details>
+
         {/* Timeline - Activity/History */}
-        <details className={`${workspaceDetailsClass}${isHvacServiceMode ? " xl:col-span-2" : ""}`}>
+        <details className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title={timelineTitle}
@@ -5324,8 +5197,132 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </Suspense>
           </div>
         </details>
+
+        <details id="service-chain" className={serviceChainCardClass}>
+          <summary className="cursor-pointer list-none">
+            <CollapsibleHeader
+              title="Service Chain"
+              subtitle={serviceChainSummaryText}
+              meta={`${serviceCaseVisitCount} visit${serviceCaseVisitCount === 1 ? "" : "s"}`}
+            />
+          </summary>
+
+          <div className={workspaceDetailsDividerClass}>
+            {serviceCaseId ? (
+              <div className="mb-3 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                Case: {serviceCaseId.slice(0, 8)}…
+              </div>
+            ) : null}
+
+            {!serviceCaseId ? (
+              <div className={workspaceEmptyStateClass}>
+                This job is not attached to a service case yet.
+              </div>
+            ) : (
+              <Suspense fallback={<ServiceChainPanelBodyFallback />}>
+                <DeferredServiceChainPanelBody
+                  accountOwnerUserId={String(internalUser.account_owner_user_id)}
+                  currentJobId={String(jobId)}
+                  serviceCaseId={String(serviceCaseId)}
+                  emptyStateClassName={workspaceEmptyStateClass}
+                />
+              </Suspense>
+            )}
+          </div>
+        </details>
+
+        {showSharedNotesCard ? (
+          <details id="shared-notes" className={sharedNotesCardClass} open={Boolean(sharedNoteBannerMessage)}>
+            <summary className="cursor-pointer list-none">
+              <CollapsibleHeader
+                title={sharedNotesTitle}
+                subtitle={sharedNotesSummaryText}
+                meta={sharedNotesMeta}
+              />
+            </summary>
+
+            <div className={`${workspaceDetailsDividerClass} space-y-2`}>
+              {sharedNoteBannerMessage ? (
+                <FlashBanner
+                  type={sharedNoteBannerType as "success" | "warning" | "error"}
+                  message={sharedNoteBannerMessage}
+                />
+              ) : null}
+
+  <form action={addPublicNoteFromForm} className="mb-4 space-y-3">
+      <input type="hidden" name="note_scope" value="shared" />
+      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#shared-notes`} />
+    <input type="hidden" name="job_id" value={job.id} />
+    <input type="hidden" name="tab" value={tab} />
+
+    <textarea
+      name="note"
+      rows={3}
+      placeholder="Add a note visible to the contractor..."
+      className={workspaceTextareaClass}
+    />
+
+    <div className="flex justify-end">
+      <SubmitButton
+        loadingText="Adding note..."
+        className={secondaryButtonClass}
+      >
+        Save shared note
+      </SubmitButton>
+    </div>
+  </form>
+
+  <Suspense fallback={<NarrativeNotesBodyFallback />}>
+    <DeferredSharedNotesBody
+      jobId={String(job.id)}
+      timelineJobIds={narrativeScopeJobIds}
+      hasDirectNarrativeChain={hasDirectNarrativeChain}
+      emptyStateClassName={workspaceEmptyStateClass}
+    />
+  </Suspense>
+            </div>
+          </details>
+        ) : null}
+
+        {showEccSummaryCard ? (
+          <details className={eccSummaryCardClass}>
+            <summary className="cursor-pointer list-none">
+              <CollapsibleHeader
+                title="ECC Summary"
+                subtitle="Test history, runs, and compliance workspace context."
+                meta={`${eccRunCount} run${eccRunCount === 1 ? "" : "s"}`}
+              />
+            </summary>
+
+            <div className={workspaceDetailsDividerClass}>
+              <div className="rounded-xl border border-slate-200/80 bg-white/96 px-4 py-4 text-sm text-slate-700">
+                <p className="text-sm leading-6 text-slate-700">
+                  Test history, runs, and compliance workspace context.
+                </p>
+                {eccRunCount > 0 ? (
+                  <p className="mt-2 text-xs leading-5 text-slate-600">
+                    Latest result: <span className="font-semibold text-slate-800">{latestEccRunResultLabel}</span>
+                    {latestEccRunDateLabel ? ` • ${latestEccRunDateLabel}` : ""}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs leading-5 text-slate-600">No tests recorded yet.</p>
+                )}
+              </div>
+
+              <div className="mt-3">
+                <Link
+                  href={`/jobs/${job.id}/tests`}
+                  className={darkButtonClass}
+                >
+                  Open Tests Workspace
+                </Link>
+              </div>
+            </div>
+          </details>
+        ) : null}
       </div>
     </section>
+  </div>
 
           {/* Failure Resolution */}
 {(showRetestSection || showCorrectionReviewResolution) ? (
@@ -5415,8 +5412,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
 {timingEnabled ? <JobDetailTimingLog /> : null}
 
-    </div>
-  </div>
   </div>
   );
 
