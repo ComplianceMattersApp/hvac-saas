@@ -4,6 +4,7 @@ const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
 const createJobMock = vi.fn();
+const ensureActiveAssignmentAndNotifyMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 
 vi.mock("next/cache", () => ({
@@ -31,6 +32,7 @@ vi.mock("@/lib/actions/job-actions", async () => {
   return {
     ...actual,
     createJob: (...args: unknown[]) => createJobMock(...args),
+    ensureActiveAssignmentAndNotify: (...args: unknown[]) => ensureActiveAssignmentAndNotifyMock(...args),
   };
 });
 
@@ -236,6 +238,11 @@ describe("contractor intake finalization notes preservation", () => {
     });
 
     createJobMock.mockResolvedValue({ id: "job-1" });
+    ensureActiveAssignmentAndNotifyMock.mockResolvedValue({
+      assignmentCreated: false,
+      notificationCreated: false,
+      notificationId: null,
+    });
   });
 
   it("copies contractor follow-up comments and review note to job_events with proper visibility event types", async () => {
@@ -282,6 +289,8 @@ describe("contractor intake finalization notes preservation", () => {
     await expect(finalizeContractorIntakeSubmissionFromForm(formData)).rejects.toThrow(
       "REDIRECT:/jobs/job-1?banner=contractor_intake_finalized",
     );
+
+    expect(ensureActiveAssignmentAndNotifyMock).not.toHaveBeenCalled();
 
     expect(createJobMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -369,8 +378,45 @@ describe("contractor intake finalization notes preservation", () => {
       "REDIRECT:/jobs/job-1?banner=contractor_intake_finalized",
     );
 
+    expect(ensureActiveAssignmentAndNotifyMock).not.toHaveBeenCalled();
+
     // Only the canonical finalization event should be inserted.
     expect(fixture.jobEventInsertPayloads).toHaveLength(1);
     expect(fixture.jobEventInsertPayloads[0]?.event_type).toBe("contractor_intake_finalized");
+  });
+
+  it("creates assignment notification when finalization includes a valid internal assignee", async () => {
+    const submission = buildSubmission();
+    const fixture = makeAdminClient({ submission });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    ensureActiveAssignmentAndNotifyMock.mockResolvedValue({
+      assignmentCreated: true,
+      notificationCreated: true,
+      notificationId: "notif-1",
+    });
+
+    const { finalizeContractorIntakeSubmissionFromForm } = await import("@/lib/actions/contractor-intake-actions");
+
+    const formData = new FormData();
+    formData.set("submission_id", submission.id);
+    formData.set("finalization_mode", "existing_existing");
+    formData.set("existing_customer_id", "22222222-2222-4222-8222-222222222222");
+    formData.set("existing_location_id", "33333333-3333-4333-8333-333333333333");
+    formData.set("assigned_internal_user_id", "44444444-4444-4444-8444-444444444444");
+
+    await expect(finalizeContractorIntakeSubmissionFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?banner=contractor_intake_finalized",
+    );
+
+    expect(ensureActiveAssignmentAndNotifyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        supabase: fixture.admin,
+        jobId: "job-1",
+        userId: "44444444-4444-4444-8444-444444444444",
+        actorUserId: "internal-user-1",
+        accountOwnerUserId: "owner-1",
+      }),
+    );
   });
 });

@@ -1884,6 +1884,104 @@ async function ensureActiveAssignmentForUser(params: {
   }
 }
 
+export async function ensureActiveAssignmentAndNotify(params: {
+  supabase: any;
+  jobId: string;
+  userId: string;
+  actorUserId: string;
+  accountOwnerUserId: string;
+  timing?: FieldActionTimingRecorder;
+}) {
+  const {
+    supabase,
+    jobId,
+    userId,
+    actorUserId,
+    accountOwnerUserId,
+    timing,
+  } = params;
+
+  let assignmentCreated = false;
+  let notificationCreated = false;
+  let notificationId: string | null = null;
+
+  await ensureActiveAssignmentForUser({
+    supabase,
+    jobId,
+    userId,
+    actorUserId,
+    accountOwnerUserId,
+    timing,
+    onCreated: async () => {
+      assignmentCreated = true;
+      console.info("[jobs] assignment notification attempt", {
+        marker: "assignment_notification_attempt",
+        job_id: jobId,
+        actor_user_id: actorUserId,
+        target_user_id: userId,
+        account_owner_user_id: accountOwnerUserId,
+        assignment_created: true,
+        notification_attempted: true,
+      });
+
+      try {
+        notificationId = await notifyJobAssignmentCreated({
+          supabase,
+          jobId,
+          accountOwnerUserId,
+          actorUserId,
+          recipientUserId: userId,
+        });
+        notificationCreated = !!notificationId;
+
+        console.info("[jobs] assignment notification result", {
+          marker: "assignment_notification_attempt",
+          job_id: jobId,
+          actor_user_id: actorUserId,
+          target_user_id: userId,
+          account_owner_user_id: accountOwnerUserId,
+          assignment_created: true,
+          notification_attempted: true,
+          notification_created: notificationCreated,
+        });
+      } catch (notificationError) {
+        const safeError = getSafeErrorDetails(notificationError);
+        console.error("[jobs] job assignment notification failed", {
+          marker: "assignment_notification_attempt",
+          jobId,
+          actorUserId,
+          recipientUserId: userId,
+          account_owner_user_id: accountOwnerUserId,
+          assignment_created: true,
+          notification_attempted: true,
+          notification_created: false,
+          error_code: safeError.error_code,
+          error_message: safeError.error_message,
+        });
+      }
+    },
+  });
+
+  if (!assignmentCreated) {
+    console.info("[jobs] assignment notification skipped", {
+      marker: "assignment_notification_attempt",
+      job_id: jobId,
+      actor_user_id: actorUserId,
+      target_user_id: userId,
+      account_owner_user_id: accountOwnerUserId,
+      assignment_created: false,
+      notification_attempted: false,
+      notification_created: false,
+    });
+  }
+
+  return {
+    assignmentCreated,
+    notificationCreated,
+    notificationId,
+  };
+}
+
 /** Returns the current primary active assignment, or null if none is set. */
 async function getPrimaryActiveAssignment(params: {
   supabase: any;
@@ -4463,75 +4561,13 @@ export async function assignJobAssigneeFromForm(formData: FormData) {
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
-  let assignmentCreated = false;
-
-  await ensureActiveAssignmentForUser({
+  await ensureActiveAssignmentAndNotify({
     supabase,
     jobId,
     userId,
     actorUserId,
     accountOwnerUserId: internalUser.account_owner_user_id,
-    onCreated: async () => {
-      assignmentCreated = true;
-      console.info("[jobs] assignment notification attempt", {
-        marker: "assignment_notification_attempt",
-        job_id: jobId,
-        actor_user_id: actorUserId,
-        target_user_id: userId,
-        account_owner_user_id: internalUser.account_owner_user_id,
-        assignment_created: true,
-        notification_attempted: true,
-      });
-
-      try {
-        const notificationId = await notifyJobAssignmentCreated({
-          supabase,
-          jobId,
-          accountOwnerUserId: internalUser.account_owner_user_id,
-          actorUserId,
-          recipientUserId: userId,
-        });
-
-        console.info("[jobs] assignment notification result", {
-          marker: "assignment_notification_attempt",
-          job_id: jobId,
-          actor_user_id: actorUserId,
-          target_user_id: userId,
-          account_owner_user_id: internalUser.account_owner_user_id,
-          assignment_created: true,
-          notification_attempted: true,
-          notification_created: !!notificationId,
-        });
-      } catch (notificationError) {
-        const safeError = getSafeErrorDetails(notificationError);
-        console.error("[jobs] job assignment notification failed", {
-          marker: "assignment_notification_attempt",
-          jobId,
-          actorUserId,
-          recipientUserId: userId,
-          account_owner_user_id: internalUser.account_owner_user_id,
-          assignment_created: true,
-          notification_attempted: true,
-          notification_created: false,
-          error_code: safeError.error_code,
-          error_message: safeError.error_message,
-        });
-      }
-    },
   });
-
-  if (!assignmentCreated) {
-    console.info("[jobs] assignment notification skipped", {
-      marker: "assignment_notification_attempt",
-      job_id: jobId,
-      actor_user_id: actorUserId,
-      target_user_id: userId,
-      account_owner_user_id: internalUser.account_owner_user_id,
-      assignment_created: false,
-      notification_attempted: false,
-      notification_created: false,
-    });
-  }
 
   if (makePrimary) {
     await setPrimaryJobAssignment({
@@ -9520,6 +9556,30 @@ export async function addPublicNoteFromForm(formData: FormData) {
   redirect(`/jobs/${jobId}?tab=${tab}&banner=note_added`);
 }
 
+function buildInternalNoteRedirectPath(params: {
+  jobId: string;
+  tab: string;
+  banner: string;
+  mentionRecipientName?: string | null;
+  mentionCount?: number | null;
+}) {
+  const searchParams = new URLSearchParams({
+    tab: params.tab,
+    banner: params.banner,
+  });
+
+  const recipientName = String(params.mentionRecipientName ?? "").trim();
+  if (recipientName) {
+    searchParams.set("mention_recipient", recipientName);
+  }
+
+  if (typeof params.mentionCount === "number" && params.mentionCount > 0) {
+    searchParams.set("mention_count", String(params.mentionCount));
+  }
+
+  return `/jobs/${params.jobId}?${searchParams.toString()}`;
+}
+
 export async function addInternalNoteFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const note = String(formData.get("note") || "").trim();
@@ -9621,6 +9681,8 @@ export async function addInternalNoteFromForm(formData: FormData) {
     let validatedRecipientCount = 0;
     let notificationAttempted = false;
     let notificationCreatedCount = 0;
+    let mentionRecipientDisplayName: string | null = null;
+    let mentionAlertFailed = false;
 
     try {
       const validRecipientIds: string[] = [];
@@ -9655,10 +9717,14 @@ export async function addInternalNoteFromForm(formData: FormData) {
       if (uniqueRecipientIds.length > 0) {
         const displayMap = await resolveUserDisplayMap({
           supabase,
-          userIds: [userId],
+          userIds: [userId, ...uniqueRecipientIds],
         });
         const actorDisplayName =
           String(displayMap[userId] ?? "").trim() || "A teammate";
+        if (uniqueRecipientIds.length === 1) {
+          mentionRecipientDisplayName =
+            String(displayMap[uniqueRecipientIds[0]!] ?? "").trim() || "teammate";
+        }
         const notePreview = buildNotePreview(note, 140);
 
         for (const recipientId of uniqueRecipientIds) {
@@ -9698,6 +9764,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
         notification_created_count: notificationCreatedCount,
       });
     } catch (notificationError) {
+      mentionAlertFailed = notificationAttempted;
       const safeError = getSafeErrorDetails(notificationError);
       console.error("[jobs] internal note tag notification failed", {
         marker: "internal_note_tag_notification_attempt",
@@ -9711,6 +9778,35 @@ export async function addInternalNoteFromForm(formData: FormData) {
         error_code: safeError.error_code,
         error_message: safeError.error_message,
       });
+    }
+
+    const mentionBanner =
+      notificationCreatedCount > 0
+        ? notificationCreatedCount === 1
+          ? "internal_note_mention_alert_created"
+          : "internal_note_mention_alerts_created"
+        : mentionAlertFailed
+        ? "internal_note_mention_alert_failed"
+        : null;
+
+    if (mentionBanner) {
+      revalidatePath(`/jobs/${jobId}`);
+      revalidatePath(`/ops`);
+      redirect(
+        buildInternalNoteRedirectPath({
+          jobId,
+          tab,
+          banner: mentionBanner,
+          mentionRecipientName:
+            mentionBanner === "internal_note_mention_alert_created"
+              ? mentionRecipientDisplayName
+              : null,
+          mentionCount:
+            mentionBanner === "internal_note_mention_alerts_created"
+              ? notificationCreatedCount
+              : null,
+        }),
+      );
     }
   }
 

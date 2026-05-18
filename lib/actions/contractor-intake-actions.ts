@@ -7,7 +7,7 @@ import {
   isInternalAccessError,
   requireInternalRole,
 } from "@/lib/auth/internal-user";
-import { createJob } from "@/lib/actions/job-actions";
+import { createJob, ensureActiveAssignmentAndNotify } from "@/lib/actions/job-actions";
 import { markInternalNewWorkNotificationsResolved } from "@/lib/actions/notification-actions";
 import {
   normalizeContractorIntakeProjectType,
@@ -614,29 +614,19 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
     },
   );
 
-  try {
-    const { count: activeAssignmentCount, error: assignmentCountError } = await admin
-      .from("job_assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("job_id", created.id)
-      .eq("is_active", true);
+  const hasValidSelectedAssignee =
+    !!selectedAssignedInternalUserId && isUuid(selectedAssignedInternalUserId);
 
-    if (assignmentCountError) {
-      const safeError = getSafeErrorDetails(assignmentCountError);
-      console.error("[contractor-intake] finalization assignment diagnostics failed", {
-        marker: "proposal_finalization_assignment_path",
-        submission_id: submission.id,
-        job_id: created.id,
-        account_owner_user_id: accountOwnerUserId,
-        actor_user_id: userId,
-        selected_assigned_user_id: selectedAssignedInternalUserId,
-        selected_assigned_user_id_present: !!selectedAssignedInternalUserId,
-        assignment_notification_hook_bypassed: true,
-        error_code: safeError.error_code,
-        error_message: safeError.error_message,
+  if (hasValidSelectedAssignee) {
+    try {
+      const assignmentResult = await ensureActiveAssignmentAndNotify({
+        supabase: admin,
+        jobId: created.id,
+        userId: selectedAssignedInternalUserId,
+        actorUserId: userId,
+        accountOwnerUserId,
       });
-    } else {
-      const safeAssignmentCount = Number(activeAssignmentCount ?? 0);
+
       console.info("[contractor-intake] finalization assignment diagnostics", {
         marker: "proposal_finalization_assignment_path",
         submission_id: submission.id,
@@ -644,15 +634,30 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
         account_owner_user_id: accountOwnerUserId,
         actor_user_id: userId,
         selected_assigned_user_id: selectedAssignedInternalUserId,
-        selected_assigned_user_id_present: !!selectedAssignedInternalUserId,
-        job_assignments_created: safeAssignmentCount > 0,
-        active_job_assignment_count: safeAssignmentCount,
-        assignment_notification_hook_bypassed: true,
+        selected_assigned_user_id_present: true,
+        selected_assigned_user_id_valid: true,
+        assignment_notification_hook_bypassed: false,
+        assignment_created: assignmentResult.assignmentCreated,
+        notification_created: assignmentResult.notificationCreated,
+      });
+    } catch (assignmentPathError) {
+      const safeError = getSafeErrorDetails(assignmentPathError);
+      console.error("[contractor-intake] finalization assignment diagnostics failed", {
+        marker: "proposal_finalization_assignment_path",
+        submission_id: submission.id,
+        job_id: created.id,
+        account_owner_user_id: accountOwnerUserId,
+        actor_user_id: userId,
+        selected_assigned_user_id: selectedAssignedInternalUserId,
+        selected_assigned_user_id_present: true,
+        selected_assigned_user_id_valid: true,
+        assignment_notification_hook_bypassed: false,
+        error_code: safeError.error_code,
+        error_message: safeError.error_message,
       });
     }
-  } catch (assignmentPathError) {
-    const safeError = getSafeErrorDetails(assignmentPathError);
-    console.error("[contractor-intake] finalization assignment diagnostics failed", {
+  } else {
+    console.info("[contractor-intake] finalization assignment diagnostics", {
       marker: "proposal_finalization_assignment_path",
       submission_id: submission.id,
       job_id: created.id,
@@ -660,9 +665,8 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
       actor_user_id: userId,
       selected_assigned_user_id: selectedAssignedInternalUserId,
       selected_assigned_user_id_present: !!selectedAssignedInternalUserId,
+      selected_assigned_user_id_valid: false,
       assignment_notification_hook_bypassed: true,
-      error_code: safeError.error_code,
-      error_message: safeError.error_message,
     });
   }
 
