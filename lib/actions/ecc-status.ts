@@ -173,6 +173,20 @@ export async function evaluateEccOpsStatus(
     return;
   }
 
+  const currentOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
+  if (currentOpsStatus === "closed") {
+    console.error("[ECC_EVAL]", {
+      jobId,
+      current_ops_status: job.ops_status ?? null,
+      computed_next_status: null,
+      reason: "closed_terminal_noop",
+      manual_lock_prevented: false,
+      final_ops_status: "closed",
+      updated: false,
+    });
+    return;
+  }
+
   const isFieldComplete = Boolean((job as any)?.field_complete);
 
   const { data: systems, error: sysErr } = await timeEccPhase(

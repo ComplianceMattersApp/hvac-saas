@@ -391,4 +391,82 @@ describe("evaluateEccOpsStatus", () => {
     );
     expect(forceSetOpsStatusMock).toHaveBeenCalledTimes(1);
   });
+
+  it("does not reopen a closed ECC job via field_complete_fallback", async () => {
+    await runEvaluation({
+      job: {
+        id: "job-closed",
+        status: "completed",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        ops_status: "closed",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+      },
+      runs: [
+        {
+          id: "run-1",
+          system_id: "sys-1",
+          test_type: "duct_leakage",
+          is_completed: true,
+          computed_pass: null,
+          override_pass: null,
+          data: { verification_method: "photo_taken" },
+          computed: { status: "photo_evidence" },
+        },
+      ],
+      correctionResolutionEvent: null,
+    });
+
+    expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
+    expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves manual-lock handling for non-closed field-complete fallback", async () => {
+    setOpsStatusIfNotManualMock.mockResolvedValueOnce({
+      finalStatus: "pending_info",
+      manualLockPrevented: true,
+      updated: false,
+    });
+
+    await runEvaluation({
+      job: {
+        id: "job-pending-info",
+        status: "completed",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        ops_status: "pending_info",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+      },
+      runs: [
+        {
+          id: "run-1",
+          system_id: "sys-1",
+          test_type: "duct_leakage",
+          is_completed: true,
+          computed_pass: null,
+          override_pass: null,
+          data: { verification_method: "photo_taken" },
+          computed: { status: "photo_evidence" },
+        },
+      ],
+      correctionResolutionEvent: null,
+    });
+
+    expect(setOpsStatusIfNotManualMock).toHaveBeenCalledWith(
+      "job-pending-info",
+      "paperwork_required",
+      expect.objectContaining({ timing: undefined })
+    );
+    expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
+  });
 });
