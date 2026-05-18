@@ -2032,18 +2032,6 @@ const hasPermitDetails = permitDetailCount > 0;
 const serviceCaseVisitCount = serviceCaseVisitCountRaw ?? 0;
 const equipmentItems = Array.isArray(job.job_equipment) ? job.job_equipment : [];
 const equipmentCount = equipmentItems.length;
-const outdoorEquipment = equipmentItems.find((eq: any) => {
-  const role = String(eq?.equipment_role ?? "").toLowerCase();
-  return role.includes("condenser") || role.includes("outdoor") || role.includes("package");
-});
-const indoorEquipment = equipmentItems.find((eq: any) => {
-  const role = String(eq?.equipment_role ?? "").toLowerCase();
-  return role.includes("air_handler") || role.includes("furnace") || role.includes("indoor") || role.includes("coil");
-});
-const equipmentSummaryLabel =
-  equipmentCount > 0
-    ? `${equipmentCount} item(s) linked to this job`
-    : "No equipment on file yet.";
 
 
 const followUpOwnerLabel = String((job as any).action_required_by ?? "").trim();
@@ -2070,9 +2058,6 @@ const followUpHistorySummaryText = "Follow-up history loads below";
 const serviceChainSummaryText = serviceCaseId
   ? "Visit history across the linked service case."
   : "No linked service case yet.";
-const eccSummaryText = job.ecc_test_runs?.length
-  ? "Recorded test history with direct workspace access."
-  : "No ECC runs recorded yet.";
 // Slice 5D: section titles still use chain metadata (cheap); counts/dates deferred.
 const sharedNotesTitle = hasDirectNarrativeChain ? "Shared Notes Across Job Chain" : "Shared Notes";
 const internalNotesTitle = hasDirectNarrativeChain ? "Internal Notes Across Job Chain" : "Internal Notes";
@@ -4821,60 +4806,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
   <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.92fr)] xl:items-start">
   <div className="order-2 flex flex-col gap-5 xl:order-2">
-    {/* Equipment */}
-  <details className={`${workspaceDetailsClass} xl:order-2`}>
-      <summary className="cursor-pointer list-none">
-        <CollapsibleHeader
-          title="Equipment"
-          subtitle={equipmentSummaryLabel}
-          meta={`${equipmentCount} item${equipmentCount === 1 ? "" : "s"}`}
-        />
-      </summary>
-
-      <div className={workspaceDetailsDividerClass}>
-
-      <div className={workspaceInsetClass}>
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-          Status
-        </div>
-        <div className="mt-1 text-sm font-semibold text-slate-950">
-          {equipmentSummaryLabel}
-        </div>
-      </div>
-
-      {equipmentCount > 0 ? (
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 text-sm">
-          <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-3">
-            <div className="text-[11px] uppercase tracking-[0.12em] text-slate-500">Condenser</div>
-            <div className="mt-1 font-medium text-slate-900">
-              {outdoorEquipment
-                ? `${outdoorEquipment.manufacturer ?? "—"} ${outdoorEquipment.model ?? ""}`.trim()
-                : "—"}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-3">
-            <div className="text-[11px] uppercase tracking-[0.12em] text-slate-500">Indoor Equipment</div>
-            <div className="mt-1 font-medium text-slate-900">
-              {indoorEquipment
-                ? `${indoorEquipment.manufacturer ?? "—"} ${indoorEquipment.model ?? ""}`.trim()
-                : "—"}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Link
-          href={`/jobs/${job.id}/info?f=equipment`}
-          className={darkButtonClass}
-        >
-          {equipmentCount > 0 ? "View / Edit Equipment" : "Capture Equipment"}
-        </Link>
-      </div>
-      </div>
-    </details>
-
     {/* Attachments - moved up from bottom */}
     <details className={workspaceDetailsClass}>
       <summary className="cursor-pointer list-none">
@@ -4955,36 +4886,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       </div>
     </details>
 
-      {job.job_type === "ecc" ? (
-      <details className={`${workspaceDetailsClass} xl:order-3`}>
-        <summary className="cursor-pointer list-none">
-          <CollapsibleHeader
-            title="ECC Summary"
-            subtitle={eccSummaryText}
-            meta={`${job.ecc_test_runs?.length ?? 0} run${(job.ecc_test_runs?.length ?? 0) === 1 ? "" : "s"}`}
-          />
-        </summary>
-
-        <div className={workspaceDetailsDividerClass}>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className={`${job.ecc_test_runs?.length ? "rounded-xl border border-slate-200/80 bg-white/96" : workspaceEmptyStateClass} px-4 py-4 text-sm text-slate-600 sm:flex-1`}>
-              {job.ecc_test_runs?.length ? (
-                <span>{job.ecc_test_runs.length} test run(s) recorded.</span>
-              ) : (
-                <span>No tests recorded yet.</span>
-              )}
-            </div>
-
-            <Link
-              href={`/jobs/${job.id}/tests`}
-              className={darkButtonClass}
-            >
-              Open Tests Workspace
-            </Link>
-          </div>
-        </div>
-      </details>
-      ) : null}
     </div>
 
     <div className="order-1 flex flex-col gap-6 xl:order-1">
