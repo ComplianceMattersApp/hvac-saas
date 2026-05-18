@@ -58,6 +58,29 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function isMissingIntakeContactCandidatesWriteError(error: any) {
+  const code = normalizeText(error?.code).toUpperCase();
+  const message = [error?.message, error?.details, error?.hint]
+    .map((value) => normalizeText(value).toLowerCase())
+    .filter(Boolean)
+    .join(" ");
+
+  if (!message.includes("contractor_intake_contact_candidates")) {
+    return false;
+  }
+
+  if (code === "42P01" || code === "PGRST205") {
+    return true;
+  }
+
+  return (
+    message.includes("does not exist") ||
+    message.includes("schema cache") ||
+    message.includes("could not find the table") ||
+    message.includes("not found in the schema cache")
+  );
+}
+
 function getSafeErrorDetails(error: unknown): { error_code: string | null; error_message: string | null } {
   if (!error) {
     return { error_code: null, error_message: null };
@@ -190,6 +213,89 @@ async function requireScopedPendingAdjudication(formData: FormData) {
     submissionId,
     submission,
   };
+}
+
+async function updateContractorIntakeContactCandidateStatusFromForm(params: {
+  formData: FormData;
+  nextStatus: "approved_for_promotion" | "skipped";
+  successNotice: "candidate_approved" | "candidate_skipped";
+}) {
+  const { admin, accountOwnerUserId, submissionId } = await requireScopedPendingAdjudication(params.formData);
+  const candidateId = normalizeText(params.formData.get("candidate_id"));
+
+  if (!isUuid(candidateId)) {
+    throw new Error("Invalid candidate_id");
+  }
+
+  let candidate: { id: string; status: string } | null = null;
+  try {
+    const { data, error } = await admin
+      .from("contractor_intake_contact_candidates")
+      .select("id, status")
+      .eq("id", candidateId)
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("contractor_intake_submission_id", submissionId)
+      .maybeSingle();
+
+    if (error) throw error;
+    candidate = data && data.id ? { id: String((data as any).id), status: normalizeText((data as any).status).toLowerCase() } : null;
+  } catch (error) {
+    if (isMissingIntakeContactCandidatesWriteError(error)) {
+      redirect(`/ops/admin/contractor-intake-submissions/${submissionId}?notice=candidate_table_unavailable`);
+    }
+    throw error;
+  }
+
+  if (!candidate?.id) {
+    throw new Error("Candidate not found in account scope");
+  }
+
+  if (candidate.status !== "proposed") {
+    redirect(`/ops/admin/contractor-intake-submissions/${submissionId}?notice=candidate_already_reviewed`);
+  }
+
+  const reviewedAtIso = new Date().toISOString();
+
+  try {
+    const { error: updateErr } = await admin
+      .from("contractor_intake_contact_candidates")
+      .update({
+        status: params.nextStatus,
+        updated_at: reviewedAtIso,
+      })
+      .eq("id", candidateId)
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("contractor_intake_submission_id", submissionId)
+      .eq("status", "proposed");
+
+    if (updateErr) throw updateErr;
+  } catch (error) {
+    if (isMissingIntakeContactCandidatesWriteError(error)) {
+      redirect(`/ops/admin/contractor-intake-submissions/${submissionId}?notice=candidate_table_unavailable`);
+    }
+    throw error;
+  }
+
+  revalidatePath("/ops/admin/contractor-intake-submissions");
+  revalidatePath(`/ops/admin/contractor-intake-submissions/${submissionId}`);
+
+  redirect(`/ops/admin/contractor-intake-submissions/${submissionId}?notice=${params.successNotice}`);
+}
+
+export async function approveContractorIntakeContactCandidateFromForm(formData: FormData) {
+  await updateContractorIntakeContactCandidateStatusFromForm({
+    formData,
+    nextStatus: "approved_for_promotion",
+    successNotice: "candidate_approved",
+  });
+}
+
+export async function skipContractorIntakeContactCandidateFromForm(formData: FormData) {
+  await updateContractorIntakeContactCandidateStatusFromForm({
+    formData,
+    nextStatus: "skipped",
+    successNotice: "candidate_skipped",
+  });
 }
 
 async function listSubmissionComments(params: {

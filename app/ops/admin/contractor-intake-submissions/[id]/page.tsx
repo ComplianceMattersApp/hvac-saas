@@ -6,7 +6,10 @@ import {
   finalizeContractorIntakeSubmissionFromForm,
   rejectContractorIntakeSubmissionFromForm,
   markContractorIntakeSubmissionAsDuplicateFromForm,
+  approveContractorIntakeContactCandidateFromForm,
+  skipContractorIntakeContactCandidateFromForm,
 } from "@/lib/actions/contractor-intake-actions";
+import { listIntakeContactCandidatesForSubmission } from "@/lib/communications/intake-contact-candidates-read";
 import { formatDateOnlyDisplay } from "@/lib/utils/schedule-la";
 import GuidedFinalizationWizard from "./_components/GuidedFinalizationWizard";
 
@@ -66,7 +69,31 @@ function noticeText(notice: string) {
   if (key === "rejected") return "Proposal rejected.";
   if (key === "already_reviewed") return "Proposal was already reviewed.";
   if (key === "duplicate") return "Proposal marked as duplicate of an existing job.";
+  if (key === "candidate_approved") return "Candidate marked approved for promotion.";
+  if (key === "candidate_skipped") return "Candidate skipped.";
+  if (key === "candidate_already_reviewed") return "Candidate was already reviewed.";
+  if (key === "candidate_table_unavailable") return "Candidate controls are waiting for schema rollout in this environment.";
   return "";
+}
+
+function roleLabel(role: string) {
+  const key = normalizeText(role).toLowerCase();
+  if (!key) return "Unknown role";
+  return key.replace(/_/g, " ");
+}
+
+function targetLabel(target: string) {
+  const key = normalizeText(target).toLowerCase();
+  if (key === "customer") return "Customer";
+  if (key === "job") return "Job";
+  return "Undecided";
+}
+
+function statusLabel(status: string) {
+  const key = normalizeText(status).toLowerCase();
+  if (key === "approved_for_promotion") return "Approved for promotion";
+  if (key === "skipped") return "Skipped";
+  return "Proposed";
 }
 
 function customerDisplayName(row: any) {
@@ -152,6 +179,13 @@ export default async function ContractorIntakeSubmissionDetailPage({
     .limit(200);
 
   if (commentErr) throw commentErr;
+
+  const candidateRows = await listIntakeContactCandidatesForSubmission({
+    supabase: admin,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    contractorIntakeSubmissionId: submission.id,
+    limit: 300,
+  });
 
   const { data: customerRows, error: customerErr } = await admin
     .from("customers")
@@ -409,6 +443,62 @@ export default async function ContractorIntakeSubmissionDetailPage({
         </section>
 
         <section className="space-y-4">
+          {candidateRows.length > 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Intake contact candidates</p>
+                <p className="mt-1 text-sm text-slate-600">Review provisional contacts and mark each one approved for promotion or skipped.</p>
+              </div>
+
+              <div className="space-y-2">
+                {candidateRows.map((candidate) => {
+                  const candidateStatus = normalizeText(candidate.status).toLowerCase();
+                  const isProposed = candidateStatus === "proposed";
+
+                  return (
+                    <div key={candidate.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{normalizeText(candidate.display_name) || "Unnamed candidate"}</p>
+                          <p className="mt-0.5 text-xs text-slate-600">{roleLabel(candidate.proposed_role)} · {targetLabel(candidate.proposed_link_target)} · {statusLabel(candidate.status)}</p>
+                          <p className="mt-1 text-xs text-slate-600">Phone: {normalizeText(candidate.phone) || "—"}</p>
+                          <p className="text-xs text-slate-600">Email: {normalizeText(candidate.email) || "—"}</p>
+                        </div>
+                        <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-600">
+                          {statusLabel(candidate.status)}
+                        </span>
+                      </div>
+
+                      {isProposed ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <form action={approveContractorIntakeContactCandidateFromForm}>
+                            <input type="hidden" name="submission_id" value={submission.id} />
+                            <input type="hidden" name="candidate_id" value={candidate.id} />
+                            <button type="submit" disabled={!isPending} className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 disabled:opacity-50">
+                              Approve
+                            </button>
+                          </form>
+
+                          <form action={skipContractorIntakeContactCandidateFromForm}>
+                            <input type="hidden" name="submission_id" value={submission.id} />
+                            <input type="hidden" name="candidate_id" value={candidate.id} />
+                            <button type="submit" disabled={!isPending} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 disabled:opacity-50">
+                              Skip
+                            </button>
+                          </form>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : isPending ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+              No provisional intake contact candidates yet.
+            </div>
+          ) : null}
+
           <GuidedFinalizationWizard
             submissionId={submission.id}
             customers={customerOptions}
