@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
-import { buildPromotedCompanionReadModel, buildVisitScopeReadModel } from "@/lib/jobs/visit-scope";
+import {
+  buildPromotedCompanionReadModel,
+  buildVisitScopeIncludesReadModel,
+  buildVisitScopeReadModel,
+} from "@/lib/jobs/visit-scope";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonDisplayName } from "@/lib/utils/identity-display";
 
@@ -268,6 +272,12 @@ const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.
     previewItemCount: 1,
     previewItemMaxLength: 34,
   });
+  const isEccJob = String(job.job_type ?? "").toLowerCase() === "ecc";
+  const visitScopeIncludes = isEccJob
+    ? buildVisitScopeIncludesReadModel(job.visit_scope_summary, job.visit_scope_items, {
+        leadMaxLength: 70,
+      })
+    : null;
   const promotedCompanion = buildPromotedCompanionReadModel(job.visit_scope_items);
   const followUpDateDisplay = job.follow_up_date ? formatDateOnlyDisplay(job.follow_up_date) : "";
 
@@ -293,8 +303,8 @@ const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.
 
                   {visitScope.hasContent ? (
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
-                      <span className="font-semibold uppercase tracking-wide text-gray-500">Visit</span>
-                      <span className="font-medium text-gray-700">{visitScope.lead}</span>
+                      <span className="font-semibold uppercase tracking-wide text-gray-500">{isEccJob ? "Includes" : "Visit"}</span>
+                      <span className="font-medium text-gray-700">{isEccJob ? visitScopeIncludes?.label : visitScope.lead}</span>
                       {visitScope.itemCount > 0 ? (
                         <span className="rounded-full border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
                           {visitScope.itemCount} item{visitScope.itemCount === 1 ? "" : "s"}
