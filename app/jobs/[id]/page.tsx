@@ -3222,7 +3222,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
       {/* Closeout Actions (Internal Only) */}
     {showCloseoutRow && (
-      <div className="mt-3 min-w-0 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)]">
+      <div id="closeout-actions" className="mt-3 min-w-0 scroll-mt-24 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)]">
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div className="text-sm font-medium text-gray-700">Closeout</div>
 
@@ -3231,6 +3231,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           {canShowCertsButton && (
             <form action={markCertsCompleteFromForm}>
               <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#closeout-actions`} />
               <SubmitButton
                 loadingText="Saving..."
                 className={darkButtonClass}
@@ -3243,6 +3244,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {canShowInvoiceButton && (
           <form action={markInvoiceCompleteFromForm}>
             <input type="hidden" name="job_id" value={job.id} />
+            <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#closeout-actions`} />
             <SubmitButton
               loadingText="Saving..."
               className={darkButtonClass}
@@ -4127,7 +4129,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
       {/* Single-workspace context (tab query preserved for compatibility) */}
 
-          <details className={`${workspaceDetailsClass} mb-6`}>
+          <details id="edit-job" className={`${workspaceDetailsClass} mb-6`}>
             <summary className="cursor-pointer list-none">
               <CollapsibleHeader
                 title="Edit Job"
@@ -4141,6 +4143,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
                 <form action={updateJobScheduleFromForm} className="space-y-4">
                   <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#edit-job`} />
                   <input type="hidden" name="permit_number" value={job.permit_number ?? ""} />
                   <input type="hidden" name="jurisdiction" value={(job as any).jurisdiction ?? ""} />
                   <input type="hidden" name="permit_date" value={(job as any).permit_date ?? ""} />
@@ -4219,6 +4222,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   </summary>
                   <form action={updateJobScheduleFromForm} className="mt-3 space-y-3">
                     <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#edit-job`} />
                     <input type="hidden" name="scheduled_date" value={displayDateLA(job.scheduled_date) ?? ""} />
                     <input type="hidden" name="window_start" value={timeToTimeInput(job.window_start) ?? ""} />
                     <input type="hidden" name="window_end" value={timeToTimeInput(job.window_end) ?? ""} />
@@ -4805,7 +4809,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       {/* Unified operations workspace */}
   <div className="order-1 space-y-5 xl:order-1">
           {/* Job Status (ops_status) */}
-<details className={workspaceDetailsClass}>
+<details id="job-status" className={workspaceDetailsClass}>
   <summary className="cursor-pointer list-none">
     <CollapsibleHeader
       title="Job Status"
@@ -4817,6 +4821,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
   <form action={updateJobOpsFromForm} className="flex flex-col gap-3 sm:gap-2 sm:flex-row sm:items-end sm:flex-wrap">
     <input type="hidden" name="job_id" value={job.id} />
+    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
 
     <div className="flex-1 min-w-xs">
       {activeWaitingState ? (
@@ -4837,6 +4842,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               </p>
               <form action={releaseAndReevaluateFromForm} className="mt-2">
                 <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
                 <SubmitButton loadingText="Updating..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
                   Mark Ready to Continue
                 </SubmitButton>
@@ -4897,6 +4903,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {canShowReleaseAndReevaluate ? (
           <form action={releaseAndReevaluateFromForm} className="mt-2">
             <input type="hidden" name="job_id" value={job.id} />
+            <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
             <SubmitButton loadingText="Updating..." className={`w-full ${secondaryButtonClass} sm:w-auto`}>
               {interruptReleaseActionLabel}
             </SubmitButton>
@@ -4924,7 +4931,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 </details>
 
       {markVisitCountedLinkId && !suggestedNextDueProjection ? (
-        <div className="mt-4 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-slate-900">
+        <div id="service-plan-visit-count" className="mt-4 scroll-mt-24 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-slate-900">
           <div className="text-sm font-semibold text-emerald-900">Service Plan Visit Count Review</div>
           <p className="mt-1 text-xs leading-5 text-emerald-900/90">
             This completed maintenance visit is eligible to count against
@@ -4933,13 +4940,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             Counting is manual and operator-confirmed.
           </p>
           <div className="mt-3">
-            <MarkVisitCountedActionButton jobId={String(job.id)} linkId={markVisitCountedLinkId} />
+            <MarkVisitCountedActionButton jobId={String(job.id)} linkId={markVisitCountedLinkId} tab={tab} />
           </div>
         </div>
       ) : null}
 
       {suggestedNextDueProjection ? (
-        <div className="mt-4 rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 text-slate-900">
+        <div id="service-plan-next-due" className="mt-4 scroll-mt-24 rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 text-slate-900">
           <div className="text-sm font-semibold text-blue-900">Suggested next due date</div>
           {confirmedNextDueContext ? (
             <>
@@ -4974,6 +4981,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     suggestedNextDueDate={suggestedNextDueProjection.suggestedNextDueDate}
                     baselineNextDueDate={suggestedNextDueProjection.baselineNextDueDate || ""}
                     displayDate={formatDateOnlyUs(suggestedNextDueProjection.suggestedNextDueDate) || suggestedNextDueProjection.suggestedNextDueDate}
+                    tab={tab}
                   />
                 </div>
               ) : null}
@@ -5073,7 +5081,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </details>
 
         {/* Section A: Follow Up (Active Edit Area) */}
-        <details className={workspaceDetailsClass}>
+        <details id="follow-up" className={workspaceDetailsClass}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title="Follow Up"
@@ -5092,6 +5100,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
             <form action={updateJobOpsDetailsFromForm} className="grid gap-3">
               <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#follow-up`} />
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>

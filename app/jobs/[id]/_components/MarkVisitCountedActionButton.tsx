@@ -6,6 +6,7 @@ import { markMaintenanceAgreementVisitCountedFromForm } from "@/lib/maintenance-
 type MarkVisitCountedActionButtonProps = {
   jobId: string;
   linkId: string;
+  tab: string;
 };
 
 function SubmitInner() {
@@ -25,6 +26,7 @@ function SubmitInner() {
 export default function MarkVisitCountedActionButton({
   jobId,
   linkId,
+  tab,
 }: MarkVisitCountedActionButtonProps) {
   return (
     <form
@@ -42,6 +44,7 @@ export default function MarkVisitCountedActionButton({
     >
       <input type="hidden" name="job_id" value={jobId} />
       <input type="hidden" name="maintenance_agreement_visit_link_id" value={linkId} />
+      <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}#service-plan-visit-count`} />
       <SubmitInner />
     </form>
   );

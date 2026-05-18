@@ -65,7 +65,7 @@ export default function VisitScopeJobDetailForm({
     <form action={updateJobVisitScopeFromForm} onSubmit={handleSubmit} className="space-y-4">
       <input type="hidden" name="job_id" value={jobId} />
       <input type="hidden" name="tab" value={tab} />
-      <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}`} />
+      <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}#visit-scope-section`} />
 
       <VisitScopeBuilder
         initialSummary={initialSummary}

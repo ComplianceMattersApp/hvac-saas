@@ -9,6 +9,7 @@ type ConfirmNextDueDateActionButtonProps = {
   suggestedNextDueDate: string;
   baselineNextDueDate: string;
   displayDate: string;
+  tab: string;
 };
 
 function formatDateOnlyForDialog(dateOnlyValue: string, fallbackDisplayDate: string) {
@@ -43,6 +44,7 @@ export default function ConfirmNextDueDateActionButton({
   suggestedNextDueDate,
   baselineNextDueDate,
   displayDate,
+  tab,
 }: ConfirmNextDueDateActionButtonProps) {
   const confirmDialogDisplayDate = formatDateOnlyForDialog(suggestedNextDueDate, displayDate);
 
@@ -64,6 +66,7 @@ export default function ConfirmNextDueDateActionButton({
       <input type="hidden" name="agreement_id" value={agreementId} />
       <input type="hidden" name="suggested_next_due_date" value={suggestedNextDueDate} />
       <input type="hidden" name="baseline_next_due_date" value={baselineNextDueDate} />
+      <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}#service-plan-next-due`} />
       <SubmitInner />
     </form>
   );

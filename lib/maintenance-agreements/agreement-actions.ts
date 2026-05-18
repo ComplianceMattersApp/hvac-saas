@@ -509,8 +509,15 @@ export async function createMaintenanceAgreementVisitLinkFromJobCreation(params:
   }
 }
 
-function jobBannerPath(jobIdRaw: string, banner: string) {
+function jobBannerPath(jobIdRaw: string, banner: string, returnToRaw?: string | null) {
   const jobId = cleanString(jobIdRaw);
+  const returnTo = cleanString(returnToRaw);
+  if (returnTo.startsWith("/") && !returnTo.startsWith("//")) {
+    const target = new URL(returnTo, "https://app.local");
+    target.searchParams.set("banner", banner);
+    return `${target.pathname}?${target.searchParams.toString()}${target.hash}`;
+  }
+
   if (!jobId) return `/ops?banner=${encodeURIComponent(banner)}`;
   return `/jobs/${encodeURIComponent(jobId)}?banner=${encodeURIComponent(banner)}`;
 }
@@ -518,14 +525,16 @@ function jobBannerPath(jobIdRaw: string, banner: string) {
 export async function markMaintenanceAgreementVisitCountedFromForm(formData: FormData): Promise<void> {
   const jobId = cleanString(formData.get("job_id"));
   const linkId = cleanString(formData.get("maintenance_agreement_visit_link_id"));
+  const returnToRaw = cleanString(formData.get("return_to"));
+  const redirectWithBanner = (banner: string): never => redirect(jobBannerPath(jobId, banner, returnToRaw));
 
   if (!jobId || !linkId) {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_missing_link"));
+    redirectWithBanner("maintenance_visit_count_missing_link");
   }
 
   if (!isMaintenanceAgreementsEnabled()) {
     revalidatePath(`/jobs/${jobId}`);
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_unavailable"));
+    redirectWithBanner("maintenance_visit_count_unavailable");
   }
 
   const supabase = await createClient();
@@ -547,7 +556,7 @@ export async function markMaintenanceAgreementVisitCountedFromForm(formData: For
   const actingUserId = cleanString(authz.userId);
 
   if (!accountOwnerUserId || !actingUserId) {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_out_of_scope"));
+    redirectWithBanner("maintenance_visit_count_out_of_scope");
   }
 
   const entitlement = await resolveOperationalMutationEntitlementAccess({
@@ -556,7 +565,7 @@ export async function markMaintenanceAgreementVisitCountedFromForm(formData: For
   });
 
   if (!entitlement.authorized) {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_unavailable"));
+    redirectWithBanner("maintenance_visit_count_unavailable");
   }
 
   const admin = createAdminClient();
@@ -586,18 +595,19 @@ export async function markMaintenanceAgreementVisitCountedFromForm(formData: For
   } | null;
 
   if (linkError) {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_failed"));
+    redirectWithBanner("maintenance_visit_count_failed");
   }
 
   if (!link?.id) {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_missing_link"));
+    redirectWithBanner("maintenance_visit_count_missing_link");
   }
+  const linkResolved = link as NonNullable<typeof link>;
 
-  const scopedLinkAccountOwnerUserId = cleanString(link.account_owner_user_id);
-  const scopedLinkJobId = cleanString(link.job_id);
-  const scopedLinkAgreementId = cleanString(link.agreement_id);
-  const scopedLinkCountStatus = cleanString(link.count_status).toLowerCase();
-  const scopedLinkCountsToward = Boolean(link.counts_toward_visit_balance);
+  const scopedLinkAccountOwnerUserId = cleanString(linkResolved.account_owner_user_id);
+  const scopedLinkJobId = cleanString(linkResolved.job_id);
+  const scopedLinkAgreementId = cleanString(linkResolved.agreement_id);
+  const scopedLinkCountStatus = cleanString(linkResolved.count_status).toLowerCase();
+  const scopedLinkCountsToward = Boolean(linkResolved.counts_toward_visit_balance);
 
   if (
     !scopedLinkAccountOwnerUserId ||
@@ -605,20 +615,20 @@ export async function markMaintenanceAgreementVisitCountedFromForm(formData: For
     !scopedLinkAgreementId ||
     scopedLinkJobId !== jobId
   ) {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_out_of_scope"));
+    redirectWithBanner("maintenance_visit_count_out_of_scope");
   }
 
   if (scopedLinkCountStatus === "counted" && scopedLinkCountsToward) {
     revalidatePath(`/jobs/${jobId}`);
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_already_counted"));
+    redirectWithBanner("maintenance_visit_count_already_counted");
   }
 
   if (scopedLinkCountStatus === "excluded" || scopedLinkCountStatus === "reversed") {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_excluded_or_reversed"));
+    redirectWithBanner("maintenance_visit_count_excluded_or_reversed");
   }
 
   if ((scopedLinkCountStatus !== "linked" && scopedLinkCountStatus !== "eligible") || scopedLinkCountsToward) {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_not_eligible"));
+    redirectWithBanner("maintenance_visit_count_not_eligible");
   }
 
   const { data: jobRow, error: jobError } = await admin
@@ -650,8 +660,9 @@ export async function markMaintenanceAgreementVisitCountedFromForm(formData: For
   } | null;
 
   if (jobError || !job?.id) {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_out_of_scope"));
+    redirectWithBanner("maintenance_visit_count_out_of_scope");
   }
+  const jobResolved = job as NonNullable<typeof job>;
 
   const { data: agreementRow, error: agreementError } = await admin
     .from("maintenance_agreements")
@@ -668,18 +679,19 @@ export async function markMaintenanceAgreementVisitCountedFromForm(formData: For
   } | null;
 
   if (agreementError || !agreement?.id) {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_out_of_scope"));
+    redirectWithBanner("maintenance_visit_count_out_of_scope");
   }
+  const agreementResolved = agreement as NonNullable<typeof agreement>;
 
-  const agreementStatus = cleanString(agreement.status).toLowerCase();
-  const agreementCustomerId = cleanString(agreement.customer_id);
-  const jobCustomerId = cleanString(job.customer_id);
+  const agreementStatus = cleanString(agreementResolved.status).toLowerCase();
+  const agreementCustomerId = cleanString(agreementResolved.customer_id);
+  const jobCustomerId = cleanString(jobResolved.customer_id);
   if (!agreementCustomerId || !jobCustomerId || agreementCustomerId !== jobCustomerId) {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_out_of_scope"));
+    redirectWithBanner("maintenance_visit_count_out_of_scope");
   }
 
   if (agreementStatus !== "active") {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_not_eligible"));
+    redirectWithBanner("maintenance_visit_count_not_eligible");
   }
 
   const projectedLabel = projectMaintenanceAgreementVisitCountReview({
@@ -688,18 +700,18 @@ export async function markMaintenanceAgreementVisitCountedFromForm(formData: For
       counts_toward_visit_balance: scopedLinkCountsToward,
     },
     job: {
-      id: job.id,
-      status: job.status,
-      ops_status: job.ops_status,
-      job_type: job.job_type,
-      field_complete: job.field_complete,
-      service_visit_type: job.service_visit_type,
-      service_visit_outcome: job.service_visit_outcome,
+      id: jobResolved.id,
+      status: jobResolved.status,
+      ops_status: jobResolved.ops_status,
+      job_type: jobResolved.job_type,
+      field_complete: jobResolved.field_complete,
+      service_visit_type: jobResolved.service_visit_type,
+      service_visit_outcome: jobResolved.service_visit_outcome,
     },
   });
 
   if (projectedLabel !== "eligible_for_count_review") {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_not_eligible"));
+    redirectWithBanner("maintenance_visit_count_not_eligible");
   }
 
   const nowIso = new Date().toISOString();
@@ -723,7 +735,7 @@ export async function markMaintenanceAgreementVisitCountedFromForm(formData: For
     .maybeSingle();
 
   if (updateError) {
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_failed"));
+    redirectWithBanner("maintenance_visit_count_failed");
   }
 
   if (!updatedLink?.id) {
@@ -739,7 +751,7 @@ export async function markMaintenanceAgreementVisitCountedFromForm(formData: For
     } | null;
 
     if (recheckError) {
-      redirect(jobBannerPath(jobId, "maintenance_visit_count_failed"));
+      redirectWithBanner("maintenance_visit_count_failed");
     }
 
     const recheckStatus = cleanString(recheck?.count_status).toLowerCase();
@@ -747,15 +759,15 @@ export async function markMaintenanceAgreementVisitCountedFromForm(formData: For
     if (recheckStatus === "counted" && recheckCountsToward) {
       revalidatePath(`/jobs/${jobId}`);
       revalidatePath(`/service-plans`);
-      redirect(jobBannerPath(jobId, "maintenance_visit_count_already_counted"));
+      redirectWithBanner("maintenance_visit_count_already_counted");
     }
 
-    redirect(jobBannerPath(jobId, "maintenance_visit_count_not_eligible"));
+    redirectWithBanner("maintenance_visit_count_not_eligible");
   }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/service-plans`);
-  redirect(jobBannerPath(jobId, "maintenance_visit_count_saved"));
+  redirectWithBanner("maintenance_visit_count_saved");
 }
 
 /**
@@ -768,19 +780,21 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
   const agreementId = cleanString(formData.get("agreement_id"));
   const suggestedNextDueDate = cleanString(formData.get("suggested_next_due_date"));
   const baselineNextDueDate = cleanString(formData.get("baseline_next_due_date"));
+  const returnToRaw = cleanString(formData.get("return_to"));
+  const redirectWithBanner = (banner: string): never => redirect(jobBannerPath(jobId, banner, returnToRaw));
 
   if (!jobId || !agreementId || !suggestedNextDueDate || !baselineNextDueDate) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_missing_params"));
+    redirectWithBanner("confirm_next_due_missing_params");
   }
 
   // Validate date formats
   if (!DATE_RE.test(suggestedNextDueDate) || !DATE_RE.test(baselineNextDueDate)) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_invalid_date"));
+    redirectWithBanner("confirm_next_due_invalid_date");
   }
 
   if (!isMaintenanceAgreementsEnabled()) {
     revalidatePath(`/jobs/${jobId}`);
-    redirect(jobBannerPath(jobId, "confirm_next_due_unavailable"));
+    redirectWithBanner("confirm_next_due_unavailable");
   }
 
   const supabase = await createClient();
@@ -802,7 +816,7 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
   const actingUserId = cleanString(authz.userId);
 
   if (!accountOwnerUserId || !actingUserId) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_out_of_scope"));
+    redirectWithBanner("confirm_next_due_out_of_scope");
   }
 
   const entitlement = await resolveOperationalMutationEntitlementAccess({
@@ -811,7 +825,7 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
   });
 
   if (!entitlement.authorized) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_unavailable"));
+    redirectWithBanner("confirm_next_due_unavailable");
   }
 
   const admin = createAdminClient();
@@ -825,23 +839,24 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
     .maybeSingle();
 
   if (linkError || !linkRow?.id) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_missing_link"));
+    redirectWithBanner("confirm_next_due_missing_link");
   }
+  const linkRowResolved = linkRow as NonNullable<typeof linkRow>;
 
-  const linkAccountOwnerUserId = cleanString(linkRow.account_owner_user_id);
-  const linkCountStatus = cleanString(linkRow.count_status).toLowerCase();
-  const linkCountsToward = Boolean(linkRow.counts_toward_visit_balance);
+  const linkAccountOwnerUserId = cleanString(linkRowResolved.account_owner_user_id);
+  const linkCountStatus = cleanString(linkRowResolved.count_status).toLowerCase();
+  const linkCountsToward = Boolean(linkRowResolved.counts_toward_visit_balance);
 
   if (linkAccountOwnerUserId !== accountOwnerUserId || linkCountStatus !== "counted" || !linkCountsToward) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_not_counted"));
+    redirectWithBanner("confirm_next_due_not_counted");
   }
 
   // Idempotency guard: prevent repeat next-due advancement from the same counted visit
-  const linkNextDueConfirmedAt = cleanString(linkRow.next_due_confirmed_at ?? "");
-  const linkConfirmedNextDueDate = cleanString(linkRow.confirmed_next_due_date ?? "");
+  const linkNextDueConfirmedAt = cleanString(linkRowResolved.next_due_confirmed_at ?? "");
+  const linkConfirmedNextDueDate = cleanString(linkRowResolved.confirmed_next_due_date ?? "");
   if (linkNextDueConfirmedAt || linkConfirmedNextDueDate) {
     revalidatePath(`/jobs/${jobId}`);
-    redirect(jobBannerPath(jobId, "confirm_next_due_already_confirmed"));
+    redirectWithBanner("confirm_next_due_already_confirmed");
   }
 
   // Verify agreement exists and is active
@@ -853,28 +868,29 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
     .maybeSingle();
 
   if (agreementError || !agreementRow?.id) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_agreement_not_found"));
+    redirectWithBanner("confirm_next_due_agreement_not_found");
   }
+  const agreementRowResolved = agreementRow as NonNullable<typeof agreementRow>;
 
-  const agreementAccountOwnerUserId = cleanString(agreementRow.account_owner_user_id);
-  const agreementStatus = cleanString(agreementRow.status).toLowerCase();
-  const agreementFrequency = cleanString(agreementRow.frequency).toLowerCase();
-  const currentAgreementNextDueDate = cleanString(agreementRow.next_due_date ?? "");
+  const agreementAccountOwnerUserId = cleanString(agreementRowResolved.account_owner_user_id);
+  const agreementStatus = cleanString(agreementRowResolved.status).toLowerCase();
+  const agreementFrequency = cleanString(agreementRowResolved.frequency).toLowerCase();
+  const currentAgreementNextDueDate = cleanString(agreementRowResolved.next_due_date ?? "");
 
   // Verify scope and status
   if (agreementAccountOwnerUserId !== accountOwnerUserId || agreementStatus !== "active") {
-    redirect(jobBannerPath(jobId, "confirm_next_due_agreement_inactive"));
+    redirectWithBanner("confirm_next_due_agreement_inactive");
   }
 
   // Verify frequency is interval-based (not custom/manual)
   const INTERVAL_FREQUENCIES = ["monthly", "quarterly", "semi_annual", "annual"] as const;
   if (!INTERVAL_FREQUENCIES.includes(agreementFrequency as any)) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_custom_frequency"));
+    redirectWithBanner("confirm_next_due_custom_frequency");
   }
 
   // Stale-state guard: verify agreement.next_due_date still matches baseline
   if (currentAgreementNextDueDate !== baselineNextDueDate) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_stale_state"));
+    redirectWithBanner("confirm_next_due_stale_state");
   }
 
   // Verify job customer matches agreement customer
@@ -885,14 +901,15 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
     .maybeSingle();
 
   if (jobError || !jobRow?.id) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_job_not_found"));
+    redirectWithBanner("confirm_next_due_job_not_found");
   }
+  const jobRowResolved = jobRow as NonNullable<typeof jobRow>;
 
-  const jobCustomerId = cleanString(jobRow.customer_id ?? "");
-  const agreementCustomerId = cleanString(agreementRow.customer_id ?? "");
+  const jobCustomerId = cleanString(jobRowResolved.customer_id ?? "");
+  const agreementCustomerId = cleanString(agreementRowResolved.customer_id ?? "");
 
   if (!jobCustomerId || !agreementCustomerId || jobCustomerId !== agreementCustomerId) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_scope_mismatch"));
+    redirectWithBanner("confirm_next_due_scope_mismatch");
   }
 
   // Update agreement with new next_due_date
@@ -910,11 +927,11 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
     .maybeSingle();
 
   if (updateError) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_update_failed"));
+    redirectWithBanner("confirm_next_due_update_failed");
   }
 
   if (!updatedAgreement?.id) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_update_failed"));
+    redirectWithBanner("confirm_next_due_update_failed");
   }
 
   // Write link-level confirmation metadata; .is guard prevents partial double-write in race condition
@@ -928,7 +945,7 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
       next_due_confirmed_by_user_id: actingUserId,
       updated_by_user_id: actingUserId,
     })
-    .eq("id", linkRow.id)
+    .eq("id", linkRowResolved.id)
     .eq("account_owner_user_id", accountOwnerUserId)
     .eq("agreement_id", agreementId)
     .is("next_due_confirmed_at", null)
@@ -936,17 +953,17 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
     .maybeSingle();
 
   if (linkUpdateError) {
-    redirect(jobBannerPath(jobId, "confirm_next_due_update_failed"));
+    redirectWithBanner("confirm_next_due_update_failed");
   }
 
   if (!updatedLink?.id) {
     // Concurrent confirm already wrote metadata for this link
     revalidatePath(`/jobs/${jobId}`);
-    redirect(jobBannerPath(jobId, "confirm_next_due_already_confirmed"));
+    redirectWithBanner("confirm_next_due_already_confirmed");
   }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/service-plans`);
   revalidatePath(`/customers/${agreementCustomerId}`);
-  redirect(jobBannerPath(jobId, "confirm_next_due_saved"));
+  redirectWithBanner("confirm_next_due_saved");
 }

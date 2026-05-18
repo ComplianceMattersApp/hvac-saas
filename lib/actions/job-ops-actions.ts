@@ -140,6 +140,32 @@ async function requireOperationalJobOpsEntitlementAccessOrRedirect(params: {
   redirect(`/ops/admin/company-profile?${search.toString()}`);
 }
 
+function buildJobOpsRedirectPath(params: {
+  jobId: string;
+  returnToRaw?: string | null;
+  banner?: string | null;
+  notice?: string | null;
+  fallbackPath: string;
+}) {
+  const returnToRaw = String(params.returnToRaw ?? "").trim();
+  const target =
+    returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")
+      ? new URL(returnToRaw, "https://app.local")
+      : new URL(params.fallbackPath, "https://app.local");
+
+  const banner = String(params.banner ?? "").trim();
+  if (banner) {
+    target.searchParams.set("banner", banner);
+  }
+
+  const notice = String(params.notice ?? "").trim();
+  if (notice) {
+    target.searchParams.set("notice", notice);
+  }
+
+  return `${target.pathname}?${target.searchParams.toString()}${target.hash}`;
+}
+
 function buildOpsChanges(before: OpsSnapshot, after: OpsSnapshot) {
   const keys = Object.keys(after) as (keyof OpsSnapshot)[];
   const changes: Array<{ field: keyof OpsSnapshot; from: any; to: any }> = [];
@@ -1103,6 +1129,18 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
 
   const jobId = formData.get("job_id");
   if (typeof jobId !== "string" || !jobId) throw new Error("Missing job_id");
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+
+  const redirectToJob = (params: { banner?: string; notice?: string }): never =>
+    redirect(
+      buildJobOpsRedirectPath({
+        jobId,
+        returnToRaw,
+        fallbackPath: `/jobs/${jobId}`,
+        banner: params.banner,
+        notice: params.notice,
+      }),
+    );
 
   // Server-side auth guard: contractors cannot close out jobs
   const {
@@ -1128,7 +1166,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
   if (jobErr) throw jobErr;
 
   if (job.ops_status === "failed" || job.ops_status === "retest_needed") {
-  redirect(`/jobs/${jobId}?notice=failed_requires_retest`);
+    redirectToJob({ notice: "failed_requires_retest" });
   }
 
     // ECC hardening:
@@ -1163,12 +1201,12 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
     }
 
     if (hasFailedCompletedRun && !hasCorrectionReviewResolution) {
-      redirect(`/jobs/${jobId}?notice=failed_requires_retest`);
+      redirectToJob({ notice: "failed_requires_retest" });
     }
   }
 
   if (!job.field_complete) {
-    redirect(`/jobs/${jobId}?notice=field_not_complete`);
+    redirectToJob({ notice: "field_not_complete" });
   }
 
     // Mark certs complete and verify update
@@ -1224,7 +1262,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  redirect(`/jobs/${jobId}`);
+  redirectToJob({});
 }
 
 export async function markInvoiceCompleteFromForm(formData: FormData): Promise<void> {
@@ -1232,6 +1270,18 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
 
   const jobId = formData.get("job_id");
   if (typeof jobId !== "string" || !jobId) throw new Error("Missing job_id");
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+
+  const redirectToJob = (params: { banner?: string; notice?: string }): never =>
+    redirect(
+      buildJobOpsRedirectPath({
+        jobId,
+        returnToRaw,
+        fallbackPath: `/jobs/${jobId}`,
+        banner: params.banner,
+        notice: params.notice,
+      }),
+    );
 
   // Server-side auth guard: contractors cannot close out jobs
   const {
@@ -1250,7 +1300,7 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
   });
 
   if (billingMode === "internal_invoicing") {
-    redirect(`/jobs/${jobId}?banner=internal_invoicing_billing_pending`);
+    redirectToJob({ banner: "internal_invoicing_billing_pending" });
   }
 
   // Read current job snapshot
@@ -1265,7 +1315,7 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
   if (jobErr) throw jobErr;
 
   if (!job.field_complete) {
-    redirect(`/jobs/${jobId}?notice=field_not_complete`);
+    redirectToJob({ notice: "field_not_complete" });
   }
 
   const completedAt = job.data_entry_completed_at ?? new Date().toISOString();
@@ -1368,13 +1418,24 @@ if (!job.data_entry_completed_at && !updatedInvoiceRow.data_entry_completed_at) 
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  redirect(`/jobs/${jobId}`);
+  redirectToJob({});
 }
 export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
 
   const jobId = formData.get('job_id');
   if (typeof jobId !== 'string' || !jobId) throw new Error('Missing job_id');
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+
+  const redirectToOpsSection = (banner: string): never =>
+    redirect(
+      buildJobOpsRedirectPath({
+        jobId,
+        returnToRaw,
+        fallbackPath: `/jobs/${jobId}?tab=ops`,
+        banner,
+      }),
+    );
 
   const {
     data: { user },
@@ -1429,7 +1490,7 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
   const changes = buildOpsChanges(before, after);
   if (changes.length === 0) {
     revalidatePath(`/jobs/${jobId}`);
-    redirect(`/jobs/${jobId}?tab=ops&banner=ops_details_already_saved`);
+    redirectToOpsSection("ops_details_already_saved");
   }
 
   const { error: updateErr } = await supabase
@@ -1454,7 +1515,7 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  redirect(`/jobs/${jobId}?tab=ops&banner=ops_details_saved`);
+  redirectToOpsSection("ops_details_saved");
 }
 
 export async function releasePendingInfoAndRecompute(jobId: string, source = "manual_release_pending_info"): Promise<string | null> {
@@ -1728,6 +1789,7 @@ export async function releasePendingInfoAndRecomputeFromForm(formData: FormData)
 export async function releaseAndReevaluateFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const jobId = String(formData.get("job_id") ?? "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
   if (!jobId) throw new Error("Missing job_id");
 
   const {
@@ -1747,7 +1809,13 @@ export async function releaseAndReevaluateFromForm(formData: FormData): Promise<
   revalidatePath(`/ops`);
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${jobId}`);
-  redirect(`/jobs/${jobId}?tab=ops`);
+  redirect(
+    buildJobOpsRedirectPath({
+      jobId,
+      returnToRaw,
+      fallbackPath: `/jobs/${jobId}?tab=ops`,
+    }),
+  );
 }
 
 export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
@@ -1763,6 +1831,17 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   if (typeof jobId !== "string" || !jobId) {
     throw new Error("Missing job_id");
   }
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+
+  const redirectToOpsSection = (banner: string): never =>
+    redirect(
+      buildJobOpsRedirectPath({
+        jobId,
+        returnToRaw,
+        fallbackPath: `/jobs/${jobId}?tab=ops`,
+        banner,
+      }),
+    );
 
   const {
     data: { user },
@@ -1802,13 +1881,13 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
           : null;
 
   if (!interruptState) {
-    redirect(`/jobs/${jobId}?tab=ops&banner=interrupt_state_required`);
+    redirectToOpsSection("interrupt_state_required");
   }
 
   let nextOpsStatus: "pending_info" | "on_hold";
   let blockerReason = "";
   let blockerReasonParsed: ReturnType<typeof parseWaitingStateReason> = null;
-  let blockerTypeForMeta: string = interruptState;
+  let blockerTypeForMeta: string = interruptState ?? "pending_info";
   let blockerReasonForMeta: string = statusReason ?? "";
 
   if (interruptState === "pending_info" || interruptState === "on_hold") {
@@ -1816,27 +1895,29 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
       const banner = interruptState === "pending_info"
         ? "pending_info_reason_required"
         : "on_hold_reason_required";
-      redirect(`/jobs/${jobId}?tab=ops&banner=${banner}`);
+      redirectToOpsSection(banner);
     }
 
     nextOpsStatus = interruptState;
-    blockerReason = statusReason;
+    blockerReason = statusReason ?? "";
   } else {
     if (!waitingStateType) {
-      redirect(`/jobs/${jobId}?tab=ops&banner=waiting_reason_required`);
+      redirectToOpsSection("waiting_reason_required");
     }
 
     if (waitingStateType === "other" && !waitingOtherReason) {
-      redirect(`/jobs/${jobId}?tab=ops&banner=waiting_other_reason_required`);
+      redirectToOpsSection("waiting_other_reason_required");
     }
 
-    const waitingReasonBody = waitingStateType === "other"
-      ? (waitingOtherReason ?? "")
-      : getWaitingStateLabel(waitingStateType);
+    const waitingStateTypeSafe = waitingStateType ?? "other";
 
-    blockerReason = formatWaitingStateReason(waitingStateType, waitingReasonBody);
+    const waitingReasonBody = waitingStateTypeSafe === "other"
+      ? (waitingOtherReason ?? "")
+      : getWaitingStateLabel(waitingStateTypeSafe);
+
+    blockerReason = formatWaitingStateReason(waitingStateTypeSafe, waitingReasonBody);
     blockerReasonParsed = parseWaitingStateReason(blockerReason);
-    blockerTypeForMeta = blockerReasonParsed?.blockerType ?? waitingStateType;
+    blockerTypeForMeta = blockerReasonParsed?.blockerType ?? waitingStateTypeSafe;
     blockerReasonForMeta = blockerReasonParsed?.blockerReason ?? waitingReasonBody;
 
     // Preserve legacy callers that still post ops_status=on_hold with waiting-state fields.
@@ -1881,7 +1962,7 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   const changes = buildOpsChanges(before, after);
   if (changes.length === 0) {
     revalidatePath(`/jobs/${jobId}`);
-    redirect(`/jobs/${jobId}?tab=ops&banner=ops_status_already_saved`);
+    redirectToOpsSection("ops_status_already_saved");
   }
 
   // UPDATE
@@ -1925,7 +2006,7 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${jobId}`);
-  redirect(`/jobs/${jobId}?tab=ops&banner=ops_status_saved`);
+  redirectToOpsSection("ops_status_saved");
 }
 
 export async function markJobFieldCompleteFromForm(formData: FormData): Promise<void> {
