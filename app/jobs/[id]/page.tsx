@@ -4833,6 +4833,127 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   </Suspense>
 ) : null}
 
+<details id="job-status" className={`${workspaceDetailsClass} mb-6`}>
+  <summary className="cursor-pointer list-none">
+    <CollapsibleHeader
+      title="Job Status"
+      subtitle={jobStatusSummaryText}
+    />
+  </summary>
+
+  <div className={workspaceDetailsDividerClass}>
+
+  <form action={updateJobOpsFromForm} className="flex flex-col gap-3 sm:gap-2 sm:flex-row sm:items-end sm:flex-wrap">
+    <input type="hidden" name="job_id" value={job.id} />
+    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
+
+    <div className="flex-1 min-w-xs">
+      {activeWaitingState ? (
+        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm">
+          <div className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-800">
+            Waiting
+          </div>
+          <div className="mt-2 text-xs leading-5 text-amber-900/90">
+            Waiting State explains why progress is paused. It does not replace Work Items / Visit Scope.
+          </div>
+          {activeWaitingState.blockerReason ? (
+            <div className="mt-2 text-sm text-amber-900">{activeWaitingState.blockerReason}</div>
+          ) : null}
+          {canShowWaitingReleaseQuickAction ? (
+            <div className="mt-2 border-t border-amber-200/80 pt-2.5">
+              <p className="text-xs leading-5 text-amber-900/90">
+                Use this when the part, approval, access, or missing information is no longer blocking the job.
+              </p>
+              <form action={releaseAndReevaluateFromForm} className="mt-2">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
+                <SubmitButton loadingText="Updating..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                  Mark Ready to Continue
+                </SubmitButton>
+              </form>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {!["need_to_schedule", "scheduled", "pending_info", "on_hold"].includes(
+        String(job.ops_status ?? "")
+      ) ? (
+        <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50/80 px-3.5 py-3 text-sm font-medium text-slate-900">
+          Current lifecycle state:{" "}
+          <span>
+            {formatOpsStatusLabel(job.ops_status)}
+          </span>
+        </div>
+      ) : null}
+
+      <InterruptStateFields
+        workspaceFieldLabelClass={workspaceFieldLabelClass}
+        workspaceInputClass={workspaceInputClass}
+        initialInterruptState={currentInterruptState as "" | "pending_info" | "on_hold" | "waiting"}
+        initialStatusReason={initialInterruptReason}
+        initialWaitingReasonType={initialWaitingReasonType}
+        initialWaitingOtherReason={initialWaitingOtherReason}
+      />
+    </div>
+
+    <SubmitButton loadingText="Saving..." className={`${primaryButtonClass} sm:shrink-0`}>
+      Save Interrupt State
+    </SubmitButton>
+  </form>
+
+  {currentInterruptState ? (
+    <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-700">
+      <div className="font-semibold text-slate-900">Current Interrupt Detail</div>
+      <div className="mt-1 text-xs leading-5 text-slate-600">
+        This pause reason is operational context only and does not replace Work Items / Visit Scope.
+      </div>
+      <div className="mt-1">
+        {currentInterruptReasonText
+          ? (currentInterruptState === "waiting"
+              ? `Waiting - ${currentInterruptReasonText}`
+              : currentInterruptState === "pending_info"
+              ? `Pending Info - ${currentInterruptReasonText}`
+              : `On Hold - ${currentInterruptReasonText}`)
+          : currentInterruptState === "waiting"
+          ? "Waiting is active. Add or update the blocking reason if needed."
+          : currentInterruptState === "pending_info"
+          ? "Pending Info is active. Add the missing blocker detail if needed."
+          : "On Hold is active. Add the pause reason if needed."}
+      </div>
+    </div>
+  ) : null}
+
+        {canShowReleaseAndReevaluate ? (
+          <form action={releaseAndReevaluateFromForm} className="mt-2">
+            <input type="hidden" name="job_id" value={job.id} />
+            <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
+            <SubmitButton loadingText="Updating..." className={`w-full ${secondaryButtonClass} sm:w-auto`}>
+              {interruptReleaseActionLabel}
+            </SubmitButton>
+          </form>
+        ) : null}
+      </div>
+
+      <TimedServiceStatusActions
+        jobId={job.id}
+        billingMode={billingMode}
+        jobType={job.job_type}
+        opsStatus={job.ops_status}
+        timingEnabled={timingEnabled}
+        onPhaseTiming={recordBlockingPhase}
+      />
+
+      {job.job_notes ? (
+        <div className={`${workspacePanelClass} p-4 text-gray-900`}>
+          <div className="mb-2 text-sm font-semibold text-slate-950">Job Notes</div>
+          <div className="whitespace-pre-wrap rounded-xl border border-slate-200/80 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-800">
+            {job.job_notes}
+          </div>
+        </div>
+      ) : null}
+</details>
+
 
   <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.92fr)] xl:items-start">
   <div className="order-2 flex flex-col gap-5 xl:order-2">
@@ -4958,128 +5079,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     <div className="order-1 flex flex-col gap-6 xl:order-1">
       {/* Unified operations workspace */}
   <div className="order-1 space-y-5 xl:order-1">
-          {/* Job Status (ops_status) */}
-<details id="job-status" className={workspaceDetailsClass}>
-  <summary className="cursor-pointer list-none">
-    <CollapsibleHeader
-      title="Job Status"
-      subtitle={jobStatusSummaryText}
-    />
-  </summary>
-
-  <div className={workspaceDetailsDividerClass}>
-
-  <form action={updateJobOpsFromForm} className="flex flex-col gap-3 sm:gap-2 sm:flex-row sm:items-end sm:flex-wrap">
-    <input type="hidden" name="job_id" value={job.id} />
-    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
-
-    <div className="flex-1 min-w-xs">
-      {activeWaitingState ? (
-        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm">
-          <div className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-800">
-            Waiting
-          </div>
-          <div className="mt-2 text-xs leading-5 text-amber-900/90">
-            Waiting State explains why progress is paused. It does not replace Work Items / Visit Scope.
-          </div>
-          {activeWaitingState.blockerReason ? (
-            <div className="mt-2 text-sm text-amber-900">{activeWaitingState.blockerReason}</div>
-          ) : null}
-          {canShowWaitingReleaseQuickAction ? (
-            <div className="mt-2 border-t border-amber-200/80 pt-2.5">
-              <p className="text-xs leading-5 text-amber-900/90">
-                Use this when the part, approval, access, or missing information is no longer blocking the job.
-              </p>
-              <form action={releaseAndReevaluateFromForm} className="mt-2">
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
-                <SubmitButton loadingText="Updating..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
-                  Mark Ready to Continue
-                </SubmitButton>
-              </form>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {!["need_to_schedule", "scheduled", "pending_info", "on_hold"].includes(
-        String(job.ops_status ?? "")
-      ) ? (
-        <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50/80 px-3.5 py-3 text-sm font-medium text-slate-900">
-          Current lifecycle state:{" "}
-          <span>
-            {formatOpsStatusLabel(job.ops_status)}
-          </span>
-        </div>
-      ) : null}
-
-      <InterruptStateFields
-        workspaceFieldLabelClass={workspaceFieldLabelClass}
-        workspaceInputClass={workspaceInputClass}
-        initialInterruptState={currentInterruptState as "" | "pending_info" | "on_hold" | "waiting"}
-        initialStatusReason={initialInterruptReason}
-        initialWaitingReasonType={initialWaitingReasonType}
-        initialWaitingOtherReason={initialWaitingOtherReason}
-      />
-    </div>
-
-    <SubmitButton loadingText="Saving..." className={`${primaryButtonClass} sm:shrink-0`}>
-      Save Interrupt State
-    </SubmitButton>
-  </form>
-
-  {currentInterruptState ? (
-    <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-700">
-      <div className="font-semibold text-slate-900">Current Interrupt Detail</div>
-      <div className="mt-1 text-xs leading-5 text-slate-600">
-        This pause reason is operational context only and does not replace Work Items / Visit Scope.
-      </div>
-      <div className="mt-1">
-        {currentInterruptReasonText
-          ? (currentInterruptState === "waiting"
-              ? `Waiting - ${currentInterruptReasonText}`
-              : currentInterruptState === "pending_info"
-              ? `Pending Info - ${currentInterruptReasonText}`
-              : `On Hold - ${currentInterruptReasonText}`)
-          : currentInterruptState === "waiting"
-          ? "Waiting is active. Add or update the blocking reason if needed."
-          : currentInterruptState === "pending_info"
-          ? "Pending Info is active. Add the missing blocker detail if needed."
-          : "On Hold is active. Add the pause reason if needed."}
-      </div>
-    </div>
-  ) : null}
-
-        {canShowReleaseAndReevaluate ? (
-          <form action={releaseAndReevaluateFromForm} className="mt-2">
-            <input type="hidden" name="job_id" value={job.id} />
-            <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
-            <SubmitButton loadingText="Updating..." className={`w-full ${secondaryButtonClass} sm:w-auto`}>
-              {interruptReleaseActionLabel}
-            </SubmitButton>
-          </form>
-        ) : null}
-      </div>
-
-      <TimedServiceStatusActions
-        jobId={job.id}
-        billingMode={billingMode}
-        jobType={job.job_type}
-        opsStatus={job.ops_status}
-        timingEnabled={timingEnabled}
-        onPhaseTiming={recordBlockingPhase}
-      />
-
-      {job.job_notes ? (
-        <div className={`${workspacePanelClass} p-4 text-gray-900`}>
-          <div className="mb-2 text-sm font-semibold text-slate-950">Job Notes</div>
-          <div className="whitespace-pre-wrap rounded-xl border border-slate-200/80 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-800">
-            {job.job_notes}
-          </div>
-        </div>
-      ) : null}
-</details>
-
       {markVisitCountedLinkId && !suggestedNextDueProjection ? (
         <div id="service-plan-visit-count" className="mt-4 scroll-mt-24 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-slate-900">
           <div className="text-sm font-semibold text-emerald-900">Service Plan Visit Count Review</div>
