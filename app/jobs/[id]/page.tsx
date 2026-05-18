@@ -238,6 +238,24 @@ function finalRunPass(run: any): boolean | null {
   return null;
 }
 
+function formatLatestEccRunResultLabel(run: any): string {
+  if (!run) return "";
+  if (run.override_pass === true) return "PASS (override)";
+  if (run.override_pass === false) return "FAIL (override)";
+  if (run.computed?.status === "photo_evidence") return "Photo Taken (attestation)";
+  if (run.computed?.status === "blocked") return "BLOCKED (conditions)";
+  if (run.computed_pass === true) return "PASS";
+  if (run.computed_pass === false) return "FAIL";
+  if (run.is_completed === true) return "Verified";
+  return "Draft";
+}
+
+function toTimestampMs(value?: string | null): number {
+  if (!value) return -1;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : -1;
+}
+
 function isFailedFamilyOpsStatus(value?: string | null) {
   return ["failed", "retest_needed", "pending_office_review"].includes(
     String(value ?? "").toLowerCase()
@@ -2032,6 +2050,18 @@ const hasPermitDetails = permitDetailCount > 0;
 const serviceCaseVisitCount = serviceCaseVisitCountRaw ?? 0;
 const equipmentItems = Array.isArray(job.job_equipment) ? job.job_equipment : [];
 const equipmentCount = equipmentItems.length;
+const eccRuns = Array.isArray(job.ecc_test_runs) ? job.ecc_test_runs : [];
+const eccRunCount = eccRuns.length;
+const latestEccRun = eccRuns.reduce((latest: any | null, run: any) => {
+  if (!latest) return run;
+  const latestMs = toTimestampMs(String(latest?.updated_at ?? latest?.created_at ?? ""));
+  const runMs = toTimestampMs(String(run?.updated_at ?? run?.created_at ?? ""));
+  return runMs > latestMs ? run : latest;
+}, null);
+const latestEccRunResultLabel = latestEccRun ? formatLatestEccRunResultLabel(latestEccRun) : "";
+const latestEccRunDateLabel = latestEccRun
+  ? formatTimestampDateDisplayLA(String(latestEccRun.updated_at ?? latestEccRun.created_at ?? ""))
+  : "";
 
 
 const followUpOwnerLabel = String((job as any).action_required_by ?? "").trim();
@@ -4886,6 +4916,43 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       </div>
     </details>
 
+    {job.job_type === "ecc" ? (
+      <details className={`${workspaceDetailsClass} xl:order-3`}>
+        <summary className="cursor-pointer list-none">
+          <CollapsibleHeader
+            title="ECC Summary"
+            subtitle="Test history, runs, and compliance workspace context."
+            meta={`${eccRunCount} run${eccRunCount === 1 ? "" : "s"}`}
+          />
+        </summary>
+
+        <div className={workspaceDetailsDividerClass}>
+          <div className="rounded-xl border border-slate-200/80 bg-white/96 px-4 py-4 text-sm text-slate-700">
+            <p className="text-sm leading-6 text-slate-700">
+              Test history, runs, and compliance workspace context.
+            </p>
+            {eccRunCount > 0 ? (
+              <p className="mt-2 text-xs leading-5 text-slate-600">
+                Latest result: <span className="font-semibold text-slate-800">{latestEccRunResultLabel}</span>
+                {latestEccRunDateLabel ? ` • ${latestEccRunDateLabel}` : ""}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs leading-5 text-slate-600">No tests recorded yet.</p>
+            )}
+          </div>
+
+          <div className="mt-3">
+            <Link
+              href={`/jobs/${job.id}/tests`}
+              className={darkButtonClass}
+            >
+              Open Tests Workspace
+            </Link>
+          </div>
+        </div>
+      </details>
+    ) : null}
+
     </div>
 
     <div className="order-1 flex flex-col gap-6 xl:order-1">
@@ -5076,7 +5143,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
  </div>
 
     <section className="order-1 space-y-4 xl:order-5">
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {/* Shared Notes */}
         {!isHvacServiceMode ? (
           <details id="shared-notes" className={workspaceDetailsClass} open={Boolean(sharedNoteBannerMessage)}>
@@ -5238,7 +5305,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </details>
 
         {/* Timeline - Activity/History */}
-        <details className={workspaceDetailsClass}>
+        <details className={`${workspaceDetailsClass}${isHvacServiceMode ? " xl:col-span-2" : ""}`}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title={timelineTitle}
