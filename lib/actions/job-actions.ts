@@ -9508,10 +9508,21 @@ export async function addPublicNoteFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const note = String(formData.get("note") || "").trim();
   const tab = String(formData.get("tab") || "ops").trim() || "ops";
+  const noteScope = String(formData.get("note_scope") || "").trim().toLowerCase();
+
+  const returnToRaw = String(formData.get("return_to") || "").trim();
 
   if (!jobId) throw new Error("Job ID is required");
   if (!note) {
-    redirect(`/jobs/${jobId}?tab=${tab}&banner=note_add_failed`);
+    redirect(
+      buildPublicNoteRedirectPath({
+        jobId,
+        tab,
+        banner: "note_add_failed",
+        returnToRaw,
+        noteScope,
+      }),
+    );
   }
 
   const supabase = await createClient();
@@ -9539,7 +9550,15 @@ export async function addPublicNoteFromForm(formData: FormData) {
   if (recentDuplicate?.id) {
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath(`/ops`);
-    redirect(`/jobs/${jobId}?tab=${tab}&banner=note_already_added`);
+    redirect(
+      buildPublicNoteRedirectPath({
+        jobId,
+        tab,
+        banner: "note_already_added",
+        returnToRaw,
+        noteScope,
+      }),
+    );
   }
 
   await insertJobEvent({
@@ -9552,7 +9571,36 @@ export async function addPublicNoteFromForm(formData: FormData) {
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  redirect(`/jobs/${jobId}?tab=${tab}&banner=note_added`);
+  redirect(
+    buildPublicNoteRedirectPath({
+      jobId,
+      tab,
+      banner: "note_added",
+      returnToRaw,
+      noteScope,
+    }),
+  );
+}
+
+function buildPublicNoteRedirectPath(params: {
+  jobId: string;
+  tab: string;
+  banner: string;
+  returnToRaw?: string | null;
+  noteScope?: string | null;
+}) {
+  const returnToRaw = String(params.returnToRaw ?? "").trim();
+  const target =
+    returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")
+      ? new URL(returnToRaw, "https://app.local")
+      : new URL(`/jobs/${params.jobId}?tab=${params.tab}`, "https://app.local");
+
+  target.searchParams.set("banner", params.banner);
+  if (String(params.noteScope ?? "").trim() === "shared") {
+    target.searchParams.set("note_scope", "shared");
+  }
+
+  return `${target.pathname}?${target.searchParams.toString()}${target.hash}`;
 }
 
 function buildInternalNoteRedirectPath(params: {

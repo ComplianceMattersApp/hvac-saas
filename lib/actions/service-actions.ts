@@ -24,6 +24,22 @@ const CLOSEOUT_MANUAL_LOCK_STATUSES = new Set([
 function hasManualCloseoutLock(value?: string | null) {
   return CLOSEOUT_MANUAL_LOCK_STATUSES.has(String(value ?? "").trim().toLowerCase());
 }
+function buildServiceCloseoutRedirectPath(params: {
+  jobId: string;
+  banner: string;
+  returnToRaw?: string | null;
+}): string {
+  const returnToRaw = String(params.returnToRaw ?? "").trim();
+  const target =
+    returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")
+      ? new URL(returnToRaw, "https://app.local")
+      : new URL(`/jobs/${params.jobId}`, "https://app.local");
+
+  target.searchParams.set("banner", params.banner);
+
+  return `${target.pathname}?${target.searchParams.toString()}${target.hash}`;
+}
+
 
 type ScopedServiceCloseoutJob = {
   id: string;
@@ -104,7 +120,13 @@ async function requireOperationalServiceCloseoutEntitlementAccessOrRedirect(para
  * - Will NOT overwrite pending_info / on_hold (manual lock)
  */
 
-export async function markServiceComplete(jobId: string): Promise<void> {
+export async function markServiceComplete(jobIdOrFormData: string | FormData, returnToOverride?: string): Promise<void> {
+  const formData = jobIdOrFormData instanceof FormData ? jobIdOrFormData : null;
+  const jobId = String(formData ? formData.get("job_id") : jobIdOrFormData || "").trim();
+  const returnToRaw = String(formData ? formData.get("return_to") : returnToOverride || "").trim();
+
+  if (!jobId) throw new Error("Job ID is required");
+
   const supabase = await createClient();
   const { userId: actingUserId, internalUser, job } = await requireInternalScopedServiceCloseoutJob({
     supabase,
@@ -124,7 +146,13 @@ export async function markServiceComplete(jobId: string): Promise<void> {
   // Idempotent: already field-complete and at invoice_required
   if (job.field_complete && job.ops_status === "invoice_required") {
     revalidatePath(`/jobs/${jobId}`);
-    redirect(`/jobs/${jobId}?banner=service_closeout_already_saved`);
+    redirect(
+      buildServiceCloseoutRedirectPath({
+        jobId,
+        banner: "service_closeout_already_saved",
+        returnToRaw,
+      }),
+    );
   }
 
   const beforeStatus = job.status ?? "in_progress";
@@ -192,10 +220,22 @@ export async function markServiceComplete(jobId: string): Promise<void> {
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  redirect(`/jobs/${jobId}?banner=service_closeout_saved`);
+  redirect(
+    buildServiceCloseoutRedirectPath({
+      jobId,
+      banner: "service_closeout_saved",
+      returnToRaw,
+    }),
+  );
 }
 
-export async function markInvoiceSent(jobId: string): Promise<void> {
+export async function markInvoiceSent(jobIdOrFormData: string | FormData, returnToOverride?: string): Promise<void> {
+  const formData = jobIdOrFormData instanceof FormData ? jobIdOrFormData : null;
+  const jobId = String(formData ? formData.get("job_id") : jobIdOrFormData || "").trim();
+  const returnToRaw = String(formData ? formData.get("return_to") : returnToOverride || "").trim();
+
+  if (!jobId) throw new Error("Job ID is required");
+
   const supabase = await createClient();
   const { userId: actingUserId, internalUser, job } = await requireInternalScopedServiceCloseoutJob({
     supabase,
@@ -214,7 +254,13 @@ export async function markInvoiceSent(jobId: string): Promise<void> {
 
   if (billingMode === "internal_invoicing") {
     revalidatePath(`/jobs/${jobId}`);
-    redirect(`/jobs/${jobId}?banner=internal_invoicing_billing_pending`);
+    redirect(
+      buildServiceCloseoutRedirectPath({
+        jobId,
+        banner: "internal_invoicing_billing_pending",
+        returnToRaw,
+      }),
+    );
   }
 
   if (job.job_type !== "service") {
@@ -224,7 +270,13 @@ export async function markInvoiceSent(jobId: string): Promise<void> {
   if (hasManualCloseoutLock(job.ops_status)) {
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath(`/ops`);
-    redirect(`/jobs/${jobId}?banner=service_closeout_locked`);
+    redirect(
+      buildServiceCloseoutRedirectPath({
+        jobId,
+        banner: "service_closeout_locked",
+        returnToRaw,
+      }),
+    );
   }
 
   const completedAt = job.data_entry_completed_at ?? new Date().toISOString();
@@ -309,12 +361,30 @@ export async function markInvoiceSent(jobId: string): Promise<void> {
   revalidatePath(`/ops`);
 
   if (result.manualLockPrevented) {
-    redirect(`/jobs/${jobId}?banner=service_closeout_locked`);
+    redirect(
+      buildServiceCloseoutRedirectPath({
+        jobId,
+        banner: "service_closeout_locked",
+        returnToRaw,
+      }),
+    );
   }
 
   if (!result.updated && !invoiceCompleteChanged && !dataEntryCompletedChanged) {
-    redirect(`/jobs/${jobId}?banner=service_closeout_already_saved`);
+    redirect(
+      buildServiceCloseoutRedirectPath({
+        jobId,
+        banner: "service_closeout_already_saved",
+        returnToRaw,
+      }),
+    );
   }
 
-  redirect(`/jobs/${jobId}?banner=service_closeout_saved`);
+  redirect(
+    buildServiceCloseoutRedirectPath({
+      jobId,
+      banner: "service_closeout_saved",
+      returnToRaw,
+    }),
+  );
 }

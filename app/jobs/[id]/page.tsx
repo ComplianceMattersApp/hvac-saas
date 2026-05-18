@@ -853,6 +853,23 @@ export default async function JobDetailPage({
       ? "Select a team member to assign."
       : "";
   const assignmentBannerType = banner === "assignment_user_required" ? "warning" : "success";
+  const noteScopeRaw = sp.note_scope;
+  const noteScope =
+    Array.isArray(noteScopeRaw)
+      ? noteScopeRaw[0]
+      : typeof noteScopeRaw === "string"
+      ? noteScopeRaw
+      : "";
+  const isSharedNoteBanner = noteScope === "shared";
+  const sharedNoteBannerMessage =
+    isSharedNoteBanner && banner === "note_added"
+      ? "Shared note added."
+      : isSharedNoteBanner && banner === "note_already_added"
+      ? "That shared note was already added recently."
+      : isSharedNoteBanner && banner === "note_add_failed"
+      ? "Could not add shared note."
+      : "";
+  const sharedNoteBannerType = banner === "note_add_failed" ? "error" : "success";
 
   const timingEnabled = process.env.JOB_DETAIL_TIMING_DEBUG === "true";
   const renderStartMs = Date.now();
@@ -4971,14 +4988,22 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       <div className="space-y-4">
         {/* Shared Notes */}
         {!isHvacServiceMode ? (
-          <details className={workspaceDetailsClass}>
+          <details id="shared-notes" className={workspaceDetailsClass} open={Boolean(sharedNoteBannerMessage)}>
             <summary className="cursor-pointer list-none">
               <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} />
             </summary>
 
             <div className={`${workspaceDetailsDividerClass} space-y-2`}>
+              {sharedNoteBannerMessage ? (
+                <FlashBanner
+                  type={sharedNoteBannerType as "success" | "warning" | "error"}
+                  message={sharedNoteBannerMessage}
+                />
+              ) : null}
 
   <form action={addPublicNoteFromForm} className="mb-4 space-y-3">
+      <input type="hidden" name="note_scope" value="shared" />
+      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#shared-notes`} />
     <input type="hidden" name="job_id" value={job.id} />
     <input type="hidden" name="tab" value={tab} />
 

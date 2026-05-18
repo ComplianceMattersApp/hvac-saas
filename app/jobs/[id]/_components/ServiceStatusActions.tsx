@@ -36,12 +36,12 @@ export default function ServiceStatusActions({
   if (jobType !== "service") return null;
 
   // Bind server actions to this jobId (so the form submit passes the id)
-  const completeAction = markServiceComplete.bind(null, jobId);
-  const invoiceSentAction = markInvoiceSent.bind(null, jobId);
+  const completeAction = markServiceComplete.bind(null, jobId, `/jobs/${jobId}?tab=ops#service-closeout`);
+  const invoiceSentAction = markInvoiceSent.bind(null, jobId, `/jobs/${jobId}?tab=ops#service-closeout`);
   const isInternalInvoicing = billingMode === "internal_invoicing";
 
   return (
-    <section className="rounded-xl border bg-white p-4">
+    <section id="service-closeout" className="rounded-xl border bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold">Service Closeout</h2>
