@@ -2659,9 +2659,14 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <h2 className="mt-1 text-lg font-semibold text-slate-900">Visit Reason &amp; Work Items</h2>
                   <p className="mt-1 text-sm text-slate-500">
                     {jobType === "service"
-                      ? "Capture why this visit exists, then add the Work Items for this trip."
+                      ? "Start with Reason for Visit to describe this visit, then add the structured Work Items for this trip."
                       : "ECC testing can be created without work items; add optional companion work context only when this visit also includes service work."}
                   </p>
+                  {isHybridProductMode ? (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Job type controls workflow/testing. Visit Scope can include additional work performed during the same visit.
+                    </p>
+                  ) : null}
                 </div>
               ) : (
                 <div>
@@ -2672,12 +2677,17 @@ const [billingRecipient, setBillingRecipient] = useState<
               {isInternalMode ? (
                 <div className={`rounded-2xl border bg-white p-4 shadow-sm space-y-3 ${visitScopeError ? "border-red-300 ring-2 ring-red-100" : "border-slate-200/85"}`}>
                   <div>
-                    <h3 className="text-base font-semibold text-slate-900">Work Items</h3>
+                    <h3 className="text-base font-semibold text-slate-900">Visit Summary &amp; Work Items</h3>
                     <p className="mt-1 text-sm text-slate-500">
                       {jobType === "service"
-                        ? "Add at least one Work Item defining what belongs to this visit."
+                        ? "Reason for Visit describes the created visit title. After that, add at least one Work Item defining what belongs to this visit."
                         : "ECC jobs don't require Work Items. Add companion work only if this visit includes service work."}
                     </p>
+                    {jobType === "service" ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Use this to describe the visit, such as Diagnostic, Maintenance, or Duct Cleaning.
+                      </p>
+                    ) : null}
                     {jobType === "service" ? (
                       <p className="mt-1 text-xs text-slate-500">
                         Work Items define what belongs to this visit. They can help build an invoice later, but they are not billing records.

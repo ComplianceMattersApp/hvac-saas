@@ -353,7 +353,7 @@ export default function VisitScopeBuilder({
       <>
       <div className="space-y-1">
         <label className="block text-sm font-medium text-slate-900">
-          {jobType === "service" ? "Reason for Visit / Dispatch Notes" : "Known trip context"}
+          {jobType === "service" ? "Reason for Visit / Visit Title" : "Known trip context"}
         </label>
         <textarea
           name={summaryName}
@@ -366,7 +366,7 @@ export default function VisitScopeBuilder({
         />
         <p className="text-xs text-slate-500">
           {jobType === "service"
-            ? "Reason for Visit explains why this visit exists and gives dispatch context."
+            ? "Reason for Visit sets the created visit title and gives dispatch context. Use this to describe the visit, such as Diagnostic, Maintenance, or Duct Cleaning."
             : "Optional. Use this for helpful field context, not to replace the inspection or test type."}
         </p>
         {shouldShowFallbackPreview && fallbackPreviewTitle ? (
