@@ -22,52 +22,54 @@ export default function JobDetailLoading() {
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
-        <section className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
-            <div className="h-3 w-32 animate-pulse rounded bg-slate-200" />
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="h-24 animate-pulse rounded-xl border border-slate-100 bg-slate-50"
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="h-3 w-36 animate-pulse rounded bg-slate-200" />
-              <div className="h-8 w-28 animate-pulse rounded-lg bg-slate-100" />
-            </div>
-            <div className="mt-3 space-y-2">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="h-14 animate-pulse rounded-xl border border-slate-100 bg-slate-50"
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <aside className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(28rem,auto)] lg:items-center">
+          <div>
             <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
-            <div className="mt-3 space-y-2">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="h-10 animate-pulse rounded-lg border border-slate-100 bg-slate-50"
-                />
-              ))}
+            <div className="mt-2 h-6 w-72 max-w-full animate-pulse rounded bg-slate-200" />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-4 lg:min-w-[28rem]">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-14 animate-pulse rounded-lg border border-slate-100 bg-slate-50" />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(300px,0.94fr)_minmax(420px,1.22fr)_minmax(250px,0.74fr)]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+          <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
+          <div className="mt-3 h-7 w-56 max-w-full animate-pulse rounded bg-slate-200" />
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-12 animate-pulse rounded-lg border border-slate-100 bg-slate-50" />
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="h-9 w-24 animate-pulse rounded-lg bg-slate-100" />
+            ))}
+          </div>
+        </div>
+
+        <div className="min-h-80 rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
+          <div className="h-full min-h-80 animate-pulse rounded-2xl bg-slate-100" />
+        </div>
+
+        <aside className="space-y-3">
+          {Array.from({ length: 2 }).map((_, cardIndex) => (
+            <div key={cardIndex} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+              <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
+              <div className="mt-3 space-y-2">
+                {Array.from({ length: cardIndex === 0 ? 3 : 2 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="h-10 animate-pulse rounded-lg border border-slate-100 bg-slate-50"
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
-            <div className="h-3 w-28 animate-pulse rounded bg-slate-200" />
-            <div className="mt-3 h-24 animate-pulse rounded-xl border border-slate-100 bg-slate-50" />
-          </div>
+          ))}
         </aside>
       </div>
     </div>

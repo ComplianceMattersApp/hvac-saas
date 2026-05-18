@@ -136,6 +136,7 @@ import {
 } from "@/lib/communications/contact-recipients-read";
 import { buildInternalJobRoleContactSections } from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
+import { equipmentRoleLabel } from "@/lib/utils/equipment-display";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -593,6 +594,28 @@ function truncateSummaryText(value: string, maxLength = 84) {
   const normalized = value.trim().replace(/\s+/g, " ");
   if (normalized.length <= maxLength) return normalized;
   return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
+}
+
+function presentEquipmentText(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function formatEquipmentTitle(eq: any) {
+  const role = equipmentRoleLabel(eq?.equipment_role);
+  const makeModel = [presentEquipmentText(eq?.manufacturer), presentEquipmentText(eq?.model)]
+    .filter(Boolean)
+    .join(" ");
+  return makeModel ? `${role} - ${makeModel}` : role;
+}
+
+function formatEquipmentMeta(eq: any) {
+  return [
+    presentEquipmentText(eq?.serial) ? `Serial ${presentEquipmentText(eq?.serial)}` : "",
+    presentEquipmentText(eq?.tonnage) ? `${presentEquipmentText(eq?.tonnage)} ton` : "",
+    presentEquipmentText(eq?.refrigerant_type) ? presentEquipmentText(eq?.refrigerant_type) : "",
+  ]
+    .filter(Boolean)
+    .join(" - ");
 }
 
 
@@ -2955,77 +2978,79 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
   </div>
 
-  <div className={`${workspaceInsetClass} mb-4 border-slate-200/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.82),rgba(255,255,255,0.99))] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]`}>
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.95fr)] lg:items-center">
+  <div className={`${workspaceInsetClass} mb-4 border-slate-200/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.82),rgba(255,255,255,0.99))] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] sm:px-4`}>
+    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(28rem,auto)] lg:items-center">
       <div className="min-w-0">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Schedule</div>
-        <div className="mt-1 text-[1.32rem] font-semibold tracking-[-0.02em] text-slate-950">{appointmentDateLabel}</div>
-        <div className="mt-1 text-sm leading-6 text-slate-600">{appointmentTimeLabel}</div>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Schedule</div>
+          <div className="min-w-0 text-[1.05rem] font-semibold tracking-[-0.01em] text-slate-950 sm:text-[1.16rem]">
+            {appointmentDateLabel}
+          </div>
+          <div className="text-sm font-medium text-slate-600">{appointmentTimeLabel}</div>
+        </div>
 
         {job.job_type === "service" ? (
-          <div className="mt-4 border-t border-slate-200/60 pt-3">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Needed</div>
-            <div className="mt-1 text-sm font-semibold leading-5 text-slate-900">{visitScopeBadgeMainText}</div>
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
+            <span className="font-semibold uppercase tracking-[0.1em] text-slate-500">Work Needed</span>
+            <span className="font-semibold text-slate-900">{visitScopeBadgeMainText}</span>
             <a
               href="#visit-scope-section"
-              className="mt-1.5 inline-block text-xs font-semibold text-slate-600 underline-offset-2 transition-colors hover:text-slate-900 hover:underline"
+              className="font-semibold text-slate-600 underline-offset-2 transition-colors hover:text-slate-900 hover:underline"
             >
-              {hasVisitScopeDefined ? "View work details" : "Add work details"}
+              {hasVisitScopeDefined ? "View details" : "Add details"}
             </a>
           </div>
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-white/80 bg-white/76 px-3.5 py-3 shadow-[0_12px_28px_-30px_rgba(15,23,42,0.3)] backdrop-blur-[2px]">
-        <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Schedule</div>
-            <div className={`mt-1 text-[15px] font-semibold tracking-[-0.01em] ${job.scheduled_date ? "text-emerald-800" : "text-slate-700"}`}>
-              {job.scheduled_date ? "Scheduled" : "Unscheduled"}
-            </div>
+      <div className="grid gap-2 sm:grid-cols-4 lg:min-w-[28rem]">
+        <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Schedule Status</div>
+          <div className={`mt-0.5 text-sm font-semibold ${job.scheduled_date ? "text-emerald-800" : "text-slate-700"}`}>
+            {job.scheduled_date ? "Scheduled" : "Unscheduled"}
           </div>
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Time Window</div>
-            <div className="mt-1 text-[15px] font-semibold tracking-[-0.01em] text-slate-800">
-              {job.scheduled_date ? (hasFullSchedule ? "Confirmed" : "Pending") : "Not set"}
-            </div>
+        </div>
+        <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Time Window</div>
+          <div className="mt-0.5 text-sm font-semibold text-slate-800">
+            {job.scheduled_date ? (hasFullSchedule ? "Confirmed" : "Pending") : "Not set"}
           </div>
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Field</div>
-            <div className={`mt-1 text-[15px] font-semibold tracking-[-0.01em] ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>
-              {formatStatus(job.status)}
-            </div>
+        </div>
+        <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Field Status</div>
+          <div className={`mt-0.5 text-sm font-semibold ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>
+            {formatStatus(job.status)}
           </div>
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Ops</div>
-            <div className="mt-1 text-[15px] font-semibold tracking-[-0.01em] text-slate-800">{formatOpsStatusLabel(job.ops_status)}</div>
-          </div>
+        </div>
+        <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Ops Status</div>
+          <div className="mt-0.5 text-sm font-semibold text-slate-800">{formatOpsStatusLabel(job.ops_status)}</div>
         </div>
       </div>
     </div>
   </div>
 
-  <div className={`mb-4 grid items-stretch gap-4${job.job_type === "ecc" ? " xl:grid-cols-[minmax(300px,0.94fr)_minmax(420px,1.22fr)_minmax(250px,0.74fr)]" : " xl:grid-cols-[minmax(320px,0.96fr)_minmax(440px,1.28fr)]"}`}>
+  <div className="mb-4 grid items-stretch gap-4 xl:grid-cols-[minmax(300px,0.94fr)_minmax(420px,1.22fr)_minmax(250px,0.74fr)]">
     {/* Left: customer / contact info */}
-    <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4 sm:p-5`}>
+    <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4`}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
         {(job.job_type ? String(job.job_type).toUpperCase() : "SERVICE")}
         {serviceCity ? ` • ${serviceCity}` : ""}
       </div>
-      <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer / Account</div>
+      <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer</div>
 
       {job.customer_id ? (
         <Link
           href={`/customers/${job.customer_id}`}
-          className="mt-1.5 block text-[1.55rem] font-semibold tracking-[-0.02em] text-slate-950 hover:underline"
+          className="mt-1.5 block text-[1.35rem] font-semibold tracking-[-0.01em] text-slate-950 hover:underline"
         >
           {customerDisplayName}
         </Link>
       ) : (
-        <h1 className="mt-1.5 text-[1.55rem] font-semibold tracking-[-0.02em] text-slate-950">{customerDisplayName}</h1>
+        <h1 className="mt-1.5 text-[1.35rem] font-semibold tracking-[-0.01em] text-slate-950">{customerDisplayName}</h1>
       )}
 
-      <div className="mt-4 grid gap-x-6 gap-y-3 border-t border-slate-200/70 pt-4 text-sm sm:grid-cols-2">
+      <div className="mt-3 grid gap-x-5 gap-y-2.5 border-t border-slate-200/70 pt-3 text-sm sm:grid-cols-2">
         {contractorId ? (
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Contractor</div>
@@ -3034,29 +3059,29 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
         {customerPhone !== "—" ? (
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer / Account Phone</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer Phone</div>
             <div className="mt-1 font-semibold text-slate-800">{customerPhone}</div>
           </div>
         ) : null}
         {customerEmail !== "—" ? (
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer / Account Email</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer Email</div>
             <div className="mt-1 font-semibold text-slate-800 break-all">{customerEmail}</div>
           </div>
         ) : null}
         {String((job as any).billing_name ?? "").trim() || String((job as any).billing_phone ?? "").trim() || String((job as any).billing_email ?? "").trim() || String((job as any).billing_recipient ?? "").trim() ? (
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Billing Contact / Billing Recipient</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Billing Recipient</div>
             <div className="mt-1 font-semibold text-slate-800 break-words">
               {[String((job as any).billing_name ?? "").trim(), String((job as any).billing_phone ?? "").trim(), String((job as any).billing_email ?? "").trim()]
                 .filter(Boolean)
-                .join(" • ") || String((job as any).billing_recipient ?? "").trim()}
+                .join(" - ") || String((job as any).billing_recipient ?? "").trim()}
             </div>
           </div>
         ) : null}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2 sm:gap-1.5 lg:gap-2">
+      <div className="mt-3 flex flex-wrap gap-2 sm:gap-1.5 lg:gap-2">
         {telLink ? (
           <a
             href={telLink}
@@ -3086,8 +3111,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </a>
         ) : null}
       </div>
-
-      <p className="mt-2 text-xs text-slate-500">Confirm whether this is the site contact before calling or texting.</p>
 
       <ContactLoggingQuickActions
         jobId={String(job.id)}
@@ -3226,45 +3249,87 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       </div>
     </div>
 
-    {/* Right: ECC permit reference panel (ECC only) */}
-    {job.job_type === "ecc" ? (
-      <div className={`${workspaceSubtleCardClass} border-slate-200/70 p-4 sm:p-5 ${hasPermitDetails ? "bg-white/92" : "bg-slate-50/88"}`}>
+    {/* Right: permit and equipment reference rail */}
+    <div className="space-y-3">
+      {job.job_type === "ecc" ? (
+        <div className={`${workspaceSubtleCardClass} border-slate-200/70 p-4 ${hasPermitDetails ? "bg-white/92" : "bg-slate-50/88"}`}>
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Permit</div>
+              <div className="mt-1 text-sm text-slate-600">
+                {hasPermitDetails
+                  ? `${permitDetailCount} of 3 fields`
+                  : "Permit information pending"}
+              </div>
+            </div>
+            <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              ECC
+            </span>
+          </div>
+
+          {hasPermitDetails ? (
+            <div className="space-y-2">
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Permit #</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitNumber || "Not added"}</div>
+              </div>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Jurisdiction</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitJurisdiction || "Not added"}</div>
+              </div>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Permit Date</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitDateLabel || "Not added"}</div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-white/90 px-4 py-4 text-sm text-slate-600">
+              No permit details recorded yet.
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4`}>
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Permit</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Equipment</div>
             <div className="mt-1 text-sm text-slate-600">
-              {hasPermitDetails
-                ? `${permitDetailCount} of 3 reference field${permitDetailCount === 1 ? "" : "s"} available`
-                : "Permit information pending"}
+              {equipmentCount > 0 ? `${equipmentCount} item${equipmentCount === 1 ? "" : "s"} recorded` : "No equipment recorded yet."}
             </div>
           </div>
-          <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            ECC
-          </span>
+          <Link
+            href={`/jobs/${job.id}/info?f=equipment`}
+            className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-white"
+          >
+            Manage
+          </Link>
         </div>
 
-        {hasPermitDetails ? (
-          <div className="space-y-2.5">
-            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
-              <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Permit #</div>
-              <div className="mt-1 text-sm font-semibold text-slate-900">{permitNumber || "Not added"}</div>
-            </div>
-            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
-              <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Jurisdiction</div>
-              <div className="mt-1 text-sm font-semibold text-slate-900">{permitJurisdiction || "Not added"}</div>
-            </div>
-            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
-              <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Permit Date</div>
-              <div className="mt-1 text-sm font-semibold text-slate-900">{permitDateLabel || "Not added"}</div>
-            </div>
+        {equipmentCount > 0 ? (
+          <div className="space-y-2">
+            {equipmentItems.slice(0, 3).map((eq: any) => {
+              const meta = formatEquipmentMeta(eq);
+              return (
+                <div key={eq.id} className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+                  <div className="text-sm font-semibold leading-5 text-slate-900">{formatEquipmentTitle(eq)}</div>
+                  {meta ? <div className="mt-0.5 text-xs leading-5 text-slate-600">{meta}</div> : null}
+                </div>
+              );
+            })}
+            {equipmentCount > 3 ? (
+              <div className="text-xs font-semibold text-slate-500">
+                +{equipmentCount - 3} more in Equipment
+              </div>
+            ) : null}
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white/90 px-4 py-4 text-sm text-slate-600">
-            No permit details recorded yet.
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
+            No equipment recorded yet.
           </div>
         )}
       </div>
-    ) : null}
+    </div>
   </div>
 
   {isInternalUser && job.job_type === "service" ? (
