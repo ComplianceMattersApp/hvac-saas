@@ -8,6 +8,7 @@ import {
   markContractorIntakeSubmissionAsDuplicateFromForm,
   approveContractorIntakeContactCandidateFromForm,
   skipContractorIntakeContactCandidateFromForm,
+  addContractorIntakeContactCandidateFromForm,
 } from "@/lib/actions/contractor-intake-actions";
 import { listIntakeContactCandidatesForSubmission } from "@/lib/communications/intake-contact-candidates-read";
 import { formatDateOnlyDisplay } from "@/lib/utils/schedule-la";
@@ -73,6 +74,8 @@ function noticeText(notice: string) {
   if (key === "candidate_skipped") return "Candidate skipped.";
   if (key === "candidate_already_reviewed") return "Candidate was already reviewed.";
   if (key === "candidate_table_unavailable") return "Candidate controls are waiting for schema rollout in this environment.";
+  if (key === "candidate_added") return "Candidate contact added.";
+  if (key === "candidate_add_failed") return "Candidate contact could not be added.";
   return "";
 }
 
@@ -443,6 +446,78 @@ export default async function ContractorIntakeSubmissionDetailPage({
         </section>
 
         <section className="space-y-4">
+          {isPending ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Add candidate contact</p>
+                <p className="mt-1 text-sm text-slate-600">Capture a provisional contact for internal review. This does not create a durable role contact.</p>
+              </div>
+
+              <form action={addContractorIntakeContactCandidateFromForm} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <input type="hidden" name="submission_id" value={submission.id} />
+                <input type="hidden" name="candidate_section" value="1" />
+
+                <label className="space-y-1 text-xs font-medium text-slate-700">
+                  <span>Role</span>
+                  <select name="proposed_role" required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900">
+                    <option value="responsible_party">Responsible party</option>
+                    <option value="homeowner">Homeowner</option>
+                    <option value="tenant_or_occupant">Tenant or occupant</option>
+                    <option value="billing_contact">Billing contact</option>
+                    <option value="third_party_oversight">Third-party oversight</option>
+                    <option value="site_access_contact">Site access contact</option>
+                  </select>
+                </label>
+
+                <label className="space-y-1 text-xs font-medium text-slate-700">
+                  <span>Display name</span>
+                  <input name="display_name" required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                </label>
+
+                <label className="space-y-1 text-xs font-medium text-slate-700">
+                  <span>Phone</span>
+                  <input name="phone" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                </label>
+
+                <label className="space-y-1 text-xs font-medium text-slate-700">
+                  <span>Email</span>
+                  <input name="email" type="email" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                </label>
+
+                <label className="space-y-1 text-xs font-medium text-slate-700">
+                  <span>Preferred contact method</span>
+                  <select name="preferred_contact_method" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900">
+                    <option value="none">None</option>
+                    <option value="phone">Phone</option>
+                    <option value="email">Email</option>
+                    <option value="sms">SMS</option>
+                  </select>
+                </label>
+
+                <label className="space-y-1 text-xs font-medium text-slate-700">
+                  <span>Proposed link target</span>
+                  <select name="proposed_link_target" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900">
+                    <option value="default_from_role">Default from role</option>
+                    <option value="customer">Customer</option>
+                    <option value="job">Job</option>
+                    <option value="undecided">Undecided</option>
+                  </select>
+                </label>
+
+                <label className="space-y-1 text-xs font-medium text-slate-700 sm:col-span-2">
+                  <span>Notes</span>
+                  <textarea name="notes" rows={2} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                </label>
+
+                <div className="sm:col-span-2">
+                  <button type="submit" className="rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                    Add candidate contact
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : null}
+
           {candidateRows.length > 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
               <div>

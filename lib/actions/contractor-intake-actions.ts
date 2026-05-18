@@ -50,6 +50,30 @@ type IntakeSubmissionCommentRow = {
   created_at: string | null;
 };
 
+const INTAKE_CANDIDATE_ALLOWED_ROLES = new Set([
+  "homeowner",
+  "tenant_or_occupant",
+  "responsible_party",
+  "billing_contact",
+  "third_party_oversight",
+  "site_access_contact",
+]);
+
+const INTAKE_CANDIDATE_ALLOWED_METHODS = new Set(["sms", "phone", "email", "none"]);
+const INTAKE_CANDIDATE_ALLOWED_TARGETS = new Set(["customer", "job", "undecided"]);
+
+function defaultIntakeCandidateTargetForRole(role: string) {
+  return role === "site_access_contact" ? "job" : "customer";
+}
+
+function isValidIntakeCandidateRoleTargetPair(role: string, target: string) {
+  if (role === "site_access_contact") {
+    return target === "job" || target === "undecided";
+  }
+
+  return target === "customer" || target === "undecided";
+}
+
 function normalizeText(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -296,6 +320,111 @@ export async function skipContractorIntakeContactCandidateFromForm(formData: For
     nextStatus: "skipped",
     successNotice: "candidate_skipped",
   });
+}
+
+export async function addContractorIntakeContactCandidateFromForm(formData: FormData) {
+  let scoped:
+    | {
+        userId: string;
+        admin: ReturnType<typeof createAdminClient>;
+        accountOwnerUserId: string;
+        submissionId: string;
+        submission: IntakeSubmissionRow;
+      }
+    | null = null;
+
+  try {
+    scoped = await requireScopedPendingAdjudication(formData);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("REDIRECT:")) {
+      throw error;
+    }
+
+    const submissionId = normalizeText(formData.get("submission_id"));
+    if (isUuid(submissionId)) {
+      redirect(`/ops/admin/contractor-intake-submissions/${submissionId}?notice=candidate_add_failed`);
+    }
+    throw error;
+  }
+
+  const { admin, userId, accountOwnerUserId, submissionId } = scoped;
+
+  try {
+    const role = normalizeText(formData.get("proposed_role")).toLowerCase();
+    const displayName = normalizeText(formData.get("display_name"));
+    const phone = normalizeText(formData.get("phone")) || null;
+    const email = normalizeText(formData.get("email")) || null;
+    const preferredContactMethod = normalizeText(formData.get("preferred_contact_method")).toLowerCase() || "none";
+    const proposedTargetInput = normalizeText(formData.get("proposed_link_target")).toLowerCase();
+    const notes = normalizeText(formData.get("notes")) || null;
+
+    if (!INTAKE_CANDIDATE_ALLOWED_ROLES.has(role)) {
+      throw new Error("Invalid role");
+    }
+
+    if (!displayName) {
+      throw new Error("Display name is required");
+    }
+
+    if (!INTAKE_CANDIDATE_ALLOWED_METHODS.has(preferredContactMethod)) {
+      throw new Error("Invalid preferred contact method");
+    }
+
+    const proposedLinkTarget =
+      proposedTargetInput && proposedTargetInput !== "default_from_role"
+        ? proposedTargetInput
+        : defaultIntakeCandidateTargetForRole(role);
+
+    if (!INTAKE_CANDIDATE_ALLOWED_TARGETS.has(proposedLinkTarget)) {
+      throw new Error("Invalid proposed link target");
+    }
+
+    if (!isValidIntakeCandidateRoleTargetPair(role, proposedLinkTarget)) {
+      throw new Error("Invalid role and target pairing");
+    }
+
+    if ((preferredContactMethod === "sms" || preferredContactMethod === "phone") && !phone) {
+      throw new Error("Phone required for preferred contact method");
+    }
+
+    if (preferredContactMethod === "email" && !email) {
+      throw new Error("Email required for preferred contact method");
+    }
+
+    const { error: insertErr } = await admin
+      .from("contractor_intake_contact_candidates")
+      .insert({
+        account_owner_user_id: accountOwnerUserId,
+        contractor_intake_submission_id: submissionId,
+        proposed_role: role,
+        display_name: displayName,
+        phone,
+        email,
+        preferred_contact_method: preferredContactMethod,
+        proposed_link_target: proposedLinkTarget,
+        source_role: "internal",
+        source_type: "internal_review",
+        status: "proposed",
+        notes,
+        created_by_user_id: userId,
+      });
+
+    if (insertErr) throw insertErr;
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("REDIRECT:")) {
+      throw error;
+    }
+
+    if (isMissingIntakeContactCandidatesWriteError(error)) {
+      redirect(`/ops/admin/contractor-intake-submissions/${submissionId}?notice=candidate_table_unavailable`);
+    }
+
+    redirect(`/ops/admin/contractor-intake-submissions/${submissionId}?notice=candidate_add_failed`);
+  }
+
+  revalidatePath("/ops/admin/contractor-intake-submissions");
+  revalidatePath(`/ops/admin/contractor-intake-submissions/${submissionId}`);
+  redirect(`/ops/admin/contractor-intake-submissions/${submissionId}?notice=candidate_added`);
 }
 
 async function listSubmissionComments(params: {
