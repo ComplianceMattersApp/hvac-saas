@@ -241,6 +241,17 @@ export async function insertTargetedInternalNotification(
     throw new Error("Failed to create targeted internal notification row");
   }
 
+  console.info("[notification-actions] targeted notification insert succeeded", {
+    marker: "targeted_internal_notification_insert_succeeded",
+    notification_id: notificationId,
+    notification_type: notificationType,
+    channel,
+    recipient_type: recipientType,
+    recipient_ref: recipientUserId,
+    account_owner_user_id: accountOwnerUserId,
+    job_id: jobId,
+  });
+
   // Fire-and-forget: send web push if feature-gated and enabled
   // Failures are logged and swallowed; never blocks notification creation
   sendWebPushNotificationForInternalNotification({
