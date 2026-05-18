@@ -9545,6 +9545,15 @@ export async function addInternalNoteFromForm(formData: FormData) {
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
+  console.info("[jobs] internal note submission received", {
+    marker: "internal_note_submission_received",
+    job_id: jobId,
+    actor_user_id: userId,
+    account_owner_user_id: internalUser.account_owner_user_id,
+    note_length: note.length,
+    tagged_user_ids_count: taggedUserIds.length,
+  });
+
   const hasContextFields = !!(context || anchorEventId || anchorEventType);
   const meta = hasContextFields
     ? {
@@ -9578,6 +9587,14 @@ export async function addInternalNoteFromForm(formData: FormData) {
   if (duplicateErr) throw duplicateErr;
 
   if (recentDuplicate?.id) {
+    console.info("[jobs] internal note duplicate skipped", {
+      marker: "internal_note_duplicate_skipped",
+      job_id: jobId,
+      actor_user_id: userId,
+      account_owner_user_id: internalUser.account_owner_user_id,
+      tagged_user_ids_count: taggedUserIds.length,
+      has_tagged_user_ids: taggedUserIds.length > 0,
+    });
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath(`/ops`);
     refresh();
