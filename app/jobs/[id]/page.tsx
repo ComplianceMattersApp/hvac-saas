@@ -1253,6 +1253,37 @@ export default async function JobDetailPage({
     };
   });
 
+  const noteCountSummaryPromise = timelineSummaryPromise.then((timelineSummary) =>
+    timedPhase("noteCountSummary", async () => {
+      const narrativeScopeJobIds = timelineSummary.narrativeScopeJobIds;
+
+      const [sharedCountRes, internalCountRes] = await Promise.all([
+        supabase
+          .from("job_events")
+          .select("id", { count: "exact", head: true })
+          .in("job_id", narrativeScopeJobIds)
+          .in("event_type", ["public_note", "contractor_note", "contractor_correction_submission"]),
+        supabase
+          .from("job_events")
+          .select("id", { count: "exact", head: true })
+          .in("job_id", narrativeScopeJobIds)
+          .eq("event_type", "internal_note"),
+      ]);
+
+      if (sharedCountRes.error) throw new Error(sharedCountRes.error.message);
+      if (internalCountRes.error) throw new Error(internalCountRes.error.message);
+
+      const sharedCount = Number(sharedCountRes.count ?? 0) || 0;
+      const internalCount = Number(internalCountRes.count ?? 0) || 0;
+
+      return {
+        sharedCount,
+        internalCount,
+        timelineNoteEventCount: sharedCount + internalCount,
+      };
+    }),
+  );
+
   setPhaseValue("customerAttemptSummary", 0);
 
   const onTheWayUndoEligibilityPromise = timedPhase("undoEligibility", async () =>
@@ -1447,6 +1478,7 @@ export default async function JobDetailPage({
     activeAssignmentDisplayMap,
     serviceCaseSummary,
     timelineSummary,
+    noteCountSummary,
     onTheWayUndoEligibility,
     billingPartyReads,
     visitScopePricebookTemplates,
@@ -1456,6 +1488,7 @@ export default async function JobDetailPage({
     assignmentDisplayPromise,
     serviceCaseSummaryPromise,
     timelineSummaryPromise,
+    noteCountSummaryPromise,
     onTheWayUndoEligibilityPromise,
     billingPartyReadsPromise(),
     visitScopePricebookTemplatesPromise,
@@ -2022,6 +2055,15 @@ const sharedNotesTitle = hasDirectNarrativeChain ? "Shared Notes Across Job Chai
 const internalNotesTitle = hasDirectNarrativeChain ? "Internal Notes Across Job Chain" : "Internal Notes";
 const timelineTitle = hasDirectNarrativeChain ? "Job Chain Timeline" : "Timeline";
 const isHvacServiceMode = productMode === "hvac_service";
+const sharedNotesMeta = noteCountSummary.sharedCount
+  ? `${noteCountSummary.sharedCount} note${noteCountSummary.sharedCount === 1 ? "" : "s"}`
+  : undefined;
+const internalNotesMeta = noteCountSummary.internalCount
+  ? `${noteCountSummary.internalCount} note${noteCountSummary.internalCount === 1 ? "" : "s"}`
+  : undefined;
+const timelineNotesMeta = noteCountSummary.timelineNoteEventCount
+  ? `${noteCountSummary.timelineNoteEventCount} note${noteCountSummary.timelineNoteEventCount === 1 ? "" : "s"}`
+  : undefined;
 const sharedNotesSummaryText = "Notes stream below.";
 const internalNotesSummaryText = "Notes stream below.";
 const timelineSummaryText = "History loads below.";
@@ -5067,7 +5109,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {!isHvacServiceMode ? (
           <details id="shared-notes" className={workspaceDetailsClass} open={Boolean(sharedNoteBannerMessage)}>
             <summary className="cursor-pointer list-none">
-              <CollapsibleHeader title={sharedNotesTitle} subtitle={sharedNotesSummaryText} />
+              <CollapsibleHeader
+                title={sharedNotesTitle}
+                subtitle={sharedNotesSummaryText}
+                meta={sharedNotesMeta}
+              />
             </summary>
 
             <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -5116,7 +5162,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {/* Internal Notes */}
         <details id="internal-notes" className={workspaceDetailsClass} open={Boolean(internalNoteBannerMessage)}>
           <summary className="cursor-pointer list-none">
-            <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} />
+            <CollapsibleHeader
+              title={internalNotesTitle}
+              subtitle={internalNotesSummaryText}
+              meta={internalNotesMeta}
+            />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
@@ -5221,6 +5271,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <CollapsibleHeader
               title={timelineTitle}
               subtitle={timelineSummaryText}
+              meta={timelineNotesMeta}
             />
           </summary>
 
