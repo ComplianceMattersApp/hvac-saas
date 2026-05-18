@@ -2939,16 +2939,17 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {(job.job_type ? String(job.job_type).toUpperCase() : "SERVICE")}
         {serviceCity ? ` • ${serviceCity}` : ""}
       </div>
+      <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer / Account</div>
 
       {job.customer_id ? (
         <Link
           href={`/customers/${job.customer_id}`}
-          className="mt-2 block text-[1.55rem] font-semibold tracking-[-0.02em] text-slate-950 hover:underline"
+          className="mt-1.5 block text-[1.55rem] font-semibold tracking-[-0.02em] text-slate-950 hover:underline"
         >
           {customerDisplayName}
         </Link>
       ) : (
-        <h1 className="mt-2 text-[1.55rem] font-semibold tracking-[-0.02em] text-slate-950">{customerDisplayName}</h1>
+        <h1 className="mt-1.5 text-[1.55rem] font-semibold tracking-[-0.02em] text-slate-950">{customerDisplayName}</h1>
       )}
 
       <div className="mt-4 grid gap-x-6 gap-y-3 border-t border-slate-200/70 pt-4 text-sm sm:grid-cols-2">
@@ -2962,6 +2963,22 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer / Account Phone</div>
             <div className="mt-1 font-semibold text-slate-800">{customerPhone}</div>
+          </div>
+        ) : null}
+        {customerEmail !== "—" ? (
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer / Account Email</div>
+            <div className="mt-1 font-semibold text-slate-800 break-all">{customerEmail}</div>
+          </div>
+        ) : null}
+        {String((job as any).billing_name ?? "").trim() || String((job as any).billing_phone ?? "").trim() || String((job as any).billing_email ?? "").trim() || String((job as any).billing_recipient ?? "").trim() ? (
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Billing Contact / Billing Recipient</div>
+            <div className="mt-1 font-semibold text-slate-800 break-words">
+              {[String((job as any).billing_name ?? "").trim(), String((job as any).billing_phone ?? "").trim(), String((job as any).billing_email ?? "").trim()]
+                .filter(Boolean)
+                .join(" • ") || String((job as any).billing_recipient ?? "").trim()}
+            </div>
           </div>
         ) : null}
       </div>
@@ -2996,6 +3013,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </a>
         ) : null}
       </div>
+
+      <p className="mt-2 text-xs text-slate-500">Confirm whether this is the site contact before calling or texting.</p>
 
       <ContactLoggingQuickActions
         jobId={String(job.id)}

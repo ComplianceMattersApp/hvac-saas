@@ -1692,6 +1692,12 @@ const [billingRecipient, setBillingRecipient] = useState<
         <section className="space-y-3">
           <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Customer &amp; Location</h2>
 
+          {isInternalMode ? (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-3 text-sm text-blue-900">
+              Who should be contacted for this job? If the tenant, property manager, or responsible party is different, include that in job notes for now.
+            </div>
+          ) : null}
+
           {isContractorMode ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 space-y-1.5">
               <p className="text-xs font-semibold text-amber-900">Reviewed by our team</p>

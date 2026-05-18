@@ -197,6 +197,9 @@ export default async function CustomerEditPage({
   <div className="text-sm text-slate-500">
     Update contact info and billing address.
   </div>
+  <div className="text-xs text-slate-500">
+    Use these fields for the customer/account contact. Job-specific site contacts can be tracked separately when available.
+  </div>
 </div>
 
 

@@ -718,6 +718,9 @@ export default async function CustomerDetailPage(props: {
                 Customer Overview
               </h2>
             </div>
+            <p className="mb-4 text-sm text-slate-500">
+              This is the account/customer contact. Site contact or tenant details may differ by job.
+            </p>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
@@ -791,6 +794,9 @@ export default async function CustomerDetailPage(props: {
                 </a>
               ) : null}
             </div>
+            <p className="mt-3 text-xs text-slate-500">
+              Calls and emails here use the account/customer contact and may not be the person on site for every job.
+            </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
