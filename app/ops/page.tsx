@@ -35,6 +35,7 @@ import {
   buildOperationalReportingReadModel,
   type OperationalReportingJob,
 } from "@/lib/ops/operational-reporting";
+import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { summarizeMaintenanceAgreementsForAccount } from "@/lib/maintenance-agreements/read-model";
@@ -511,8 +512,8 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
       .is("deleted_at", null)
       .neq("status", "cancelled")
       .eq("field_complete", true)
-      .order("field_complete_at", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: true })
+      .neq("ops_status", "closed")
+      .order("created_at", { ascending: false })
       .limit(100);
 
     closeoutQ = applyCommonFilters(closeoutQ);
@@ -1604,9 +1605,7 @@ function closeoutLabel(j: any) {
 }
 
 const closeoutJobs = sortJobs(
-  (closeoutSourceJobs ?? []).filter((j: any) => {
-    return isInCloseoutQueue(getCloseoutProjection(j));
-  }),
+  listCloseoutQueueJobs(closeoutSourceJobs ?? [], getCloseoutProjection),
   sort
 );
 
