@@ -2960,7 +2960,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
         {customerPhone !== "—" ? (
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Phone</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer / Account Phone</div>
             <div className="mt-1 font-semibold text-slate-800">{customerPhone}</div>
           </div>
         ) : null}
