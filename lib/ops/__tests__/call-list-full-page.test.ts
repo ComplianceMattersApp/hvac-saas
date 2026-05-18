@@ -12,6 +12,11 @@ const callListPageSource = readFileSync(
   "utf-8",
 );
 
+const recentAttemptDisplaySource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/recent-attempt-display.ts"),
+  "utf-8",
+);
+
 describe("/ops call list — Full Page link", () => {
   it("renders a link to /ops/call-list from the call list card header", () => {
     expect(opsPageSource).toContain('href={`/ops/call-list');
@@ -31,7 +36,7 @@ describe("/ops call list — Full Page link", () => {
   });
 
   it("uses a subtle no-attempt fallback copy on ops cards", () => {
-    expect(opsPageSource).toContain("No attempts yet");
+    expect(recentAttemptDisplaySource).toContain("No attempts yet");
   });
 });
 
