@@ -84,8 +84,8 @@ export default async function OpsAdminPage() {
     {
       section: "people",
       eyebrow: "People",
-      title: "People & Access",
-      description: "Manage access, invites, and account-level permissions.",
+      title: "Directory & Access Recovery",
+      description: "Search internal and contractor accounts, and handle invite or recovery actions.",
       href: "/ops/admin/users",
       ctaLabel: "Open workspace",
       enabled: true,
@@ -93,8 +93,8 @@ export default async function OpsAdminPage() {
     {
       section: "people",
       eyebrow: "People",
-      title: "Internal Team",
-      description: "Manage internal team members who perform office or field work.",
+      title: "Internal Roles & Team Setup",
+      description: "Manage internal roles, active status, and team-setup confirmation for office and field staff.",
       href: "/ops/admin/internal-users",
       ctaLabel: "Open workspace",
       enabled: true,

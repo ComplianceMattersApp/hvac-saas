@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
+import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode-defaults";
 
 async function requireReviewerOrRedirect() {
   const supabase = await createClient();
@@ -17,7 +18,7 @@ async function requireReviewerOrRedirect() {
       userId: user.id,
     });
 
-    return { userId: user.id, internalUser: authz.internalUser };
+    return { supabase, userId: user.id, internalUser: authz.internalUser };
   } catch (error) {
     if (isInternalAccessError(error)) {
       const { data: cu, error: cuErr } = await supabase
@@ -49,8 +50,12 @@ function formatDateTime(value: string | null) {
 }
 
 export default async function ContractorIntakeSubmissionsPage() {
-  const { internalUser } = await requireReviewerOrRedirect();
+  const { supabase, internalUser } = await requireReviewerOrRedirect();
   const admin = createAdminClient();
+  const productMode = await resolveProductModeForAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   const { data, error } = await admin
     .from("contractor_intake_submissions")
@@ -97,6 +102,12 @@ export default async function ContractorIntakeSubmissionsPage() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        {productMode === "hvac_service" ? (
+          <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            Optional collaboration tool for HVAC Service accounts. Use this queue only when outside contractor collaboration is needed.
+          </div>
+        ) : null}
+
         <div className="mb-3 text-sm font-semibold text-slate-900">
           Pending proposals ({rows.length})
         </div>

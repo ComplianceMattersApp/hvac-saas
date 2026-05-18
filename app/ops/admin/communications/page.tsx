@@ -507,12 +507,9 @@ export default async function AdminCommunicationsPage({
         <div className="mt-4 space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-700">
             <p className="font-medium text-slate-900">{templateGovernance.status.statusLabel}</p>
-            <p className="mt-1">SMS is not enabled.</p>
-            <p className="mt-1">Live sends are disabled.</p>
-            <p className="mt-1">Template approval does not enable sending.</p>
-            <p className="mt-1">Sample preview only.</p>
-            <p className="mt-1">Mark On The Way does not send SMS.</p>
-            <p className="mt-1">Final wording may still require legal/provider review.</p>
+            <p className="mt-1">SMS is not enabled and live sends are disabled.</p>
+            <p className="mt-1">Template approval and Mark On The Way do not send SMS.</p>
+            <p className="mt-1">Sample previews are informational only; final wording may still require legal/provider review.</p>
           </div>
 
           {templateNotice ? (
@@ -600,12 +597,9 @@ export default async function AdminCommunicationsPage({
             </div>
 
             <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-sm text-slate-700">
-              <p>SMS is not enabled.</p>
-              <p className="mt-1">Live sends are disabled.</p>
-              <p className="mt-1">Template approval does not enable sending.</p>
-              <p className="mt-1">Sample preview only.</p>
-              <p className="mt-1">Mark On The Way does not send SMS.</p>
-              <p className="mt-1">Final wording may still require legal/provider review.</p>
+              <p>SMS is not enabled and live sends are disabled.</p>
+              <p className="mt-1">Template approval and Mark On The Way do not send SMS.</p>
+              <p className="mt-1">Sample previews are informational only; final wording may still require legal/provider review.</p>
             </div>
 
             {latestVersionIsMutableDraft ? (

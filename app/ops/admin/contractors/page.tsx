@@ -14,6 +14,7 @@ import {
   resendContractorInviteFromForm,
   sendPasswordResetFromForm,
 } from "@/lib/actions/admin-user-actions";
+import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode-defaults";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -72,6 +73,10 @@ export default async function AdminContractorsPage({
 
   const { supabase, internalUser } = await requireAdminOrRedirect();
   const admin = createAdminClient();
+  const productMode = await resolveProductModeForAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   const { data: contractors, error } = await supabase
     .from("contractors")
@@ -491,6 +496,12 @@ export default async function AdminContractorsPage({
       {notice ? (
         <div className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${bannerClass(notice.tone)}`}>
           {notice.message}
+        </div>
+      ) : null}
+
+      {productMode === "hvac_service" ? (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 shadow-sm">
+          Optional collaboration tool for HVAC Service accounts. Use this workspace only when outside contractor collaboration is needed.
         </div>
       ) : null}
 

@@ -411,8 +411,8 @@ function PlatformAccountSection({
       <dl className="grid grid-cols-2 gap-px bg-slate-100/70 sm:grid-cols-4">
         <PlatformAccountField label="Plan" value={planLabel} />
         <PlatformAccountField label="Account status" value={statusLabel} />
-        <PlatformAccountField label="Active users" value={String(entitlement.activeSeatCount)} />
-        <PlatformAccountField label="User limit" value={userLimitLabel} />
+        <PlatformAccountField label="Active seats used" value={String(entitlement.activeSeatCount)} />
+        <PlatformAccountField label="Seat limit" value={userLimitLabel} />
       </dl>
       <dl className="grid grid-cols-1 gap-px border-t border-slate-100 bg-slate-100/70 sm:grid-cols-3">
         <PlatformAccountField

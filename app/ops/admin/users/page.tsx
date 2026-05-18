@@ -106,6 +106,18 @@ function matchesQuery(record: UserRecord, query: string) {
   );
 }
 
+function toCategoryLabel(category: UserRecord["category"]) {
+  if (category === "internal") return "Internal user";
+  return "Contractor user";
+}
+
+function toLifecycleLabel(lifecycle: Lifecycle) {
+  if (lifecycle === "invited") return "Invitation pending";
+  if (lifecycle === "inactive") return "Inactive";
+  if (lifecycle === "active") return "Active";
+  return "Unknown";
+}
+
 async function requireAdminOrRedirect() {
   const supabase = await createClient();
   const {
@@ -499,7 +511,7 @@ export default async function AdminUsersCommandCenterPage({
                               : "border-indigo-200 bg-indigo-50 text-indigo-800"
                           }`}
                         >
-                          {record.category}
+                          {toCategoryLabel(record.category)}
                         </span>
                         {record.role ? (
                           <span
@@ -515,7 +527,7 @@ export default async function AdminUsersCommandCenterPage({
                             record.lifecycle,
                           )}`}
                         >
-                          {record.lifecycle}
+                          {toLifecycleLabel(record.lifecycle)}
                         </span>
                         {isSelf ? (
                           <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">

@@ -60,7 +60,7 @@ export default function UserAccountMenu({ accountName, accountLabel, isAdmin }: 
           <span className="inline-flex items-center gap-1.5">
             <span>{accountLabel}</span>
             <span className="text-slate-400">•</span>
-            <span className="text-slate-500">Settings</span>
+            <span className="text-slate-500">Account menu</span>
           </span>
         </span>
       </button>
