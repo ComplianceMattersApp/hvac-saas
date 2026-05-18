@@ -4,9 +4,9 @@ export default function JobDetailLoading() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
-            <div className="h-3 w-32 animate-pulse rounded bg-slate-200" />
-            <div className="mt-3 h-8 w-72 max-w-full animate-pulse rounded bg-slate-200" />
-            <div className="mt-3 h-4 w-96 max-w-full animate-pulse rounded bg-slate-100" />
+            <div className="h-8 w-72 max-w-full animate-pulse rounded bg-slate-200" />
+            <div className="mt-2 h-4 w-80 max-w-full animate-pulse rounded bg-slate-100" />
+            <div className="mt-2 h-6 w-52 max-w-full animate-pulse rounded-full border border-slate-200 bg-slate-50" />
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
             {Array.from({ length: 4 }).map((_, index) => (

@@ -115,8 +115,6 @@ import InternalInvoiceLineItemsTable, {
 } from "./_components/InternalInvoiceLineItemsTable";
 import VisitScopeJobDetailForm from "@/components/jobs/VisitScopeJobDetailForm";
 import {
-  buildVisitScopeIncludesReadModel,
-  buildPromotedCompanionReadModel,
   buildVisitScopeReadModel,
   formatVisitScopeItemKindLabel,
   isVisitScopeItemPromoted,
@@ -1658,7 +1656,7 @@ const customerEmail =
       ? `Ends ${formatTimeDisplay(job.window_end)}`
       : job.scheduled_date
       ? "Time window TBD"
-      : "Use the schedule controls below to assign a visit time.";
+      : "No time window set";
 
 function formatOpsStatusLabel(value?: string | null) {
   const v = String(value ?? "").trim();
@@ -1952,10 +1950,6 @@ const visitScopeHeaderPreview = buildVisitScopeReadModel(visitScopeSummary, visi
   previewItemCount: 1,
   previewItemMaxLength: 34,
 });
-const visitScopeIncludesHeader = buildVisitScopeIncludesReadModel(visitScopeSummary, visitScopeItems, {
-  leadMaxLength: 96,
-});
-const promotedCompanionHeader = buildPromotedCompanionReadModel(visitScopeItems);
 const primaryVisitScopeItems = visitScopeItems.filter((item) => item.kind === "primary");
 const companionVisitScopeItems = visitScopeItems.filter((item) => item.kind === "companion_service");
 const visitScopeLeadText = visitScopeSummary || visitScopeHeaderPreview.lead;
@@ -2093,6 +2087,14 @@ const sharedNotesTitle = hasDirectNarrativeChain ? "Shared Notes Across Job Chai
 const internalNotesTitle = hasDirectNarrativeChain ? "Internal Notes Across Job Chain" : "Internal Notes";
 const timelineTitle = hasDirectNarrativeChain ? "Job Chain Timeline" : "Timeline";
 const isHvacServiceMode = productMode === "hvac_service";
+const headerJobTypeLabel = String(job.job_type ?? "service")
+  .split("_")
+  .filter(Boolean)
+  .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+  .join(" ");
+const headerMetaLine = [headerJobTypeLabel, serviceCity, formatOpsStatusLabel(job.ops_status)]
+  .filter((part) => String(part ?? "").trim().length > 0)
+  .join(" • ");
 const showSharedNotesCard = !isHvacServiceMode;
 const showEccSummaryCard = job.job_type === "ecc";
 const lowerGridCardCount = 6 + (showSharedNotesCard ? 1 : 0) + (showEccSummaryCard ? 1 : 0);
@@ -2888,39 +2890,16 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
 <section className={`${workspaceSectionClass} mb-6 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] shadow-[0_20px_44px_-34px_rgba(15,23,42,0.26)]`}>
   <div className="mb-4 border-b border-slate-200/80 pb-4">
-    <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-      <span>Job Workspace</span>
-      <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/88 px-2.5 py-1 text-[10px] tracking-[0.12em] text-slate-500 shadow-[0_8px_18px_-22px_rgba(15,23,42,0.2)]">
-        <span className="text-slate-400">ID</span>
-        <span className="font-mono text-[11px] text-slate-700">{job.id}</span>
-      </span>
-    </div>
-
-    <div className="mt-3 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div className="mt-1 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <div className="min-w-0 max-w-3xl">
-        <p className="max-w-xl text-sm leading-6 text-slate-600">
-          Manage scheduling, field progress, and closeout for this job.
-        </p>
         <h1 className="text-[clamp(1.35rem,2vw,1.85rem)] font-semibold tracking-[-0.02em] text-slate-950">
           {normalizeRetestLinkedJobTitle(job.title) || "Operational job workspace"}
         </h1>
-        {isInternalUser && String(job.job_type ?? "").toLowerCase() === "ecc" && visitScopeIncludesHeader.hasContent ? (
-          <div className="mt-1.5 flex max-w-2xl flex-wrap items-center gap-1.5 text-xs text-slate-600">
-            <span className="font-semibold uppercase tracking-[0.1em] text-slate-500">Includes</span>
-            <span className="font-medium text-slate-700">{visitScopeIncludesHeader.label}</span>
-          </div>
-        ) : null}
-        {!isFieldComplete ? (
-          <p className="mt-1 text-xs text-slate-500">
-            {!hasFullSchedule ? "Next: set a schedule to dispatch." : "Scheduled — use the field status buttons when work begins."}
-          </p>
-        ) : null}
-        {isInternalUser && String(job.job_type ?? "").toLowerCase() === "ecc" && promotedCompanionHeader.hasPromotedCompanion ? (
-          <div className="mt-2 flex max-w-2xl flex-wrap items-center gap-1.5 text-xs text-emerald-700">
-            <span className="font-semibold uppercase tracking-[0.1em] text-emerald-600">Follow-up</span>
-            <span className="font-medium">{promotedCompanionHeader.label}</span>
-          </div>
-        ) : null}
+        <div className="mt-1.5 text-sm font-medium text-slate-600">{headerMetaLine}</div>
+        <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+          <span className="text-slate-400">Job ID</span>
+          <span className="font-mono normal-case tracking-normal text-slate-600">{job.id}</span>
+        </div>
       </div>
       <div id="field-status-actions" className="flex w-full flex-col gap-2.5 xl:w-auto xl:min-w-[24rem] xl:items-end">
         {!isFieldComplete ? (
@@ -3017,7 +2996,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <span className="font-semibold text-slate-900">{visitScopeBadgeMainText}</span>
             <a
               href="#visit-scope-section"
-              className="font-semibold text-slate-600 underline-offset-2 transition-colors hover:text-slate-900 hover:underline"
+              className="text-xs font-medium text-slate-500 underline-offset-2 transition-colors hover:text-slate-700 hover:underline"
             >
               {hasVisitScopeDefined ? "View details" : "Add details"}
             </a>
