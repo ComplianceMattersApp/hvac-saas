@@ -8,6 +8,8 @@ import {
 } from "@/lib/jobs/visit-scope";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonDisplayName } from "@/lib/utils/identity-display";
+import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
+import { summarizeScheduledAssignmentDisplay } from "@/lib/staffing/scheduled-assignment-display";
 
 
 const QUEUES = [
@@ -152,6 +154,15 @@ if (countsData) {
     );
   }
 
+  const jobIds = (jobs ?? [])
+    .map((job: any) => String(job?.id ?? "").trim())
+    .filter(Boolean);
+
+  const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
+    supabase,
+    jobIds,
+  });
+
           const customerIds = Array.from(
       new Set((jobs ?? []).map((j: any) => j.customer_id).filter(Boolean))
     ) as string[];
@@ -280,6 +291,10 @@ const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.
     : null;
   const promotedCompanion = buildPromotedCompanionReadModel(job.visit_scope_items);
   const followUpDateDisplay = job.follow_up_date ? formatDateOnlyDisplay(job.follow_up_date) : "";
+  const isScheduledJob = Boolean(String(job.scheduled_date ?? "").trim());
+  const assignmentSummary = isScheduledJob
+    ? summarizeScheduledAssignmentDisplay(activeAssignmentDisplayMap[String(job.id ?? "")] ?? [])
+    : null;
 
   return (
 
@@ -300,6 +315,20 @@ const displayCity: string = [l?.city ?? job.city ?? null, [l?.state ?? null, l?.
                     <span className="font-medium">{formatOpsStatusLabel(job.ops_status)}</span>
                     {job.follow_up_date ? <> • Follow-up: {followUpDateDisplay}</> : null}
                   </div>
+
+                  {assignmentSummary ? (
+                    <div className="mt-1 text-xs">
+                      <span
+                        className={
+                          assignmentSummary.isUnassigned
+                            ? "inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-800"
+                            : "inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium text-slate-700"
+                        }
+                      >
+                        {assignmentSummary.text}
+                      </span>
+                    </div>
+                  ) : null}
 
                   {visitScope.hasContent ? (
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-600">

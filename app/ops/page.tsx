@@ -2001,7 +2001,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   const scheduleLabel = showDate ? "Scheduled" : "Schedule";
   const hasContractorMeta = contractorName !== "Unassigned";
   const isTechUnassigned = assignmentSummary === "Unassigned";
-  const assignedDisplay = isTechUnassigned ? "Tech not assigned" : assignmentSummary;
+  const assignedDisplay = isTechUnassigned ? "No tech assigned" : assignmentSummary;
   const reasonCallout = isFailedFamily
     ? {
         tone: "border-rose-200/80 bg-rose-50/60 text-rose-900",
