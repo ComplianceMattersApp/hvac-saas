@@ -1,9 +1,38 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildInternalJobRoleContactSections,
   formatRoleForInternalDisplay,
   isDisplayableRole,
   INTERNAL_DISPLAY_RECIPIENT_ROLES,
 } from "@/lib/communications/contact-recipients-display";
+import type { ContactRecipientRow } from "@/lib/communications/contact-recipients-read";
+
+function makeRecipient(overrides?: Partial<ContactRecipientRow>): ContactRecipientRow {
+  return {
+    id: "recipient-1",
+    account_owner_user_id: "owner-1",
+    linked_entity_type: "customer",
+    linked_entity_id: "customer-1",
+    display_name: "Contact One",
+    phone_e164: "+15551234567",
+    phone_last10: "5551234567",
+    email: "contact@example.com",
+    recipient_role: "homeowner",
+    status: "active",
+    preferred_contact_method: "phone",
+    recipient_timezone: null,
+    source_type: "manual",
+    source_ref: null,
+    notes: null,
+    created_by_user_id: "user-1",
+    updated_by_user_id: "user-1",
+    deactivated_at: null,
+    deactivated_by_user_id: null,
+    created_at: "2026-05-18T00:00:00.000Z",
+    updated_at: "2026-05-18T00:00:00.000Z",
+    ...overrides,
+  };
+}
 
 describe("contact recipient display", () => {
   it("formats displayable roles correctly", () => {
@@ -64,5 +93,49 @@ describe("contact recipient display", () => {
       "billing_contact",
       "third_party_oversight",
     ]);
+  });
+
+  it("builds job detail sections with customer-linked contacts when available", () => {
+    const customerContact = makeRecipient({
+      id: "recipient-customer-1",
+      linked_entity_type: "customer",
+      linked_entity_id: "customer-1",
+    });
+
+    const sections = buildInternalJobRoleContactSections({
+      customerLinkedContacts: [customerContact],
+      jobLinkedContacts: [],
+    });
+
+    expect(sections).toHaveLength(1);
+    expect(sections[0].title).toBe("Customer / Account Role Contacts");
+    expect(sections[0].recipients).toHaveLength(1);
+  });
+
+  it("keeps job-linked contacts visible when present", () => {
+    const jobContact = makeRecipient({
+      id: "recipient-job-1",
+      linked_entity_type: "job",
+      linked_entity_id: "job-1",
+      recipient_role: "site_access_contact",
+    });
+
+    const sections = buildInternalJobRoleContactSections({
+      customerLinkedContacts: [],
+      jobLinkedContacts: [jobContact],
+    });
+
+    expect(sections).toHaveLength(1);
+    expect(sections[0].title).toBe("Job-Specific Contacts");
+    expect(sections[0].recipients).toHaveLength(1);
+  });
+
+  it("returns empty sections safely when no role contacts exist", () => {
+    const sections = buildInternalJobRoleContactSections({
+      customerLinkedContacts: [],
+      jobLinkedContacts: [],
+    });
+
+    expect(sections).toEqual([]);
   });
 });

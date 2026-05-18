@@ -134,6 +134,7 @@ import ConfirmNextDueDateActionButton from "./_components/ConfirmNextDueDateActi
 import {
   listContactRecipientsForEntity,
 } from "@/lib/communications/contact-recipients-read";
+import { buildInternalJobRoleContactSections } from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
 
 function dateToDateInput(value?: string | null) {
@@ -1266,6 +1267,16 @@ export default async function JobDetailPage({
     limit: 100,
   }).catch(() => []);
 
+  const customerRoleContactsPromise = customerId
+    ? listContactRecipientsForEntity({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        linkedEntityType: "customer",
+        linkedEntityId: customerId,
+        limit: 100,
+      }).catch(() => [])
+    : Promise.resolve([]);
+
   const contractorBillingPromise = contractorId
     ? supabase
         .from("contractors")
@@ -1439,6 +1450,7 @@ export default async function JobDetailPage({
     onTheWayUndoEligibility,
     billingPartyReads,
     visitScopePricebookTemplates,
+    customerRoleContacts,
     jobRoleContacts,
   ] = await Promise.all([
     assignmentDisplayPromise,
@@ -1447,6 +1459,7 @@ export default async function JobDetailPage({
     onTheWayUndoEligibilityPromise,
     billingPartyReadsPromise(),
     visitScopePricebookTemplatesPromise,
+    customerRoleContactsPromise,
     jobRoleContactsPromise,
   ]);
 
@@ -1483,6 +1496,10 @@ export default async function JobDetailPage({
     "—");
 
   const customerDisplayName = formatPersonNamePart(customerName);
+  const roleContactSections = buildInternalJobRoleContactSections({
+    customerLinkedContacts: customerRoleContacts,
+    jobLinkedContacts: jobRoleContacts,
+  });
 
 const customerPhone =
   customerBilling?.phone ?? job.customer_phone ?? "—";
@@ -3038,11 +3055,14 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         buttonClassName="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
       />
 
-      <RoleContactsCard
-        title="Role Contacts"
-        recipients={jobRoleContacts}
-        className="mt-4"
-      />
+      {roleContactSections.map((section, index) => (
+        <RoleContactsCard
+          key={section.title}
+          title={section.title}
+          recipients={section.recipients}
+          className={index === 0 ? "mt-4" : "mt-3"}
+        />
+      ))}
 
       <div id="assigned-team" className="mt-4 scroll-mt-24 border-t border-slate-200/80 pt-4">
         {assignmentBannerMessage ? (

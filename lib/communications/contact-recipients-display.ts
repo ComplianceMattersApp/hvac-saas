@@ -1,4 +1,4 @@
-import type { ContactRecipientRole } from "./contact-recipients-read";
+import type { ContactRecipientRole, ContactRecipientRow } from "./contact-recipients-read";
 
 /**
  * Internal display roles only: safe to show in internal UI without SMS/email behavior.
@@ -46,4 +46,32 @@ export function formatRoleForInternalDisplay(role: ContactRecipientRole | string
  */
 export function isDisplayableRole(role: ContactRecipientRole | string): boolean {
   return formatRoleForInternalDisplay(role) !== null;
+}
+
+export type InternalRoleContactSection = {
+  title: "Customer / Account Role Contacts" | "Job-Specific Contacts";
+  recipients: ContactRecipientRow[];
+};
+
+export function buildInternalJobRoleContactSections(params: {
+  customerLinkedContacts: ContactRecipientRow[];
+  jobLinkedContacts: ContactRecipientRow[];
+}): InternalRoleContactSection[] {
+  const sections: InternalRoleContactSection[] = [];
+
+  if (params.customerLinkedContacts.length > 0) {
+    sections.push({
+      title: "Customer / Account Role Contacts",
+      recipients: params.customerLinkedContacts,
+    });
+  }
+
+  if (params.jobLinkedContacts.length > 0) {
+    sections.push({
+      title: "Job-Specific Contacts",
+      recipients: params.jobLinkedContacts,
+    });
+  }
+
+  return sections;
 }
