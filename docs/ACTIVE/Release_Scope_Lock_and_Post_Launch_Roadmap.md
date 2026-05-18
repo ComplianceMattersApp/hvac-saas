@@ -38,6 +38,15 @@ Field bus closeout documentation note (May 2026):
    - `/ops/call-list` dedicated full page and polish
    - schedule update permit-field preservation in `updateJobScheduleFromForm`
 
+Push Notifications V1 closeout (May 2026):
+- Web push delivery is now active and field-proven in production (commit 5a4d732, deployed to dpl_6m3kDYv7sgHgy1ecdGa3tLJpZrSh)
+- Supported events: `internal_job_assigned`, `internal_note_tag`
+- Device enrollment is per-browser/device; users explicitly enable push separately on each device
+- Feature flag: `ENABLE_WEB_PUSH=true`; rollback is ENABLE_WEB_PUSH=false + redeploy
+- In-app notifications remain the primary delivery channel; web push is secondary/best-effort
+- RLS was not weakened; SMS/email/Twilio remain inactive
+- See `docs/ACTIVE/PWA_Push_Outside_App_Alerts_Planning_Audit.md` for complete V1 closeout details and production runbook
+
 ECC verification expansion closeout note (May 2026):
 - Active documentation now records completed ECC verification expansion passes for:
    - mini split/ductless applicability clarification and preserved labeling

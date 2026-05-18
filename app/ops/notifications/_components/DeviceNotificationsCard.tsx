@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bell, BellOff, Smartphone } from "lucide-react";
+import { Bell, BellOff, Smartphone, ChevronDown, ChevronUp } from "lucide-react";
 import type { PushSubscriptionSafeRow } from "@/lib/notifications/push-subscriptions";
 import type {
   DeactivateBrowserPushSubscriptionResult,
   RegisterBrowserPushSubscriptionResult,
 } from "@/lib/actions/push-subscription-actions";
+import { DeviceNotificationsDeviceList } from "./DeviceNotificationsDeviceList";
 
 type DeviceNotificationsCardProps = {
   initialSubscriptions: PushSubscriptionSafeRow[];
@@ -90,6 +91,7 @@ export function DeviceNotificationsCard({
   const [message, setMessage] = useState<string | null>(null);
   const [currentEndpoint, setCurrentEndpoint] = useState<string | null>(null);
   const [activeCount, setActiveCount] = useState(initialSubscriptions.length);
+  const [showDeviceList, setShowDeviceList] = useState(false);
   const savedEndpoints = useMemo(
     () => new Set(initialSubscriptions.map((subscription) => subscription.endpoint)),
     [initialSubscriptions],
@@ -145,20 +147,50 @@ export function DeviceNotificationsCard({
   }, [publicVapidKey, savedEndpoints]);
 
   const statusText = useMemo(() => {
-    if (state === "unsupported") return "Device notifications are not supported in this browser.";
-    if (state === "missing_config") return "Device notification setup needs a public push key.";
-    if (state === "denied") return "Notifications are blocked in this browser.";
-    if (state === "enabled") return "Device notifications are enabled for this browser.";
-    if (state === "needs_resync") return message ?? "This browser subscription needs to be re-synced with the server.";
-    if (state === "saving") return "Saving this device...";
-    if (state === "failed") return message ?? "Device notification setup failed. Try again.";
-    if (activeCount > 0) return "Device notifications are enabled on another device.";
-    return "Enable this browser to receive future device notifications.";
+    switch (state) {
+      case "unsupported":
+        return "Device notifications are not supported in this browser.";
+      case "missing_config":
+        return "Device notification setup needs a public push key.";
+      case "denied":
+        return "Notifications are blocked in this browser.";
+      case "enabled":
+        return "Get notified when you are assigned to a job or mentioned in an internal note.";
+      case "needs_resync":
+        return message ?? "This browser subscription needs to be re-synced with the server.";
+      case "saving":
+        return "Saving this device...";
+      case "failed":
+        return message ?? "Device notification setup failed. Try again.";
+      case "checking":
+      case "not_enabled":
+      default:
+        if (activeCount > 0) {
+          return "Get notified on this device when you are assigned to a job or mentioned in an internal note.";
+        }
+        return "Get notified when you are assigned to a job or mentioned in an internal note.";
+    }
   }, [activeCount, message, state]);
+
+  const promptTitle = useMemo(() => {
+    switch (state) {
+      case "unsupported":
+      case "missing_config":
+        return "Device Notifications Not Available";
+      case "denied":
+        return "Notifications Blocked";
+      case "enabled":
+        return "Device Notifications Enabled";
+      case "saving":
+        return "Saving...";
+      default:
+        return "Turn on job alerts for this device";
+    }
+  }, [state]);
 
   const canEnable = state === "not_enabled" || state === "failed" || state === "needs_resync";
   const canDisable = state === "enabled" && Boolean(currentEndpoint);
-  const enableButtonLabel = state === "needs_resync" ? "Re-sync this device" : "Enable device notifications";
+  const enableButtonLabel = state === "needs_resync" ? "Re-sync this device" : "Enable alerts on this device";
 
   async function handleEnable() {
     setMessage(null);
@@ -256,8 +288,33 @@ export function DeviceNotificationsCard({
     }
   }
 
+  // Show helpful guidance for unsupported/denied states
+  const isUnsupported = state === "unsupported" || state === "missing_config";
+  const isDenied = state === "denied";
+
+  if (isUnsupported || isDenied) {
+    return (
+      <section className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-sm">
+        <div className="flex gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+            <Smartphone className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold text-slate-900">{promptTitle}</h2>
+            <p className="mt-1 text-sm text-slate-600">{statusText}</p>
+            {isDenied && (
+              <p className="mt-2 text-xs text-slate-600">
+                To enable notifications, go to your browser settings and allow notifications for Compliance Matters, then reload this page.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="mb-6 space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex min-w-0 gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700">
@@ -265,17 +322,19 @@ export function DeviceNotificationsCard({
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-sm font-semibold text-slate-900">Device notifications</h2>
-              <span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                Enrollment only
-              </span>
+              <h2 className="text-sm font-semibold text-slate-900">{promptTitle}</h2>
+              {state === "enabled" && (
+                <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                  Active
+                </span>
+              )}
+              {state !== "enabled" && activeCount > 0 && (
+                <span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                  {activeCount} other {activeCount === 1 ? "device" : "devices"} active
+                </span>
+              )}
             </div>
             <p className="mt-1 text-sm text-slate-600">{statusText}</p>
-            {activeCount > 0 && state !== "enabled" ? (
-              <p className="mt-1 text-xs text-slate-500">
-                {activeCount} active device {activeCount === 1 ? "subscription" : "subscriptions"} saved.
-              </p>
-            ) : null}
           </div>
         </div>
 
@@ -287,7 +346,7 @@ export function DeviceNotificationsCard({
               className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <BellOff className="h-4 w-4" aria-hidden="true" />
-              Disable this device
+              Not now
             </button>
           ) : (
             <button
@@ -302,6 +361,40 @@ export function DeviceNotificationsCard({
           )}
         </div>
       </div>
+
+      {/* Device list toggle */}
+      {activeCount > 0 && (
+        <div className="border-t border-slate-100 pt-3">
+          <button
+            type="button"
+            onClick={() => setShowDeviceList(!showDeviceList)}
+            className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-sm font-medium text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300"
+          >
+            {showDeviceList ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            <span>
+              {activeCount} enrolled {activeCount === 1 ? "device" : "devices"}
+            </span>
+          </button>
+
+          {showDeviceList && (
+            <div className="mt-3">
+              <DeviceNotificationsDeviceList
+                subscriptions={initialSubscriptions}
+                currentEndpoint={currentEndpoint}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Guidance text */}
+      {state === "not_enabled" && activeCount === 0 && (
+        <div className="border-t border-slate-100 pt-3">
+          <p className="text-xs text-slate-500">
+            Device alerts are per browser/device. Enable alerts separately on your phone, tablet, and desktop. Turning this off only affects this browser/device.
+          </p>
+        </div>
+      )}
     </section>
   );
 }

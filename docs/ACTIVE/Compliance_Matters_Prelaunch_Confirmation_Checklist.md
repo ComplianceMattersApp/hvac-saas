@@ -1377,6 +1377,19 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Focused work should use short-lived branches created from current `main`, merged back only after validation, then retired.
 - The Supabase sandbox environment remains usable; only the stale Git branch was retired.
 
+### 2.23 Push Notifications V1 — field-ready device alert delivery (completed)
+- **Production deployment confirmed:** commit `5a4d732` ("Pass 2D-D7 add privileged push delivery") is deployed to `dpl_6m3kDYv7sgHgy1ecdGa3tLJpZrSh` aliased to `app.compliancemattersca.com`.
+- **Field smoke passed:** @mention phone push confirmed working; existing and new job assignment phone push confirmed working; in-app notification visibility confirmed.
+- **Scope locked:** Push delivery is active for `internal_job_assigned` and `internal_note_tag` only; no broadcast push; no SMS/email/Twilio activated.
+- **Feature flag:** `ENABLE_WEB_PUSH=true` (exact string); rollback is `ENABLE_WEB_PUSH=false` + redeploy.
+- **RLS not weakened:** No migrations touched; push subscriptions and delivery attempts remain account-owner-scoped; privileged delivery path isolated to push send only.
+- **Device enrollment:** Per-browser/device; users explicitly enable push separately on each device; no auto-enrollment on page load.
+- **First-use UX:** Device notification enrollment card on `/account` (primary) and `/ops/notifications` (secondary).
+- **User boundaries:** Internal users can manage their own device subscriptions; contractors/portal users cannot access internal push enrollment unless explicitly enabled later.
+- **Safe fields:** Device list shows only safe metadata (device label, active/inactive state, enrolled date, last seen date); never exposes endpoint, p256dh, auth, or VAPID private key.
+- **Deliverability audit trail:** `notification_delivery_attempts` records all push send attempts with safe fields: notification_id, status, error_code, provider_status_code, attempted_at.
+- **Runbook reference:** see `docs/ACTIVE/PWA_Push_Outside_App_Alerts_Planning_Audit.md` for complete V1 closeout, architecture, and operational procedures.
+
 ---
 
 ## 3. Support / customer-operations readiness

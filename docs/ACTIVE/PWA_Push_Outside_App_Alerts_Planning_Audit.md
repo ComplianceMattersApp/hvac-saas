@@ -1,8 +1,60 @@
 # Compliance Matters Software — Pass 2D PWA Push / Outside-App Alerts Planning Audit
 
-**Status:** planning only; no push delivery activated  
-**Date:** 2026-05-15  
-**Scope:** outside-app alerts for internal job assignment and internal-note mention notifications, with PWA/device push as the first candidate channel.
+**Status:** Push Notifications V1 ACTIVE and field-proven  
+**Date:** 2026-05-15 (planning), 2026-05-18 (V1 closeout)  
+**Scope:** outside-app alerts for internal job assignment and internal-note mention notifications via web push for internal users.
+
+---
+
+## Push Notifications V1 — Closeout (May 2026)
+
+**Field Status:** DEPLOYED AND CONFIRMED WORKING
+
+- **Supported Events:**
+  - `internal_job_assigned` – triggered when an internal user is assigned to a job
+  - `internal_note_tag` – triggered when an internal user is @mentioned in an internal note
+
+- **Delivery Path:**
+  - In-app notification row (`notifications` table) is the source of truth; remains primary delivery channel
+  - Web push is a secondary, best-effort delivery channel via registered browser/device subscription
+  - Device enrollment is per-browser/device; users must explicitly enable per device (no auto-enrollment)
+  - Delivery attempts are audited in `notification_delivery_attempts` table with safe fields: notification_id, status, error_code, provider_status_code, attempted_at (no endpoint/p256dh/auth exposed)
+
+- **Production Deployment:**
+  - Commit: `5a4d732` ("Pass 2D-D7 add privileged push delivery")
+  - Deployment: `dpl_6m3kDYv7sgHgy1ecdGa3tLJpZrSh` (Ready)
+  - Alias: `app.compliancemattersca.com`
+  - Feature flag: `ENABLE_WEB_PUSH=true` (exact string, case-sensitive)
+
+- **Root Cause + Final Fix:**
+  - Original issue: D7 "authority fix" (privileged push delivery via `createAdminClient()`) was implemented locally during D7A but not committed; prior production deployment was not traceable to a Git SHA
+  - Final fix: All D7 changes committed, pushed to `origin/main`, and redeployed from traceable commit 5a4d732
+  - Fire-and-forget/serverless completion boundary respected: web push delivery uses server-side privileged path only for scoped delivery side effects; never blocks assignment/mention creation
+
+- **RLS Status:** NOT WEAKENED
+  - No migrations touched
+  - No policy changes made
+  - Push subscriptions (`push_subscriptions`) and delivery attempts (`notification_delivery_attempts`) remain account-owner-scoped
+  - Service-role privileged path is isolated to push delivery only; notification writes remain user-initiated and scoped
+
+- **SMS/Email/Twilio Status:** REMAIN INACTIVE
+  - No SMS/email/Twilio code touched
+  - No provider integration activated
+  - Push is the only new external delivery channel
+
+- **Smoke Test Results:**
+  - @mention phone push confirmed working (Smoke B)
+  - Existing job assignment phone push confirmed working
+  - New job assignment phone push confirmed working
+  - In-app notification visibility confirmed working
+
+- **Rollback:** Simple and non-destructive
+  - Set `ENABLE_WEB_PUSH=false` (exact string, no newline)
+  - Redeploy production target
+  - In-app notifications continue working immediately
+  - Stored subscriptions remain dormant; not deleted
+
+---
 
 ## Current Repo Findings
 
