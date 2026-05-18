@@ -6,6 +6,10 @@ import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 import { updateJobScheduleFromForm } from "@/lib/actions";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import {
+  buildLatestCustomerAttemptByJob,
+  resolveRecentAttemptDisplay,
+} from "@/lib/ops/recent-attempt-display";
 
 const baseSelect =
   "id, title, status, ops_status, job_type, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, location_id, created_at, deleted_at, pending_info_reason, on_hold_reason, permit_number, jurisdiction, permit_date";
@@ -105,6 +109,21 @@ export default async function CallListPage({
   if (error) throw error;
 
   const jobs = data ?? [];
+  const jobIds = jobs.map((j: any) => String(j?.id ?? "")).filter(Boolean);
+  const { data: customerAttemptEvents, error: customerAttemptEventsError } = jobIds.length
+    ? await supabase
+        .from("job_events")
+        .select("job_id, created_at")
+        .in("job_id", jobIds)
+        .eq("event_type", "customer_attempt")
+        .order("created_at", { ascending: false })
+    : { data: [], error: null };
+
+  if (customerAttemptEventsError) throw customerAttemptEventsError;
+
+  const latestCustomerAttemptByJob = buildLatestCustomerAttemptByJob(
+    (customerAttemptEvents ?? []) as Array<{ job_id: string; created_at: string }>,
+  );
   const now = new Date();
 
   return (
@@ -171,6 +190,9 @@ export default async function CallListPage({
             const scheduledText = j.scheduled_date
               ? formatBusinessDateUS(String(j.scheduled_date))
               : null;
+            const recentAttemptDisplay = resolveRecentAttemptDisplay(
+              latestCustomerAttemptByJob.get(jobId) ?? null,
+            );
 
             return (
               <div
@@ -249,6 +271,10 @@ export default async function CallListPage({
                       <span className={subtleChipClass}>
                         {scheduledText ?? "Not scheduled"}
                       </span>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <span className={labelClass}>Last attempt</span>
+                      <span className={subtleChipClass}>{recentAttemptDisplay}</span>
                     </div>
                   </div>
 

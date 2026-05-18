@@ -43,6 +43,10 @@ import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { summarizeMaintenanceAgreementsForAccount } from "@/lib/maintenance-agreements/read-model";
+import {
+  buildLatestCustomerAttemptByJob,
+  resolveRecentAttemptDisplay,
+} from "@/lib/ops/recent-attempt-display";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -1229,6 +1233,7 @@ const [
   pendingInfoTransitionRes,
   activeAssignmentDisplayMap,
   signalRes,
+  customerAttemptEventsRes,
   unreadContractorAwarenessNotifications,
   unreadNewWorkRequestAwarenessNotifications,
   failedRunsRes,
@@ -1273,6 +1278,17 @@ const [
       : Promise.resolve({ data: [], error: null })
   ),
   trackOpsTiming(
+    "ops:secondarySignalReads:customerAttemptEvents",
+    allOpenOpsJobIds.length
+      ? supabase
+          .from("job_events")
+          .select("job_id, created_at")
+          .in("job_id", allOpenOpsJobIds)
+          .eq("event_type", "customer_attempt")
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null })
+  ),
+  trackOpsTiming(
     "ops:secondarySignalReads:unreadContractorNotifications",
     listInternalContractorUpdateAwareness({
       limit: 100,
@@ -1301,6 +1317,7 @@ const [
 
 if (pendingInfoTransitionRes.error) throw pendingInfoTransitionRes.error;
 if (signalRes.error) throw signalRes.error;
+if (customerAttemptEventsRes.error) throw customerAttemptEventsRes.error;
 if (failedRunsRes.error) throw failedRunsRes.error;
 if (opsTimingEnabled) console.log(`[ops:secondarySignalReads] ${Date.now() - _t_secondarySignalReads}ms`);
 
@@ -1328,6 +1345,9 @@ function assignmentSummaryForJob(jobId: string) {
 }
 
 const signalEvents = signalRes.data ?? [];
+const latestCustomerAttemptByJob = buildLatestCustomerAttemptByJob(
+  (customerAttemptEventsRes.data ?? []) as Array<{ job_id: string; created_at: string }>,
+);
 
 const unreadContractorUpdateNotifications = unreadContractorAwarenessNotifications
   .filter((notification: any) => {
@@ -2002,6 +2022,13 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   const hasContractorMeta = contractorName !== "Unassigned";
   const isTechUnassigned = assignmentSummary === "Unassigned";
   const assignedDisplay = isTechUnassigned ? "No tech assigned" : assignmentSummary;
+  const supportsAttemptHistory =
+    opsStatus === "need_to_schedule" ||
+    opsStatus === "pending_info" ||
+    opsStatus === "on_hold";
+  const recentAttemptDisplay = supportsAttemptHistory
+    ? resolveRecentAttemptDisplay(latestCustomerAttemptByJob.get(jobId) ?? null)
+    : "";
   const reasonCallout = isFailedFamily
     ? {
         tone: "border-rose-200/80 bg-rose-50/60 text-rose-900",
@@ -2047,6 +2074,14 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
       value: assignedDisplay,
       framed: isTechUnassigned,
     },
+    supportsAttemptHistory
+      ? {
+          key: "last_attempt",
+          label: "Last attempt",
+          value: recentAttemptDisplay,
+          framed: recentAttemptDisplay === "No attempts logged",
+        }
+      : null,
   ].filter(Boolean) as Array<{ key: string; label: string; value: string; href?: string; framed?: boolean }>;
 
   return (
