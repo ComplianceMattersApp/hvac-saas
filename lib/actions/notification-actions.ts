@@ -110,6 +110,31 @@ type CreateContractorIntakeProposalAwarenessNotificationInput = {
   contractorId: string;
 };
 
+function getSafeErrorDetails(error: unknown): { error_code: string | null; error_message: string | null } {
+  if (!error) {
+    return { error_code: null, error_message: null };
+  }
+
+  const maybeRecord = error as Record<string, unknown>;
+  const errorCode =
+    typeof maybeRecord.code === "string"
+      ? maybeRecord.code
+      : typeof maybeRecord.error_code === "string"
+        ? maybeRecord.error_code
+        : null;
+  const errorMessage =
+    typeof maybeRecord.message === "string"
+      ? maybeRecord.message
+      : error instanceof Error
+        ? error.message
+        : String(error);
+
+  return {
+    error_code: errorCode,
+    error_message: errorMessage,
+  };
+}
+
 export async function insertInternalAwarenessNotification(
   input: InsertInternalAwarenessNotificationInput,
 ): Promise<string> {
@@ -175,14 +200,17 @@ export async function insertTargetedInternalNotification(
     tagged_user_id: recipientUserId,
   };
 
+  const channel = "in_app" as const;
+  const recipientType = "internal" as const;
+
   const { data, error } = await input.supabase
     .from("notifications")
     .insert({
       job_id: jobId,
       account_owner_user_id: accountOwnerUserId,
-      recipient_type: "internal",
+      recipient_type: recipientType,
       recipient_ref: recipientUserId,
-      channel: "in_app",
+      channel,
       notification_type: notificationType,
       subject: subject || null,
       body: body || null,
@@ -192,7 +220,21 @@ export async function insertTargetedInternalNotification(
     .select("id")
     .single();
 
-  if (error) throw error;
+  if (error) {
+    const safeError = getSafeErrorDetails(error);
+    console.error("[notification-actions] targeted notification insert failed", {
+      marker: "targeted_internal_notification_insert_failed",
+      notification_type: notificationType,
+      channel,
+      recipient_type: recipientType,
+      recipient_ref: recipientUserId,
+      account_owner_user_id: accountOwnerUserId,
+      job_id: jobId,
+      error_code: safeError.error_code,
+      error_message: safeError.error_message,
+    });
+    throw error;
+  }
 
   const notificationId = String(data?.id ?? "").trim();
   if (!notificationId) {

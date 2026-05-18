@@ -103,6 +103,31 @@ type OnTheWayUndoEligibility = {
   onMyWayEventId: string | null;
 };
 
+function getSafeErrorDetails(error: unknown): { error_code: string | null; error_message: string | null } {
+  if (!error) {
+    return { error_code: null, error_message: null };
+  }
+
+  const maybeRecord = error as Record<string, unknown>;
+  const errorCode =
+    typeof maybeRecord.code === "string"
+      ? maybeRecord.code
+      : typeof maybeRecord.error_code === "string"
+        ? maybeRecord.error_code
+        : null;
+  const errorMessage =
+    typeof maybeRecord.message === "string"
+      ? maybeRecord.message
+      : error instanceof Error
+        ? error.message
+        : String(error);
+
+  return {
+    error_code: errorCode,
+    error_message: errorMessage,
+  };
+}
+
 type CreateJobInput = {
   ops_status?: string | null;
   parent_job_id?: string | null;
@@ -1635,14 +1660,14 @@ async function notifyJobAssignmentCreated(params: {
   accountOwnerUserId: string;
   actorUserId: string;
   recipientUserId: string;
-}) {
+}): Promise<string | null> {
   const displayMap = await resolveUserDisplayMap({
     supabase: params.supabase,
     userIds: [params.actorUserId],
   });
   const actorDisplayName = String(displayMap[params.actorUserId] ?? "").trim() || "A teammate";
 
-  await insertTargetedInternalNotification({
+  return insertTargetedInternalNotification({
     supabase: params.supabase,
     jobId: params.jobId,
     accountOwnerUserId: params.accountOwnerUserId,
@@ -4438,6 +4463,8 @@ export async function assignJobAssigneeFromForm(formData: FormData) {
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
+  let assignmentCreated = false;
+
   await ensureActiveAssignmentForUser({
     supabase,
     jobId,
@@ -4445,24 +4472,66 @@ export async function assignJobAssigneeFromForm(formData: FormData) {
     actorUserId,
     accountOwnerUserId: internalUser.account_owner_user_id,
     onCreated: async () => {
+      assignmentCreated = true;
+      console.info("[jobs] assignment notification attempt", {
+        marker: "assignment_notification_attempt",
+        job_id: jobId,
+        actor_user_id: actorUserId,
+        target_user_id: userId,
+        account_owner_user_id: internalUser.account_owner_user_id,
+        assignment_created: true,
+        notification_attempted: true,
+      });
+
       try {
-        await notifyJobAssignmentCreated({
+        const notificationId = await notifyJobAssignmentCreated({
           supabase,
           jobId,
           accountOwnerUserId: internalUser.account_owner_user_id,
           actorUserId,
           recipientUserId: userId,
         });
+
+        console.info("[jobs] assignment notification result", {
+          marker: "assignment_notification_attempt",
+          job_id: jobId,
+          actor_user_id: actorUserId,
+          target_user_id: userId,
+          account_owner_user_id: internalUser.account_owner_user_id,
+          assignment_created: true,
+          notification_attempted: true,
+          notification_created: !!notificationId,
+        });
       } catch (notificationError) {
+        const safeError = getSafeErrorDetails(notificationError);
         console.error("[jobs] job assignment notification failed", {
+          marker: "assignment_notification_attempt",
           jobId,
           actorUserId,
           recipientUserId: userId,
-          error: notificationError,
+          account_owner_user_id: internalUser.account_owner_user_id,
+          assignment_created: true,
+          notification_attempted: true,
+          notification_created: false,
+          error_code: safeError.error_code,
+          error_message: safeError.error_message,
         });
       }
     },
   });
+
+  if (!assignmentCreated) {
+    console.info("[jobs] assignment notification skipped", {
+      marker: "assignment_notification_attempt",
+      job_id: jobId,
+      actor_user_id: actorUserId,
+      target_user_id: userId,
+      account_owner_user_id: internalUser.account_owner_user_id,
+      assignment_created: false,
+      notification_attempted: false,
+      notification_created: false,
+    });
+  }
 
   if (makePrimary) {
     await setPrimaryJobAssignment({
@@ -9523,7 +9592,19 @@ export async function addInternalNoteFromForm(formData: FormData) {
     userId,
   });
 
+  console.info("[jobs] internal note saved", {
+    marker: "internal_note_saved",
+    job_id: jobId,
+    actor_user_id: userId,
+    account_owner_user_id: internalUser.account_owner_user_id,
+    tagged_user_ids_count: taggedUserIds.length,
+  });
+
   if (taggedUserIds.length > 0) {
+    let validatedRecipientCount = 0;
+    let notificationAttempted = false;
+    let notificationCreatedCount = 0;
+
     try {
       const validRecipientIds: string[] = [];
 
@@ -9540,6 +9621,19 @@ export async function addInternalNoteFromForm(formData: FormData) {
       }
 
       const uniqueRecipientIds = Array.from(new Set(validRecipientIds));
+      validatedRecipientCount = uniqueRecipientIds.length;
+      notificationAttempted = uniqueRecipientIds.length > 0;
+
+      console.info("[jobs] internal note tag notification attempt", {
+        marker: "internal_note_tag_notification_attempt",
+        job_id: jobId,
+        actor_user_id: userId,
+        account_owner_user_id: internalUser.account_owner_user_id,
+        tagged_user_ids_count: taggedUserIds.length,
+        tagged_user_ids_safe_prefixes: taggedUserIds.slice(0, 3).map((value) => value.slice(0, 8)),
+        validated_recipient_count: validatedRecipientCount,
+        notification_attempted: notificationAttempted,
+      });
 
       if (uniqueRecipientIds.length > 0) {
         const displayMap = await resolveUserDisplayMap({
@@ -9551,7 +9645,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
         const notePreview = buildNotePreview(note, 140);
 
         for (const recipientId of uniqueRecipientIds) {
-          await insertTargetedInternalNotification({
+          const createdNotificationId = await insertTargetedInternalNotification({
             supabase,
             jobId,
             accountOwnerUserId: internalUser.account_owner_user_id,
@@ -9568,16 +9662,37 @@ export async function addInternalNoteFromForm(formData: FormData) {
               anchor_event_type: anchorEventType ?? undefined,
             },
           });
+
+          if (createdNotificationId) {
+            notificationCreatedCount += 1;
+          }
         }
       }
+
+      console.info("[jobs] internal note tag notification result", {
+        marker: "internal_note_tag_notification_attempt",
+        job_id: jobId,
+        actor_user_id: userId,
+        account_owner_user_id: internalUser.account_owner_user_id,
+        tagged_user_ids_count: taggedUserIds.length,
+        validated_recipient_count: validatedRecipientCount,
+        notification_attempted: notificationAttempted,
+        notification_created: notificationCreatedCount > 0,
+        notification_created_count: notificationCreatedCount,
+      });
     } catch (notificationError) {
+      const safeError = getSafeErrorDetails(notificationError);
       console.error("[jobs] internal note tag notification failed", {
+        marker: "internal_note_tag_notification_attempt",
         jobId,
         actorUserId: userId,
-        error:
-          notificationError instanceof Error
-            ? notificationError.message
-            : String(notificationError),
+        account_owner_user_id: internalUser.account_owner_user_id,
+        tagged_user_ids_count: taggedUserIds.length,
+        validated_recipient_count: validatedRecipientCount,
+        notification_attempted: notificationAttempted,
+        notification_created: notificationCreatedCount > 0,
+        error_code: safeError.error_code,
+        error_message: safeError.error_message,
       });
     }
   }

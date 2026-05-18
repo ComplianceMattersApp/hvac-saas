@@ -58,6 +58,31 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function getSafeErrorDetails(error: unknown): { error_code: string | null; error_message: string | null } {
+  if (!error) {
+    return { error_code: null, error_message: null };
+  }
+
+  const maybeRecord = error as Record<string, unknown>;
+  const errorCode =
+    typeof maybeRecord.code === "string"
+      ? maybeRecord.code
+      : typeof maybeRecord.error_code === "string"
+        ? maybeRecord.error_code
+        : null;
+  const errorMessage =
+    typeof maybeRecord.message === "string"
+      ? maybeRecord.message
+      : error instanceof Error
+        ? error.message
+        : String(error);
+
+  return {
+    error_code: errorCode,
+    error_message: errorMessage,
+  };
+}
+
 function resolveJobType(raw: unknown): "ecc" | "service" {
   const value = normalizeText(raw).toLowerCase();
   return value === "service" ? "service" : "ecc";
@@ -432,6 +457,10 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
   const { admin, userId, accountOwnerUserId, submission } = await requireScopedPendingAdjudication(formData);
   const modeRaw = normalizeText(formData.get("finalization_mode")).toLowerCase();
   const reviewNote = normalizeText(formData.get("review_note")) || null;
+  const selectedAssignedInternalUserId =
+    normalizeText(formData.get("assigned_internal_user_id")) ||
+    normalizeText(formData.get("assignee_user_id")) ||
+    null;
 
   if (!["existing_existing", "existing_new", "new_new"].includes(modeRaw)) {
     throw new Error("Invalid finalization mode");
@@ -584,6 +613,58 @@ export async function finalizeContractorIntakeSubmissionFromForm(formData: FormD
       serviceCaseWriteClient: admin,
     },
   );
+
+  try {
+    const { count: activeAssignmentCount, error: assignmentCountError } = await admin
+      .from("job_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("job_id", created.id)
+      .eq("is_active", true);
+
+    if (assignmentCountError) {
+      const safeError = getSafeErrorDetails(assignmentCountError);
+      console.error("[contractor-intake] finalization assignment diagnostics failed", {
+        marker: "proposal_finalization_assignment_path",
+        submission_id: submission.id,
+        job_id: created.id,
+        account_owner_user_id: accountOwnerUserId,
+        actor_user_id: userId,
+        selected_assigned_user_id: selectedAssignedInternalUserId,
+        selected_assigned_user_id_present: !!selectedAssignedInternalUserId,
+        assignment_notification_hook_bypassed: true,
+        error_code: safeError.error_code,
+        error_message: safeError.error_message,
+      });
+    } else {
+      const safeAssignmentCount = Number(activeAssignmentCount ?? 0);
+      console.info("[contractor-intake] finalization assignment diagnostics", {
+        marker: "proposal_finalization_assignment_path",
+        submission_id: submission.id,
+        job_id: created.id,
+        account_owner_user_id: accountOwnerUserId,
+        actor_user_id: userId,
+        selected_assigned_user_id: selectedAssignedInternalUserId,
+        selected_assigned_user_id_present: !!selectedAssignedInternalUserId,
+        job_assignments_created: safeAssignmentCount > 0,
+        active_job_assignment_count: safeAssignmentCount,
+        assignment_notification_hook_bypassed: true,
+      });
+    }
+  } catch (assignmentPathError) {
+    const safeError = getSafeErrorDetails(assignmentPathError);
+    console.error("[contractor-intake] finalization assignment diagnostics failed", {
+      marker: "proposal_finalization_assignment_path",
+      submission_id: submission.id,
+      job_id: created.id,
+      account_owner_user_id: accountOwnerUserId,
+      actor_user_id: userId,
+      selected_assigned_user_id: selectedAssignedInternalUserId,
+      selected_assigned_user_id_present: !!selectedAssignedInternalUserId,
+      assignment_notification_hook_bypassed: true,
+      error_code: safeError.error_code,
+      error_message: safeError.error_message,
+    });
+  }
 
   const reviewedAtIso = new Date().toISOString();
 
