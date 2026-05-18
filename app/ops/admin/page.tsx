@@ -62,19 +62,19 @@ export default async function OpsAdminPage() {
       badge: "HVAC Service",
       heroHint: "Service/work-order-first workspace. Contractor tools remain optional and unchanged.",
       peopleCopy:
-        "Start here for user lookup and internal team workspaces. Contractor tools remain available as optional collaboration workspaces when this service account needs them.",
+        "Start with Directory & Access Recovery, then move into Internal Roles & Team Setup. Contractor tools remain optional collaboration workspaces when this service account needs them.",
     },
     ecc_hers: {
       badge: "ECC/HERS",
       heroHint: "Compliance and contractor collaboration remain relevant in this workspace.",
       peopleCopy:
-        "Start here for user lookup and recovery, then step into team workspaces and contractor/compliance collaboration tools when needed.",
+        "Start with Directory & Access Recovery, then step into Internal Roles & Team Setup and contractor/compliance collaboration tools when needed.",
     },
     hybrid: {
       badge: "All-in-One",
       heroHint: "Owner all-in-one workspace. Service and compliance tools remain available together.",
       peopleCopy:
-        "Start here for user lookup and recovery, then step into team workspaces and optional contractor tools when needed.",
+        "Start with Directory & Access Recovery, then step into Internal Roles & Team Setup and optional contractor tools when needed.",
     },
   };
 
@@ -185,10 +185,10 @@ export default async function OpsAdminPage() {
       : [];
   const organizationCards = cards.filter((card) => card.section === "organization");
   const peopleSectionTitle =
-    productMode === "hvac_service" ? "Service team and account access" : "Access and account management";
+    productMode === "hvac_service" ? "Service team and directory access" : "Directory and access workspaces";
   const peopleSectionDescription =
     productMode === "hvac_service"
-      ? "Start with internal team access and account controls. Optional outside collaboration tools are moved below so this page stays service/work-order first."
+      ? "Start with Directory & Access Recovery and Internal Roles & Team Setup. Optional outside collaboration tools are moved below so this page stays service/work-order first."
       : modeContext.peopleCopy;
 
   return (

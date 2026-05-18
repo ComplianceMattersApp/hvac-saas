@@ -75,7 +75,7 @@ export default function UserAccountMenu({ accountName, accountLabel, isAdmin }: 
               onClick={() => setOpen(false)}
               className="block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
             >
-              Admin
+              Admin Center
             </Link>
           ) : null}
           <Link
@@ -83,7 +83,7 @@ export default function UserAccountMenu({ accountName, accountLabel, isAdmin }: 
             onClick={() => setOpen(false)}
             className="block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
           >
-            Profile
+            Account
           </Link>
           <div className="my-1.5 border-t border-slate-200/80" />
           <LogoutButton className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900" />

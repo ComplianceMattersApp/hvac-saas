@@ -350,12 +350,12 @@ export default async function AdminUsersCommandCenterPage({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
-            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">People &amp; Access</h1>
+            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Directory &amp; Access Recovery</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Search every internal and contractor account, resend access emails, and handle recovery from one place.
+              Search internal and contractor user accounts, resend setup emails, and handle recovery actions from one place.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Manage access, invites, and account-level permissions.
+              Directory lookup plus invite and access recovery actions.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -369,7 +369,7 @@ export default async function AdminUsersCommandCenterPage({
               href="/ops/admin/internal-users"
               className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >
-              Internal Team
+              Internal Roles &amp; Team Setup
             </Link>
             <Link
               href="/ops/admin/contractors"
@@ -389,7 +389,7 @@ export default async function AdminUsersCommandCenterPage({
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-[22px] border border-slate-200/80 bg-white px-4 py-3.5 shadow-[0_18px_32px_-28px_rgba(15,23,42,0.22)]">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Users in view</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Accounts in view</p>
           <p className="mt-1 text-2xl font-semibold text-slate-900">{summary.total}</p>
         </div>
         <div className="rounded-[22px] border border-emerald-200/80 bg-emerald-50/80 px-4 py-3.5 shadow-[0_18px_32px_-28px_rgba(5,150,105,0.22)]">
@@ -420,9 +420,9 @@ export default async function AdminUsersCommandCenterPage({
                 defaultValue={filterType || "all"}
                 className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-2 focus:ring-slate-200"
               >
-                <option value="all">All users</option>
-                <option value="internal">Internal users</option>
-                <option value="contractor">Contractor users</option>
+                <option value="all">All user accounts</option>
+                <option value="internal">Internal user accounts</option>
+                <option value="contractor">Contractor user accounts</option>
                 <option value="invited">Invited / pending</option>
                 <option value="inactive">Inactive</option>
               </select>
@@ -435,7 +435,7 @@ export default async function AdminUsersCommandCenterPage({
                 <input
                   name="q"
                   defaultValue={query}
-                  placeholder="Search users..."
+                  placeholder="Search directory..."
                   className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
                 />
                 <button
@@ -452,7 +452,7 @@ export default async function AdminUsersCommandCenterPage({
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invite team member</h2>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invite internal team member</h2>
           <p className="mt-1 text-sm leading-6 text-slate-600">Send an access invite and assign an internal role in one step.</p>
           <form action={inviteInternalUserFromForm} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
             <input
@@ -483,15 +483,15 @@ export default async function AdminUsersCommandCenterPage({
 
       <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
         <div className="border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">People directory</h2>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Directory results</h2>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Internal and contractor accounts in the current view.
+            Internal and contractor user accounts in the current view.
           </p>
         </div>
 
         {filtered.length === 0 ? (
           <div className="px-5 py-12 text-center text-sm leading-6 text-slate-600">
-            No users match the current filters.
+            No user accounts match the current filters.
           </div>
         ) : (
           <div className="divide-y divide-gray-200">

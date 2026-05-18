@@ -18,7 +18,7 @@ type PageProps = {
 };
 
 export const metadata: Metadata = {
-  title: "Internal User Profile",
+  title: "Internal Roles & Team Setup | Profile",
 };
 
 const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
@@ -50,6 +50,22 @@ function resolveInternalLifecycleState(isActive: boolean, emailConfirmed: boolea
   if (emailConfirmed === false) return "invited" as const;
   if (emailConfirmed === true) return "active" as const;
   return "unknown" as const;
+}
+
+function toRoleLabel(role: string): string {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (normalized === "admin") return "Admin";
+  if (normalized === "office") return "Dispatcher";
+  if (normalized === "tech" || normalized === "technician") return "Technician";
+  if (normalized === "billing") return "Billing";
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Unknown";
+}
+
+function toLifecycleLabel(lifecycle: "active" | "invited" | "inactive" | "unknown") {
+  if (lifecycle === "invited") return "Invitation pending";
+  if (lifecycle === "inactive") return "Inactive";
+  if (lifecycle === "active") return "Active";
+  return "Unknown";
 }
 
 function readSearchParam(searchParams: Record<string, string | string[] | undefined>, key: string) {
@@ -151,12 +167,12 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</div>
-            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Edit internal profile</h1>
+            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Internal profile details</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
               Update the practical profile details your team sees across the app without changing sign-in credentials or account ownership.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Profile details only. Role changes and broader recovery actions stay in the parent admin workspaces.
+              Profile details only. Role changes and recovery actions stay in the parent admin workspaces.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -170,13 +186,13 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
               href="/ops/admin/internal-users"
               className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >
-              Back to Internal Team
+              Back to Internal Roles &amp; Team Setup
             </Link>
             <Link
               href="/ops/admin/users"
               className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >
-              People &amp; Access
+              Directory &amp; Access Recovery
             </Link>
           </div>
         </div>
@@ -263,10 +279,10 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${roleBadgeTone(targetMembership.role as InternalRole)}`}>
-                {targetMembership.role}
+                {toRoleLabel(String(targetMembership.role ?? ""))}
               </span>
               <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${lifecycleBadgeTone(lifecycle)}`}>
-                {lifecycle}
+                {toLifecycleLabel(lifecycle)}
               </span>
               {isSelf ? (
                 <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
@@ -292,9 +308,9 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
           </section>
 
           <section className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-5 shadow-[0_18px_32px_-30px_rgba(15,23,42,0.18)] sm:p-6">
-            <h2 className="text-sm font-semibold text-slate-900">What this page controls</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Where to make other changes</h2>
             <p className="mt-2 text-sm text-slate-600">
-              Edit profile details here. Use Internal Team for role changes and People &amp; Access for broader invite or password work.
+              Edit profile details here. Use Internal Roles &amp; Team Setup for role changes and Directory &amp; Access Recovery for broader invite or password work.
             </p>
           </section>
         </aside>

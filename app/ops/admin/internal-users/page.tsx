@@ -65,6 +65,13 @@ function resolveInternalLifecycleState(isActive: boolean, emailConfirmed: boolea
   return "unknown" as const;
 }
 
+function toLifecycleLabel(lifecycle: "active" | "invited" | "inactive" | "unknown") {
+  if (lifecycle === "invited") return "Invitation pending";
+  if (lifecycle === "inactive") return "Inactive";
+  if (lifecycle === "active") return "Active";
+  return "Unknown";
+}
+
 function toRoleLabel(role: string): string {
   const normalized = String(role || "").trim().toLowerCase();
   if (normalized === "admin") return "Admin";
@@ -83,7 +90,7 @@ const INVITE_STATUS_TEXT: Record<string, { tone: "success" | "warn" | "error"; m
   },
   attached_existing_auth: {
     tone: "success",
-    message: "Existing auth user linked/updated in internal users.",
+    message: "Existing auth user linked/updated in the internal team directory.",
   },
   already_internal: {
     tone: "warn",
@@ -180,12 +187,12 @@ export default async function AdminInternalUsersPage({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
-            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Internal Team</h1>
+            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Internal Roles &amp; Team Setup</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Manage internal role membership, profile details, and day-to-day access changes for your team.
+              Manage internal role assignments, profile details, and day-to-day access changes for office and field staff.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Manage internal team members who perform office or field work.
+              Team setup and role management for internal users.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -199,7 +206,7 @@ export default async function AdminInternalUsersPage({
               href="/ops/admin/users"
               className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >
-              People &amp; Access
+              Directory &amp; Access Recovery
             </Link>
           </div>
         </div>
@@ -240,7 +247,7 @@ export default async function AdminInternalUsersPage({
 
       <div>
       <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
-        <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invite team member</h2>
+        <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invite internal team member</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
           Send a setup link and attach internal role access automatically.
         </p>
@@ -273,7 +280,7 @@ export default async function AdminInternalUsersPage({
 
       <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
         <div className="border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Team members</h2>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Internal team directory</h2>
           <p className="mt-1 text-sm leading-6 text-slate-600">Edit profiles, adjust roles, or pause access for internal staff.</p>
         </div>
 
@@ -310,7 +317,7 @@ export default async function AdminInternalUsersPage({
                           lifecycle,
                         )}`}
                       >
-                        {lifecycle}
+                        {toLifecycleLabel(lifecycle)}
                       </span>
                       {isSelf ? (
                         <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
@@ -378,7 +385,7 @@ export default async function AdminInternalUsersPage({
           })}
           {(internalUsers ?? []).length === 0 ? (
             <div className="px-5 py-12 text-center text-sm leading-6 text-slate-600">
-              No internal team members have been added yet.
+              No internal team members are in this account yet.
             </div>
           ) : null}
         </div>
