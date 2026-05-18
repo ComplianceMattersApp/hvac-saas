@@ -273,6 +273,21 @@ describe("job staffing entitlement hardening", () => {
       expect(revalidatePathMock).toHaveBeenCalled();
     });
 
+    it("preserves the assigned-team anchor when assignment starts from the job detail section", async () => {
+      const fixture = makeStaffingFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+
+      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+
+      await expect(
+        assignJobAssigneeFromForm(
+          buildAssignFormData({ return_to: "/jobs/job-1?tab=ops#assigned-team" }),
+        ),
+      ).rejects.toThrow(
+        "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_added#assigned-team",
+      );
+    });
+
     it("allows valid trial assignment mutation", async () => {
       const fixture = makeStaffingFixture();
       createClientMock.mockResolvedValue(fixture.supabase);

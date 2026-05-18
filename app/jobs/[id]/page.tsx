@@ -822,6 +822,37 @@ export default async function JobDetailPage({
       ? mentionCountRaw
       : "";
   const mentionCount = Number.parseInt(mentionCountValue, 10);
+  const internalNoteBannerMessage =
+    banner === "follow_up_note_added"
+      ? "Follow-up note added."
+      : banner === "internal_note_mention_alert_created"
+      ? `Mention alert created for ${mentionRecipientName.trim() || "teammate"}.`
+      : banner === "internal_note_mention_alerts_created"
+      ? `Mention alerts created for ${Number.isFinite(mentionCount) && mentionCount > 0 ? mentionCount : 2} teammates.`
+      : banner === "internal_note_mention_alert_failed"
+      ? "Note saved, but mention alert could not be created."
+      : banner === "note_add_failed"
+      ? "Could not add note."
+      : "";
+  const internalNoteBannerType =
+    banner === "note_add_failed"
+      ? "error"
+      : banner === "internal_note_mention_alert_failed"
+      ? "warning"
+      : "success";
+  const assignmentBannerMessage =
+    banner === "assignment_added"
+      ? "Team member assigned to this job."
+      : banner === "assignment_added_primary"
+      ? "Team member assigned and set as primary."
+      : banner === "assignment_primary_set"
+      ? "Primary assignee updated."
+      : banner === "assignment_removed"
+      ? "Assignee removed from this job."
+      : banner === "assignment_user_required"
+      ? "Select a team member to assign."
+      : "";
+  const assignmentBannerType = banner === "assignment_user_required" ? "warning" : "success";
 
   const timingEnabled = process.env.JOB_DETAIL_TIMING_DEBUG === "true";
   const renderStartMs = Date.now();
@@ -2947,7 +2978,14 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         buttonClassName="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
       />
 
-      <div className="mt-4 border-t border-slate-200/80 pt-4">
+      <div id="assigned-team" className="mt-4 scroll-mt-24 border-t border-slate-200/80 pt-4">
+        {assignmentBannerMessage ? (
+          <FlashBanner
+            type={assignmentBannerType as "success" | "warning"}
+            message={assignmentBannerMessage}
+          />
+        ) : null}
+
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Assigned Team</div>
           <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
@@ -2971,6 +3009,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="user_id" value={assignee.user_id} />
                     <input type="hidden" name="tab" value={tab} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#assigned-team`} />
                     <SubmitButton
                       loadingText="Updating..."
                       className={workspaceUtilityControlClass}
@@ -2985,6 +3024,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="user_id" value={assignee.user_id} />
                     <input type="hidden" name="tab" value={tab} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#assigned-team`} />
                     <SubmitButton
                       loadingText="Removing..."
                       className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
@@ -4972,32 +5012,38 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
 
         {/* Internal Notes */}
-        <details id="internal-notes" className={workspaceDetailsClass}>
+        <details id="internal-notes" className={workspaceDetailsClass} open={Boolean(internalNoteBannerMessage)}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader title={internalNotesTitle} subtitle={internalNotesSummaryText} />
           </summary>
 
           <div className={`${workspaceDetailsDividerClass} space-y-2`}>
+            {internalNoteBannerMessage ? (
+              <FlashBanner
+                type={internalNoteBannerType as "success" | "warning" | "error"}
+                message={internalNoteBannerMessage}
+              />
+            ) : null}
 
-  <InternalNoteMentionComposer
-    action={addInternalNoteFromForm}
-    jobId={String(job.id)}
-    tab={tab}
-    candidates={internalTagCandidates}
-    textareaClassName={workspaceTextareaClass}
-    selectClassName={workspaceInputClass}
-    helperTextClassName="text-xs text-slate-500"
-    buttonClassName={secondaryButtonClass}
-  />
+            <InternalNoteMentionComposer
+              action={addInternalNoteFromForm}
+              jobId={String(job.id)}
+              tab={tab}
+              candidates={internalTagCandidates}
+              textareaClassName={workspaceTextareaClass}
+              selectClassName={workspaceInputClass}
+              helperTextClassName="text-xs text-slate-500"
+              buttonClassName={secondaryButtonClass}
+            />
 
-  <Suspense fallback={<NarrativeNotesBodyFallback />}>
-    <DeferredInternalNotesBody
-      jobId={String(job.id)}
-      timelineJobIds={narrativeScopeJobIds}
-      hasDirectNarrativeChain={hasDirectNarrativeChain}
-      emptyStateClassName={workspaceEmptyStateClass}
-    />
-  </Suspense>
+            <Suspense fallback={<NarrativeNotesBodyFallback />}>
+              <DeferredInternalNotesBody
+                jobId={String(job.id)}
+                timelineJobIds={narrativeScopeJobIds}
+                hasDirectNarrativeChain={hasDirectNarrativeChain}
+                emptyStateClassName={workspaceEmptyStateClass}
+              />
+            </Suspense>
           </div>
         </details>
 

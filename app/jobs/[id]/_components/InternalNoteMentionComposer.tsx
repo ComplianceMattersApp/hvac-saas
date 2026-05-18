@@ -96,6 +96,7 @@ export default function InternalNoteMentionComposer({
     <form action={action} className="space-y-3">
       <input type="hidden" name="job_id" value={jobId} />
       <input type="hidden" name="tab" value={tab} />
+      <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}#internal-notes`} />
       <textarea
         ref={textareaRef}
         name="note"

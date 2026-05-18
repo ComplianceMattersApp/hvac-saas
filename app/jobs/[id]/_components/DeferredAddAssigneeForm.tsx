@@ -33,6 +33,7 @@ export default async function DeferredAddAssigneeForm({
     >
       <input type="hidden" name="job_id" value={jobId} />
       <input type="hidden" name="tab" value={tab} />
+      <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}#assigned-team`} />
       <select
         name="user_id"
         className={`${selectClass} w-full min-w-0 sm:w-auto sm:min-w-[14rem]`}

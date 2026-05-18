@@ -4444,11 +4444,10 @@ function redirectToJobWithBanner(params: {
   const returnToRaw = String(params.returnToRaw ?? "").trim();
 
   if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
-    const [pathOnly, searchRaw = ""] = returnToRaw.split("?");
-    const search = new URLSearchParams(searchRaw);
-    search.set("banner", params.banner);
-    if (params.cacheBust) search.set("rv", Date.now().toString());
-    redirect(`${pathOnly}?${search.toString()}`);
+    const target = new URL(returnToRaw, "https://app.local");
+    target.searchParams.set("banner", params.banner);
+    if (params.cacheBust) target.searchParams.set("rv", Date.now().toString());
+    redirect(`${target.pathname}?${target.searchParams.toString()}${target.hash}`);
   }
 
   const q = new URLSearchParams();
@@ -9560,30 +9559,35 @@ function buildInternalNoteRedirectPath(params: {
   jobId: string;
   tab: string;
   banner: string;
+  returnToRaw?: string | null;
   mentionRecipientName?: string | null;
   mentionCount?: number | null;
 }) {
-  const searchParams = new URLSearchParams({
-    tab: params.tab,
-    banner: params.banner,
-  });
+  const returnToRaw = String(params.returnToRaw ?? "").trim();
+  const target =
+    returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")
+      ? new URL(returnToRaw, "https://app.local")
+      : new URL(`/jobs/${params.jobId}?tab=${params.tab}`, "https://app.local");
+
+  target.searchParams.set("banner", params.banner);
 
   const recipientName = String(params.mentionRecipientName ?? "").trim();
   if (recipientName) {
-    searchParams.set("mention_recipient", recipientName);
+    target.searchParams.set("mention_recipient", recipientName);
   }
 
   if (typeof params.mentionCount === "number" && params.mentionCount > 0) {
-    searchParams.set("mention_count", String(params.mentionCount));
+    target.searchParams.set("mention_count", String(params.mentionCount));
   }
 
-  return `/jobs/${params.jobId}?${searchParams.toString()}`;
+  return `${target.pathname}?${target.searchParams.toString()}${target.hash}`;
 }
 
 export async function addInternalNoteFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();
   const note = String(formData.get("note") || "").trim();
   const tab = String(formData.get("tab") || "ops").trim() || "ops";
+  const returnToRaw = String(formData.get("return_to") || "").trim();
   const context = String(formData.get("context") || "").trim() || null;
   const anchorEventId = String(formData.get("anchor_event_id") || "").trim() || null;
   const anchorEventType = String(formData.get("anchor_event_type") || "").trim() || null;
@@ -9591,7 +9595,14 @@ export async function addInternalNoteFromForm(formData: FormData) {
 
   if (!jobId) throw new Error("Job ID is required");
   if (!note) {
-    redirect(`/jobs/${jobId}?tab=${tab}&banner=note_add_failed`);
+    redirect(
+      buildInternalNoteRedirectPath({
+        jobId,
+        tab,
+        banner: "note_add_failed",
+        returnToRaw,
+      }),
+    );
   }
 
   const supabase = await createClient();
@@ -9797,6 +9808,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
           jobId,
           tab,
           banner: mentionBanner,
+          returnToRaw,
           mentionRecipientName:
             mentionBanner === "internal_note_mention_alert_created"
               ? mentionRecipientDisplayName
@@ -9812,7 +9824,14 @@ export async function addInternalNoteFromForm(formData: FormData) {
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  redirect(`/jobs/${jobId}?tab=${tab}&banner=follow_up_note_added`);
+  redirect(
+    buildInternalNoteRedirectPath({
+      jobId,
+      tab,
+      banner: "follow_up_note_added",
+      returnToRaw,
+    }),
+  );
 }
 
 export async function completeDataEntryFromForm(formData: FormData) {

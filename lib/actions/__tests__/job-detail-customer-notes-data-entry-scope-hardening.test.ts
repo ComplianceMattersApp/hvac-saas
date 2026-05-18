@@ -387,6 +387,19 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     });
   });
 
+  it("preserves the internal notes anchor when saving an internal note from the job detail section", async () => {
+    const { supabase } = makeAllowSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const formData = buildAddInternalNoteFormData();
+    formData.set("return_to", "/jobs/job-1?tab=ops#internal-notes");
+
+    await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?tab=ops&banner=follow_up_note_added#internal-notes",
+    );
+  });
+
   it("creates tagged internal notifications for valid same-account tagged teammates", async () => {
     const { supabase } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
