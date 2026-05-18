@@ -264,7 +264,7 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
                 type="submit"
                 className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
               >
-                Save changes
+                Save profile details
               </button>
             </div>
           </form>

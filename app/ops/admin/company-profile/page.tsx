@@ -310,7 +310,7 @@ export default async function AdminCompanyProfilePage({
                 type="submit"
                 className="inline-flex min-h-11 items-center rounded-xl bg-slate-900 px-4.5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_30px_-22px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_22px_34px_-22px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
               >
-                Save changes
+                Save company profile
               </button>
             </div>
           </form>
@@ -451,7 +451,7 @@ function PlatformAccountSection({
                 type="submit"
                 className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
               >
-                Start subscription setup
+                Open billing setup
               </button>
             </form>
             <form action="/api/stripe/portal" method="post">
@@ -459,7 +459,7 @@ function PlatformAccountSection({
                 type="submit"
                 className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
               >
-                Manage billing
+                Manage subscription
               </button>
             </form>
           </div>

@@ -115,7 +115,7 @@ export default async function SupportConsolePage({
             href="/ops/admin/users"
             className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
           >
-            Back to People &amp; Access
+            Back to Directory &amp; Access Recovery
           </Link>
         </div>
       </div>
@@ -153,7 +153,7 @@ export default async function SupportConsolePage({
           <h2 className="text-base font-semibold text-slate-900">Target account scope</h2>
           <form action="/ops/admin/users/support" method="get" className="mt-3 space-y-3">
             <label className="block text-sm font-medium text-slate-700" htmlFor="account_owner_user_id">
-              account_owner_user_id
+              Account owner user ID
             </label>
             <input
               id="account_owner_user_id"
@@ -166,7 +166,7 @@ export default async function SupportConsolePage({
               type="submit"
               className="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
             >
-              Load scope
+              Load account scope
             </button>
           </form>
         </div>
@@ -226,7 +226,7 @@ export default async function SupportConsolePage({
               disabled={!snapshot.accountOwnerUserId}
               className="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              Start read-only session
+              Start support session
             </button>
           </form>
 
@@ -239,7 +239,7 @@ export default async function SupportConsolePage({
               disabled={!snapshot.accountOwnerUserId || !session?.id}
               className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
             >
-              End session
+              End support session
             </button>
           </form>
         </div>

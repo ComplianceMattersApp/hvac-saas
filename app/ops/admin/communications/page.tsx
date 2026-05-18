@@ -624,7 +624,7 @@ export default async function AdminCommunicationsPage({
                     type="submit"
                     className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
                   >
-                    Save draft
+                    Save draft wording
                   </button>
                 </div>
               </form>
@@ -640,7 +640,7 @@ export default async function AdminCommunicationsPage({
                     type="submit"
                     className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
                   >
-                    Create draft from default
+                    Create draft wording
                   </button>
                 </form>
               </div>
@@ -743,7 +743,7 @@ export default async function AdminCommunicationsPage({
                   type="submit"
                   className="inline-flex items-center rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-emerald-100 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px] focus:outline-none focus:ring-2 focus:ring-emerald-300"
                 >
-                  Mark wording ready for sandbox
+                  Mark ready for sandbox
                 </button>
               </form>
             ) : (

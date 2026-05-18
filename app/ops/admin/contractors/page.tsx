@@ -321,7 +321,7 @@ export default async function AdminContractorsPage({
                   type="submit"
                   className="rounded-lg border border-slate-300/90 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_20px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px] whitespace-nowrap"
                 >
-                  Save quick edit
+                  Save contractor details
                 </button>
               </form>
 
@@ -346,7 +346,7 @@ export default async function AdminContractorsPage({
                     disabled={isArchived}
                     className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-55"
                   >
-                    Send Invite
+                    Invite contractor user
                   </button>
                 </form>
               </div>
@@ -430,7 +430,7 @@ export default async function AdminContractorsPage({
                                   disabled={isArchived}
                                   className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-55"
                                 >
-                                  Resend Invite
+                                  Resend invite
                                 </button>
                               </form>
                             ) : null}
@@ -443,7 +443,7 @@ export default async function AdminContractorsPage({
                                   type="submit"
                                   className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                                 >
-                                  Send Password Reset
+                                  Send password reset
                                 </button>
                               </form>
                             ) : null}
@@ -473,7 +473,7 @@ export default async function AdminContractorsPage({
               Manage contractor companies, primary contacts, and contractor-scoped member access from one clean workspace.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Organization setup lives here. People &amp; Access handles broader account recovery work.
+              Organization setup lives here. Directory &amp; Access Recovery handles broader account recovery work.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -528,7 +528,7 @@ export default async function AdminContractorsPage({
             type="submit"
             className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
           >
-            Create contractor
+            Add contractor company
           </button>
         </form>
       </div>

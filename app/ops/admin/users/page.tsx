@@ -442,7 +442,7 @@ export default async function AdminUsersCommandCenterPage({
                   type="submit"
                   className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
                 >
-                  Apply
+                  Apply filters
                 </button>
               </div>
             </div>
@@ -453,7 +453,7 @@ export default async function AdminUsersCommandCenterPage({
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invite internal team member</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">Send an access invite and assign an internal role in one step.</p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">Invite a team member and assign an internal role in one step.</p>
           <form action={inviteInternalUserFromForm} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
             <input
               name="email"
@@ -475,7 +475,7 @@ export default async function AdminUsersCommandCenterPage({
               type="submit"
               className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
             >
-              Send access invite
+              Invite team member
             </button>
           </form>
         </div>
@@ -556,7 +556,7 @@ export default async function AdminUsersCommandCenterPage({
                             type="submit"
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
-                            Save Role
+                            Update role
                           </button>
                         </form>
                       ) : null}
@@ -569,7 +569,7 @@ export default async function AdminUsersCommandCenterPage({
                               type="submit"
                               className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
                             >
-                              Deactivate
+                              Deactivate access
                             </button>
                           </form>
                         ) : (
@@ -579,7 +579,7 @@ export default async function AdminUsersCommandCenterPage({
                               type="submit"
                               className="rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
                             >
-                              Reactivate
+                              Reactivate access
                             </button>
                           </form>
                         )
@@ -593,7 +593,7 @@ export default async function AdminUsersCommandCenterPage({
                             type="submit"
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
-                            Send Password Reset
+                            Send password reset
                           </button>
                         </form>
                       ) : null}
@@ -607,7 +607,7 @@ export default async function AdminUsersCommandCenterPage({
                             type="submit"
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
-                            Resend Invite
+                            Resend invite
                           </button>
                         </form>
                       ) : null}
@@ -621,7 +621,7 @@ export default async function AdminUsersCommandCenterPage({
                             type="submit"
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
-                            Resend Invite
+                            Resend invite
                           </button>
                         </form>
                       ) : null}
