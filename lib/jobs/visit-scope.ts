@@ -255,3 +255,41 @@ export function buildPromotedCompanionReadModel(itemsValue: unknown) {
         : `${promotedJobIds.length} service follow-ups created`,
   };
 }
+
+export function buildVisitScopeIncludesReadModel(
+  summaryValue: unknown,
+  itemsValue: unknown,
+  options?: {
+    leadMaxLength?: number;
+  },
+) {
+  const readModel = buildVisitScopeReadModel(summaryValue, itemsValue, {
+    leadMaxLength: options?.leadMaxLength ?? 72,
+    previewItemCount: 1,
+    previewItemMaxLength: 40,
+  });
+
+  if (!readModel.hasContent) {
+    return {
+      hasContent: false,
+      lead: "",
+      sourceItemCount: 0,
+      label: "",
+    };
+  }
+
+  const sourceItems = readModel.items.filter((item) => item.kind === "primary");
+  const rankedSource = sourceItems.length > 0 ? sourceItems : readModel.items;
+  const sourceItemCount = rankedSource.length;
+  const leadSource = rankedSource[0]?.title || readModel.summary || readModel.lead;
+  const lead = truncateVisitScopeText(String(leadSource ?? "").trim(), options?.leadMaxLength ?? 72);
+  const extraCount = sourceItemCount > 1 ? sourceItemCount - 1 : 0;
+  const label = extraCount > 0 ? `${lead} + ${extraCount} more` : lead;
+
+  return {
+    hasContent: true,
+    lead,
+    sourceItemCount,
+    label,
+  };
+}

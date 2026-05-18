@@ -115,6 +115,7 @@ import InternalInvoiceLineItemsTable, {
 } from "./_components/InternalInvoiceLineItemsTable";
 import VisitScopeJobDetailForm from "@/components/jobs/VisitScopeJobDetailForm";
 import {
+  buildVisitScopeIncludesReadModel,
   buildPromotedCompanionReadModel,
   buildVisitScopeReadModel,
   formatVisitScopeItemKindLabel,
@@ -1846,6 +1847,9 @@ const visitScopeHeaderPreview = buildVisitScopeReadModel(visitScopeSummary, visi
   previewItemCount: 1,
   previewItemMaxLength: 34,
 });
+const visitScopeIncludesHeader = buildVisitScopeIncludesReadModel(visitScopeSummary, visitScopeItems, {
+  leadMaxLength: 96,
+});
 const promotedCompanionHeader = buildPromotedCompanionReadModel(visitScopeItems);
 const primaryVisitScopeItems = visitScopeItems.filter((item) => item.kind === "primary");
 const companionVisitScopeItems = visitScopeItems.filter((item) => item.kind === "companion_service");
@@ -2782,6 +2786,12 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <h1 className="text-[clamp(1.35rem,2vw,1.85rem)] font-semibold tracking-[-0.02em] text-slate-950">
           {normalizeRetestLinkedJobTitle(job.title) || "Operational job workspace"}
         </h1>
+        {isInternalUser && String(job.job_type ?? "").toLowerCase() === "ecc" && visitScopeIncludesHeader.hasContent ? (
+          <div className="mt-1.5 flex max-w-2xl flex-wrap items-center gap-1.5 text-xs text-slate-600">
+            <span className="font-semibold uppercase tracking-[0.1em] text-slate-500">Includes</span>
+            <span className="font-medium text-slate-700">{visitScopeIncludesHeader.label}</span>
+          </div>
+        ) : null}
         {!isFieldComplete ? (
           <p className="mt-1 text-xs text-slate-500">
             {!hasFullSchedule ? "Next: set a schedule to dispatch." : "Scheduled — use the field status buttons when work begins."}

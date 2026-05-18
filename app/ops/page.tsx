@@ -19,7 +19,11 @@ import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/search-normalization";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
-import { buildPromotedCompanionReadModel, buildVisitScopeReadModel } from "@/lib/jobs/visit-scope";
+import {
+  buildPromotedCompanionReadModel,
+  buildVisitScopeIncludesReadModel,
+  buildVisitScopeReadModel,
+} from "@/lib/jobs/visit-scope";
 import {
   listInternalContractorUpdateAwareness,
   listInternalNewWorkRequestAwareness,
@@ -1928,11 +1932,17 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   const showOnHoldBanner = onHoldSignal && Boolean(onHoldContext);
   const customerName = formatPersonNamePart(customerNameOnly(j));
   const customerPhone = customerPhoneOnly(j);
+  const isEccJob = String(j?.job_type ?? "").toLowerCase() === "ecc";
   const visitScope = buildVisitScopeReadModel(j?.visit_scope_summary, j?.visit_scope_items, {
     leadMaxLength: 82,
     previewItemCount: 1,
     previewItemMaxLength: 34,
   });
+  const visitScopeIncludes = isEccJob
+    ? buildVisitScopeIncludesReadModel(j?.visit_scope_summary, j?.visit_scope_items, {
+        leadMaxLength: 70,
+      })
+    : null;
   const promotedCompanion = buildPromotedCompanionReadModel(j?.visit_scope_items);
   const contractorName = contractorNameOnly(j);
   const phoneHref = telHref(customerPhone);
@@ -2074,8 +2084,8 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
             <div className={`${opsSupportTextClass} text-slate-600`}>{addressLine(j)}</div>
             {visitScope.hasContent ? (
               <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] leading-4 text-slate-600">
-                <span className="font-semibold uppercase tracking-[0.08em] text-slate-500">Visit</span>
-                <span className="min-w-0 font-medium text-slate-700">{visitScope.lead}</span>
+                <span className="font-semibold uppercase tracking-[0.08em] text-slate-500">{isEccJob ? "Includes" : "Visit"}</span>
+                <span className="min-w-0 font-medium text-slate-700">{isEccJob ? visitScopeIncludes?.label : visitScope.lead}</span>
                 {visitScope.itemCount > 0 ? (
                   <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                     {visitScope.itemCount} item{visitScope.itemCount === 1 ? "" : "s"}

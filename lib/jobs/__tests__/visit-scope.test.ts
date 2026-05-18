@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildVisitScopeIncludesReadModel,
   buildVisitScopeReadModel,
   hasStructuredVisitScopeItemsJson,
   isVisitScopeItemId,
@@ -169,5 +170,44 @@ describe("visit scope durable item ids", () => {
   it("treats empty or malformed scope payload as invalid", () => {
     expect(hasStructuredVisitScopeItemsJson("[]")).toBe(false);
     expect(hasStructuredVisitScopeItemsJson("not-json")).toBe(false);
+  });
+
+  it("builds Includes label from primary work items when multiple items exist", () => {
+    const readModel = buildVisitScopeIncludesReadModel("", [
+      {
+        title: "Duct Cleaning",
+        details: null,
+        kind: "primary",
+      },
+      {
+        title: "Vent sealing",
+        details: null,
+        kind: "primary",
+      },
+      {
+        title: "ECC context note",
+        details: null,
+        kind: "companion_service",
+      },
+    ]);
+
+    expect(readModel.hasContent).toBe(true);
+    expect(readModel.sourceItemCount).toBe(2);
+    expect(readModel.label).toBe("Duct Cleaning + 1 more");
+  });
+
+  it("falls back to summary when no visit-scope items exist", () => {
+    const readModel = buildVisitScopeIncludesReadModel("Diagnostic + Duct Cleaning", []);
+
+    expect(readModel.hasContent).toBe(true);
+    expect(readModel.sourceItemCount).toBe(0);
+    expect(readModel.label).toBe("Diagnostic + Duct Cleaning");
+  });
+
+  it("returns no Includes label when summary and items are empty", () => {
+    const readModel = buildVisitScopeIncludesReadModel(null, []);
+
+    expect(readModel.hasContent).toBe(false);
+    expect(readModel.label).toBe("");
   });
 });
