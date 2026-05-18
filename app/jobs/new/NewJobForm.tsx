@@ -2733,7 +2733,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 hideCustomer
                 hideServiceLocation
                 jobType={jobType}
-                showJobDetails={jobType !== "service"}
+                showJobDetails={false}
                 showCustomerSection={false}
                 showServiceLocationSection={false}
                 showNotesSection={false}
