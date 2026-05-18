@@ -59,8 +59,14 @@ function makeRecipient(input: Partial<ContactRecipientFixture> & { id: string })
   };
 }
 
-function makeSupabase(rows: ContactRecipientFixture[]) {
+function makeSupabase(
+  rows: ContactRecipientFixture[],
+  options?: {
+    queryError?: unknown;
+  },
+) {
   const calls: Array<{ table: string; op: string; column?: string; value?: unknown }> = [];
+  const queryError = options?.queryError ?? null;
 
   const supabase = {
     from(table: string) {
@@ -70,6 +76,10 @@ function makeSupabase(rows: ContactRecipientFixture[]) {
       let limitValue: number | null = null;
 
       const resolve = () => {
+        if (queryError) {
+          return { data: null, error: queryError };
+        }
+
         let data = [...rows];
         for (const [column, value] of eqFilters) {
           data = data.filter((row: any) => row?.[column] === value);
@@ -108,7 +118,7 @@ function makeSupabase(rows: ContactRecipientFixture[]) {
           limitValue = value;
           return query;
         }),
-        then: (onFulfilled: (value: { data: ContactRecipientFixture[]; error: null }) => unknown, onRejected?: (reason: unknown) => unknown) =>
+        then: (onFulfilled: (value: any) => unknown, onRejected?: (reason: unknown) => unknown) =>
           Promise.resolve(resolve()).then(onFulfilled, onRejected),
       };
 
@@ -180,6 +190,54 @@ describe("contact recipient read model", () => {
 
     expect(rows).toEqual([]);
     expect(calls.some((call) => call.op === "from")).toBe(false);
+  });
+
+  it("returns safe empty when contact_recipients is missing from schema cache", async () => {
+    const queryError = {
+      code: "PGRST205",
+      message: "Could not find the table 'contact_recipients' in the schema cache",
+    };
+
+    const { supabase } = makeSupabase([], { queryError });
+
+    const rows = await listContactRecipientsForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(rows).toEqual([]);
+  });
+
+  it("returns safe empty when contact_recipients relation is missing", async () => {
+    const queryError = {
+      code: "42P01",
+      message: 'relation "public.contact_recipients" does not exist',
+    };
+
+    const { supabase } = makeSupabase([], { queryError });
+
+    const rows = await listContactRecipientsForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(rows).toEqual([]);
+  });
+
+  it("throws for non-missing-table query errors", async () => {
+    const queryError = {
+      code: "42501",
+      message: "permission denied for table contact_recipients",
+    };
+
+    const { supabase } = makeSupabase([], { queryError });
+
+    await expect(
+      listContactRecipientsForAccount({
+        supabase: supabase as any,
+        accountOwnerUserId: "owner-1",
+      }),
+    ).rejects.toBe(queryError);
   });
 
   it("filters by entity, role, and status", async () => {

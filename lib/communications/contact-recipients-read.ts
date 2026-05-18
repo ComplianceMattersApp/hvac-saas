@@ -117,6 +117,29 @@ function uniqueNonEmpty(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+function isMissingContactRecipientsReadError(error: any) {
+  const code = asTrimmed(error?.code).toUpperCase();
+  const message = [error?.message, error?.details, error?.hint]
+    .map((value) => asTrimmed(value).toLowerCase())
+    .filter(Boolean)
+    .join(" ");
+
+  if (!message.includes("contact_recipients")) {
+    return false;
+  }
+
+  if (code === "42P01" || code === "PGRST205") {
+    return true;
+  }
+
+  return (
+    message.includes("does not exist") ||
+    message.includes("schema cache") ||
+    message.includes("could not find the table") ||
+    message.includes("not found in the schema cache")
+  );
+}
+
 export function normalizeContactRecipientRow(row: any): ContactRecipientRow | null {
   const id = asTrimmed(row?.id);
   const accountOwnerUserId = asTrimmed(row?.account_owner_user_id);
@@ -220,7 +243,12 @@ export async function listContactRecipientsForAccount(
   query = query.order("display_name", { ascending: true });
 
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) {
+    if (isMissingContactRecipientsReadError(error)) {
+      return [];
+    }
+    throw error;
+  }
 
   return (data ?? [])
     .map((row: any) => normalizeContactRecipientRow(row))
