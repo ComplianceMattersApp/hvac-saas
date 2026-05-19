@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildEstimateDocumentViewModel,
+  buildEstimateQuoteReadinessChecklist,
   ESTIMATE_DOCUMENT_DISCLAIMERS,
   ESTIMATE_REVISION_PLANNING_DEFAULTS,
 } from "@/lib/estimates/estimate-document";
@@ -128,5 +129,57 @@ describe("ESTIMATE_REVISION_PLANNING_DEFAULTS", () => {
       historyPolicy: "immutable",
       postFreezeEditPolicy: "new_revision_required",
     });
+  });
+});
+
+describe("buildEstimateQuoteReadinessChecklist", () => {
+  it("marks all checklist rows ready for a well-formed internal estimate", () => {
+    const documentView = buildEstimateDocumentViewModel({
+      estimate: buildEstimateFixture(),
+      customerName: "Atlas Foods",
+      locationDisplay: "Main Plant",
+    });
+
+    const checklist = buildEstimateQuoteReadinessChecklist({
+      documentView,
+      scopeSummary: "Replace rooftop package and startup.",
+      customerEmail: "ops@atlasfoods.com",
+      isEmailSendEnabled: false,
+    });
+
+    expect(checklist.attentionCount).toBe(0);
+    expect(checklist.readyCount).toBe(7);
+    expect(checklist.items).toHaveLength(7);
+    expect(checklist.items.find((item) => item.key === "recipient_email")?.status).toBe("ready");
+    expect(checklist.items.find((item) => item.key === "internal_manual_boundary")?.detail.toLowerCase()).toContain("email send is disabled");
+  });
+
+  it("surfaces attention for missing context, lines, zero total, and recipient email", () => {
+    const estimate = buildEstimateFixture();
+    estimate.title = "";
+    estimate.total_cents = 0;
+    estimate.subtotal_cents = 0;
+    estimate.line_items = [];
+    const documentView = buildEstimateDocumentViewModel({
+      estimate,
+      customerName: null,
+      locationDisplay: null,
+    });
+
+    const checklist = buildEstimateQuoteReadinessChecklist({
+      documentView,
+      scopeSummary: null,
+      customerEmail: null,
+      isEmailSendEnabled: true,
+    });
+
+    expect(checklist.attentionCount).toBe(5);
+    expect(checklist.readyCount).toBe(2);
+    expect(checklist.items.find((item) => item.key === "customer_location_context")?.status).toBe("attention");
+    expect(checklist.items.find((item) => item.key === "title_scope_summary")?.status).toBe("attention");
+    expect(checklist.items.find((item) => item.key === "line_items")?.status).toBe("attention");
+    expect(checklist.items.find((item) => item.key === "total_amount")?.status).toBe("attention");
+    expect(checklist.items.find((item) => item.key === "recipient_email")?.status).toBe("attention");
+    expect(checklist.items.find((item) => item.key === "internal_manual_boundary")?.status).toBe("ready");
   });
 });

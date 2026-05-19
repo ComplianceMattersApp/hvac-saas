@@ -506,6 +506,7 @@ The following are explicitly runbook-gated and must remain controlled:
    - Enablement boundaries preserved: `ENABLE_ESTIMATE_EMAIL_SEND` remained unset/false; no outbound email/PDF/public links/contractor-customer exposure/conversion/payment/Stripe-tenant/QBO/Product Mode/Support Console changes
    - Warning/watch item: intermittent `net::ERR_ABORTED` browser-log events during navigation/action transitions; required smoke outcomes persisted successfully
    - Job-context Estimate Entry Wiring V1 is complete on the guarded internal baseline (commit `92df487`): job detail workspace now shows a `Create Estimate` CTA when estimates are enabled and required context is present; `/estimates/new` parses and validates multi-param prefill context; `NewEstimateForm` initializes from prefill; pure helper module `lib/estimates/estimate-new-entry.ts` added; `143/143` tests, TSC clean, all browser smokes passed; no schema/migration/flag/email/PDF/conversion/payment/contractor/portal changes; Group 6 status: Monitoring / controlled-user ready for internal Estimates
+   - Estimate Internal Quote Readiness Checklist V1 is complete as internal-only hardening: estimate detail now provides a read-only quote readiness checklist from existing estimate/customer/location/line/total data and recipient email-on-file readiness, with no customer-facing/public/send-enable changes.
 2. Support Console production enablement
    - Controlled by Support Console runbook
    - V1 read-only, account-scoped, no impersonation, no tenant mutation

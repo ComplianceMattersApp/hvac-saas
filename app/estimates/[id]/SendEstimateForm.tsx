@@ -11,12 +11,14 @@ type Props = {
   estimateId: string;
   action: (formData: FormData) => void | Promise<void>;
   isEmailSendEnabled: boolean;
+  defaultRecipientEmail?: string | null;
 };
 
 export default function SendEstimateForm({
   estimateId,
   action,
   isEmailSendEnabled,
+  defaultRecipientEmail,
 }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -70,6 +72,7 @@ export default function SendEstimateForm({
             type="email"
             name="recipient_email"
             placeholder="customer@example.com"
+            defaultValue={defaultRecipientEmail ?? ""}
             required
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
@@ -88,6 +91,12 @@ export default function SendEstimateForm({
           ? 'Accepted by provider does not mean delivered or read. No lifecycle status change, customer approval, PDF, invoice, or conversion is created.'
           : 'No email or PDF is generated from this action.'}
       </p>
+
+      {defaultRecipientEmail ? (
+        <p className="text-[11px] text-slate-500">
+          Prefilled from customer email on file. Operators can edit before recording the attempt.
+        </p>
+      ) : null}
     </form>
   );
 }

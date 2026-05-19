@@ -41,6 +41,7 @@ The latest clean-run Estimates rehearsal closed the earlier enabled-mode render-
 	- manual estimate lines remain supported
 	- Estimate Lines remain proposed commercial scope and are not Work Items or Invoice Charges
 	- no estimate email/PDF/customer approval/customer portal/conversion/payment/Stripe tenant payment/QBO behavior was added
+- Estimate Internal Quote Readiness Checklist V1 is complete on the guarded internal baseline: estimate detail now includes a read-only internal checklist for customer/location context, title/scope notes readiness, line-item presence, total readiness, recipient email-on-file readiness for manual send-attempt recording, and explicit proposed-scope/internal-only boundary reminders.
 
 ### Locked internal-only boundaries for this runbook
 

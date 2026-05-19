@@ -67,6 +67,28 @@ export type EstimateDocumentViewModel = {
   }>;
 };
 
+export type EstimateQuoteReadinessStatus = "ready" | "attention";
+
+export type EstimateQuoteReadinessItem = {
+  key:
+    | "customer_location_context"
+    | "title_scope_summary"
+    | "line_items"
+    | "total_amount"
+    | "recipient_email"
+    | "proposed_scope_boundary"
+    | "internal_manual_boundary";
+  label: string;
+  status: EstimateQuoteReadinessStatus;
+  detail: string;
+};
+
+export type EstimateQuoteReadinessChecklist = {
+  readyCount: number;
+  attentionCount: number;
+  items: EstimateQuoteReadinessItem[];
+};
+
 export function buildEstimateDocumentViewModel(params: {
   estimate: EstimateReadResult;
   customerName?: string | null;
@@ -104,5 +126,99 @@ export function buildEstimateDocumentViewModel(params: {
       unitPriceCents: line.unit_price_cents,
       lineSubtotalCents: line.line_subtotal_cents,
     })),
+  };
+}
+
+function normalizeEmail(value: string | null | undefined): string {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function isLikelyEmail(value: string | null | undefined): boolean {
+  const normalized = normalizeEmail(value);
+  return Boolean(normalized) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+}
+
+export function buildEstimateQuoteReadinessChecklist(params: {
+  documentView: EstimateDocumentViewModel;
+  scopeSummary: string | null;
+  customerEmail: string | null;
+  isEmailSendEnabled: boolean;
+}): EstimateQuoteReadinessChecklist {
+  const hasCustomer = Boolean(String(params.documentView.context.customerName ?? "").trim());
+  const hasLocation = Boolean(String(params.documentView.context.locationDisplay ?? "").trim());
+  const hasTitle = Boolean(String(params.documentView.identity.title ?? "").trim());
+  const hasScopeSummary = Boolean(String(params.scopeSummary ?? "").trim());
+  const hasLineItems = params.documentView.lines.length > 0;
+  const hasNonZeroTotal = params.documentView.totals.totalCents > 0;
+  const hasRecipientEmail = isLikelyEmail(params.customerEmail);
+
+  const items: EstimateQuoteReadinessItem[] = [
+    {
+      key: "customer_location_context",
+      label: "Customer and location context",
+      status: hasCustomer && hasLocation ? "ready" : "attention",
+      detail:
+        hasCustomer && hasLocation
+          ? "Customer and location context are present."
+          : "Customer and location context should both be present before manual sharing.",
+    },
+    {
+      key: "title_scope_summary",
+      label: "Title and scope summary",
+      status: hasTitle ? "ready" : "attention",
+      detail: hasTitle
+        ? hasScopeSummary
+          ? "Estimate title and scope summary notes are present."
+          : "Estimate title is present. Scope summary notes are optional and currently empty."
+        : "Estimate title is required for clear manual sharing context.",
+    },
+    {
+      key: "line_items",
+      label: "At least one estimate line item",
+      status: hasLineItems ? "ready" : "attention",
+      detail: hasLineItems
+        ? `Estimate includes ${params.documentView.lines.length} line item${params.documentView.lines.length === 1 ? "" : "s"}.`
+        : "Add at least one Estimate Line before manual sharing.",
+    },
+    {
+      key: "total_amount",
+      label: "Total amount readiness",
+      status: hasNonZeroTotal ? "ready" : "attention",
+      detail: hasNonZeroTotal
+        ? "Estimate total is non-zero."
+        : "Estimate total is zero. If intentional, treat this as internal/manual-only and confirm before sharing.",
+    },
+    {
+      key: "recipient_email",
+      label: "Recipient email for send-attempt logging",
+      status: hasRecipientEmail ? "ready" : "attention",
+      detail: hasRecipientEmail
+        ? `Customer email on file: ${normalizeEmail(params.customerEmail)}.`
+        : "No valid customer email is on file. Manual send-attempt recording still allows operator entry.",
+    },
+    {
+      key: "proposed_scope_boundary",
+      label: "Proposed commercial scope boundary",
+      status: "ready",
+      detail:
+        "Estimate Lines are proposed commercial scope only; they are not Work Items, Invoice Charges, or payment truth.",
+    },
+    {
+      key: "internal_manual_boundary",
+      label: "Internal-only manual-sharing boundary",
+      status: "ready",
+      detail: params.isEmailSendEnabled
+        ? "Environment email send is enabled; this checklist remains internal/manual-readiness only."
+        : "Email send is disabled by feature flag; no public links, customer portal exposure, conversion, or payment behavior is enabled.",
+    },
+  ];
+
+  const readyCount = items.filter((item) => item.status === "ready").length;
+  const attentionCount = items.length - readyCount;
+
+  return {
+    readyCount,
+    attentionCount,
+    items,
   };
 }

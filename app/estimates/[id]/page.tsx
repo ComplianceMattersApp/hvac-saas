@@ -15,6 +15,7 @@ import {
 } from "@/lib/estimates/estimate-activity";
 import {
   buildEstimateDocumentViewModel,
+  buildEstimateQuoteReadinessChecklist,
   ESTIMATE_DOCUMENT_DISCLAIMERS,
   ESTIMATE_DOCUMENT_READINESS_GUIDANCE,
   ESTIMATE_REVISION_PLANNING_DEFAULTS,
@@ -101,7 +102,7 @@ function statusGuidanceMessage(status: string) {
   }
 }
 
-type CustomerRow = { id: string; full_name: string | null; first_name: string | null; last_name: string | null };
+type CustomerRow = { id: string; full_name: string | null; first_name: string | null; last_name: string | null; email: string | null };
 type LocationRow = { id: string; address_line1: string | null; city: string | null; state: string | null; zip: string | null; nickname: string | null };
 type EventRow = { id: string; event_type: string; meta: Record<string, unknown> | null; user_id: string | null; created_at: string };
 type CommunicationRow = {
@@ -177,12 +178,13 @@ export default async function EstimateDetailPage({
 
   // Load customer and location names for context display
   let customerName: string | null = null;
+  let customerEmail: string | null = null;
   let locationDisplay: string | null = null;
 
   if (estimate.customer_id) {
     const { data: cRow } = await supabase
       .from("customers")
-      .select("id, full_name, first_name, last_name")
+      .select("id, full_name, first_name, last_name, email")
       .eq("id", estimate.customer_id)
       .maybeSingle();
     const c = cRow as CustomerRow | null;
@@ -191,6 +193,7 @@ export default async function EstimateDetailPage({
         String(c.full_name ?? "").trim() ||
         [c.first_name, c.last_name].filter(Boolean).join(" ") ||
         "Customer";
+      customerEmail = String(c.email ?? "").trim() || null;
     }
   }
 
@@ -233,6 +236,12 @@ export default async function EstimateDetailPage({
     estimate,
     customerName,
     locationDisplay,
+  });
+  const readinessChecklist = buildEstimateQuoteReadinessChecklist({
+    documentView,
+    scopeSummary: estimate.notes,
+    customerEmail,
+    isEmailSendEnabled: emailSendEnabled,
   });
 
   return (
@@ -372,6 +381,45 @@ export default async function EstimateDetailPage({
           </p>
         </div>
       </details>
+
+      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">Quote Readiness Checklist</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Internal-only readiness for manual presentation/sharing. This is advisory and does not change lifecycle behavior.
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-right text-xs text-slate-600">
+            <div>
+              Ready: <span className="font-semibold text-slate-900">{readinessChecklist.readyCount}</span>
+            </div>
+            <div>
+              Needs attention: <span className="font-semibold text-slate-900">{readinessChecklist.attentionCount}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 divide-y divide-slate-200/70 overflow-hidden rounded-xl border border-slate-200/80">
+          {readinessChecklist.items.map((item) => (
+            <div key={item.key} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-slate-900">{item.label}</div>
+                <div className="mt-0.5 text-xs leading-5 text-slate-600">{item.detail}</div>
+              </div>
+              <span
+                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] ${
+                  item.status === "ready"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-amber-100 text-amber-700"
+                }`}
+              >
+                {item.status === "ready" ? "Ready" : "Attention"}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Status actions (internal + scoped + feature-gated by route access) */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
@@ -603,6 +651,7 @@ export default async function EstimateDetailPage({
               estimateId={estimate.id}
               action={sendEstimateFromForm}
               isEmailSendEnabled={emailSendEnabled}
+              defaultRecipientEmail={customerEmail}
             />
           </div>
         </div>
