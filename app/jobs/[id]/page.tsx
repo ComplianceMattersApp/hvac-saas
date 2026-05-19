@@ -4688,20 +4688,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
 
     <div className="mb-3 text-sm leading-6 text-amber-900">
-      Record external invoice details for closeout tracking. This does not create an internal billed-truth invoice record.
+      Mark the external invoice as sent to finish billing closeout tracking.
     </div>
 
-    <form action={completeDataEntryFromForm} className="flex flex-wrap gap-2 items-end">
+    <form action={completeDataEntryFromForm}>
       <input type="hidden" name="job_id" value={job.id} />
-
-      <div className="flex flex-col">
-        <label className="mb-1 text-sm font-medium text-amber-900">External Invoice # (optional)</label>
-        <input
-          name="invoice_number"
-          defaultValue={String(job.invoice_number ?? "")}
-          className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-900"
-        />
-      </div>
 
       <SubmitButton
         loadingText="Saving..."
