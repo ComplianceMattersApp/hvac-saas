@@ -68,7 +68,6 @@ export function buildCustomerScheduledEmailHtml(args: {
 }) {
   const safeLogoUrl = resolveSafeEmailLogoUrl(args.companyLogoUrl);
   const supportDisplayName = String(args.supportDisplayName ?? "").trim() || "Compliance Matters";
-  const serviceCompany = String(args.companyName ?? "").trim() || supportDisplayName;
   const scheduledDateDisplay = formatScheduledDateMMDDYYYY(args.scheduledDate);
   const supportLine = buildSupportContactLine({
     supportDisplayName,
@@ -86,7 +85,7 @@ export function buildCustomerScheduledEmailHtml(args: {
                 <td style="padding: 18px 20px 10px 20px; border-bottom: 1px solid #e2e8f0; background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);">
                   <div style="font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #1d4ed8; font-weight: 700; margin: 0 0 8px 0;">Appointment Scheduled</div>
                   ${safeLogoUrl
-                    ? `<img src="${escapeHtml(safeLogoUrl)}" alt="" width="180" height="56" style="display: block; max-width: 180px; max-height: 56px; width: auto; height: auto; object-fit: contain; border: 0; outline: none; text-decoration: none;" />`
+                    ? `<div><img src="${escapeHtml(safeLogoUrl)}" alt="" width="180" height="56" style="display: block; max-width: 180px; max-height: 56px; width: auto; height: auto; object-fit: contain; border: 0; outline: none; text-decoration: none;" /><div style="margin-top: 6px; font-size: 18px; line-height: 1.3; font-weight: 700; color: #0f172a;">${escapeHtml(supportDisplayName)}</div></div>`
                     : `<div style="font-size: 22px; line-height: 1.2; font-weight: 700; color: #0f172a;">${escapeHtml(supportDisplayName)}</div>`}
                 </td>
               </tr>
@@ -114,11 +113,7 @@ export function buildCustomerScheduledEmailHtml(args: {
                       <td style="padding: 8px 12px; font-size: 13px; color: #475569;">Service Address</td>
                       <td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${escapeHtml(args.serviceAddress)}</td>
                     </tr>
-                    ${args.serviceType ? `<tr><td style="padding: 8px 12px; font-size: 13px; color: #475569;">Service Type</td><td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${escapeHtml(args.serviceType)}</td></tr>` : ""}
-                    <tr>
-                      <td style="padding: 8px 12px; font-size: 13px; color: #475569;">Service Company</td>
-                      <td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${escapeHtml(serviceCompany)}</td>
-                    </tr>
+                    ${args.serviceType ? `<tr><td style="padding: 8px 12px; font-size: 13px; color: #475569;">Reason for Visit</td><td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${escapeHtml(args.serviceType)}</td></tr>` : ""}
                   </table>
                 </td>
               </tr>
